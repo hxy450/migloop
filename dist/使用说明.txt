@@ -1,0 +1,57 @@
+MigLoop Trace Viewer — 使用说明
+================================
+
+这是什么
+--------
+一个单文件工具(migloop.pyz),把 Claude Code 会话的 JSONL transcript
+生成为可交互的轨迹分析页面(HTML),包含:
+执行拓扑 / Git 式执行流 / 主线上下文占用曲线 / Skill 调用统计 /
+阶段对比 / 阶段甘特(子代理并行一目了然)+ 任意元素点击详情。
+
+运行要求
+--------
+- Python 3.9 或更高(macOS 自带 python3;Windows 从 python.org 或
+  Microsoft Store 安装均可)
+- 无需安装任何第三方库,无需联网
+
+最常用:直接指定文件生成
+------------------------
+拿到一个会话的 .jsonl 文件(放哪儿都行),在它旁边执行:
+
+    Windows:  py migloop.pyz D:\某目录\<session-id>.jsonl
+    macOS  :  python3 migloop.pyz /某目录/<session-id>.jsonl
+
+即在当前目录生成 migloop-xxx.html,双击用浏览器打开。
+加 --open 生成后自动打开;加 -o 名字.html 指定输出文件名。
+
+多会话对比页(横向比较多次运行):
+    py migloop.pyz arch6 arch7 arch9 --compare
+目标可以混用 session-id 前缀 / 项目名片段 / jsonl 路径,至少 2 个。
+
+会话数据长什么样 / 怎么拿
+-------------------------
+Claude Code 在每台机器上都把会话记录存在固定位置:
+    ~/.claude/projects/<项目目录>/
+    (Windows 即 C:\Users\<你的用户名>\.claude\projects\...)
+
+一个完整会话 = 两部分,分享给别人时要一起拷:
+    <session-id>.jsonl        主会话记录
+    <session-id>\             同名文件夹(内含 subagents\,子代理记录)
+两者放同一目录下再运行工具。只有 .jsonl 也能生成,但页面中
+子代理甘特/泳道为空,工具会给出提示。
+
+分析自己本机的会话(免找文件)
+------------------------------
+    py migloop.pyz                 列出本机最近的 session
+    py migloop.pyz f3bb027a        按 session-id 前缀直接生成
+    py migloop.pyz 项目名片段 --open
+
+工具会自动在本机 ~/.claude/projects 下定位,无需手动找路径。
+
+常见问题
+--------
+- Windows 提示找不到 py:改用 python migloop.pyz ...
+- session-id 前缀命中多个:多打几位前缀
+- 生成的页面几百 KB~几 MB:正常,数据与字体全部内嵌
+- 兼容性:在 Claude Code v2.1.170 ~ v2.1.204 的记录上实测通过;
+  未跑 a2h 管线 skill 的普通会话会整体显示为单一 Session 阶段

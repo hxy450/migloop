@@ -1,0 +1,527 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MigLoop Compare</title>
+<style>
+  /*__FONT_FACE__*/
+  :root { --font-mono: "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace; }
+  :root {
+    --page: #f6f7f9; --surface: #fdfdfe; --ink: #0e1116; --ink-2: #4a5361; --ink-3: #828a97;
+    --grid: #e4e7ec; --axis: #c3c9d4; --ring: rgba(14, 17, 22, .09); --wash: rgba(14, 17, 22, .045);
+    --dot: #e7eaef; --shadow: 0 1px 2px rgba(14, 23, 42, .05), 0 12px 32px -16px rgba(14, 23, 42, .10);
+    --c1: #2a78d6; --c2: #1baf7a; --c3: #eda100; --c4: #008300; --c5: #4a3aa7; --c6: #e34948;
+    --bar: #256abf; --crit: #d03b3b; --good: #0ca30c;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --page: #0b0d11; --surface: #14171d; --ink: #f0f3f8; --ink-2: #b6bec9; --ink-3: #7c8593;
+      --grid: #242a33; --axis: #38404d; --ring: rgba(255, 255, 255, .09); --wash: rgba(255, 255, 255, .055);
+      --dot: #161b22; --shadow: inset 0 1px 0 rgba(255, 255, 255, .04), 0 14px 36px -20px rgba(0, 0, 0, .6);
+      --c1: #3987e5; --c2: #199e70; --c3: #c98500; --c4: #008300; --c5: #9085e9; --c6: #e66767;
+      --bar: #3987e5;
+    }
+  }
+  :root[data-theme="dark"] {
+    --page: #0b0d11; --surface: #14171d; --ink: #f0f3f8; --ink-2: #b6bec9; --ink-3: #7c8593;
+    --grid: #242a33; --axis: #38404d; --ring: rgba(255, 255, 255, .09); --wash: rgba(255, 255, 255, .055);
+    --dot: #161b22; --shadow: inset 0 1px 0 rgba(255, 255, 255, .04), 0 14px 36px -20px rgba(0, 0, 0, .6);
+    --c1: #3987e5; --c2: #199e70; --c3: #c98500; --c4: #008300; --c5: #9085e9; --c6: #e66767;
+    --bar: #3987e5;
+  }
+  :root[data-theme="light"] {
+    --page: #f6f7f9; --surface: #fdfdfe; --ink: #0e1116; --ink-2: #4a5361; --ink-3: #828a97;
+    --grid: #e4e7ec; --axis: #c3c9d4; --ring: rgba(14, 17, 22, .09); --wash: rgba(14, 17, 22, .045);
+    --dot: #e7eaef; --shadow: 0 1px 2px rgba(14, 23, 42, .05), 0 12px 32px -16px rgba(14, 23, 42, .10);
+    --c1: #2a78d6; --c2: #1baf7a; --c3: #eda100; --c4: #008300; --c5: #4a3aa7; --c6: #e34948;
+    --bar: #256abf;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--page); background-image: radial-gradient(var(--dot) 1px, transparent 1px); background-size: 26px 26px; color: var(--ink); font: 14px/1.55 system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif; }
+  ::selection { background: rgba(42, 120, 214, .25); }
+  .mono { font-family: var(--font-mono); }
+  .wrap { max-width: 1160px; margin: 0 auto; padding: 0 24px 80px; }
+
+  .hdr { position: sticky; top: 0; z-index: 40; border-bottom: 1px solid var(--grid); background: color-mix(in srgb, var(--page) 80%, transparent); backdrop-filter: blur(10px) saturate(1.1); -webkit-backdrop-filter: blur(10px) saturate(1.1); margin: 0 -24px; padding: 0 24px; }
+  @supports not (backdrop-filter: blur(1px)) { .hdr { background: var(--page); } }
+  .topbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; padding: 10px 0 6px; }
+  .brand { display: flex; align-items: center; gap: 8px; font-family: var(--font-mono); font-size: 17px; font-weight: 700; }
+  .brand .sub { font-family: system-ui, sans-serif; font-weight: 400; color: var(--ink-3); font-size: 12.5px; margin-left: 8px; }
+  .mainnav { display: flex; gap: 4px; margin-left: 10px; }
+  .mainnav .mn { font-size: 13px; font-weight: 600; padding: 4px 14px; border-radius: 6px; color: var(--ink-2); }
+  .mainnav .mn.active { color: var(--ink); background: var(--wash); box-shadow: inset 0 -2px 0 var(--bar); }
+  .mainnav .mn.disabled { color: var(--ink-3); border: 1px dashed var(--axis); font-weight: 400; }
+  .mainnav .mn.disabled small { font-size: 10px; margin-left: 4px; }
+  .theme-btn { width: 30px; height: 30px; border: 1px solid var(--ring); border-radius: 8px; background: transparent; color: var(--ink-2); font-size: 15px; cursor: pointer; }
+  .theme-btn:hover { background: var(--wash); color: var(--ink); }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-left: auto; }
+  .chip { font-size: 12px; color: var(--ink-2); background: var(--wash); border: 1px solid var(--ring); border-radius: 999px; padding: 2px 10px; white-space: nowrap; }
+  .subnav { display: flex; flex-wrap: wrap; gap: 8px; padding: 6px 0 12px; }
+  .subnav a { display: inline-flex; align-items: baseline; gap: 7px; font-size: 13px; font-weight: 600; color: var(--ink-2); text-decoration: none; border: 1px solid var(--ring); border-radius: 8px; padding: 6px 15px; background: var(--surface); }
+  .subnav a i { font-style: normal; font-family: var(--font-mono); font-size: 10px; color: var(--ink-3); }
+  .subnav a:hover { border-color: var(--axis); color: var(--ink); }
+  .subnav a.active { border-color: var(--bar); color: var(--ink); box-shadow: inset 0 -2px 0 var(--bar); }
+  h2 { display: flex; align-items: baseline; gap: 10px; font-size: 13.5px; letter-spacing: .02em; color: var(--ink); font-weight: 700; margin: 38px 0 12px; }
+  h2 i { font-style: normal; font-family: var(--font-mono); font-size: 11px; font-weight: 700; color: var(--bar); letter-spacing: .1em; }
+  h2 em { font-style: normal; font-family: var(--font-mono); font-size: 9.5px; font-weight: 500; color: var(--ink-3); letter-spacing: .24em; text-transform: uppercase; align-self: center; }
+  h2::after { content: ""; flex: 1 1 24px; height: 1px; background: var(--grid); align-self: center; margin-left: 4px; }
+  h2 .hint { font-weight: 400; margin-left: 2px; color: var(--ink-3); font-size: 12px; }
+  h2[id] { scroll-margin-top: 116px; }
+  .box { background: var(--surface); border: 1px solid var(--ring); border-radius: 8px; padding: 14px 16px; box-shadow: var(--shadow); overflow-x: auto; }
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 10px 2px 12px; font-size: 12px; color: var(--ink-2); }
+  .legend .li { display: inline-flex; align-items: center; gap: 6px; }
+  .sw { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+
+  /* 总览表 */
+  table.ov { border-collapse: collapse; min-width: 720px; width: 100%; }
+  table.ov th, table.ov td { padding: 6px 14px 6px 0; text-align: left; border-bottom: 1px solid var(--grid); font-variant-numeric: tabular-nums; }
+  table.ov thead th { font-family: var(--font-mono); font-size: 12px; color: var(--ink); }
+  table.ov thead th small { display: block; font-weight: 400; color: var(--ink-3); font-size: 10px; }
+  table.ov td.k { color: var(--ink-3); font-size: 12px; width: 130px; }
+  table.ov td { font-size: 13px; }
+  table.ov td.best { color: var(--good); font-weight: 700; }
+  table.ov td .mono { font-size: 12px; }
+
+  /* 趋势小图 */
+  .trends { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 12px; }
+  .tr-card { background: var(--surface); border: 1px solid var(--ring); border-radius: 8px; padding: 12px 14px; box-shadow: var(--shadow); }
+  .tr-card .tk { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); font-weight: 700; margin-bottom: 8px; }
+  .brow { display: flex; align-items: center; gap: 10px; padding: 2.5px 0; }
+  .brow .lbl { flex: none; width: 52px; font-family: var(--font-mono); font-size: 11.5px; color: var(--ink-2); text-align: right; }
+  .brow .track { flex: 1; display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .brow .bar { height: 13px; border-radius: 0 4px 4px 0; background: var(--bar); min-width: 3px; }
+  .brow .val { font-family: var(--font-mono); font-size: 11.5px; color: var(--ink); white-space: nowrap; }
+
+  /* 堆叠条 */
+  .stackrow { display: flex; align-items: center; gap: 12px; padding: 5px 0; }
+  .stackrow .lbl { flex: none; width: 60px; font-family: var(--font-mono); font-size: 12px; color: var(--ink-2); text-align: right; }
+  .stackrow .stack { flex: 1; display: flex; gap: 2px; min-width: 0; align-items: center; }
+  .stackrow .seg { height: 16px; border-radius: 2px; min-width: 3px; cursor: default; }
+  .stackrow .seg:last-of-type { border-radius: 2px 4px 4px 2px; }
+  .stackrow .val { flex: none; font-family: var(--font-mono); font-size: 11.5px; color: var(--ink); width: 70px; }
+
+  /* 上下文小倍图 */
+  .sparks { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+  .sp-card { background: var(--surface); border: 1px solid var(--ring); border-radius: 8px; padding: 10px 12px 8px; box-shadow: var(--shadow); }
+  .sp-card .tk { font-family: var(--font-mono); font-size: 11.5px; color: var(--ink); font-weight: 700; }
+  .sp-card .sub { font-size: 11px; color: var(--ink-3); margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .sp-card svg { display: block; width: 100%; height: 46px; margin-top: 6px; }
+  .sp-line { stroke: var(--bar); stroke-width: 1.6; fill: none; }
+  .sp-area { fill: var(--bar); opacity: .13; }
+
+  /* skill 矩阵 */
+  table.skm { border-collapse: collapse; min-width: 680px; }
+  table.skm th, table.skm td { padding: 4px 12px 4px 0; font-size: 12px; border-bottom: 1px solid var(--grid); text-align: left; font-variant-numeric: tabular-nums; }
+  table.skm thead th { font-family: var(--font-mono); color: var(--ink); }
+  table.skm td.sk { font-family: var(--font-mono); color: var(--ink-2); white-space: nowrap; }
+  table.skm td.c { text-align: center; min-width: 56px; border-radius: 3px; }
+
+  footer { margin-top: 44px; padding-top: 14px; border-top: 1px solid var(--grid); font-size: 12px; color: var(--ink-3); display: flex; flex-wrap: wrap; gap: 4px 18px; justify-content: space-between; }
+  #tip { position: fixed; z-index: 50; max-width: 380px; background: var(--surface); color: var(--ink); border: 1px solid var(--axis); border-radius: 6px; padding: 8px 10px; font-size: 12px; pointer-events: none; display: none; box-shadow: 0 4px 14px rgba(0,0,0,.18); }
+  @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  .wrap > .box, .wrap > .trends, .wrap > .sparks, .wrap > .legend, footer { animation: rise .5s cubic-bezier(.2,.7,.3,1) both; }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+  html { scroll-behavior: smooth; }
+  button:focus-visible, a:focus-visible { outline: 2px solid var(--bar); outline-offset: 2px; }
+</style>
+
+<div class="wrap">
+  <header class="hdr">
+  <div class="topbar">
+    <div class="brand"><svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><path d="M6 2.5 V17.5" stroke="var(--bar)" stroke-width="2" stroke-linecap="round" fill="none"/><path d="M6 10 C13 10 13 10 13 6" stroke="var(--c2)" stroke-width="2" stroke-linecap="round" fill="none"/><circle cx="13" cy="4.5" r="2.1" fill="var(--c2)"/><circle cx="6" cy="17" r="2.1" fill="var(--bar)"/></svg>MigLoop<span class="sub">跨会话对比 · PoC</span></div>
+    <nav class="mainnav">
+      <span class="mn disabled" title="单会话轨迹页面请单独打开">轨迹</span>
+      <span class="mn active">对比 Compare</span>
+      <span class="mn disabled" title="规划中:评测与建议">分析<small>规划中</small></span>
+    </nav>
+    <button id="theme-btn" class="theme-btn" title="切换主题">◐</button>
+    <div class="chips" id="meta-chips"></div>
+  </div>
+  <nav class="subnav" id="subnav">
+    <a href="#sec-ov"><i>01</i>总览</a>
+    <a href="#sec-tr"><i>02</i>演进趋势</a>
+    <a href="#sec-st"><i>03</i>阶段构成</a>
+    <a href="#sec-ag"><i>04</i>子代理</a>
+    <a href="#sec-co"><i>05</i>成本</a>
+    <a href="#sec-cx"><i>06</i>上下文</a>
+    <a href="#sec-sk"><i>07</i>Skill 矩阵</a>
+  </nav>
+  </header>
+
+  <h2 id="sec-ov">总览<em>Overview</em><span class="hint">按会话开始时间排序 · 绿色 = 该行最优</span></h2>
+  <div class="box"><table class="ov" id="ov"></table></div>
+
+  <h2 id="sec-tr">演进趋势<em>Trends</em><span class="hint">单指标横向对比,同一蓝色 = 同一量纲</span></h2>
+  <div class="trends" id="trends"></div>
+
+  <h2 id="sec-st">阶段构成<em>Stages</em><span class="hint">段宽 = 该阶段主线 output tokens · 悬停看明细</span></h2>
+  <div class="legend" id="st-legend"></div>
+  <div class="box" id="stages"></div>
+
+  <h2 id="sec-ag">子代理构成<em>Agents</em><span class="hint">段宽 = 该类型子代理数量</span></h2>
+  <div class="legend" id="ag-legend"></div>
+  <div class="box" id="agents"></div>
+
+  <h2 id="sec-co">成本构成<em>Cost</em><span class="hint">按 API 目录价折算 · 段宽 = 各计费桶费用</span></h2>
+  <div class="legend" id="co-legend"></div>
+  <div class="box" id="cost"></div>
+
+  <h2 id="sec-cx">主线上下文<em>Context</em><span class="hint">同一纵轴刻度,便于横向比较</span></h2>
+  <div class="sparks" id="sparks"></div>
+
+  <h2 id="sec-sk">Skill 矩阵<em>Skills</em><span class="hint">主线 + 子代理合并计数 · 色深 = 相对频次</span></h2>
+  <div class="box"><table class="skm" id="skm"></table></div>
+
+  <footer>
+    <span>由 <span class="mono">migloop --compare</span> 生成 · 成本按 API 目录价折算(opus-4-8 $5/$25 · 缓存读 0.1x · 缓存写 1.25x/2x)</span>
+    <span class="mono">migloop-poc · compare v1</span>
+  </footer>
+</div>
+<div id="tip"></div>
+
+<script id="compare-data" type="application/json">__COMPARE_JSON__</script>
+<script>
+(function () {
+  "use strict";
+  var D = JSON.parse(document.getElementById("compare-data").textContent);
+  var S = D.sessions;
+
+  /* 主题 */
+  (function () {
+    var KEY = "migloop-theme", root = document.documentElement, btn = document.getElementById("theme-btn");
+    var cur = "";
+    try { cur = localStorage.getItem(KEY) || ""; } catch (e) {}
+    function icon() { btn.textContent = cur === "dark" ? "☾" : cur === "light" ? "☀" : "◐"; }
+    if (cur) root.dataset.theme = cur;
+    icon();
+    btn.addEventListener("click", function () {
+      cur = cur === "" ? "light" : cur === "light" ? "dark" : "";
+      try { cur ? localStorage.setItem(KEY, cur) : localStorage.removeItem(KEY); } catch (e) {}
+      if (cur) root.dataset.theme = cur; else delete root.dataset.theme;
+      icon();
+    });
+  })();
+
+  var PRICE = { "claude-opus-4-8": [5.0, 25.0], "claude-sonnet-5": [2.0, 10.0] };
+  function cost(b) {
+    var total = 0;
+    Object.keys(b || {}).forEach(function (m) {
+      var p = PRICE[m] || [5.0, 25.0], x = b[m];
+      total += (x.inp * p[0] + x.cread * p[0] * 0.1 + x.cw5 * p[0] * 1.25 + x.cw1h * p[0] * 2.0 + x.out * p[1]) / 1e6;
+    });
+    return total;
+  }
+  function costBuckets(b) {
+    var r = { cread: 0, cw: 0, inp: 0, out: 0 };
+    Object.keys(b || {}).forEach(function (m) {
+      var p = PRICE[m] || [5.0, 25.0], x = b[m];
+      r.cread += x.cread * p[0] * 0.1 / 1e6;
+      r.cw += (x.cw5 * p[0] * 1.25 + x.cw1h * p[0] * 2.0) / 1e6;
+      r.inp += x.inp * p[0] / 1e6;
+      r.out += x.out * p[1] / 1e6;
+    });
+    return r;
+  }
+  function reqs(b) { var n = 0; Object.keys(b || {}).forEach(function (m) { n += b[m].req; }); return n; }
+  function fmtTok(n) {
+    if (n == null) return "—";
+    function tr(s) { return s.replace(/\.0+$|(\.\d*[1-9])0+$/, "$1"); }
+    if (n >= 1e6) return tr((n / 1e6).toFixed(2)) + "M";
+    if (n >= 1e3) return tr((n / 1e3).toFixed(1)) + "K";
+    return String(n);
+  }
+  function fmtDur(ms) {
+    if (!ms) return "—";
+    var h = ms / 3600000;
+    return h >= 1 ? h.toFixed(1) + "h" : Math.round(ms / 60000) + "m";
+  }
+  function el(tag, cls, text) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text != null) e.textContent = text;
+    return e;
+  }
+  var tip = document.getElementById("tip");
+  function showTip(ev, html) { tip.innerHTML = html; tip.style.display = "block"; moveTip(ev); }
+  function moveTip(ev) {
+    var x = ev.clientX + 14, y = ev.clientY + 12, r = tip.getBoundingClientRect();
+    if (x + r.width > innerWidth - 8) x = ev.clientX - r.width - 10;
+    if (y + r.height > innerHeight - 8) y = ev.clientY - r.height - 10;
+    tip.style.left = x + "px"; tip.style.top = y + "px";
+  }
+  function hideTip() { tip.style.display = "none"; }
+  function hover(node, html) {
+    node.addEventListener("mouseenter", function (ev) { showTip(ev, html); });
+    node.addEventListener("mousemove", moveTip);
+    node.addEventListener("mouseleave", hideTip);
+  }
+
+  var STAGE_HUES = { "mig-arch": "232,123,164", "a2h-arch-scaffold": "235,104,52", "a2h-spec": "42,120,214", "a2h-plan": "74,58,167", "a2h-execute": "27,175,122", "a2h-verify": "201,133,0", "a2h-retrospect": "235,104,52", "session": "130,138,151" };
+  function stageColor(k) { return "rgb(" + (STAGE_HUES[k] || "130,138,151") + ")"; }
+  var typeTotals = {};
+  S.forEach(function (s) { Object.keys(s.agent_types).forEach(function (t) { typeTotals[t] = (typeTotals[t] || 0) + s.agent_types[t]; }); });
+  var typeOrder = Object.keys(typeTotals).sort(function (a, b) { return typeTotals[b] - typeTotals[a]; });
+  var LANES = ["var(--c1)", "var(--c2)", "var(--c3)", "var(--c4)", "var(--c5)", "var(--c6)"];
+  function typeColor(t) { var i = typeOrder.indexOf(t); return LANES[(i < 0 ? 0 : i) % LANES.length]; }
+
+  /* chips */
+  var chips = document.getElementById("meta-chips");
+  chips.appendChild(el("span", "chip", S.length + " 个会话"));
+  chips.appendChild(el("span", "chip mono", (S[0].start || "").slice(0, 10) + " ~ " + (S[S.length - 1].end || "").slice(0, 10)));
+
+  /* ============ 01 总览 ============ */
+  (function () {
+    var tbl = document.getElementById("ov");
+    var thead = el("thead"), trh = el("tr");
+    trh.appendChild(el("th", null, ""));
+    S.forEach(function (s) {
+      var th = el("th");
+      th.appendChild(document.createTextNode(s.label));
+      var sm = el("small", null, (s.start || "").slice(5, 10) + " · cc " + (s.cc || ""));
+      th.appendChild(sm);
+      trh.appendChild(th);
+    });
+    thead.appendChild(trh); tbl.appendChild(thead);
+    var tbody = el("tbody");
+    function row(name, vals, fmt, best) {
+      var tr = el("tr");
+      tr.appendChild(el("td", "k", name));
+      var bi = -1;
+      if (best === "min") { var mv = Infinity; vals.forEach(function (v, i) { if (v != null && v < mv) { mv = v; bi = i; } }); }
+      vals.forEach(function (v, i) {
+        var td = el("td", i === bi ? "best" : null, fmt ? fmt(v) : String(v));
+        tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
+    }
+    row("墙钟时长", S.map(function (s) { return s.dur_ms; }), fmtDur, null);
+    row("活跃时长(净)", S.map(function (s) { return s.active_ms != null ? s.active_ms : s.dur_ms; }), fmtDur, null);
+    row("等待用户", S.map(function (s) { return s.wait_ms || 0; }), fmtDur, null);
+    row("模型构成(请求)", S.map(function (s) {
+      return Object.keys(s.billing || {}).sort(function (a, b) { return s.billing[b].req - s.billing[a].req; })
+        .map(function (m) { return m.replace("claude-", "").replace(/-\d-\d$/, function (x) { return x; }) + " " + s.billing[m].req; }).join(" · ");
+    }), null, null);
+    row("阶段序列", S.map(function (s) { return s.stages.map(function (x) { return x.label; }).join("→"); }), null, null);
+    row("工具调用", S.map(function (s) { return s.tool_calls; }), null, null);
+    row("失败调用", S.map(function (s) { return s.fails; }), null, "min");
+    row("子代理", S.map(function (s) { return s.agents; }), null, null);
+    row("LLM 请求", S.map(function (s) { return reqs(s.billing); }), null, null);
+    row("Output tokens", S.map(function (s) { return s.out_total; }), fmtTok, null);
+    row("用户介入", S.map(function (s) { return s.prompts; }), null, "min");
+    row("上下文峰值", S.map(function (s) { return s.ctx_peak; }), fmtTok, null);
+    row("压缩次数", S.map(function (s) { return s.compactions; }), null, null);
+    row("成本(API 折算)", S.map(function (s) { return cost(s.billing); }), function (v) { return "$" + v.toFixed(0); }, "min");
+    tbl.appendChild(tbody);
+  })();
+
+  /* ============ 02 演进趋势 ============ */
+  (function () {
+    var host = document.getElementById("trends");
+    function mini(title, vals, fmt) {
+      var card = el("div", "tr-card");
+      card.appendChild(el("div", "tk", title));
+      var mx = Math.max.apply(null, vals.map(function (v) { return v || 0; })) || 1;
+      S.forEach(function (s, i) {
+        var r = el("div", "brow");
+        r.appendChild(el("span", "lbl", s.label));
+        var track = el("div", "track");
+        var b = el("div", "bar");
+        b.style.width = Math.max(2, 100 * (vals[i] || 0) / mx * 0.72) + "%";
+        track.appendChild(b);
+        track.appendChild(el("span", "val", fmt ? fmt(vals[i]) : String(vals[i])));
+        r.appendChild(track);
+        card.appendChild(r);
+      });
+      host.appendChild(card);
+    }
+    mini("用户介入(次)", S.map(function (s) { return s.prompts; }));
+    mini("成本(API 折算 $)", S.map(function (s) { return cost(s.billing); }), function (v) { return "$" + v.toFixed(0); });
+    mini("失败调用(次)", S.map(function (s) { return s.fails; }));
+    mini("Plan 阶段净时长(分钟)", S.map(function (s) {
+      var p = s.stages.filter(function (x) { return x.stage === "a2h-plan"; });
+      return Math.round(p.reduce(function (a, x) { return a + (x.active_ms != null ? x.active_ms : x.dur_ms); }, 0) / 60000);
+    }), function (v) { return v + "m"; });
+    mini("活跃时长(净,小时)", S.map(function (s) {
+      return Math.round((s.active_ms != null ? s.active_ms : s.dur_ms) / 360000) / 10;
+    }), function (v) { return v + "h"; });
+    mini("子代理(个)", S.map(function (s) { return s.agents; }));
+    mini("上下文峰值(tokens)", S.map(function (s) { return s.ctx_peak; }), fmtTok);
+  })();
+
+  /* ============ 03 阶段构成 ============ */
+  (function () {
+    var lg = document.getElementById("st-legend");
+    var seen = {};
+    S.forEach(function (s) { s.stages.forEach(function (x) { seen[x.stage] = STAGE_LABELS_FALLBACK(x); }); });
+    function STAGE_LABELS_FALLBACK(x) { return x.label.replace(/ ·\d+$/, ""); }
+    Object.keys(seen).forEach(function (k) {
+      var li = el("span", "li");
+      var sw = el("span", "sw"); sw.style.background = stageColor(k);
+      li.appendChild(sw); li.appendChild(document.createTextNode(seen[k]));
+      lg.appendChild(li);
+    });
+    var host = document.getElementById("stages");
+    var mx = Math.max.apply(null, S.map(function (s) { return s.stages.reduce(function (a, x) { return a + x.out; }, 0); })) || 1;
+    S.forEach(function (s) {
+      var total = s.stages.reduce(function (a, x) { return a + x.out; }, 0);
+      var r = el("div", "stackrow");
+      r.appendChild(el("span", "lbl", s.label));
+      var st = el("div", "stack");
+      st.style.maxWidth = (100 * total / mx) + "%";
+      s.stages.forEach(function (x) {
+        if (!x.out) return;
+        var seg = el("span", "seg");
+        seg.style.flex = String(x.out);
+        seg.style.background = stageColor(x.stage);
+        hover(seg, '<b>' + s.label + " · " + x.label + "</b><br>" + fmtDur(x.dur_ms) + " · " + x.tools + " 次调用 · " + x.agents + " 子代理<br>output " + fmtTok(x.out));
+        st.appendChild(seg);
+      });
+      r.appendChild(st);
+      r.appendChild(el("span", "val", fmtTok(total)));
+      host.appendChild(r);
+    });
+  })();
+
+  /* ============ 04 子代理构成 ============ */
+  (function () {
+    var lg = document.getElementById("ag-legend");
+    typeOrder.forEach(function (t) {
+      var li = el("span", "li");
+      var sw = el("span", "sw"); sw.style.background = typeColor(t); sw.style.borderRadius = "50%";
+      li.appendChild(sw); li.appendChild(document.createTextNode(t + " ×" + typeTotals[t]));
+      lg.appendChild(li);
+    });
+    var host = document.getElementById("agents");
+    var mx = Math.max.apply(null, S.map(function (s) { return s.agents; })) || 1;
+    S.forEach(function (s) {
+      var r = el("div", "stackrow");
+      r.appendChild(el("span", "lbl", s.label));
+      var st = el("div", "stack");
+      st.style.maxWidth = (100 * s.agents / mx) + "%";
+      typeOrder.forEach(function (t) {
+        var n = s.agent_types[t];
+        if (!n) return;
+        var seg = el("span", "seg");
+        seg.style.flex = String(n);
+        seg.style.background = typeColor(t);
+        hover(seg, "<b>" + s.label + "</b><br>" + t + " ×" + n);
+        st.appendChild(seg);
+      });
+      r.appendChild(st);
+      r.appendChild(el("span", "val", s.agents + " 个"));
+      host.appendChild(r);
+    });
+  })();
+
+  /* ============ 05 成本构成 ============ */
+  (function () {
+    var BUCKETS = [["cread", "缓存读", "var(--c1)"], ["cw", "缓存写", "var(--c3)"], ["out", "输出", "var(--c2)"], ["inp", "未缓存输入", "var(--c5)"]];
+    var lg = document.getElementById("co-legend");
+    BUCKETS.forEach(function (b) {
+      var li = el("span", "li");
+      var sw = el("span", "sw"); sw.style.background = b[2];
+      li.appendChild(sw); li.appendChild(document.createTextNode(b[1]));
+      lg.appendChild(li);
+    });
+    var host = document.getElementById("cost");
+    var mx = Math.max.apply(null, S.map(function (s) { return cost(s.billing); })) || 1;
+    S.forEach(function (s) {
+      var cb = costBuckets(s.billing), tot = cost(s.billing);
+      var r = el("div", "stackrow");
+      r.appendChild(el("span", "lbl", s.label));
+      var st = el("div", "stack");
+      st.style.maxWidth = (100 * tot / mx) + "%";
+      BUCKETS.forEach(function (b) {
+        var v = cb[b[0]];
+        if (v < 0.5) return;
+        var seg = el("span", "seg");
+        seg.style.flex = String(Math.round(v * 100));
+        seg.style.background = b[2];
+        hover(seg, "<b>" + s.label + " · " + b[1] + "</b><br>$" + v.toFixed(2));
+        st.appendChild(seg);
+      });
+      r.appendChild(st);
+      r.appendChild(el("span", "val", "$" + tot.toFixed(0)));
+      host.appendChild(r);
+    });
+  })();
+
+  /* ============ 06 上下文小倍图 ============ */
+  (function () {
+    var host = document.getElementById("sparks");
+    var gmax = Math.max.apply(null, S.map(function (s) { return s.ctx_peak; })) || 1;
+    S.forEach(function (s) {
+      var card = el("div", "sp-card");
+      card.appendChild(el("div", "tk", s.label));
+      var W = 200, H = 46;
+      var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+      svg.setAttribute("preserveAspectRatio", "none");
+      if (s.spark.length > 1) {
+        var line = "", area = "M0 " + H;
+        s.spark.forEach(function (p, i) {
+          var x = (p[0] * W).toFixed(1), y = (H - p[1] / gmax * (H - 4)).toFixed(1);
+          line += (i ? " L" : "M") + x + " " + y;
+          area += " L" + x + " " + y;
+        });
+        area += " L" + W + " " + H + " Z";
+        var ap = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        ap.setAttribute("d", area); ap.setAttribute("class", "sp-area"); svg.appendChild(ap);
+        var lp = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        lp.setAttribute("d", line); lp.setAttribute("class", "sp-line"); svg.appendChild(lp);
+      }
+      card.appendChild(svg);
+      card.appendChild(el("div", "sub", "峰值 " + fmtTok(s.ctx_peak) + " · 压缩 ×" + s.compactions));
+      host.appendChild(card);
+    });
+  })();
+
+  /* ============ 07 Skill 矩阵 ============ */
+  (function () {
+    var totals = {};
+    S.forEach(function (s) { Object.keys(s.skills).forEach(function (k) { totals[k] = (totals[k] || 0) + s.skills[k].m + s.skills[k].s; }); });
+    var names = Object.keys(totals).sort(function (a, b) { return totals[b] - totals[a]; }).slice(0, 16);
+    var mx = Math.max.apply(null, names.map(function (k) {
+      return Math.max.apply(null, S.map(function (s) { var v = s.skills[k]; return v ? v.m + v.s : 0; }));
+    })) || 1;
+    var tbl = document.getElementById("skm");
+    var trh = el("tr");
+    trh.appendChild(el("th", null, "skill"));
+    S.forEach(function (s) { trh.appendChild(el("th", null, s.label)); });
+    var thead = el("thead"); thead.appendChild(trh); tbl.appendChild(thead);
+    var tbody = el("tbody");
+    names.forEach(function (k) {
+      var tr = el("tr");
+      tr.appendChild(el("td", "sk", "/" + k));
+      S.forEach(function (s) {
+        var v = s.skills[k], n = v ? v.m + v.s : 0;
+        var td = el("td", "c", n ? String(n) : "·");
+        if (n) {
+          td.style.background = "rgba(74,58,167," + (0.06 + 0.3 * n / mx).toFixed(2) + ")";
+          if (v.m) hover(td, "<b>/" + k + " · " + s.label + "</b><br>主线 " + v.m + " · 子代理 " + v.s);
+          else hover(td, "<b>/" + k + " · " + s.label + "</b><br>子代理 " + v.s);
+        } else td.style.color = "var(--ink-3)";
+        tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
+    });
+    tbl.appendChild(tbody);
+  })();
+
+  /* 滚动高亮 */
+  (function () {
+    if (!("IntersectionObserver" in window)) return;
+    var links = {};
+    document.querySelectorAll("#subnav a").forEach(function (a) { links[a.getAttribute("href").slice(1)] = a; });
+    var cur = null;
+    var io = new IntersectionObserver(function (es) {
+      es.forEach(function (en) {
+        if (en.isIntersecting && links[en.target.id]) {
+          if (cur) cur.classList.remove("active");
+          cur = links[en.target.id];
+          cur.classList.add("active");
+        }
+      });
+    }, { rootMargin: "-110px 0px -65% 0px" });
+    Object.keys(links).forEach(function (id) { var h = document.getElementById(id); if (h) io.observe(h); });
+  })();
+})();
+</script>
