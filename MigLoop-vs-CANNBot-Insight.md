@@ -217,7 +217,142 @@ flowchart TB
 
 ---
 
-## 6. 两边各自的优势与短板
+## 6. CANNBot 当前不如 MigLoop 的地方
+
+这里比较的不是 CANNBot 作为通用产品是否优秀，而是它能否承担 MigLoop 当前承担的任务：为迁移过程和 Spec Eval 提供可复核的确定性证据。
+
+```mermaid
+flowchart LR
+    A[CANNBot 当前差距] --> B[输入侧仍大量重算]
+    A --> C[源码可见性口径偏松]
+    A --> D[阶段边界包含 heuristic]
+    A --> E[部署与分享较重]
+
+    B --> B1[长 session 刷新成本增长]
+    C --> C1[不能直接作为 D0 真值]
+    D --> D1[难以证明阶段为何成立]
+    E --> E1[不适合随手转发单次分析]
+```
+
+### 6.1 它不是真正的输入增量解析
+
+CANNBot 使用文件监听触发刷新，但 [`deltaRefreshSession()`](https://gitcode.com/guanxinghua/CANNBot-Insight/blob/master/src/lib/ingest/data-service.ts#L651) 会重新读取主 JSONL 和各个子 Agent JSONL，重新完成 normalize、turn splitting 和 bridge 构建，最后才与数据库中的既有记录做差异合并。
+
+所以它的“增量”更准确地说是：
+
+> **数据库写入层增量，输入计算层仍接近全量。**
+
+```mermaid
+flowchart LR
+    subgraph CANNBot
+      C1[文件变化] --> C2[重读主会话和子会话]
+      C2 --> C3[重新 Normalize / Split / Bridge]
+      C3 --> C4[与 SQLite 做差异合并]
+    end
+
+    subgraph MigLoop
+      M1[文件变化] --> M2[从 byte offset 续读]
+      M2 --> M3[只解析新增完整 JSONL]
+      M3 --> M4[归并新增事件]
+    end
+```
+
+随着 session 变长，CANNBot 单次刷新要重新处理的数据也会增加。数据库不会重复插入全部记录，但这并不等于前面的解析工作没有重做。
+
+MigLoop 的 [`IncrementalSessionMonitor`](./lineage2/live_session.py#L216) 则为主会话和每个子 Agent transcript 分别保存：
+
+- 已读 byte offset；
+- 尚未写完整的 JSONL 尾部；
+- 文件长度、头部签名与截断状态；
+- Workflow 文件的 mtime；
+- Android 源码 inventory 缓存；
+- 已归并的增量统计状态。
+
+正常刷新只处理新追加字节；只有 transcript 被截断或替换时，才丢弃旧状态并执行确定性重放。因此，在长时间持续增长的迁移会话上，MigLoop 的增量模型更稳固。
+
+### 6.2 CANNBot 的“源码被看到”统计不够严格
+
+CANNBot 当前主要从 `Read` ToolCall 建立文件读取记录。它没有把以下来源统一纳入“源码确实进入模型上下文”的口径：
+
+- `Grep` 返回的源码命中行和上下文行；
+- `cat/head/sed/grep` 等 Bash 命令最终输出的源码；
+- PowerShell `Get-Content`、`Select-String` 的实际输出；
+- “只返回文件路径或计数”与“真正返回源码文本”的区别。
+
+另外，[`analyzeReads()`](https://gitcode.com/guanxinghua/CANNBot-Insight/blob/master/src/lib/file-reads.ts#L90) 计算行数时只汇总 `partialRanges`。没有 `offset/limit` 的完整 Read 虽然被标记和展示为 `full`，却不会增加 `totalLinesRead` 与 `uniqueLinesRead` 的行数分子。
+
+| 场景 | CANNBot 当前口径 | MigLoop 当前口径 |
+|---|---|---|
+| `Read(file)` 完整读取 | 有读取记录，但不进入行数分子 | 按实际返回行计入 |
+| `Grep -n pattern file` | 不进入统一源码行口径 | 只计实际返回的命中行 |
+| `cat file \| grep x` | 不进入统一源码行口径 | 只计最终传给模型的匹配行 |
+| `find` / `grep -l` | 不是源码行统计重点 | 只算路径探测，不算源码可见 |
+| PowerShell 输出源码 | 不进入统一源码行口径 | 与真实文件逐行核对后计入 |
+| 工程总量分母 | 通用文件读取分析 | Android 文件、源码行、逻辑代码和顶层节点分母 |
+
+因此，CANNBot 的读取统计适合回答“Agent 调用了哪些 Read、哪些文件重复读了”，但还不能直接作为 D0 的“模型真实源码视野”真值。
+
+MigLoop 的原则更严格：
+
+1. 只有源码文本真正出现在最终 tool result 中，才算被模型看到；
+2. 路径、计数和静默命令不算源码可见性；
+3. “脚本探测过这个文件”和“源码进入上下文”分别记录；
+4. 所有可见行跨工具、跨 Agent 做区间并集；
+5. 再与 Android 工程总文件、总行数、逻辑代码和顶层节点分母对照。
+
+### 6.3 阶段划分更偏 heuristic
+
+CANNBot 的确定性 Workflow 切分主要依赖：
+
+1. 主 Agent 文本中的“阶段 N”标记；
+2. Skill family 与 turn gap；
+3. 没有 Skill event 时使用 fallback tree；
+4. 也可以调用 LLM 做语义阶段分析。
+
+对应实现见 [`splitWorkflow()`](https://gitcode.com/guanxinghua/CANNBot-Insight/blob/master/src/lib/ingest/phase-split.ts#L164)。
+
+LLM Workflow 分析也不会把完整 session 原样交给模型。当前 [`analyzeWorkflow()`](https://gitcode.com/guanxinghua/CANNBot-Insight/blob/master/src/lib/ai/analyzer.ts#L183) 主要组织 root turns 的摘要，单条内容和总 digest 均有长度限制；子 Agent 正文不会全部进入这一阶段分析。
+
+这种方式的优势是通用：即使会话没有正式 Workflow 元数据，也能尝试生成一棵可读的阶段树。但它不能像 MigLoop 一样明确证明：
+
+> 这个阶段是因为某次 Workflow/Skill 实际启动和结束而存在，而不是分析器根据文字、间隔或语义判断它“像一个阶段”。
+
+MigLoop 优先采用 `attributionSkill`、Workflow 调用记录、编排 metadata 和状态作为阶段边界。它牺牲了一部分自由会话的语义分段能力，换来迁移流水线中的确定性与可追溯性。
+
+### 6.4 部署和分享更重
+
+CANNBot 是完整的本地应用，需要 Node.js、Next.js、Prisma、SQLite、依赖安装和常驻服务。这个代价换来了数据库、API、多会话管理、Web Dashboard 和 TUI，适合团队长期运营。
+
+但如果目标只是把某一次迁移会话交给同事评审，它的交付链路会更长：
+
+```mermaid
+flowchart TD
+    subgraph CANNBot交付
+      C1[获取项目] --> C2[安装 Node 依赖]
+      C2 --> C3[初始化数据库]
+      C3 --> C4[导入会话]
+      C4 --> C5[启动本地服务]
+      C5 --> C6[浏览器访问]
+    end
+
+    subgraph MigLoop交付
+      M1[收到一个自包含 HTML] --> M2[浏览器直接打开]
+    end
+```
+
+MigLoop 的离线产物是一个字体、样式与数据全部内嵌的 HTML，适合：
+
+- 通过邮件或 IM 直接发送；
+- 在评审会议中离线打开；
+- 跟随 Spec Eval run 一起归档；
+- 在不能安装服务或不能联网的环境中查看；
+- 保存某个时刻不可变的分析快照。
+
+反过来说，如果目标是长期积累和查询几百次会话，CANNBot 的较重架构会转化成优势。因此，这一项是使用场景的取舍，而不是绝对的工程缺陷。
+
+---
+
+## 7. 两边各自的优势与短板
 
 ### MigLoop
 
@@ -262,7 +397,7 @@ flowchart TB
 
 ---
 
-## 7. 应该选择哪一个
+## 8. 应该选择哪一个
 
 ```mermaid
 flowchart TD
@@ -310,7 +445,7 @@ flowchart LR
 
 ---
 
-## 8. 分析依据与边界
+## 9. 分析依据与边界
 
 - CANNBot-Insight 本地版本：`9a68268`，2026-07-31；
 - 对比检查了导入、增量刷新、阶段划分、LLM workflow 分析和文件读取统计的实际代码路径；
