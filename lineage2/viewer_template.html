@@ -2990,10 +2990,21 @@
 
     // ---- 两张图的配置 ----
     var allAgentById = {}; L.agents.forEach(function (a) { allAgentById[a.agent_id] = a; });
-    var workflowStages = (D.stages || []).filter(function (s) { return /^wf:/.test(s.stage || ""); });
-    if (workflowStages.length) {
+    // 只要会话里存在 Workflow 阶段，就使用按阶段的确定性血缘视图。
+    // 注意：a2h-spec 不是 wf:*，但它是 Workflow 之前的真实 Spec 生产阶段，
+    // 不能因为后续阶段由 Workflow 启动就把它从数据血缘中删掉。
+    var workflowStages = (D.stages || []).filter(function (s) {
+      return s.stage && s.stage !== "setup" &&
+        ((L.agents || []).some(function (a) {
+          return a.stage === s.stage && ((a.n_out || 0) + (a.n_android || 0) +
+            (a.n_spec_read || 0) + (a.n_proj || 0));
+        }));
+    });
+    var hasWorkflowStage = (D.stages || []).some(function (s) { return /^wf:/.test(s.stage || ""); });
+    if (hasWorkflowStage) {
       // Workflow 已经给出了确定性边界，不再强行套用“找到 spec 阶段再切 A/B”的
-      // a2h 专用模型。每个 Workflow 单独展示它真实读写的四类证据。
+      // a2h 专用模型。现在按原始阶段顺序展示 a2h-spec + 每个 Workflow，
+      // 每一段分别呈现真实读写的四类证据。
       ["lin-gt-A", "lin-view-A", "lin-box-A", "lin-gt-B", "lin-view-B", "lin-box-B"].forEach(function (id) {
         var node = document.getElementById(id); if (node) node.hidden = true;
       });
