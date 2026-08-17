@@ -6,8 +6,8 @@ import threading
 import unittest
 import urllib.request
 
-import chat_provider
-from live_session import LiveHTTPServer
+from migloop.chat import provider as chat_provider
+from migloop.live.monitor import LiveHTTPServer
 
 
 class _Monitor:

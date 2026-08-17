@@ -1,10 +1,41 @@
-# MigLoop 血缘增强版(lineage2)
+# MigLoop 开发与架构指南
 
 把一次 Android → HarmonyOS 迁移会话回放成两张血缘图,用来回答:
 
 > **生成 Spec 时,最终有哪些源码行进入了 agent 上下文?去重之后看到了多少?**
 
 离线只读:不改工作流、不装钩子、不联网,拿到会话记录才开始工作,对正在跑的任务零影响。
+
+---
+
+## 项目分层
+
+```text
+src/migloop/
+├── adapters/       # 来源专属：发现、识别、解析并归一化 session
+│   ├── base.py     # SourceAdapter / SessionCandidate 契约
+│   ├── claude.py
+│   └── codex.py
+├── render/         # 来源无关：静态报告、compare、HTML templates
+├── live/           # 增量 cursor、checkpoint、本地 HTTP server
+├── chat/           # 页面分析助手 provider
+├── cli.py          # 命令行编排，只通过 adapter registry 接触来源
+└── __main__.py     # python -m migloop
+tests/              # 与运行时代码分离的回归测试
+scripts/            # 开发工具和 pyz 打包
+docs/               # 设计与维护文档
+dist/               # 可直接分发的单文件 pyz
+```
+
+### Adapter 契约
+
+新来源只负责四件事：`default_root()`、`is_session(path)`、`iter_sessions(root)` 和
+`extract(path)`。`extract()` 必须返回统一的 `meta / totals / stages / tools / agents /
+prompts / billing / lineage / workflows` trace。实现完成后在
+`src/migloop/adapters/__init__.py` 的 `ADAPTERS` 注册即可；render、compare 和静态页面无需修改。
+
+实时模式还需要该来源自己的增量 reducer，因此通过 `SUPPORTS_LIVE` 单独声明，不能把“能离线解析”
+误当成“能安全增量续读”。
 
 ---
 
@@ -24,11 +55,14 @@ python3 migloop-lineage.pyz <会话.jsonl> -o 输出.html
 
 > 请显式用 `py` / `python3` 调用,不要给 pyz 加执行权限直接跑。
 
-**源码版**(要改代码时用)
+**源码版**（要改代码时用）
 
 ```bash
-python src/extract_session.py <会话.jsonl> --out trace.json   # 抽取:会话 → 结构化数据
-python src/build_viewer.py trace.json --out 输出.html          # 渲染:数据 → 自包含页面
+python -m pip install -e .
+migloop <会话.jsonl> -o 输出.html
+python scripts/build_viewer.py trace.json --out 输出.html
+python -m unittest discover -s tests -t . -p "test_*.py"
+python scripts/build_pyz.py
 ```
 
 产出是**自包含单文件 HTML**:数据与字体全部内嵌,无外部资源与网络请求,双击即看,断网可用,可直接转发。

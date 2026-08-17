@@ -3,7 +3,7 @@ MigLoop Trace Viewer — 使用说明
 
 这是什么
 --------
-一个单文件工具(migloop.pyz),把 Claude Code 会话的 JSONL transcript
+一个单文件工具(migloop.pyz),把 Claude Code 或 Codex 会话记录
 生成为可交互的轨迹分析页面(HTML),包含:
 执行拓扑 / Git 式执行流 / 主线上下文占用曲线 / Skill 调用统计 /
 阶段对比 / 阶段甘特(子代理并行一目了然)+ 任意元素点击详情。
@@ -46,7 +46,7 @@ Claude Code 在每台机器上都把会话记录存在固定位置:
     py migloop.pyz f3bb027a        按 session-id 前缀直接生成
     py migloop.pyz 项目名片段 --open
 
-工具会自动在本机 ~/.claude/projects 下定位,无需手动找路径。
+工具会自动在本机 ~/.claude/projects 和 ~/.codex/sessions 下定位,无需手动找路径。
 
 常见问题
 --------

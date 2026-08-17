@@ -28,7 +28,7 @@ MigLoop 读取 Claude Code 落盘的会话记录(transcript),还原出一次迁�
 
 ```mermaid
 flowchart LR
-    A["会话记录 JSONL<br/>主会话 + 子代理"] --> B["抽取器<br/>extract_session.py"]
+    A["会话记录<br/>Claude JSONL / Codex rollouts / 未来来源"] --> B["Adapter Registry<br/>来源专属解析 → 统一 Trace"]
     B --> C["trace JSON<br/>结构化中间产物"]
     C --> D["模板注入"]
     D --> E["单会话页面<br/>自包含 HTML"]

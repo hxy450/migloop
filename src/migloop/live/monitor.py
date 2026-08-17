@@ -31,8 +31,8 @@ import webbrowser
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-import extract_session
-import chat_provider
+from ..adapters import claude as extract_session
+from ..chat import provider as chat_provider
 
 
 CACHE_SCHEMA = 3

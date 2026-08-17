@@ -5,8 +5,9 @@
 
 ## 文档
 
-- [MigLoop 设计说明](./MigLoop-设计说明.md)：目标、证据口径、数据结构和实现方式
-- [MigLoop 与 CANNBot-Insight 对比](./MigLoop-vs-CANNBot-Insight.md)：定位、能力、优缺点与演进建议
+- [MigLoop 设计说明](./docs/design.md)：目标、证据口径、数据结构和实现方式
+- [开发与架构指南](./docs/development.md)：目录分层、adapter 契约、测试和扩展方式
+- [MigLoop 与 CANNBot-Insight 对比](./docs/comparison-cannbot.md)：定位、能力、优缺点与演进建议
 
 ## 使用(推荐:单文件 `dist/migloop-lineage.pyz`)
 
@@ -101,33 +102,52 @@ Claude Code 的一个 session 由两部分组成,分享时要一起拷:
 
 对方拿到后:`py migloop-lineage.pyz 路径/到/<session-id>.jsonl`。
 
-## 从源码构建 pyz
+## 开发
+
+项目采用标准 `src` layout。建议使用 editable install：
 
 ```bash
-mkdir _stage
-cp lineage2/migloop.py _stage/__main__.py
-cp lineage2/extract_session.py lineage2/extract_codex_session.py lineage2/live_session.py lineage2/chat_provider.py lineage2/viewer_template.html _stage/
-cp lineage2/compare_build.py lineage2/compare_template.html _stage/
-python -m zipapp _stage -o dist/migloop-lineage.pyz -p "/usr/bin/env python3"
-rm -rf _stage
+python -m pip install -e .
+migloop 01a0048b --open
+python -m unittest discover -s tests -t . -p "test_*.py"
 ```
+
+不安装也可以运行：
+
+```bash
+# PowerShell
+$env:PYTHONPATH="src"; python -m migloop 01a0048b
+
+# macOS / Linux
+PYTHONPATH=src python -m migloop 01a0048b
+```
+
+### 从源码构建 pyz
+
+```bash
+python scripts/build_pyz.py
+```
+
+构建脚本会从 `src/migloop/` 创建临时 staging 目录并原子替换
+`dist/migloop-lineage.pyz`，不会在仓库中留下 `_stage`。
 
 ## 已知边界
 
 - JSONL 格式属于 Claude Code / Codex 内部实现,官方不保证稳定;Claude 已在 v2.1.170 ~ v2.1.220、Codex 已在 rollout schema `session_meta` / `response_item` / `event_msg` 上验证
 - 阶段切分针对 a2h 管线 skill(mig-arch / a2h-spec / plan / execute / verify / retrospect);
   未调用管线 skill 的通用会话会整体作为单一 "Session" 阶段展示
-- token 统计按 message.id 去重、过滤 `<synthetic>` 本地合成记录(细节见 extract_session.py 注释)
+- token 统计按 message.id 去重、过滤 `<synthetic>` 本地合成记录（细节见 `adapters/claude.py` 注释）
 
-## 文件
+## 代码结构
 
-| 文件 | 说明 |
+| 目录 | 说明 |
 |---|---|
-| `lineage2/migloop.py` | CLI 入口(定位 → 离线抽取或增量 live) |
-| `lineage2/extract_session.py` | JSONL → 最终结构化 trace |
-| `lineage2/extract_codex_session.py` | Codex rollout 树 → 同一结构化 trace |
-| `lineage2/live_session.py` | byte cursor、增量 reducer、checkpoint 与本地 live server |
-| `lineage2/chat_provider.py` | 血缘摘要与 Codex / Anthropic / OpenAI-compatible provider |
-| `lineage2/viewer_template.html` | 最终离线页面模板 |
-| `lineage2/build_viewer.py` | 开发用:trace JSON → HTML |
+| `src/migloop/adapters/` | Claude、Codex 等输入格式 → 统一 trace；registry 也在这里 |
+| `src/migloop/render/` | 静态 HTML、对比页面和模板，完全不关心输入来源 |
+| `src/migloop/live/` | 增量 cursor、checkpoint 和本地 live server |
+| `src/migloop/chat/` | Codex / Anthropic / OpenAI-compatible 分析助手 |
+| `src/migloop/cli.py` | session 定位、adapter dispatch 与命令行编排 |
+| `tests/` | adapter、源码视野、live 与 chat 回归测试 |
+| `scripts/` | pyz 打包与开发期 trace/HTML 工具 |
+| `docs/` | 设计、开发和竞品对比文档 |
 | `dist/migloop-lineage.pyz` | 分发用单文件 |

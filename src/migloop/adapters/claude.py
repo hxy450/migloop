@@ -3,7 +3,7 @@
 MigLoop PoC — Claude Code session JSONL -> structured trace JSON
 
 用法:
-  python extract_session.py <path-to-session.jsonl> [--out out.json]
+  python -m migloop.adapters.claude <path-to-session.jsonl> [--out out.json]
 
 产出 schema v0.1:
   meta / totals / stages[] / tools[] / agents[] / prompts[] / markers[]
@@ -14,6 +14,7 @@ MigLoop PoC — Claude Code session JSONL -> structured trace JSON
   - 首个管线阶段之前 = setup 段
   - 非管线 skill(deveco-cli / grill-with-docs 等)记为当前阶段内的 helper 标记
 """
+import glob
 import json
 import os
 import sys
@@ -21,6 +22,49 @@ import argparse
 import difflib
 from collections import Counter
 from datetime import datetime, timedelta
+
+from .base import SessionCandidate
+
+
+FORMAT = "claude"
+SUPPORTS_LIVE = True
+
+
+def default_root():
+    return os.path.join(os.path.expanduser("~"), ".claude", "projects")
+
+
+def is_session(path):
+    try:
+        with open(path, encoding="utf-8", errors="replace") as stream:
+            for line in stream:
+                try:
+                    record = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                return (record.get("type") != "session_meta" and
+                        any(key in record for key in ("sessionId", "message", "uuid", "type")))
+    except OSError:
+        pass
+    return False
+
+
+def iter_sessions(root):
+    if not root or not os.path.isdir(root):
+        return
+    for path in glob.glob(os.path.join(root, "*", "*.jsonl")):
+        try:
+            stat = os.stat(path)
+        except OSError:
+            continue
+        yield SessionCandidate(
+            mtime=stat.st_mtime,
+            path=path,
+            project=os.path.basename(os.path.dirname(path)),
+            size=stat.st_size,
+            format=FORMAT,
+            session_id=os.path.basename(path).split(".")[0],
+        )
 
 PIPELINE_SKILLS = ["a2h-run", "a2h-run-zh", "a2h-init-zh", "a2h-build-zh",
                    "mig-arch", "a2h-arch-scaffold", "a2h-spec", "a2h-plan",

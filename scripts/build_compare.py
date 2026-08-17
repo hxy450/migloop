@@ -5,23 +5,27 @@
 import argparse
 import json
 import os
+import sys
 
-import compare_build
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(ROOT, "src"))
 
-HERE = os.path.dirname(os.path.abspath(__file__))
+from migloop.render import load_asset
+from migloop.render import compare
 
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("traces", nargs="+")
-    ap.add_argument("--out", default=os.path.join(HERE, "dist", "migloop-compare.html"))
+    ap.add_argument("--out", default=os.path.join(ROOT, "dist", "migloop-compare.html"))
     args = ap.parse_args()
 
-    traces = [json.load(open(p, encoding="utf-8")) for p in args.traces]
-    tpl = open(os.path.join(HERE, "compare_template.html"), encoding="utf-8").read()
-    font = compare_build.extract_font_face(
-        open(os.path.join(HERE, "viewer_template.html"), encoding="utf-8").read())
-    html = compare_build.build_compare_html(traces, tpl, font)
+    traces = []
+    for path in args.traces:
+        with open(path, encoding="utf-8") as stream:
+            traces.append(json.load(stream))
+    font = compare.extract_font_face(load_asset("viewer.html"))
+    html = compare.build_compare_html(traces, load_asset("compare.html"), font)
     os.makedirs(os.path.dirname(args.out), exist_ok=True)
     with open(args.out, "w", encoding="utf-8") as f:
         f.write(html)

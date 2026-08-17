@@ -259,7 +259,7 @@ flowchart LR
 
 随着 session 变长，CANNBot 单次刷新要重新处理的数据也会增加。数据库不会重复插入全部记录，但这并不等于前面的解析工作没有重做。
 
-MigLoop 的 [`IncrementalSessionMonitor`](./lineage2/live_session.py#L216) 则为主会话和每个子 Agent transcript 分别保存：
+MigLoop 的 [`IncrementalSessionMonitor`](../src/migloop/live/monitor.py#L216) 则为主会话和每个子 Agent transcript 分别保存：
 
 - 已读 byte offset；
 - 尚未写完整的 JSONL 尾部；

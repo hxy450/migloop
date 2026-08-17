@@ -2,7 +2,7 @@ import os
 import tempfile
 import unittest
 
-from extract_session import _infer_visible_source_lines, _spec_kind
+from migloop.adapters.claude import _infer_visible_source_lines, _spec_kind
 
 
 SOURCE = """public class Sample {

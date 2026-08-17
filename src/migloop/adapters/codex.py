@@ -14,7 +14,16 @@ import os
 import re
 from collections import Counter
 
-import extract_session as common
+from . import claude as common
+from .base import SessionCandidate
+
+
+FORMAT = "codex"
+SUPPORTS_LIVE = False
+
+
+def default_root():
+    return os.path.join(os.path.expanduser("~"), ".codex", "sessions")
 
 
 _JSON_STRING = r'"(?:\\.|[^"\\])*"'
@@ -44,6 +53,31 @@ def _first_json(path):
 def is_codex_session(path):
     record = _first_json(path) or {}
     return record.get("type") == "session_meta" and isinstance(record.get("payload"), dict)
+
+
+is_session = is_codex_session
+
+
+def iter_sessions(root):
+    if not root or not os.path.isdir(root):
+        return
+    for path in glob.iglob(os.path.join(root, "**", "*.jsonl"), recursive=True):
+        summary = session_summary(path)
+        if not summary or summary.get("thread_source") == "subagent":
+            continue
+        try:
+            stat = os.stat(path)
+        except OSError:
+            continue
+        project = os.path.basename((summary.get("cwd") or "codex-session").rstrip("\\/"))
+        yield SessionCandidate(
+            mtime=stat.st_mtime,
+            path=path,
+            project=project,
+            size=stat.st_size,
+            format=FORMAT,
+            session_id=summary.get("id") or summary.get("session_id") or "",
+        )
 
 
 def session_summary(path):

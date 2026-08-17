@@ -4,7 +4,7 @@ import os
 import tempfile
 import unittest
 
-from live_session import IncrementalSessionMonitor, IntervalIndex, _attach_live_controls
+from migloop.live.monitor import IncrementalSessionMonitor, IntervalIndex, _attach_live_controls
 
 
 def append_jsonl(path, record, newline=True):

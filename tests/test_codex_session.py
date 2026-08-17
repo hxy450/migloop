@@ -4,8 +4,8 @@ import os
 import tempfile
 import unittest
 
-import extract_codex_session
-import migloop
+from migloop import cli
+from migloop.adapters import codex
 
 
 def write_jsonl(path, records):
@@ -142,7 +142,7 @@ class CodexSessionAdapterTest(unittest.TestCase):
             write_jsonl(main_path, root_records)
             write_jsonl(child_path, child_records)
 
-            trace = extract_codex_session.extract(main_path, sessions_root=root)
+            trace = codex.extract(main_path, sessions_root=root)
             self.assertEqual("codex", trace["meta"]["session_format"])
             self.assertEqual(root_id, trace["meta"]["session_id"])
             self.assertEqual("gpt-test", trace["meta"]["model"])
@@ -157,7 +157,7 @@ class CodexSessionAdapterTest(unittest.TestCase):
                                 for item in trace["lineage"]["android"]))
             self.assertTrue(any(item["path"].endswith("F001.md")
                                 for item in trace["lineage"]["specs"]))
-            self.assertEqual("codex", migloop.session_format(main_path))
+            self.assertEqual("codex", cli.session_format(main_path))
 
 
 if __name__ == "__main__":

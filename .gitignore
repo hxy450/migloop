@@ -4,14 +4,20 @@
 # Repository documents
 !.gitignore
 !README.md
-!MigLoop-设计说明.md
-!MigLoop-vs-CANNBot-Insight.md
+!pyproject.toml
 
 # Authoritative source and tests
-!lineage2/
-!lineage2/**
-lineage2/__pycache__/
+!src/
+!src/**
+!tests/
+!tests/**
+!scripts/
+!scripts/**
+!docs/
+!docs/**
+**/__pycache__/
 *.py[cod]
+*.egg-info/
 
 # Ready-to-run distribution
 !dist/

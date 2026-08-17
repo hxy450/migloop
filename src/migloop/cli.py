@@ -13,8 +13,6 @@ MigLoop Trace Viewer — 单命令生成 Claude Code / Codex 会话轨迹页面
 依赖:Python >= 3.9,无第三方库
 """
 import argparse
-import glob
-import json
 import os
 import sys
 import webbrowser
@@ -25,64 +23,23 @@ try:
 except Exception:
     pass
 
-import extract_session
-import extract_codex_session
-
-
-def load_asset(name):
-    """资源与脚本同目录;打进 zipapp 时从归档内读取。"""
-    here = os.path.dirname(os.path.abspath(__file__))
-    p = os.path.join(here, name)
-    if os.path.isfile(p):
-        with open(p, encoding="utf-8") as f:
-            return f.read()
-    archive = here
-    while archive and not os.path.isfile(archive):
-        parent = os.path.dirname(archive)
-        if parent == archive:
-            break
-        archive = parent
-    import zipfile
-    with zipfile.ZipFile(archive) as z:
-        return z.read(name).decode("utf-8")
-
-
-def load_template():
-    return load_asset("viewer_template.html")
+from . import adapters
+from .render import build_html, load_asset, load_template
 
 
 def projects_root(cli_root=None):
-    return cli_root or os.path.join(os.path.expanduser("~"), ".claude", "projects")
+    return cli_root or adapters.get("claude").default_root()
 
 
 def codex_sessions_root(cli_root=None):
-    return cli_root or os.path.join(os.path.expanduser("~"), ".codex", "sessions")
+    return cli_root or adapters.get("codex").default_root()
 
 
 def all_sessions(root, codex_root=None):
     """[(mtime, path, project, size, format, session_id)] 新→旧。"""
-    rows = []
-    for p in glob.glob(os.path.join(root, "*", "*.jsonl")):
-        try:
-            st = os.stat(p)
-        except OSError:
-            continue
-        rows.append((st.st_mtime, p, os.path.basename(os.path.dirname(p)), st.st_size,
-                     "claude", os.path.basename(p).split(".")[0]))
-    if codex_root and os.path.isdir(codex_root):
-        for p in glob.iglob(os.path.join(codex_root, "**", "*.jsonl"), recursive=True):
-            summary = extract_codex_session.session_summary(p)
-            if not summary or summary.get("thread_source") == "subagent":
-                continue
-            try:
-                st = os.stat(p)
-            except OSError:
-                continue
-            project = os.path.basename((summary.get("cwd") or "codex-session").rstrip("\\/"))
-            rows.append((st.st_mtime, p, project, st.st_size, "codex",
-                         summary.get("id") or summary.get("session_id") or ""))
-    rows.sort(reverse=True)
-    return rows
+    roots = {"claude": root, "codex": codex_root or codex_sessions_root()}
+    return [(row.mtime, row.path, row.project, row.size, row.format, row.session_id)
+            for row in adapters.discover(roots)]
 
 
 def short_proj(dirname):
@@ -145,32 +102,12 @@ def resolve_target(target, root, codex_root=None):
 
 
 def session_format(path):
-    return "codex" if extract_codex_session.is_codex_session(path) else "claude"
+    return adapters.detect(path).FORMAT
 
 
 def extract_trace(path):
-    return (extract_codex_session.extract(path) if session_format(path) == "codex"
-            else extract_session.extract(path))
-
-
-def page_title(trace):
-    """每个页面唯一标题:浏览器 tab / 发布画廊全靠它区分,不能都叫 MigLoop Trace。
-    项目名放最前(tab 截断时保住区分度),再带 session 短 id 防同工程多会话重名。"""
-    meta = trace.get("meta") or {}
-    label = os.path.basename((meta.get("cwd") or "").rstrip("\\/")) or "Trace"
-    sid8 = (meta.get("session_id") or "")[:8]
-    return ("%s · %s" % (label, sid8)) if sid8 else label
-
-
-def build_html(trace, template):
-    payload = json.dumps(trace, ensure_ascii=False,
-                         separators=(",", ":")).replace("</", "<\\/")
-    # 源 transcript 可能带 U+FFFD 乱码替换符,部分发布通道会拒收,统一替换
-    payload = payload.replace("�", "?")
-    assert "__TRACE_JSON__" in template
-    html = template.replace("__TRACE_JSON__", payload)
-    return html.replace("<title>MigLoop Trace</title>",
-                        "<title>%s</title>" % page_title(trace), 1)
+    adapter = adapters.detect(path)
+    return adapter.extract(path)
 
 
 def main():
@@ -220,14 +157,14 @@ def main():
     if args.compare:
         if len(args.targets) < 2:
             sys.exit("--compare 需要至少 2 个目标")
-        import compare_build
+        from .render import compare as compare_build
         traces = []
         for tgt in args.targets:
             jl = resolve_target(tgt, root, codex_root)
             print("解析 %s ..." % jl)
             traces.append(extract_trace(jl))
-        font = compare_build.extract_font_face(load_asset("viewer_template.html"))
-        html = compare_build.build_compare_html(traces, load_asset("compare_template.html"), font)
+        font = compare_build.extract_font_face(load_asset("viewer.html"))
+        html = compare_build.build_compare_html(traces, load_asset("compare.html"), font)
         out = args.out or "migloop-compare-%d.html" % len(traces)
         with open(out, "w", encoding="utf-8") as f:
             f.write(html)
@@ -239,23 +176,24 @@ def main():
         return
 
     jsonl = resolve_target(args.targets[0], root, codex_root)
-    fmt = session_format(jsonl)
+    adapter = adapters.detect(jsonl)
+    fmt = adapter.FORMAT
     sub = os.path.join(os.path.splitext(jsonl)[0], "subagents")
     if fmt == "claude" and not os.path.isdir(sub):
         print("提示: 未找到 %s,子代理泳道将为空(分享 session 时请连同同名目录一起拷贝)" % sub)
 
     if args.live:
-        if fmt == "codex":
-            sys.exit("Codex rollout 已支持离线/对比报告；--live 增量监控尚未接入 Codex reducer")
-        import live_session
-        import chat_provider
+        if not adapter.SUPPORTS_LIVE:
+            sys.exit("%s session 已支持离线/对比报告；--live 增量监控尚未接入该 adapter" % fmt)
+        from .chat import provider as chat_provider
+        from .live import monitor as live_session
         cwd_base = os.path.basename(os.path.dirname(jsonl)).replace("C--Users-hongy-projects-", "") or "session"
         out = args.out or "migloop-%s-%s.html" % (
             cwd_base, os.path.splitext(os.path.basename(jsonl))[0][:8])
         template = load_template()
 
         def build_snapshot_bytes():
-            trace = extract_session.extract(jsonl)
+            trace = adapter.extract(jsonl)
             return build_html(trace, template).encode("utf-8")
 
         chat_service = None
@@ -271,7 +209,7 @@ def main():
 
                 def build_chat_context():
                     return chat_provider.build_lineage_context(
-                        extract_session.extract(jsonl), chat_config.max_context_chars
+                        adapter.extract(jsonl), chat_config.max_context_chars
                     )
 
                 chat_service = chat_provider.ChatService(

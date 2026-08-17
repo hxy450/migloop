@@ -506,7 +506,7 @@
   </section>
 
   <footer>
-    <span>由 <span class="mono" id="extractor-name">extract_session.py</span> 从 <span id="session-format">Claude Code</span> 会话 JSONL 确定性抽取 · 数据源 <span class="mono" id="src-file"></span></span>
+    <span>由 <span class="mono" id="extractor-name">adapters/claude.py</span> 从 <span id="session-format">Claude Code</span> 会话 JSONL 确定性抽取 · 数据源 <span class="mono" id="src-file"></span></span>
     <span class="mono">migloop-poc · schema v<span id="schema-v">?</span></span>
   </footer>
 </div>
@@ -631,7 +631,7 @@
     "来源: JSONL 离线导入"
   ].forEach(function (c) { if (c) { var e = el("span", "chip", c); if (c.indexOf("session") === 0) e.classList.add("mono"); chips.appendChild(e); } });
   document.getElementById("src-file").textContent = (D.meta.source_file || "").split("\\").pop();
-  document.getElementById("extractor-name").textContent = isCodex ? "extract_codex_session.py" : "extract_session.py";
+  document.getElementById("extractor-name").textContent = isCodex ? "adapters/codex.py" : "adapters/claude.py";
   document.getElementById("session-format").textContent = isCodex ? "Codex" : "Claude Code";
   document.getElementById("schema-v").textContent = D.meta.schema_version || "?";
   document.title = "MigLoop Trace — " + proj + " · " + (D.meta.session_id || "").slice(0, 8);
