@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-MigLoop Trace Viewer — 单命令生成 Claude Code 会话轨迹页面
+MigLoop Trace Viewer — 单命令生成 Claude Code / Codex 会话轨迹页面
 
 用法:
   migloop                          列出最近的 session
   migloop <session.jsonl 路径>      指定 transcript 文件
-  migloop <session-id 前缀>         在 ~/.claude/projects 下自动定位
+  migloop <session-id 前缀>         在 Claude / Codex session 目录中自动定位
   migloop <项目名片段>              匹配项目目录,取最新 session
   migloop <目标> -o out.html --open
 
@@ -26,6 +26,7 @@ except Exception:
     pass
 
 import extract_session
+import extract_codex_session
 
 
 def load_asset(name):
@@ -54,15 +55,32 @@ def projects_root(cli_root=None):
     return cli_root or os.path.join(os.path.expanduser("~"), ".claude", "projects")
 
 
-def all_sessions(root):
-    """[(mtime, jsonl_path, project_dir_name, size_bytes)] 新→旧"""
+def codex_sessions_root(cli_root=None):
+    return cli_root or os.path.join(os.path.expanduser("~"), ".codex", "sessions")
+
+
+def all_sessions(root, codex_root=None):
+    """[(mtime, path, project, size, format, session_id)] 新→旧。"""
     rows = []
     for p in glob.glob(os.path.join(root, "*", "*.jsonl")):
         try:
             st = os.stat(p)
         except OSError:
             continue
-        rows.append((st.st_mtime, p, os.path.basename(os.path.dirname(p)), st.st_size))
+        rows.append((st.st_mtime, p, os.path.basename(os.path.dirname(p)), st.st_size,
+                     "claude", os.path.basename(p).split(".")[0]))
+    if codex_root and os.path.isdir(codex_root):
+        for p in glob.iglob(os.path.join(codex_root, "**", "*.jsonl"), recursive=True):
+            summary = extract_codex_session.session_summary(p)
+            if not summary or summary.get("thread_source") == "subagent":
+                continue
+            try:
+                st = os.stat(p)
+            except OSError:
+                continue
+            project = os.path.basename((summary.get("cwd") or "codex-session").rstrip("\\/"))
+            rows.append((st.st_mtime, p, project, st.st_size, "codex",
+                         summary.get("id") or summary.get("session_id") or ""))
     rows.sort(reverse=True)
     return rows
 
@@ -76,41 +94,45 @@ def short_proj(dirname):
     return dirname[-30:]
 
 
-def list_sessions(root, limit=20):
-    rows = all_sessions(root)
+def list_sessions(root, codex_root=None, limit=20):
+    rows = all_sessions(root, codex_root)
     if not rows:
-        print("在 %s 下没有找到任何 session transcript" % root)
+        print("没有找到 Claude Code 或 Codex session transcript")
         return
-    print("最近的 session(%s):\n" % root)
-    print("  %-34s %-10s %8s  %s" % ("项目", "session", "大小", "修改时间"))
+    print("最近的 session:\n")
+    print("  %-30s %-7s %-10s %8s  %s" % ("项目", "格式", "session", "大小", "修改时间"))
     import datetime
-    for mt, p, proj, size in rows[:limit]:
-        sid = os.path.basename(p)[:8]
+    for mt, p, proj, size, kind, sid in rows[:limit]:
         t = datetime.datetime.fromtimestamp(mt).strftime("%m-%d %H:%M")
-        print("  %-34s %-10s %7.1fM  %s" % (short_proj(proj)[:34], sid, size / 1e6, t))
+        print("  %-30s %-7s %-10s %7.1fM  %s" %
+              (short_proj(proj)[:30], kind, sid[:8], size / 1e6, t))
     print("\n用法: migloop <session-id 前缀 | 项目名片段 | jsonl 路径> [-o out.html] [--open]")
 
 
-def resolve_target(target, root):
+def resolve_target(target, root, codex_root=None):
     """把用户输入解析成唯一的 jsonl 路径;歧义/未命中时报错退出。"""
     if os.path.isfile(target):
         return target
+    directory_hint = None
     if os.path.isdir(target):
         cands = sorted(glob.glob(os.path.join(target, "*.jsonl")),
                        key=os.path.getmtime, reverse=True)
-        if not cands:
-            sys.exit("目录中没有 .jsonl: %s" % target)
-        return cands[0]
+        if cands:
+            return cands[0]
+        # A project directory is also a useful lookup key for Codex because
+        # rollout files live under ~/.codex/sessions rather than in the repo.
+        directory_hint = os.path.basename(os.path.abspath(target))
 
-    rows = all_sessions(root)
-    by_sid = [p for _, p, _, _ in rows if os.path.basename(p).startswith(target)]
+    rows = all_sessions(root, codex_root)
+    lookup = directory_hint or target
+    by_sid = [p for _, p, _, _, _, sid in rows if sid.startswith(lookup)]
     if len(by_sid) == 1:
         return by_sid[0]
     if len(by_sid) > 1:
         sys.exit("session-id 前缀不唯一,命中 %d 个,请给更长前缀" % len(by_sid))
 
-    low = target.lower()
-    by_proj = [(mt, p, proj) for mt, p, proj, _ in rows if low in proj.lower()]
+    low = lookup.lower()
+    by_proj = [(mt, p, proj) for mt, p, proj, _, _, _ in rows if low in proj.lower()]
     if by_proj:
         projs = sorted(set(proj for _, _, proj in by_proj))
         if len(projs) > 1:
@@ -119,7 +141,16 @@ def resolve_target(target, root):
                 print("  -", short_proj(pr))
         return by_proj[0][1]
 
-    sys.exit("找不到匹配 %r 的 session(root=%s);运行 migloop 不带参数可列出全部" % (target, root))
+    sys.exit("找不到匹配 %r 的 Claude/Codex session;运行 migloop 不带参数可列出全部" % target)
+
+
+def session_format(path):
+    return "codex" if extract_codex_session.is_codex_session(path) else "claude"
+
+
+def extract_trace(path):
+    return (extract_codex_session.extract(path) if session_format(path) == "codex"
+            else extract_session.extract(path))
 
 
 def page_title(trace):
@@ -143,12 +174,13 @@ def build_html(trace, template):
 
 
 def main():
-    ap = argparse.ArgumentParser(prog="migloop", description="Claude Code 会话轨迹可视化页面生成器")
+    ap = argparse.ArgumentParser(prog="migloop", description="Claude Code / Codex 会话轨迹可视化页面生成器")
     ap.add_argument("targets", nargs="*", help="jsonl 路径 | session-id 前缀 | 项目名片段(--compare 时可多个)")
     ap.add_argument("-o", "--out", default=None, help="输出 HTML 路径")
     ap.add_argument("--open", action="store_true", help="生成后在浏览器打开")
     ap.add_argument("--compare", action="store_true", help="多个目标生成跨会话对比页")
     ap.add_argument("--projects-root", default=None, help="覆盖 ~/.claude/projects")
+    ap.add_argument("--codex-sessions-root", default=None, help="覆盖 ~/.codex/sessions")
     ap.add_argument("--live", action="store_true",
                     help="增量监控仍在追加的 session，并启动本地自动刷新页面")
     ap.add_argument("--interval", type=float, default=10.0,
@@ -177,8 +209,9 @@ def main():
     args = ap.parse_args()
 
     root = projects_root(args.projects_root)
+    codex_root = codex_sessions_root(args.codex_sessions_root)
     if not args.targets:
-        list_sessions(root)
+        list_sessions(root, codex_root)
         return
 
     if args.live and args.compare:
@@ -190,9 +223,9 @@ def main():
         import compare_build
         traces = []
         for tgt in args.targets:
-            jl = resolve_target(tgt, root)
+            jl = resolve_target(tgt, root, codex_root)
             print("解析 %s ..." % jl)
-            traces.append(extract_session.extract(jl))
+            traces.append(extract_trace(jl))
         font = compare_build.extract_font_face(load_asset("viewer_template.html"))
         html = compare_build.build_compare_html(traces, load_asset("compare_template.html"), font)
         out = args.out or "migloop-compare-%d.html" % len(traces)
@@ -205,12 +238,15 @@ def main():
             webbrowser.open(pathlib.Path(out).resolve().as_uri())
         return
 
-    jsonl = resolve_target(args.targets[0], root)
+    jsonl = resolve_target(args.targets[0], root, codex_root)
+    fmt = session_format(jsonl)
     sub = os.path.join(os.path.splitext(jsonl)[0], "subagents")
-    if not os.path.isdir(sub):
+    if fmt == "claude" and not os.path.isdir(sub):
         print("提示: 未找到 %s,子代理泳道将为空(分享 session 时请连同同名目录一起拷贝)" % sub)
 
     if args.live:
+        if fmt == "codex":
+            sys.exit("Codex rollout 已支持离线/对比报告；--live 增量监控尚未接入 Codex reducer")
         import live_session
         import chat_provider
         cwd_base = os.path.basename(os.path.dirname(jsonl)).replace("C--Users-hongy-projects-", "") or "session"
@@ -263,7 +299,7 @@ def main():
         return
 
     print("解析 %s ..." % jsonl)
-    trace = extract_session.extract(jsonl)
+    trace = extract_trace(jsonl)
 
     m, t = trace["meta"], trace["totals"]
     cwd_base = os.path.basename((m.get("cwd") or "").rstrip("\\/")) or "session"
@@ -272,7 +308,8 @@ def main():
     with open(out, "w", encoding="utf-8") as f:
         f.write(html)
 
-    print("  session  %s  (cc %s, %s)" % (m["session_id"], m["cc_version"], m["model"]))
+    print("  session  %s  (%s %s, %s)" %
+          (m["session_id"], m.get("session_format", "claude"), m["cc_version"], m["model"]))
     print("  时长 %.1fh · 工具调用 %d · 子代理 %d · 阶段 %s" % (
         (t["duration_ms"] or 0) / 3600000, t["tool_calls"], t["subagent_transcripts"],
         " → ".join(s["label"] for s in trace["stages"] if s["stage"] != "setup")))

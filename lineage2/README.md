@@ -13,7 +13,7 @@
 **单文件版**(推荐,零第三方依赖,Python ≥ 3.9)
 
 ```bash
-py migloop-lineage.pyz <会话.jsonl> -o 输出.html
+py migloop-lineage.pyz <Claude或Codex会话.jsonl> -o 输出.html
 ```
 
 mac / Linux 换成:
@@ -92,6 +92,9 @@ Live 模式不是定时从头重跑 extractor。它为主会话和每个子 agen
 | 阶段来源 | 管线 skill 边界(a2h-spec / a2h-execute…) | 每次 `Workflow` 调用一段,名字取脚本 `meta.name` |
 | agent 身份 | meta 里的 description | 编排里的 `label`(如 `audit:template`)+ phase |
 | 收尾判定 | transcript 是否正常收尾 | 编排状态 `state`(权威) |
+
+Codex 离线报告使用 `~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl`。主线程与子 Agent 是独立
+rollout，通过 `parent_thread_id` 回链；当前支持静态 HTML 与跨 session 对比，暂不支持 `--live`。
 
 > Workflow 子代理的 transcript **不写 `toolUseResult`**,读取行数从结果正文的 `N⇥内容`
 > 行号前缀还原;末条记录是 tool_result 而非 assistant,所以收尾**必须**看编排状态——

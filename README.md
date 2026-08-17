@@ -1,6 +1,6 @@
 # MigLoop Trace Viewer (PoC)
 
-把 Claude Code 迁移会话的 JSONL transcript 一键变成可交互的轨迹页面:
+把 Claude Code 或 Codex 迁移会话的 JSONL transcript 一键变成可交互的轨迹页面:
 执行拓扑 / Git 式执行流(主干=主会话,分支=子代理)/ 主线上下文占用曲线 / 阶段对比 / 阶段明细 + 点击详情抽屉。
 
 ## 文档
@@ -17,6 +17,7 @@
 py migloop-lineage.pyz                 # 列出本机最近的 session
 py migloop-lineage.pyz f3bb027a        # 按 session-id 前缀生成
 py migloop-lineage.pyz arch9 --open    # 按项目名片段生成并在浏览器打开
+py migloop-lineage.pyz 01a0048b        # Codex session-id 前缀同样可用
 
 # macOS / Linux
 python3 migloop-lineage.pyz <目标> [-o out.html] [--open]
@@ -24,7 +25,7 @@ python3 migloop-lineage.pyz <目标> [-o out.html] [--open]
 
 `<目标>` 三种写法任选:
 1. `.jsonl` 文件完整路径(拿到别人分享的文件时用这个)
-2. session-id 前缀(自动在 `~/.claude/projects` 下查找)
+2. session-id 前缀(自动在 `~/.claude/projects` 与 `~/.codex/sessions` 下查找)
 3. 项目目录名片段(取该项目最新 session)
 
 输出为**完全自包含**的 HTML(字体、数据全部内嵌),可以直接发给任何人用浏览器打开,不需要网络。
@@ -35,7 +36,7 @@ python3 migloop-lineage.pyz <目标> [-o out.html] [--open]
 py migloop-lineage.pyz dynamic1 --live --open
 ```
 
-`--live` 启动仅监听 `127.0.0.1` 的本地页面。主会话与每个子 agent 的 JSONL 都按 byte offset
+`--live` 当前用于 Claude Code session，启动仅监听 `127.0.0.1` 的本地页面。主会话与每个子 agent 的 JSONL 都按 byte offset
 增量续读；没有新记录时不会重新解析历史内容。默认首页就是完整分析页面，右下角 live 控件每
 10 秒读取一次小型聚合状态。发现新记录时只提示“分析快照已过期”，不会在后台反复重算全部图；
 右下角会明确显示快照版本、记录数和生成时间；点击“刷新完整分析”才执行一次一致性重建，点击
@@ -75,6 +76,20 @@ Anthropic/OpenAI-compatible 可用 `--chat-api-key-env <环境变量名>` 改 ke
 增量 checkpoint 默认保存在 `~/.migloop/cache/<session-id>.live.json`。MigLoop 重启后会从保存的
 offset 继续；若检测到 transcript 被截断或替换，则自动丢弃旧聚合状态并重放。
 
+## Codex session
+
+Codex 主线程与子 Agent 分别落在按日期分区的 rollout 文件中：
+
+```
+~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl
+```
+
+给出主 rollout 的完整路径、session-id 前缀或项目目录名即可。MigLoop 会根据
+`session_meta.source.subagent.thread_spawn.parent_thread_id` 递归回链同一 session 的子 Agent，
+并把 `response_item` / `event_msg`、`function_call` / `custom_tool_call`、token 用量和
+`functions.exec` 内的 `shell_command` / `apply_patch` 归一到现有 trace。Codex 目前支持离线 HTML
+和 `--compare`；增量 `--live` reducer 仍只支持 Claude Code。
+
 ## 跨机器分享 session
 
 Claude Code 的一个 session 由两部分组成,分享时要一起拷:
@@ -91,7 +106,7 @@ Claude Code 的一个 session 由两部分组成,分享时要一起拷:
 ```bash
 mkdir _stage
 cp lineage2/migloop.py _stage/__main__.py
-cp lineage2/extract_session.py lineage2/live_session.py lineage2/chat_provider.py lineage2/viewer_template.html _stage/
+cp lineage2/extract_session.py lineage2/extract_codex_session.py lineage2/live_session.py lineage2/chat_provider.py lineage2/viewer_template.html _stage/
 cp lineage2/compare_build.py lineage2/compare_template.html _stage/
 python -m zipapp _stage -o dist/migloop-lineage.pyz -p "/usr/bin/env python3"
 rm -rf _stage
@@ -99,7 +114,7 @@ rm -rf _stage
 
 ## 已知边界
 
-- JSONL 格式属 Claude Code 内部实现,官方不保证稳定;已在 v2.1.170 ~ v2.1.220 上实测核心字段一致
+- JSONL 格式属于 Claude Code / Codex 内部实现,官方不保证稳定;Claude 已在 v2.1.170 ~ v2.1.220、Codex 已在 rollout schema `session_meta` / `response_item` / `event_msg` 上验证
 - 阶段切分针对 a2h 管线 skill(mig-arch / a2h-spec / plan / execute / verify / retrospect);
   未调用管线 skill 的通用会话会整体作为单一 "Session" 阶段展示
 - token 统计按 message.id 去重、过滤 `<synthetic>` 本地合成记录(细节见 extract_session.py 注释)
@@ -110,6 +125,7 @@ rm -rf _stage
 |---|---|
 | `lineage2/migloop.py` | CLI 入口(定位 → 离线抽取或增量 live) |
 | `lineage2/extract_session.py` | JSONL → 最终结构化 trace |
+| `lineage2/extract_codex_session.py` | Codex rollout 树 → 同一结构化 trace |
 | `lineage2/live_session.py` | byte cursor、增量 reducer、checkpoint 与本地 live server |
 | `lineage2/chat_provider.py` | 血缘摘要与 Codex / Anthropic / OpenAI-compatible provider |
 | `lineage2/viewer_template.html` | 最终离线页面模板 |
