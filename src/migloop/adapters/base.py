@@ -5,8 +5,9 @@ discovering sessions, and normalizing one session into MigLoop's trace dict.
 Rendering, comparison, chat, and lineage presentation consume that common
 trace and must not branch on the source format.
 """
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Any, Dict, Iterable, Protocol
+from typing import Any, Protocol
 
 
 @dataclass(frozen=True)
@@ -29,5 +30,5 @@ class SourceAdapter(Protocol):
 
     def iter_sessions(self, root: str) -> Iterable[SessionCandidate]: ...
 
-    def extract(self, path: str) -> Dict[str, Any]: ...
+    def extract(self, path: str) -> dict[str, Any]: ...
 

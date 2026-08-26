@@ -3,7 +3,7 @@
 MigLoop PoC — Claude Code session JSONL -> structured trace JSON
 
 用法:
-  python -m migloop.adapters.claude <path-to-session.jsonl> [--out out.json]
+  python -m migbot.insight.adapters.claude <path-to-session.jsonl> [--out out.json]
 
 产出 schema v0.1:
   meta / totals / stages[] / tools[] / agents[] / prompts[] / markers[]
@@ -14,6 +14,7 @@ MigLoop PoC — Claude Code session JSONL -> structured trace JSON
   - 首个管线阶段之前 = setup 段
   - 非管线 skill(deveco-cli / grill-with-docs 等)记为当前阶段内的 helper 标记
 """
+import copy
 import glob
 import json
 import os
@@ -24,6 +25,7 @@ from collections import Counter
 from datetime import datetime, timedelta
 
 from .base import SessionCandidate
+from ..blame import replay_file as _blame_replay
 
 
 FORMAT = "claude"
@@ -68,7 +70,8 @@ def iter_sessions(root):
 
 PIPELINE_SKILLS = ["a2h-run", "a2h-run-zh", "a2h-init-zh", "a2h-build-zh",
                    "mig-arch", "a2h-arch-scaffold", "a2h-spec", "a2h-plan",
-                   "a2h-execute", "a2h-verify", "a2h-retrospect"]
+                   "a2h-execute", "a2h-verify", "a2h-retrospect",
+                   "arkts-visual-verify"]
 
 STAGE_LABELS = {
     "setup": "Setup",
@@ -82,6 +85,7 @@ STAGE_LABELS = {
     "a2h-plan": "Plan",
     "a2h-execute": "Execute",
     "a2h-verify": "Verify",
+    "arkts-visual-verify": "Visual Verify",
     "a2h-retrospect": "Retrospect",
     "session": "Session",
 }
@@ -216,6 +220,17 @@ def _rel(path, cwd):
     return p
 
 
+def _android_in_tree(rel):
+    """会话 cwd 同时罩住 Android 与鸿蒙工程时(AIPPT 布局),Android 源码会
+    rel 化成"工程内"路径,漏出 android 血缘。Java/Kotlin 源码与 Android
+    特征目录是可靠的结构信号 —— 鸿蒙工程里不存在这些。"""
+    low = rel.lower()
+    if low.endswith((".java", ".kt")):
+        return True
+    return any(x in low for x in ("/src/main/java/", "/src/main/kotlin/",
+                                  "/src/main/res/", "androidmanifest.xml"))
+
+
 def _spec_kind(rel):
     """rel 是相对路径。返回契约/分析文档细类，或 None(普通工程文件)。
 
@@ -225,6 +240,11 @@ def _spec_kind(rel):
     假断链。这里只认明确的迁移目录，不把工程内任意 Markdown 都当 Spec。
     """
     low = rel.lower()
+    # 会话 cwd 落在工程父目录时 rel 会带一层工程前缀(AIPPT 实测
+    # "AIPPT_830_test/spec/..."),剥一层再判;两层以上不认,防误吞。
+    first_slash = low.find("/")
+    if first_slash > 0 and low[first_slash + 1:].startswith(("spec/", ".migration/")):
+        low = low[first_slash + 1:]
     if low.startswith(".migration/analysis/") and low.endswith(".md"):
         return "analysis"
     if low.startswith(".migration/") and low.endswith(".md"):
@@ -270,7 +290,8 @@ _ANDROID_EXT = (".java", ".kt", ".kts", ".xml", ".gradle", ".aidl", ".pro",
 # 纯逻辑代码口径:布局 xml / gradle 脚本的阅读成本远低于逻辑代码,混在一起会高估
 # "理解深度"。两套口径同时产出,分子分母各自对齐,读数时不会串味。
 _CODE_EXT = (".java", ".kt", ".kts")
-_EXTERNAL_EXCLUDE = ("migbot", "/skills/", "/.claude/", "/scratchpad/", "/temp/claude/")
+_EXTERNAL_EXCLUDE = ("migbot", "/skills/", "/.claude/", "/scratchpad/", "/temp/claude/",
+                     "/.codex/", "/.agents/")  # codex 的 agent 配置(.toml)与技能目录同属 tooling
 
 
 def _is_code(path):
@@ -661,6 +682,174 @@ def _abort_reason(last_rec):
     return None
 
 
+
+#: 子代理解析产物缓存 —— 增量 extract 的核心。
+#: 收尾的子代理 transcript 不再变化,其解析产物(含最贵的源码视野推断,
+#: profile 实测占全量 extract 的 72%)可按 (jsonl, meta.json, cwd) 签名复用;
+#: 迁移进行中每轮只有少数活跃子代理文件在写,其余全部命中。
+#: 存取都 deepcopy:下游会往 entry 回填 stage/seg 并剥离 _prompt,
+#: 浅共享会让缓存被第一次消费污染。
+_SUB_CACHE: dict[str, tuple[tuple, dict]] = {}
+_SUB_CACHE_MAX = 2048
+
+
+def _sub_sig(jl_path, meta_path, cwd):
+    """两个文件的 (mtime_ns, size) + cwd;stat 不到(竞态删除)返回 None 不缓存。"""
+    try:
+        j = os.stat(jl_path) if os.path.isfile(jl_path) else None
+        m = os.stat(meta_path)
+    except OSError:
+        return None
+    return (j.st_mtime_ns if j else 0, j.st_size if j else 0,
+            m.st_mtime_ns, m.st_size, cwd)
+
+
+def _merge_prefixed_specs(spec_read_by, spec_authors):
+    """spec 台账的单层前缀归并 —— 分裂对各持一半(一边 authors 一边
+    read_by),前缀映射必须从两侧 key 的并集里找。"""
+    all_keys = set(spec_read_by) | set(spec_authors)
+    to_prefixed = {}
+    for key in all_keys:
+        i = key.find("/")
+        if i > 0:
+            rest = key[i + 1:]
+            if rest in all_keys and rest.startswith(("spec/", ".migration/")):
+                to_prefixed[rest] = key
+    for mapping, field in ((spec_read_by, "read_by"), (spec_authors, "authors")):
+        for bare, pk in to_prefixed.items():
+            if bare in mapping:
+                src = mapping.pop(bare)
+                dst = mapping.setdefault(pk, {"kind": src["kind"], field: set()})
+                dst[field] = set(dst[field]) | set(src[field])
+
+
+# ---- shell 写盘归属:Write/Edit 实录之外,Bash/PowerShell 落盘的文件也要有作者 ----
+# 真实流水线里大量 spec 页由主线 python heredoc / 生成脚本批量落盘(AIPPT 0723:
+# 156/259 页无结构化写实录)。从命令文本启发式提取落盘目标,两级置信:
+#   文件级 —— 重定向/tee/sed -i/--out(带后缀)/python 体内完整文件字面量
+#   目录级 —— python 体内目录字面量(fill_acs 的 OUT=Path(...features) 场景)
+# 目录级只兜底"无精确作者"的既有台账页,不新增页、不覆盖 Write/Edit 作者。
+_PCH = r"(?:[A-Za-z]:)?[A-Za-z0-9_.\\/\-]"   # 路径字符类(含 Windows 盘符/反斜杠)
+_SH_REDIR = re.compile(r"(?<![<>\d&])>{1,2}\s*(['\"]?)(" + _PCH + r"+\.\w{1,6})\1")
+_SH_TEE = re.compile(r"\btee\s+(?:-a\s+)?(['\"]?)(" + _PCH + r"+)\1")
+_SH_OUT = re.compile(r"--out(?:put)?(?:-dir)?[= ]\s*(['\"]?)(" + _PCH + r"+)\1")
+_SH_SED_I = re.compile(r"\bsed\s+(?:-[a-zA-Z]+\s+)*-i(?:\s+'')?\s+"
+                       r"(?:'[^']*'|\"[^\"]*\"|\S+)\s+(" + _PCH + r"+\.\w{1,6})")
+_SH_CP_MV = re.compile(r"\b(?:cp|mv)\s+(?:-[a-zA-Z]+\s+)*\S+\s+"
+                       r"(['\"]?)(" + _PCH + r"+)\1(?=\s|$|;|&)")
+_SH_PY = re.compile(r"\bpython3?\b")
+_PY_WRITE_SEM = re.compile(r"write_text\(|json\.dump|\.write\(|to_csv\(|savefig\(|"
+                           r"open\([^)]*['\"][wa]b?['\"]")
+_PY_FILE_LIT = re.compile(r"['\"](" + _PCH + r"+\.(?:md|json|json5|ets|ts|xml|txt|"
+                          r"csv|ya?ml|log))['\"]")
+_PY_DIR_LIT = re.compile(r"['\"](" + _PCH + r"*[\\/][A-Za-z0-9_.\-]+)['\"]")
+_KNOWN_EXT = re.compile(r"\.\w{1,6}$")
+# cat/tee 落盘的脚本(heredoc 体) —— 会话内脚本库的另一半(Write 之外)
+_SH_SCRIPT_HD = re.compile(r"(?:cat|tee)\s*>{1,2}\s*(['\"]?)(\S+?\.(?:py|sh))\1"
+                           r"[^\n]*<<\s*-?\s*['\"]?(\w+)['\"]?\n(.*?)\n\3", re.S)
+
+
+def _heredoc_scripts(cmd):
+    """Bash 命令里 cat>/tee 落盘的 .py/.sh 脚本 {path: body}。"""
+    return {m.group(2): m.group(4) for m in _SH_SCRIPT_HD.finditer(cmd)}
+
+
+def _py_body_targets(body):
+    """python 体(heredoc/-c/会话内脚本)的落盘候选:有写语义才启用。
+    读写混在同一体内时无法区分(不做数据流分析),由调用侧的
+    只补无作者页 + _EXTERNAL_EXCLUDE 双重限损。"""
+    if not _PY_WRITE_SEM.search(body):
+        return [], []
+    files = [m.group(1) for m in _PY_FILE_LIT.finditer(body)]
+    dirs = [m.group(1) for m in _PY_DIR_LIT.finditer(body)
+            if not _KNOWN_EXT.search(m.group(1))]
+    return files, dirs
+
+
+def _shell_write_targets(name, inp, scripts):
+    """Bash/PowerShell 命令的落盘目标 (files, dirs),原始字符串未相对化。
+    scripts: 本会话落盘的脚本 {path: body} —— 命令执行到其中脚本时用
+    脚本体提取(fill_acs.py 场景:目标在脚本内不在命令行)。"""
+    cmd = str(inp.get("command") or "")
+    if not cmd:
+        return [], []
+    files, dirs = [], []
+    files += [m.group(2) for m in _SH_REDIR.finditer(cmd)]
+    files += [m.group(2) for m in _SH_TEE.finditer(cmd)]
+    files += [m.group(1) for m in _SH_SED_I.finditer(cmd)]
+    for rx in (_SH_OUT, _SH_CP_MV):
+        for m in rx.finditer(cmd):
+            (files if _KNOWN_EXT.search(m.group(2)) else dirs).append(m.group(2))
+    bodies = [cmd] if _SH_PY.search(cmd) else []
+    bodies += [body for sp, body in scripts.items()
+               if os.path.basename(sp) and os.path.basename(sp) in cmd]
+    for body in bodies:
+        f2, d2 = _py_body_targets(body)
+        files += f2
+        dirs += d2
+    drop = lambda x: "/dev/" in x or "$" in x or x.startswith("&")  # noqa: E731
+    return ([f for f in files if not drop(f)],
+            [d for d in dirs if not drop(d)])
+
+
+def collect_blame_events(path):
+    """整个会话(主线+全部子代理)的 .ets 写事件(含明文 payload) ——
+    跨会话接力用,与 codex.collect_blame_events 同输出形状:
+    [(ts, abs_path, agent_id, op, payload)]。轻量逐行扫描,不做完整 extract。"""
+    events = []
+
+    def scan(jl_path, who):
+        try:
+            stream = open(jl_path, encoding="utf-8", errors="ignore")
+        except OSError:
+            return
+        with stream:
+            for line in stream:
+                try:
+                    rec = json.loads(line)
+                except Exception:
+                    continue
+                msg = rec.get("message") or {}
+                content = msg.get("content")
+                if rec.get("type") != "assistant" or not isinstance(content, list):
+                    continue
+                ts = str(rec.get("timestamp") or "")
+                for blk in content:
+                    if not isinstance(blk, dict) or blk.get("type") != "tool_use":
+                        continue
+                    name = blk.get("name")
+                    inp = blk.get("input") or {}
+                    fp = inp.get("file_path")
+                    if name not in ("Write", "Edit", "MultiEdit") or not isinstance(fp, str):
+                        continue
+                    if not fp.endswith(".ets"):
+                        continue
+                    norm = fp.replace("\\", "/")
+                    if name == "Write":
+                        events.append((ts, norm, who, "write", inp.get("content") or ""))
+                    elif name == "Edit":
+                        events.append((ts, norm, who, "edits",
+                                       [(inp.get("old_string") or "",
+                                         inp.get("new_string") or "",
+                                         bool(inp.get("replace_all")))]))
+                    else:
+                        events.append((ts, norm, who, "edits",
+                                       [(e2.get("old_string") or "",
+                                         e2.get("new_string") or "",
+                                         bool(e2.get("replace_all")))
+                                        for e2 in (inp.get("edits") or [])
+                                        if isinstance(e2, dict)]))
+
+    scan(path, "__main__")
+    adir = os.path.join(os.path.splitext(os.path.abspath(path))[0], "subagents")
+    if os.path.isdir(adir):
+        for jl in sorted(glob.glob(os.path.join(adir, "agent-*.jsonl"))):
+            aid = os.path.basename(jl)[len("agent-"):-len(".jsonl")]
+            scan(jl, aid)
+    events.sort(key=lambda e: e[0])
+    return events
+
+
 def build_lineage(agents, main_tools, cwd):
     """从子代理(+主线)的可见源码行与 Write 还原 agent ↔ spec/Android 源 ↔ 鸿蒙文件关系。
     **不做任何归属推断**：每个 spec 文件(含 addendum)、每个 Android 源文件、每个 agent、
@@ -673,18 +862,35 @@ def build_lineage(agents, main_tools, cwd):
     spec_read_by = {}  # spec rel -> {kind, read_by:set}   谁实际 Read 了这个 spec 文件
     spec_authors = {}  # spec rel -> {kind, authors:set}   谁写出这个 spec 文件
     file_writers = {}  # hmos rel -> {kind, writers:set}
+    file_read_counts = {}  # hmos rel -> 被读次数(全体 agent 的读取区间条数)
+    file_read_by = {}      # 工程内文件 rel -> 读过它的 agent 集合(读侧不隐身)
     android_read_by = {}  # android 绝对路径 -> set(agent_id)
     stage_view = {}    # stage -> 该阶段的安卓源码"视野"(读到哪些文件/去重多少行)
     android_probed_by = {}  # 安卓文件 -> 只用脚本点过它的 agent(内容未必进上下文)
     g_android_iv = {}     # android 绝对路径 -> 全体 agent 的读取区间(全局去重并集用)
     g_android_tot = {}    # android 绝对路径 -> 文件总行数(totalLines)
     g_write_events = []   # (ts, rel_path, kind, val) 全局写事件(终态重放)
+    g_blame = {}          # rel_path -> [(ts, seq, agent_id, op, payload)] 行级归属重放
 
     def role_of(wk):
         if wk.get("ets"): return "execute"
         if wk.get("spec"): return "spec"
         if wk.get("plan"): return "plan"
         return "other"
+
+    # 会话内脚本库:Write/cat>/tee 落盘的 .py/.sh 明文 —— shell 写目标提取用
+    # (fill_acs.py 场景:落盘目标在脚本体内,命令行只有脚本路径)。
+    shell_scripts = {}
+    for t in main_tools:
+        inp0 = t.get("_inp") or {}
+        if t["name"] == "Write":
+            fp0 = str(inp0.get("file_path") or "")
+            if fp0.endswith((".py", ".sh")) and inp0.get("content"):
+                shell_scripts[fp0] = str(inp0["content"])
+        elif t["name"] in ("Bash", "PowerShell"):
+            shell_scripts.update(_heredoc_scripts(str(inp0.get("command") or "")))
+    for a in agents:
+        shell_scripts.update(a.get("_script_bodies") or {})
 
     # 主线程作为合成贡献者。**按阶段拆开**:主线横跨全程,若合成单个 __main__ 则它
     # 没有阶段归属,任何"按阶段筛选"的视图都会整块丢掉主线的读写。
@@ -703,8 +909,11 @@ def build_lineage(agents, main_tools, cwd):
                 "_reads": [], "_writes": [],
                 "_read_lines": {}, "_write_lines": {},
                 "_read_iv": {}, "_read_total": {}, "_write_events": [],
-                "_read_sources": {}, "_probed": [],
+                "_blame_events": [],
+                "_read_sources": {}, "_probed": [], "_shell_cmds": [],
             }
+        if t["name"] in ("Bash", "PowerShell"):
+            m["_shell_cmds"].append((t["name"], t.get("_inp") or {}))
         if t["name"] == "Read":
             m["_reads"].append(p)
             m["_read_sources"].setdefault(p, set()).add("Read")
@@ -723,6 +932,21 @@ def build_lineage(agents, main_tools, cwd):
                 m["_write_lines"][p] = m["_write_lines"].get(p, 0) + t["wlines"]
                 if t.get("wevent"):
                     m["_write_events"].append((t.get("ts") or "", p, t["wevent"][0], t["wevent"][1]))
+            if p.endswith(".ets"):
+                # 行级归属:CC 从 _inp 取明文,codex 行自带 bevent(patch 解析);
+                # 两者都没有 = 实录外写盘(shell/heredoc),标 opaque 让重放诚实断链
+                bev = t.get("bevent")
+                if bev is None:
+                    inp0 = t.get("_inp") or {}
+                    if t["name"] == "Write" and inp0.get("content") is not None:
+                        bev = ("write", inp0["content"])
+                    elif t["name"] == "Edit" and inp0.get("old_string"):
+                        bev = ("edits", [(inp0.get("old_string") or "",
+                                          inp0.get("new_string") or "",
+                                          bool(inp0.get("replace_all")))])
+                    else:
+                        bev = ("opaque", None)
+                m["_blame_events"].append((t.get("ts") or "", p, bev[0], bev[1]))
         for pp in t.get("_probed_paths") or []:
             m["_probed"].append(pp)
         for event in t.get("_visible_source_lines") or []:
@@ -740,6 +964,22 @@ def build_lineage(agents, main_tools, cwd):
             if total:
                 m["_read_total"][path] = max(m["_read_total"].get(path, 0), total)
     contributors = list(main_by_stage.values()) + agents
+
+    shell_file_authors = {}  # spec rel -> set(agent):shell 落盘·文件级(高置信)
+    shell_dir_authors = {}   # dir rel  -> set(agent):shell 落盘·目录级(兜底)
+    for a in contributors:
+        for nm0, inp0 in (a.get("_shell_cmds") or []):
+            sf, sd = _shell_write_targets(nm0, inp0, shell_scripts)
+            for tg in sf:
+                r = _rel(tg, cwd)
+                if _is_abs(r) or any(x in r.lower() for x in _EXTERNAL_EXCLUDE):
+                    continue
+                shell_file_authors.setdefault(r, set()).add(a["agent_id"])
+            for tg in sd:
+                r = _rel(tg, cwd).rstrip("/")
+                if _is_abs(r) or any(x in r.lower() for x in _EXTERNAL_EXCLUDE):
+                    continue
+                shell_dir_authors.setdefault(r, set()).add(a["agent_id"])
 
     for a in contributors:
         reads_rel = [_rel(p, cwd) for p in a.get("_reads", [])]
@@ -762,8 +1002,14 @@ def build_lineage(agents, main_tools, cwd):
             if _is_hmos(rp) == "ets":
                 g_write_events.append((ev[0] or "", rp, ev[2], ev[3],
                                        a.get("stage") or "?"))
+        for ev in (a.get("_blame_events") or []):
+            rp = _rel(ev[1], cwd)
+            if _is_hmos(rp) == "ets":
+                lst = g_blame.setdefault(rp, [])
+                lst.append((ev[0] or "", len(lst), str(a.get("agent_id")), ev[2], ev[3]))
         lines_spec = lines_android = lines_ets = android_dedup = 0
         lines_proj = 0
+        tooling_reads, w_tooling = [], []
         wk = {}
         # 实质 spec 读取——每个文件独立(含 addendum)；shared/plan 另存供抽屉展示；
         # 工程外源码后缀 = Android 参考读取；工程内相对路径 = 项目自读(review/续写他人产出)
@@ -778,6 +1024,8 @@ def build_lineage(agents, main_tools, cwd):
             elif _is_abs(r):
                 low = r.lower()
                 if any(x in low for x in _EXTERNAL_EXCLUDE):
+                    if "/skills/" not in low:   # skill 模板读取不进血缘:抽屉的 Skill 调用已承载
+                        tooling_reads.append(r)
                     continue
                 if low.endswith(_ANDROID_EXT):
                     android_full.append(r)
@@ -786,9 +1034,19 @@ def build_lineage(agents, main_tools, cwd):
             else:
                 low = r.lower()
                 if any(x in low for x in _EXTERNAL_EXCLUDE):
+                    if "/skills/" not in low:   # 同上:skill 模板读取不进血缘
+                        tooling_reads.append(r)
+                    continue
+                if _android_in_tree(r):   # cwd 罩住 Android 工程的布局(AIPPT)
+                    android_full.append(r)
+                    lines_android += rl_rel.get(r, 0)
+                    android_dedup += _union_lines(iv_rel.get(r, []))
                     continue
                 proj_reads.append(r)   # 工程内文件(含读别人的 .ets/配置)
                 lines_proj += rl_rel.get(r, 0)
+                file_read_counts[r] = file_read_counts.get(r, 0) \
+                    + max(1, len(iv_rel.get(r, [])))
+                file_read_by.setdefault(r, set()).add(a["agent_id"])
         w_ets, w_spec, w_res, w_other = [], [], [], []
         for w in sorted(set(writes_rel)):
             sk = _spec_kind(w)
@@ -796,8 +1054,10 @@ def build_lineage(agents, main_tools, cwd):
             if not sk and not hk:
                 # 既不是 spec 也不是鸿蒙产物:仍然是这个 agent 的产出(构建脚本、
                 # 临时工具等),按"其它产物"收下——不按目录预判它有没有价值。
-                # 工程外的工具/缓存文件(.claude、migbot skills 等)不算。
-                if not any(x in w.lower() for x in _EXTERNAL_EXCLUDE):
+                # 工具面(.claude/skills/scratchpad)单列 tooling:照记,不隐身。
+                if any(x in w.lower() for x in _EXTERNAL_EXCLUDE):
+                    w_tooling.append(w)
+                else:
                     w_other.append(w)
                     fw = file_writers.setdefault(w, {"kind": "other", "writers": set(), "lines": 0})
                     fw["writers"].add(a["agent_id"])
@@ -890,8 +1150,11 @@ def build_lineage(agents, main_tools, cwd):
             "lines_ets": lines_ets,          # .ets 累计写入行(Write 全文 + Edit new_string)
             "n_proj": len(proj_reads),       # 工程内读取(自家产出/配置,非 spec 非安卓)
             "lines_proj": lines_proj,
-            # 主线视野要能列出明细;子代理只留计数,防 trace 膨胀
-            **({"proj_reads": proj_reads[:800]} if a.get("type") == "main-thread" else {}),
+            # 读写历史不隐身:全体 agent 保留明细(截断防爆),工具面单列
+            "proj_reads": proj_reads[:400],
+            "tooling_reads": sorted(set(tooling_reads))[:80],
+            "writes_tooling": sorted(set(w_tooling))[:80],
+            "n_tooling": len(set(tooling_reads)) + len(set(w_tooling)),
         })
 
     # ---- Android 根推断：全部外部源码读的**段级公共前缀**(大小写不敏感) ----
@@ -975,16 +1238,36 @@ def build_lineage(agents, main_tools, cwd):
         ]
         x["n_android"] = len(x["android_reads"])
 
+    # 写侧 patch 的相对路径 resolve 可能少一层工程前缀(会话 cwd 罩住工程的
+    # 布局),同一 spec 分裂成 "spec/x.md"(authors)与 "<proj>/spec/x.md"
+    # (read_by)两个条目,作者环断裂 —— 归并到带前缀版(读侧真实盘上路径)。
+    _merge_prefixed_specs(spec_read_by, spec_authors)
     # spec 文件全集 = 被读到 ∪ 被写出的**所有** spec/ 下文件(每个独立,含 addendum)
     spec_paths = set(spec_read_by) | set(spec_authors)
     specs_out = []
     for p in sorted(spec_paths):
         kind = (spec_read_by.get(p) or spec_authors.get(p))["kind"]
-        specs_out.append({
+        authors = sorted(spec_authors.get(p, {}).get("authors", []))
+        shell = []
+        if not authors:
+            # shell 写盘兜底:文件级精确匹配优先;目录级取最长前缀命中。
+            # 只补无精确作者的既有页 —— 不新增页、不覆盖 Write/Edit 作者。
+            hit = shell_file_authors.get(p)
+            if not hit:
+                best = max((d for d in shell_dir_authors if p.startswith(d + "/")),
+                           key=len, default=None)
+                hit = shell_dir_authors.get(best) if best else None
+            if hit:
+                shell = sorted(hit)
+                authors = shell
+        row = {
             "path": p, "kind": kind,
             "read_by": sorted(spec_read_by.get(p, {}).get("read_by", [])),
-            "authors": sorted(spec_authors.get(p, {}).get("authors", [])),
-        })
+            "authors": authors,
+        }
+        if shell:
+            row["authors_shell"] = shell
+        specs_out.append(row)
     # ---- 终态重放：全局写事件按时间排序，Write 覆盖 / Edit 净增减 → 每 .ets 最终行数 ----
     # 顺带产出:产码进度曲线(工程内 .ets 终态总行数随时间)与每文件"末笔归属阶段"
     g_write_events.sort(key=lambda e: e[0])
@@ -1020,9 +1303,37 @@ def build_lineage(agents, main_tools, cwd):
     android_code_dedup_in_scope = sum(_union_lines(g_android_iv.get(p, []))
                                       for p in _code_read if p not in _oos_abs)
 
+    # ---- 行级归属重放(git blame 语义):payload 只在内存,trace 只落区段与接手台账;
+    # 重放断链(实录外改动/opaque 写盘)时 blame=None + 原因,takeovers 不落半截数据 ----
+    def _blame_fields(r):
+        if not r:
+            return {}
+        if r["broken"]:
+            return {"blame": None, "blame_broken": r["broken"],
+                    "changes": r.get("changes") or []}
+        return {"blame": r["segments"], "takeovers": r["takeovers"], "blame_broken": None,
+                "changes": r.get("changes") or []}
+
+    blame_by_file = {}
+    for rp, evs in g_blame.items():
+        evs.sort(key=lambda x: (x[0], x[1]))
+        blame_by_file[rp] = _blame_replay(
+            [(aid, op, payload) for _, _, aid, op, payload in evs])
+
+    file_write_counts = Counter(rp for _, rp, _, _, _ in g_write_events)
     files_out = [{"path": p, "kind": v["kind"], "writers": sorted(v["writers"]), "lines": v.get("lines", 0),
-                  "final_lines": final_lines.get(p, 0)}
+                  "final_lines": final_lines.get(p, 0),
+                  "writes": file_write_counts.get(p, 0),
+                  "reads": file_read_counts.get(p, 0),
+                  "readers": sorted(file_read_by.get(p, set())),
+                  **_blame_fields(blame_by_file.get(p))}
                  for p, v in sorted(file_writers.items())]
+    # 只读未写的工程文件同样入台账 —— 被读也是血缘事实,不隐身
+    files_out += [{"path": p, "kind": _is_hmos(p) or "other", "writers": [],
+                   "lines": 0, "final_lines": 0, "writes": 0,
+                   "reads": file_read_counts.get(p, 0),
+                   "readers": sorted(file_read_by.get(p, set()))}
+                  for p in sorted(set(file_read_by) - set(file_writers))]
 
     # ---- 各阶段的安卓源码视野 ----
     # lines_dedup  = 跨 agent 区间并集,同一段代码被多人读只算一次(真实"看过"的量)
@@ -1186,7 +1497,7 @@ def extract(path):
 
     meta = {
         "source_file": os.path.abspath(path),
-        "schema_version": "1.8",
+        "schema_version": "2.0",
         "session_id": None,
         "cc_version": None,
         "cwd": None,
@@ -1549,213 +1860,256 @@ def extract(path):
             except (json.JSONDecodeError, OSError):
                 continue
             wfi = wf_byagent.get(agent_id) or {}
-            entry = {
-                "agent_id": agent_id,
-                "type": m.get("agentType"),
-                # workflow 子代理的 meta 没有 description，编排 label 才是它的身份
-                "desc": (wfi.get("label") or m.get("description") or "")[:240],
-                "wf_run": wfi.get("run_id"),
-                "wf_name": wfi.get("wf_name"),
-                "wf_phase": wfi.get("phase"),
-                "tuid": m.get("toolUseId"),
-                "stage": None,
-                "start_ts": None,
-                "end_ts": None,
-                "dur_ms": None,
-                "output_tokens": 0,
-                "tool_uses": 0,
-                "tool_counts": {},
-                "status": "unknown",
-                "aborted": None,  # 'interrupted' / 'api_error' / None(正常收尾)
-                "model": None,
-                "result": "",
-                "skills": {},
-                "skill_calls": [],
-                "seg": None,
-                "_prompt": "",   # 派发 prompt(首条 user 文本)—lineage owning-spec 兜底信号
-                "_probed": [],   # 脚本(Bash/Grep)点到过的源码文件——只是探测,未必进上下文
-                "_reads": [],    # Read file_path 原始路径
-                "_writes": [],   # Write/Edit/MultiEdit file_path 原始路径
-                "_read_lines": {},   # path -> 累计读取行数(Read 结果 numLines)
-                "_read_iv": {},      # path -> [(startLine, numLines)...] 读取区间(去重并集用)
-                "_read_total": {},   # path -> 文件总行数(Read 结果 totalLines, 取 max)
-                "_read_sources": {}, # path -> {Read/Grep/Bash/PowerShell} 可见行来源
-                "_write_lines": {},  # path -> 累计写入行数(Write content/Edit new_string)
-                "_write_events": [], # (ts, path, 'set'|'delta', 行数/净差) 终态重放用
-            }
-            jl = os.path.join(adir, f"agent-{agent_id}.jsonl")
-            if os.path.isfile(jl):
-                first_ts = last_ts = None
-                last_rec = None
-                sub_usage = {}  # message.id -> {m:model, u:最新 usage, ch:[think,text,tool]字符}
-                pending_skill = {}  # tool_use_id -> skill_calls 下标(待回填结果)
-                pending_read = {}   # tool_use_id -> file_path(待从结果取 numLines)
-                pending_visible = {}  # tool_use_id -> (name, input)，从最终输出还原源码行
-                with open(jl, encoding="utf-8") as f:
-                    for line in f:
-                        try:
-                            rec = json.loads(line)
-                        except json.JSONDecodeError:
-                            continue
-                        ts = rec.get("timestamp")
-                        if ts:
-                            if first_ts is None:
-                                first_ts = ts
-                            last_ts = ts
-                        # 收尾判定用:正常结束的子代理末条一定是 stop_reason=end_turn 的
-                        # assistant 文本;被中断/断连的则停在 [Request interrupted] 或错误上
-                        last_rec = rec
-                        msg = rec.get("message")
-                        if isinstance(msg, dict):
-                            mm = msg.get("model")
-                            if entry["model"] is None and mm and not mm.startswith("<"):
-                                entry["model"] = mm
-                            u = msg.get("usage")
-                            if isinstance(u, dict) and not (mm or "").startswith("<"):
-                                sslot = sub_usage.setdefault(
-                                    msg.get("id"),
-                                    {"m": msg.get("model") or "unknown", "u": u, "ch": [0, 0, 0]})
-                                sslot["u"] = u
-                                if rec.get("type") == "assistant":
-                                    th, tx, tu = block_chars(msg)
-                                    sslot["ch"][0] += th
-                                    sslot["ch"][1] += tx
-                                    sslot["ch"][2] += tu
-                            c = msg.get("content")
-                            if not entry["_prompt"] and rec.get("type") == "user":
-                                pt = c if isinstance(c, str) else (
-                                    " ".join(b.get("text", "") for b in c
-                                             if isinstance(b, dict) and b.get("type") == "text")
-                                    if isinstance(c, list) else "")
-                                if pt and pt.strip():
-                                    entry["_prompt"] = pt.strip()[:4000]
-                            if isinstance(c, list):
-                                for blk in c:
-                                    if not isinstance(blk, dict):
-                                        continue
-                                    if blk.get("type") == "tool_use":
-                                        entry["tool_uses"] += 1
-                                        n = blk.get("name")
-                                        entry["tool_counts"][n] = entry["tool_counts"].get(n, 0) + 1
-                                        binp = blk.get("input") or {}
-                                        bfp = binp.get("file_path") or binp.get("path")
-                                        if n == "Read" and isinstance(bfp, str):
-                                            entry["_reads"].append(bfp)
-                                            pending_read[blk.get("id")] = bfp
-                                        elif n in ("Grep", "Bash", "PowerShell"):
-                                            pending_visible[blk.get("id")] = (n, binp)
-                                            for pp in _script_probed_paths(n, binp, meta["cwd"]):
-                                                entry["_probed"].append(pp)
-                                        elif n in ("Write", "Edit", "MultiEdit") and isinstance(bfp, str):
-                                            entry["_writes"].append(bfp)
-                                            wl = 0
-                                            if n == "Write":
-                                                wl = (binp.get("content") or "").count("\n") + 1
-                                                entry["_write_events"].append((ts, bfp, "set", wl))
-                                            elif n == "Edit":
-                                                wl = (binp.get("new_string") or "").count("\n") + 1
-                                                ol = (binp.get("old_string") or "").count("\n") + 1
-                                                entry["_write_events"].append((ts, bfp, "delta", wl - ol))
-                                            else:  # MultiEdit
-                                                dlt = 0
-                                                for e2 in (binp.get("edits") or []):
-                                                    if isinstance(e2, dict):
-                                                        n2 = (e2.get("new_string") or "").count("\n") + 1
-                                                        o2 = (e2.get("old_string") or "").count("\n") + 1
-                                                        wl += n2
-                                                        dlt += n2 - o2
-                                                entry["_write_events"].append((ts, bfp, "delta", dlt))
-                                            entry["_write_lines"][bfp] = entry["_write_lines"].get(bfp, 0) + wl
-                                        if n == "Skill":
-                                            sk = (blk.get("input") or {}).get("skill")
-                                            if sk:
-                                                entry["skills"][sk] = entry["skills"].get(sk, 0) + 1
-                                                entry["skill_calls"].append(
-                                                    {"skill": sk, "ts": ts, "ok": None, "dur_ms": None})
-                                                pending_skill[blk.get("id")] = len(entry["skill_calls"]) - 1
-                                    elif blk.get("type") == "tool_result" and blk.get("tool_use_id") in pending_skill:
-                                        sc = entry["skill_calls"][pending_skill.pop(blk["tool_use_id"])]
-                                        sc["ok"] = not blk.get("is_error", False)
-                                        sc["dur_ms"] = ms_between(sc["ts"], ts)
-                                    elif blk.get("type") == "tool_result" and blk.get("tool_use_id") in pending_read:
-                                        rp = pending_read.pop(blk["tool_use_id"])
-                                        tur = rec.get("toolUseResult")
-                                        nl, st, tot = 0, 1, 0
-                                        if isinstance(tur, dict):
-                                            fl = tur.get("file")
-                                            if isinstance(fl, dict):
-                                                nl = fl.get("numLines") or 0
-                                                st = fl.get("startLine") or 1
-                                                tot = fl.get("totalLines") or 0
-                                        spans = []
-                                        if not nl and not blk.get("is_error"):
-                                            # 无 toolUseResult(workflow 子代理)：从正文 `N\t` 前缀取精确区间
-                                            body = result_text(blk, rec.get("toolUseResult"))
-                                            spans = _spans_from_numbered_text(body)
-                                            if not spans and body:  # 无行号(如图片/二进制)才退回数行
-                                                nl = body.count("\n") + 1
-                                        if spans and not blk.get("is_error"):
-                                            entry["_read_sources"].setdefault(rp, set()).add("Read")
-                                            for s0, c0 in spans:
-                                                entry["_read_iv"].setdefault(rp, []).append((s0, c0))
-                                                entry["_read_lines"][rp] = entry["_read_lines"].get(rp, 0) + c0
-                                        elif nl and not blk.get("is_error"):
-                                            entry["_read_lines"][rp] = entry["_read_lines"].get(rp, 0) + nl
-                                            entry["_read_iv"].setdefault(rp, []).append((st, nl))
-                                            entry["_read_sources"].setdefault(rp, set()).add("Read")
-                                        if tot and not blk.get("is_error"):
-                                            entry["_read_total"][rp] = max(entry["_read_total"].get(rp, 0), tot)
-                                    elif blk.get("type") == "tool_result" and blk.get("tool_use_id") in pending_visible:
-                                        name, vinp = pending_visible.pop(blk["tool_use_id"])
-                                        if not blk.get("is_error"):
-                                            visible = _infer_visible_source_lines(
-                                                name, vinp, result_text(blk, rec.get("toolUseResult")),
-                                                meta["cwd"],
-                                            )
-                                            for event in visible:
-                                                rp = event["path"]
-                                                entry["_reads"].append(rp)
-                                                entry["_read_sources"].setdefault(rp, set()).add(name)
-                                                for start, count in event["intervals"]:
-                                                    entry["_read_iv"].setdefault(rp, []).append(
-                                                        (start, count)
-                                                    )
-                                                    entry["_read_lines"][rp] = (
-                                                        entry["_read_lines"].get(rp, 0) + count
-                                                    )
-                                                try:
-                                                    with open(
-                                                        rp, encoding="utf-8", errors="ignore"
-                                                    ) as stream:
-                                                        total = sum(1 for _ in stream)
-                                                except OSError:
-                                                    total = 0
-                                                if total:
-                                                    entry["_read_total"][rp] = max(
-                                                        entry["_read_total"].get(rp, 0), total
-                                                    )
-                                    elif (blk.get("type") == "text" and blk.get("text", "").strip()
-                                          and msg.get("role") == "assistant"):
-                                        entry["result"] = blk["text"].strip()[:300]
-                a_split = {"thinking": 0.0, "text": 0.0, "tool": 0.0}
-                for sslot in sub_usage.values():
-                    u = sslot["u"]
-                    entry["output_tokens"] += u.get("output_tokens") or 0
-                    bill(sslot["m"], u)
-                    o = u.get("output_tokens") or 0
-                    th, tx, tu = sslot["ch"]
-                    tot_ch = th + tx + tu
-                    if tot_ch:
-                        a_split["thinking"] += o * th / tot_ch
-                        a_split["text"] += o * tx / tot_ch
-                        a_split["tool"] += o * tu / tot_ch
-                    else:
-                        a_split["text"] += o
-                entry["out_split"] = {k: int(round(v)) for k, v in a_split.items()}
-                entry["start_ts"] = first_ts
-                entry["end_ts"] = last_ts
-                entry["dur_ms"] = ms_between(first_ts, last_ts)
-                entry["aborted"] = _abort_reason(last_rec)
+            _jl_path = os.path.join(adir, f"agent-{agent_id}.jsonl")
+            _sig = _sub_sig(_jl_path, os.path.join(adir, fn), meta["cwd"])
+            _hit = _SUB_CACHE.get(_jl_path) if _sig else None
+            if _hit is not None and _hit[0] == _sig:
+                entry = copy.deepcopy(_hit[1])
+                # 主线相关字段不缓存价值(wfi 来自主线解析,可能已更新),命中后重填
+                entry["desc"] = (wfi.get("label") or m.get("description") or "")[:240]
+                entry["wf_run"] = wfi.get("run_id")
+                entry["wf_name"] = wfi.get("wf_name")
+                entry["wf_phase"] = wfi.get("phase")
+            else:
+                entry = {
+                    "agent_id": agent_id,
+                    "type": m.get("agentType"),
+                    # workflow 子代理的 meta 没有 description，编排 label 才是它的身份
+                    "desc": (wfi.get("label") or m.get("description") or "")[:240],
+                    "wf_run": wfi.get("run_id"),
+                    "wf_name": wfi.get("wf_name"),
+                    "wf_phase": wfi.get("phase"),
+                    "tuid": m.get("toolUseId"),
+                    "stage": None,
+                    "start_ts": None,
+                    "end_ts": None,
+                    "dur_ms": None,
+                    "output_tokens": 0,
+                    "tool_uses": 0,
+                    "tool_counts": {},
+                    "status": "unknown",
+                    "aborted": None,  # 'interrupted' / 'api_error' / None(正常收尾)
+                    "model": None,
+                    "result": "",
+                    "skills": {},
+                    "skill_calls": [],
+                    "seg": None,
+                    "_prompt": "",   # 派发 prompt(首条 user 文本)—lineage owning-spec 兜底信号
+                    "_probed": [],   # 脚本(Bash/Grep)点到过的源码文件——只是探测,未必进上下文
+                    "_reads": [],    # Read file_path 原始路径
+                    "_writes": [],   # Write/Edit/MultiEdit file_path 原始路径
+                    "_read_lines": {},   # path -> 累计读取行数(Read 结果 numLines)
+                    "_read_iv": {},      # path -> [(startLine, numLines)...] 读取区间(去重并集用)
+                    "_read_total": {},   # path -> 文件总行数(Read 结果 totalLines, 取 max)
+                    "_read_sources": {}, # path -> {Read/Grep/Bash/PowerShell} 可见行来源
+                    "_write_lines": {},  # path -> 累计写入行数(Write content/Edit new_string)
+                    "_write_events": [], # (ts, path, 'set'|'delta', 行数/净差) 终态重放用
+                    "_blame_events": [], # (ts, path, op, payload) 行级归属重放(.ets 限定)
+                    "_shell_cmds": [],   # (tool_name, input) shell 写盘归属提取用
+                    "_script_bodies": {},  # 该 agent 落盘的 .py/.sh 明文(脚本库)
+                }
+                jl = os.path.join(adir, f"agent-{agent_id}.jsonl")
+                if os.path.isfile(jl):
+                    first_ts = last_ts = None
+                    last_rec = None
+                    sub_usage = {}  # message.id -> {m:model, u:最新 usage, ch:[think,text,tool]字符}
+                    pending_skill = {}  # tool_use_id -> skill_calls 下标(待回填结果)
+                    pending_read = {}   # tool_use_id -> file_path(待从结果取 numLines)
+                    pending_visible = {}  # tool_use_id -> (name, input)，从最终输出还原源码行
+                    with open(jl, encoding="utf-8") as f:
+                        for line in f:
+                            try:
+                                rec = json.loads(line)
+                            except json.JSONDecodeError:
+                                continue
+                            ts = rec.get("timestamp")
+                            if ts:
+                                if first_ts is None:
+                                    first_ts = ts
+                                last_ts = ts
+                            # 收尾判定用:正常结束的子代理末条一定是 stop_reason=end_turn 的
+                            # assistant 文本;被中断/断连的则停在 [Request interrupted] 或错误上
+                            last_rec = rec
+                            msg = rec.get("message")
+                            if isinstance(msg, dict):
+                                mm = msg.get("model")
+                                if entry["model"] is None and mm and not mm.startswith("<"):
+                                    entry["model"] = mm
+                                u = msg.get("usage")
+                                if isinstance(u, dict) and not (mm or "").startswith("<"):
+                                    sslot = sub_usage.setdefault(
+                                        msg.get("id"),
+                                        {"m": msg.get("model") or "unknown", "u": u, "ch": [0, 0, 0]})
+                                    sslot["u"] = u
+                                    if rec.get("type") == "assistant":
+                                        th, tx, tu = block_chars(msg)
+                                        sslot["ch"][0] += th
+                                        sslot["ch"][1] += tx
+                                        sslot["ch"][2] += tu
+                                c = msg.get("content")
+                                if not entry["_prompt"] and rec.get("type") == "user":
+                                    pt = c if isinstance(c, str) else (
+                                        " ".join(b.get("text", "") for b in c
+                                                 if isinstance(b, dict) and b.get("type") == "text")
+                                        if isinstance(c, list) else "")
+                                    if pt and pt.strip():
+                                        entry["_prompt"] = pt.strip()[:4000]
+                                if isinstance(c, list):
+                                    for blk in c:
+                                        if not isinstance(blk, dict):
+                                            continue
+                                        if blk.get("type") == "tool_use":
+                                            entry["tool_uses"] += 1
+                                            n = blk.get("name")
+                                            entry["tool_counts"][n] = entry["tool_counts"].get(n, 0) + 1
+                                            binp = blk.get("input") or {}
+                                            bfp = binp.get("file_path") or binp.get("path")
+                                            if n == "Read" and isinstance(bfp, str):
+                                                entry["_reads"].append(bfp)
+                                                pending_read[blk.get("id")] = bfp
+                                            elif n in ("Grep", "Bash", "PowerShell"):
+                                                pending_visible[blk.get("id")] = (n, binp)
+                                                for pp in _script_probed_paths(n, binp, meta["cwd"]):
+                                                    entry["_probed"].append(pp)
+                                                if n != "Grep":
+                                                    entry["_shell_cmds"].append((n, binp))
+                                                    entry["_script_bodies"].update(
+                                                        _heredoc_scripts(str(binp.get("command") or "")))
+                                            elif n in ("Write", "Edit", "MultiEdit") and isinstance(bfp, str):
+                                                entry["_writes"].append(bfp)
+                                                wl = 0
+                                                if n == "Write":
+                                                    wl = (binp.get("content") or "").count("\n") + 1
+                                                    entry["_write_events"].append((ts, bfp, "set", wl))
+                                                    if bfp.endswith((".py", ".sh")) and binp.get("content"):
+                                                        entry["_script_bodies"][bfp] = str(binp["content"])
+                                                elif n == "Edit":
+                                                    wl = (binp.get("new_string") or "").count("\n") + 1
+                                                    ol = (binp.get("old_string") or "").count("\n") + 1
+                                                    entry["_write_events"].append((ts, bfp, "delta", wl - ol))
+                                                else:  # MultiEdit
+                                                    dlt = 0
+                                                    for e2 in (binp.get("edits") or []):
+                                                        if isinstance(e2, dict):
+                                                            n2 = (e2.get("new_string") or "").count("\n") + 1
+                                                            o2 = (e2.get("old_string") or "").count("\n") + 1
+                                                            wl += n2
+                                                            dlt += n2 - o2
+                                                    entry["_write_events"].append((ts, bfp, "delta", dlt))
+                                                if bfp.endswith(".ets"):
+                                                    if n == "Write":
+                                                        entry["_blame_events"].append(
+                                                            (ts, bfp, "write", binp.get("content") or ""))
+                                                    elif n == "Edit":
+                                                        entry["_blame_events"].append(
+                                                            (ts, bfp, "edits",
+                                                             [(binp.get("old_string") or "",
+                                                               binp.get("new_string") or "",
+                                                               bool(binp.get("replace_all")))]))
+                                                    else:  # MultiEdit:分块按序作用在前一块结果上
+                                                        entry["_blame_events"].append(
+                                                            (ts, bfp, "edits",
+                                                             [(e2.get("old_string") or "",
+                                                               e2.get("new_string") or "",
+                                                               bool(e2.get("replace_all")))
+                                                              for e2 in (binp.get("edits") or [])
+                                                              if isinstance(e2, dict)]))
+                                                entry["_write_lines"][bfp] = entry["_write_lines"].get(bfp, 0) + wl
+                                            if n == "Skill":
+                                                sk = (blk.get("input") or {}).get("skill")
+                                                if sk:
+                                                    entry["skills"][sk] = entry["skills"].get(sk, 0) + 1
+                                                    entry["skill_calls"].append(
+                                                        {"skill": sk, "ts": ts, "ok": None, "dur_ms": None})
+                                                    pending_skill[blk.get("id")] = len(entry["skill_calls"]) - 1
+                                        elif blk.get("type") == "tool_result" and blk.get("tool_use_id") in pending_skill:
+                                            sc = entry["skill_calls"][pending_skill.pop(blk["tool_use_id"])]
+                                            sc["ok"] = not blk.get("is_error", False)
+                                            sc["dur_ms"] = ms_between(sc["ts"], ts)
+                                        elif blk.get("type") == "tool_result" and blk.get("tool_use_id") in pending_read:
+                                            rp = pending_read.pop(blk["tool_use_id"])
+                                            tur = rec.get("toolUseResult")
+                                            nl, st, tot = 0, 1, 0
+                                            if isinstance(tur, dict):
+                                                fl = tur.get("file")
+                                                if isinstance(fl, dict):
+                                                    nl = fl.get("numLines") or 0
+                                                    st = fl.get("startLine") or 1
+                                                    tot = fl.get("totalLines") or 0
+                                            spans = []
+                                            if not nl and not blk.get("is_error"):
+                                                # 无 toolUseResult(workflow 子代理)：从正文 `N\t` 前缀取精确区间
+                                                body = result_text(blk, rec.get("toolUseResult"))
+                                                spans = _spans_from_numbered_text(body)
+                                                if not spans and body:  # 无行号(如图片/二进制)才退回数行
+                                                    nl = body.count("\n") + 1
+                                            if spans and not blk.get("is_error"):
+                                                entry["_read_sources"].setdefault(rp, set()).add("Read")
+                                                for s0, c0 in spans:
+                                                    entry["_read_iv"].setdefault(rp, []).append((s0, c0))
+                                                    entry["_read_lines"][rp] = entry["_read_lines"].get(rp, 0) + c0
+                                            elif nl and not blk.get("is_error"):
+                                                entry["_read_lines"][rp] = entry["_read_lines"].get(rp, 0) + nl
+                                                entry["_read_iv"].setdefault(rp, []).append((st, nl))
+                                                entry["_read_sources"].setdefault(rp, set()).add("Read")
+                                            if tot and not blk.get("is_error"):
+                                                entry["_read_total"][rp] = max(entry["_read_total"].get(rp, 0), tot)
+                                        elif blk.get("type") == "tool_result" and blk.get("tool_use_id") in pending_visible:
+                                            name, vinp = pending_visible.pop(blk["tool_use_id"])
+                                            if not blk.get("is_error"):
+                                                visible = _infer_visible_source_lines(
+                                                    name, vinp, result_text(blk, rec.get("toolUseResult")),
+                                                    meta["cwd"],
+                                                )
+                                                for event in visible:
+                                                    rp = event["path"]
+                                                    entry["_reads"].append(rp)
+                                                    entry["_read_sources"].setdefault(rp, set()).add(name)
+                                                    for start, count in event["intervals"]:
+                                                        entry["_read_iv"].setdefault(rp, []).append(
+                                                            (start, count)
+                                                        )
+                                                        entry["_read_lines"][rp] = (
+                                                            entry["_read_lines"].get(rp, 0) + count
+                                                        )
+                                                    try:
+                                                        with open(
+                                                            rp, encoding="utf-8", errors="ignore"
+                                                        ) as stream:
+                                                            total = sum(1 for _ in stream)
+                                                    except OSError:
+                                                        total = 0
+                                                    if total:
+                                                        entry["_read_total"][rp] = max(
+                                                            entry["_read_total"].get(rp, 0), total
+                                                        )
+                                        elif (blk.get("type") == "text" and blk.get("text", "").strip()
+                                              and msg.get("role") == "assistant"):
+                                            entry["result"] = blk["text"].strip()[:300]
+                    a_split = {"thinking": 0.0, "text": 0.0, "tool": 0.0}
+                    for sslot in sub_usage.values():
+                        u = sslot["u"]
+                        entry["output_tokens"] += u.get("output_tokens") or 0
+                        bill(sslot["m"], u)
+                        o = u.get("output_tokens") or 0
+                        th, tx, tu = sslot["ch"]
+                        tot_ch = th + tx + tu
+                        if tot_ch:
+                            a_split["thinking"] += o * th / tot_ch
+                            a_split["text"] += o * tx / tot_ch
+                            a_split["tool"] += o * tu / tot_ch
+                        else:
+                            a_split["text"] += o
+                    entry["out_split"] = {k: int(round(v)) for k, v in a_split.items()}
+                    entry["start_ts"] = first_ts
+                    entry["end_ts"] = last_ts
+                    entry["dur_ms"] = ms_between(first_ts, last_ts)
+                    entry["aborted"] = _abort_reason(last_rec)
+
+                if _sig is not None:
+                    if len(_SUB_CACHE) >= _SUB_CACHE_MAX:
+                        _SUB_CACHE.pop(next(iter(_SUB_CACHE)))
+                    _SUB_CACHE[_jl_path] = (_sig, copy.deepcopy(entry))
             # Workflow 子代理没有派发 tool_use,按所属 workflow 归段——
             # 工作流在后台跑，时间窗常越过主线阶段边界，按时间兜底会归错。
             wf_key = wf_stage_of_run.get(entry.get("wf_run") or "")
@@ -1942,7 +2296,9 @@ def extract(path):
     # ---- 数据血缘: spec ↔ agent ↔ 鸿蒙文件(在剥离临时字段之前构建)----
     lineage = build_lineage(agents, tools, meta["cwd"])
     for a in agents:  # 剥离仅供 lineage 的临时字段
-        a.pop("_prompt", None)
+        # 派发指令摘录:主线 Agent 调用的原话,零推断 —— 详情抽屉「派发指令」栏用。
+        # 反查 skill 源文件哪一段生成的派发词是文本对齐推断,刻意不做。
+        a["prompt_excerpt"] = (a.pop("_prompt", None) or "")[:800]
         a.pop("_reads", None)
         a.pop("_writes", None)
         a.pop("_read_lines", None)
@@ -1951,6 +2307,9 @@ def extract(path):
         a.pop("_read_total", None)
         a.pop("_read_sources", None)
         a.pop("_write_events", None)
+        a.pop("_blame_events", None)
+        a.pop("_shell_cmds", None)
+        a.pop("_script_bodies", None)
     for tool in tools:
         tool.pop("_inp", None)
         tool.pop("_visible_source_lines", None)

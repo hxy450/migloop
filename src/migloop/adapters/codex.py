@@ -9,10 +9,12 @@ objects returned by :mod:`extract_session`.
 """
 import difflib
 import glob
+import hashlib
 import json
 import os
 import re
 from collections import Counter
+from datetime import datetime
 
 from . import claude as common
 from .base import SessionCandidate
@@ -34,6 +36,9 @@ _PIPELINE_SKILLS = set(common.PIPELINE_SKILLS)
 _CODEX_STAGE_SKILLS = {
     "mig-arch", "a2h-arch-scaffold", "a2h-spec", "a2h-plan",
     "a2h-execute", "a2h-verify", "a2h-retrospect",
+    # dynamic workflow 的 verify 轮:visual verify 会话整场读它开工 ——
+    # 不成阶段的话 fixer 拿不到 verify 语义,正式口径(verify 阶段=fix)落空
+    "arkts-visual-verify",
 }
 
 
@@ -138,6 +143,7 @@ def discover_rollout_tree(path, sessions_root=None):
             "parent": spawn.get("parent_thread_id"),
             "agent_path": spawn.get("agent_path"),
             "nickname": spawn.get("agent_nickname"),
+            "agent_role": spawn.get("agent_role"),
             "depth": spawn.get("depth"),
         }
     if root_id not in candidates:
@@ -216,13 +222,16 @@ def _nested_segments(source, tool_name):
 
 
 def _extract_shell_calls(source, default_cwd):
+    # CLI 0.147+ 把 shell_command 换成 exec_command、参数 command 换成 cmd;
+    # 两代形态都要认 —— 漏认的后果是读侧血缘整体为零(AIPPT 实测)。
     calls = []
-    for segment in _nested_segments(source, "shell_command"):
-        command = _js_field(segment, "command")
-        if not command:
-            continue
-        calls.append({"command": command,
-                      "workdir": _js_field(segment, "workdir") or default_cwd})
+    for tool_name, field in (("shell_command", "command"), ("exec_command", "cmd")):
+        for segment in _nested_segments(source, tool_name):
+            command = _js_field(segment, field) or _js_field(segment, "command")
+            if not command:
+                continue
+            calls.append({"command": command,
+                          "workdir": _js_field(segment, "workdir") or default_cwd})
     return calls
 
 
@@ -298,13 +307,38 @@ def _explicit_get_content_paths(command, cwd):
     return values
 
 
-def _visible_intervals(path, output):
+#: 源文件读缓存 —— 视野推断对同一批源文件反复 open+read(326MB 会话实测
+#: 3843 次 open 共 24s),按 (mtime,size) 缓存;文件在写自然失效。
+_SRC_CACHE = {}
+_SRC_CACHE_MAX = 64
+
+
+def _read_source_cached(path):
+    try:
+        st = os.stat(path)
+        key = (st.st_mtime_ns, st.st_size)
+    except OSError:
+        return None
+    hit = _SRC_CACHE.get(path)
+    if hit is not None and hit[0] == key:
+        return hit[1]
     try:
         with open(path, encoding="utf-8", errors="ignore") as stream:
             source = stream.read().replace("\r\n", "\n").replace("\r", "\n")
     except OSError:
+        return None
+    value = (source, source.splitlines())
+    if len(_SRC_CACHE) >= _SRC_CACHE_MAX:
+        _SRC_CACHE.pop(next(iter(_SRC_CACHE)))
+    _SRC_CACHE[path] = (key, value)
+    return value
+
+
+def _visible_intervals(path, output):
+    cached = _read_source_cached(path)
+    if cached is None:
         return [], 0
-    lines = source.splitlines()
+    source, lines = cached
     shown = (output or "").replace("\r\n", "\n").replace("\r", "\n")
     if source and source.rstrip("\n") in shown:
         return [(1, len(lines))], len(lines)
@@ -331,6 +365,63 @@ def _visible_intervals(path, output):
     return common._merge_line_intervals(hits), len(lines)
 
 
+_SED_RANGE_RE = re.compile(r"\bsed\s+-n\s+'?(\d+),(\d+)p'?\s+\"?([^-\s;|&\"][^\s;|&\"]*)")
+_CAT_READ_RE = re.compile(r"\b(?:cat|head|tail)\s+(?:-n\s*\d*\s+)?\"?([^-\s;|&\"][^\s;|&\"]*)")
+
+
+def _offline_norm(path, cwd):
+    # 相对路径(verify 轮 fixer 实测形态)以 workdir 归一;绝对路径原样
+    p = path.replace("\\", "/")
+    if not p.startswith("/") and ":" not in p.split("/")[0]:
+        p = (cwd or "").replace("\\", "/").rstrip("/") + "/" + p
+    return p
+
+
+def _looks_like_path(token):
+    # 数字参数/引号残片不是路径:tail -n 1000 的 1000、裸引号等(实测污染图)
+    t = token.strip("'")
+    if not t or t.isdigit():
+        return False
+    return "/" in t or "." in t
+
+
+def _strip_exec_wrapper(output):
+    text = output or ""
+    idx = text.find("Output:\n")
+    if idx >= 0 and text[:idx].count("\n") <= 4:
+        return text[idx + len("Output:\n"):].lstrip("\n")
+    return text
+
+
+def _offline_visible_events(command, output, cwd):
+    """离线导入的会话兜底:文件不在本机盘,磁盘比对必然为空 —— 用命令语义
+    (sed 的范围是实录参数)+ 输出规模判定"内容进了上下文"。wc/重定向这类
+    只有计数或无正文输出的不算。仅在磁盘比对拿不到结果时使用。"""
+    body = _strip_exec_wrapper(output)
+    if not body.strip():
+        return []
+    n_out = body.count("\n") + 1
+    events = []
+    seen = set()
+    for match in _SED_RANGE_RE.finditer(command or ""):
+        start, end = int(match.group(1)), int(match.group(2))
+        path = match.group(3)
+        if path in seen or "$" in path or not _looks_like_path(path):
+            continue
+        seen.add(path)
+        count = max(1, min(end - start + 1, n_out))
+        events.append({"path": _offline_norm(path, cwd),
+                       "intervals": [(start, count)], "via": "PowerShell"})
+    for match in _CAT_READ_RE.finditer(command or ""):
+        path = match.group(1)
+        if path in seen or "$" in path or not _looks_like_path(path):
+            continue
+        seen.add(path)
+        events.append({"path": _offline_norm(path, cwd),
+                       "intervals": [(1, n_out)], "via": "PowerShell"})
+    return events
+
+
 def _generic_visible_events(command, output, cwd):
     events = []
     for path in _explicit_get_content_paths(command, cwd):
@@ -339,6 +430,45 @@ def _generic_visible_events(command, output, cwd):
             events.append({"path": path.replace("\\", "/"),
                            "intervals": intervals, "via": "PowerShell"})
     return events
+
+
+def _patch_body_lines(body):
+    lines = body.split("\n")
+    if lines and lines[0] == "":
+        lines = lines[1:]
+    if lines and lines[-1] == "":
+        lines = lines[:-1]
+    return [line for line in lines if not line.startswith("***")]
+
+
+def _patch_chunks(body):
+    """V4A Update 体 → 结构化 hunk 列表,每块 = [("ctx"|"del"|"add", [行])…]。
+    ctx/del/add 分开是行级归属的关键:上下文行没被改,必须保留原作者,
+    只有 add 行归编辑者(blame 的 "hunks" op 语义)。块按序作用。"""
+    chunks = []
+    runs = []
+
+    def push(kind, text):
+        if runs and runs[-1][0] == kind:
+            runs[-1][1].append(text)
+        else:
+            runs.append((kind, [text]))
+
+    for line in _patch_body_lines(body):
+        if line.startswith("@@"):
+            if runs:
+                chunks.append(runs)
+            runs = []
+            continue
+        if line.startswith("-"):
+            push("del", line[1:])
+        elif line.startswith("+"):
+            push("add", line[1:])
+        else:
+            push("ctx", line[1:] if line.startswith(" ") else line)
+    if runs:
+        chunks.append(runs)
+    return chunks
 
 
 def _patch_entries(patch, cwd):
@@ -360,8 +490,18 @@ def _patch_entries(patch, cwd):
             name, event = "Edit", ["delta", -removed]
         else:
             name, event = "Edit", ["delta", added - removed]
-        rows.append({"name": name, "brief": path, "wlines": added,
-                     "wevent": event, "patch_action": action})
+        row = {"name": name, "brief": path, "wlines": added,
+               "wevent": event, "patch_action": action}
+        if path.endswith(".ets"):
+            if action == "Add":
+                row["bevent"] = ("write", "\n".join(
+                    line[1:] for line in _patch_body_lines(body)
+                    if line.startswith("+")))
+            elif action == "Delete":
+                row["bevent"] = ("delete", None)
+            else:
+                row["bevent"] = ("hunks", _patch_chunks(body))
+        rows.append(row)
     return rows
 
 
@@ -375,204 +515,335 @@ def _tool_entry(idx, ts, name, inp, call_id, output, output_ts, brief=None):
     }
 
 
+def _normalize_one(call, outputs, cwd):
+    """单条 call 的规整(原 _normalize_tools 循环体)。纯函数:结果只依赖
+    (call, 它的 output, cwd) —— 增量解析按此粒度缓存昂贵的源码视野推断。"""
+    rows = []
+    result = outputs.get(call.get("call_id")) or {}
+    output = result.get("text") or ""
+    output_ts = result.get("ts")
+    raw = call.get("raw") or ""
+    if call.get("name") == "exec":
+        extracted = False
+        for shell in _extract_shell_calls(raw, cwd):
+            extracted = True
+            command = shell["command"]
+            workdir = shell.get("workdir") or cwd
+            entry = _tool_entry(call["idx"], call["ts"], "PowerShell",
+                                {"command": command, "workdir": workdir},
+                                call.get("call_id"), output, output_ts,
+                                brief=" ".join(command.split())[:300])
+            visible = common._infer_visible_source_lines(
+                "PowerShell", {"command": command}, output, workdir
+            )
+            existing = {(event["path"], tuple(event["intervals"])) for event in visible}
+            for event in _generic_visible_events(command, output, workdir):
+                key = (event["path"], tuple(event["intervals"]))
+                if key not in existing:
+                    visible.append(event)
+                    existing.add(key)
+            if not visible:
+                covered = {event["path"] for event in visible}
+                for event in _offline_visible_events(command, output, workdir):
+                    if event["path"] in covered or os.path.isfile(event["path"]):
+                        continue  # 本机盘上存在的文件以磁盘比对为权威
+                    visible.append(event)
+            if visible:
+                entry["_visible_source_lines"] = visible
+            probed = common._script_probed_paths(
+                "PowerShell", {"command": command}, workdir
+            )
+            if probed:
+                entry["_probed_paths"] = probed
+            skills = _skill_names(command)
+            if skills:
+                entry["skills"] = skills
+            rows.append(entry)
+        for patch in _extract_apply_patches(raw):
+            extracted = True
+            for patch_row in _patch_entries(patch, cwd):
+                entry = _tool_entry(call["idx"], call["ts"], patch_row.pop("name"),
+                                    {}, call.get("call_id"), output, output_ts,
+                                    brief=patch_row.pop("brief"))
+                entry.update(patch_row)
+                rows.append(entry)
+        if not extracted:
+            rows.append(_tool_entry(call["idx"], call["ts"], "exec",
+                                    {"input": raw}, call.get("call_id"), output, output_ts,
+                                    brief=" ".join(raw.split())[:300]))
+        return rows
+
+    args = _decode_arguments(call.get("raw"))
+    name = call.get("name") or "tool"
+    display_name = "Agent" if name == "spawn_agent" else name
+    entry = _tool_entry(call["idx"], call["ts"], display_name, args,
+                        call.get("call_id"), output, output_ts)
+    if name == "spawn_agent":
+        entry["agent_type"] = args.get("task_name") or "codex-subagent"
+        message = args.get("message") or ""
+        entry["agent_desc"] = message[:240] if not message.startswith("gAAAA") else args.get("task_name", "")
+        # 派发原话全文段:子代理条目的 prompt_excerpt 用(codex 子代理 rollout
+        # 里没有 user_message,派发内容只存在于主线这条 spawn 调用上)
+        if not message.startswith("gAAAA"):
+            entry["agent_prompt"] = message[:800]
+    rows.append(entry)
+    return rows
+
+
 def _normalize_tools(rollout):
     rows = []
     for call in rollout["calls"]:
-        result = rollout["outputs"].get(call.get("call_id")) or {}
-        output = result.get("text") or ""
-        output_ts = result.get("ts")
-        raw = call.get("raw") or ""
-        if call.get("name") == "exec":
-            extracted = False
-            for shell in _extract_shell_calls(raw, rollout.get("cwd")):
-                extracted = True
-                command = shell["command"]
-                workdir = shell.get("workdir") or rollout.get("cwd")
-                entry = _tool_entry(call["idx"], call["ts"], "PowerShell",
-                                    {"command": command, "workdir": workdir},
-                                    call.get("call_id"), output, output_ts,
-                                    brief=" ".join(command.split())[:300])
-                visible = common._infer_visible_source_lines(
-                    "PowerShell", {"command": command}, output, workdir
-                )
-                existing = {(event["path"], tuple(event["intervals"])) for event in visible}
-                for event in _generic_visible_events(command, output, workdir):
-                    key = (event["path"], tuple(event["intervals"]))
-                    if key not in existing:
-                        visible.append(event)
-                        existing.add(key)
-                if visible:
-                    entry["_visible_source_lines"] = visible
-                probed = common._script_probed_paths(
-                    "PowerShell", {"command": command}, workdir
-                )
-                if probed:
-                    entry["_probed_paths"] = probed
-                skills = _skill_names(command)
-                if skills:
-                    entry["skills"] = skills
-                rows.append(entry)
-            for patch in _extract_apply_patches(raw):
-                extracted = True
-                for patch_row in _patch_entries(patch, rollout.get("cwd")):
-                    entry = _tool_entry(call["idx"], call["ts"], patch_row.pop("name"),
-                                        {}, call.get("call_id"), output, output_ts,
-                                        brief=patch_row.pop("brief"))
-                    entry.update(patch_row)
-                    rows.append(entry)
-            if not extracted:
-                rows.append(_tool_entry(call["idx"], call["ts"], "exec",
-                                        {"input": raw}, call.get("call_id"), output, output_ts,
-                                        brief=" ".join(raw.split())[:300]))
-            continue
-
-        args = _decode_arguments(call.get("raw"))
-        name = call.get("name") or "tool"
-        display_name = "Agent" if name == "spawn_agent" else name
-        entry = _tool_entry(call["idx"], call["ts"], display_name, args,
-                            call.get("call_id"), output, output_ts)
-        if name == "spawn_agent":
-            entry["agent_type"] = args.get("task_name") or "codex-subagent"
-            message = args.get("message") or ""
-            entry["agent_desc"] = message[:240] if not message.startswith("gAAAA") else args.get("task_name", "")
-        rows.append(entry)
+        rows.extend(_normalize_one(call, rollout["outputs"], rollout.get("cwd")))
     for seq, row in enumerate(sorted(rows, key=lambda x: (x["idx"], x.get("ts") or "", x["name"]))):
         row["seq"] = seq
     return rows
 
 
-def _parse_rollout(path, tree_item=None):
+# ---- 增量解析状态 ----
+# 长 codex 会话(实测 326MB / 55k 记录)全量解析 157s,其中视野推断 ~150s。
+# 状态化后:文件未变直接出货;追加只解析新行、只对「新 call 或 output 新到的
+# call」跑昂贵推断;头 4KB 签名变化(改写/截断)则整体重来。
+_ROLLOUT_STATE = {}
+_ROLLOUT_STATE_MAX = 6
+_HEAD_SIG_BYTES = 4096
+_FORK_MARKER = "You are an agent in a team of agents"
+
+
+class _RescanNeeded(Exception):
+    """增量段撞上 fork 边界标记 —— 状态假设破裂,丢弃缓存全量重扫。"""
+
+
+def _head_sig(path):
+    try:
+        with open(path, "rb") as f:
+            return hashlib.sha1(f.read(_HEAD_SIG_BYTES)).hexdigest()
+    except OSError:
+        return None
+
+
+def _new_scan_state():
+    return {"line_idx": 0, "local_start": 0, "inherited": {}, "meta": {},
+            "first": None, "last": None, "record_points": [], "calls": [],
+            "outputs": {}, "prompts": [], "token_points": [], "markers": [],
+            "model": None, "last_message": "", "first_message": "", "completed": False,
+            "text_chars": 0, "tool_chars": 0, "record_count": 0,
+            "norm": {}, "offset": 0, "sig": None, "head": None}
+
+
+def _scan_record(s, idx, record):
+    """主循环体的状态机版:一条记录进,各累加器更新。与原实现逐分支等价。"""
+    if idx < s["local_start"]:
+        return
+    s["record_count"] += 1
+    ts = record.get("timestamp")
+    if ts:
+        s["first"] = min(s["first"], ts) if s["first"] else ts
+        s["last"] = max(s["last"], ts) if s["last"] else ts
+        s["record_points"].append((idx, ts))
+    outer = record.get("type")
+    payload = record.get("payload") or {}
+    if outer == "session_meta":
+        if not s["meta"]:
+            s["meta"] = payload
+        s["first"] = s["first"] or payload.get("timestamp")
+    elif outer == "turn_context":
+        s["model"] = payload.get("model") or s["model"]
+    elif outer == "response_item":
+        ptype = payload.get("type")
+        if ptype in ("function_call", "custom_tool_call"):
+            raw = payload.get("arguments") if ptype == "function_call" else payload.get("input")
+            raw = raw if isinstance(raw, str) else json.dumps(raw, ensure_ascii=False)
+            s["calls"].append({"idx": idx, "ts": ts, "ptype": ptype,
+                               "name": payload.get("name"), "call_id": payload.get("call_id"),
+                               "raw": raw})
+            s["tool_chars"] += len(raw or "")
+        elif ptype in ("function_call_output", "custom_tool_call_output"):
+            s["outputs"][payload.get("call_id")] = {"ts": ts, "text": _content_text(payload.get("output"))}
+        elif ptype == "message" and payload.get("role") == "assistant":
+            text = _content_text(payload.get("content"))
+            if text.strip():
+                if not s["first_message"]:
+                    s["first_message"] = text.strip()[:800]
+                s["last_message"] = text.strip()[:300]
+                s["text_chars"] += len(text)
+        elif ptype == "reasoning":
+            summary = _content_text(payload.get("summary"))
+            if summary:
+                s["text_chars"] += len(summary)
+    elif outer == "event_msg":
+        ptype = payload.get("type")
+        if ptype == "user_message":
+            text = payload.get("message") or ""
+            if text.strip():
+                s["prompts"].append({"idx": idx, "ts": ts, "wait_ms": 0,
+                                     "text": " ".join(text.split())[:400]})
+        elif ptype == "agent_message" and payload.get("message"):
+            s["last_message"] = str(payload.get("message"))[:300]
+        elif ptype == "task_complete":
+            s["completed"] = True
+        elif ptype == "token_count" and isinstance(payload.get("info"), dict):
+            info = payload["info"]
+            total = dict(info.get("total_token_usage") or {})
+            if s["inherited"]:
+                for key, value in list(total.items()):
+                    if isinstance(value, (int, float)):
+                        total[key] = max(0, value - (s["inherited"].get(key) or 0))
+            s["token_points"].append({"idx": idx, "ts": ts, "total": total,
+                                      "last": info.get("last_token_usage") or {},
+                                      "model": s["model"] or "codex"})
+        elif ptype in ("context_compacted", "compaction"):
+            s["markers"].append({"idx": idx, "ts": ts, "kind": "compact"})
+
+
+def _split_complete_lines(data):
+    boundary = data.rfind(b"\n") + 1
+    if boundary <= 0:
+        return [], 0
+    return data[:boundary].split(b"\n")[:-1], boundary
+
+
+def _full_scan(path, tree_item=None):
+    s = _new_scan_state()
+    with open(path, "rb") as f:
+        data = f.read()
+    lines, boundary = _split_complete_lines(data)
+    s["offset"] = boundary
+    s["line_idx"] = len(lines)
     records = []
-    with open(path, encoding="utf-8", errors="replace") as stream:
-        for idx, line in enumerate(stream):
-            try:
-                records.append((idx, json.loads(line)))
-            except json.JSONDecodeError:
-                continue
-
-    meta_payload = next(
-        ((record.get("payload") or {}) for _, record in records
-         if record.get("type") == "session_meta"),
-        {},
-    )
-
-    # A forked Codex rollout starts with its own session_meta, then replays the
-    # parent's conversation snapshot before injecting the child-agent
-    # developer message.  Tool calls are normally local-only, but token_count
-    # records in that snapshot contain the parent's cumulative counters.  Do
-    # not charge that inherited context to the child.  The marker is emitted
-    # by Codex itself at the subagent activation boundary.
-    local_start = 0
+    for idx, raw in enumerate(lines):
+        try:
+            records.append((idx, json.loads(raw)))
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            continue
+    # fork 子代理:先定 local_start(激活边界)与父的累计用量,再喂状态机
     if tree_item and tree_item.get("parent"):
         for idx, record in records:
             payload = record.get("payload") or {}
             if (record.get("type") == "response_item" and
                     payload.get("type") == "message" and
                     payload.get("role") == "developer" and
-                    "You are an agent in a team of agents" in _content_text(payload.get("content"))):
-                local_start = idx
-
-    inherited_usage = {}
-    if local_start:
-        for idx, record in records:
-            if idx >= local_start:
-                break
-            payload = record.get("payload") or {}
-            if (record.get("type") == "event_msg" and
-                    payload.get("type") == "token_count" and
-                    isinstance(payload.get("info"), dict)):
-                inherited_usage = dict(payload["info"].get("total_token_usage") or {})
-
-    first = last = None
-    record_points = []
-    calls, outputs, prompts, token_points, markers = [], {}, [], [], []
-    model = None
-    last_message = ""
-    completed = False
-    text_chars = tool_chars = 0
-    record_count = 0
+                    _FORK_MARKER in _content_text(payload.get("content"))):
+                s["local_start"] = idx
+        if s["local_start"]:
+            for idx, record in records:
+                if idx >= s["local_start"]:
+                    break
+                payload = record.get("payload") or {}
+                if (record.get("type") == "event_msg" and
+                        payload.get("type") == "token_count" and
+                        isinstance(payload.get("info"), dict)):
+                    s["inherited"] = dict(payload["info"].get("total_token_usage") or {})
+    # meta 兜底:local_start 之前的 session_meta 也是身份来源(fork 首条)
     for idx, record in records:
-            if idx < local_start:
-                continue
-            record_count += 1
-            ts = record.get("timestamp")
-            if ts:
-                first = min(first, ts) if first else ts
-                last = max(last, ts) if last else ts
-                record_points.append((idx, ts))
-            outer = record.get("type")
-            payload = record.get("payload") or {}
-            if outer == "session_meta":
-                first = first or payload.get("timestamp")
-            elif outer == "turn_context":
-                model = payload.get("model") or model
-            elif outer == "response_item":
-                ptype = payload.get("type")
-                if ptype in ("function_call", "custom_tool_call"):
-                    raw = payload.get("arguments") if ptype == "function_call" else payload.get("input")
-                    raw = raw if isinstance(raw, str) else json.dumps(raw, ensure_ascii=False)
-                    calls.append({"idx": idx, "ts": ts, "ptype": ptype,
-                                  "name": payload.get("name"), "call_id": payload.get("call_id"),
-                                  "raw": raw})
-                    tool_chars += len(raw or "")
-                elif ptype in ("function_call_output", "custom_tool_call_output"):
-                    outputs[payload.get("call_id")] = {"ts": ts, "text": _content_text(payload.get("output"))}
-                elif ptype == "message" and payload.get("role") == "assistant":
-                    text = _content_text(payload.get("content"))
-                    if text.strip():
-                        last_message = text.strip()[:300]
-                        text_chars += len(text)
-                elif ptype == "reasoning":
-                    summary = _content_text(payload.get("summary"))
-                    if summary:
-                        text_chars += len(summary)
-            elif outer == "event_msg":
-                ptype = payload.get("type")
-                if ptype == "user_message":
-                    text = payload.get("message") or ""
-                    if text.strip():
-                        prompts.append({"idx": idx, "ts": ts, "wait_ms": 0,
-                                        "text": " ".join(text.split())[:400]})
-                elif ptype == "agent_message" and payload.get("message"):
-                    last_message = str(payload.get("message"))[:300]
-                elif ptype == "task_complete":
-                    completed = True
-                elif ptype == "token_count" and isinstance(payload.get("info"), dict):
-                    info = payload["info"]
-                    total = dict(info.get("total_token_usage") or {})
-                    if inherited_usage:
-                        for key, value in list(total.items()):
-                            if isinstance(value, (int, float)):
-                                total[key] = max(0, value - (inherited_usage.get(key) or 0))
-                    token_points.append({"idx": idx, "ts": ts,
-                                         "total": total,
-                                         "last": info.get("last_token_usage") or {},
-                                         "model": model or "codex"})
-                elif ptype in ("context_compacted", "compaction"):
-                    markers.append({"idx": idx, "ts": ts, "kind": "compact"})
-    resolved_model = model or "codex"
+        if record.get("type") == "session_meta":
+            s["meta"] = s["meta"] or (record.get("payload") or {})
+            break
+    for idx, record in records:
+        _scan_record(s, idx, record)
+    return s
+
+
+def _scan_append(s, path):
+    with open(path, "rb") as f:
+        f.seek(s["offset"])
+        data = f.read()
+    lines, boundary = _split_complete_lines(data)
+    if not lines:
+        return
+    for raw in lines:
+        idx = s["line_idx"]
+        s["line_idx"] += 1
+        try:
+            record = json.loads(raw)
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            continue
+        payload = record.get("payload") or {}
+        if (record.get("type") == "response_item" and payload.get("type") == "message"
+                and payload.get("role") == "developer"
+                and _FORK_MARKER in _content_text(payload.get("content"))):
+            raise _RescanNeeded()
+        _scan_record(s, idx, record)
+    s["offset"] += boundary
+
+
+def _emit(s, path, tree_item=None):
+    """从状态组装 rollout dict。normalize 按 call 增量:已推断且当时有 output
+    的直接复用;output 新到或新 call 才跑昂贵路径。行 dict 浅拷贝出货 ——
+    下游会回填 stage/seg,共享对象会污染缓存。"""
+    outputs = s["outputs"]
+    cwd = (s["meta"] or {}).get("cwd")
+    all_rows = []
+    for call in s["calls"]:
+        key = call.get("call_id") or "i%d" % call["idx"]
+        out = outputs.get(call.get("call_id"))
+        slot = s["norm"].get(key)
+        if slot is not None and (slot["had"] or not out):
+            rows = slot["rows"]
+        else:
+            rows = _normalize_one(call, outputs, cwd)
+            s["norm"][key] = {"rows": rows, "had": bool(out)}
+        all_rows.extend(rows)
+    tools = [dict(r) for r in sorted(all_rows, key=lambda x: (x["idx"], x.get("ts") or "", x["name"]))]
+    for seq, row in enumerate(tools):
+        row["seq"] = seq
+    resolved_model = s["model"] or "codex"
+    token_points = [dict(p) for p in s["token_points"]]
     for point in token_points:
         if point.get("model") == "codex":
             point["model"] = resolved_model
+    meta_payload = s["meta"] or {}
     result = {
         "path": os.path.abspath(path), "meta": meta_payload,
         "id": meta_payload.get("id") or meta_payload.get("session_id"),
         "session_id": meta_payload.get("session_id") or meta_payload.get("id"),
         "cwd": meta_payload.get("cwd"), "model": resolved_model,
-        "start_ts": first or meta_payload.get("timestamp"), "end_ts": last,
-        "record_count": record_count, "record_points": record_points,
-        "calls": calls, "outputs": outputs, "prompts": prompts,
-        "token_points": token_points, "markers": markers,
-        "completed": completed, "result": last_message,
-        "text_chars": text_chars, "tool_chars": tool_chars,
+        "start_ts": s["first"] or meta_payload.get("timestamp"), "end_ts": s["last"],
+        "record_count": s["record_count"], "record_points": s["record_points"],
+        "calls": s["calls"], "outputs": outputs,
+        "prompts": [dict(pp) for pp in s["prompts"]],
+        "token_points": token_points,
+        "markers": [dict(m) for m in s["markers"]],
+        "completed": s["completed"], "result": s["last_message"],
+        "first_message": s["first_message"],
+        "text_chars": s["text_chars"], "tool_chars": s["tool_chars"],
     }
     if tree_item:
         result.update({"parent": tree_item.get("parent"),
                        "agent_path": tree_item.get("agent_path"),
                        "nickname": tree_item.get("nickname"),
+                       "agent_role": tree_item.get("agent_role"),
                        "depth": tree_item.get("depth")})
-    result["tools"] = _normalize_tools(result)
+    result["tools"] = tools
     return result
+
+
+def _parse_rollout(path, tree_item=None):
+    try:
+        st = os.stat(path)
+    except OSError:
+        st = None
+    if st is not None:
+        s = _ROLLOUT_STATE.get(path)
+        if s is not None and s["sig"] is not None:
+            if (st.st_mtime_ns, st.st_size) == s["sig"]:
+                return _emit(s, path, tree_item)
+            if st.st_size >= s["offset"] and s["head"] and _head_sig(path) == s["head"]:
+                try:
+                    _scan_append(s, path)
+                    s["sig"] = (st.st_mtime_ns, st.st_size)
+                    return _emit(s, path, tree_item)
+                except _RescanNeeded:
+                    _ROLLOUT_STATE.pop(path, None)
+            else:
+                _ROLLOUT_STATE.pop(path, None)
+    s = _full_scan(path, tree_item)
+    if st is not None:
+        s["sig"] = (st.st_mtime_ns, st.st_size)
+        s["head"] = _head_sig(path)
+        if path not in _ROLLOUT_STATE and len(_ROLLOUT_STATE) >= _ROLLOUT_STATE_MAX:
+            _ROLLOUT_STATE.pop(next(iter(_ROLLOUT_STATE)))
+        _ROLLOUT_STATE[path] = s
+    return _emit(s, path, tree_item)
 
 
 def _usage_deltas(points):
@@ -608,6 +879,17 @@ def _billing_add(billing, model, delta):
     bucket["out"] += delta.get("output_tokens") or 0
 
 
+#: 阶段最短驻留(秒):短于它的"阶段"是技能路径的浏览批次,不是真实切换
+_STAGE_MIN_SPAN_S = 90
+
+
+def _ts_seconds(ts):
+    try:
+        return datetime.fromisoformat(str(ts).replace("Z", "+00:00")).timestamp()
+    except (ValueError, TypeError):
+        return None
+
+
 def _stage_boundaries(root):
     markers = []
     for call in root["calls"]:
@@ -628,6 +910,32 @@ def _stage_boundaries(root):
         transitions.append((idx, skill))
         used_idx.add(idx)
         current = skill
+    # 浏览批次去噪:开场技能清单/一条命令引用多个技能,会造出几秒到几十秒的
+    # 假阶段(实测 AIPPT 生成会话开场 1 分钟连环 execute/plan/spec/verify)。
+    # 持续不足 _STAGE_MIN_SPAN_S 的段不是真实阶段:删掉后其区间归前段
+    # (开场批次归 setup),同名相邻合并,迭代至稳定;真实的多轮循环保留。
+    ts_by_idx = {}
+    for call in root["calls"]:
+        sec = _ts_seconds(call.get("ts"))
+        if sec is not None:
+            ts_by_idx[call["idx"]] = sec
+    changed = True
+    while changed and len(transitions) > 1:
+        changed = False
+        for i in range(len(transitions)):
+            t0 = ts_by_idx.get(transitions[i][0])
+            t1 = (ts_by_idx.get(transitions[i + 1][0])
+                  if i + 1 < len(transitions) else None)
+            if t0 is not None and t1 is not None and t1 - t0 < _STAGE_MIN_SPAN_S:
+                del transitions[i]
+                j = 1
+                while j < len(transitions):
+                    if transitions[j][1] == transitions[j - 1][1]:
+                        del transitions[j]
+                    else:
+                        j += 1
+                changed = True
+                break
     if not transitions:
         return [(0, "session")]
     rows = [(0, "setup")] if transitions[0][0] > 0 else []
@@ -691,6 +999,10 @@ def _aggregate_agent_reads(agent, tools):
             if tool.get("wevent"):
                 agent["_write_events"].append((tool.get("ts") or "", path,
                                                 tool["wevent"][0], tool["wevent"][1]))
+            if path.endswith(".ets"):
+                # patch 行自带 bevent;shell 写盘没有明文 → opaque 让重放诚实断链
+                bev = tool.get("bevent") or ("opaque", None)
+                agent["_blame_events"].append((tool.get("ts") or "", path, bev[0], bev[1]))
         for probed in tool.get("_probed_paths") or []:
             agent["_probed"].append(probed)
         for event in tool.get("_visible_source_lines") or []:
@@ -721,7 +1033,10 @@ def _agent_entry(rollout, stage, spawn_tool=None):
     text_out = int(round(remaining * rollout["text_chars"] / chars)) if chars else remaining
     entry = {
         "agent_id": rollout["id"],
-        "type": (rollout.get("agent_path") or "codex-subagent").rstrip("/").split("/")[-1],
+        # 角色(thread_spawn.agent_role)优先于任务代号:fixer/visual 等审计判定
+        # 靠 type,任务代号可以叫任何名字(实据见 test_codex_session)
+        "type": (rollout.get("agent_role")
+                 or (rollout.get("agent_path") or "codex-subagent").rstrip("/").split("/")[-1]),
         "desc": ((rollout.get("agent_path") or "Codex subagent") +
                  ((" · " + rollout["nickname"]) if rollout.get("nickname") else ""))[:240],
         "wf_run": None, "wf_name": None, "wf_phase": None,
@@ -737,13 +1052,35 @@ def _agent_entry(rollout, stage, spawn_tool=None):
         "skills": dict(skills), "skill_calls": [],
         "out_split": {"thinking": reasoning, "text": text_out,
                       "tool": max(0, remaining - text_out)},
-        "_prompt": rollout["prompts"][0]["text"] if rollout["prompts"] else "",
+        "_prompt": ((spawn_tool or {}).get("agent_prompt")
+                    or (rollout["prompts"][0]["text"] if rollout["prompts"] else "")
+                    or (("[任务复述·派发原文加密未落盘] " + rollout["first_message"])
+                        if rollout.get("first_message") else "")),
         "_probed": [], "_reads": [], "_writes": [], "_read_lines": {},
         "_read_iv": {}, "_read_total": {}, "_read_sources": {},
-        "_write_lines": {}, "_write_events": [],
+        "_write_lines": {}, "_write_events": [], "_blame_events": [],
     }
     _aggregate_agent_reads(entry, rollout["tools"])
     return entry
+
+
+def collect_blame_events(path, sessions_root=None):
+    """整个会话树(root+全部子代理)的 .ets 行级写事件,跨会话接力用。
+
+    返回 [(ts, abs_path, agent_id, op, payload)];agent_id = rollout thread id
+    (与 trace lineage 的子代理 agent_id 同一命名空间,root 主线即 root id)。
+    payload 只在内存流转,与单会话 blame 同一来源(tools 行的 bevent)。
+    """
+    events = []
+    for item in discover_rollout_tree(path, sessions_root=sessions_root):
+        rollout = _parse_rollout(item["path"], tree_item=item)
+        aid = str(rollout.get("id") or "")
+        for tool in rollout["tools"]:
+            bev = tool.get("bevent")
+            if bev and tool.get("ok") is not False and tool.get("brief"):
+                events.append((tool.get("ts") or "", str(tool["brief"]), aid,
+                               bev[0], bev[1]))
+    return events
 
 
 def extract(path, sessions_root=None):
@@ -816,8 +1153,11 @@ def extract(path, sessions_root=None):
     lineage = common.build_lineage(agents, root["tools"], root["cwd"])
 
     for agent in agents:
-        for key in ("_prompt", "_reads", "_writes", "_read_lines", "_write_lines",
-                    "_read_iv", "_read_total", "_read_sources", "_write_events"):
+        # 与 claude.py 同款:派发指令摘录保留(抽屉「派发指令」栏用),其余临时字段剥离
+        agent["prompt_excerpt"] = (agent.pop("_prompt", None) or "")[:800]
+        for key in ("_reads", "_writes", "_read_lines", "_write_lines",
+                    "_read_iv", "_read_total", "_read_sources", "_write_events",
+                    "_blame_events"):
             agent.pop(key, None)
     for tool in root["tools"]:
         tool.pop("_inp", None)
