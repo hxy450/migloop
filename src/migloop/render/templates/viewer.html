@@ -506,7 +506,7 @@
   </section>
 
   <footer>
-    <span>由 <span class="mono" id="extractor-name">adapters/claude.py</span> 从 <span id="session-format">Claude Code</span> 会话 JSONL 确定性抽取 · 数据源 <span class="mono" id="src-file"></span></span>
+    <span>由 <span class="mono" id="extractor-name">adapters/claude.py</span> 从 <span id="session-format">Claude Code</span> 会话 <span id="session-medium">JSONL</span> 确定性抽取 · 数据源 <span class="mono" id="src-file"></span></span>
     <span class="mono">migloop-poc · schema v<span id="schema-v">?</span></span>
   </footer>
 </div>
@@ -623,16 +623,24 @@
   var chips = document.getElementById("meta-chips");
   var proj = (D.meta.cwd || "").split("\\").pop() || "project";
   var isCodex = D.meta.session_format === "codex";
+  var isDeveco = D.meta.session_format === "deveco";
+  var isDbDirect = isDeveco && D.meta.source_file && D.meta.source_file.indexOf("deveco.db:") === 0;
+  var fmtLabel = isDeveco ? "DevEco Code" : (isCodex ? "Codex" : "Claude Code");
+  var fmtVer = isDeveco ? "deveco " : (isCodex ? "codex " : "cc ");
+  var fmtSrc = isDeveco ? (isDbDirect ? "来源: deveco.db 直读" : "来源: 导出 JSON 导入") : "来源: JSONL 离线导入";
+  var fmtAdapter = isDeveco ? "adapters/deveco.py" : (isCodex ? "adapters/codex.py" : "adapters/claude.py");
+  var fmtMedium = isDeveco ? (isDbDirect ? "SQLite 数据库" : "导出 JSON") : "JSONL";
   [
     "session " + (D.meta.session_id || "").slice(0, 8),
     proj,
     D.meta.model || "",
-    (isCodex ? "codex " : "cc ") + (D.meta.cc_version || ""),
-    "来源: JSONL 离线导入"
+    fmtVer + (D.meta.cc_version || ""),
+    fmtSrc
   ].forEach(function (c) { if (c) { var e = el("span", "chip", c); if (c.indexOf("session") === 0) e.classList.add("mono"); chips.appendChild(e); } });
   document.getElementById("src-file").textContent = (D.meta.source_file || "").split("\\").pop();
-  document.getElementById("extractor-name").textContent = isCodex ? "adapters/codex.py" : "adapters/claude.py";
-  document.getElementById("session-format").textContent = isCodex ? "Codex" : "Claude Code";
+  document.getElementById("extractor-name").textContent = fmtAdapter;
+  document.getElementById("session-format").textContent = fmtLabel;
+  document.getElementById("session-medium").textContent = fmtMedium;
   document.getElementById("schema-v").textContent = D.meta.schema_version || "?";
   document.title = "MigLoop Trace — " + proj + " · " + (D.meta.session_id || "").slice(0, 8);
 
@@ -646,7 +654,7 @@
     Object.keys(a.skills || {}).forEach(function (k) { skillSet[k] = 1; subSkillCalls += a.skills[k]; });
   });
   var statDefs = [
-    { k: "总时长", v: (T.duration_ms / 3600000).toFixed(1), u: "h", d: T.active_ms != null ? ("活跃 " + fmtDur(T.active_ms) + " · 等待用户 " + fmtDur(T.user_wait_ms) + (T.duration_ms - T.active_ms - T.user_wait_ms > 60000 ? " · 挂起 " + fmtDur(T.duration_ms - T.active_ms - T.user_wait_ms) : "")) : "含用户离开的挂起等待" },
+    { k: "总时长", v: (T.duration_ms / 3600000).toFixed(1), u: "h", d: T.active_ms != null ? ("活跃 " + fmtDur(T.active_ms) + (T.user_wait_ms != null ? " · 等待用户 " + fmtDur(T.user_wait_ms) + (T.duration_ms - T.active_ms - T.user_wait_ms > 60000 ? " · 挂起 " + fmtDur(T.duration_ms - T.active_ms - T.user_wait_ms) : "") : " · 非活跃 " + fmtDur(Math.max(0, T.duration_ms - T.active_ms)))) : "含用户离开的挂起等待" },
     { k: "阶段", v: String(stages.filter(function (s) { return s.stage !== "setup"; }).length), d: stages.filter(function (s) { return s.stage !== "setup"; }).map(function (s) { return s.label; }).join(" → ") },
     { k: "工具调用", v: String(T.tool_calls), u: "次", d: failCount ? ('<span class="bad">' + failCount + " 次失败</span>") : "全部成功", html: true },
     { k: "子代理", v: String(T.subagent_transcripts), u: "个", d: "独立 transcript 已回链" },
@@ -1113,25 +1121,46 @@
       // 其余阶段被压成看不见的细条,合并反而比分开更难读。
       // 做法:找出"整段没有任何活动"的空隙,每个只给一小格固定宽度并打上斜纹,
       // 其余时间仍严格等比 —— 阶段内的相对节奏与并行关系不失真,空档也没被抹掉。
-      var evs = [];
-      allTools0.forEach(function (t) { evs.push(new Date(t.ts).getTime()); });
-      allAgents0.forEach(function (a) {
-        evs.push(new Date(a.start_ts).getTime()); evs.push(new Date(a.end_ts).getTime());
-      });
-      (D.prompts || []).forEach(function (p) { evs.push(new Date(p.ts).getTime()); });
-      (D.markers || []).forEach(function (m) { evs.push(new Date(m.ts).getTime()); });
-      ss.forEach(function (s) {
-        evs.push(new Date(s.start_ts).getTime()); evs.push(new Date(s.end_ts).getTime());
-      });
-      evs = evs.filter(function (v) { return v >= t0 && v <= t1; }).sort(function (a, b) { return a - b; });
       var GAPMIN = Math.max(10 * 60e3, 0.03 * span);
-      var segs = [], gaps = [], cur = t0;
-      for (var gi = 1; gi < evs.length; gi++) {
-        if (evs[gi] - evs[gi - 1] > GAPMIN) {
-          segs.push([cur, evs[gi - 1]]); gaps.push([evs[gi - 1], evs[gi]]); cur = evs[gi];
+      var segs = [], gaps = [];
+      if ((D.activity_intervals || []).length) {
+        // 精确空档:适配器给出 reasoning∪tool 的活动区间,区间之外即空档(deveco 等)
+        var cur = t0;
+        (D.activity_intervals || []).map(function (iv) { return [new Date(iv[0]).getTime(), new Date(iv[1]).getTime()]; })
+          .filter(function (iv) { return iv[1] > t0 && iv[0] < t1; })
+          .sort(function (a, b) { return a[0] - b[0]; })
+          .forEach(function (iv) {
+            var s = Math.max(t0, iv[0]), e = Math.min(t1, iv[1]);
+            if (s > cur) { gaps.push([cur, s]); cur = e; }
+            else if (e > cur) { cur = e; }
+          });
+        if (cur < t1) gaps.push([cur, t1]);
+        gaps = gaps.filter(function (g) { return g[1] - g[0] > GAPMIN; });
+        cur = t0;
+        gaps.forEach(function (g) { if (g[0] > cur) segs.push([cur, g[0]]); cur = Math.max(cur, g[1]); });
+        if (cur < t1) segs.push([cur, t1]);
+        if (!segs.length) { segs = [[t0, t1]]; gaps = []; }
+      } else {
+        // 回退:按事件时间戳的启发式空档(claude/codex 没有 activity_intervals)
+        var evs = [];
+        allTools0.forEach(function (t) { evs.push(new Date(t.ts).getTime()); });
+        allAgents0.forEach(function (a) {
+          evs.push(new Date(a.start_ts).getTime()); evs.push(new Date(a.end_ts).getTime());
+        });
+        (D.prompts || []).forEach(function (p) { evs.push(new Date(p.ts).getTime()); });
+        (D.markers || []).forEach(function (m) { evs.push(new Date(m.ts).getTime()); });
+        ss.forEach(function (s) {
+          evs.push(new Date(s.start_ts).getTime()); evs.push(new Date(s.end_ts).getTime());
+        });
+        evs = evs.filter(function (v) { return v >= t0 && v <= t1; }).sort(function (a, b) { return a - b; });
+        var cur2 = t0;
+        for (var gi = 1; gi < evs.length; gi++) {
+          if (evs[gi] - evs[gi - 1] > GAPMIN) {
+            segs.push([cur2, evs[gi - 1]]); gaps.push([evs[gi - 1], evs[gi]]); cur2 = evs[gi];
+          }
         }
+        segs.push([cur2, t1]);
       }
-      segs.push([cur, t1]);
       var kept = segs.reduce(function (n, s) { return n + (s[1] - s[0]); }, 0) || 1;
       var GAPW = kept * 0.012;                       // 每个空档固定占约 1.2%
       var total = kept + gaps.length * GAPW;
@@ -1162,7 +1191,7 @@
         + (T.active_ms != null ? "(活跃 " + fmtDur(T.active_ms) + ")" : ""));
       if (T.active_ms != null) {
         tr.title = "活跃 = 会话真正在跑的时间(总 " + fmtDur(T.duration_ms)
-          + " · 等待用户 " + fmtDur(T.user_wait_ms || 0) + ")";
+          + (T.user_wait_ms != null ? " · 等待用户 " + fmtDur(T.user_wait_ms) : " · 非活跃 " + fmtDur(Math.max(0, T.duration_ms - (T.active_ms || 0)))) + ")";
       }
       head.appendChild(tr);
       card.appendChild(head);
@@ -1394,10 +1423,10 @@
         + " · " + fmtDur(s.duration_ms)
         + (s.active_ms != null ? "(活跃 " + fmtDur(s.active_ms) + ")" : ""));
       if (s.active_ms != null) {
-        var idle = s.duration_ms - s.active_ms;
+        var idle = Math.max(0, s.duration_ms - s.active_ms);
         str.title = "墙钟 " + fmtDur(s.duration_ms) + " · 活跃 " + fmtDur(s.active_ms)
-          + (idle > 1000 ? " · 空转 " + fmtDur(idle)
-             + (s.wait_ms > 1000 ? "(等待用户 " + fmtDur(s.wait_ms) + ")" : "") : "");
+          + (idle > 1000 ? (s.wait_ms != null ? " · 空转 " + fmtDur(idle)
+             + (s.wait_ms > 1000 ? "(等待用户 " + fmtDur(s.wait_ms) + ")" : "") : " · 非活跃 " + fmtDur(idle)) : "");
       }
       head.appendChild(str);
       card.appendChild(head);
@@ -1412,8 +1441,12 @@
       ms.appendChild(msItem("Output tokens", fmtTok(s.output_tokens)));
       ms.appendChild(msItem("产物文件", s.artifacts.length));
       ms.appendChild(msItem("用户输入", s.prompt_idxs.length));
-      if (s.wait_ms > 60000) ms.appendChild(msItem("等待用户", fmtDur(s.wait_ms)));
-      if (s.active_ms != null && s.duration_ms - s.active_ms - s.wait_ms > 60000) ms.appendChild(msItem("挂起(无活动)", fmtDur(s.duration_ms - s.active_ms - s.wait_ms)));
+      if (s.wait_ms != null) {
+        if (s.wait_ms > 60000) ms.appendChild(msItem("等待用户", fmtDur(s.wait_ms)));
+        if (s.active_ms != null && s.duration_ms - s.active_ms - s.wait_ms > 60000) ms.appendChild(msItem("挂起(无活动)", fmtDur(s.duration_ms - s.active_ms - s.wait_ms)));
+      } else if (s.active_ms != null && s.duration_ms - s.active_ms > 60000) {
+        ms.appendChild(msItem("非活跃", fmtDur(s.duration_ms - s.active_ms)));
+      }
       card.appendChild(ms);
 
       // 工具构成分割条(按组占比)

@@ -35,9 +35,14 @@ def codex_sessions_root(cli_root=None):
     return cli_root or adapters.get("codex").default_root()
 
 
-def all_sessions(root, codex_root=None):
+def deveco_sessions_root(cli_root=None):
+    return cli_root or adapters.get("deveco").default_root()
+
+
+def all_sessions(root, codex_root=None, deveco_root=None):
     """[(mtime, path, project, size, format, session_id)] 新→旧。"""
-    roots = {"claude": root, "codex": codex_root or codex_sessions_root()}
+    roots = {"claude": root, "codex": codex_root or codex_sessions_root(),
+             "deveco": deveco_root or deveco_sessions_root()}
     return [(row.mtime, row.path, row.project, row.size, row.format, row.session_id)
             for row in adapters.discover(roots)]
 
@@ -51,10 +56,10 @@ def short_proj(dirname):
     return dirname[-30:]
 
 
-def list_sessions(root, codex_root=None, limit=20):
-    rows = all_sessions(root, codex_root)
+def list_sessions(root, codex_root=None, deveco_root=None, limit=20):
+    rows = all_sessions(root, codex_root, deveco_root)
     if not rows:
-        print("没有找到 Claude Code 或 Codex session transcript")
+        print("没有找到 Claude Code / Codex / DevEco session transcript")
         return
     print("最近的 session:\n")
     print("  %-30s %-7s %-10s %8s  %s" % ("项目", "格式", "session", "大小", "修改时间"))
@@ -66,7 +71,7 @@ def list_sessions(root, codex_root=None, limit=20):
     print("\n用法: migloop <session-id 前缀 | 项目名片段 | jsonl 路径> [-o out.html] [--open]")
 
 
-def resolve_target(target, root, codex_root=None):
+def resolve_target(target, root, codex_root=None, deveco_root=None):
     """把用户输入解析成唯一的 jsonl 路径;歧义/未命中时报错退出。"""
     if os.path.isfile(target):
         return target
@@ -80,7 +85,7 @@ def resolve_target(target, root, codex_root=None):
         # rollout files live under ~/.codex/sessions rather than in the repo.
         directory_hint = os.path.basename(os.path.abspath(target))
 
-    rows = all_sessions(root, codex_root)
+    rows = all_sessions(root, codex_root, deveco_root)
     lookup = directory_hint or target
     by_sid = [p for _, p, _, _, _, sid in rows if sid.startswith(lookup)]
     if len(by_sid) == 1:
@@ -98,15 +103,17 @@ def resolve_target(target, root, codex_root=None):
                 print("  -", short_proj(pr))
         return by_proj[0][1]
 
-    sys.exit("找不到匹配 %r 的 Claude/Codex session;运行 migloop 不带参数可列出全部" % target)
+    sys.exit("找不到匹配 %r 的 Claude/Codex/DevEco session;运行 migloop 不带参数可列出全部" % target)
 
 
 def session_format(path):
     return adapters.detect(path).FORMAT
 
 
-def extract_trace(path):
+def extract_trace(path, storage_root=None):
     adapter = adapters.detect(path)
+    if getattr(adapter, "FORMAT", "") == "deveco":
+        return adapter.extract(path, storage_root=storage_root)
     return adapter.extract(path)
 
 
@@ -118,6 +125,9 @@ def main():
     ap.add_argument("--compare", action="store_true", help="多个目标生成跨会话对比页")
     ap.add_argument("--projects-root", default=None, help="覆盖 ~/.claude/projects")
     ap.add_argument("--codex-sessions-root", default=None, help="覆盖 ~/.codex/sessions")
+    ap.add_argument("--deveco-sessions-root", default=None, help="覆盖 DevEco 数据目录")
+    ap.add_argument("--deveco-db", default=None,
+                    help="deveco.db 路径(或 DevEco 数据目录)，覆盖默认位置；用于按 session id 直读 DB 及定位子代理库")
     ap.add_argument("--live", action="store_true",
                     help="增量监控仍在追加的 session，并启动本地自动刷新页面")
     ap.add_argument("--interval", type=float, default=10.0,
@@ -147,8 +157,11 @@ def main():
 
     root = projects_root(args.projects_root)
     codex_root = codex_sessions_root(args.codex_sessions_root)
+    # 会话发现(root)也遵循 --deveco-db:未给 --deveco-sessions-root 时,让指定 db 的
+    # session id 也能被解析(iter_sessions 已能接受 db 文件或数据目录)。
+    deveco_root = args.deveco_sessions_root or args.deveco_db or deveco_sessions_root()
     if not args.targets:
-        list_sessions(root, codex_root)
+        list_sessions(root, codex_root, deveco_root)
         return
 
     if args.live and args.compare:
@@ -160,7 +173,7 @@ def main():
         from .render import compare as compare_build
         traces = []
         for tgt in args.targets:
-            jl = resolve_target(tgt, root, codex_root)
+            jl = resolve_target(tgt, root, codex_root, deveco_root)
             print("解析 %s ..." % jl)
             traces.append(extract_trace(jl))
         font = compare_build.extract_font_face(load_asset("viewer.html"))
@@ -175,7 +188,7 @@ def main():
             webbrowser.open(pathlib.Path(out).resolve().as_uri())
         return
 
-    jsonl = resolve_target(args.targets[0], root, codex_root)
+    jsonl = resolve_target(args.targets[0], root, codex_root, deveco_root)
     adapter = adapters.detect(jsonl)
     fmt = adapter.FORMAT
     sub = os.path.join(os.path.splitext(jsonl)[0], "subagents")
@@ -237,7 +250,7 @@ def main():
         return
 
     print("解析 %s ..." % jsonl)
-    trace = extract_trace(jsonl)
+    trace = extract_trace(jsonl, storage_root=args.deveco_db)
 
     m, t = trace["meta"], trace["totals"]
     cwd_base = os.path.basename((m.get("cwd") or "").rstrip("\\/")) or "session"
