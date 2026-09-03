@@ -1,0 +1,155 @@
+"""MigLoop 两原子 MCP 服务 —— 调查 agent 的工具面。
+
+人在返修链页上点的每一步,对应这里的一次工具调用:同一份账本、同一套原子,
+文本渲染给模型。启动(stdio):
+
+    python -m migloop.mcp_server
+
+在 Claude Code 里注册:``claude mcp add migloop -- python -m migloop.mcp_server``。
+所有工具都要 sid(会话 id 或其 8 位前缀);账本按 sid 的池子(同工程兄弟会话)整包缓存。
+"""
+
+from __future__ import annotations
+
+from typing import Any
+
+from migloop import atoms_text
+
+GUIDE = """\
+# MigLoop 两原子归因指南
+
+你在分析一次 Android→HarmonyOS 自动迁移的完整实录。实录已被整理成一本账,账上只有两种原子:
+
+- **版本文件** file(path, v):文件的第 v 版。工具给你 ≤v 的全部写者(每版是哪个 agent 在它自己的
+  第几版写的、diff、来路)、读了这一版的 agent(下游)、以及这一版的复原全文(复原不了会说明原因)。
+- **版本 agent** agent(id, v):一个 agent 的第 v 版 = 它做出第 v 个对外效应(写文件 / 删文件 /
+  派发子 agent / 发消息)之后的状态。工具给你派发它的人与派发词全文、收件箱、≤v 的全部读取
+  (每条绑定读到的是文件第几版)、产出、收尾输出。**v 之后的活动与第 v 版的归因无因果,已截掉。**
+
+两原子互相以 (path, v) / (agent id, v) 引用。人和你走的是同一张图。
+
+## 标签的含义(标签是证据,不是裁决)
+- ▲旧版 a/b:读的时候绑到第 a 版,但这条读喂养的那笔写发生时文件已是第 b 版 —— "读旧版"候选
+- 行段 (x-y行):只读了这几行 —— "源码没读全"的原始证据;没标的是全文读
+- 写前读:读自己也写过的文件(Edit 前必 Read / 写后自查),程序性动作,归因时打折
+- 依赖读:cp 源 / < 输入,内容没进上下文
+- 脚本读 / 脚本落盘:从脚本字面量推断的读写,置信低于 Read/Write 工具
+- 外部输入:第一次出现就是被读,没人写过(安卓源码、spec 参考、模板)—— 树的叶子
+- 实录外修改:内容变了但没有记录在案的写(脚本动态目标 / 构建工具 / 人手)
+- 版本就近绑定(不确定):读发生在文件状态未知时,版本号是就近猜的
+
+## 信息不会丢
+agent 工具给的每条动作/读取后面的 (#n) 是动作号;action(id, n) 返回那次工具调用的完整原始输入与输出
+(命令原文、grep 命中、cat 出来的全文、Read 到的内容)。摘要看不清时直接展开,不要猜。
+读记录下的"看见 615: …"是从 stdout 对账出来的行:agent 在那次调用里确实看到了这一行。
+摘要只给前 3 行和全部行号,原文用 action(id, n) 拉 —— 两者是同一份信息,摘要只负责让你知道该展开哪次。
+读不一定是全文:每条读带范围标签([570-625行] / 看见的行 / 依赖读=内容没进上下文)。核一条读有两条路:
+action(id, n) 是模型当时眼睛里看到的原始输出;file(path, v, content=True, start=570, n=56) 是账本复原的
+第 v 版里那一段。两者对不上就是线索(实录外改动、就近绑定的版本)。
+**主会话动辄几百次调用,整个生命周期一次查会撑爆上下文**:查主会话一律带窗口
+agent(id, v, since=v-1),只看喂养第 v 版的输入;子 agent 通常几十次调用,可以不带。
+
+## 建议的调查路径
+1. sessions(sid) 看返修链:被修文件、修复方、被修行数与 ★ 原作者、修因。
+2. blame(path, v_fix-1) 对被修文件修复前一版做逐行归属,定位被替换的行是谁在哪一版引入的;
+   diff(path, v_fix) 看修复到底改了什么。
+3. agent(owner_id, since_v) 看引入者写那一版时手里有什么:派发词、读过哪些 spec/源码(版本、
+   行段、是否旧版)、收件箱有没有改指令。对比修复方 agent 的读取集,找"该读没读"。
+4. 顺着 file(读到的 spec@v) 往上游走,直到找到最早出问题的环节。
+
+## 结论要求
+定性六类之一并给证据:spec 写错 / 读了旧版 / 漏读(相对修复方的读取集)/ 转换错(读全了仍写错)/
+closer 或后续写者破坏 / 源码没读全。每条证据带 `path@v` 或 `agent v` 引用。
+边界:账本里只有**被读过**的安卓源码,从没人读过的文件不存在;标签是线索,盲写/脚本落盘的
+版本内容可能未知,如实说"无法确认"。
+"""
+
+
+def _rt() -> Any:
+    from migloop import service
+    return service.McpBackend()
+
+
+def build_server(backend: Any | None = None) -> Any:
+    """backend 提供三个 async 方法:get_ledger(sid) / get_session_cwd(sid) / get_fixchain(sid)。
+    默认用 service.McpBackend(与 ``migloop serve`` 共用账本缓存);别的宿主注入自己的服务层。"""
+    from mcp.server.fastmcp import FastMCP
+
+    srv = FastMCP("migloop-atoms",
+                  instructions="MigLoop 两原子(版本文件 × 版本 agent)归因工具。先调 guide 读指南,"
+                               "再从 sessions(sid) 的返修链出发。")
+
+    def _be() -> Any:
+        return backend if backend is not None else _rt()
+
+    async def _ctx(sid: str) -> tuple[Any, str]:
+        rt = _be()
+        return await rt.get_ledger(sid), await rt.get_session_cwd(sid)
+
+    @srv.tool()
+    def guide() -> str:
+        """两原子模型、标签含义、建议的调查路径与结论要求。第一次用之前先读。"""
+        return GUIDE
+
+    @srv.tool()
+    async def sessions(sid: str) -> str:
+        """返修链总览:被修文件 × 修复方、被修行数与 ★ 原作者、修因、跨会话接力。sid = 会话 id 或 8 位前缀。"""
+        rt = _be()
+        payload = await rt.get_fixchain(sid)
+        cwd = await rt.get_session_cwd(sid)
+        return atoms_text.render_chains(payload, root=cwd)
+
+    @srv.tool()
+    async def index(sid: str, kind: str | None = None, query: str | None = None,
+                    limit: int = 300) -> str:
+        """账本目录:全部 agent 与文件各一行。kind = agent | ets | spec | src | other(空=全部);query 子串过滤。"""
+        ledger, cwd = await _ctx(sid)
+        return atoms_text.render_index(ledger, kind, query, root=cwd, limit=limit)
+
+    @srv.tool()
+    async def file(sid: str, path: str, v: int | None = None, content: bool = False,
+                   diff: bool = False, start: int | None = None, n: int | None = None) -> str:
+        """版本文件原子:≤v 的写者脊柱(写者 agent 版本/来路/diff)、读了这一版的 agent、复原全文。
+        path 可给文件名、相对路径或绝对路径;v 空 = 最新版;content=True 给全文(start/n 裁行窗口);
+        diff=True 附每版 diff。"""
+        ledger, cwd = await _ctx(sid)
+        return atoms_text.render_file(ledger, path, v, root=cwd, content=content, diff=diff,
+                                      start=start, n=n)
+
+    @srv.tool()
+    async def agent(sid: str, id: str, v: int | None = None, since: int | None = None) -> str:
+        """版本 agent 原子:身份、派发者与派发词全文、收件箱、≤v 逐版的效应与输入(读绑文件版本、
+        ▲旧版/行段/写前读等标)、收尾输出。id 可带或不带 agent- 前缀;v 空 = 整个生命周期;
+        since 给了只看 (since, v] 这段版本 —— 主会话动辄几百次调用,查它必须带窗口。"""
+        ledger, cwd = await _ctx(sid)
+        return atoms_text.render_agent(ledger, id, v, root=cwd, since=since)
+
+    @srv.tool()
+    async def blame(sid: str, path: str, v: int | None = None, start: int | None = None,
+                    n: int | None = None) -> str:
+        """逐行归属:文件@v 每一行是谁在哪一版写的(确定性逐行签名)。start/n 裁窗口,汇总按全文。"""
+        ledger, cwd = await _ctx(sid)
+        return atoms_text.render_blame(ledger, path, v, start, n, root=cwd)
+
+    @srv.tool()
+    async def diff(sid: str, path: str, v: int) -> str:
+        """某一版的 unified diff(相对前一已知版)。"""
+        ledger, cwd = await _ctx(sid)
+        return atoms_text.render_diff(ledger, path, v, root=cwd)
+
+    @srv.tool()
+    async def action(sid: str, id: str, seq: int, max_chars: int = 20000) -> str:
+        """展开 agent 某一次工具调用的完整原始输入与输出(agent 工具时间线里的 #n 就是 seq)。
+        账本是实录的索引,任何摘要不够看时用它拿原文,信息不会丢。"""
+        ledger, _cwd = await _ctx(sid)
+        return atoms_text.render_action(ledger, id, seq, max_chars=max_chars)
+
+    return srv
+
+
+def main() -> None:
+    build_server().run()
+
+
+if __name__ == "__main__":
+    main()

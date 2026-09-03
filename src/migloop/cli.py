@@ -8,6 +8,7 @@ MigLoop Trace Viewer — 单命令生成 Claude Code / Codex 会话轨迹页面
   migloop <session-id 前缀>         在 Claude / Codex session 目录中自动定位
   migloop <项目名片段>              匹配项目目录,取最新 session
   migloop <目标> -o out.html --open
+  migloop <目标> --serve --open      本机服务:报告页 + 返修链路页 + 两原子端点
 
 跨平台:Windows `py migloop.pyz ...` / macOS·Linux `python3 migloop.pyz ...`
 依赖:Python >= 3.9,无第三方库
@@ -23,7 +24,7 @@ try:
 except Exception:
     pass
 
-from . import adapters
+from . import adapters, service
 from .render import build_html, load_asset, load_template
 
 
@@ -128,6 +129,8 @@ def main():
     ap.add_argument("--deveco-sessions-root", default=None, help="覆盖 DevEco 数据目录")
     ap.add_argument("--deveco-db", default=None,
                     help="deveco.db 路径(或 DevEco 数据目录)，覆盖默认位置；用于按 session id 直读 DB 及定位子代理库")
+    ap.add_argument("--serve", action="store_true",
+                    help="起本机服务:报告页 + 返修链路页 + 两原子端点(供调查 agent / MCP);复用 --host/--port/--open")
     ap.add_argument("--live", action="store_true",
                     help="增量监控仍在追加的 session，并启动本地自动刷新页面")
     ap.add_argument("--interval", type=float, default=10.0,
@@ -166,6 +169,8 @@ def main():
 
     if args.live and args.compare:
         sys.exit("--live 不能与 --compare 同时使用")
+    if args.serve and (args.live or args.compare):
+        sys.exit("--serve 不能与 --live / --compare 同时使用")
 
     if args.compare:
         if len(args.targets) < 2:
@@ -195,6 +200,12 @@ def main():
     if fmt == "claude" and not os.path.isdir(sub):
         print("提示: 未找到 %s,子代理泳道将为空(分享 session 时请连同同名目录一起拷贝)" % sub)
 
+    if args.serve:
+        from . import serve as serve_mod
+        serve_mod.serve(jsonl, host=args.host, port=args.port, open_browser=args.open,
+                        roots={"claude": root, "codex": codex_root, "deveco": deveco_root})
+        return
+
     if args.live:
         if not adapter.SUPPORTS_LIVE:
             sys.exit("%s session 已支持离线/对比报告；--live 增量监控尚未接入该 adapter" % fmt)
@@ -206,7 +217,8 @@ def main():
         template = load_template()
 
         def build_snapshot_bytes():
-            trace = adapter.extract(jsonl)
+            # live 快照:带审计,不建两原子账本(每次刷新都重算太贵);页面没有服务端,藏返修链路入口
+            trace = service.report_trace(jsonl, static=True, with_chains=False)
             return build_html(trace, template).encode("utf-8")
 
         chat_service = None
@@ -250,7 +262,8 @@ def main():
         return
 
     print("解析 %s ..." % jsonl)
-    trace = extract_trace(jsonl, storage_root=args.deveco_db)
+    # 离线报告 = 提取 + 审计 + 返修追溯卡(claude / codex 建两原子账本);导出页没有服务端,藏返修链路入口
+    trace = service.report_trace(jsonl, static=True, storage_root=args.deveco_db)
 
     m, t = trace["meta"], trace["totals"]
     cwd_base = os.path.basename((m.get("cwd") or "").rstrip("\\/")) or "session"
