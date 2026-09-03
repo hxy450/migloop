@@ -4,11 +4,15 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "migloop"
-version = "0.3.0"
+version = "0.4.0"
 description = "Provider-neutral migration session lineage viewer"
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = []
+
+[project.optional-dependencies]
+mcp = ["mcp>=1.0"]
+dev = ["pytest"]
 
 [project.scripts]
 migloop = "migloop.cli:main"

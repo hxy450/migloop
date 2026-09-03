@@ -1,7 +1,8 @@
 # MigLoop Trace Viewer (PoC)
 
-把 Claude Code 或 Codex 迁移会话的 JSONL transcript 一键变成可交互的轨迹页面:
-执行拓扑 / Git 式执行流(主干=主会话,分支=子代理)/ 主线上下文占用曲线 / 阶段对比 / 阶段明细 + 点击详情抽屉。
+把 Claude Code / Codex / DevEco 迁移会话的记录一键变成可交互的轨迹页面:
+执行拓扑 / Git 式执行流(主干=主会话,分支=子代理)/ 主线上下文占用曲线 / 阶段对比 / 阶段明细 + 点击详情抽屉 /
+风险点审计 / 数据血缘 / **返修链路**(哪个文件被谁修了、被修的行是谁写的、当时读了什么)。
 
 ## 文档
 
@@ -91,6 +92,38 @@ Codex 主线程与子 Agent 分别落在按日期分区的 rollout 文件中：
 `functions.exec` 内的 `shell_command` / `apply_patch` 归一到现有 trace。Codex 目前支持离线 HTML
 和 `--compare`；增量 `--live` reducer 仍只支持 Claude Code。
 
+## 返修链路(`--serve`)
+
+报告页「02 风险点」里有一张**返修追溯**卡:哪些鸿蒙文件在 execute 之后被改过、谁生成的、谁修的、
+修了哪些行、被修行的原作者是谁。它从**两原子账本**算出来:
+
+- **版本文件**:每个文件的写者脊柱,每一版记(写者 agent、它的版本号、来路、diff、内容)
+- **版本 agent**:每个 agent 的每个对外效应(写 / 删 / 派发 / 发消息)+1 版;读等输入归到它喂养的下一版
+
+修复方的判定只有一处(`filestory.build_fix_chains`):按逐笔版本的**阶段**(a2h-execute 之后的写 = 修复,
+主会话在 verify 阶段亲手改的也算);没有阶段戳的旧记录退回血缘层的 agent 级判定。跨会话同一工程的前序
+会话会并进同一本账,前序轮回合内的返修也在链里。
+
+导出的自包含 HTML 只带这张卡;要点进链页、逐行 blame、展开某一次工具调用的原文,起本机服务:
+
+```bash
+py migloop-lineage.pyz <目标> --serve --open     # 报告页 + 返修链路页 + 两原子端点
+```
+
+端点全部 GET,与 hmigbot 同名:`/api/insight1/report/<sid>`、`/api/insight1/fixchain/<sid>`、
+`/api/insight1/fixchain-data/<sid>`、`/api/insight1/atom/<sid>/text/<tool>`(`guide` / `sessions` /
+`index` / `file` / `agent` / `blame` / `diff` / `action`,纯文本,给调查 agent 用,先读 `guide`)。
+目前支持 Claude Code 与 Codex 会话;DevEco 会话只有报告页。
+
+### 让 agent 做返修归因
+
+[`docs/skills/migloop-investigate/SKILL.md`](./docs/skills/migloop-investigate/SKILL.md) 是给 Claude Code /
+Codex 的调查技能:从修复 diff 出发逐行溯源到写者 agent 的输入(派发词、读过的 spec 与源码及其版本),
+定性(spec 写错 / 读了旧版 / 漏读 / 转换错 …)并给带 `path@v` 引用的证据。两条接法:
+
+- HTTP:起 `--serve`,把技能里的 `BASE` 换成启动时打印的地址
+- MCP:`claude mcp add migloop -- python -m migloop.mcp_server`(需要 `pip install mcp`;`sid` 给会话 id 前缀或 jsonl 路径)
+
 ## 跨机器分享 session
 
 Claude Code 的一个 session 由两部分组成,分享时要一起拷:
@@ -104,12 +137,16 @@ Claude Code 的一个 session 由两部分组成,分享时要一起拷:
 
 ## 开发
 
+上游是 [migbot-server](https://github.com/hxy450/migbot-server) 的 `src/vendor/migloop`(2026-09 起以 server 为准),
+本仓同步 adapters / audit / 两原子 / 模板,并加上自己的 cli / live / chat / service / serve。
+
 项目采用标准 `src` layout。建议使用 editable install：
 
 ```bash
 python -m pip install -e .
 migloop 01a0048b --open
-python -m unittest discover -s tests -t . -p "test_*.py"
+python -m pip install pytest
+python -m pytest tests -q
 ```
 
 不安装也可以运行：
@@ -137,17 +174,23 @@ python scripts/build_pyz.py
 - 阶段切分针对 a2h 管线 skill(mig-arch / a2h-spec / plan / execute / verify / retrospect);
   未调用管线 skill 的通用会话会整体作为单一 "Session" 阶段展示
 - token 统计按 message.id 去重、过滤 `<synthetic>` 本地合成记录（细节见 `adapters/claude.py` 注释）
+- 两原子收集器对 shell 读写做静态解析(变量、for 循环、grep/head 输出对账都覆盖);脚本黑盒、`$(…)` 命令替换、
+  通配路径标为「未解析读写」而不猜,`index` 里能看到每个 agent 的未解析计数
+- 运行时把主会话快照当子代理上传的记录(agent-snapshot)在「02 风险点」标出,页面忠实呈现不去重;账本里去重
 
 ## 代码结构
 
 | 目录 | 说明 |
 |---|---|
-| `src/migloop/adapters/` | Claude、Codex 等输入格式 → 统一 trace；registry 也在这里 |
+| `src/migloop/adapters/` | Claude、Codex、DevEco 输入格式 → 统一 trace；registry 也在这里 |
+| `src/migloop/atoms*.py` `filestory*.py` `shellparse.py` | 两原子账本:收集(含 shell 读写静态解析)、版本文件 × 版本 agent、返修链、文本渲染 |
+| `src/migloop/audit.py` `blame.py` `crosschain.py` | 风险点审计、行级 blame、同工程前序 / 后续会话发现 |
+| `src/migloop/service.py` `serve.py` `mcp_server.py` | 会话定位与账本缓存、`--serve` 本机 HTTP、MCP 工具面(同一份文本输出) |
 | `src/migloop/render/` | 静态 HTML、对比页面和模板，完全不关心输入来源 |
 | `src/migloop/live/` | 增量 cursor、checkpoint 和本地 live server |
 | `src/migloop/chat/` | Codex / Anthropic / OpenAI-compatible 分析助手 |
 | `src/migloop/cli.py` | session 定位、adapter dispatch 与命令行编排 |
 | `tests/` | adapter、源码视野、live 与 chat 回归测试 |
 | `scripts/` | pyz 打包与开发期 trace/HTML 工具 |
-| `docs/` | 设计、开发和竞品对比文档 |
+| `docs/` | 设计、开发、竞品对比文档;`docs/skills/` 是给 agent 的返修归因技能 |
 | `dist/migloop-lineage.pyz` | 分发用单文件 |

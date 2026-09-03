@@ -1,0 +1,1404 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>返修链路</title>
+<style>
+  :root {
+    --page: #f3f4f7; --surface: #ffffff; --ink: #191c23; --ink-2: #4b5160; --ink-3: #8a90a0;
+    --ring: #e4e6ec; --wash: #f7f8fa; --wash-2: #eef0f4;
+    --c-src: #7c5cd6; --c-spec: #2a78d6; --c-gen: #1a9e6c; --c-file: #d68a2a; --c-fix: #cf222e; --c-dis: #0f8a7a;
+    --mono: Consolas, "Cascadia Mono", "SF Mono", Menlo, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--page); color: var(--ink); font: 14px/1.6 var(--sans);
+         padding: 22px clamp(14px, 2vw, 32px) 30px; }
+  .mono { font-family: var(--mono); }
+  header { max-width: 1720px; margin: 0 auto 12px; }
+  .crumb { font-size: 11px; color: var(--ink-3); letter-spacing: .12em; text-transform: uppercase; }
+  h1 { font-size: 22px; margin-top: 2px; display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  h1 em { font-style: normal; font-size: 12.5px; color: var(--ink-3); font-weight: 400; }
+  h1 em b { color: var(--ink-2); font-family: var(--mono); font-weight: 600; }
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; align-items: center; }
+  .chip { font-size: 12px; padding: 2px 11px; border: 1px solid var(--ring); border-radius: 99px; background: var(--surface); color: var(--ink-2); }
+  .chip b { color: var(--ink); }
+  .clear { display: none; font-size: 12px; color: var(--c-spec); cursor: pointer; padding: 2px 10px; border: 1px solid color-mix(in srgb, var(--c-spec) 40%, transparent); border-radius: 99px; }
+  .clear.show { display: inline-block; }
+
+  .stage-wrap { max-width: 1720px; margin: 0 auto; display: flex; gap: 12px; align-items: flex-start; }
+  .panel { background: var(--surface); border: 1px solid var(--ring); border-radius: 14px;
+           box-shadow: 0 1px 2px rgba(16,24,40,.04), 0 6px 18px rgba(16,24,40,.04); }
+  /* 左栏:入口 —— 任何 文件@v / agent@ver 都能当根 */
+  .rail { flex: 0 0 292px; height: calc(100vh - 176px); min-height: 460px; display: flex; flex-direction: column; overflow: hidden; }
+  .rail.closed { flex-basis: 30px; }
+  .rail.closed .railbody, .rail.closed .search { display: none; }
+  .rail .railhead { display: flex; align-items: center; gap: 6px; padding: 10px 10px 8px; border-bottom: 1px solid var(--ring); }
+  .rail .railhead b { flex: 1 1 auto; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); white-space: nowrap; overflow: hidden; }
+  .rail.closed .railhead { flex-direction: column; padding: 8px 4px; }
+  .rail.closed .railhead b { writing-mode: vertical-rl; letter-spacing: .15em; }
+  .rail .tog { font-size: 12px; width: 22px; height: 22px; border: 1px solid var(--ring); background: var(--surface); border-radius: 6px; cursor: pointer; color: var(--ink-2); }
+  .rail .search { margin: 8px 10px 4px; }
+  .rail .search input { width: 100%; font: 12.5px var(--sans); padding: 6px 10px; border: 1px solid var(--ring); border-radius: 8px; background: var(--wash); color: var(--ink); outline: none; }
+  .rail .search input:focus { border-color: color-mix(in srgb, var(--c-spec) 60%, transparent); background: var(--surface); }
+  .railbody { flex: 1 1 auto; overflow-y: auto; padding: 4px 6px 12px; }
+  .rsec > .rsh { display: flex; align-items: center; gap: 6px; font-size: 10.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+                 color: var(--ink-3); padding: 10px 6px 4px; cursor: pointer; user-select: none; }
+  .rsec > .rsh .n { font-weight: 500; letter-spacing: 0; }
+  .rsec > .rsh .chev { margin-left: auto; font-size: 10px; }
+  .rsec.closed > .rlist { display: none; }
+  .rkind { font-size: 10.5px; color: var(--ink-3); padding: 6px 6px 2px; cursor: pointer; user-select: none; display: flex; gap: 6px; }
+  .rkind .chev { margin-left: auto; font-size: 10px; }
+  .rkind.closed + .rklist { display: none; }
+  .ritem { border-radius: 8px; }
+  .ritem > .rrow { display: flex; align-items: center; gap: 6px; padding: 4px 6px 4px; font-size: 12px; color: var(--ink); cursor: pointer; border-radius: 8px; }
+  .ritem > .rrow:hover { background: var(--wash); }
+  .ritem.on > .rrow { background: color-mix(in srgb, var(--c-spec) 8%, var(--surface)); }
+  .ritem .lab { flex: 1 1 auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ritem .lab.mono { font-size: 11.5px; }
+  .ritem .lab .ind { color: var(--ink-3); }
+  .ritem .pill { font-size: 10px; padding: 0 6px; }
+  .ritem .vers { padding: 2px 0 6px 14px; display: none; }
+  .ritem.open .vers { display: block; }
+  .vline { display: flex; gap: 6px; align-items: baseline; padding: 3px 6px; font-size: 11.5px; color: var(--ink-2); border-radius: 6px; cursor: pointer; border-left: 2px solid var(--ring); margin-left: 2px; }
+  .vline:hover { background: var(--wash); color: var(--ink); border-left-color: var(--c-spec); }
+  .vline .vn { font-family: var(--mono); font-size: 10.5px; color: var(--ink-3); min-width: 26px; }
+  .vline .t { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .vline.fix .t { color: var(--c-fix); }
+  .rempty { font-size: 11.5px; color: var(--ink-3); padding: 6px 8px; }
+
+  .graph { flex: 1 1 auto; min-width: 0; position: relative; overflow: auto; height: calc(100vh - 176px); min-height: 460px; }
+  .toolbar { position: sticky; top: 0; left: 0; z-index: 6; display: flex; gap: 10px; align-items: center;
+             padding: 10px 14px; background: color-mix(in srgb, var(--surface) 88%, transparent);
+             backdrop-filter: blur(6px); border-bottom: 1px solid var(--ring); font-size: 11.5px; color: var(--ink-3); }
+  .toolbar .legend { display: flex; gap: 12px; flex-wrap: wrap; flex: 1 1 auto; }
+  .legend i { font-style: normal; display: inline-flex; align-items: center; gap: 4px; }
+  .legend .sw { width: 10px; height: 10px; border-radius: 3px; border: 1.5px solid; display: inline-block; }
+  .zoomctl { display: flex; gap: 4px; }
+  .zoomctl button { font-size: 12px; min-width: 26px; height: 24px; border: 1px solid var(--ring); padding: 0 8px;
+                    background: var(--surface); border-radius: 6px; cursor: pointer; color: var(--ink-2); }
+  .zoomctl button:hover { background: var(--wash); }
+  .canvas { position: relative; transform-origin: 0 0; }
+  .colhead { position: absolute; top: 0; font-size: 10.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+             color: var(--ink-3); padding-bottom: 5px; border-bottom: 2px solid var(--ring); text-align: center; white-space: nowrap; overflow: hidden; }
+  .colhead.root { color: var(--c-file); border-color: var(--c-file); }
+  .colhead.rootA { color: var(--c-gen); border-color: var(--c-gen); }
+  .colhead.fix { color: var(--c-fix); border-color: var(--c-fix); }
+  .colhead.down { color: var(--c-spec); border-color: var(--c-spec); }
+  svg.wires { position: absolute; left: 0; top: 0; pointer-events: none; z-index: 1; overflow: visible; }
+  .wire { fill: none; stroke: #cfd3dc; stroke-width: 1.4; transition: stroke .12s, stroke-width .12s; }
+  .wire.on { stroke: var(--c-file); stroke-width: 2.2; }
+  .node { position: absolute; z-index: 2; height: 30px; font-size: 12px; padding: 0 26px 0 10px; line-height: 28px;
+          border: 1.4px solid var(--ring); border-radius: 8px; background: var(--wash); cursor: pointer;
+          white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--ink-2);
+          transition: box-shadow .12s, transform .12s; }
+  .node:hover { box-shadow: 0 2px 10px rgba(16,24,40,.14); transform: translateY(-1px); z-index: 3; }
+  .node.sel { box-shadow: 0 0 0 2.5px color-mix(in srgb, var(--c-spec) 45%, transparent); }
+  .node .chev { position: absolute; right: 8px; top: 0; color: var(--ink-3); font-size: 10px; }
+  .node .badge { display: inline-block; font-size: 9.5px; line-height: 14px; padding: 0 5px; margin-left: 5px; border-radius: 4px;
+                 background: var(--wash-2); color: var(--ink-3); vertical-align: 1px; font-family: var(--sans); }
+  .node .badge.stale { background: color-mix(in srgb, var(--c-fix) 12%, transparent); color: var(--c-fix); font-weight: 700; }
+  .node .badge.via { background: color-mix(in srgb, var(--c-src) 12%, transparent); color: var(--c-src); }
+  .node .badge.self { background: color-mix(in srgb, var(--c-gen) 12%, transparent); color: var(--c-gen); }
+  .node.file { border-color: color-mix(in srgb, var(--c-file) 55%, transparent); font-family: var(--mono); font-size: 11.5px; color: var(--ink); }
+  .node.file.root { background: color-mix(in srgb, var(--c-file) 10%, var(--surface)); border-width: 2px; font-weight: 600; }
+  .node.file.stale { border-left: 4px solid var(--c-fix); }
+  .node.gen  { border-color: color-mix(in srgb, var(--c-gen) 55%, transparent); color: var(--ink); background: color-mix(in srgb, var(--c-gen) 5%, var(--surface)); }
+  .node.gen.root { border-width: 2px; font-weight: 600; background: color-mix(in srgb, var(--c-gen) 12%, var(--surface)); }
+  .node.gen.sharp { border-color: var(--c-fix); box-shadow: inset 3px 0 0 var(--c-fix); }
+  .node.fix  { border-color: var(--c-fix); color: var(--c-fix); font-weight: 600; background: color-mix(in srgb, var(--c-fix) 5%, var(--surface)); }
+  .node.dispatch { border-style: dashed; border-color: var(--c-dis); color: var(--c-dis); background: var(--surface); }
+  .node.leaf { border-color: color-mix(in srgb, var(--c-src) 45%, transparent); color: var(--c-src); cursor: default; }
+  .node.leaf:hover { transform: none; box-shadow: none; }
+  .node.down { border-style: dotted; }
+  .cvempty { position: absolute; left: 24px; top: 40px; font-size: 12.5px; color: var(--ink-3); line-height: 1.8; max-width: 520px; }
+
+  .side { flex: 0 0 380px; position: relative; padding: 0; max-height: calc(100vh - 176px); min-height: 460px; overflow-y: auto; }
+  .side .placeholder { color: var(--ink-3); font-size: 12.5px; line-height: 1.8; padding: 22px 20px; }
+  .side .head { padding: 16px 20px 12px; border-bottom: 1px solid var(--ring); position: sticky; top: 0; background: var(--surface); z-index: 2; border-radius: 14px 14px 0 0; }
+  .side .head.file { border-top: 4px solid var(--c-file); }
+  .side .head.gen { border-top: 4px solid var(--c-gen); }
+  .side .head.fix { border-top: 4px solid var(--c-fix); }
+  .side .tag { font-size: 10.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); }
+  .side .head.file .tag { color: var(--c-file); } .side .head.gen .tag { color: var(--c-gen); } .side .head.fix .tag { color: var(--c-fix); }
+  .side h3 { font-size: 15px; word-break: break-all; margin-top: 2px; line-height: 1.35; }
+  .side .sub { font-size: 11.5px; color: var(--ink-3); margin-top: 3px; word-break: break-all; }
+  .side .rootbtn { margin-top: 8px; font: 12px var(--sans); padding: 4px 12px; border-radius: 99px; cursor: pointer;
+                   border: 1px solid color-mix(in srgb, var(--c-spec) 50%, transparent); color: var(--c-spec); background: var(--surface); }
+  .side .rootbtn:hover { background: color-mix(in srgb, var(--c-spec) 8%, var(--surface)); }
+  .side .body { padding: 6px 20px 20px; }
+  .side .sec { margin-top: 16px; }
+  .side .sec > b { display: block; font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); font-weight: 700; margin-bottom: 6px; }
+  .side .kv { font-size: 12.5px; color: var(--ink-2); line-height: 1.7; }
+  .side .kv .k { color: var(--ink-3); font-size: 11px; margin-right: 6px; }
+  .side .pills { display: flex; gap: 6px; flex-wrap: wrap; }
+  .pill { font-size: 11px; padding: 1px 8px; border-radius: 99px; background: var(--wash-2); color: var(--ink-2); }
+  .pill.warn { background: color-mix(in srgb, var(--c-fix) 10%, transparent); color: var(--c-fix); font-weight: 600; }
+  .pill.ok { background: color-mix(in srgb, var(--c-gen) 10%, transparent); color: var(--c-gen); }
+  .pill.via { background: color-mix(in srgb, var(--c-src) 10%, transparent); color: var(--c-src); }
+  .vrow { display: grid; grid-template-columns: 34px 1fr auto; gap: 8px; align-items: baseline; padding: 6px 8px; border-radius: 8px;
+          font-size: 12px; color: var(--ink-2); border-left: 3px solid transparent; }
+  .vrow:hover { background: var(--wash); }
+  .vrow.anchor { background: color-mix(in srgb, var(--c-file) 10%, transparent); border-left-color: var(--c-file); }
+  .vrow.dim { opacity: .5; }
+  .vrow .vn { font-family: var(--mono); font-size: 11px; color: var(--ink-3); }
+  .vrow .who { font-weight: 600; color: var(--ink); }
+  .vrow .who.fix { color: var(--c-fix); } .vrow .who.ext { color: var(--c-src); font-weight: 500; }
+  .vrow .meta { font-size: 11px; color: var(--ink-3); display: block; }
+  .vrow .act { font-size: 11px; color: var(--c-spec); cursor: pointer; white-space: nowrap; }
+  .vrow .act:hover { text-decoration: underline; }
+  .diffblock, .srcblock { grid-column: 1 / -1; font: 11px/1.55 var(--mono); background: var(--wash);
+               border: 1px solid var(--ring); border-radius: 7px; padding: 8px 10px; margin: 4px 0 6px;
+               white-space: pre-wrap; word-break: break-all; overflow-x: auto; }
+  .srcblock { white-space: pre; overflow: auto; max-height: 60vh; counter-reset: ln; }
+  .srcblock .ln { display: block; }
+  .srcblock .ln::before { counter-increment: ln; content: counter(ln); display: inline-block; width: 3.2em; color: var(--ink-3); text-align: right; margin-right: 12px; user-select: none; }
+  .dl-add { color: #1a7f37; background: rgba(26,158,108,.10); display: inline; }
+  .dl-del { color: #cf222e; background: rgba(207,34,46,.08); display: inline; }
+  .dl-ctx { color: var(--ink-3); }
+  .quote { font-size: 12px; color: var(--ink-2); background: var(--wash); border-radius: 10px; padding: 10px 12px;
+           border-left: 3px solid var(--ring); line-height: 1.65; word-break: break-word; margin-top: 8px; white-space: pre-wrap; }
+  .quote b { display: block; font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; margin-bottom: 4px; white-space: normal; color: var(--ink-3); }
+  .quote.dispatch { border-left-color: var(--c-gen); } .quote.dispatch b { color: var(--c-gen); }
+  .quote.cause { border-left-color: var(--c-fix); } .quote.cause b { color: var(--c-fix); }
+  .quote.inbox { border-left-color: var(--c-spec); } .quote.inbox b { color: var(--c-spec); }
+  .quote.dim { opacity: .6; }
+  .more { font-size: 11px; color: var(--c-spec); cursor: pointer; white-space: nowrap; }
+  .tl { position: relative; margin-top: 4px; }
+  .tl .trow { display: grid; grid-template-columns: 40px 1fr; gap: 8px; padding: 5px 8px; border-radius: 8px; font-size: 12px; color: var(--ink-2); border-left: 3px solid transparent; }
+  .tl .trow:hover { background: var(--wash); }
+  .tl .trow.anchor { background: color-mix(in srgb, var(--c-gen) 10%, transparent); border-left-color: var(--c-gen); }
+  .tl .trow.dim { opacity: .5; }
+  .tl .vn { font-family: var(--mono); font-size: 11px; color: var(--ink-3); padding-top: 1px; }
+  .tl .eff { color: var(--ink); }
+  .tl .inp { font-size: 11px; color: var(--ink-3); }
+  .arow { font-size: 11px; color: var(--ink-3); padding: 2px 0 2px 8px; border-left: 2px solid var(--ring); margin: 2px 0 0 4px; word-break: break-all; }
+  .arow .vn { font-family: var(--mono); color: var(--ink-3); }
+  .arow .diffblock { margin-top: 4px; }
+  .lnk { color: var(--c-spec); cursor: pointer; }
+  .lnk:hover { text-decoration: underline; }
+  .lnk.mono { font-family: var(--mono); font-size: 11.5px; }
+
+  .empty { max-width: 620px; margin: 12vh auto 0; text-align: center; color: var(--ink-3); }
+  .empty h2 { color: var(--ink-2); font-size: 17px; margin-bottom: 8px; }
+</style>
+
+<header>
+  <div class="crumb">MigLoop · Fix Traceback</div>
+  <h1>返修链路<em id="rootlbl">两原子探索树 —— 版本文件 × 版本 agent,任何一个版本都能当根</em>
+    <span class="clear" id="clear">✕ 回到入口</span></h1>
+  <div class="chips" id="chips"></div>
+</header>
+<div class="stage-wrap" id="wrap" hidden>
+  <aside class="rail panel" id="rail">
+    <div class="railhead"><b>入口 · 选一个版本当根</b><button class="tog" id="railtog" title="收起/展开">◂</button></div>
+    <div class="search"><input id="q" type="search" placeholder="搜文件名 / 路径 / agent / 会话…" autocomplete="off"></div>
+    <div class="railbody" id="railbody"><div class="rempty">账本装配中…</div></div>
+  </aside>
+  <div class="graph panel" id="graph">
+    <div class="toolbar">
+      <div class="legend">
+        <i><span class="sw" style="border-color:var(--c-file)"></span>文件@版本</i>
+        <i><span class="sw" style="border-color:var(--c-gen)"></span>agent v版本</i>
+        <i><span class="sw" style="border-color:var(--c-dis); border-style:dashed"></span>派发它的上游</i>
+        <i><span class="sw" style="border-color:var(--c-spec); border-style:dotted"></span>下游(读者 / 产出)</i>
+        <i><span class="sw" style="border-color:var(--c-fix)"></span>修复方</i>
+        <i>★ 被修行原作者</i><i>▲ 读的是旧版</i><i>行段 · 依赖 · 写前读 · 脚本 = 标签,不裁剪</i>
+      </div>
+      <div class="zoomctl"><button id="zo">−</button><button id="zi">+</button><button id="zf">适应</button><button id="z1">1:1</button></div>
+    </div>
+    <div class="canvas" id="canvas"><svg class="wires" id="wires"></svg></div>
+  </div>
+  <aside class="side panel" id="side">
+    <div class="placeholder">左栏搜一个文件或 agent,点开它的版本,选一个当根。<br><br>文件@v → 左边写者(上游),右边读者(下游);<br>agent v → 左边读取与派发者(上游),右边产出(下游)。<br><br>右侧抽屉:版本脊柱 / 内容复原 / 派发指令 / 收件箱 / 逐版时间线。</div>
+  </aside>
+</div>
+<div class="empty" id="empty" hidden>
+  <h2>本次会话没有返修记录</h2>
+  <div>修复轮(verify/fixer)发生后,这里会为每一次修复画出完整链路。</div>
+</div>
+
+<script>
+  var DATA = __FIXCHAIN_JSON__;
+  (function () {
+    var chips = document.getElementById("chips");
+    function el(tag, cls, text) {
+      var n = document.createElement(tag);
+      if (cls) n.className = cls;
+      if (text != null) n.textContent = text;
+      return n;
+    }
+    function chip(html, id) {
+      var c = el("span", "chip");
+      c.innerHTML = html;
+      if (id) c.id = id;
+      chips.appendChild(c);
+      return c;
+    }
+    // 端点地址可由宿主注入(server 把页面挂在别的路径下);缺省是 hmigbot 的 insight1 路由
+    var SIDQ = encodeURIComponent(DATA.sid || DATA.sid8 || "");
+    // 看板空窗承载时由看板注入 __API_BASE__(浏览器眼里的 API origin);直开页面时空串,走同源相对路径。
+    // 服务端只给相对路径 —— 按 Host 头拼绝对地址在反代 / TLS 终结下会拼错
+    var API_BASE = window.__API_BASE__ || "";
+    function absUrl(u) { return (!u || /^https?:\/\//i.test(u)) ? u : API_BASE + u; }
+    var U = DATA.urls || {};
+    U.data = absUrl(U.data || ("/api/insight1/fixchain-data/" + SIDQ));
+    U.atom = absUrl(U.atom || ("/api/insight1/atom/" + SIDQ));
+    U.filediff = absUrl(U.filediff || ("/api/insight1/filediff/" + SIDQ));
+    if (!("report" in U)) U.report = "/insight1/report/";     // null = 前序会话不给链接
+    if (U.report) U.report = absUrl(U.report);
+    function reportLink(s) {
+      if (!U.report) return "<b>" + s + "</b>";
+      return '<a href="' + U.report + s + '" target="_blank" rel="noopener" style="font-weight:700">' + s + " ↗</a>";
+    }
+    chip("session <b>" + (DATA.sid8 || "") + "</b>");
+    chip("<b>" + (DATA.project || "") + "</b>");
+    // 没有返修链也开门:任何 文件@v / agent vN 都能当根,返修入口只是最常用的一个入口
+    DATA.fixes = DATA.fixes || [];
+    document.getElementById("wrap").hidden = false;
+    var noneChip = null;
+    function refreshNone(chains) {
+      // 首屏 fixes 只是账本缓存的快照(可能为空),链装配完再定一次;生成轮给后继轮的链页当入口
+      if (noneChip) { noneChip.remove(); noneChip = null; }
+      if (chains && chains.length) return;
+      var t = "本轮<b>没有识别出返修链</b> · 从左栏任选一个版本开始";
+      if (DATA.later && DATA.later.url) t += ' · 修复轮在会话 <a href="' + DATA.later.url + '" style="font-weight:700">' + DATA.later.sid8 + " ↗</a>";
+      noneChip = chip(t);
+    }
+    refreshNone(DATA.fixes);
+    var fixChip = chip("<b>" + DATA.fixes.length + "</b> 个被修文件");
+    var fxrChip = chip("<b>" + (DATA.fixers || []).length + "</b> 个修复方");
+    var loadChip = chip("⏳ 账本装配中…(首次约 1 分钟,之后即开)", "load-chip");
+    var idxChip = chip("⏳ 目录装配中…", "idx-chip");
+
+    // ---- 名片:链上登记的 agent desc/stage;账本 id 与血缘 id 只差 "agent-" 前缀 ----
+    var G = { nodes: {} };
+    function agentKey(id) { return String(id).indexOf("agent-") === 0 ? String(id).slice(6) : String(id); }
+    function baseName(p) { return String(p).replace(/\\/g, "/").split("/").pop(); }
+    function regAgent(id, meta) {
+      var cur = G.nodes[agentKey(id)] || {};
+      meta = meta || {};
+      G.nodes[agentKey(id)] = {
+        kind: meta.kind || cur.kind || "agent",
+        label: meta.label || cur.label, stage: meta.stage || cur.stage,
+        prompt: meta.prompt || cur.prompt, note: meta.note || cur.note
+      };
+    }
+    (DATA.fixes || []).forEach(function (f) { G.nodes[f.id] = { kind: "ets", label: f.label }; });
+    (DATA.fixers || []).forEach(function (f) { regAgent(f.id, { kind: "fixer", label: f.label }); });
+
+    var chainByFile = {};
+    var fixerIds = {};
+    (DATA.fixers || []).forEach(function (f) { fixerIds[agentKey(f.id)] = 1; });
+    var fixerVers = {};      // 主会话只有部分版本是修复(verify 阶段亲手改的那几笔):按 agent 版本号着色
+    function isFixAt(aid, ver) {
+      var k = agentKey(aid);
+      if (!fixerIds[k]) return false;
+      var fv = fixerVers[k];
+      return !fv || ver == null || !!fv[ver];
+    }
+    var dataReady = false;
+    var IDX = null;          // /atom/index:全部文件 + agent
+    var agentById = {};
+
+    function relT(ts) {
+      // T+h:mm 相对迁移开始(池子里最早一条动作);算不出退回 MM-DD HH:MM
+      if (!ts) return "?";
+      var d = (new Date(ts) - new Date(DATA.t0 || "")) / 60000;
+      if (!DATA.t0 || isNaN(d)) return String(ts).slice(5, 16).replace("T", " ");
+      var m = Math.round(Math.abs(d)), h = Math.floor(m / 60), mm = m % 60;
+      return "T" + (d < 0 ? "-" : "+") + h + ":" + (mm < 10 ? "0" : "") + mm;
+    }
+    function indexData(d) {
+      DATA.t0 = d.t0 || DATA.t0;
+      chainByFile = {};
+      var fixes = [], fixersSeen = {}, fixers = [];
+      (d.chains || []).forEach(function (c) {
+        chainByFile[c.file_abs] = c;
+        G.nodes[c.file_abs] = { kind: "ets", label: c.file };
+        fixes.push({ id: c.file_abs, label: c.file });
+        (c.generators || []).forEach(function (g) {
+          regAgent(g.id, { kind: "agent", label: g.desc, stage: g.stage, prompt: g.prompt });
+        });
+        (c.fixers_all || []).forEach(function (f) {
+          regAgent(f.id, { kind: "fixer", label: f.desc, stage: f.stage, note: f.note });
+          fixerIds[agentKey(f.id)] = 1;
+          if (String(f.id).indexOf("__main__") === 0 && f.vers && f.vers.length) {
+            fixerVers[agentKey(f.id)] = fixerVers[agentKey(f.id)] || {};
+            f.vers.forEach(function (v) { fixerVers[agentKey(f.id)][v] = 1; });
+          }
+          if (!fixersSeen[agentKey(f.id)]) {
+            fixersSeen[agentKey(f.id)] = 1;
+            fixers.push({ id: f.id, label: f.desc || agentKey(f.id).slice(0, 24) });
+          }
+        });
+      });
+      DATA.fixes = fixes; DATA.fixers = fixers;
+      refreshNone(d.chains);
+      dataReady = true;
+      fixChip.innerHTML = "<b>" + DATA.fixes.length + "</b> 个被修文件";
+      fxrChip.innerHTML = "<b>" + (DATA.fixers || []).length + "</b> 个修复方";
+      loadChip.innerHTML = "两原子账本 · <b>" + (d.chains || []).length + "</b> 条返修链(逐行签名)";
+      if (d.cross && d.cross.priors && d.cross.priors.length) {
+        chip("跨会话接力 · 前序会话 " + d.cross.priors.map(reportLink).join("、") + " · " + d.cross.n_cross + " 条跨链");
+      }
+      renderRail();
+      if (!XT) { renderEmptyCanvas(); openFromHash(); }
+    }
+    fetch(U.data, { credentials: "include" })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (d && d.chains) { indexData(d); }
+        else { loadChip.textContent = "返修链装配失败:" + ((d || {}).error || "未知"); }
+      })
+      .catch(function (e) { loadChip.textContent = "返修链装配失败:" + e; });
+    fetch(U.atom + "/index", { credentials: "include" })
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        if (!j || j.error) { idxChip.textContent = "目录装配失败:" + ((j || {}).error || "未知"); return; }
+        IDX = j;
+        (IDX.agents || []).forEach(function (a) { agentById[a.id] = a; });
+        idxChip.innerHTML = "目录 · <b>" + (IDX.files || []).length + "</b> 个文件 · <b>" + (IDX.agents || []).length + "</b> 个 agent";
+        renderRail();
+        if (!XT) openFromHash();
+      })
+      .catch(function (e) { idxChip.textContent = "目录装配失败:" + e; });
+
+    // ---- 两原子供数:按原子身份键控缓存,重复节点零成本;截断在客户端 ----
+    var ENG = { sid: (DATA.sid || DATA.sid8), fv: {}, fvCb: {}, ag: {}, agCb: {}, fc: {}, fcCb: {} };
+    function lazyFetch(store, cbs, key, url, cb) {
+      if (store[key]) { cb(store[key]); return; }
+      if (cbs[key]) { cbs[key].push(cb); return; }
+      cbs[key] = [cb];
+      fetch(url, { credentials: "include" }).then(function (r) { return r.json(); })
+        .then(function (j) {
+          var list = cbs[key] || []; delete cbs[key];
+          if (j && !j.error) { store[key] = j; list.forEach(function (f) { f(j); }); }
+          else { list.forEach(function (f) { f(null, (j || {}).error || "未知"); }); }
+        })
+        .catch(function (e) {
+          var list = cbs[key] || []; delete cbs[key];
+          list.forEach(function (f) { f(null, e); });
+        });
+    }
+    var API = U.atom;
+    function atomFile(path, cb) {           // 全脊柱 + 读者,不带正文
+      lazyFetch(ENG.fv, ENG.fvCb, path, API + "/file?diff=0&content=0&path=" + encodeURIComponent(path), cb);
+    }
+    function atomFileContent(path, v, cb) { // 某一版的复原正文
+      lazyFetch(ENG.fc, ENG.fcCb, path + "@" + v, API + "/file?diff=0&content=1&v=" + v + "&path=" + encodeURIComponent(path), cb);
+    }
+    function atomAgent(aid, cb) {
+      var key = agentKey(aid);
+      lazyFetch(ENG.ag, ENG.agCb, key, API + "/agent?id=" + encodeURIComponent(key), cb);
+    }
+    function agentLabelOf(aid) {
+      var k = agentKey(aid);
+      var n = G.nodes[k];
+      if (n && n.label) return n.label;
+      var a = ENG.ag[k] || agentById[aid] || agentById["agent-" + k];
+      if (a && a.label) return a.label;
+      return String(aid).indexOf("__main__") === 0 ? "主会话" : k.slice(0, 20);
+    }
+
+    // ═══════════ 左栏:入口 ═══════════
+    var rail = document.getElementById("rail");
+    var railBody = document.getElementById("railbody");
+    var qInput = document.getElementById("q");
+    var railState = { q: "", closedSec: {}, closedKind: { spec: 1, src: 1, other: 1 }, open: {} };
+    document.getElementById("railtog").addEventListener("click", function () {
+      rail.classList.toggle("closed");
+      this.textContent = rail.classList.contains("closed") ? "▸" : "◂";
+    });
+    qInput.addEventListener("input", function () { railState.q = qInput.value.trim().toLowerCase(); renderRail(); });
+    function hit(s) { return !railState.q || String(s || "").toLowerCase().indexOf(railState.q) >= 0; }
+    var KIND_LABEL = { ets: "ArkTS 源码 (.ets)", spec: "Spec / 配置 (.md .json)", src: "安卓源码 (.java .kt .xml)", other: "其它" };
+    function pill(t, cls) { return el("span", "pill " + (cls || ""), t); }
+    function rsec(title, count, key, body) {
+      var s = el("div", "rsec" + (railState.closedSec[key] ? " closed" : ""));
+      var h = el("div", "rsh");
+      h.appendChild(el("span", null, title));
+      h.appendChild(el("span", "n", "(" + count + ")"));
+      h.appendChild(el("span", "chev", railState.closedSec[key] ? "▸" : "▾"));
+      h.addEventListener("click", function () { railState.closedSec[key] = !railState.closedSec[key]; renderRail(); });
+      s.appendChild(h);
+      var list = el("div", "rlist");
+      body(list);
+      s.appendChild(list);
+      return s;
+    }
+    function ritem(key, labelNode, pills, onExpand) {
+      var it = el("div", "ritem" + (railState.open[key] ? " open" : "") + (curRootKey === key ? " on" : ""));
+      var row = el("div", "rrow");
+      row.appendChild(labelNode);
+      (pills || []).forEach(function (p) { if (p) row.appendChild(p); });
+      it.appendChild(row);
+      var vers = el("div", "vers");
+      it.appendChild(vers);
+      row.addEventListener("click", function () {
+        railState.open[key] = !railState.open[key];
+        it.classList.toggle("open", !!railState.open[key]);
+        if (railState.open[key] && !vers.childNodes.length) { vers.textContent = "装配中…"; onExpand(vers); }
+      });
+      if (railState.open[key]) { vers.textContent = "装配中…"; onExpand(vers); }
+      return it;
+    }
+    function vline(vn, text, cls, onClick) {
+      var v = el("div", "vline " + (cls || ""));
+      v.appendChild(el("span", "vn", vn));
+      v.appendChild(el("span", "t", text));
+      v.title = text;
+      v.addEventListener("click", function (ev) { ev.stopPropagation(); onClick(); });
+      return v;
+    }
+    function fileVersLines(vers, path) {
+      atomFile(path, function (fa, err) {
+        vers.textContent = "";
+        if (!fa) { vers.appendChild(el("div", "rempty", "(" + (err || "未知") + ")")); return; }
+        if (!(fa.versions || []).length) vers.appendChild(el("div", "rempty", "(没有写入记录)"));
+        (fa.versions || []).forEach(function (vv) {
+          var who = vv.by === "__external__" ? "外部输入" : vv.by === "__outband__" ? "实录外修改"
+                  : (vv.by_name || agentLabelOf(vv.by)) + (vv.by_ver != null ? " v" + vv.by_ver : "");
+          vers.appendChild(vline("v" + vv.v, "← " + who + " · " + vv.diff_kind + (vv.lines != null ? " · " + vv.lines + " 行" : ""),
+            isFixAt(vv.by, vv.by_ver) ? "fix" : "", function () { openRoot({ kind: "file", path: path, v: vv.v }); }));
+        });
+      });
+    }
+    function agentVersLines(vers, aid) {
+      atomAgent(aid, function (ag, err) {
+        vers.textContent = "";
+        if (!ag) { vers.appendChild(el("div", "rempty", "(" + (err || "未知") + ")")); return; }
+        var effs = (ag.actions || []).filter(function (a) { return a.ver != null; });
+        if (!effs.length) vers.appendChild(el("div", "rempty", "(没有对外效应)"));
+        effs.forEach(function (a) {
+          vers.appendChild(vline("v" + a.ver, effectText(a), "", function () { openRoot({ kind: "agent", id: ag.id, v: a.ver }); }));
+        });
+      });
+    }
+    function effectText(a) {
+      if (a.kind === "dispatch") return "派发 " + (a.detail.name || a.detail.description || "子agent");
+      if (a.kind === "message") return "发消息 → " + (a.detail.to || "?");
+      var fs = a.files.filter(function (f) { return f.op !== "read"; });
+      return fs.map(function (f) { return (f.op === "delete" ? "删 " : "写 ") + baseName(f.path) + "@v" + f.v + (f.via === "script" ? "(脚本)" : f.via === "shell" ? "(shell)" : ""); }).join(", ")
+             || (a.tool + (a.ok ? "" : "(失败)"));
+    }
+    function renderRail() {
+      railBody.innerHTML = "";
+      if (!dataReady && !IDX) { railBody.appendChild(el("div", "rempty", "账本装配中…")); return; }
+      // 返修入口
+      if (dataReady) {
+        var fx = (DATA.fixes || []).filter(function (f) { return hit(f.label) || hit(f.id); });
+        var fr = (DATA.fixers || []).filter(function (f) { return hit(f.label) || hit(f.id); });
+        railBody.appendChild(rsec("返修入口", fx.length + fr.length, "fix", function (list) {
+          fx.forEach(function (f) {
+            var lab = el("span", "lab mono", "★ " + f.label);
+            list.appendChild(ritem("F:" + f.id, lab, [pill("被修", "warn")], function (vers) { fileVersLines(vers, f.id); }));
+          });
+          fr.forEach(function (f) {
+            var lab = el("span", "lab", f.label);
+            lab.style.color = "var(--c-fix)";
+            list.appendChild(ritem("A:agent-" + agentKey(f.id), lab, [pill("修复方", "warn")], function (vers) { agentVersLines(vers, f.id); }));
+          });
+          if (!fx.length && !fr.length) list.appendChild(el("div", "rempty", "无匹配"));
+        }));
+      }
+      if (!IDX) { railBody.appendChild(el("div", "rempty", "目录装配中…")); return; }
+      // agent:按会话、按派发层级缩进
+      var ags = IDX.agents || [];
+      var kids = {};
+      ags.forEach(function (a) { (kids[a.parent || ""] = kids[a.parent || ""] || []).push(a); });
+      var shown = 0;
+      var agBox = rsec("Agent", ags.length, "ag", function (list) {
+        function emit(a, depth) {
+          var m = hit(a.label) || hit(a.id) || hit(a.kind) || hit(a.session);
+          var sub = kids[a.id] || [];
+          var childNodes = [];
+          sub.forEach(function (c) { var n = emit(c, depth + 1); if (n) childNodes.push(n); });
+          if (!m && !childNodes.length) return null;
+          var lab = el("span", "lab");
+          if (depth) lab.appendChild(el("span", "ind", "└ ".padStart(depth * 2 + 2, "　")));
+          lab.appendChild(document.createTextNode(a.label));
+          lab.title = a.id + (a.kind ? " · " + a.kind : "");
+          var ps = [pill("v" + a.n_versions)];
+          if (fixerIds[agentKey(a.id)]) ps.push(pill("修复方", "warn"));
+          var it = ritem("A:" + a.id, lab, ps, function (vers) { agentVersLines(vers, a.id); });
+          shown += 1;
+          var frag = document.createDocumentFragment();
+          frag.appendChild(it);
+          childNodes.forEach(function (n) { frag.appendChild(n); });
+          return frag;
+        }
+        (kids[""] || []).forEach(function (a) { var n = emit(a, 0); if (n) list.appendChild(n); });
+        if (!shown) list.appendChild(el("div", "rempty", "无匹配"));
+      });
+      railBody.appendChild(agBox);
+      // 文件:按类型分组,被修的 ★
+      var files = (IDX.files || []).filter(function (f) { return hit(baseName(f.path)) || hit(f.path); });
+      railBody.appendChild(rsec("文件", files.length, "fl", function (list) {
+        ["ets", "spec", "src", "other"].forEach(function (kind) {
+          var fs = files.filter(function (f) { return f.kind === kind; });
+          if (!fs.length) return;
+          fs.sort(function (a, b) {
+            var fa = chainByFile[a.path] ? 0 : 1, fb = chainByFile[b.path] ? 0 : 1;
+            if (fa !== fb) return fa - fb;
+            var wa = a.has_writer ? 0 : 1, wb = b.has_writer ? 0 : 1;
+            if (wa !== wb) return wa - wb;
+            return baseName(a.path).localeCompare(baseName(b.path));
+          });
+          var closed = !!railState.closedKind[kind] && !railState.q;
+          var kh = el("div", "rkind" + (closed ? " closed" : ""));
+          kh.appendChild(el("span", null, KIND_LABEL[kind]));
+          kh.appendChild(el("span", null, "(" + fs.length + ")"));
+          kh.appendChild(el("span", "chev", closed ? "▸" : "▾"));
+          kh.addEventListener("click", function () { railState.closedKind[kind] = !railState.closedKind[kind]; renderRail(); });
+          list.appendChild(kh);
+          var kl = el("div", "rklist");
+          fs.slice(0, 400).forEach(function (f) {
+            var lab = el("span", "lab mono", (chainByFile[f.path] ? "★ " : "") + baseName(f.path));
+            lab.title = f.path;
+            var ps = [pill("v" + f.n_versions), f.has_writer ? null : pill("外部", "via")];
+            kl.appendChild(ritem("F:" + f.path, lab, ps, function (vers) { fileVersLines(vers, f.path); }));
+          });
+          if (fs.length > 400) kl.appendChild(el("div", "rempty", "还有 " + (fs.length - 400) + " 个,搜索缩小范围"));
+          list.appendChild(kl);
+        });
+        if (!files.length) list.appendChild(el("div", "rempty", "无匹配"));
+      }));
+    }
+
+    // ═══════════ 探索树 ═══════════
+    // 节点只依赖自身原子((path,≤v) / (agent,≤ver)),版本号沿边严格向过去,天然无环。
+    // 不预计算、不裁剪、不插非原子的中间层。根的右侧是"下游":文件根 → 读了这一版的 agent
+    // (+ 修复方),agent 根 → 它 ≤ 这一版的产出。
+    var XT = null;
+    var curRootKey = null;
+    function xtNode(kind, props) {
+      var n = { tid: "t" + (XT.seq++), kind: kind, children: null, expanded: false,
+                depth: 0, parent: null, busy: false, badges: [] };
+      Object.keys(props).forEach(function (k) { n[k] = props[k]; });
+      XT.byId[n.tid] = n;
+      return n;
+    }
+    function rangeStr(vs) {
+      var out = [], s = vs[0], p = vs[0];
+      for (var i = 1; i <= vs.length; i++) {
+        var v = vs[i];
+        if (v === p + 1) { p = v; continue; }
+        out.push(s === p ? "v" + s : "v" + s + "-" + p);
+        s = p = v;
+      }
+      return out.join(",");
+    }
+    function readBadges(r) {
+      var b = [];
+      if (r.stale) b.push({ cls: "stale", t: "▲v" + r.v + "/" + r.latest_v });
+      if (r.start != null && r.n != null && !r.full) b.push({ cls: "", t: r.start + "-" + (r.start + r.n - 1) + "行" });
+      if (r.dep) b.push({ cls: "", t: "依赖" });
+      if (r.self_written) b.push({ cls: "self", t: "写前读" });
+      if (r.via === "script") b.push({ cls: "via", t: "脚本读" });
+      return b;
+    }
+    function addKid(node, kid) {
+      kid.parent = node.tid;
+      kid.depth = node.depth + 1;
+      node.children.push(kid.tid);
+      return kid;
+    }
+    function addRight(root, kid) {
+      kid.parent = root.tid;
+      kid.depth = -1;
+      kid.isRight = true;
+      XT.rights.push(kid.tid);
+      return kid;
+    }
+    function fileKid(path, v, badges, extra) {
+      var props = { path: path, anchorV: v, label: baseName(path) + "@v" + v, badges: badges || [] };
+      Object.keys(extra || {}).forEach(function (k) { props[k] = extra[k]; });
+      return xtNode("file", props);
+    }
+    // 文件原子 → 写者分组子节点;每组锚在该写者写这个文件的最后一个 agent 版本
+    function expandFile(node, done) {
+      atomFile(node.path, function (fa, err) {
+        if (!fa) { node.busy = false; done("(" + (err || "未知") + ")"); return; }
+        var groups = [], byA = {};
+        (fa.versions || []).forEach(function (vv) {
+          if (node.anchorV && vv.v > node.anchorV) return;   // 时间截断:≤v 才有因果
+          var g = byA[vv.by];
+          if (!g) { g = byA[vv.by] = { by: vv.by, name: vv.by_name, vs: [], ver: null, vias: {} }; groups.push(g); }
+          g.vs.push(vv.v);
+          if (vv.by_ver != null && (g.ver == null || vv.by_ver > g.ver)) g.ver = vv.by_ver;
+          g.vias[vv.via] = 1;
+        });
+        var ch = node.isRoot ? chainByFile[node.path] : null;
+        var sharp = {};
+        if (ch && ch.lines) (ch.lines.from || []).forEach(function (x) { sharp[agentKey(x.id)] = 1; });
+        node.children = [];
+        groups.forEach(function (g) {
+          if (node.isRoot && fixerIds[agentKey(g.by)] && !node.anchorV) return;   // 被修文件根:修复方在右侧
+          if (g.by === "__external__" || g.by === "__outband__") {
+            addKid(node, xtNode("leaf", { label: (g.by === "__external__" ? "外部输入" : "实录外修改") + " " + rangeStr(g.vs) }));
+            return;
+          }
+          var badges = [{ cls: "", t: rangeStr(g.vs) }];
+          if (g.vias.script) badges.push({ cls: "via", t: "脚本落盘" });
+          else if (g.vias.shell) badges.push({ cls: "via", t: "shell" });
+          addKid(node, xtNode("agent", {
+            aid: g.by, anchorVer: g.ver, sharp: !!sharp[agentKey(g.by)],
+            label: (sharp[agentKey(g.by)] ? "★ " : "") + (g.name || agentLabelOf(g.by)) + (g.ver != null ? " v" + g.ver : ""),
+            badges: badges
+          }));
+        });
+        node.expanded = true;
+        node.busy = false;
+        done();
+      });
+    }
+    // agent 原子 → ≤ver 的读取(file@v)+ 派发它的上游(父 agent@父版本)
+    function expandAgent(node, done) {
+      atomAgent(node.aid, function (ag, err) {
+        if (!ag) { node.busy = false; done("(" + (err || "未知") + ")"); return; }
+        node.children = [];
+        var seen = {};
+        function inCut(x) { return node.anchorVer == null || (x.ver != null ? x.ver <= node.anchorVer : x.at <= node.anchorVer); }
+        (ag.reads || []).forEach(function (r) {
+          if (!inCut(r)) return;
+          var key = r.path + "@" + r.v;
+          if (seen[key]) return;
+          seen[key] = 1;
+          addKid(node, fileKid(r.path, r.v, readBadges(r), { stale: !!r.stale }));
+        });
+        if (ag.parent && ag.parent.id) {
+          var nIn = (ag.inbox || []).filter(function (m) { return inCut(m); }).length;
+          addKid(node, xtNode("agent", { aid: ag.parent.id, anchorVer: ag.parent.ver, isDispatch: true,
+            label: "⇠ 派发 " + (ag.parent.name || agentLabelOf(ag.parent.id)) + (ag.parent.ver != null ? " v" + ag.parent.ver : ""),
+            badges: nIn > 1 ? [{ cls: "", t: "+" + (nIn - 1) + " 条消息" }] : [] }));
+        }
+        node.expanded = true;
+        node.busy = false;
+        done();
+      });
+    }
+    function collapse(node) {
+      (node.children || []).forEach(function (tid) {
+        var kid = XT.byId[tid];
+        if (kid) { collapse(kid); delete XT.byId[tid]; }
+      });
+      node.children = null;
+      node.expanded = false;
+    }
+    var selTid = null;
+    function onNode(tid) {
+      var node = XT.byId[tid];
+      if (!node) return;
+      selTid = tid;
+      if (node.kind === "file") drawerFile(node);
+      else if (node.kind === "agent") drawerAgent(node);
+      if (node.busy || node.kind === "leaf" || node.isRight) { renderTree(tid); return; }
+      if (node.expanded) { collapse(node); renderTree(tid); return; }
+      node.busy = true;
+      var done = function (err) {
+        if (err) { node.label += " " + err; }
+        renderTree(tid);
+      };
+      if (node.kind === "file") expandFile(node, done);
+      else expandAgent(node, done);
+    }
+    // ---- 根:任何 文件@v / agent@ver ----
+    function openRoot(spec) {
+      if (spec.kind === "file") openFileRoot(spec.path, spec.v || null);
+      else openAgentRoot(spec.id, spec.v || null);
+    }
+    function setRootLabel(text, key, hash) {
+      curRootKey = key;
+      document.getElementById("rootlbl").innerHTML = "从 <b></b> 出发";
+      document.getElementById("rootlbl").querySelector("b").textContent = text;
+      clearBtn.classList.add("show");
+      // 看板用 about:blank 空窗 document.write 承载本页时,改 URL 可能抛 SecurityError —— 不能拖垮渲染
+      if (hash != null && location.hash !== "#" + hash) { try { history.replaceState(null, "", "#" + hash); } catch (_e) {} }
+      renderRail();
+    }
+    function openFileRoot(path, v) {
+      XT = { byId: {}, seq: 0, root: null, rights: [], rootKind: "file" };
+      var root = xtNode("file", { path: path, anchorV: v, isRoot: true, label: baseName(path) + (v ? "@v" + v : "") });
+      XT.root = root.tid;
+      root.busy = true;
+      selTid = root.tid;
+      autoFit = true;
+      atomFile(path, function (fa) {
+        var anchor = v || (fa ? fa.v : null);
+        if (!v && fa) root.label = baseName(path) + "@v" + fa.v;
+        setRootLabel(baseName(path) + "@v" + anchor, "F:" + path, "file=" + encodeURIComponent(path) + "&v=" + anchor);
+        // 下游:读了这一版的 agent(锚在它被喂养的版本);被修文件根再加修复方
+        var seen = {};
+        ((fa && fa.readers) || []).forEach(function (r) {
+          if (r.v !== anchor) return;
+          var key = r.by + "@" + r.at;
+          if (seen[key]) return;
+          seen[key] = 1;
+          var b = [];
+          if (r.start != null && r.n != null && !(r.start === 1 && r.n >= (fa.versions[anchor - 1] || {}).lines)) b.push({ cls: "", t: r.start + "-" + (r.start + r.n - 1) + "行" });
+          if (r.dep) b.push({ cls: "", t: "依赖" });
+          addRight(root, xtNode("agent", { aid: r.by, anchorVer: r.at, isReader: true,
+            label: (r.by_name || agentLabelOf(r.by)) + (r.at != null ? " v" + r.at : ""), badges: b }));
+        });
+        var ch = chainByFile[path];
+        if (ch && !v) {
+          (ch.fixers_all || []).forEach(function (f) {
+            if (seen["fx" + agentKey(f.id)]) return;
+            seen["fx" + agentKey(f.id)] = 1;
+            addRight(root, xtNode("agent", { aid: f.id, anchorVer: null, isFixer: true, label: f.desc || agentKey(f.id).slice(0, 20), badges: [{ cls: "stale", t: "修复方" }] }));
+          });
+        }
+        expandFile(root, function () { renderTree(root.tid); });
+        drawerFile(root);
+      });
+    }
+    function openAgentRoot(id, v) {
+      XT = { byId: {}, seq: 0, root: null, rights: [], rootKind: "agent" };
+      var root = xtNode("agent", { aid: id, anchorVer: v, isRoot: true, label: agentLabelOf(id) + (v ? " v" + v : "") });
+      XT.root = root.tid;
+      root.busy = true;
+      selTid = root.tid;
+      autoFit = true;
+      atomAgent(id, function (ag) {
+        var anchor = v || (ag ? ag.n_versions : null);
+        var name = ag ? (ag.label || agentLabelOf(id)) : agentLabelOf(id);
+        root.label = name + (anchor ? " v" + anchor : "");
+        setRootLabel(name + " v" + anchor, "A:" + (ag ? ag.id : id), "agent=" + encodeURIComponent(ag ? ag.id : id) + "&v=" + anchor);
+        var seen = {};
+        ((ag && ag.writes) || []).forEach(function (w) {
+          if (anchor != null && w.ver > anchor) return;
+          var key = w.path + "@" + w.v;
+          if (seen[key]) return;
+          seen[key] = 1;
+          var b = [{ cls: "", t: "v" + w.ver }];
+          if (w.op === "delete") b.push({ cls: "stale", t: "删除" });
+          if (w.via === "script") b.push({ cls: "via", t: "脚本落盘" });
+          addRight(root, xtNode("file", { path: w.path, anchorV: w.v, label: baseName(w.path) + "@v" + w.v, badges: b }));
+        });
+        expandAgent(root, function () { renderTree(root.tid); });
+        drawerAgent(root);
+      });
+    }
+    function openFromHash() {
+      var h = location.hash.replace(/^#/, "");
+      if (!h || XT) return;
+      var m = {};
+      h.split("&").forEach(function (kv) { var i = kv.indexOf("="); if (i > 0) m[kv.slice(0, i)] = decodeURIComponent(kv.slice(i + 1)); });
+      if (m.file) openRoot({ kind: "file", path: m.file, v: parseInt(m.v, 10) || null });
+      else if (m.agent) openRoot({ kind: "agent", id: m.agent, v: parseInt(m.v, 10) || null });
+    }
+    function nodeCls(node) {
+      var c;
+      if (node.kind === "agent") c = node.isDispatch ? "dispatch" : (isFixAt(node.aid, node.anchorVer) || node.isFixer) ? "fix" : "gen" + (node.sharp ? " sharp" : "");
+      else if (node.kind === "leaf") c = "leaf";
+      else c = "file" + (node.stale ? " stale" : "");
+      if (node.isRoot) c += " root";
+      if (node.isRight) c += " down";
+      return c;
+    }
+
+    // ---- 布局:整齐树。纵向占位 = max(自身, 子树占位之和),子节点在父占位内连续堆叠、父居中;
+    // 展开谁,谁的子树把兄弟推开,边呈扇形不打结。横向:深度即列,上游在左、根居中偏右、下游最右。----
+    var NODE_W = 196, NODE_H = 30, GAP_Y = 8, GAP_X = 74, TOP = 34;
+    function measure(n) {
+      var kids = (n.children || []).map(function (t) { return XT.byId[t]; }).filter(Boolean);
+      if (!kids.length) { n.ext = NODE_H; return n.ext; }
+      var total = 0;
+      kids.forEach(function (k) { total += measure(k); });
+      total += GAP_Y * (kids.length - 1);
+      n.ext = Math.max(NODE_H, total);
+      return n.ext;
+    }
+    function place(n, y0) {
+      n.y = y0 + (n.ext - NODE_H) / 2;
+      var kids = (n.children || []).map(function (t) { return XT.byId[t]; }).filter(Boolean);
+      if (!kids.length) return;
+      var total = 0;
+      kids.forEach(function (k) { total += k.ext; });
+      total += GAP_Y * (kids.length - 1);
+      var cy = y0 + (n.ext - total) / 2;
+      kids.forEach(function (k) { place(k, cy); cy += k.ext + GAP_Y; });
+    }
+    var svg = document.getElementById("wires");
+    var canvas = document.getElementById("canvas");
+    var graphEl = document.getElementById("graph");
+    var nodeEls = {};
+    var zoom = 1;
+    var autoFit = true;
+    var layoutSize = { w: 0, h: 0 };
+    var spacer = el("div", null, "");
+    spacer.style.position = "relative";
+    spacer.style.pointerEvents = "none";
+    graphEl.appendChild(spacer);
+    canvas.style.position = "absolute";
+    canvas.style.left = "0";
+    var toolbarEl = graphEl.querySelector(".toolbar");
+    function canvasTop() { return toolbarEl.offsetHeight + 6; }   // 图例可能折行,列头不能被盖住
+    function applyZoom(z, keepAuto) {
+      zoom = Math.max(0.08, Math.min(2.5, z));
+      if (!keepAuto) autoFit = false;
+      canvas.style.top = canvasTop() + "px";
+      canvas.style.transform = "scale(" + zoom + ")";
+      canvas.style.width = layoutSize.w + "px";
+      canvas.style.height = layoutSize.h + "px";
+      spacer.style.width = (layoutSize.w * zoom) + "px";
+      spacer.style.height = (layoutSize.h * zoom) + "px";
+    }
+    // 自动适应有下限:树长大后不再一味缩小,到 MIN_AUTO 停住、靶点滚进视野;"适应"按钮不受下限约束
+    var MIN_AUTO = 0.62;
+    function fitView(floor) {
+      var gw = graphEl.clientWidth - 8, gh = graphEl.clientHeight - canvasTop() - 8;
+      var k = Math.min(gw / (layoutSize.w || 1), gh / (layoutSize.h || 1), 1);
+      if (floor != null) k = Math.max(k, floor);
+      applyZoom(k, true);
+      autoFit = true;
+      if (floor == null) { graphEl.scrollLeft = 0; graphEl.scrollTop = 0; }
+    }
+    function renderTree(focusTid) {
+      var root = XT.byId[XT.root];
+      measure(root);
+      var rightsH = XT.rights.length ? XT.rights.length * (NODE_H + GAP_Y) - GAP_Y : 0;
+      var top = TOP + Math.max(0, (rightsH - root.ext) / 2);
+      place(root, top);
+      var maxD = 0;
+      Object.keys(XT.byId).forEach(function (tid) { var n = XT.byId[tid]; if (n.depth > maxD) maxD = n.depth; });
+      var colX = function (d) { return 24 + (maxD - d) * (NODE_W + GAP_X); };
+      var rightsX = colX(0) + NODE_W + GAP_X;
+      var totalH = Math.max(root.ext, rightsH) + TOP + 40;
+      var totalW = (XT.rights.length ? rightsX + NODE_W : colX(0) + NODE_W) + 30;
+      layoutSize = { w: totalW, h: totalH };
+      nodeEls = {};
+      canvas.innerHTML = "";
+      canvas.appendChild(svg);
+      svg.setAttribute("width", totalW); svg.setAttribute("height", totalH);
+      svg.style.width = totalW + "px"; svg.style.height = totalH + "px";
+      for (var d = 0; d <= maxD; d++) {
+        var title = d === 0 ? (root.kind === "file" ? "ROOT · 文件" : "ROOT · agent") : "上游 " + d;
+        var h = el("div", "colhead" + (d === 0 ? (root.kind === "file" ? " root" : " rootA") : ""), title);
+        h.style.left = colX(d) + "px"; h.style.width = NODE_W + "px";
+        canvas.appendChild(h);
+      }
+      if (XT.rights.length) {
+        var hf = el("div", "colhead down", root.kind === "file" ? "下游 · 读者" + (XT.rights.some(function (t) { return XT.byId[t].isFixer; }) ? " / 修复方" : "") : "下游 · 产出");
+        hf.style.left = rightsX + "px"; hf.style.width = NODE_W + "px";
+        canvas.appendChild(hf);
+        var ry = root.y + NODE_H / 2 - rightsH / 2;
+        XT.rights.forEach(function (tid) { var n = XT.byId[tid]; n.x = rightsX; n.y = Math.max(TOP, ry); ry += NODE_H + GAP_Y; });
+      }
+      Object.keys(XT.byId).forEach(function (tid) {
+        var n = XT.byId[tid];
+        if (n.depth >= 0) n.x = colX(n.depth);
+        addTreeNode(n);
+      });
+      drawEdges();
+      if (autoFit) fitView(MIN_AUTO);
+      else applyZoom(zoom);
+      if (focusTid && nodeEls[focusTid]) {
+        var n0 = XT.byId[focusTid];
+        var kids = (n0.children || []).map(function (t) { return XT.byId[t]; }).filter(Boolean);
+        var tgt = kids.length ? kids[0] : n0;
+        var cx = (tgt.x + NODE_W / 2) * zoom, cy = (tgt.y + NODE_H / 2) * zoom + canvasTop();
+        var vw = graphEl.clientWidth, vh = graphEl.clientHeight;
+        if (cx < graphEl.scrollLeft + 40 || cx > graphEl.scrollLeft + vw - 40) graphEl.scrollLeft = Math.max(0, cx - vw / 2);
+        if (cy < graphEl.scrollTop + 60 || cy > graphEl.scrollTop + vh - 40) graphEl.scrollTop = Math.max(0, cy - vh / 2);
+      }
+    }
+    function addTreeNode(node) {
+      var d = el("div", "node " + nodeCls(node) + (node.tid === selTid ? " sel" : ""));
+      d.style.left = node.x + "px"; d.style.top = node.y + "px"; d.style.width = NODE_W + "px";
+      d.appendChild(document.createTextNode(node.label));
+      (node.badges || []).forEach(function (b) { d.appendChild(el("span", "badge " + (b.cls || ""), b.t)); });
+      if (node.kind !== "leaf" && !node.isRight) d.appendChild(el("span", "chev", node.expanded ? "▾" : (node.busy ? "…" : "▸")));
+      d.title = (node.kind === "file" ? node.path : node.kind === "agent" ? node.aid : node.label)
+              + ((node.badges || []).length ? "  [" + node.badges.map(function (b) { return b.t; }).join(" · ") + "]" : "")
+              + (node.isRight ? "  (下游节点:抽屉里可「以此为根」)" : "");
+      d.addEventListener("click", function (ev) { ev.stopPropagation(); onNode(node.tid); });
+      d.addEventListener("mouseenter", function () { hiliteEdges(node.tid, true); });
+      d.addEventListener("mouseleave", function () { hiliteEdges(node.tid, false); });
+      canvas.appendChild(d);
+      nodeEls[node.tid] = d;
+    }
+    var wireByTid = {};
+    function drawEdges() {
+      svg.innerHTML = "";
+      wireByTid = {};
+      var frag = document.createDocumentFragment();
+      Object.keys(XT.byId).forEach(function (tid) {
+        var n = XT.byId[tid];
+        if (!n.parent) return;
+        var p = XT.byId[n.parent];
+        if (!p) return;
+        var a, b;
+        if (n.x < p.x) { a = n; b = p; } else { a = p; b = n; }
+        var x1 = a.x + NODE_W, y1 = a.y + NODE_H / 2, x2 = b.x, y2 = b.y + NODE_H / 2;
+        var mx = (x1 + x2) / 2;
+        var path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        path.setAttribute("d", "M" + x1 + "," + y1 + " C" + mx + "," + y1 + " " + mx + "," + y2 + " " + x2 + "," + y2);
+        path.setAttribute("class", "wire");
+        frag.appendChild(path);
+        (wireByTid[tid] = wireByTid[tid] || []).push(path);
+        (wireByTid[n.parent] = wireByTid[n.parent] || []).push(path);
+      });
+      svg.appendChild(frag);
+    }
+    function hiliteEdges(tid, on) {
+      (wireByTid[tid] || []).forEach(function (p) { p.classList.toggle("on", on); });
+    }
+    window.addEventListener("resize", function () { if (XT && autoFit) fitView(MIN_AUTO); });
+
+    var clearBtn = document.getElementById("clear");
+    var side = document.getElementById("side");
+
+    // ═══════════ 抽屉 ═══════════
+    function head(cls, tag, title, sub, rootSpec) {
+      var h = el("div", "head " + cls);
+      h.appendChild(el("div", "tag", tag));
+      h.appendChild(el("h3", cls === "file" ? "mono" : "", title));
+      if (sub) h.appendChild(el("div", "sub", sub));
+      if (rootSpec) {
+        var b = el("button", "rootbtn", "以此为根开树 →");
+        b.addEventListener("click", function () { openRoot(rootSpec); });
+        h.appendChild(b);
+      }
+      return h;
+    }
+    function sec(label) {
+      var s = el("div", "sec");
+      if (label) s.appendChild(el("b", null, label));
+      return s;
+    }
+    function kv(k, v) {
+      var d = el("div", "kv");
+      d.appendChild(el("span", "k", k));
+      d.appendChild(document.createTextNode(v));
+      return d;
+    }
+    function pills(items) {
+      var p = el("div", "pills");
+      items.forEach(function (it) { if (it) p.appendChild(el("span", "pill " + (it.cls || ""), it.t)); });
+      return p;
+    }
+    function lnk(text, cls, fn) {
+      var a = el("span", "lnk " + (cls || ""), text);
+      a.addEventListener("click", function (ev) { ev.stopPropagation(); fn(); });
+      return a;
+    }
+    function diffInto(holder, path, v) {
+      holder.textContent = "加载 diff…";
+      fetch(U.filediff + "?file=" + encodeURIComponent(path) + "&v=" + v, { credentials: "include" })
+        .then(function (r) { return r.json(); })
+        .then(function (j) {
+          if (!j.diff) { holder.textContent = "(无 diff 正文:" + (j.diff_kind || j.error || "未知") + ")"; return; }
+          holder.innerHTML = "";
+          j.diff.split("\n").forEach(function (ln) {
+            var row = document.createElement("span");
+            row.textContent = ln;
+            row.className = ln.charAt(0) === "+" ? "dl-add" : ln.charAt(0) === "-" ? "dl-del" : ln.charAt(0) === "@" ? "dl-ctx" : "";
+            holder.appendChild(row);
+            holder.appendChild(document.createTextNode("\n"));
+          });
+        })
+        .catch(function (e) { holder.textContent = "diff 加载失败: " + e; });
+    }
+    function quote(cls, label, text) {
+      var q = el("div", "quote " + cls);
+      q.appendChild(el("b", null, label));
+      q.appendChild(document.createTextNode(text));
+      return q;
+    }
+    function quoteLong(cls, label, text) {
+      text = String(text || "");
+      if (text.length <= 360) return quote(cls, label, text);
+      var q = el("div", "quote " + cls);
+      q.appendChild(el("b", null, label));
+      var body = document.createTextNode(text.slice(0, 360) + "…");
+      q.appendChild(body);
+      var more = el("span", "more", " 展开全文(" + text.length + " 字)");
+      more.addEventListener("click", function () { body.textContent = text; more.remove(); });
+      q.appendChild(more);
+      return q;
+    }
+    // 为什么复原不了 —— 按版本的来路/档位说人话
+    function unknownReason(vv) {
+      if (!vv) return "该版本不在账本里";
+      if (vv.by === "__external__") return "外部输入:第一次出现就是被读,且读取没带全文快照(区间读/命令读),账本里没有它的正文";
+      if (vv.by === "__outband__") return "实录外修改:观测到内容变了,但这次观测没带全文快照";
+      if (vv.diff_kind === "delete") return "该版为删除,内容为空";
+      if (vv.source === "opaque" || vv.source === "derived") return "脚本 / shell 落盘(内容未进实录),之后没有被全文读到,无法复原";
+      if (vv.source === "delta") return "edit 作用在未知状态上(盲写):前一版内容未知,应用不了差量";
+      return "前态在覆盖前没被看过,内容未知";
+    }
+    function contentSection(container, path, anchorV, fa) {
+      var s = sec("内容复原 · @v" + anchorV + " 当时的样子");
+      var body = el("div", null, "复原中…");
+      s.appendChild(body);
+      container.appendChild(s);
+      var vv = (fa.versions || [])[anchorV - 1];
+      if (vv && !vv.content_known) {
+        body.textContent = "";
+        body.appendChild(pills([{ cls: "warn", t: "无法复原" }]));
+        body.appendChild(el("div", "kv", unknownReason(vv)));
+        return;
+      }
+      atomFileContent(path, anchorV, function (fc, err) {
+        body.textContent = "";
+        if (!fc || fc.content == null) { body.appendChild(pills([{ cls: "warn", t: "无法复原" }])); body.appendChild(el("div", "kv", err || unknownReason(vv))); return; }
+        var lines = fc.content.replace(/\n$/, "").split("\n");
+        body.appendChild(pills([{ cls: "ok", t: lines.length + " 行 · 可复原全文" }, vv && vv.sealed ? { t: "由后续观测封口" } : null]));
+        var pre = el("pre", "srcblock");
+        var LIMIT = 80;
+        function paint(n) {
+          pre.innerHTML = "";
+          lines.slice(0, n).forEach(function (ln) { pre.appendChild(el("span", "ln", ln)); });
+        }
+        paint(LIMIT);
+        body.appendChild(pre);
+        if (lines.length > LIMIT) {
+          var more = el("span", "more", "展开全部 " + lines.length + " 行");
+          more.addEventListener("click", function () { paint(lines.length); more.remove(); });
+          body.appendChild(more);
+        }
+      });
+    }
+    function fileVersionSection(container, path, anchorV, onLoaded) {
+      var s = sec("版本脊柱 · 每版一条写者边(点写者 → 以它当时的版本为根)");
+      var body = el("div", null, "装配中…");
+      s.appendChild(body);
+      container.appendChild(s);
+      atomFile(path, function (fa, err) {
+        if (!fa) { body.textContent = "(" + (err || "未知") + ")"; return; }
+        body.textContent = "";
+        var anchor = anchorV || fa.v;
+        var vvA = (fa.versions || [])[anchor - 1];
+        body.appendChild(pills([
+          { t: fa.n_versions + " 版" },
+          { t: (anchorV ? "走访 @v" + anchorV : "最新 @v" + fa.v) },
+          vvA && vvA.content_known ? { cls: "ok", t: "内容可复原" } : { cls: "warn", t: "内容未知" },
+          (fa.breaks || []).length ? { cls: "warn", t: (fa.breaks || []).length + " 个断点" } : null
+        ]));
+        (fa.breaks || []).forEach(function (b) {
+          body.appendChild(quote("cause", "断点 · " + b.kind + " · " + String(b.ts).slice(0, 19), b.detail || (b.kind === "outband-change" ? "实录外修改,观测处已重锚" : "")));
+        });
+        var list = el("div", null, "");
+        list.style.marginTop = "8px";
+        (fa.versions || []).forEach(function (vv) {
+          var row = el("div", "vrow" + (vv.v === anchor ? " anchor" : "") + (anchorV && vv.v > anchorV ? " dim" : ""));
+          row.appendChild(el("span", "vn", "v" + vv.v));
+          var mid = el("span", null, "");
+          var isExt = vv.by === "__external__" || vv.by === "__outband__";
+          if (isExt) {
+            mid.appendChild(el("span", "who ext", vv.by === "__external__" ? "外部输入" : "实录外修改"));
+          } else {
+            var who = lnk((vv.by_name || agentLabelOf(vv.by)) + (vv.by_ver != null ? " v" + vv.by_ver : ""),
+                          "who" + (isFixAt(vv.by, vv.by_ver) ? " fix" : ""),
+                          function () { openRoot({ kind: "agent", id: vv.by, v: vv.by_ver }); });
+            who.style.fontWeight = "600";
+            mid.appendChild(who);
+          }
+          mid.appendChild(el("span", "meta", String(vv.ts).slice(5, 19).replace("T", " ") + " · " + vv.diff_kind
+            + (vv.via === "script" ? " · 脚本落盘(推断)" : vv.via === "shell" ? " · shell" : "")
+            + (vv.sealed ? " · 观测封口" : "") + (vv.lines != null ? " · " + vv.lines + " 行" : "")
+            + (!vv.content_known ? " · 内容未知" : "")
+            + (vv.v === anchor ? " · ◀ 走访锚点" : "")));
+          row.appendChild(mid);
+          var act = el("span", "act", vv.has_diff ? "diff" : "");
+          row.appendChild(act);
+          if (vv.has_diff) {
+            act.addEventListener("click", function (ev) {
+              ev.stopPropagation();
+              var pre = row.nextSibling && row.nextSibling.className === "diffblock" ? row.nextSibling : null;
+              if (pre) { pre.remove(); act.textContent = "diff"; return; }
+              pre = document.createElement("pre");
+              pre.className = "diffblock";
+              row.parentNode.insertBefore(pre, row.nextSibling);
+              act.textContent = "收起";
+              diffInto(pre, path, vv.v);
+            });
+          }
+          list.appendChild(row);
+        });
+        if (!(fa.versions || []).length) list.appendChild(el("div", "kv", "(账本里没有它的写入)"));
+        body.appendChild(list);
+        // 下游:谁读了这一版
+        var rd = (fa.readers || []).filter(function (r) { return r.v === anchor; });
+        var sr = sec("读了 @v" + anchor + " 的 agent · 下游(点 → 以它当时的版本为根)");
+        if (!rd.length) sr.appendChild(el("div", "kv", "(没人读过这一版)"));
+        rd.forEach(function (r) {
+          var row = el("div", "vrow");
+          row.appendChild(el("span", "vn", r.at != null ? "v" + r.at : ""));
+          var mid = el("span", null, "");
+          mid.appendChild(lnk((r.by_name || agentLabelOf(r.by)) + (r.at != null ? " v" + r.at : ""), "who", function () { openRoot({ kind: "agent", id: r.by, v: r.at }); }));
+          mid.appendChild(el("span", "meta", String(r.ts).slice(5, 19).replace("T", " ")
+            + (r.start != null && r.n != null ? " · " + r.start + "-" + (r.start + r.n - 1) + " 行" : " · 全文")
+            + (r.dep ? " · 依赖读" : "") + (r.certain ? "" : " · 版本就近绑定(不确定)")));
+          row.appendChild(mid);
+          row.appendChild(el("span", null, ""));
+          sr.appendChild(row);
+        });
+        container.appendChild(sr);
+        if (onLoaded) onLoaded(fa, anchor);
+      });
+    }
+    function drawerFile(node) {
+      side.innerHTML = "";
+      var rootSpec = node.isRoot ? null : { kind: "file", path: node.path, v: node.anchorV };
+      side.appendChild(head("file", "文件原子" + (node.anchorV ? " · 截至 @v" + node.anchorV : ""), baseName(node.path), node.path, rootSpec));
+      var body = el("div", "body");
+      side.appendChild(body);
+      if (node.badges && node.badges.length) {
+        var s0 = sec("这条边的标签");
+        s0.appendChild(pills(node.badges.map(function (b) { return { cls: b.cls === "stale" ? "warn" : b.cls === "via" ? "via" : "", t: b.t }; })));
+        body.appendChild(s0);
+      }
+      // 被修文件:把返修链的两端和修因放在最前面(左栏改成任意根之后这段曾经掉了)
+      var c = chainByFile[node.path];
+      if (c) {
+        var g = c.generator || {}, fx = c.fixer || {};
+        var sc = sec("这条返修链");
+        var genKv = kv("生成方", (g.desc || "?") + "(" + (g.stage || "?") + ")" + (c.lines ? " · 行级归属" : ""));
+        if (c.gen_session && DATA.sid8 && c.gen_session !== DATA.sid8) {
+          if (U.report) {
+            var gl = el("a", null, " · 生成于前序会话 " + c.gen_session + " ↗");
+            gl.href = U.report + c.gen_session; gl.target = "_blank"; gl.rel = "noopener";
+            genKv.appendChild(gl);
+          } else {
+            genKv.appendChild(document.createTextNode(" · 生成于前序会话 " + c.gen_session));
+          }
+        }
+        sc.appendChild(genKv);
+        var fixKv = kv("修复方", (fx.desc || "?") + "(" + (fx.stage || "?") + ")");
+        if (c.fix_session && DATA.sid8 && c.fix_session !== DATA.sid8) {
+          // 前序轮自己回合内的返修:修复方不在当前会话(修复/生成只是账本之上的一层划分)
+          if (U.report) {
+            var fl = el("a", null, " · 修复于前序会话 " + c.fix_session + "(回合内返修)↗");
+            fl.href = U.report + c.fix_session; fl.target = "_blank"; fl.rel = "noopener";
+            fixKv.appendChild(fl);
+          } else {
+            fixKv.appendChild(document.createTextNode(" · 修复于前序会话 " + c.fix_session + "(回合内返修)"));
+          }
+        }
+        sc.appendChild(fixKv);
+        if (c.fix_at) sc.appendChild(kv("时刻", "生成于 " + relT(c.gen_at) + " · 修复于 " + relT(c.fix_at) + "(T+ 相对迁移开始)"));
+        if (c.lines) {
+          sc.appendChild(kv("被修行", c.lines.touched + " 行 · 原作者 " + (c.lines.from || []).map(function (x) { return x.desc + "(" + x.n + "行)"; }).join("、") + " · 树上标 ★"));
+        } else if (c.blame_broken) {
+          sc.appendChild(kv("行级归属", c.blame_broken + " · 无锐指,按写者脊柱逐个查"));
+        }
+        (c.fixers_all || []).forEach(function (ff) {
+          if (ff.note) sc.appendChild(quoteLong("cause", "修因 · " + (ff.desc || "修复方"), ff.note));
+        });
+        body.appendChild(sc);
+      }
+      var holder = el("div", null, "");
+      body.appendChild(holder);
+      fileVersionSection(body, node.path, node.anchorV, function (fa, anchor) {
+        contentSection(holder, node.path, anchor, fa);
+      });
+    }
+    function actionSummary(a) {
+      var d = a.detail || {};
+      if (a.kind === "dispatch") return "派发 " + (d.name || d.description || "子agent");
+      if (a.kind === "message") return "发消息 → " + (d.to || "?");
+      var fs = (a.files || []).map(function (f) { return (f.op === "read" ? "读 " : f.op === "delete" ? "删 " : "写 ") + baseName(f.path) + "@v" + f.v; });
+      var desc = d.cmd || d.pattern || d.skill || d.url || d.path || "";
+      return (fs.length ? fs.join(", ") : "") + (desc ? (fs.length ? " ← " : "") + desc : "");
+    }
+    // 一行一个动作:#seq · 工具 · 摘要 · [原文] —— 原文按账本里的记录指针取完整输入输出
+    function actionRow(a) {
+      var r = el("div", "arow");
+      r.appendChild(el("span", "vn", "#" + a.seq));
+      r.appendChild(document.createTextNode(" " + a.tool + (a.ok === false ? "(失败)" : "") + " · " + actionSummary(a)));
+      if (a.expandable && curAgentId) {
+        var lk = el("span", "more", " 原文");
+        var pre = null;
+        lk.addEventListener("click", function (ev) {
+          ev.stopPropagation();
+          if (pre) { pre.remove(); pre = null; lk.textContent = " 原文"; return; }
+          pre = el("pre", "diffblock", "加载原文…");
+          r.appendChild(pre);
+          lk.textContent = " 收起";
+          fetch(API + "/action?id=" + encodeURIComponent(curAgentId) + "&seq=" + a.seq, { credentials: "include" })
+            .then(function (x) { return x.json(); })
+            .then(function (j) {
+              if (!j || j.error) { pre.textContent = "(" + ((j || {}).error || "失败") + ")"; return; }
+              var inp = typeof j.input === "string" ? j.input : JSON.stringify(j.input, null, 1);
+              var out = j.output || "(空)";
+              pre.textContent = "";
+              function seg(label, text, cap) {
+                pre.appendChild(el("span", "dl-ctx", label + "\n"));
+                var t = document.createTextNode(text.length > cap ? text.slice(0, cap) + "…" : text);
+                pre.appendChild(t);
+                if (text.length > cap) {
+                  var m = el("span", "more", " 展开全部(" + text.length + " 字)");
+                  m.addEventListener("click", function (e2) { e2.stopPropagation(); t.textContent = text; m.remove(); });
+                  pre.appendChild(m);
+                }
+                pre.appendChild(document.createTextNode("\n"));
+              }
+              seg("── 输入 ──", inp, 1500);
+              seg("── 输出 ──", out, 3000);
+            })
+            .catch(function (e) { pre.textContent = "加载失败: " + e; });
+        });
+        r.appendChild(lk);
+      }
+      return r;
+    }
+    var curAgentId = null;
+    function agentTimeline(container, ag, anchorVer) {
+      curAgentId = ag.id;
+      var s = sec("逐版时间线 · 每个效应一版,读归到它喂养的下一版(点 file@v → 以它为根)");
+      var tl = el("div", "tl");
+      var byVer = {};
+      (ag.actions || []).forEach(function (a) {
+        var k = a.ver != null ? a.ver : a.at;
+        (byVer[k] = byVer[k] || { effects: [], inputs: [] })[a.ver != null ? "effects" : "inputs"].push(a);
+      });
+      var keys = Object.keys(byVer).map(Number).sort(function (a, b) { return a - b; });
+      keys.forEach(function (k) {
+        var g = byVer[k];
+        var late = anchorVer != null && k > anchorVer;
+        var row = el("div", "trow" + (late ? " dim" : "") + (anchorVer != null && k === anchorVer ? " anchor" : ""));
+        row.appendChild(el("span", "vn", k > ag.n_versions ? "尾" : "v" + k));
+        var mid = el("div", null, "");
+        var eff = el("div", "eff");
+        var first = true;
+        g.effects.forEach(function (a) {
+          if (!first) eff.appendChild(document.createTextNode(" · "));
+          first = false;
+          if (a.kind === "dispatch") {
+            eff.appendChild(document.createTextNode("派发 "));
+            if (a.detail.child) eff.appendChild(lnk(a.detail.name || a.detail.description || "子agent", "", function () { openRoot({ kind: "agent", id: a.detail.child, v: null }); }));
+            else eff.appendChild(document.createTextNode(a.detail.name || a.detail.description || "子agent"));
+            return;
+          }
+          if (a.kind === "message") { eff.appendChild(document.createTextNode("发消息 → " + (a.detail.to || "?"))); return; }
+          var fs = a.files.filter(function (f) { return f.op !== "read"; });
+          if (!fs.length) { eff.appendChild(document.createTextNode(a.tool + (a.ok ? "" : "(失败)"))); return; }
+          fs.forEach(function (f, i) {
+            if (i) eff.appendChild(document.createTextNode(", "));
+            eff.appendChild(document.createTextNode(f.op === "delete" ? "删 " : "写 "));
+            eff.appendChild(lnk(baseName(f.path) + "@v" + f.v, "mono", function () { openRoot({ kind: "file", path: f.path, v: f.v }); }));
+            if (f.via === "script") eff.appendChild(document.createTextNode("(脚本)"));
+            else if (f.via === "shell") eff.appendChild(document.createTextNode("(shell)"));
+          });
+        });
+        if (!g.effects.length) eff.textContent = k > ag.n_versions ? "收尾后的读取/自查" : "(这一版之前的输入)";
+        mid.appendChild(eff);
+        var reads = 0, other = 0, inbox = 0, stale = 0;
+        g.inputs.forEach(function (a) {
+          if (a.kind === "read") { reads += a.files.length; }
+          else if (a.kind === "inbox") inbox += 1;
+          else other += 1;
+        });
+        (ag.reads || []).forEach(function (r) { if (r.at === k && r.stale) stale += 1; });
+        var parts = [];
+        if (reads) parts.push("读 " + reads + (stale ? "(▲旧版 " + stale + ")" : ""));
+        if (inbox) parts.push("收件 " + inbox);
+        if (other) parts.push("其它调用 " + other);
+        if (anchorVer != null && k === anchorVer) parts.push("◀ 走访锚点");
+        if (parts.length) mid.appendChild(el("div", "inp", parts.join(" · ")));
+        // 动作明细:每次调用一行,"原文"按指针展开完整输入输出 —— 账本是实录的索引,信息不丢
+        var acts = g.effects.concat(g.inputs).sort(function (a, b) { return a.seq - b.seq; });
+        if (acts.length) {
+          var tog = el("span", "more", "动作明细 " + acts.length + " ▸");
+          var box = el("div", null, "");
+          box.hidden = true;
+          tog.addEventListener("click", function (ev) {
+            ev.stopPropagation();
+            box.hidden = !box.hidden;
+            tog.textContent = "动作明细 " + acts.length + (box.hidden ? " ▸" : " ▾");
+            if (!box.hidden && !box.childNodes.length) acts.forEach(function (a) { box.appendChild(actionRow(a)); });
+          });
+          mid.appendChild(tog);
+          mid.appendChild(box);
+        }
+        row.appendChild(mid);
+        tl.appendChild(row);
+      });
+      if (!keys.length) tl.appendChild(el("div", "kv", "(没有动作)"));
+      s.appendChild(tl);
+      container.appendChild(s);
+    }
+    function drawerAgent(node) {
+      side.innerHTML = "";
+      var isFix = isFixAt(node.aid, node.anchorVer) || node.isFixer;
+      var rootSpec = node.isRoot ? null : { kind: "agent", id: node.aid, v: node.anchorVer };
+      var hd = head(isFix ? "fix" : "gen", "Agent 原子" + (node.anchorVer != null ? " · 截至 v" + node.anchorVer : " · 全程"), agentLabelOf(node.aid), agentKey(node.aid), rootSpec);
+      side.appendChild(hd);
+      var body = el("div", "body");
+      side.appendChild(body);
+      var meta = G.nodes[agentKey(node.aid)] || {};
+      body.appendChild(el("div", "kv", "账本装配中…"));
+      atomAgent(node.aid, function (ag, err) {
+        body.innerHTML = "";
+        if (!ag) { body.appendChild(kv("状态", "(装配失败:" + (err || "未知") + ")")); return; }
+        hd.querySelector("h3").textContent = ag.label || agentLabelOf(node.aid);
+        var anchor = node.anchorVer != null ? node.anchorVer : ag.n_versions;
+        var cut = ag.reads.filter(function (r) { return r.at <= anchor; });
+        var s0 = sec("身份");
+        s0.appendChild(pills([
+          { t: ag.kind || "agent" }, ag.model ? { t: ag.model } : null, meta.stage ? { t: "阶段 " + meta.stage } : null,
+          { t: "会话 " + ag.session }, { t: ag.n_versions + " 版(效应)" },
+          { t: "读 " + cut.length + (node.anchorVer != null ? " / " + ag.reads.length : "") },
+          { t: "写 " + ag.writes.filter(function (w) { return w.ver <= anchor; }).length + (node.anchorVer != null ? " / " + ag.writes.length : "") },
+          (function () { var n = cut.filter(function (r) { return r.stale; }).length; return n ? { cls: "warn", t: "▲ 旧版读 " + n } : null; })(),
+          (function () { var n = cut.filter(function (r) { return r.self_written; }).length; return n ? { t: "写前读 " + n } : null; })(),
+          (function () { var n = cut.filter(function (r) { return r.via === "script"; }).length; return n ? { cls: "via", t: "脚本读 " + n } : null; })()
+        ]));
+        body.appendChild(s0);
+        if (ag.parent) {
+          var s1 = sec("派发自");
+          s1.appendChild(lnk((ag.parent.name || agentLabelOf(ag.parent.id)) + (ag.parent.ver != null ? " @v" + ag.parent.ver : ""), "", function () { openRoot({ kind: "agent", id: ag.parent.id, v: ag.parent.ver }); }));
+          body.appendChild(s1);
+        }
+        if (ag.prompt) body.appendChild(quoteLong("dispatch", "派发指令 · 全文", ag.prompt));
+        (ag.inbox || []).forEach(function (m, i) {
+          if (i === 0 && ag.prompt && m.text === ag.prompt) return;   // 首条收件 = 派发词本身
+          var late = m.at > anchor;
+          body.appendChild(quoteLong("inbox" + (late ? " dim" : ""), "收件 · " + (m.from || "?") + (m.summary ? " · " + m.summary : "")
+            + " · 喂 v" + m.at + (late ? " · 锚点之后" : ""), m.text || ""));
+        });
+        agentTimeline(body, ag, node.anchorVer);
+        if (ag.result && ag.result.text) body.appendChild(quoteLong("cause dim", "收尾输出 · 锚点之后,非因果证据", ag.result.text));
+        else if (meta.note) body.appendChild(quote("cause dim", "收尾说明", meta.note));
+      });
+    }
+    function renderEmptyCanvas() {
+      XT = null;
+      nodeEls = {};
+      canvas.innerHTML = "";
+      canvas.appendChild(svg);
+      svg.innerHTML = "";
+      layoutSize = { w: 600, h: 200 };
+      var m = el("div", "cvempty", "");
+      m.innerHTML = "从左栏选一个<b>文件的某一版</b>或<b>agent 的某一版</b>当根,树就从这里开始生长。<br>"
+        + "返修入口里的被修文件是最常用的起点;任何读到的 spec、安卓源码、脚本产物也都能当根。";
+      canvas.appendChild(m);
+      applyZoom(1, true);
+    }
+    function reset() {
+      clearBtn.classList.remove("show");
+      curRootKey = null;
+      document.getElementById("rootlbl").textContent = "两原子探索树 —— 版本文件 × 版本 agent,任何一个版本都能当根";
+      if (location.hash) { try { history.replaceState(null, "", location.pathname + location.search); } catch (_e) {} }
+      renderEmptyCanvas();
+      renderRail();
+      side.innerHTML = "";
+      side.appendChild(el("div", "placeholder",
+        "左栏搜一个文件或 agent,点开它的版本,选一个当根。文件@v → 左边写者(上游),右边读者(下游);agent v → 左边读取与派发者(上游),右边产出(下游)。"));
+    }
+    document.getElementById("zi").addEventListener("click", function () { applyZoom(zoom * 1.25); });
+    document.getElementById("zo").addEventListener("click", function () { applyZoom(zoom / 1.25); });
+    document.getElementById("zf").addEventListener("click", function () { fitView(); });
+    document.getElementById("z1").addEventListener("click", function () { applyZoom(1); });
+    graphEl.addEventListener("wheel", function (ev) {
+      if (!ev.ctrlKey) return;
+      ev.preventDefault();
+      applyZoom(zoom * (ev.deltaY < 0 ? 1.15 : 0.87));
+    }, { passive: false });
+    clearBtn.addEventListener("click", reset);
+    window.addEventListener("hashchange", function () { if (!XT && dataReady) openFromHash(); });
+    renderEmptyCanvas();
+    renderRail();
+  })();
+</script>

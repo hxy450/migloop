@@ -220,7 +220,26 @@
   .g-cap b { color: var(--ink-2); font-variant-numeric: tabular-nums; }
   .gantt { position: relative; }
   .g-bar { position: absolute; height: 15px; border-radius: 3px; cursor: pointer; opacity: .92; }
+  .g-seg { position: absolute; height: 15px; border-radius: 3px; pointer-events: none; opacity: .95; z-index: 1; }
+  .g-bar.aborted { outline: 2px solid var(--crit); outline-offset: 0; opacity: 1;
+    background-image: repeating-linear-gradient(45deg, transparent 0 4px, rgba(207,34,46,.5) 4px 7px); }
+  /* resume 复用型:整条退成近隐形轨道(交互仍在),实色只画活跃段。
+     组合选择器压过 .aborted(0,3,0 > 0,2,0)——整跨度的红框斜纹是主要视觉
+     噪音,异常标记改挂到最后一个活跃段(中断真正发生处,见 .g-seg.aborted) */
+  .g-bar.resumed, .g-bar.resumed.aborted { opacity: .12; outline: none; background-image: none; }
+  .g-bar.resumed:hover { opacity: .35; outline: 1.5px solid var(--ink-2); }
+  .g-seg.aborted { outline: 2px solid var(--crit); outline-offset: 0;
+    background-image: repeating-linear-gradient(45deg, transparent 0 4px, rgba(207,34,46,.5) 4px 7px); }
   .g-bar:hover { opacity: 1; outline: 1.5px solid var(--ink-2); z-index: 2; }
+  /* 主会话快照:上传上来的"子代理"转录其实是主会话的影子(migbot-runtime-src#46)。忠实画出来,
+     但一眼能认出 —— 琥珀虚线框 + 冲淡 + 反向斜纹,活跃段同样处理;审计「02 风险点」点名。
+     选择器堆到四类,压过 resumed/aborted 的组合规则 */
+  .g-bar.snapshot, .g-bar.snapshot.resumed, .g-bar.snapshot.resumed.aborted, .g-bar.snapshot.aborted {
+    outline: 2px dashed #b45309; outline-offset: 0; opacity: .38;
+    background-image: repeating-linear-gradient(-45deg, transparent 0 3px, rgba(180,83,9,.45) 3px 6px); }
+  .g-seg.snapshot, .g-seg.snapshot.aborted { outline: 2px dashed #b45309; outline-offset: 0; opacity: .5;
+    background-image: repeating-linear-gradient(-45deg, transparent 0 3px, rgba(180,83,9,.45) 3px 6px); }
+  .st.snap { color: #b45309; }
   .g-guide { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--ink-2); opacity: .55; display: none; pointer-events: none; z-index: 1; }
   /* 全程总览:所有阶段画在同一条时间轴上 */
   .ov-card { background: var(--surface); border: 1px solid var(--ring); border-radius: 8px;
@@ -343,6 +362,44 @@
   .sk-seg:last-child { border-radius: 2px 4px 4px 2px; }
   .sk-n { flex: none; width: 44px; font-family: var(--font-mono); font-size: 11.5px; color: var(--ink); }
 
+  /* 06 时间轴拖选缩放 */
+  .strip.zoomable, .gantt.zoomable { cursor: grab; position: relative; overflow: hidden; }
+  .pan-inner { position: absolute; inset: 0; will-change: transform; }
+  .strip.zoomable.panning, .gantt.zoomable.panning { cursor: grabbing; }
+  .zoom-reset { font: inherit; font-size: 11px; border: 1px solid var(--ring); background: var(--surface); border-radius: 6px; padding: 1px 10px; cursor: pointer; color: var(--ink-2); }
+  .zoom-reset:hover { border-color: var(--axis); color: var(--ink); }
+
+  /* 02 执行链路整段退场:hidden 属性会被渲染 JS 翻开,CSS 强制压住。
+     取证需要时删掉这四行即可复活。 */
+  #sec-git, #git-filters, #git-filters-kinds, #gitflow { display: none !important; }
+
+  /* ---------- 02 风险点 ---------- */
+  .risk-pass { color: var(--ok, #1a7f37); font-size: 13.5px; font-weight: 600; }
+  .risk-list { display: flex; flex-direction: column; gap: 8px; }
+  .risk-item { display: flex; gap: 10px; align-items: flex-start; padding: 9px 12px; border: 1px solid var(--ring); border-radius: 8px; }
+  .risk-item.error { border-color: rgba(207, 34, 46, .45); background: rgba(207, 34, 46, .05); }
+  .risk-item.warn { border-color: rgba(154, 103, 0, .4); background: rgba(154, 103, 0, .05); }
+  .risk-lv { flex-shrink: 0; font-size: 10.5px; font-weight: 700; padding: 1px 8px; border-radius: 99px; letter-spacing: .5px; margin-top: 2px; background: var(--wash); color: var(--ink-3); }
+  .risk-item.error .risk-lv { background: rgba(207, 34, 46, .12); color: #cf222e; }
+  .risk-item.warn .risk-lv { background: rgba(154, 103, 0, .12); color: #9a6700; }
+  .risk-t { margin: 0; font-size: 13px; font-weight: 650; color: var(--ink); }
+  .risk-chain { margin-top: 6px; }
+  .risk-chain summary { font-size: 11.5px; color: var(--ink-3); cursor: pointer; }
+  .rc-row { border-left: 2px solid var(--ring); margin: 8px 0 8px 2px; padding: 2px 0 2px 10px; }
+  .rc-file { font-size: 12px; font-weight: 650; word-break: break-all; }
+  .rc-line { font-size: 12px; color: var(--ink-2); margin-top: 2px; }
+  .rc-sub { font-size: 11.5px; color: var(--ink-3); margin: 1px 0 0 14px; word-break: break-word; }
+  .risk-item.go { cursor: pointer; }
+  .risk-item.go:hover { border-color: var(--axis); box-shadow: 0 1px 6px rgba(0,0,0,.06); }
+  .risk-go { margin-left: auto; flex-shrink: 0; font-size: 11px; color: var(--ink-3); align-self: center; white-space: nowrap; }
+  .risk-item.go:hover .risk-go { color: var(--ink); }
+  .card.risk-flash { animation: riskFlash 2.6s ease-out; }
+  @keyframes riskFlash {
+    0%, 55% { outline: 2px solid #cf222e; outline-offset: 3px; }
+    100% { outline: 2px solid transparent; outline-offset: 3px; }
+  }
+  .risk-d { margin: 1px 0 0; font-size: 12px; line-height: 1.65; color: var(--ink-2); word-break: break-word; }
+
   /* ---------- lineage (血缘) ---------- */
   .lin-box { background: var(--surface); border: 1px solid var(--ring); border-radius: 8px; box-shadow: var(--shadow); padding: 0; overflow: hidden; }
   .lin-gt { font-size: 13px; color: var(--ink-2); margin: 18px 0 8px; font-family: var(--font-mono); }
@@ -429,15 +486,13 @@
     <div class="brand"><svg class="mark" width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><path d="M6 2.5 V17.5" stroke="var(--bar)" stroke-width="2" stroke-linecap="round" fill="none"/><path d="M6 10 C13 10 13 10 13 6" stroke="var(--g-bash)" stroke-width="2" stroke-linecap="round" fill="none"/><circle cx="13" cy="4.5" r="2.1" fill="var(--g-bash)"/><circle cx="6" cy="17" r="2.1" fill="var(--bar)"/></svg>MigLoop<span class="sub">PoC v0.9</span></div>
     <nav class="mainnav" aria-label="主菜单">
       <span class="mn active">轨迹 Trace</span>
-      <span class="mn disabled" title="规划中:跨 session 对比">对比<small>规划中</small></span>
-      <span class="mn disabled" title="规划中:评测与建议">分析<small>规划中</small></span>
     </nav>
     <button id="theme-btn" class="theme-btn" title="切换主题">◐</button>
     <div class="chips" id="meta-chips"></div>
   </div>
   <nav class="subnav" id="subnav" aria-label="页内导航">
     <a href="#sec-topo"><i>01</i>执行拓扑</a>
-    <a href="#sec-git"><i>02</i>执行链路</a>
+    <a href="#sec-risk"><i>02</i>风险点</a>
     <a href="#sec-cmp"><i>03</i>阶段对比</a>
     <a href="#sec-ctx"><i>04</i>上下文</a>
     <a href="#sec-skills"><i>05</i>Skill</a>
@@ -452,10 +507,13 @@
   <h2 id="sec-topo"><i>01</i>执行拓扑<em>Topology</em><span class="hint">阶段主链 + 子代理委派 · 点击节点跳转详情</span></h2>
   <div class="topo-box"><svg id="topo" role="img" aria-label="阶段与子代理委派拓扑图"></svg></div>
 
-  <h2 id="sec-git"><i>02</i>执行链路<em>Trace</em><span class="hint">主干 = 主会话 · 分支 = 子代理(并行分道) · 行底色 = 所属阶段 · 点 chip 筛选 · 点行开详情</span></h2>
-  <div class="gfilters" id="git-filters"></div>
-  <div class="gfilters" id="git-filters-kinds"></div>
-  <div class="git-box" id="gitflow"></div>
+  <h2 id="sec-risk"><i>02</i>风险点<em>Risk</em><span class="hint">基于迁移管线经验的自动审计 · 告警规则集中在 migbot/insight/audit.py,按四步指南可扩展</span></h2>
+  <div class="cmp" id="riskbox"></div>
+
+  <h2 id="sec-git" hidden><i></i>执行链路<em>Trace</em></h2>
+  <div class="gfilters" id="git-filters" hidden></div>
+  <div class="gfilters" id="git-filters-kinds" hidden></div>
+  <div class="git-box" id="gitflow" hidden></div>
 
   <h2 id="sec-cmp"><i>03</i>阶段对比<em>Compare</em></h2>
   <div class="cmp" id="cmp"></div>
@@ -637,10 +695,62 @@
     fmtVer + (D.meta.cc_version || ""),
     fmtSrc
   ].forEach(function (c) { if (c) { var e = el("span", "chip", c); if (c.indexOf("session") === 0) e.classList.add("mono"); chips.appendChild(e); } });
+  // 返修链路页入口(页面级 button;链路可视化只在独立页,migloop 本页不渲染)。
+  // 单会话无链但会话里有修复型 agent 时也给入口 —— 生成方在前序会话,
+  // 独立页会做跨会话接力(codex),这里不预算链数。
+  (function () {
+    var tb = ((D.audit || {}).findings || []).filter(function (f) {
+      return f.rule === "verify-fix-traceback" && f.chain && f.chain.length; })[0];
+    var hasFixer = (D.agents || []).some(function (a) {
+      var t = String(a.type || "").toLowerCase();
+      return t.indexOf("fixer") >= 0 || t.indexOf("visual") >= 0;
+    });
+    // cross_hint:同工程的相邻轮次。轮次链接让"生成轮/验证轮"互相可见;
+    // 生成轮自己没有修复方时,后继轮的存在也是返修入口的依据
+    // (链页会自动重定向到后继的链)
+    var hint = (D.audit || {}).cross_hint || {};
+    function roundChip(label, sid8) {
+      if (!sid8) return;
+      var r = document.createElement("a");
+      r.className = "chip";
+      r.textContent = label + " " + sid8 + " ↗";
+      r.href = "/insight1/report/" + sid8;
+      r.target = "_top";
+      r.style.textDecoration = "none";
+      chips.appendChild(r);
+    }
+    roundChip("← 前一轮", hint.prior);
+    roundChip("后一轮", hint.later);
+    // 返修链路是迁移结束后的复盘 —— 会话还在跑时按钮不出现
+    if ((D.audit || {}).live_running) return;
+    if (hint.prior || hint.later) {
+      var jn = document.createElement("a");
+      jn.className = "chip";
+      jn.textContent = "迁移全程 ↗";
+      jn.href = "/api/insight1/journey/" + encodeURIComponent((D.meta || {}).session_id || "");
+      jn.target = "_blank";
+      jn.rel = "noopener";
+      jn.style.textDecoration = "none";
+      chips.appendChild(jn);
+    }
+    // 宿主自己有返修链路入口(server 看板弹窗的按钮)时注入 urls 且 fixchain 为空:这里不再画入口
+    if (D.urls && !D.urls.fixchain) return;
+    if (!tb && !hasFixer && !hint.later) return;
+    var a = document.createElement("a");
+    a.className = "chip";
+    a.textContent = tb ? ("返修链路 ↗ " + tb.chain.length + " 条") : "返修链路 ↗ 跨会话";
+    a.href = (((D.urls || {}).fixchain && !/^https?:/i.test(D.urls.fixchain)) ? (window.__API_BASE__ || "") : "")
+      + (((D.urls || {}).fixchain) || ("/api/insight1/fixchain/" + encodeURIComponent((D.meta || {}).session_id || "")));
+    a.target = "_blank";
+    a.rel = "noopener";
+    a.style.cssText = "text-decoration:none;color:var(--crit);border-color:color-mix(in srgb, var(--crit) 45%, transparent);font-weight:650;";
+    chips.appendChild(a);
+  })();
   document.getElementById("src-file").textContent = (D.meta.source_file || "").split("\\").pop();
   document.getElementById("extractor-name").textContent = fmtAdapter;
   document.getElementById("session-format").textContent = fmtLabel;
-  document.getElementById("session-medium").textContent = fmtMedium;
+  var mediumEl = document.getElementById("session-medium");
+  if (mediumEl) mediumEl.textContent = fmtMedium;
   document.getElementById("schema-v").textContent = D.meta.schema_version || "?";
   document.title = "MigLoop Trace — " + proj + " · " + (D.meta.session_id || "").slice(0, 8);
 
@@ -654,16 +764,14 @@
     Object.keys(a.skills || {}).forEach(function (k) { skillSet[k] = 1; subSkillCalls += a.skills[k]; });
   });
   var statDefs = [
-    { k: "总时长", v: (T.duration_ms / 3600000).toFixed(1), u: "h", d: T.active_ms != null ? ("活跃 " + fmtDur(T.active_ms) + (T.user_wait_ms != null ? " · 等待用户 " + fmtDur(T.user_wait_ms) + (T.duration_ms - T.active_ms - T.user_wait_ms > 60000 ? " · 挂起 " + fmtDur(T.duration_ms - T.active_ms - T.user_wait_ms) : "") : " · 非活跃 " + fmtDur(Math.max(0, T.duration_ms - T.active_ms)))) : "含用户离开的挂起等待" },
+    { k: "总时长", v: (T.duration_ms / 3600000).toFixed(1), u: "h", d: T.active_ms != null ? ("活跃 " + fmtDur(T.active_ms) + " · 等待用户 " + fmtDur(T.user_wait_ms) + (T.duration_ms - T.active_ms - T.user_wait_ms > 60000 ? " · 挂起 " + fmtDur(T.duration_ms - T.active_ms - T.user_wait_ms) : "")) : "含用户离开的挂起等待" },
     { k: "阶段", v: String(stages.filter(function (s) { return s.stage !== "setup"; }).length), d: stages.filter(function (s) { return s.stage !== "setup"; }).map(function (s) { return s.label; }).join(" → ") },
     { k: "工具调用", v: String(T.tool_calls), u: "次", d: failCount ? ('<span class="bad">' + failCount + " 次失败</span>") : "全部成功", html: true },
     { k: "子代理", v: String(T.subagent_transcripts), u: "个", d: "独立 transcript 已回链" },
     { k: "Output Tokens", v: fmtTok(T.main_output_tokens + T.subagent_output_tokens), d: "主线 " + fmtTok(T.main_output_tokens) + " + 子代理 " + fmtTok(T.subagent_output_tokens),
       split: [{ v: T.main_output_tokens, c: "var(--lane-1)" }, { v: T.subagent_output_tokens, c: "var(--lane-2)" }] },
-    { k: "白烧 Output", v: fmtTok(T.waste_output_tokens || 0),
-      d: (T.aborted_agents ? '<span class="bad">' + T.aborted_agents + " 个 agent 异常收尾</span> · 占总 output "
-           + (100 * (T.waste_output_tokens || 0) / Math.max(1, T.main_output_tokens + T.subagent_output_tokens)).toFixed(1) + "%"
-           : "无异常收尾 agent"), html: true },
+    // 「白烧 Output」指标卡已撤 —— 异常收尾信息移入「02 风险点」的
+    // aborted-agent 聚合卡(按阶段点名 + 浪费 token 汇总 + 跳转现场)
     { k: "Skill 调用", v: String(mainSkillCalls + subSkillCalls), u: "次", d: "主线 " + mainSkillCalls + " · 子代理 " + subSkillCalls + " · 覆盖 " + Object.keys(skillSet).length + " 个" }
   ];
   var statsBox = document.getElementById("stats");
@@ -1070,20 +1178,44 @@
                { label: "\u7ed3\u679c\u6458\u8981", text: t.result }]
     });
   }
+  var _linAgentIdx = null;   // agent_id -> lineage \u6761\u76ee(\u8bfb\u5199\u89c6\u91ce),\u4e24\u4e2a\u62bd\u5c49\u5165\u53e3\u5171\u7528
+  function _linAgentOf(id) {
+    if (_linAgentIdx === null) {
+      _linAgentIdx = {};
+      (((D.lineage || {}).agents) || []).forEach(function (x) { _linAgentIdx[x.agent_id] = x; });
+    }
+    return _linAgentIdx[id] || null;
+  }
   function openAgentDrawer(a) {
     var bars = Object.keys(a.tool_counts || {}).sort(function (x, y) { return a.tool_counts[y] - a.tool_counts[x]; })
       .slice(0, 8).map(function (k) { return { label: k, n: a.tool_counts[k], color: GROUPS[groupOf(k)].css }; });
     var skch = Object.keys(a.skills || {}).sort(function (x, y) { return a.skills[y] - a.skills[x]; })
       .map(function (k) { return { text: "/" + k + (a.skills[k] > 1 ? " \u00d7" + a.skills[k] : "") }; });
+    // \u8840\u7f18\u6761\u76ee join:\u9636\u6bb5\u660e\u7ec6\u4e0e\u8840\u7f18\u4e24\u4e2a\u5165\u53e3\u6253\u5f00\u7684\u662f\u540c\u4e00\u4e2a\u62bd\u5c49,
+    // \u8eab\u4efd/\u6267\u884c(\u8fd9\u91cc) + \u8bfb\u5199\u89c6\u91ce(lineage)\u5408\u5e76\u5448\u73b0,\u4e0d\u518d\u4e24\u5904\u4e24\u526f\u9762\u5b54
+    var la = _linAgentOf(a.agent_id) || {};
+    var facts = [["\u72b6\u6001", a.status === "completed" ? "\u5b8c\u6210(\u540c\u6b65)" : "\u5f02\u6b65"],
+              ["\u65f6\u957f", fmtDur(a.dur_ms)],
+              ["Output tokens", fmtTok(a.output_tokens)], ["\u5185\u90e8\u8c03\u7528", a.tool_uses],
+              ["\u6a21\u578b", (a.model || "").replace("claude-", "")], ["Agent ID", (a.agent_id || "").slice(0, 12)]];
+    if (la.agent_id) {
+      facts.push(["\u8bfb spec", (la.n_spec_read || 0) + " \u4e2a \u00b7 " + fmtTok(la.lines_spec || 0) + " \u884c"]);
+      facts.push(["\u8bfb Android", (la.n_android || 0) + " \u4e2a \u00b7 " + fmtTok(la.lines_android || 0) + " \u884c"]);
+      facts.push(["\u4ea7\u51fa", "spec " + (la.n_spec_w || 0) + " \u00b7 \u4ee3\u7801 " + (la.n_ets || 0) + " \u00b7 \u5176\u5b83 "
+        + Math.max(0, (la.n_out || 0) - (la.n_spec_w || 0) - (la.n_ets || 0))]);
+    }
+    var blocks = [{ label: "\u4efb\u52a1\u63cf\u8ff0", text: a.desc },
+               { label: "\u6d3e\u53d1\u6307\u4ee4(\u4e3b\u7ebf\u539f\u8bdd \u00b7 \u524d 800 \u5b57)", text: a.prompt_excerpt },
+               { label: "\u6700\u7ec8\u4ea7\u51fa(\u672b\u6761\u6587\u672c)", text: a.result }];
+    if (la.agent_id) {
+      blocks.push({ label: "\u8bfb\u5230\u7684 spec \u6587\u4ef6", text: (la.spec_reads || []).join("\n") });
+      blocks.push({ label: "\u5199\u51fa\u7684\u4ee3\u7801\u6587\u4ef6", text: (la.writes_ets || []).join("\n") });
+    }
     openDrawer({
       kind: "SubAgent", color: typeColor(a.type),
       title: a.type + (a.desc ? " \u00b7 " + a.desc : ""),
-      facts: [["\u72b6\u6001", a.status === "completed" ? "\u5b8c\u6210(\u540c\u6b65)" : "\u5f02\u6b65"],
-              ["\u65f6\u957f", fmtDur(a.dur_ms)],
-              ["Output tokens", fmtTok(a.output_tokens)], ["\u5185\u90e8\u8c03\u7528", a.tool_uses],
-              ["\u6a21\u578b", (a.model || "").replace("claude-", "")], ["Agent ID", (a.agent_id || "").slice(0, 12)]],
-      blocks: [{ label: "\u4efb\u52a1\u63cf\u8ff0", text: a.desc },
-               { label: "\u6700\u7ec8\u4ea7\u51fa(\u672b\u6761\u6587\u672c)", text: a.result }],
+      facts: facts,
+      blocks: blocks,
       chips: skch.length ? { label: "Skill \u8c03\u7528", items: skch } : null,
       bars: bars, barsLabel: "\u5185\u90e8\u5de5\u5177\u5206\u5e03"
     });
@@ -1121,46 +1253,25 @@
       // 其余阶段被压成看不见的细条,合并反而比分开更难读。
       // 做法:找出"整段没有任何活动"的空隙,每个只给一小格固定宽度并打上斜纹,
       // 其余时间仍严格等比 —— 阶段内的相对节奏与并行关系不失真,空档也没被抹掉。
+      var evs = [];
+      allTools0.forEach(function (t) { evs.push(new Date(t.ts).getTime()); });
+      allAgents0.forEach(function (a) {
+        evs.push(new Date(a.start_ts).getTime()); evs.push(new Date(a.end_ts).getTime());
+      });
+      (D.prompts || []).forEach(function (p) { evs.push(new Date(p.ts).getTime()); });
+      (D.markers || []).forEach(function (m) { evs.push(new Date(m.ts).getTime()); });
+      ss.forEach(function (s) {
+        evs.push(new Date(s.start_ts).getTime()); evs.push(new Date(s.end_ts).getTime());
+      });
+      evs = evs.filter(function (v) { return v >= t0 && v <= t1; }).sort(function (a, b) { return a - b; });
       var GAPMIN = Math.max(10 * 60e3, 0.03 * span);
-      var segs = [], gaps = [];
-      if ((D.activity_intervals || []).length) {
-        // 精确空档:适配器给出 reasoning∪tool 的活动区间,区间之外即空档(deveco 等)
-        var cur = t0;
-        (D.activity_intervals || []).map(function (iv) { return [new Date(iv[0]).getTime(), new Date(iv[1]).getTime()]; })
-          .filter(function (iv) { return iv[1] > t0 && iv[0] < t1; })
-          .sort(function (a, b) { return a[0] - b[0]; })
-          .forEach(function (iv) {
-            var s = Math.max(t0, iv[0]), e = Math.min(t1, iv[1]);
-            if (s > cur) { gaps.push([cur, s]); cur = e; }
-            else if (e > cur) { cur = e; }
-          });
-        if (cur < t1) gaps.push([cur, t1]);
-        gaps = gaps.filter(function (g) { return g[1] - g[0] > GAPMIN; });
-        cur = t0;
-        gaps.forEach(function (g) { if (g[0] > cur) segs.push([cur, g[0]]); cur = Math.max(cur, g[1]); });
-        if (cur < t1) segs.push([cur, t1]);
-        if (!segs.length) { segs = [[t0, t1]]; gaps = []; }
-      } else {
-        // 回退:按事件时间戳的启发式空档(claude/codex 没有 activity_intervals)
-        var evs = [];
-        allTools0.forEach(function (t) { evs.push(new Date(t.ts).getTime()); });
-        allAgents0.forEach(function (a) {
-          evs.push(new Date(a.start_ts).getTime()); evs.push(new Date(a.end_ts).getTime());
-        });
-        (D.prompts || []).forEach(function (p) { evs.push(new Date(p.ts).getTime()); });
-        (D.markers || []).forEach(function (m) { evs.push(new Date(m.ts).getTime()); });
-        ss.forEach(function (s) {
-          evs.push(new Date(s.start_ts).getTime()); evs.push(new Date(s.end_ts).getTime());
-        });
-        evs = evs.filter(function (v) { return v >= t0 && v <= t1; }).sort(function (a, b) { return a - b; });
-        var cur2 = t0;
-        for (var gi = 1; gi < evs.length; gi++) {
-          if (evs[gi] - evs[gi - 1] > GAPMIN) {
-            segs.push([cur2, evs[gi - 1]]); gaps.push([evs[gi - 1], evs[gi]]); cur2 = evs[gi];
-          }
+      var segs = [], gaps = [], cur = t0;
+      for (var gi = 1; gi < evs.length; gi++) {
+        if (evs[gi] - evs[gi - 1] > GAPMIN) {
+          segs.push([cur, evs[gi - 1]]); gaps.push([evs[gi - 1], evs[gi]]); cur = evs[gi];
         }
-        segs.push([cur2, t1]);
       }
+      segs.push([cur, t1]);
       var kept = segs.reduce(function (n, s) { return n + (s[1] - s[0]); }, 0) || 1;
       var GAPW = kept * 0.012;                       // 每个空档固定占约 1.2%
       var total = kept + gaps.length * GAPW;
@@ -1191,7 +1302,7 @@
         + (T.active_ms != null ? "(活跃 " + fmtDur(T.active_ms) + ")" : ""));
       if (T.active_ms != null) {
         tr.title = "活跃 = 会话真正在跑的时间(总 " + fmtDur(T.duration_ms)
-          + (T.user_wait_ms != null ? " · 等待用户 " + fmtDur(T.user_wait_ms) : " · 非活跃 " + fmtDur(Math.max(0, T.duration_ms - (T.active_ms || 0)))) + ")";
+          + " · 等待用户 " + fmtDur(T.user_wait_ms || 0) + ")";
       }
       head.appendChild(tr);
       card.appendChild(head);
@@ -1334,13 +1445,26 @@
             for (var q = 0; q < lanes.length; q++) { if (lanes[q] <= st) { li = q; break; } }
             if (li < 0) { li = lanes.length; lanes.push(0); }
             lanes[li] = en;
-            var bar = el("div", "g-bar");
+            var bar = el("div", "g-bar" + (a.snapshot_of_main ? " snapshot" : ""));
             var lx = Math.max(0, Math.min(99.5, X(a.start_ts)));
             bar.style.left = lx + "%";
             bar.style.width = Math.max(0.35, Math.min(100 - lx, X(a.end_ts) - lx)) + "%";
             bar.style.top = (li * 19) + "px";
             bar.style.background = typeColor(a.type);
-            if (a.aborted) bar.style.outline = "1.5px dashed var(--crit)";
+            if (a.aborted) bar.classList.add("aborted");
+            if (a.active && a.active.length > 1) {
+              bar.classList.add("resumed");
+              a.active.forEach(function (seg, si) {
+                var s0 = Math.max(0, Math.min(99.7, X(seg[0])));
+                var sw = Math.max(0.3, Math.min(100 - s0, X(seg[1]) - s0));
+                var sd = el("div", "g-seg"
+                  + (a.aborted && si === a.active.length - 1 ? " aborted" : "") + (a.snapshot_of_main ? " snapshot" : ""));
+                sd.style.left = s0 + "%"; sd.style.width = sw + "%";
+                sd.style.top = (li * 19) + "px";
+                sd.style.background = typeColor(a.type);
+                gantt.appendChild(sd);
+              });
+            }
             bar.addEventListener("mouseenter", function (ev) {
               var sks = Object.keys(a.skills || {});
               showTip(ev, '<div class="tt-h">' + (a.desc || a.type || "").replace(/&/g, "&amp;").replace(/</g, "&lt;") + "</div>"
@@ -1348,6 +1472,8 @@
                 + (a.type || "") + "</div>"
                 + '<div class="tt-s">' + hhmm(a.start_ts) + " → " + hhmm(a.end_ts) + " · " + fmtDur(a.dur_ms)
                 + " · out " + fmtTok(a.output_tokens) + (a.model ? " · " + a.model.replace("claude-", "") : "") + "</div>"
+                + (a.active && a.active.length > 1 ? '<div class="tt-s">☍ resume 复用 · ' + a.active.length
+                  + " 段活跃 · 累计 " + fmtDur(a.active_ms || 0) + "</div>" : "")
                 + (sks.length ? '<div class="tt-s">◆ ' + sks.map(function (k) { return "/" + k; }).join(" · ") + "</div>" : ""));
             });
             bar.addEventListener("mousemove", moveTip);
@@ -1403,6 +1529,7 @@
         host.appendChild(conn);
       }
       var card = el("div", "card");
+      card.setAttribute("data-stage-card", s.stage);
       card.id = "card-" + s.id;
 
       // header
@@ -1414,21 +1541,6 @@
       sname.appendChild(document.createTextNode(s.label));
       head.appendChild(sname);
       if (s.stage !== "setup") head.appendChild(el("span", "skill-chip mono", "/" + s.stage));
-      var badge = el("span", "badge-det", "Skill 边界 · 确定性");
-      badge.title = "阶段边界来自管线 Skill 调用记录,非关键词模糊推断";
-      head.appendChild(badge);
-      // 活跃时长一律显示,不只在与墙钟差超过 1 分钟时才显示——
-      // 时有时无会让人以为"没写的那几段没算",反而要去猜
-      var str = el("span", "t-range mono", mmdd(s.start_ts) + " → " + mmdd(s.end_ts)
-        + " · " + fmtDur(s.duration_ms)
-        + (s.active_ms != null ? "(活跃 " + fmtDur(s.active_ms) + ")" : ""));
-      if (s.active_ms != null) {
-        var idle = Math.max(0, s.duration_ms - s.active_ms);
-        str.title = "墙钟 " + fmtDur(s.duration_ms) + " · 活跃 " + fmtDur(s.active_ms)
-          + (idle > 1000 ? (s.wait_ms != null ? " · 空转 " + fmtDur(idle)
-             + (s.wait_ms > 1000 ? "(等待用户 " + fmtDur(s.wait_ms) + ")" : "") : " · 非活跃 " + fmtDur(idle)) : "");
-      }
-      head.appendChild(str);
       card.appendChild(head);
 
       // mini stats
@@ -1441,13 +1553,48 @@
       ms.appendChild(msItem("Output tokens", fmtTok(s.output_tokens)));
       ms.appendChild(msItem("产物文件", s.artifacts.length));
       ms.appendChild(msItem("用户输入", s.prompt_idxs.length));
-      if (s.wait_ms != null) {
-        if (s.wait_ms > 60000) ms.appendChild(msItem("等待用户", fmtDur(s.wait_ms)));
-        if (s.active_ms != null && s.duration_ms - s.active_ms - s.wait_ms > 60000) ms.appendChild(msItem("挂起(无活动)", fmtDur(s.duration_ms - s.active_ms - s.wait_ms)));
-      } else if (s.active_ms != null && s.duration_ms - s.active_ms > 60000) {
-        ms.appendChild(msItem("非活跃", fmtDur(s.duration_ms - s.active_ms)));
-      }
+      if (s.wait_ms > 60000) ms.appendChild(msItem("等待用户", fmtDur(s.wait_ms)));
+      if (s.active_ms != null && s.duration_ms - s.active_ms - s.wait_ms > 60000) ms.appendChild(msItem("挂起(无活动)", fmtDur(s.duration_ms - s.active_ms - s.wait_ms)));
       card.appendChild(ms);
+
+      // subagents row
+      var sagents = agentsByStage[s.id] || [];
+      if (sagents.length) {
+        var row = el("div", "row");
+        row.appendChild(el("div", "rk", "子代理委派 · " + sagents.length));
+        var chipsBox = el("div", "agent-chips");
+        var byType = {};
+        sagents.forEach(function (a) { (byType[a.type] = byType[a.type] || []).push(a); });
+        Object.keys(byType).sort(function (a, b) { return byType[b].length - byType[a].length; }).forEach(function (tp) {
+          var c = el("button", "achip");
+          c.innerHTML = "<b>×" + byType[tp].length + "</b> " + tp;
+          c.style.borderColor = typeColor(tp);
+          c.addEventListener("click", function () { det.open = !det.open; });
+          chipsBox.appendChild(c);
+        });
+        var nAborted = sagents.filter(function (a) { return a.aborted; }).length;
+        if (nAborted) {
+          var ac = el("button", "achip");
+          ac.innerHTML = "<b>✕" + nAborted + "</b> 异常收尾";
+          ac.style.borderColor = "var(--crit)";
+          ac.style.color = "var(--crit)";
+          ac.addEventListener("click", function () { det.open = !det.open; });
+          chipsBox.appendChild(ac);
+        }
+        var nSnap = sagents.filter(function (a) { return a.snapshot_of_main; }).length;
+        if (nSnap) {
+          var sc = el("button", "achip");
+          sc.innerHTML = "<b>⧉" + nSnap + "</b> 主会话快照";
+          sc.title = "上传上来的转录是主会话的影子,不是这些代理自己的轨迹(见 02 风险点)";
+          sc.style.borderColor = "#b45309";
+          sc.style.color = "#b45309";
+          sc.addEventListener("click", function () { det.open = !det.open; });
+          chipsBox.appendChild(sc);
+        }
+        row.appendChild(chipsBox);
+        card.appendChild(row);
+      }
+
 
       // 工具构成分割条(按组占比)
       if (stools.length) {
@@ -1468,143 +1615,249 @@
         card.appendChild(comp);
       }
 
-      // timeline strip
+      // timeline strip —— 视窗渲染:鼠标框选一段放大(renderStrip 重绘),双击复位。
+      // t0/t1 是阶段全程,v0/v1 是当前视窗;所有元素定位一律以视窗为基准。
       var t0 = new Date(s.start_ts).getTime(), t1 = new Date(s.end_ts).getTime();
-      var span = Math.max(1, t1 - t0);
       var gAgents = (agentsByStage[s.id] || []).filter(function (a) { return a.start_ts && a.end_ts; });
       var sb = el("div", "strip-box");
-      if (gAgents.length) sb.appendChild(el("div", "g-cap", "主线工具流"));
-      var strip = el("div", "strip");
-      // hour gridlines(有甘特时,时间标签移到甘特底部)
-      var hourStep = span > 12 * 3600e3 ? 4 * 3600e3 : (span > 4 * 3600e3 ? 2 * 3600e3 : 3600e3);
-      var firstHour = Math.ceil(t0 / hourStep) * hourStep;
-      function addHourMarks(container, withLabels) {
-        for (var ht = firstHour; ht < t1; ht += hourStep) {
-          var hx = 100 * (ht - t0) / span;
-          var hl = el("div", "hourline"); hl.style.left = hx + "%"; container.appendChild(hl);
-          if (withLabels) {
-            var lab = el("div", "hourlab", hhmm(new Date(ht).toISOString()));
-            lab.style.left = hx + "%"; container.appendChild(lab);
-          }
-        }
-      }
-      addHourMarks(strip, !gAgents.length);
-      // compact markers
-      D.markers.forEach(function (m) {
-        var mt = new Date(m.ts).getTime();
-        if (mt < t0 || mt > t1) return;
-        var cm = el("div", "cmark", "⧉");
-        cm.style.left = (100 * (mt - t0) / span) + "%";
-        cm.title = "上下文压缩 " + hhmm(m.ts);
-        strip.appendChild(cm);
-      });
-      // ticks
-      stools.forEach(function (t) {
-        var tt = new Date(t.ts).getTime();
-        var x = 100 * (tt - t0) / span;
-        var g = groupOf(t.name);
-        var tick = el("div", "tick");
-        tick.style.left = Math.min(99.6, Math.max(0, x)) + "%";
-        tick.style.background = GROUPS[g].css;
-        tick.style.height = (g === "agent" ? 44 : g === "skill" ? 44 : 26) + "px";
-        if (t.ok === false) tick.classList.add("f");
-        tick.addEventListener("mouseenter", function (ev) {
-          var h = '<div class="tt-h">' + t.name + (t.agent_type ? " → " + t.agent_type : "") + (t.skill ? " → /" + t.skill : "") + (t.ok === false ? ' <span class="fail">✕ 失败</span>' : "") + "</div>";
-          if (t.brief) h += '<div class="tt-m mono">' + t.brief.slice(0, 150).replace(/&/g, "&amp;").replace(/</g, "&lt;") + "</div>";
-          h += '<div class="tt-s">#' + t.seq + " · " + hhmm(t.ts) + (t.dur_ms != null ? " · 耗时 " + fmtDur(t.dur_ms) : "") + "</div>";
-          showTip(ev, h);
-        });
-        tick.addEventListener("mousemove", moveTip);
-        tick.addEventListener("mouseleave", hideTip);
-        tick.addEventListener("click", function () { openToolDrawer(t); });
-        strip.appendChild(tick);
-      });
-      // prompt flags
-      s.prompt_idxs.forEach(function (pi) {
-        var p = promptByIdx[pi];
-        if (!p) return;
-        var pt = new Date(p.ts).getTime();
-        var f = el("div", "pflag");
-        f.style.left = (100 * Math.min(1, Math.max(0, (pt - t0) / span))) + "%";
-        f.addEventListener("mouseenter", function (ev) {
-          showTip(ev, '<div class="tt-h">⚑ 用户输入 · ' + hhmm(p.ts) + '</div><div class="tt-m">' + p.text.replace(/&/g, "&amp;").replace(/</g, "&lt;") + "</div>");
-        });
-        f.addEventListener("mousemove", moveTip);
-        f.addEventListener("mouseleave", hideTip);
-        f.addEventListener("click", function () { openPromptDrawer(p); });
-        strip.appendChild(f);
-      });
-      sb.appendChild(strip);
-      if (gAgents.length) {
-        var lanes = [];
-        var gantt = el("div", "gantt");
-        var placed = gAgents.slice().sort(function (x, y) { return x.start_ts < y.start_ts ? -1 : 1; });
-        placed.forEach(function (a) {
-          var st = new Date(a.start_ts).getTime();
-          var en = Math.max(new Date(a.end_ts).getTime(), st + 1);
-          var li = -1;
-          for (var q = 0; q < lanes.length; q++) { if (lanes[q] <= st) { li = q; break; } }
-          if (li < 0) { li = lanes.length; lanes.push(0); }
-          lanes[li] = en;
-          var bar = el("div", "g-bar");
-          var lx = Math.max(0, Math.min(99.5, 100 * (st - t0) / span));
-          bar.style.left = lx + "%";
-          bar.style.width = Math.max(0.35, Math.min(100 - lx, 100 * (en - st) / span)) + "%";
-          bar.style.top = (li * 19) + "px";
-          bar.style.background = typeColor(a.type);
-          bar.addEventListener("mouseenter", function (ev) {
-            var sks = Object.keys(a.skills || {});
-            showTip(ev, '<div class="tt-h">' + a.type + "</div>"
-              + '<div class="tt-m">' + (a.desc || "").replace(/&/g, "&amp;").replace(/</g, "&lt;") + "</div>"
-              + '<div class="tt-s">' + hhmm(a.start_ts) + " → " + hhmm(a.end_ts) + " · " + fmtDur(a.dur_ms) + " · out " + fmtTok(a.output_tokens) + (a.model ? " · " + a.model.replace("claude-", "") : "") + "</div>"
-              + (sks.length ? '<div class="tt-s">◆ ' + sks.map(function (k) { return "/" + k; }).join(" · ") + "</div>" : ""));
-          });
-          bar.addEventListener("mousemove", moveTip);
-          bar.addEventListener("mouseleave", hideTip);
-          bar.addEventListener("click", function () { hideTip(); openAgentDrawer(a); });
-          gantt.appendChild(bar);
-        });
-        gantt.style.height = (lanes.length * 19 + 2) + "px";
-        addHourMarks(gantt, true);
-        var guideS = el("div", "g-guide"), guideG = el("div", "g-guide");
-        strip.appendChild(guideS); gantt.appendChild(guideG);
-        Array.prototype.forEach.call(gantt.children, function (barEl) {
-          if (barEl.className !== "g-bar") return;
-          barEl.addEventListener("mouseenter", function () {
-            guideS.style.left = guideG.style.left = barEl.style.left;
-            guideS.style.display = guideG.style.display = "block";
-          });
-          barEl.addEventListener("mouseleave", function () {
-            guideS.style.display = guideG.style.display = "none";
-          });
-        });
-        var gcap = el("div", "g-cap");
-        gcap.innerHTML = "子代理甘特 · " + gAgents.length + " 个 · 峰值并行 <b>" + lanes.length + "</b> 路 · 全部由主线派发(竖引导线 = 派发时刻对位)";
-        sb.appendChild(gcap);
-        sb.appendChild(gantt);
-      }
-      var cap = el("div", "strip-cap");
-      cap.appendChild(el("span", "mono", mmdd(s.start_ts)));
-      cap.appendChild(el("span", "mono", mmdd(s.end_ts)));
-      sb.appendChild(cap);
       card.appendChild(sb);
 
-      // subagents row
-      var sagents = agentsByStage[s.id] || [];
-      if (sagents.length) {
-        var row = el("div", "row");
-        row.appendChild(el("div", "rk", "子代理委派 · " + sagents.length));
-        var chipsBox = el("div", "agent-chips");
-        var byType = {};
-        sagents.forEach(function (a) { (byType[a.type] = byType[a.type] || []).push(a); });
-        Object.keys(byType).sort(function (a, b) { return byType[b].length - byType[a].length; }).forEach(function (tp) {
-          var c = el("button", "achip");
-          c.innerHTML = "<b>×" + byType[tp].length + "</b> " + tp;
-          c.style.borderColor = typeColor(tp);
-          c.addEventListener("click", function () { det.open = !det.open; });
-          chipsBox.appendChild(c);
+      function renderStrip(v0, v1) {
+        sb.innerHTML = "";
+        var zoomed = v0 > t0 || v1 < t1;
+        var span = Math.max(1, v1 - v0);
+        if (gAgents.length) sb.appendChild(el("div", "g-cap", "主线工具流" + (zoomed ? "(已放大 · 拖动平移 · 双击复位)" : "(滚轮缩放 · 拖动平移)")));
+        var strip = el("div", "strip zoomable");
+        var stripInner = el("div", "pan-inner");
+        strip.appendChild(stripInner);
+        // 刻度密度随视窗跨度走,放大到分钟级也有格线
+        var hourStep = span > 12 * 3600e3 ? 4 * 3600e3 : span > 4 * 3600e3 ? 2 * 3600e3
+          : span > 90 * 60e3 ? 3600e3 : span > 20 * 60e3 ? 10 * 60e3 : 2 * 60e3;
+        var firstHour = Math.ceil(v0 / hourStep) * hourStep;
+        function addHourMarks(container, withLabels) {
+          for (var ht = firstHour; ht < v1; ht += hourStep) {
+            var hx = 100 * (ht - v0) / span;
+            var hl = el("div", "hourline"); hl.style.left = hx + "%"; container.appendChild(hl);
+            if (withLabels) {
+              var lab = el("div", "hourlab", hhmm(new Date(ht).toISOString()));
+              lab.style.left = hx + "%"; container.appendChild(lab);
+            }
+          }
+        }
+        addHourMarks(stripInner, !gAgents.length);
+        // compact markers
+        D.markers.forEach(function (m) {
+          var mt = new Date(m.ts).getTime();
+          if (mt < v0 || mt > v1) return;
+          var cm = el("div", "cmark", "⧉");
+          cm.style.left = (100 * (mt - v0) / span) + "%";
+          cm.title = "上下文压缩 " + hhmm(m.ts);
+          stripInner.appendChild(cm);
         });
-        row.appendChild(chipsBox);
+        // ticks
+        stools.forEach(function (t) {
+          var tt = new Date(t.ts).getTime();
+          if (tt < v0 || tt > v1) return;
+          var x = 100 * (tt - v0) / span;
+          var g = groupOf(t.name);
+          var tick = el("div", "tick");
+          tick.style.left = Math.min(99.6, Math.max(0, x)) + "%";
+          tick.style.background = GROUPS[g].css;
+          tick.style.height = (g === "agent" ? 44 : g === "skill" ? 44 : 26) + "px";
+          if (t.ok === false) tick.classList.add("f");
+          tick.addEventListener("mouseenter", function (ev) {
+            var h = '<div class="tt-h">' + t.name + (t.agent_type ? " → " + t.agent_type : "") + (t.skill ? " → /" + t.skill : "") + (t.ok === false ? ' <span class="fail">✕ 失败</span>' : "") + "</div>";
+            if (t.brief) h += '<div class="tt-m mono">' + t.brief.slice(0, 150).replace(/&/g, "&amp;").replace(/</g, "&lt;") + "</div>";
+            h += '<div class="tt-s">#' + t.seq + " · " + hhmm(t.ts) + (t.dur_ms != null ? " · 耗时 " + fmtDur(t.dur_ms) : "") + "</div>";
+            showTip(ev, h);
+          });
+          tick.addEventListener("mousemove", moveTip);
+          tick.addEventListener("mouseleave", hideTip);
+          tick.addEventListener("click", function () { openToolDrawer(t); });
+          stripInner.appendChild(tick);
+        });
+        // prompt flags
+        s.prompt_idxs.forEach(function (pi) {
+          var p = promptByIdx[pi];
+          if (!p) return;
+          var pt = new Date(p.ts).getTime();
+          if (pt < v0 || pt > v1) return;
+          var f = el("div", "pflag");
+          f.style.left = (100 * (pt - v0) / span) + "%";
+          f.addEventListener("mouseenter", function (ev) {
+            showTip(ev, '<div class="tt-h">⚑ 用户输入 · ' + hhmm(p.ts) + '</div><div class="tt-m">' + p.text.replace(/&/g, "&amp;").replace(/</g, "&lt;") + "</div>");
+          });
+          f.addEventListener("mousemove", moveTip);
+          f.addEventListener("mouseleave", hideTip);
+          f.addEventListener("click", function () { openPromptDrawer(p); });
+          stripInner.appendChild(f);
+        });
+        sb.appendChild(strip);
+        var gantt = null;
+        if (gAgents.length) {
+          var lanes = [];
+          gantt = el("div", "gantt zoomable");
+          var ganttInner = el("div", "pan-inner");
+          gantt.appendChild(ganttInner);
+          // 只排视窗内有交集的 agent,泳道按视窗内重新紧凑分配
+          var placed = gAgents.slice().sort(function (x, y) { return x.start_ts < y.start_ts ? -1 : 1; })
+            .filter(function (a) {
+              var st = new Date(a.start_ts).getTime(), en = new Date(a.end_ts).getTime();
+              return en >= v0 && st <= v1;
+            });
+          placed.forEach(function (a) {
+            var st = new Date(a.start_ts).getTime();
+            var en = Math.max(new Date(a.end_ts).getTime(), st + 1);
+            var li = -1;
+            for (var q = 0; q < lanes.length; q++) { if (lanes[q] <= st) { li = q; break; } }
+            if (li < 0) { li = lanes.length; lanes.push(0); }
+            lanes[li] = en;
+            var bar = el("div", "g-bar" + (a.aborted ? " aborted" : "") + (a.snapshot_of_main ? " snapshot" : ""));
+            var lx = Math.max(0, Math.min(99.5, 100 * (st - v0) / span));
+            bar.style.left = lx + "%";
+            bar.style.width = Math.max(0.35, Math.min(100 - lx, 100 * (Math.min(en, v1) - Math.max(st, v0)) / span)) + "%";
+            bar.style.top = (li * 19) + "px";
+            bar.style.background = typeColor(a.type);
+            if (a.active && a.active.length > 1) {
+              bar.classList.add("resumed");
+              a.active.forEach(function (seg, si) {
+                var g0 = new Date(seg[0]).getTime(), g1 = new Date(seg[1]).getTime();
+                if (g1 < v0 || g0 > v1) return;
+                var s0 = Math.max(0, Math.min(99.7, 100 * (Math.max(g0, v0) - v0) / span));
+                var sw = Math.max(0.3, Math.min(100 - s0, 100 * (Math.min(g1, v1) - Math.max(g0, v0)) / span));
+                var sd = el("div", "g-seg"
+                  + (a.aborted && si === a.active.length - 1 ? " aborted" : "") + (a.snapshot_of_main ? " snapshot" : ""));
+                sd.style.left = s0 + "%"; sd.style.width = sw + "%";
+                sd.style.top = (li * 19) + "px";
+                sd.style.background = typeColor(a.type);
+                ganttInner.appendChild(sd);
+              });
+            }
+            bar.addEventListener("mouseenter", function (ev) {
+              var sks = Object.keys(a.skills || {});
+              showTip(ev, '<div class="tt-h">' + a.type
+                + (a.aborted ? ' <span class="fail">✕ 异常收尾</span>' : "")
+                + (a.snapshot_of_main ? ' <span style="color:#b45309">⧉ 主会话快照 · 上传问题</span>' : "") + "</div>"
+                + '<div class="tt-m">' + (a.desc || "").replace(/&/g, "&amp;").replace(/</g, "&lt;") + "</div>"
+                + '<div class="tt-s">' + hhmm(a.start_ts) + " → " + hhmm(a.end_ts) + " · " + fmtDur(a.dur_ms) + " · out " + fmtTok(a.output_tokens) + (a.model ? " · " + a.model.replace("claude-", "") : "") + "</div>"
+                + (a.active && a.active.length > 1 ? '<div class="tt-s">☍ resume 复用 · ' + a.active.length
+                  + " 段活跃 · 累计 " + fmtDur(a.active_ms || 0) + "</div>" : "")
+                + (sks.length ? '<div class="tt-s">◆ ' + sks.map(function (k) { return "/" + k; }).join(" · ") + "</div>" : ""));
+            });
+            bar.addEventListener("mousemove", moveTip);
+            bar.addEventListener("mouseleave", hideTip);
+            bar.addEventListener("click", function () { hideTip(); openAgentDrawer(a); });
+            ganttInner.appendChild(bar);
+          });
+          gantt.style.height = (Math.max(lanes.length, 1) * 19 + 2) + "px";
+          addHourMarks(ganttInner, true);
+          var guideS = el("div", "g-guide"), guideG = el("div", "g-guide");
+          stripInner.appendChild(guideS); ganttInner.appendChild(guideG);
+          Array.prototype.forEach.call(ganttInner.children, function (barEl) {
+            if (barEl.className !== "g-bar") return;
+            barEl.addEventListener("mouseenter", function () {
+              guideS.style.left = guideG.style.left = barEl.style.left;
+              guideS.style.display = guideG.style.display = "block";
+            });
+            barEl.addEventListener("mouseleave", function () {
+              guideS.style.display = guideG.style.display = "none";
+            });
+          });
+          var gcap = el("div", "g-cap");
+          gcap.innerHTML = "子代理甘特 · " + (zoomed ? placed.length + "/" + gAgents.length : gAgents.length)
+            + " 个 · 峰值并行 <b>" + lanes.length + "</b> 路 · 红框斜纹 = 异常收尾 · 琥珀虚线 = 主会话快照(上传问题) · 全部由主线派发(竖引导线 = 派发时刻对位) · 滚轮缩放 · 拖动平移 · 双击复位";
+          sb.appendChild(gcap);
+          sb.appendChild(gantt);
+        }
+        var cap = el("div", "strip-cap");
+        cap.appendChild(el("span", "mono", mmdd(new Date(v0).toISOString())));
+        if (zoomed) {
+          var rst = el("button", "zoom-reset", "⟲ 复位全程");
+          rst.addEventListener("click", function () { renderStrip(t0, t1); });
+          cap.appendChild(rst);
+        }
+        cap.appendChild(el("span", "mono", mmdd(new Date(v1).toISOString())));
+        sb.appendChild(cap);
+
+        // 拖选缩放:mousedown 起框,mouseup 换算成时间窗重绘。
+        // 拖距 <6px 视为点击,放行给 tick/bar 自己的 click。
+        // 地图式交互:滚轮缩放(以鼠标所指时刻为锚点),左键拖拽平移
+        // (拖动中 transform 实时跟手,松手结算重绘),双击复位,点击照常开抽屉。
+        var wheelLast = 0;
+        [strip, gantt].forEach(function (host) {
+          if (!host) return;
+          host.addEventListener("wheel", function (ev) {
+            ev.preventDefault();
+            var now = Date.now();
+            if (now - wheelLast < 80) return;   // 节流:每档一次重绘,别跟着滚轮连发
+            wheelLast = now;
+            var r = host.getBoundingClientRect();
+            var anchor = v0 + span * Math.max(0, Math.min(1, (ev.clientX - r.left) / r.width));
+            var f = ev.deltaY < 0 ? 0.72 : 1 / 0.72;
+            var nspan = span * f;
+            if (nspan >= t1 - t0) { if (zoomed) renderStrip(t0, t1); return; }
+            if (nspan < 1000) return;           // 最小视窗 1s
+            var nv0 = anchor - (anchor - v0) * f;
+            var nv1 = nv0 + nspan;
+            if (nv0 < t0) { nv1 += t0 - nv0; nv0 = t0; }
+            if (nv1 > t1) { nv0 -= nv1 - t1; nv1 = t1; }
+            renderStrip(nv0, nv1);
+          }, { passive: false });
+
+          var x0 = null, dragging = false, rafId = null, pendingDx = 0;
+          var inner = host.querySelector(".pan-inner");
+          function applyPan() {
+            rafId = null;
+            if (inner) inner.style.transform = "translateX(" + pendingDx + "px)";
+          }
+          host.addEventListener("mousedown", function (ev) {
+            if (ev.button !== 0) return;
+            x0 = ev.clientX; dragging = false;
+            ev.preventDefault();
+          });
+          host.addEventListener("mousemove", function (ev) {
+            if (x0 === null) return;
+            var dx = ev.clientX - x0;
+            if (!dragging && Math.abs(dx) < 6) return;
+            dragging = true;
+            host.classList.add("panning");
+            pendingDx = dx;
+            if (rafId === null) rafId = requestAnimationFrame(applyPan);
+          });
+          function finish(ev) {
+            if (x0 === null) return;
+            var dx = ev.clientX - x0;
+            var wasDragging = dragging;
+            x0 = null; dragging = false;
+            if (rafId !== null) { cancelAnimationFrame(rafId); rafId = null; }
+            host.classList.remove("panning");
+            if (inner) inner.style.transform = "";
+            if (!wasDragging) return;           // <6px = 点击,放行给 tick/bar
+            var r = host.getBoundingClientRect();
+            var dt = -dx / r.width * span;      // 内容跟手:拖右 = 看左边
+            var nv0 = v0 + dt, nv1 = v1 + dt;
+            if (nv0 < t0) { nv1 += t0 - nv0; nv0 = t0; }
+            if (nv1 > t1) { nv0 -= nv1 - t1; nv1 = t1; }
+            if (nv0 !== v0 || nv1 !== v1) renderStrip(nv0, nv1);
+          }
+          host.addEventListener("mouseup", finish);
+          host.addEventListener("mouseleave", function (ev) { if (x0 !== null) finish(ev); });
+          host.addEventListener("dblclick", function () { renderStrip(t0, t1); });
+        });
+      }
+      renderStrip(t0, t1);
+      // 风险点跳转用:放大到指定时刻附近(窗口 = max(10min, 全程 2%))
+      card._zoomTo = function (tsIso) {
+        var tm = new Date(tsIso).getTime();
+        if (isNaN(tm)) return;
+        var w = Math.max(10 * 60e3, (t1 - t0) * 0.02);
+        var nv0 = Math.max(t0, tm - w), nv1 = Math.min(t1, tm + w);
+        if (nv1 - nv0 >= 1000) renderStrip(nv0, nv1);
+      };
+
+      // 子代理明细表:紧跟甘特 —— 看完颜色条就近展开对人;
+      // 委派构成 chips 留在阶段头下,点 chip 仍可远程展开这里
+      if (sagents.length) {
         var det = el("details", "sub");
         det.id = "sub-" + s.id;
         var sum = el("summary", null, "展开 " + sagents.length + " 个子代理明细");
@@ -1623,7 +1876,9 @@
             ? trsk.slice(0, 2).map(function (k) { return "/" + k; }).join(" ") + (trsk.length > 2 ? " +" + (trsk.length - 2) : "")
             : "—"));
           var tdst = el("td");
-          var stEl = el("span", "st " + (a.status === "completed" ? "done" : "async"), a.status === "completed" ? "完成" : "异步");
+          var stEl = a.snapshot_of_main ? el("span", "st snap", "⧉ 主会话快照") : a.aborted
+            ? el("span", "st fail", "✕ " + (a.aborted === "interrupted" ? "中断" : "断连"))
+            : el("span", "st " + (a.status === "completed" ? "done" : "async"), a.status === "completed" ? "完成" : "异步");
           tdst.appendChild(stEl);
           tr.appendChild(tdst);
           tr.appendChild(el("td", null, fmtDur(a.dur_ms)));
@@ -1637,8 +1892,9 @@
         tbl.appendChild(body);
         tb.appendChild(tbl);
         det.appendChild(tb);
-        row.appendChild(det);
-        card.appendChild(row);
+        var detRow = el("div", "row");
+        detRow.appendChild(det);
+        card.appendChild(detRow);
       }
 
       // helper skills row
@@ -2337,6 +2593,68 @@
     ov.addEventListener("mouseleave", function () { cross.style.display = "none"; hideTip(); });
   })();
 
+  /* ---------- 02 风险点 Risk(规则见 migbot/insight/audit.py) ---------- */
+  (function () {
+    var box = document.getElementById("riskbox");
+    if (!box) return;
+    var A = D.audit;
+    if (!A || !A.findings) {
+      box.innerHTML = '<span class="hint">本次渲染没有携带审计数据(旧端点或独立打开)。</span>';
+      return;
+    }
+    if (!A.findings.length) {
+      box.innerHTML = '<div class="risk-pass">✓ 自动审计通过 · ' + (A.checked || []).length + ' 项检查</div>';
+      return;
+    }
+    var list = el("div", "risk-list");
+    var lvName = { error: "严重", warn: "警告", info: "提示" };
+    A.findings.forEach(function (f) {
+      var it = el("div", "risk-item " + f.level);
+      it.appendChild(el("span", "risk-lv", lvName[f.level] || f.level));
+      var bd = el("div", "");
+      var t = el("p", "risk-t", f.title);
+      bd.appendChild(t);
+      bd.appendChild(el("p", "risk-d", f.detail));
+      // 链路可视化在独立页(纯文字版没人看得懂) —— 这里只留跳转按钮
+      if (f.chain && f.chain.length && !(D.urls && !D.urls.fixchain)) {
+        var goChain = el("p", "risk-d");
+        var lnk = el("a", null, "打开返修链路页 ↗ (" + f.chain.length + " 条)");
+        lnk.href = (((D.urls || {}).fixchain && !/^https?:/i.test(D.urls.fixchain)) ? (window.__API_BASE__ || "") : "")
+          + (((D.urls || {}).fixchain) || ("/api/insight1/fixchain/" + encodeURIComponent((D.meta || {}).session_id || "")));
+        lnk.target = "_blank";
+        lnk.rel = "noopener";
+        lnk.addEventListener("click", function (ev) { ev.stopPropagation(); });
+        goChain.appendChild(lnk);
+        bd.appendChild(goChain);
+      }
+      it.appendChild(bd);
+      // 证据锚点:点击跳到 06 对应阶段卡并闪烁;带时刻的顺便放大时间轴
+      var anc = f.anchor || {};
+      var target = anc.stage
+        ? document.querySelector('[data-stage-card="' + anc.stage + '"]') : null;
+      if (target) {
+        it.classList.add("go");
+        it.appendChild(el("span", "risk-go", "查看现场 →"));
+        it.addEventListener("click", function () {
+          target.scrollIntoView({ block: "start" });
+          target.classList.remove("risk-flash");
+          void target.offsetWidth;   // 重触发动画
+          target.classList.add("risk-flash");
+          setTimeout(function () { target.classList.remove("risk-flash"); }, 2600);
+          if (anc.ts && target._zoomTo) target._zoomTo(anc.ts);
+        });
+      }
+      list.appendChild(it);
+    });
+    var sum = el("div", "hint");
+    sum.style.marginBottom = "8px";
+    sum.textContent = A.findings.length + " 条发现(严重 " + (A.counts.error || 0)
+      + " · 警告 " + (A.counts.warn || 0) + " · 提示 " + (A.counts.info || 0)
+      + ") · 共 " + (A.checked || []).length + " 项检查";
+    box.appendChild(sum);
+    box.appendChild(list);
+  })();
+
   /* ---------- 07 数据血缘 Lineage ---------- */
   (function () {
     var L = D.lineage;
@@ -2391,7 +2709,7 @@
       cap.style.cssText = capCss;
       host.appendChild(cap);
       var tbl = el("table", "data");
-      tbl.innerHTML = "<thead><tr><th>文件</th><th>累计写</th><th>终态</th><th>返工行</th><th>倍率</th><th>写它的 agent</th></tr></thead>";
+      tbl.innerHTML = "<thead><tr><th>文件</th><th>被写次数</th><th>被读次数</th><th>累计写</th><th>终态</th><th>返工行</th><th>写它的 agent</th></tr></thead>";
       var tb = el("tbody");
       top.forEach(function (f) {
         var tr = el("tr");
@@ -2399,10 +2717,11 @@
         var td0 = el("td", "mono", name);
         td0.title = f.path;
         tr.appendChild(td0);
+        tr.appendChild(el("td", "mono", String(f.writes || 0)));
+        tr.appendChild(el("td", "mono", String(f.reads || 0)));
         tr.appendChild(el("td", "mono", fmtTok(f.lines)));
         tr.appendChild(el("td", "mono", fmtTok(f.final_lines)));
         tr.appendChild(el("td", "mono", fmtTok(f.lines - f.final_lines)));
-        tr.appendChild(el("td", "mono", (f.lines / Math.max(1, f.final_lines)).toFixed(1) + "×"));
         tr.appendChild(el("td", "desc", String((f.writers || []).length)));
         tb.appendChild(tr);
       });
@@ -2754,7 +3073,8 @@
       function keepAgent(a) {
         if ((a.stage || "?") !== stageKey) return false;
         if (a.aborted && !(a.n_out || 0)) return false;
-        return !!((a.n_android || 0) + (a.n_spec_read || 0) + (a.n_out || 0) + (a.n_proj || 0));
+        return !!((a.n_android || 0) + (a.n_spec_read || 0) + (a.n_out || 0)
+          + (a.n_proj || 0) + (a.n_tooling || 0));
       }
       var stageAgents = (L.agents || []).filter(keepAgent);
       if (!stageAgents.length) return;
@@ -2780,10 +3100,18 @@
         "</b> — Spec / Android 输入 → Agent → Spec / 工程文件产出";
       host.appendChild(title);
       var view = el("div", "lin-view");
+      var toolingR = 0, toolingW = 0, projR = 0;
+      stageAgents.forEach(function (a) {
+        toolingR += (a.tooling_reads || []).length;
+        toolingW += (a.writes_tooling || []).length;
+        projR += (a.n_proj || 0);
+      });
       var counts = [
         ["输入 Spec", inSpecs.length + " 个"], ["读取源码", inAndroid.length + " 个"],
+        ["工程内读", projR + " 件"],
         ["参与 Agent", stageAgents.length + " 个"], ["输出 Spec", outSpecs.length + " 个"],
-        ["输出文件", outFiles.length + " 个"]
+        ["输出文件", outFiles.length + " 个"],
+        ["工具面(脚本/临时)", "读 " + toolingR + " · 写 " + toolingW]
       ];
       var V = (L.stage_view || {})[stageKey];
       counts.forEach(function (x) {
@@ -2961,10 +3289,30 @@
         });
       } else if (kind === "agent") {
         var a = allAgentById[id];
+        // 子代理:直接复用阶段明细的合并抽屉(身份/执行 + 读写视野),
+        // 两个入口一副面孔;主线合成条目 D.agents 里没有,走下面的血缘版
+        var linkedDa = (D.agents || []).filter(function (x) { return x.agent_id === id; })[0];
+        if (linkedDa) { openAgentDrawer(linkedDa); return; }
+        // Skill 使用走自己的通道(用户口径):主线合成条目(__main__:阶段)
+        // 聚合该阶段主线的 Skill 调用
+        var lsk = {};
+        if (/^__main__/.test(id)) {
+          var lstg = id.split(":")[1] || "";
+          (D.tools || []).forEach(function (t) {
+            if (t.name === "Skill" && t.stage === lstg && t.brief) lsk[t.brief] = (lsk[t.brief] || 0) + 1;
+          });
+        } else {
+          var lda = (D.agents || []).filter(function (x) { return x.agent_id === id; })[0];
+          lsk = (lda && lda.skills) || {};
+        }
+        var lskTxt = Object.keys(lsk).map(function (k) {
+          return "/" + k + (lsk[k] > 1 ? " ×" + lsk[k] : "");
+        }).join(" · ") || "—";
         openDrawer({
           kind: "Agent · " + (a.type || "").replace(/^migbot:/, ""), color: "var(--g-execute)",
           title: a.desc || id,
-          facts: [["读 spec", a.n_spec_read + " 个 · " + fmtTok(a.lines_spec || 0) + " 行"],
+          facts: [["Skill 调用", lskTxt],
+                  ["读 spec", a.n_spec_read + " 个 · " + fmtTok(a.lines_spec || 0) + " 行"],
                   ["读 Android", (a.n_android || 0) + " 个 · " + fmtTok(a.lines_android || 0) + " 行" +
                    ((a.lines_android_dedup || 0) < (a.lines_android || 0) ? " · 去重 " + fmtTok(a.lines_android_dedup) : "")],
                   ["产出 spec", (a.n_spec_w || 0) + " 个"],
@@ -3037,7 +3385,9 @@
         }));
     });
     var hasWorkflowStage = (D.stages || []).some(function (s) { return /^wf:/.test(s.stage || ""); });
-    if (hasWorkflowStage) {
+    // 多阶段一律按阶段分段 —— 用户原则:每个阶段都要有血缘分析,
+    // plan/verify 不能因为不在"A(产 spec)/B(产码)"两个视角里就整段隐身。
+    if (hasWorkflowStage || workflowStages.length >= 2) {
       // Workflow 已经给出了确定性边界，不再强行套用“找到 spec 阶段再切 A/B”的
       // a2h 专用模型。现在按原始阶段顺序展示 a2h-spec + 每个 Workflow，
       // 每一段分别呈现真实读写的四类证据。
@@ -3045,7 +3395,7 @@
         var node = document.getElementById(id); if (node) node.hidden = true;
       });
       var sh0 = document.getElementById("lin-sec-hint");
-      if (sh0) sh0.textContent = "按 Workflow 确定性分段：每阶段分别展示读 Spec、读 Android 源码、参与 Agent、产 Spec 与产工程文件；点节点追踪该阶段的真实输入输出";
+      if (sh0) sh0.textContent = "按阶段分段：每阶段分别展示读 Spec、读源码、工程内读、参与 Agent、产出与工具面(脚本/临时)；点节点追踪该阶段的真实输入输出";
       workflowStages.forEach(mountWorkflowStage);
       var known = {}; workflowStages.forEach(function (s) { known[s.stage] = 1; });
       if ((L.agents || []).some(function (a) { return !known[a.stage] && a.stage !== "setup" && ((a.n_out || 0) + (a.n_android || 0) + (a.n_spec_read || 0)); })) {
@@ -3188,5 +3538,18 @@
     var target = document.querySelector(window.location.hash);
     if (target) target.scrollIntoView({ block: "start" });
   }, 0);
+
+  // 页内导航不进浏览器历史:默认锚点跳转每次都 push 一条 hash 记录,
+  // 宿主 SPA(hmigbot)里用户按返回键会在本页"原地打转"——实报的导航坑。
+  document.querySelectorAll('#subnav a, .mainnav a[href^="#"]').forEach(function (a) {
+    a.addEventListener("click", function (ev) {
+      var href = a.getAttribute("href") || "";
+      if (href.charAt(0) !== "#") return;
+      ev.preventDefault();
+      var t = document.querySelector(href);
+      if (t) t.scrollIntoView({ block: "start" });
+      try { history.replaceState(null, "", href); } catch (e) { /* 沙箱下忽略 */ }
+    });
+  });
 })();
 </script>

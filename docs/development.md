@@ -14,9 +14,22 @@
 src/migloop/
 ├── adapters/       # 来源专属：发现、识别、解析并归一化 session
 │   ├── base.py     # SourceAdapter / SessionCandidate 契约
-│   ├── claude.py
-│   └── codex.py
-├── render/         # 来源无关：静态报告、compare、HTML templates
+│   ├── claude.py   # 也给出管线阶段(attributionSkill)与主会话快照识别
+│   ├── codex.py    # 阶段从主线读 SKILL.md 的动作回填
+│   └── deveco.py
+├── audit.py        # 「02 风险点」规则(含 agent-snapshot、返修追溯卡)
+├── blame.py        # 行级 blame
+├── crosschain.py   # 同工程前序 / 后续会话发现(跨会话同一本账)
+├── shellparse.py   # shell 命令 → 读 / 写 / 依赖读 的静态解析
+├── filestory.py    # 版本文件(写者脊柱)+ 返修链(修复方判定唯一入口 build_fix_chains)
+├── filestory_collect.py
+├── atoms.py        # 两原子账本:Ledger / 版本 agent / T+ 相对时刻
+├── atoms_collect.py# 收集器(CC / Codex),shell 读写完备性与「未解析」标记
+├── atoms_text.py   # 两原子的文本形态(MCP 与 /atom/<sid>/text 共用)
+├── service.py      # 会话定位、trace / 账本 / 链缓存、报告 trace、两原子端点、McpBackend
+├── serve.py        # --serve:stdlib HTTP,hmigbot 同名路由
+├── mcp_server.py   # python -m migloop.mcp_server(需要 mcp 包)
+├── render/         # 来源无关：静态报告、compare、viewer.html / fixchain.html
 ├── live/           # 增量 cursor、checkpoint、本地 HTTP server
 ├── chat/           # 页面分析助手 provider
 ├── cli.py          # 命令行编排，只通过 adapter registry 接触来源
@@ -60,12 +73,22 @@ python3 migloop-lineage.pyz <会话.jsonl> -o 输出.html
 ```bash
 python -m pip install -e .
 migloop <会话.jsonl> -o 输出.html
-python scripts/build_viewer.py trace.json --out 输出.html
-python -m unittest discover -s tests -t . -p "test_*.py"
+python -m pytest tests -q          # 需要 pytest;两原子 / service 的测试用 pytest 夹具
 python scripts/build_pyz.py
 ```
 
 产出是**自包含单文件 HTML**:数据与字体全部内嵌,无外部资源与网络请求,双击即看,断网可用,可直接转发。
+
+### `--serve`:报告页 + 返修链路页 + 两原子端点
+
+```bash
+py migloop-lineage.pyz <session-id或项目名> --serve --open
+```
+
+`serve.py` 是 stdlib `ThreadingHTTPServer`,路由与 hmigbot 同名(`/api/insight1/report|fixchain|fixchain-data|atom|filediff/<sid>`),
+所以 `viewer.html` / `fixchain.html` 里的相对地址不用改。账本按 `(转录 mtime, size)` 整包缓存在 `service.py`,
+首次打开大会话要建账(几十秒),之后走缓存。导出的自包含 HTML 与 live 快照没有服务端,`urls.fixchain`
+置空,页面自动藏掉返修链路入口。
 
 ### Live：增量查看正在运行的会话
 
@@ -103,6 +126,39 @@ Live 模式不是定时从头重跑 extractor。它为主会话和每个子 agen
 复杂度：冷启动一次为 `O(已有记录)`；随后每次为 `O(新增字节 + 新增事件)`，而不是
 `O(当前 session 总大小)`。checkpoint 使进程重启后也无需重读历史。若文件缩短或头部签名变化，
 工具会认为 transcript 被替换，自动执行一次确定性重放。
+
+---
+
+## 两原子账本与返修链路
+
+报告页「02 风险点」的返修追溯卡、`--serve` 的返修链路页、`/atom` 端点与 MCP 工具面,全部建立在
+同一本**两原子账本**(`atoms.Ledger`)上:
+
+- **版本文件**(`filestory.FileStory`):写者脊柱,每一版记 `(by, agent 版本, via, diff, 内容, stage)`。
+- **版本 agent**(`atoms.AgentRec`):每个对外效应(写 / 删 / 派发 / 发消息)+1 版;读等输入归到它喂养的
+  下一版,所以 `agent(id, K)` 给的就是"它写第 K 版时手里有什么"。
+
+**阶段**:CC 记录上的 `attributionSkill` 戳给每笔动作一个阶段,子 agent 没戳的沿派发边继承
+(`atoms._fill_stages`);Codex 没戳,从主线读 `SKILL.md` 的动作回填(`adapters.codex.stage_intervals`)。
+
+**修复方判定只有一处**:`filestory.build_fix_chains`。逐笔版本按阶段判(a2h-execute 之后的写 = 修复,
+主会话在 verify 阶段亲手改也算);没有阶段的版本退回血缘层的 agent 级 `audit.agent_is_fixer`。
+链页首屏、返修追溯卡、跨会话统计都从链来(`chain_entry_lists`),不另算。
+
+**跨会话**:`crosschain` 找同工程的前序会话,`service.session_ledger` 把它们与当前会话并进一本账,
+前序轮回合内的返修也在链里(`fix_session` 标出修复方所在会话)。
+
+**收集器完备性**:shell 读写走 `shellparse` 静态解析,覆盖变量赋值替换、`for` 循环展开、
+`grep` / `head` 输出按 `path:line:` / `==> path <==` 对账、点文件;解析不了的(脚本黑盒、`$(…)`、
+变量路径、通配)打 `detail.unresolved` 标记而不猜,`ledger_index` 里按 agent 计数。
+
+**时刻**:每笔动作带 `T+h:mm`(相对池子里最早一条动作 `Ledger.t0`),跨 agent 对先后用它。
+
+**忠实呈现 vs 去重**:运行时把主会话快照当子代理上传(`snapshot_of_main`)的记录,报告页照画、
+审计规则 `agent-snapshot` 标出;只有账本里去重。
+
+给 agent 的调查技能在 `docs/skills/migloop-investigate/SKILL.md`,工具面七个,HTTP 文本端点与
+MCP 工具是同一份输出(`atoms_text`)。
 
 ---
 
