@@ -23,10 +23,24 @@ from __future__ import annotations
 
 import difflib
 import heapq
+import re
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from typing import Any
 
 from migloop.audit import agent_is_fixer
+
+
+def ts_norm(ts: str | None) -> str:
+    """ISO 时刻 → 可直接比大小的 UTC 字串(Z 与 +00:00、有无微秒混用时也能比);解析不了原样返回。"""
+    s = str(ts or "")
+    try:
+        d = datetime.fromisoformat(s.replace("Z", "+00:00"))
+    except ValueError:
+        return s
+    if d.tzinfo is not None:
+        d = d.astimezone(UTC).replace(tzinfo=None)
+    return d.isoformat(timespec="microseconds")
 
 #: 非 agent 的版本作者:外部输入(没人写过,链的天然叶子)与实录外改动
 EXTERNAL = "__external__"
@@ -496,14 +510,19 @@ def build_fix_chains(
     stories: dict[str, FileStory],
     agent_meta: dict[str, dict[str, Any]],
     is_fixer: dict[str, bool],
-    ets_only: bool = True,
     *,
+    root: str | None = None,
     session_of: dict[str, str] | None = None,
     fix_sessions: set[str] | None = None,
+    fix_after: str | None = None,
 ) -> list[dict[str, Any]]:
     """返修链 —— 全部从编年史算,旧 blame/crosschain 退役。
 
-    链根 = 修复方写过版本的 .ets 文件(用户裁定:被修文件只认鸿蒙代码)。
+    fix_after(用户口径 2026-09-04):有 run 级 stage-marks 时给 execute 结束时刻,之后的写全是修复,
+    阶段名不再参与(execute 期间派出的 visual-verify 子代理是生成侧的收尾);None 退回按阶段名排序。
+
+    链根 = 修复方写过版本的工程代码与配置文件(is_project_code:root 之下、代码/配置扩展名、不在产物与文档
+    目录下;用户口径 2026-09-04,原先只认 .ets 漏掉 app.json5 / module.json5 / color.json 这类真修复)。
     生成方 = 被修行的原作者(逐行签名,确定性);行级不可得时退回该文件的
     全部非修复写手并标注原因。diff = 修复版本的引擎真 diff 档位。
     agent_meta/is_fixer 来自血缘层(desc/stage/派发词),按引擎 agent id 松配
@@ -526,10 +545,14 @@ def build_fix_chains(
         key = eng_agent[6:] if eng_agent.startswith("agent-") else eng_agent
         return bool(is_fixer.get(key))
 
+    fix_after_key = ts_norm(fix_after) if fix_after else None
+
     def fixer_of_ver(ver: Version) -> bool:
         if (fix_sessions is not None and session_of is not None
                 and session_of.get(ver.by) not in fix_sessions):
             return False
+        if fix_after_key is not None:
+            return ts_norm(ver.ts) >= fix_after_key
         # 账本自带的阶段优先(主会话逐笔、子 agent 继承派发时阶段):正式口径 execute 之后全是修复,
         # 主会话在 verify 阶段亲手改的也算;没有归属戳(codex / 旧记录)退回血缘层的 agent 级判定
         if ver.stage:
@@ -543,17 +566,28 @@ def build_fix_chains(
             return m
         if eng_agent.startswith("__main__"):
             return {**m, "stage": ver.stage, "desc": "主会话(编排/直接写盘) · " + ver.stage}
-        return m if m.get("stage") else {**m, "stage": ver.stage}
+        # 血缘层给没有戳的会话的是占位阶段(session/setup),不如账本按时间落出来的那一版阶段
+        return m if m.get("stage") not in (None, "", "session", "setup") else {**m, "stage": ver.stage}
 
     chains: list[dict[str, Any]] = []
     for path, st in sorted(stories.items()):
-        if ets_only and not path.endswith(".ets"):
+        if not is_project_code(path, root):
             continue
         fix_vs = [v.v for v in st.versions
                   if v.by not in (EXTERNAL, OUTBAND) and fixer_of_ver(v)]
         gen_vs = [v.v for v in st.versions
                   if v.by not in (EXTERNAL, OUTBAND) and not fixer_of_ver(v)]
-        if not fix_vs or not gen_vs:
+        if not fix_vs:
+            continue
+        if not gen_vs:
+            # 生成期没写过的文件:模板/外部原样留到修复期才改的是 template(生成期没改它),
+            # 从没存在过的是 created(漏生成),都是返修(用户口径 2026-09-04);
+            # verify 自建的测试文件是它自己的产物,不进链
+            if _is_test_path(path):
+                continue
+            untouched = any(v.by in (EXTERNAL, OUTBAND) for v in st.versions if v.v < fix_vs[0])
+            chains.append(_created_chain(path, st, fix_vs, meta_at, meta_of,
+                                         kind="template" if untouched else "created"))
             continue
         touched, origins, other, broken = fixed_line_origins(st, fix_vs)
         gen_agents: list[str] = []
@@ -561,7 +595,7 @@ def build_fix_chains(
             by = st.versions[v - 1].by
             if by not in gen_agents:
                 gen_agents.append(by)
-        fix_agents = sorted({st.versions[v - 1].by for v in fix_vs})
+        fix_agents = _first_seen_writers(st, fix_vs)
         gen_ids: list[str]
         if origins:
             from_rows: list[dict[str, Any]] = [
@@ -590,13 +624,10 @@ def build_fix_chains(
         gm, fm = meta_at(gid, first_gen.get(gid)), meta_at(fid, first_fix.get(fid))
 
         # vers = 修复方写修复版本时自己的 agent 版本号:主会话只有这几笔是修复,页面按版本号着色
-        fix_vers: dict[str, set[int]] = {}
-        for v in fix_vs:
-            ver = st.versions[v - 1]
-            if ver.by_ver is not None:
-                fix_vers.setdefault(ver.by, set()).add(ver.by_ver)
+        fix_vers, file_vers = _fix_version_maps(st, fix_vs)
 
         chains.append({
+            "kind": "rework",            # 生成过、后来又被改
             "file": path.rsplit("/", 1)[-1],
             "file_abs": path,
             # 时刻:生成方在这个文件上第一笔生成 / 修复方第一笔修复(T+ 换算在文本层与页面做)
@@ -615,7 +646,8 @@ def build_fix_chains(
             "fixers_all": [{"id": f, "desc": str(meta_at(f, first_fix.get(f)).get("desc") or f)[:40],
                             "stage": meta_at(f, first_fix.get(f)).get("stage"),
                             "note": str(meta_of(f).get("note") or "")[:280],
-                            "vers": sorted(fix_vers.get(f, set()))}
+                            "vers": sorted(fix_vers.get(f, set())),
+                            "fvers": file_vers.get(f, []), "at": first_fix[f].ts}
                            for f in fix_agents],
             "lines": lines,
             "blame_broken": broken if lines is None else None,
@@ -624,6 +656,106 @@ def build_fix_chains(
             "diff": [],   # 页面吃 /fileversions + /filediff,不再内嵌摘要
         })
     return chains
+
+
+#: 测试目录 / 测试文件:verify 自建的产物,不当返修链(路径规则,鸿蒙工程约定)
+_TEST_PATH = re.compile(r"/ohosTest/|/test/|/testrunner/|/testability/|\.test\.ets$")
+
+
+def _is_test_path(path: str) -> bool:
+    return bool(_TEST_PATH.search(path.replace("\\", "/")))
+
+
+#: 链根只认工程代码与配置:代码扩展名,或 resources/** 下的资源 json;产物 / 文档 / 工具目录一律不算
+_CODE_EXT = (".ets", ".ts", ".js", ".json5", ".cpp", ".h")
+_NOISE_DIRS = frozenset({"spec", "docs", ".claude", ".agents", ".ecat", ".migbot", "build",
+                         "oh_modules", ".hvigor"})
+
+
+def is_project_code(path: str, root: str | None) -> bool:
+    """用户口径(2026-09-04)三条同时满足:在工程根目录之下(root 给了才查);扩展名是代码/配置,或 resources/**
+    下的 .json;不在 spec/docs/.claude/.agents/.ecat/.migbot/build/oh_modules/.hvigor 下。
+    DiceRoller 只放开 .ets 限制会多出 98 条 /tmp、scratchpad、spec 产物的假链,真修复只有两条 json5。"""
+    p = path.replace("\\", "/")
+    if root:
+        r = root.replace("\\", "/").rstrip("/") + "/"
+        if not p.startswith(r):
+            return False
+        p = p[len(r):]
+    parts = p.split("/")
+    if any(seg in _NOISE_DIRS for seg in parts[:-1]):
+        return False
+    low = parts[-1].lower()
+    if low.endswith(_CODE_EXT):
+        return True
+    return low.endswith(".json") and "resources" in parts[:-1]
+
+
+def _first_seen_writers(st: FileStory, vs: list[int]) -> list[str]:
+    """这些版本的写者,按第一次出现(版本序 = 时间序)排 —— 修复方 = 修复侧第一笔的写者。
+    曾按 id 字母序取第一个:DiceRoller EntryAbility.ets 先被 UI-T Step3 改、后被 ECAT 改,
+    链却报修复方是 ECAT、修复于两小时之后。"""
+    out: list[str] = []
+    for v in vs:
+        by = st.versions[v - 1].by
+        if by not in out:
+            out.append(by)
+    return out
+
+
+def _fix_version_maps(st: FileStory, fix_vs: list[int]) -> tuple[dict[str, set[int]], dict[str, list[int]]]:
+    """修复方 → 它写修复版本时自己的 agent 版本号集合;修复方 → 它写的文件版本号列表(链页/文本按修复方分段)。"""
+    fix_vers: dict[str, set[int]] = {}
+    file_vers: dict[str, list[int]] = {}
+    for v in fix_vs:
+        ver = st.versions[v - 1]
+        file_vers.setdefault(ver.by, []).append(v)
+        if ver.by_ver is not None:
+            fix_vers.setdefault(ver.by, set()).add(ver.by_ver)
+    return fix_vers, file_vers
+
+
+_NO_GEN_ROOT = {
+    "created": ("生成期未产出(修复期新建)", "修复期新建,无生成侧版本"),
+    "template": ("生成期未改(模板/外部原样)", "生成期未改动的模板/外部文件,无生成侧写者"),
+}
+
+
+def _created_chain(path: str, st: FileStory, fix_vs: list[int],
+                   meta_at: Any, meta_of: Any, kind: str = "created") -> dict[str, Any]:
+    """生成期没写过的文件:没有生成方。created = 修复期新建(漏生成),问"为什么生成期没有它";
+    template = 模板/外部原样留到修复期才改(0723 的 module.json5 / color.json),问"为什么生成期没改它"。
+    字段形状与 rework 链一致,页面同一套渲染。"""
+    gen_desc, broken = _NO_GEN_ROOT[kind]
+    fix_agents = _first_seen_writers(st, fix_vs)
+    first_fix: dict[str, Version] = {}
+    for v in fix_vs:
+        first_fix.setdefault(st.versions[v - 1].by, st.versions[v - 1])
+    fix_vers, file_vers = _fix_version_maps(st, fix_vs)
+    fid = fix_agents[0]
+    fm = meta_at(fid, first_fix.get(fid))
+    return {
+        "kind": kind,
+        "file": path.rsplit("/", 1)[-1],
+        "file_abs": path,
+        "gen_at": None,
+        "fix_at": first_fix[fid].ts,
+        "generator": {"id": None, "desc": gen_desc, "stage": None, "prompt": ""},
+        "generators": [],
+        "fixer": {"id": fid, "desc": str(fm.get("desc") or fid)[:40], "stage": fm.get("stage"),
+                  "note": str(fm.get("note") or "")[:280]},
+        "fixers_all": [{"id": f, "desc": str(meta_at(f, first_fix.get(f)).get("desc") or f)[:40],
+                        "stage": meta_at(f, first_fix.get(f)).get("stage"),
+                        "note": str(meta_of(f).get("note") or "")[:280],
+                        "vers": sorted(fix_vers.get(f, set())),
+                        "fvers": file_vers.get(f, []), "at": first_fix[f].ts}
+                       for f in fix_agents],
+        "lines": None,
+        "blame_broken": broken,
+        "fix_versions": fix_vs,
+        "breaks": [{"ts": b.ts, "kind": b.kind} for b in st.breaks],
+        "diff": [],
+    }
 
 
 def chain_entry_lists(chains: list[dict[str, Any]],

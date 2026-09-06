@@ -22,7 +22,8 @@ from dataclasses import dataclass
 from typing import Any
 
 from migloop.atoms import Action, AgentRec, FileRef
-from migloop.filestory import Ev
+from migloop.audit import stage_order
+from migloop.filestory import Ev, ts_norm
 from migloop.filestory_collect import _clean_single_cat
 from migloop.shellparse import (
     _PREFIX_SKIP,
@@ -94,31 +95,47 @@ def _resolve(p: object, base: str | None) -> str | None:
 
 # ═══════════════ 脚本字面量 ═══════════════
 
-def _literal_ops(code: str, base: str | None) -> list[FileOp]:
-    """脚本正文里的文件字面量 → 读/写。按紧邻的调用形态判方向;判不出的按
-    全文倾向(只写/只读)兜底,都有则放弃 —— 宁可漏。"""
+#: 全文倾向兜底只对小脚本生效:一张 24 条 .ets 路径的数据表在只写脚本里曾全被当成写目标
+#: (0723 vv-static-B 的 gen_static.py,凭空造出 34 条返修链里的 19 条);字面量多于这个数就不猜方向
+_TENDENCY_MAX_LITERALS = 3
+
+
+def _literal_ops(code: str, base: str | None) -> tuple[list[FileOp], int]:
+    """脚本正文里的文件字面量 → 读/写。按紧邻的调用形态判方向;判不出的只在小脚本里按
+    全文倾向(只写/只读)兜底,其余放弃并计数 —— 宁可漏,但要能报出自己。返回 (ops, 放弃的字面量数)。"""
     body_w, body_r = bool(_WRITEISH.search(code)), bool(_READISH.search(code))
+    lits = list(_LIT.finditer(code))
+    tendency_ok = len(lits) <= _TENDENCY_MAX_LITERALS
     ops: list[FileOp] = []
-    for m in _LIT.finditer(code):
+    undetermined = 0
+    for m in lits:
         after = code[m.end():m.end() + 40]
         before = code[max(0, m.start() - 40):m.start()]
-        if re.match(r"\s*,\s*['\"][wa]", after) or re.match(r"\s*\)\s*\.write", after):
+        # 紧跟在 : 后面的是映射的值("hmos_page_map": {"MainActivity": "…/Index.ets"}),不是文件操作的
+        # 目标:DiceRoller 0903 主会话初始化 progress.json 的 heredoc 曾借倾向兜底给 Index.ets 造出一版假修复
+        if re.search(r":\s*$", before):
+            undetermined += 1
+            continue
+        # open(p, 'w') / 'a' / 'wb' / 'w+':模式串必须是完整的短 token,后面紧跟 , 或 ) ——
+        # 只看引号后一个字母会把数据表里紧跟的 'wired' 之类字段当成写模式
+        if re.match(r"\s*,\s*['\"][wa][bt+]{0,2}['\"]\s*[,)]", after) or re.match(r"\s*\)\s*\.write", after):
             op = "write"
         elif re.match(r"\s*\)\s*\.(?:read|open|exists|is_file|iterdir|glob)", after) \
                 or re.search(r"(?:json\.load|read_text|readFile|Get-Content)\s*\(?\s*(?:open\()?$",
                              before) \
                 or (re.search(r"open\(\s*$", before) and re.match(r"\s*\)", after)):
             op = "read"
-        elif body_w and not body_r:
+        elif tendency_ok and body_w and not body_r:
             op = "write"
-        elif body_r and not body_w:
+        elif tendency_ok and body_r and not body_w:
             op = "read"
         else:
+            undetermined += 1
             continue
         p = _resolve(m.group(1), base)
         if p:
             ops.append(FileOp(op, p, "script"))
-    return ops
+    return ops, undetermined
 
 
 #: bash 习惯:S=/sdk/api; sed -n '570,625p' $S/x.d.ts —— 同一条命令里赋了字面量的变量可代换;
@@ -268,11 +285,12 @@ def _head_word(words: list[str]) -> tuple[str, list[str]]:
 
 
 def _shell_analyze(cmd: str, cwd: object, scripts: dict[str, str],
-                   out: str = "") -> tuple[list[FileOp], bool]:
-    """一条 shell 命令 → 文件读写 + 「有写能力但目标不全可知」标记。out = stdout,目录 grep /
-    多文件 head 这类命令里看不出目标的,按 stdout 反证。"""
+                   out: str = "") -> tuple[list[FileOp], bool, int]:
+    """一条 shell 命令 → (文件读写, 「有写能力但目标不全可知」标记, 放弃方向判定的脚本字面量数)。
+    out = stdout,目录 grep / 多文件 head 这类命令里看不出目标的,按 stdout 反证。"""
     ops: list[FileOp] = []
     capable = False
+    undetermined = 0
     text, bodies = _strip_heredocs((cmd or "").replace("\\\n", " "))
     # 同一条命令里赋了字面量的变量代换到引用处(PowerShell / bash 两种写法);静态列表循环展开。
     # 没赋值的($HOME 等)、项带通配的循环照旧放弃
@@ -332,7 +350,9 @@ def _shell_analyze(cmd: str, cwd: object, scripts: dict[str, str],
                 add("delete", p)
         if head in _PY and "-c" in args and args.index("-c") + 1 < len(args):
             code = args[args.index("-c") + 1]
-            ops += _literal_ops(code, base)
+            lit_ops, und = _literal_ops(code, base)
+            ops += lit_ops
+            undetermined += und
             capable = capable or bool(_WRITEISH.search(code))
         if head in _RUNNERS:
             run = next((w for w in args if _SCRIPT_RUN.search(w) and not w.startswith("-")), None)
@@ -341,7 +361,9 @@ def _shell_analyze(cmd: str, cwd: object, scripts: dict[str, str],
                 if body is None:
                     capable = True                # 会话外脚本:目标不可知
                 else:
-                    ops += _literal_ops(body, base)
+                    lit_ops, und = _literal_ops(body, base)
+                    ops += lit_ops
+                    undetermined += und
                     capable = capable or bool(_WRITEISH.search(body))
     if out and grep_ctx:
         gb, has_n, names_only = grep_ctx[-1]
@@ -355,9 +377,11 @@ def _shell_analyze(cmd: str, cwd: object, scripts: dict[str, str],
                 if op.op == "write" and op.path == hd_target:
                     op.content, op.via = body, "shell"
             continue
-        ops += _literal_ops(body, base)
+        lit_ops, und = _literal_ops(body, base)
+        ops += lit_ops
+        undetermined += und
         capable = capable or bool(_WRITEISH.search(body))
-    return ops, capable
+    return ops, capable, undetermined
 
 
 def shell_file_ops(cmd: str, cwd: object, scripts: dict[str, str], out: str = "") -> list[FileOp]:
@@ -451,6 +475,22 @@ def _basic_detail(name: str, inp: dict[str, Any]) -> dict[str, Any]:
     return {}
 
 
+_NUMBERED = re.compile(r"^\s*(\d+)\t(.*)$")
+
+
+def _numbered_lines(out: str) -> list[tuple[int, str]]:
+    """Read 工具结果正文的 cat -n 形态("     12\\t内容")→ [(行号, 内容)];非该形态返回空。"""
+    rows: list[tuple[int, str]] = []
+    for line in (out or "").splitlines():
+        m = _NUMBERED.match(line)
+        if m is None:
+            if rows:
+                break                       # 正文之后的系统提示 / 截断说明,不再是文件行
+            continue
+        rows.append((int(m.group(1)), m.group(2)))
+    return rows
+
+
 def _file_ops(name: str, inp: dict[str, Any], out: str, tur: Any, cwd: object,
               scripts: dict[str, str]) -> tuple[list[FileOp], dict[str, Any]]:
     """成功的调用 → 文件读写 + 附加细节。"""
@@ -466,6 +506,17 @@ def _file_ops(name: str, inp: dict[str, Any], out: str, tur: Any, cwd: object,
                                   start=f.get("startLine") or 1, n=f["numLines"]))
         elif isinstance(tur, dict):
             detail["result_type"] = tur.get("type")
+        else:
+            # 没有 toolUseResult 边车(服务端切片、Workflow 子代理转录):从结果正文的 "N\t内容" 行号
+            # 前缀还原。DiceRoller 0903 生成方读 MainActivity.kt / activity_main.xml 的两条 Read 曾因此消失,
+            # 调查员只能说"无法确认读过"。没给 offset/limit 就是整份读(Read 默认从头读到底)
+            numbered = _numbered_lines(out)
+            p = _resolve(inp.get("file_path"), _resolve(cwd, None))
+            if p and numbered:
+                start = numbered[0][0]
+                full = start == 1 and not inp.get("offset") and not inp.get("limit")
+                ops.append(FileOp("read", p, "tool", content="\n".join(t for _, t in numbered),
+                                  full=full, start=start, n=len(numbered)))
     elif name == "Write":
         p = _resolve(inp.get("file_path"), _resolve(cwd, None))
         if p:
@@ -488,13 +539,15 @@ def _file_ops(name: str, inp: dict[str, Any], out: str, tur: Any, cwd: object,
             ops.append(FileOp("write", p, "tool"))
     elif name in ("Bash", "PowerShell"):
         cmd = str(inp.get("command") or "")
-        ops, capable = _shell_analyze(cmd, cwd, scripts, out)
+        ops, capable, undetermined = _shell_analyze(cmd, cwd, scripts, out)
         if capable:
             detail["write_capable"] = True
         if not ops:
             why = _unresolved_reason(cmd)
             if why:
                 detail["unresolved"] = why      # 不许静默:解析不了的读写要能报出自己
+        if undetermined and "unresolved" not in detail:
+            detail["unresolved"] = "脚本字面量方向不明"
         tgt = _clean_single_cat(cmd)
         if tgt and out.strip() and not out.lower().startswith(_ERRISH):
             p = _resolve(tgt, _resolve(cwd, None))
@@ -511,6 +564,11 @@ def _file_ops(name: str, inp: dict[str, Any], out: str, tur: Any, cwd: object,
         detail.update({"name": inp.get("name"), "subagent_type": inp.get("subagent_type"),
                        "description": inp.get("description"), "model": inp.get("model"),
                        "prompt": inp.get("prompt")})
+        # Task 结果边车里的 agentId 是实锤的派发边:并行派发的几条派发词开头常常一模一样
+        # (仓库根目录 + 语言 + 轮次),按开头对齐会把名片挂错转录
+        aid = tur.get("agentId") if isinstance(tur, dict) else None
+        if aid:
+            detail["child"] = "agent-" + str(aid)
     elif name == "SendMessage":
         detail.update({"to": inp.get("to") or inp.get("recipient"),
                        "summary": inp.get("summary"),
@@ -544,8 +602,48 @@ def _to_ev(op: FileOp, agent: str, ts: str, seq: int, stage: str | None = None) 
               via=op.via, seen=op.seen, stage=stage)
 
 
+#: 管线技能在阶段**收尾**时调 ``a2h mark-stage``:这些 mark 的时刻是该阶段的结束(DiceRoller 0903 实测,
+#: 五个管线 mark 都落在对应归属戳末条之后 6–100 秒);a2h-init(init_helper)与 ecat-refine(ecat 插件)
+#: 是在开始时打的。把结束 mark 当起点用,会把整个 verify 段(含 visual verify)算进 execute —— 踩过
+_END_MARK_STAGES = frozenset({"a2h-spec", "a2h-plan", "a2h-execute", "a2h-verify", "a2h-retrospect", "a2h-build"})
+
+
+def stage_intervals_from_marks(marks: list[Any]) -> list[dict[str, Any]]:
+    """run 级阶段标记 → codex.stage_at 吃的区间表 [{stage, start_ts, end_ts}],时刻已归一(ts_norm)。
+    两种来源形状都收:Go 运行时 stage-marks.json 的 [{stage, ts}],导出包 manifest 的 [[ts, stage]]。
+    结束 mark 的阶段占 (上一边界, mark];起始 mark 的阶段占 [mark, 下一边界);起始 mark 后面紧跟别的
+    阶段的结束 mark 时(a2h-init 只有几秒),那一段归结束 mark 的阶段。"""
+    rows: list[tuple[str, str]] = []
+    for m in marks or []:
+        if isinstance(m, dict) and m.get("stage") and m.get("ts"):
+            rows.append((ts_norm(str(m["ts"])), str(m["stage"])))
+        elif isinstance(m, (list, tuple)) and len(m) >= 2:
+            rows.append((ts_norm(str(m[0])), str(m[1])))
+    rows.sort(key=lambda x: x[0])
+    out: list[dict[str, Any]] = []
+    prev: str | None = None
+    for i, (ts, st) in enumerate(rows):
+        nxt = rows[i + 1] if i + 1 < len(rows) else None
+        if st in _END_MARK_STAGES:
+            out.append({"stage": st, "start_ts": prev or ts, "end_ts": ts})
+            prev = ts
+        elif nxt is not None and nxt[1] in _END_MARK_STAGES:
+            prev = ts
+        else:
+            out.append({"stage": st, "start_ts": ts, "end_ts": nxt[0] if nxt else None})
+            prev = nxt[0] if nxt else ts
+    return out
+
+
+def fix_boundary(intervals: list[dict[str, Any]]) -> str | None:
+    """用户口径(2026-09-04):execute 阶段结束之后的都是修复。结束时刻 = 最后一段 a2h-execute 的 end_ts
+    (结束 mark 的时刻);没有 execute 段 = 还没结束 → None(退回按阶段名判)。"""
+    ends = [s for s in intervals if str(s.get("stage")) == "a2h-execute" and s.get("end_ts")]
+    return str(ends[-1]["end_ts"]) if ends else None
+
+
 def _walk(path: str, agent_id: str, session: str, seq: list[int],
-          scripts: dict[str, str]) -> AgentRec:
+          scripts: dict[str, str], stage_intervals: list[dict[str, Any]] | None = None) -> AgentRec:
     rec = AgentRec(id=agent_id, session=session)
     pend: dict[str, tuple[str, str, Any, Any, int, str | None]] = {}   # id -> (ts, name, inp, cwd, 行号, 阶段)
 
@@ -556,9 +654,17 @@ def _walk(path: str, agent_id: str, session: str, seq: list[int],
     last_text: str | None = None
     is_sub = not agent_id.startswith("__main__")
     # 管线阶段来自 harness 给每条记录盖的归属戳(attributionSkill,取冒号后),无戳的记录沿用上一枚;
-    # 子 agent 自己的第一枚戳就是它的阶段(没有戳时由 build_ledger 继承派发时父的阶段)
+    # 子 agent 自己的第一枚戳就是它的阶段(没有戳时由 build_ledger 继承派发时父的阶段)。
+    # 整份转录一枚戳都还没见到时,退回 run 级阶段区间按时间落阶段:ECAT 对抗循环、reviewer、
+    # loop engine 续接的 worker 都是 Driver 直接起的会话,记录上没有戳,但 stage-marks 有它们的时段
+    from migloop.adapters import codex
     from migloop.adapters.claude import PIPELINE_SKILLS
     cur_stage: str | None = None
+
+    def stage_now(ts: str) -> str | None:
+        if cur_stage is not None or not stage_intervals:
+            return cur_stage
+        return codex.stage_at(stage_intervals, ts_norm(ts))      # 区间表的时刻已归一,记录时刻同样归一再比
     with open(path, encoding="utf-8", errors="ignore") as stream:
         for line_no, line in enumerate(stream):
             try:
@@ -568,7 +674,8 @@ def _walk(path: str, agent_id: str, session: str, seq: list[int],
             ts = str(r.get("timestamp") or "")
             cwd = r.get("cwd")
             attr = str(r.get("attributionSkill") or "").split(":")[-1]
-            if attr in PIPELINE_SKILLS:
+            # 管线词表之外、但修复方口径认得的阶段名(ecat-*、*-verify 等)也算戳,别把它们当没戳
+            if attr in PIPELINE_SKILLS or (attr and stage_order(attr) is not None):
                 cur_stage = attr
                 if is_sub and rec.stage is None:
                     rec.stage = attr
@@ -602,7 +709,7 @@ def _walk(path: str, agent_id: str, session: str, seq: list[int],
                         last_text = str(b["text"]).strip()
                 elif b.get("type") == "tool_use":
                     pend[str(b.get("id"))] = (ts, str(b.get("name")), b.get("input") or {}, cwd, line_no,
-                                               cur_stage)
+                                               stage_now(ts))
                 elif b.get("type") == "tool_result" and str(b.get("tool_use_id")) in pend:
                     tuid = str(b.get("tool_use_id"))
                     uts, name, inp, ucwd, use_line, stage = pend.pop(tuid)
@@ -627,16 +734,20 @@ def _walk(path: str, agent_id: str, session: str, seq: list[int],
     return rec
 
 
-def collect_cc(main_jsonl: str, seq: list[int]) -> dict[str, AgentRec]:
-    """CC 会话(主线 + subagents/)→ {agent_id: AgentRec}。seq 跨会话共用,保证全局可排序。"""
+def collect_cc(main_jsonl: str, seq: list[int],
+               stage_intervals: list[dict[str, Any]] | None = None) -> dict[str, AgentRec]:
+    """CC 会话(主线 + subagents/)→ {agent_id: AgentRec}。seq 跨会话共用,保证全局可排序。
+    stage_intervals = run 级阶段区间(stage_intervals_from_marks),给没有归属戳的会话按时间落阶段。"""
     sid8 = os.path.basename(main_jsonl)[:8]
     scripts: dict[str, str] = {}
     main_id = f"__main__:{sid8}"
-    agents = {main_id: _walk(main_jsonl, main_id, sid8, seq, scripts)}
+    agents = {main_id: _walk(main_jsonl, main_id, sid8, seq, scripts, stage_intervals)}
     sub = os.path.splitext(main_jsonl)[0] + "/subagents"
     if os.path.isdir(sub):
         for fn in sorted(glob.glob(os.path.join(sub, "*.jsonl"))):
             stem = os.path.splitext(os.path.basename(fn))[0]
+            # 时间兜底只给根会话:子 agent 没戳时由 build_ledger 继承派发那一笔的阶段(戳是 skill 粒度,
+            # run 级区间是 stage 粒度 —— 直接按时间落会把 execute 期间派的 visual-verify 子代理误成 execute)
             agents[stem] = _walk(fn, stem, sid8, seq, scripts)
     return agents
 
@@ -737,13 +848,15 @@ def _codex_exec_ops(raw_arg: Any, out_text: str, cwd: object,
         detail.setdefault("cmd", " ".join(cmd.split())[:200])
         # 单条 shell 调用时 stdout 就是它的:目录 grep / 多文件 head 按 stdout 反证(与 CC 的 Bash 同一套)
         single = len(shell_calls) == 1 and ok
-        sub_ops, capable = _shell_analyze(cmd, wdir, scripts, stdout if single else "")
+        sub_ops, capable, undetermined = _shell_analyze(cmd, wdir, scripts, stdout if single else "")
         if capable:
             detail["write_capable"] = True
         if single and not sub_ops:
             why = _unresolved_reason(cmd)
             if why:
                 detail["unresolved"] = why      # 不许静默(与 CC 同一条规矩)
+        if undetermined and "unresolved" not in detail:
+            detail["unresolved"] = "脚本字面量方向不明"
         if len(shell_calls) == 1 and ok:
             tgt = _clean_single_cat(cmd)
             if tgt and stdout.strip() and not stdout.lower().startswith(_ERRISH):

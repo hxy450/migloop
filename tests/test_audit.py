@@ -397,3 +397,73 @@ def test_snapshot_agents_named_and_kept_out_of_aborted() -> None:
 def test_snapshot_rule_quiet_without_flag() -> None:
     t = _trace(agents=[{"agent_id": "aY", "aborted": "interrupted", "output_tokens": 1}])
     assert not _direct(_check_snapshot_agents, t)
+
+
+def test_execute_no_build_defers_to_builds_elsewhere_in_pool() -> None:
+    """DiceRoller 0903:主线 execute 里确实没跑构建,构建发生在 loop engine 后起的 a2h-build 会话里。
+    报告页只看主线一个 root 就报 error,是误报 —— 池子里别的会话有构建时降为 info 并点名在哪一会话何时构建。"""
+    stages = [{"stage": "a2h-run"}, {"stage": "a2h-spec"}, {"stage": "a2h-execute"}, {"stage": "a2h-verify"}]
+    silent = _trace(stages=stages, tools=[{"name": "Bash", "brief": "ls", "ok": True, "stage": "a2h-execute"}])
+    assert next(f for f in build_audit(silent)["findings"] if f["rule"] == "execute-no-build")["level"] == "error"
+    pool = [{"sid8": "5bee19c2", "ts": "2026-09-03T20:25:10Z", "stage": "a2h-build",
+             "cmd": "hvigorw assembleHap --mode module -p product=default"},
+            {"sid8": "efdc8b71", "ts": "2026-09-03T20:40:00Z", "stage": "a2h-build", "cmd": "ohpm install --all"}]
+    a = build_audit(silent, pool_builds=pool)
+    f = next(x for x in a["findings"] if x["rule"] == "execute-no-build")
+    assert f["level"] == "info"
+    assert "5bee19c2" in f["detail"] and "a2h-build" in f["detail"] and "20:25" in f["detail"]
+    assert a["counts"]["error"] == 0
+    # 账本证据显示主线自己在 execute 期间构建过(trace 的 brief 被长 cd 前缀截断才没看见)→ 不出项
+    silent["meta"] = {"session_id": "81e0a463-c9d3-4a7a-a671-b7f064830af1"}
+    own = [{"sid8": "81e0a463", "ts": "2026-09-03T15:22:00Z", "stage": "a2h-execute",
+            "cmd": "cd /very/long/prefix/… && hvigorw assembleHap"}]
+    assert "execute-no-build" not in {x["rule"] for x in build_audit(silent, pool_builds=own)["findings"]}
+    # 主线自己构建过,池子证据不改变结论(本来就不报)
+    built = _trace(stages=stages, tools=[{"name": "Bash", "brief": "hvigorw assembleHap", "ok": True,
+                                          "stage": "a2h-execute"}])
+    assert "execute-no-build" not in _rules_hit(built)
+
+
+def test_spec_no_analyzer_defers_to_analyzers_elsewhere_in_pool() -> None:
+    """DiceRoller 0903:spec 从首启会话 aab6a114 开始(analyzer 在那里起),在 loop engine 续接的主线里收尾;
+    只看主线一个 root 就报「未起分析代理」是误报 —— 池子里别的会话起过就降为 info 并点名。"""
+    t = _trace(
+        stages=[{"stage": "a2h-run"}, {"stage": "a2h-spec"}, {"stage": "a2h-plan"}],
+        lineage={"agents": [{"agent_id": "w1", "stage": "a2h-spec", "type": "a2h-migration-worker",
+                             "n_spec_w": 2}], "specs": [], "files": []},
+    )
+    assert next(f for f in build_audit(t)["findings"] if f["rule"] == "spec-no-analyzer")["level"] == "warn"
+    pool = [{"agent_id": "x1", "stage": "a2h-spec", "type": "a2h-android-analyzer", "sid8": "aab6a114"},
+            {"agent_id": "x2", "stage": "a2h-execute", "type": "a2h-android-analyzer", "sid8": "aab6a114"}]
+    a = build_audit(t, pool_agents=pool)
+    f = next(x for x in a["findings"] if x["rule"] == "spec-no-analyzer")
+    assert f["level"] == "info" and "aab6a114" in f["detail"] and "1 个" in f["detail"]
+    assert a["counts"]["warn"] == 0
+    # 池子里只有非 spec 阶段的 analyzer:仍是 warn
+    assert next(f for f in build_audit(t, pool_agents=pool[1:])["findings"]
+                if f["rule"] == "spec-no-analyzer")["level"] == "warn"
+
+
+def test_fixer_policy_counts_post_pipeline_stages() -> None:
+    """DiceRoller 0903 导出:管线之后还有 a2h-build(编译修复循环)与 ecat-refine(ECAT 对抗式 visual verify),
+    都在 execute 之后改鸿蒙码 —— 按「execute 之后全是修复」的正式口径必须算修复方,否则 ECAT 修的全成生成侧。"""
+    from migloop.audit import agent_is_fixer
+    assert agent_is_fixer({"stage": "a2h-build"})
+    assert agent_is_fixer({"stage": "ecat-refine"})
+    assert agent_is_fixer({"stage": "arkts-visual-verify"})
+    assert not agent_is_fixer({"stage": "a2h-execute"})
+    assert not agent_is_fixer({"stage": "a2h-plan"})
+    assert not agent_is_fixer({"stage": None}) and not agent_is_fixer({"stage": "session"})
+
+
+def test_fix_chain_card_tags_created_and_template_roots() -> None:
+    """返修追溯卡:三种链根三种标签 —— 生成方名 / (修复期新建) / (模板未改),并分别计数。"""
+    from migloop.audit import check_fix_chains
+
+    def chain(file: str, kind: str) -> dict[str, Any]:
+        return {"file": file, "file_abs": "/p/" + file, "kind": kind, "fixer": {"id": "f"},
+                "generator": {"id": None if kind != "rework" else "g", "desc": "conv" if kind == "rework" else "x",
+                              "stage": "a2h-execute" if kind == "rework" else None}}
+    f = check_fix_chains([chain("A.ets", "rework"), chain("New.ets", "created"), chain("module.json5", "template")])[0]
+    assert "A.ets(生成:conv)" in f["detail"] and "New.ets(修复期新建)" in f["detail"] and "module.json5(模板未改)" in f["detail"]
+    assert "1 个是生成期没有、修复期补建的" in f["detail"] and "1 个是模板/外部原样留到修复期才改的" in f["detail"]

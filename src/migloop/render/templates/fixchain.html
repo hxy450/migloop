@@ -1154,7 +1154,11 @@
       if (c) {
         var g = c.generator || {}, fx = c.fixer || {};
         var sc = sec("这条返修链");
-        var genKv = kv("生成方", (g.desc || "?") + "(" + (g.stage || "?") + ")" + (c.lines ? " · 行级归属" : ""));
+        var genKv = c.kind === "created"
+          ? kv("生成方", "生成期未产出 · 修复期新建(问:为什么生成期没有它)")
+          : c.kind === "template"
+          ? kv("生成方", "生成期未改 · 模板/外部原样(问:为什么生成期没改它)")
+          : kv("生成方", (g.desc || "?") + "(" + (g.stage || "?") + ")" + (c.lines ? " · 行级归属" : ""));
         if (c.gen_session && DATA.sid8 && c.gen_session !== DATA.sid8) {
           if (U.report) {
             var gl = el("a", null, " · 生成于前序会话 " + c.gen_session + " ↗");

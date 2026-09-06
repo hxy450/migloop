@@ -161,6 +161,9 @@ def render_file(ledger: atoms.Ledger, hint: str, v: int | None = None, root: str
 
 def render_agent(ledger: atoms.Ledger, agent_id: str, v: int | None = None,
                  root: str = "", full_text: bool = True, since: int | None = None) -> str:
+    """不带窗口时给整个生命周期(≤v)。曾试过默认折叠非目标版本的窗口(0723 对照实验变体 B):
+    调查员改用逐窗口查询,总字符没省(281K vs 276K),还把 AboutUsPage 那条链从「spec 写错」
+    误判成「漏读」—— 关键证据(v1 读的 spec 页)被折进一行没人点开。整段给出保持不变。"""
     ag = atoms.agent_atom(ledger, agent_id, v, since=since)
     if ag is None:
         return f"账本里没有该 agent: {agent_id}"
@@ -279,10 +282,13 @@ def render_action(ledger: atoms.Ledger, agent_id: str, seq: int, max_chars: int 
 
 
 def render_blame(ledger: atoms.Ledger, hint: str, v: int | None = None,
-                 start: int | None = None, n: int | None = None, root: str = "") -> str:
-    bl = atoms.blame(ledger, hint, v, start, n)
+                 start: int | None = None, n: int | None = None, root: str = "",
+                 changed: bool = False) -> str:
+    bl = atoms.blame(ledger, hint, v, start, n, changed=changed)
     if bl is None:
         return f"账本里没有该文件: {hint}"
+    if changed:
+        return _render_blame_changed(ledger, bl, root)
     out = [f"# 逐行归属 {rel(bl['path'], root)} @v{bl['v']}  (共 {bl['n_versions']} 版)"]
     if not bl["known"]:
         out.append("这一版内容未知,无法逐行归属(见 file 的复原原因)。")
@@ -303,6 +309,30 @@ def render_blame(ledger: atoms.Ledger, hint: str, v: int | None = None,
     return "\n".join(out)
 
 
+def _render_blame_changed(ledger: atoms.Ledger, bl: dict[str, Any], root: str) -> str:
+    """修复版替换/删除了哪些行、谁引入的 —— 只给这几行,不给整文件。"""
+    head = f"# 被替换行归属 {rel(bl['path'], root)} @v{bl['v']}  (共 {bl['n_versions']} 版)"
+    if not bl["known"]:
+        return head + "\n" + str(bl.get("note") or "无法定位被替换行")
+    out = [head, f"v{bl['v']} 替换/删除了 v{bl['prev_v']} 的 {len(bl['lines'])} 行,新增 {bl['added']} 行"
+                 f"(前一版共 {bl['n_lines']} 行;新增行没有原作者,要问 v{bl['prev_v']} 的写者当时为什么没写)"]
+    if bl["summary"]:
+        out.append("## 被替换行的原作者")
+        for s in bl["summary"]:
+            out.append(f"- {atoms.agent_label(ledger, s['owner'])} (id={s['owner']}): {s['n']} 行")
+    if bl["unknown"]:
+        out.append(f"- 归属未知(断点后): {bl['unknown']} 行")
+    if bl["lines"]:
+        out.append(f"## 逐行(v{bl['prev_v']} 的行号)")
+        width = len(str(bl["lines"][-1]["ln"]))
+        out.append("```")
+        for x in bl["lines"]:
+            who = f"{x['owner_name'] or x['owner']}@v{x['since_v']}" if x["owner"] else "?"
+            out.append(f"{x['ln']:>{width}} | {who:<28} | {x['text']}")
+        out.append("```")
+    return "\n".join(out)
+
+
 def render_diff(ledger: atoms.Ledger, hint: str, v: int, root: str = "") -> str:
     fa = atoms.file_atom(ledger, hint, v, with_diff=True, with_content=False)
     if fa is None or not fa["versions"]:
@@ -314,21 +344,41 @@ def render_diff(ledger: atoms.Ledger, hint: str, v: int, root: str = "") -> str:
     return head + "\n```diff\n" + _clip(vv["diff"], 20000) + "\n```"
 
 
-def render_chains(payload: dict[str, Any], root: str = "") -> str:
+def render_chains(payload: dict[str, Any], root: str = "", file: str | None = None) -> str:
+    """file 给了只回目标文件那条链(文件名 / 相对路径 / 绝对路径都行):调查一条链不必把全部链读一遍。"""
     chains = payload.get("chains") or []
-    out = [f"# 返修链({len(chains)})"]
+    total = len(chains)
+    if file:
+        want = file.replace("\\", "/").lstrip("/")
+        chains = [c for c in chains
+                  if any(str(p).replace("\\", "/") == want or str(p).replace("\\", "/").endswith("/" + want)
+                         for p in (c.get("file_abs"), c.get("file")) if p)]
+        if not chains:
+            return f"# 返修链(0/{total},只看 {want})\n没有匹配的链;不带 file 看全部,或先用 index 确认路径。"
+        out = [f"# 返修链({len(chains)}/{total},只看 {want})"]
+    else:
+        out = [f"# 返修链({total})"]
     cross = payload.get("cross") or {}
     if cross.get("priors"):
         out.append(f"前序会话: {', '.join(cross['priors'])} · 跨会话链 {cross.get('n_cross', 0)}")
     for c in chains:
         g, fx = c.get("generator") or {}, c.get("fixer") or {}
-        line = (f"- {rel(str(c.get('file_abs') or c.get('file')), root)} | 生成方 {g.get('desc')}({g.get('stage')})"
-                f" id={g.get('id')} | 修复方 {fx.get('desc')}({fx.get('stage')}) id={fx.get('id')}")
+        if c.get("kind") == "created":
+            gen_txt = "生成期未产出 · 修复期新建(问:为什么生成期没有它)"
+        elif c.get("kind") == "template":
+            gen_txt = "生成期未改 · 模板/外部原样(问:为什么生成期没改它)"
+        else:
+            gen_txt = f"生成方 {g.get('desc')}({g.get('stage')}) id={g.get('id')}"
+        line = (f"- {rel(str(c.get('file_abs') or c.get('file')), root)} | {gen_txt}"
+                f" | 修复方 {fx.get('desc')}({fx.get('stage')}) id={fx.get('id')}")
         t0 = str(payload.get("t0") or "")
         if c.get("fix_at"):
-            g_t = atoms.rel_time(c.get("gen_at"), t0) or str(c.get("gen_at") or "?")[5:16]
             f_t = atoms.rel_time(c.get("fix_at"), t0) or str(c.get("fix_at"))[5:16]
-            line += f" | 生成于 {g_t} · 修复于 {f_t}"
+            if c.get("gen_at"):
+                g_t = atoms.rel_time(c.get("gen_at"), t0) or str(c.get("gen_at"))[5:16]
+                line += f" | 生成于 {g_t} · 修复于 {f_t}"
+            else:                       # created / template 链没有生成侧时刻
+                line += f" | 修复于 {f_t}"
         if c.get("gen_session"):
             line += f" | 生成于会话 {c['gen_session']}"
         if c.get("fix_session"):
@@ -340,7 +390,25 @@ def render_chains(payload: dict[str, Any], root: str = "") -> str:
             out.append(f"  被修 {c['lines']['touched']} 行 · 原作者 {frm}" + (f" · 其它 {other}" if other else ""))
         elif c.get("blame_broken"):
             out.append(f"  行级归属: {c['blame_broken']}")
+        fixers = [ff for ff in c.get("fixers_all") or [] if ff.get("fvers")]
+        if fixers:
+            # 一个文件常被几拨修复方分段改(Index.ets:视觉修 → ID 注入 → ECAT),每段一个原因;按先后列出各段
+            parts = [f"{ff.get('desc')} 文件{_vrange(ff['fvers'])}"
+                     + (f" @{atoms.rel_time(ff.get('at'), t0) or str(ff.get('at'))[5:16]}" if ff.get("at") else "")
+                     for ff in fixers]
+            out.append("  修复方(按先后): " + " · ".join(parts))
         for ff in c.get("fixers_all") or []:
             if ff.get("note"):
                 out.append(f"  修因({ff.get('desc')}): {_clip(ff['note'], 400)}")
     return "\n".join(out)
+
+
+def _vrange(vs: list[int]) -> str:
+    """[5,6,7,12,14,15] → v5-7,v12,v14-15。"""
+    runs: list[tuple[int, int]] = []
+    for v in sorted(vs):
+        if runs and v == runs[-1][1] + 1:
+            runs[-1] = (runs[-1][0], v)
+        else:
+            runs.append((v, v))
+    return ",".join(f"v{a}" if a == b else f"v{a}-{b}" for a, b in runs)

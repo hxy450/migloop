@@ -448,3 +448,109 @@ def test_build_fix_chains_falls_back_when_lines_unattributable() -> None:
     c = chains[0]
     assert c["lines"] is None and c["blame_broken"] == "content-unknown"
     assert [g["id"] for g in c["generators"]] == ["agent-g"]       # 退回文件级写手
+
+
+def test_build_fix_chains_lists_fix_phase_created_code_as_missing_generation() -> None:
+    """用户口径(2026-09-04):修复期新建的、不在测试目录下的代码文件也是返修 —— 生成期少了一个文件,
+    修复方补建了(漏生成)。生成方标「生成期未产出」;verify 自建的测试文件(ohosTest / .test.ets)不进链。"""
+    from migloop.filestory import build_fix_chains
+    st = build_stories([
+        ev("T01", "wfull", "p/entry/src/main/ets/A.ets", agent="agent-g", content="a\n"),
+        ev("T03", "wfull", "p/entry/src/main/ets/util/New.ets", agent="agent-f", content="n\n", aver=1),
+        ev("T04", "wfull", "p/entry/src/main/ets/util/New.ets", agent="agent-f", content="m\n", aver=2),
+        ev("T03", "wfull", "p/entry/src/ohosTest/ets/test/X.test.ets", agent="agent-f", content="t\n"),
+        ev("T03", "wfull", "p/entry/src/main/ets/test/Helper.ets", agent="agent-f", content="h\n"),
+    ])
+    chains = build_fix_chains(st, {}, {"g": False, "f": True}, fix_after="T02")
+    assert [(c["file"], c["kind"]) for c in chains] == [("New.ets", "created")]
+    c = chains[0]
+    assert c["generator"]["id"] is None and "未产出" in c["generator"]["desc"]
+    assert c["generators"] == [] and c["lines"] is None and c["gen_at"] is None
+    assert c["fix_versions"] == [1, 2] and c["fixer"]["id"] == "agent-f"
+    assert c["fixers_all"][0]["vers"] == [1, 2]
+    # 生成过又被改的照旧是 rework
+    st2 = build_stories([
+        ev("T01", "wfull", "p/entry/src/main/ets/A.ets", agent="agent-g", content="a\n"),
+        ev("T03", "wfull", "p/entry/src/main/ets/A.ets", agent="agent-f", content="b\n"),
+    ])
+    assert [(c["file"], c["kind"]) for c in build_fix_chains(st2, {}, {"g": False, "f": True}, fix_after="T02")] \
+        == [("A.ets", "rework")]
+
+
+def test_build_fix_chains_fixer_is_the_first_fix_writer_in_time() -> None:
+    """DiceRoller EntryAbility.ets:UI-T Step3(T+4:50)先改、ECAT fix-uitest(T+6:53)后改,链却报修复方是
+    ECAT、修复于 T+6:53 —— 修复方曾按 id 字母序取第一个。修复方 = 修复侧第一笔写者,fixers_all 按首次
+    修复先后排;rework 与 created 两种链同一规则。"""
+    from migloop.filestory import build_fix_chains
+    st = build_stories([
+        ev("T01", "wfull", "p/entry/src/main/ets/A.ets", agent="agent-g", content="a\n"),
+        ev("T03", "wfull", "p/entry/src/main/ets/A.ets", agent="agent-z-early", content="a\nb\n", aver=1),
+        ev("T04", "wfull", "p/entry/src/main/ets/A.ets", agent="agent-a-late", content="a\nb\nc\n", aver=1),
+        ev("T03", "wfull", "p/entry/src/main/ets/util/New.ets", agent="agent-z-early", content="n\n", aver=2),
+        ev("T04", "wfull", "p/entry/src/main/ets/util/New.ets", agent="agent-a-late", content="m\n", aver=2),
+    ])
+    chains = {c["file"]: c for c in build_fix_chains(st, {}, {}, fix_after="T02")}
+    assert {c["kind"] for c in chains.values()} == {"rework", "created"}
+    for c in chains.values():
+        assert c["fixer"]["id"] == "agent-z-early" and c["fix_at"] == "T03"
+        assert [f["id"] for f in c["fixers_all"]] == ["agent-z-early", "agent-a-late"]
+    # 每个修复方各自改了文件的哪几版、第一笔在什么时候:Index.ets 四拨修复方 21 版,只报第一个看不出分段
+    assert [(f["fvers"], f["at"]) for f in chains["A.ets"]["fixers_all"]] == [([2], "T03"), ([3], "T04")]
+    assert [(f["fvers"], f["at"]) for f in chains["New.ets"]["fixers_all"]] == [([1], "T03"), ([2], "T04")]
+
+
+def test_build_fix_chains_scope_is_project_code_under_root() -> None:
+    """用户口径(2026-09-04):链根 = 工程根目录下的代码与配置,不再只认 .ets。三条同时满足:在 root 之下;
+    扩展名 .ets/.ts/.js/.json5/.cpp/.h 或 resources/** 下的 .json;不在 spec/docs/.claude/.agents/.ecat/.migbot/
+    build/oh_modules/.hvigor 下。DiceRoller 只放开扩展名会多 98 条噪音,真修复只有 app.json5 与 oh-package.json5;
+    0723 漏的是 module.json5(WX Ability 的注册)与 color.json(视觉修改的颜色令牌)。"""
+    from migloop.filestory import build_fix_chains, is_project_code
+
+    def gen_fix(path: str) -> list[Ev]:
+        return [ev("T01", "wfull", path, agent="agent-g", content="a\n"),
+                ev("T03", "wfull", path, agent="agent-f", content="b\n", aver=1)]
+
+    st = build_stories([
+        *gen_fix("/p/entry/src/main/ets/A.ets"),
+        *gen_fix("/p/AppScope/app.json5"),
+        *gen_fix("/p/entry/src/main/cpp/napi.cpp"),
+        *gen_fix("/p/entry/src/main/resources/base/element/string.json"),
+        *gen_fix("/p/spec/plan.json5"),                                   # 噪音目录
+        *gen_fix("/p/docs/x.ets"),
+        *gen_fix("/p/.claude/skills/x.ts"),
+        *gen_fix("/p/build/outputs/x.json5"),
+        *gen_fix("/p/oh_modules/lib/x.js"),
+        *gen_fix("/p/build_out.log"),                                     # 扩展名
+        *gen_fix("/p/spec_oracle.json"),                                  # 不在 resources 下的 json
+        *gen_fix("/p/entry/src/main/resources/base/media/icon.png"),
+        *gen_fix("/tmp/x.json5"),                                         # 根目录之外
+        *gen_fix("/q/entry/src/main/ets/B.ets"),
+    ])
+    files = sorted(c["file_abs"] for c in build_fix_chains(st, {}, {}, fix_after="T02", root="/p"))
+    assert files == ["/p/AppScope/app.json5", "/p/entry/src/main/cpp/napi.cpp",
+                     "/p/entry/src/main/ets/A.ets", "/p/entry/src/main/resources/base/element/string.json"]
+    # 不给 root(老调用方)只按扩展名与目录过滤
+    files = sorted(c["file_abs"] for c in build_fix_chains(st, {}, {}, fix_after="T02"))
+    assert "/tmp/x.json5" in files and "/q/entry/src/main/ets/B.ets" in files and "/p/spec/plan.json5" not in files
+    assert is_project_code("C:\\w\\entry\\src\\main\\ets\\A.ets", "C:/w") is True     # Windows 分隔符两边都认
+    assert is_project_code("C:/w/build/x.ets", "C:\\w\\") is False
+
+
+def test_build_fix_chains_marks_template_file_first_modified_in_fix_phase() -> None:
+    """生成期从没写过、修复期才改的模板/外部文件(0723 的 module.json5、color.json;DiceRoller 的 oh-package.json5)
+    不是「修复期新建」—— 文件一直在,是生成期没改它。单独一种 kind=template,问题从"为什么没有它"变成
+    "为什么生成期没改它";测试目录下的照旧不进链。"""
+    from migloop.filestory import build_fix_chains
+    st = build_stories([
+        ev("T00", "read", "/p/entry/src/main/module.json5", agent="agent-g", content="{}\n", full=True),
+        ev("T03", "wfull", "/p/entry/src/main/module.json5", agent="agent-f", content="{abilities}\n", aver=1),
+        ev("T03", "wfull", "/p/entry/src/main/ets/New.ets", agent="agent-f", content="n\n", aver=2),
+        ev("T00", "read", "/p/entry/src/ohosTest/module.json5", agent="agent-g", content="{}\n", full=True),
+        ev("T03", "wfull", "/p/entry/src/ohosTest/module.json5", agent="agent-f", content="t\n", aver=3),
+    ])
+    chains = {c["file"]: c for c in build_fix_chains(st, {}, {}, fix_after="T02", root="/p")}
+    assert set(chains) == {"module.json5", "New.ets"}
+    t = chains["module.json5"]
+    assert t["kind"] == "template" and t["generator"]["id"] is None and "未改" in t["generator"]["desc"]
+    assert t["fixer"]["id"] == "agent-f" and t["fix_versions"] == [2] and "未改" in t["blame_broken"]
+    assert chains["New.ets"]["kind"] == "created"

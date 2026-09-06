@@ -5,7 +5,7 @@
 
     python -m migloop.mcp_server
 
-在 Claude Code 里注册:``claude mcp add migloop -- python -m migloop.mcp_server``。
+在 Claude Code 里注册:``claude mcp add migloop -- python -m migloop.mcp_server``(需要 ``mcp`` 包)。
 所有工具都要 sid(会话 id 或其 8 位前缀);账本按 sid 的池子(同工程兄弟会话)整包缓存。
 """
 
@@ -47,12 +47,17 @@ agent 工具给的每条动作/读取后面的 (#n) 是动作号;action(id, n) �
 action(id, n) 是模型当时眼睛里看到的原始输出;file(path, v, content=True, start=570, n=56) 是账本复原的
 第 v 版里那一段。两者对不上就是线索(实录外改动、就近绑定的版本)。
 **主会话动辄几百次调用,整个生命周期一次查会撑爆上下文**:查主会话一律带窗口
-agent(id, v, since=v-1),只看喂养第 v 版的输入;子 agent 通常几十次调用,可以不带。
+agent(id, v, since=v-1),只看喂养第 v 版的输入;子 agent 通常几十次调用,整段给 —— 它早期版本读的
+spec 常常就是后来写错的根源,别只看写那一版的窗口。
 
 ## 建议的调查路径
-1. sessions(sid) 看返修链:被修文件、修复方、被修行数与 ★ 原作者、修因。
-2. blame(path, v_fix-1) 对被修文件修复前一版做逐行归属,定位被替换的行是谁在哪一版引入的;
-   diff(path, v_fix) 看修复到底改了什么。
+1. sessions(sid, file=目标文件) 看那条返修链:被修文件、修复方(按先后分段,各段文件版本与时刻)、被修行数与
+   ★ 原作者、修因。查一条链就带 file;不带 file 是全部链的总览。链根只认工程根目录下的代码与配置
+   (.ets/.ts/.js/.json5/.cpp/.h 与 resources/** 下的 .json;spec/docs/构建产物/测试目录不算),三种:
+   rework(生成过又被改,问为什么被改)/ created(修复期新建,问为什么生成期没有它)/
+   template(模板或外部原样留到修复期才改,问为什么生成期没改它)。
+2. diff(path, v_fix) 看修复到底改了什么;blame(path, v_fix, changed=True) 直接列出修复版替换/删除的
+   那些行及其引入者(owner@since_v)—— 不必对整个文件做 blame。
 3. agent(owner_id, since_v) 看引入者写那一版时手里有什么:派发词、读过哪些 spec/源码(版本、
    行段、是否旧版)、收件箱有没有改指令。对比修复方 agent 的读取集,找"该读没读"。
 4. 顺着 file(读到的 spec@v) 往上游走,直到找到最早出问题的环节。
@@ -92,12 +97,13 @@ def build_server(backend: Any | None = None) -> Any:
         return GUIDE
 
     @srv.tool()
-    async def sessions(sid: str) -> str:
-        """返修链总览:被修文件 × 修复方、被修行数与 ★ 原作者、修因、跨会话接力。sid = 会话 id 或 8 位前缀。"""
+    async def sessions(sid: str, file: str | None = None) -> str:
+        """返修链总览:被修文件 × 修复方、被修行数与 ★ 原作者、修因、跨会话接力。sid = 会话 id 或 8 位前缀。
+        file 给了(文件名 / 相对路径)只回那条链 —— 查一条链就带 file,别把全部链拉回来。"""
         rt = _be()
         payload = await rt.get_fixchain(sid)
         cwd = await rt.get_session_cwd(sid)
-        return atoms_text.render_chains(payload, root=cwd)
+        return atoms_text.render_chains(payload, root=cwd, file=file)
 
     @srv.tool()
     async def index(sid: str, kind: str | None = None, query: str | None = None,
@@ -120,16 +126,18 @@ def build_server(backend: Any | None = None) -> Any:
     async def agent(sid: str, id: str, v: int | None = None, since: int | None = None) -> str:
         """版本 agent 原子:身份、派发者与派发词全文、收件箱、≤v 逐版的效应与输入(读绑文件版本、
         ▲旧版/行段/写前读等标)、收尾输出。id 可带或不带 agent- 前缀;v 空 = 整个生命周期;
-        since 给了只看 (since, v] 这段版本 —— 主会话动辄几百次调用,查它必须带窗口。"""
+        since 给了只看 (since, v] 这段版本 —— 主会话动辄几百次调用,查它必须带窗口;子 agent 整段给。"""
         ledger, cwd = await _ctx(sid)
         return atoms_text.render_agent(ledger, id, v, root=cwd, since=since)
 
     @srv.tool()
     async def blame(sid: str, path: str, v: int | None = None, start: int | None = None,
-                    n: int | None = None) -> str:
-        """逐行归属:文件@v 每一行是谁在哪一版写的(确定性逐行签名)。start/n 裁窗口,汇总按全文。"""
+                    n: int | None = None, changed: bool = False) -> str:
+        """逐行归属:文件@v 每一行是谁在哪一版写的(确定性逐行签名)。start/n 裁窗口,汇总按全文。
+        changed=True 把 v 当修复版:只给它替换/删除掉的前一版那些行及其引入者(owner@since_v)和新增行数
+        —— 定位被修行的来源用这个,不必整文件 blame。"""
         ledger, cwd = await _ctx(sid)
-        return atoms_text.render_blame(ledger, path, v, start, n, root=cwd)
+        return atoms_text.render_blame(ledger, path, v, start, n, root=cwd, changed=changed)
 
     @srv.tool()
     async def diff(sid: str, path: str, v: int) -> str:

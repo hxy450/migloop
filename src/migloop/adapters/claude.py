@@ -74,12 +74,13 @@ def iter_sessions(root: str | None) -> Iterator[SessionCandidate]:
             session_id=os.path.basename(path).split(".")[0],
         )
 
-PIPELINE_SKILLS = ["a2h-run", "a2h-run-zh", "a2h-init-zh", "a2h-build-zh",
+PIPELINE_SKILLS = ["a2h-run", "a2h-run-zh", "a2h-init-zh", "a2h-build-zh", "a2h-build",
                    "mig-arch", "a2h-arch-scaffold", "a2h-spec", "a2h-plan",
                    "a2h-execute", "a2h-verify", "a2h-retrospect",
                    "arkts-visual-verify"]
 
 STAGE_LABELS = {
+    "a2h-build": "Build",
     "setup": "Setup",
     "a2h-run": "Run",
     "a2h-run-zh": "Run",

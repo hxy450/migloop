@@ -14,6 +14,7 @@
 
 from __future__ import annotations
 
+import difflib
 import json
 import os
 import re
@@ -91,6 +92,9 @@ class Ledger:
     feeds: dict[tuple[str, int], int] = field(default_factory=dict)
     #: 池子里最早一条动作的时刻(迁移开始)—— T+ 相对时刻的零点
     t0: str = ""
+    #: execute 阶段结束时刻(run 级 stage-marks 给的;用户口径:之后的写全是修复)。None = 没有 marks,
+    #: 修复方退回按阶段名判。由调用方(routes / server)在建账后填,账本自己不读 marks
+    fix_after: str | None = None
 
 
 def _number(a: AgentRec) -> None:
@@ -129,39 +133,42 @@ def _head(text: str | None) -> str:
 
 
 def _link_dispatches(agents: dict[str, AgentRec]) -> None:
-    """父的 dispatch 动作 ↔ 子 AgentRec:先按派发词开头对齐,退而按 id 前缀
-    (CC 子代理 id = 'a' + name + '-' + hash)。连上后把名片抄给子,子 id 回写父动作。"""
-    # 收集器已经连好的边(codex 按 task_path 对齐):只差把父的版本号填上
+    """父的 dispatch 动作 ↔ 子 AgentRec:收集器给了实锤的边(CC 的 toolUseResult.agentId、codex 的 task_path)
+    直接用;没有的先按派发词全文、再按开头对齐,最后退到 id 前缀(CC 子代理 id = 'a' + name + '-' + hash)。
+    连上后把名片抄给子,子 id 回写父动作。"""
+    def adopt(parent: AgentRec, act: Action, child: AgentRec) -> None:
+        child.parent, child.parent_ver = parent.id, act.ver
+        if child.stage is None:
+            child.stage = act.stage
+        child.name = child.name or (act.detail.get("name") or None)
+        child.kind = child.kind or act.detail.get("subagent_type")
+        child.description = child.description or act.detail.get("description")
+        child.model = child.model or act.detail.get("model")
+        act.detail["child"] = child.id
+
     for a in agents.values():
         for act in a.actions:
             child = agents.get(str(act.detail.get("child") or "")) if act.kind == "dispatch" else None
             if child is not None and child.parent_ver is None:
-                child.parent = a.id
-                child.parent_ver = act.ver
-                if child.stage is None:
-                    child.stage = act.stage
+                adopt(a, act, child)
     orphans = [c for c in agents.values() if c.parent is None and not c.id.startswith("__main__")]
     for a in agents.values():
         for act in a.actions:
-            if act.kind != "dispatch" or not act.ok or act.detail.get("child"):
+            if act.kind != "dispatch" or not act.ok or agents.get(str(act.detail.get("child") or "")):
                 continue
             name = str(act.detail.get("name") or "")
+            full = _WS.sub(" ", str(act.detail.get("prompt") or "")).strip()
             want = _head(act.detail.get("prompt"))
-            hit = next((c for c in orphans if c.parent is None and want
-                        and _head(c.prompt) == want), None)
+            hit = next((c for c in orphans if c.parent is None and full
+                        and _WS.sub(" ", str(c.prompt or "")).strip() == full), None)
+            if hit is None:
+                hit = next((c for c in orphans if c.parent is None and want
+                            and _head(c.prompt) == want), None)
             if hit is None and name:
                 hit = next((c for c in orphans if c.parent is None
                             and c.id.startswith(f"agent-a{name}-")), None)
-            if hit is None:
-                continue
-            hit.parent, hit.parent_ver = a.id, act.ver
-            if hit.stage is None:
-                hit.stage = act.stage
-            hit.name = hit.name or (name or None)
-            hit.kind = hit.kind or act.detail.get("subagent_type")
-            hit.description = hit.description or act.detail.get("description")
-            hit.model = hit.model or act.detail.get("model")
-            act.detail["child"] = hit.id
+            if hit is not None:
+                adopt(a, act, hit)
 
 
 def _fill_stages(agents: dict[str, AgentRec]) -> None:
@@ -243,6 +250,23 @@ def _text_of(raw: object) -> str:
     return ""
 
 
+def build_evidence(ledger: Ledger) -> list[dict[str, Any]]:
+    """池子里跑过的构建命令(hvigor / ohpm),按时间排:{sid8, agent, ts, stage, cmd}。
+    报告页「执行阶段未见构建」要看整个 run,不只主线一个 root —— 构建可以发生在后起的 build 会话里。"""
+    from migloop.audit import BUILD_MARKERS
+
+    out: list[dict[str, Any]] = []
+    for a in ledger.agents.values():
+        for act in a.actions:
+            if act.tool not in ("Bash", "PowerShell", "exec"):
+                continue
+            cmd = str(act.detail.get("cmd") or "")
+            if any(m in cmd.lower() for m in BUILD_MARKERS):
+                out.append({"sid8": a.session, "agent": a.id, "ts": act.ts, "stage": act.stage, "cmd": cmd[:200]})
+    out.sort(key=lambda r: str(r["ts"]))
+    return out
+
+
 def action_raw(ledger: Ledger, agent_id: str, seq: int) -> dict[str, Any] | None:
     """按指针展开一次工具调用的完整 input / output(原始记录,不经任何摘要)。"""
     a = ledger.agents.get(agent_id) or ledger.agents.get(f"agent-{agent_id}")
@@ -290,9 +314,11 @@ def action_raw(ledger: Ledger, agent_id: str, seq: int) -> dict[str, Any] | None
 
 
 def blame(ledger: Ledger, hint: str, v: int | None = None,
-          start: int | None = None, n: int | None = None) -> dict[str, Any] | None:
+          start: int | None = None, n: int | None = None,
+          changed: bool = False) -> dict[str, Any] | None:
     """逐行归属:文件@v 的每一行是谁在哪一版写的(逐行签名,确定性)。
-    内容未知的版本如实报 known=False、不给行;窗口 start/n 只裁输出,汇总仍按全文。"""
+    内容未知的版本如实报 known=False、不给行;窗口 start/n 只裁输出,汇总仍按全文。
+    changed=True 时把 v 当修复版:只给它替换/删除掉的前一版那些行及其原作者(见 _blame_changed)。"""
     path = find_story_path(ledger.stories, hint)
     if path is None:
         return None
@@ -301,6 +327,8 @@ def blame(ledger: Ledger, hint: str, v: int | None = None,
         return {"path": path, "v": 0, "n_versions": 0, "known": False, "n_lines": 0,
                 "lines": [], "summary": [], "unknown": 0}
     anchor = min(max(v or len(st.versions), 1), len(st.versions))
+    if changed:
+        return _blame_changed(ledger, path, st, anchor)
     ver = st.versions[anchor - 1]
     rows = line_origins(st)[anchor - 1]
     text = ver.content.splitlines() if ver.content is not None else []
@@ -324,6 +352,46 @@ def blame(ledger: Ledger, hint: str, v: int | None = None,
                for k, c in sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))]
     return {"path": path, "v": anchor, "n_versions": len(st.versions), "known": known,
             "n_lines": len(text), "lines": lines, "summary": summary, "unknown": unknown}
+
+
+def _blame_changed(ledger: Ledger, path: str, st: FileStory, anchor: int) -> dict[str, Any]:
+    """修复版 v 替换/删除了前一版的哪些行、各是谁引入的 —— 归因第 4 步要的就是这几行。
+    0723 调查基线里 agent 三次整文件 blame(32K/28K/12K 字符)都只为找它们;这里按 v-1 与 v 的
+    行级 diff 直接挑出旧侧的 replace/delete 行,归属取自 v-1 的逐行签名,新增侧只给行数。"""
+    base: dict[str, Any] = {"path": path, "v": anchor, "n_versions": len(st.versions), "changed": True,
+                            "prev_v": anchor - 1 if anchor > 1 else None, "known": False,
+                            "n_lines": 0, "lines": [], "added": 0, "summary": [], "unknown": 0, "note": ""}
+    if anchor < 2:
+        base["note"] = "创建版,没有前一版可比"
+        return base
+    prev, ver = st.versions[anchor - 2], st.versions[anchor - 1]
+    if prev.content is None or ver.content is None:
+        base["note"] = "前一版或本版内容未知,无法定位被替换行(见 file 的复原原因)"
+        return base
+    old, new = prev.content.splitlines(), ver.content.splitlines()
+    rows = line_origins(st)[anchor - 2]
+    lines: list[dict[str, Any]] = []
+    added = 0
+    for tag, i1, i2, j1, j2 in difflib.SequenceMatcher(None, old, new, autojunk=False).get_opcodes():
+        if tag in ("replace", "delete"):
+            for i in range(i1, i2):
+                o = rows[i] if i < len(rows) else None
+                lines.append({"ln": i + 1, "owner": o[0] if o else None,
+                              "owner_name": _agent_label(ledger.agents, o[0]) if o else None,
+                              "since_v": o[1] if o else None, "text": old[i]})
+        if tag in ("replace", "insert"):
+            added += j2 - j1
+    counts: dict[str, int] = {}
+    unknown = 0
+    for x in lines:
+        if x["owner"] is None:
+            unknown += 1
+        else:
+            counts[x["owner"]] = counts.get(x["owner"], 0) + 1
+    base.update(known=True, n_lines=len(old), lines=lines, added=added, unknown=unknown,
+                summary=[{"owner": k, "owner_name": _agent_label(ledger.agents, k), "n": c}
+                         for k, c in sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))])
+    return base
 
 
 def file_atom(ledger: Ledger, hint: str, v: int | None = None,

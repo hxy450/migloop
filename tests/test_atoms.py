@@ -59,12 +59,13 @@ def _write_jsonl(path: str, records: list[dict[str, Any]]) -> None:
 
 
 def _ledger(tmp_path: Any, main: list[dict[str, Any]],
-            subs: dict[str, list[dict[str, Any]]] | None = None) -> atoms.Ledger:
+            subs: dict[str, list[dict[str, Any]]] | None = None,
+            stage_intervals: list[dict[str, Any]] | None = None) -> atoms.Ledger:
     main_path = str(tmp_path / f"{SID}.jsonl")
     _write_jsonl(main_path, main)
     for stem, recs in (subs or {}).items():
         _write_jsonl(str(tmp_path / SID / "subagents" / f"{stem}.jsonl"), recs)
-    agents = atoms_collect.collect_cc(main_path, seq=[0])
+    agents = atoms_collect.collect_cc(main_path, seq=[0], stage_intervals=stage_intervals)
     return atoms.build_ledger(agents)
 
 
@@ -146,6 +147,52 @@ def test_script_mediated_writes_and_reads(tmp_path: Any) -> None:
     assert len(runs) == 2                        # heredoc 写 + 跑 gen.py(python -c 只读)
 
 
+def test_script_literal_tendency_fallback_only_for_small_scripts(tmp_path: Any) -> None:
+    """0723 vv-static-B 的 gen_static.py:只写脚本里一张 24 条 .ets 路径的数据表全被当成写目标,
+    凭空造出 19 条假返修链(34 条里的 56%)。全文倾向兜底只对字面量 ≤ 3 的小脚本生效;
+    多了就放弃这些字面量并在动作上记「脚本字面量方向不明」—— 宁可漏,不许静默。"""
+    small = "from pathlib import Path\nOUT = 'ui/page.md'\nPath(OUT).write_text('hi')\n"
+    # 紧跟的字段 'wired' 以 w 开头:旧的 open(p,'w') 判据只看引号后一个字母,把它当成了写模式
+    table = ("import json\nR = [\n"
+             + "".join(f"  ('P{i}', 'entry/src/main/ets/pages/P{i}.ets', 'wired'),\n" for i in range(6))
+             + "]\njson.dump(R, open('spec/static.json', 'w'))\n")
+    main = [
+        *_call("2026-01-01T00:00:00Z", "t1", "Write", {"file_path": "/tmp/small.py", "content": small}),
+        *_call("2026-01-01T00:00:10Z", "t2", "Bash", {"command": "cd /proj && python3 /tmp/small.py"}),
+        *_call("2026-01-01T00:00:20Z", "t3", "Write", {"file_path": "/tmp/gen_static.py", "content": table}),
+        *_call("2026-01-01T00:00:30Z", "t4", "Bash", {"command": "cd /proj && python3 /tmp/gen_static.py"}),
+    ]
+    led = _ledger(tmp_path, main)
+    assert led.stories["/proj/ui/page.md"].versions[0].via == "script"      # 小脚本:倾向兜底照旧
+    assert "/proj/spec/static.json" in led.stories                            # 显式 open(...,'w') 照旧
+    assert not any(p.endswith(".ets") for p in led.stories)                   # 数据表里的路径不再是写
+    runs = [a for a in led.agents[MAIN_ID].actions if a.tool == "Bash"]
+    assert runs[0].detail.get("unresolved") is None
+    assert runs[1].detail.get("unresolved") == "脚本字面量方向不明"
+
+
+def test_read_without_tool_use_result_falls_back_to_numbered_output(tmp_path: Any) -> None:
+    """服务端切片与 Workflow 子代理的转录不带 toolUseResult 边车:Read 只有结果正文 "     N\\t内容"。
+    DiceRoller 0903 生成方读 MainActivity.kt / activity_main.xml 的两条 Read 因此在账本里消失,盲评里
+    原始转录组据此指出我们"无法确认是否读过"是错的。从行号前缀还原路径、行段与全读标记。"""
+    main = [
+        *_call("2026-01-01T00:00:00Z", "r1", "Read", {"file_path": "/proj/app/src/MainActivity.kt"},
+               "     1\tclass MainActivity {\n     2\t  fun roll() = (1..6).random()\n     3\t}\n"),
+        *_call("2026-01-01T00:00:10Z", "r2", "Read", {"file_path": "/proj/app/res/layout/activity_main.xml",
+                                                      "offset": 40, "limit": 2},
+               "    40\t<Button\n    41\t    android:text=\"@string/roll\" />\n"),
+        *_call("2026-01-01T00:00:20Z", "t1", "Write", {"file_path": "/proj/entry/A.ets", "content": "a\n"}),
+    ]
+    led = _ledger(tmp_path, main)
+    reads = [(ref.path, ref.ev.start, ref.ev.n, ref.ev.full) for act in led.agents[MAIN_ID].actions
+             for ref in act.files if ref.op == "read"]
+    assert reads == [("/proj/app/src/MainActivity.kt", 1, 3, True),
+                     ("/proj/app/res/layout/activity_main.xml", 40, 2, False)]
+    kt = led.stories["/proj/app/src/MainActivity.kt"]
+    assert kt.reads and kt.reads[0].by == MAIN_ID                      # 外部输入被读到,进树的叶子
+    assert atoms.agent_atom(led, MAIN_ID)["reads"][0]["path"].endswith("MainActivity.kt")
+
+
 def test_rm_records_a_delete_version(tmp_path: Any) -> None:
     main = [
         *_call("2026-01-01T00:00:00Z", "t1", "Write", {"file_path": "/proj/a.md", "content": "x\n"}),
@@ -200,6 +247,43 @@ def test_dispatch_and_inbox_link_parent_and_child(tmp_path: Any) -> None:
     assert [a.detail["text"] for a in inbox] == ["做转换 X\n第二行", "改优先级:先出 B"]
     assert c.result == "完成了 B。"
     assert c.session == "abcdef12"
+
+
+def test_dispatch_links_by_tool_result_agent_id_when_prompts_share_a_head(tmp_path: Any) -> None:
+    """DiceRoller ECAT 主会话一次派 6 个修复子代理,派发词开头 120 字一模一样(仓库根目录 + 语言 + 循环轮次),
+    按派发词开头对齐就按目录顺序乱配:账本把 fix-identity 的名片挂到了 fix-errobserver 的转录上,六个里只有
+    第一个碰巧对上(调查 agent 在报告里点了出来)。Task 结果边车 toolUseResult.agentId 是实锤的派发边,有它就用它;
+    没有边车时先比派发词全文,再退到开头。"""
+    common = ("仓库根目录（工作目录即此处）：/private/tmp/claude-502/-Users-fengyi-Workspace-migbot-set-hmigbot-plus/"
+              "12b07daf-a671-4616-96a1-c214864ee609/scratchpad/dice-hmos\n"
+              "语言：全部输出用中文。ECAT 循环 iteration 0 修复任务。")
+    assert len(common) > 120
+    main = [
+        *_call("2026-01-01T00:00:00Z", "t1", "Agent",
+               {"name": "fix-identity", "subagent_type": "worker", "description": "Fix app.json5 identity",
+                "prompt": common + "\n## 目标文件 AppScope/app.json5"},
+               toolUseResult={"agentId": "azz999", "status": "completed"}),
+        *_call("2026-01-01T00:00:10Z", "t2", "Agent",
+               {"name": "fix-errobserver", "subagent_type": "worker", "description": "Add global error observer",
+                "prompt": common + "\n## 目标文件 EntryAbility.ets"},
+               toolUseResult={"agentId": "aaa111", "status": "completed"}),
+        *_call("2026-01-01T00:00:12Z", "t3", "Agent",                    # 没有边车:靠派发词全文对齐
+               {"name": "gate-build", "subagent_type": "worker", "description": "Run compile gate",
+                "prompt": common + "\n## 编译门"}),
+    ]
+    ident = [_rec("2026-01-01T00:00:05Z", "user", common + "\n## 目标文件 AppScope/app.json5", agentId="azz999"),
+             *_call("2026-01-01T00:00:20Z", "c1", "Write", {"file_path": "/proj/AppScope/app.json5", "content": "{}\n"})]
+    errobs = [_rec("2026-01-01T00:00:15Z", "user", common + "\n## 目标文件 EntryAbility.ets", agentId="aaa111"),
+              *_call("2026-01-01T00:00:30Z", "c2", "Write", {"file_path": "/proj/E.ets", "content": "e\n"})]
+    gate = [_rec("2026-01-01T00:00:16Z", "user", common + "\n## 编译门", agentId="abb222"),
+            *_call("2026-01-01T00:00:31Z", "c3", "Bash", {"command": "cd /proj && hvigorw assembleHap"})]
+    led = _ledger(tmp_path, main, {"agent-azz999": ident, "agent-aaa111": errobs, "agent-abb222": gate})
+    a, b, g = led.agents["agent-azz999"], led.agents["agent-aaa111"], led.agents["agent-abb222"]
+    assert (a.name, a.description, a.parent_ver) == ("fix-identity", "Fix app.json5 identity", 1)
+    assert (b.name, b.description, b.parent_ver) == ("fix-errobserver", "Add global error observer", 2)
+    assert (g.name, g.description, g.parent_ver) == ("gate-build", "Run compile gate", 3)
+    assert [act.detail["child"] for act in led.agents[MAIN_ID].actions if act.kind == "dispatch"] \
+        == ["agent-azz999", "agent-aaa111", "agent-abb222"]
 
 
 def test_plain_prompt_subagent_still_links_by_prompt(tmp_path: Any) -> None:
@@ -586,6 +670,104 @@ def test_stage_from_attribution_skill_and_inherited_by_child(tmp_path: Any) -> N
     assert idx["agent-aconv-abc123"]["stage"] == "a2h-execute"
 
 
+def test_collect_cc_falls_back_to_run_stage_intervals(tmp_path: Any) -> None:
+    """没有归属戳的 CC 会话(ECAT 对抗循环、reviewer、loop engine 续接的 worker 都是 Driver 直接起的,
+    记录上没有 attributionSkill)按 run 级阶段区间(stage-marks)以时间落阶段;有戳的记录戳优先。
+    DiceRoller 0903:ECAT fixer 会话改了 .ets 却因阶段 None 被当成生成侧,一条 ECAT 返修链都没有。"""
+    # 管线 mark 打在阶段结束:plan 在 00:00:00 结束,execute 在 00:01:00 结束,verify 在 00:02:00 结束;
+    # ecat-refine 是起始 mark
+    marks = [["2026-01-01T00:00:00Z", "a2h-plan"], ["2026-01-01T00:01:00Z", "a2h-execute"],
+             ["2026-01-01T00:02:00Z", "a2h-verify"], ["2026-01-01T00:03:00Z", "ecat-refine"]]
+    intervals = atoms_collect.stage_intervals_from_marks(marks)
+    assert [(s["stage"], s["end_ts"]) for s in intervals] == [
+        ("a2h-plan", "2026-01-01T00:00:00.000000"), ("a2h-execute", "2026-01-01T00:01:00.000000"),
+        ("a2h-verify", "2026-01-01T00:02:00.000000"), ("ecat-refine", None)]
+    main = [
+        *_call("2026-01-01T00:00:30Z", "t0", "Write", {"file_path": "/proj/entry/A.ets", "content": "a\nb\n"}),
+        # 戳是 skill 粒度(execute 期间派的 visual-verify 子代理),区间是 stage 粒度:有戳的记录戳优先,
+        # 子代理没戳时继承派发那一笔的戳,不按时间落(否则会被误成 a2h-execute)
+        *_staged(_call("2026-01-01T00:00:40Z", "t9", "Agent",
+                       {"name": "vv", "subagent_type": "worker", "description": "视觉核对", "prompt": "核"}),
+                 "arkts-visual-verify"),
+        *_call("2026-01-01T00:01:30Z", "t1", "Edit",
+               {"file_path": "/proj/entry/A.ets", "old_string": "b", "new_string": "c"}),
+    ]
+    child = _sub("核", [*_call("2026-01-01T00:00:45Z", "c1", "Write",
+                                {"file_path": "/proj/entry/C.ets", "content": "c\n"})])
+    led = _ledger(tmp_path, main, {"agent-avv-abc123": child}, stage_intervals=intervals)
+    # 无戳记录按时间落;有戳的记录戳优先,且戳沿用到后面的无戳记录(原规则不变)
+    assert [a.stage for a in led.agents[MAIN_ID].actions] == ["a2h-execute", "arkts-visual-verify",
+                                                               "arkts-visual-verify"]
+    assert led.agents["agent-avv-abc123"].stage == "arkts-visual-verify"     # 继承派发戳,不是区间的 execute
+    assert [v.stage for v in led.stories["/proj/entry/C.ets"].versions] == ["arkts-visual-verify"]
+    # 不给区间照旧:无戳 = 无阶段
+    led0 = _ledger(tmp_path, main, {"agent-avv-abc123": child})
+    assert [a.stage for a in led0.agents[MAIN_ID].actions] == [None, "arkts-visual-verify", "arkts-visual-verify"]
+    # 纯无戳会话(reviewer / ECAT 那种):全靠区间;execute 结束后落在 verify 段的写是修复
+    ecat = [
+        *_call("2026-01-01T00:00:30Z", "e0", "Write", {"file_path": "/proj/entry/A.ets", "content": "a\nb\n"}),
+        *_call("2026-01-01T00:01:30Z", "e1", "Edit",
+               {"file_path": "/proj/entry/A.ets", "old_string": "b", "new_string": "c"}),
+        *_call("2026-01-01T00:03:30Z", "e2", "Edit",
+               {"file_path": "/proj/entry/A.ets", "old_string": "c", "new_string": "d"}),
+    ]
+    led2 = _ledger(tmp_path, ecat, stage_intervals=intervals)
+    assert [v.stage for v in led2.stories["/proj/entry/A.ets"].versions] == ["a2h-execute", "a2h-verify", "ecat-refine"]
+    chains = filestory.build_fix_chains(led2.stories, {}, {})
+    assert [(c["file"], c["fixer"]["stage"], c["fix_versions"]) for c in chains] == [("A.ets", "a2h-verify", [2, 3])]
+
+
+def test_fix_boundary_is_end_of_execute_and_time_rule_beats_stage_names(tmp_path: Any) -> None:
+    """用户口径(2026-09-04):execute 阶段结束之后的都是修复。有 run 级 stage-marks 时按时间判:
+    execute 期间派的 visual-verify 子代理是生成侧的收尾,execute 结束后哪怕阶段是 None 也是修复;
+    没有 marks 才退回按阶段名排序。marks 兼容 Go 运行时的 [{stage, ts}] 与导出包的 [[ts, stage]]。"""
+    # 管线 mark = 阶段结束时刻(Go 运行时格式 {stage, ts}):plan 00:00:00 结束、execute 00:01:00 结束、
+    # verify 00:02:00 结束;ecat-refine 是起始 mark。时刻带 +00:00 也能与记录的 Z 时刻比
+    marks = [{"stage": "a2h-plan", "ts": "2026-01-01T00:00:00+00:00"},
+             {"stage": "a2h-execute", "ts": "2026-01-01T00:01:00+00:00"},
+             {"stage": "a2h-verify", "ts": "2026-01-01T00:02:00+00:00"},
+             {"stage": "ecat-refine", "ts": "2026-01-01T00:03:00+00:00"}]
+    intervals = atoms_collect.stage_intervals_from_marks(marks)
+    assert [s["stage"] for s in intervals] == ["a2h-plan", "a2h-execute", "a2h-verify", "ecat-refine"]
+    assert atoms_collect.fix_boundary(intervals) == "2026-01-01T00:01:00.000000"
+    assert atoms_collect.fix_boundary(intervals[:1]) is None            # 还没有 execute 的结束 mark:没有修复
+    assert atoms_collect.fix_boundary([]) is None
+    main = [
+        *_staged(_call("2026-01-01T00:00:20Z", "t0", "Write", {"file_path": "/proj/entry/A.ets", "content": "a\nb\n"}),
+                 "a2h-execute"),
+        *_staged(_call("2026-01-01T00:00:40Z", "t1", "Edit",                  # execute 结束(00:01:00)前的 visual-verify
+                       {"file_path": "/proj/entry/A.ets", "old_string": "b", "new_string": "c"}),
+                 "arkts-visual-verify"),
+        *_call("2026-01-01T00:01:30Z", "t2", "Edit",                           # execute 结束后,无戳
+               {"file_path": "/proj/entry/A.ets", "old_string": "c", "new_string": "d"}),
+    ]
+    led = _ledger(tmp_path, main)
+    assert [v.stage for v in led.stories["/proj/entry/A.ets"].versions] == \
+        ["a2h-execute", "arkts-visual-verify", "arkts-visual-verify"]      # 无戳沿用上一枚(原规则)
+    by_name = filestory.build_fix_chains(led.stories, {}, {})
+    assert by_name[0]["fix_versions"] == [2, 3]                          # 没有 marks:按阶段名,v2 也算修
+    timed = filestory.build_fix_chains(led.stories, {}, {}, fix_after=atoms_collect.fix_boundary(intervals))
+    assert timed[0]["fix_versions"] == [3]                               # 有 marks:execute 结束后的才算
+    assert timed[0]["fixer"]["stage"] == "arkts-visual-verify"
+
+
+def test_build_evidence_lists_build_commands_across_pool(tmp_path: Any) -> None:
+    """池子里哪些会话在什么时候跑过构建(hvigor / ohpm):报告页的「执行阶段未见构建」要看整个池子,
+    不能只看主线一个 root(DiceRoller 0903 的构建都在后起的 a2h-build 会话里)。"""
+    main = [
+        *_call("2026-01-01T00:00:00Z", "t0", "Bash", {"command": "ls entry"}),
+        *_staged(_call("2026-01-01T00:05:00Z", "t1", "Bash", {"command": "cd /proj && hvigorw assembleHap -p product=default"}),
+                 "a2h-build"),
+        *_call("2026-01-01T00:06:00Z", "t2", "Bash", {"command": "ohpm install --all"}),
+    ]
+    led = _ledger(tmp_path, main)
+    ev = atoms.build_evidence(led)
+    assert [(e["sid8"], e["stage"], e["ts"][11:16]) for e in ev] == [("abcdef12", "a2h-build", "00:05"),
+                                                                      ("abcdef12", "a2h-build", "00:06")]
+    assert ev[0]["cmd"].startswith("cd /proj && hvigorw")
+    assert atoms.build_evidence(_ledger(tmp_path, main[:2])) == []
+
+
 def test_main_session_verify_stage_write_is_a_fixer(tmp_path: Any) -> None:
     """正式口径不变(execute 之后全是修复),但判定下沉到逐笔版本的阶段:
     主会话在 visual-verify 亲手改 .ets 也是修复方,不再因为是 __main__ 被整体排除。"""
@@ -848,6 +1030,8 @@ def test_actions_carry_relative_time_from_pool_start(tmp_path: Any) -> None:
     assert (chains[0]["gen_at"], chains[0]["fix_at"]) == ("2026-01-01T00:20:00Z", "2026-01-01T01:30:00Z")
     line = atoms_text.render_chains({"chains": chains, "t0": led.t0}, root="/proj")
     assert "生成于 T+0:20" in line and "修复于 T+1:30" in line
+    assert "修复方(按先后): 主会话(编排/直接写盘) · arkts-visual-verify 文件v2 @T+1:30" in line
+    assert atoms_text._vrange([5, 6, 7, 12, 14, 15]) == "v5-7,v12,v14-15"
 
 
 def test_codex_exec_shares_stdout_reconciliation_and_unresolved_marks(tmp_path: Any) -> None:
@@ -875,3 +1059,98 @@ def test_codex_exec_shares_stdout_reconciliation_and_unresolved_marks(tmp_path: 
     reads = sorted((ref.path, ref.ev.seen) for act in m.actions for ref in act.files if ref.op == "read")
     assert reads == [("/proj/app/src/A.kt", ((12, "val mHttpUrl = x"),)), ("/proj/app/src/B.kt", ((40, "mHttpUrl"),))]
     assert [a.detail.get("unresolved") for a in m.actions if a.tool == "exec"] == [None, "命令替换路径"]
+
+
+# ═══════════════ 调查 agent 的 token 画像驱动的两刀(0723 基线:sessions 每次 9.5K 字符占 11%,
+# 整文件 blame 三次 32K/28K/12K 占 19%,都只为找目标链和那几行) ═══════════════
+
+
+def test_render_chains_can_filter_to_one_file() -> None:
+    """sessions(file=…) 只回目标链:调查一条链不必把全部链读一遍。"""
+    payload = {"chains": [
+        {"file": "entry/src/main/ets/pages/A.ets", "file_abs": "/proj/entry/src/main/ets/pages/A.ets",
+         "generator": {"id": "g1", "desc": "转 A", "stage": "a2h-execute"},
+         "fixer": {"id": "f1", "desc": "修 A", "stage": "arkts-visual-verify"}},
+        {"file": "entry/src/main/ets/pages/B.ets", "file_abs": "/proj/entry/src/main/ets/pages/B.ets",
+         "generator": {"id": "g2", "desc": "转 B", "stage": "a2h-execute"},
+         "fixer": {"id": "f1", "desc": "修 A", "stage": "arkts-visual-verify"}},
+    ], "cross": None, "t0": None}
+    full = atoms_text.render_chains(payload, root="/proj")
+    assert full.startswith("# 返修链(2)") and "A.ets" in full and "B.ets" in full
+    one = atoms_text.render_chains(payload, root="/proj", file="pages/A.ets")
+    assert one.startswith("# 返修链(1/2") and "A.ets" in one and "B.ets" not in one
+    assert "A.ets" in atoms_text.render_chains(payload, root="/proj", file="A.ets")       # 裸文件名也行
+    assert "没有匹配" in atoms_text.render_chains(payload, root="/proj", file="Nope.ets")
+
+
+def test_render_chains_labels_created_and_template_roots() -> None:
+    """三种链根三种问法:rework 问为什么被改;created 问为什么生成期没有它;template(模板/外部原样,生成期没写过)
+    问为什么生成期没改它。"""
+    def chain(file: str, kind: str, gdesc: str) -> dict[str, Any]:
+        return {"file": file.rsplit("/", 1)[-1], "file_abs": "/p/" + file, "kind": kind,
+                "generator": {"id": None, "desc": gdesc, "stage": None}, "gen_at": None,
+                "fix_at": "2026-01-01T01:00:00Z",
+                "fixer": {"id": "f1", "desc": "修", "stage": "arkts-visual-verify"}, "fixers_all": []}
+    payload = {"chains": [chain("entry/src/main/module.json5", "template", "生成期未改(模板/外部原样)"),
+                          chain("entry/src/main/ets/New.ets", "created", "生成期未产出(修复期新建)")],
+               "cross": None, "t0": "2026-01-01T00:00:00Z"}
+    text = atoms_text.render_chains(payload, root="/p")
+    assert "module.json5 | 生成期未改 · 模板/外部原样(问:为什么生成期没改它)" in text
+    assert "New.ets | 生成期未产出 · 修复期新建(问:为什么生成期没有它)" in text
+    assert "生成于" not in text and text.count("| 修复于 T+1:00") == 2       # 没有生成侧时刻就不写"生成于 "
+
+
+def test_render_agent_without_window_keeps_early_reads(tmp_path: Any) -> None:
+    """不带窗口的 agent(id, v) 整段给,早期版本的读一条不少 —— 0723 对照实验变体 B 试过默认折叠
+    非目标版本,总字符没省反而把 AboutUsPage 从「spec 写错」误判成「漏读」(v1 读的 spec 页被折进一行)。"""
+    main = [
+        *_read_call("2026-01-01T00:00:00Z", "r1", "/proj/spec/a.md", "spec a\n"),
+        *_call("2026-01-01T00:00:10Z", "t1", "Write", {"file_path": "/proj/entry/A.ets", "content": "a\n"}),
+        *_read_call("2026-01-01T00:00:20Z", "r2", "/proj/src/B.kt", "class B\n"),
+        *_call("2026-01-01T00:00:30Z", "t2", "Write", {"file_path": "/proj/entry/B.ets", "content": "b\n"}),
+    ]
+    led = _ledger(tmp_path, main)
+    full = atoms_text.render_agent(led, MAIN_ID, 2, root="/proj")
+    assert "读 spec/a.md@v1" in full and "读 src/B.kt@v1" in full and "写 entry/A.ets@v1" in full
+    windowed = atoms_text.render_agent(led, MAIN_ID, 2, root="/proj", since=1)
+    assert "读 src/B.kt@v1" in windowed and "读 spec/a.md@v1" not in windowed
+
+
+def test_blame_changed_lists_only_lines_the_fix_replaced(tmp_path: Any) -> None:
+    """blame(path, v_fix, changed=True):只列修复版替换/删除的那些行及其原作者 —— 调查第 4 步要的正是这个。"""
+    main = [
+        *_call("2026-01-01T00:00:00Z", "t0", "Write", {"file_path": "/proj/entry/A.ets", "content": "a\nb\nc\n"}),
+        *_call("2026-01-01T00:00:10Z", "t1", "Agent",
+               {"name": "fix", "subagent_type": "worker", "description": "修 A", "prompt": "修"}),
+    ]
+    child = _sub("修", [*_call("2026-01-01T00:00:30Z", "c1", "Edit",
+                                {"file_path": "/proj/entry/A.ets", "old_string": "b\nc\n", "new_string": "B\nc\nd\n"})])
+    led = _ledger(tmp_path, main, {"agent-afix-abc123": child})
+    bl = atoms.blame(led, "A.ets", 2, changed=True)
+    assert bl is not None and bl["changed"] is True and bl["prev_v"] == 1 and bl["known"]
+    assert [(x["ln"], x["text"], x["owner"], x["since_v"]) for x in bl["lines"]] == [(2, "b", MAIN_ID, 1)]
+    assert bl["added"] == 2                                   # B、d 是新增侧
+    assert [(s["owner"], s["n"]) for s in bl["summary"]] == [(MAIN_ID, 1)]
+    text = atoms_text.render_blame(led, "A.ets", 2, root="/proj", changed=True)
+    assert "v2 替换/删除了 v1 的 1 行" in text and "新增 2 行" in text
+    assert "| b" in text and "| c" not in text and "| a" not in text
+    first = atoms.blame(led, "A.ets", 1, changed=True)
+    assert first is not None and first["lines"] == [] and first["prev_v"] is None and "创建版" in first["note"]
+
+
+def test_script_literal_used_as_mapping_value_is_not_a_write(tmp_path: Any) -> None:
+    """DiceRoller 0903 主会话 v55:heredoc python 初始化 progress.json,正文里
+    "hmos_page_map": {"MainActivity": "entry/src/main/ets/pages/Index.ets"} 只是数据值,却被全文倾向兜底
+    当成写目标,凭空给 Index.ets 造出一版"修复"(链的修复方 / 修复时刻全错)。紧跟在 `:` 后面的字面量是
+    映射的值,不是文件操作的目标 —— 放弃并记「方向不明」;同一脚本里真写的 progress.json 照旧。"""
+    script = ('import json\nfrom pathlib import Path\np = Path("spec/visual-verify/progress.json")\n'
+              'prog = {"current_round": 1, "hmos_page_map": {"MainActivity": "entry/src/main/ets/pages/Index.ets"}}\n'
+              'p.write_text(json.dumps(prog))\n')
+    main = [*_call("2026-01-01T00:00:00Z", "t1", "Bash",
+                   {"command": "cd /proj\nmkdir -p spec/fix/round-1/ui\npython3 - <<EOF\n" + script
+                               + "EOF\nls spec/visual-verify/"})]
+    led = _ledger(tmp_path, main)
+    assert "/proj/spec/visual-verify/progress.json" in led.stories
+    assert not any(p.endswith(".ets") for p in led.stories)
+    run = next(a for a in led.agents[MAIN_ID].actions if a.tool == "Bash")
+    assert run.detail.get("unresolved") == "脚本字面量方向不明"

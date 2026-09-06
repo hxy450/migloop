@@ -239,6 +239,8 @@ def _check_pipeline_gap(trace: dict[str, Any],
 
 # 经验规则的命令词表 —— 按管线演进随时补充,大小写不敏感子串匹配
 _BUILD_MARKERS = ("hvigor", "assemblehap", "ohpm ")
+#: 账本侧(atoms.build_evidence)扫全池构建命令用同一份词表
+BUILD_MARKERS = _BUILD_MARKERS
 _EMULATOR_MARKERS = ("emulator", "hdc ", "simulator", "phone-", "x86emu")
 
 
@@ -290,11 +292,15 @@ def _check_script_failures(trace: dict[str, Any]) -> list[dict[str, Any]]:
     return out
 
 
-def _check_execute_build(trace: dict[str, Any]) -> list[dict[str, Any]]:
+def _check_execute_build(trace: dict[str, Any],
+                         pool_builds: list[dict[str, Any]] | None = None) -> list[dict[str, Any]]:
     """execute 阶段没跑过构建 —— 产出的代码从未被编译器检验过。
 
     只看主线命令(子代理内部的编译不进主线 transcript);主线门禁编译是
-    a2h 流程的硬要求,词表见 _BUILD_MARKERS。"""
+    a2h 流程的硬要求,词表见 _BUILD_MARKERS。
+    pool_builds = 池子里别的会话跑过的构建(atoms.build_evidence):一次迁移 run 的构建可以发生在
+    loop engine 后起的 a2h-build 会话里(DiceRoller 0903),只看主线一个 root 会误报 —— 有就降为 info,
+    点名在哪一会话何时构建。"""
     ex_stages = [s for s in trace.get("stages") or [] if "execute" in str(s.get("stage") or "")]
     if not ex_stages:
         return []
@@ -303,19 +309,47 @@ def _check_execute_build(trace: dict[str, Any]) -> list[dict[str, Any]]:
             if t.get("name") == "Bash" and any(
                     m in str(t.get("brief") or "").lower() for m in _BUILD_MARKERS):
                 return []
+    anchor = {"stage": str(ex_stages[0].get("stage"))}
+    if pool_builds:
+        # 账本的命令原文比 trace 的 brief 可靠(brief 截断,长 cd 前缀会把 hvigorw 挤出去):
+        # 主线自己在 execute 期间构建过就不出项;只有别的会话构建才提示
+        main8 = str((trace.get("meta") or {}).get("session_id") or "")[:8]
+        own = [b for b in pool_builds if str(b.get("sid8") or "") == main8
+               and "execute" in str(b.get("stage") or "")]
+        if own:
+            return []
+        by_sid: dict[str, tuple[str, str, int]] = {}
+        for b in pool_builds:
+            sid8 = str(b.get("sid8") or "?")
+            first = by_sid.get(sid8)
+            by_sid[sid8] = (str(b.get("ts") or "")[11:16] if first is None else first[0],
+                            str(b.get("stage") or "?") if first is None else first[1],
+                            (first[2] if first else 0) + 1)
+        shown = "、".join(f"{sid8}({t} {st},{n} 次)" for sid8, (t, st, n) in list(by_sid.items())[:4])
+        more = f" 等 {len(by_sid)} 个会话" if len(by_sid) > 4 else ""
+        return [_finding(
+            "execute-no-build", "info",
+            "构建在管线主线之外的会话完成",
+            f"主线 execute 阶段没跑构建;构建发生在同一 run 的其它会话:{shown}{more} —— "
+            "编译验证有,只是不在主线里(loop engine 续接 / build 循环)。",
+            anchor=anchor,
+        )]
     return [_finding(
         "execute-no-build", "error",
         "执行阶段未见构建",
         "execute 阶段的主线命令里没有出现过构建(hvigor/ohpm)—— 产出的代码可能从未编译验证。",
-        anchor={"stage": str(ex_stages[0].get("stage"))},
+        anchor=anchor,
     )]
 
 
-def _check_spec_analyzer(trace: dict[str, Any]) -> list[dict[str, Any]]:
+def _check_spec_analyzer(trace: dict[str, Any],
+                         pool_agents: list[dict[str, Any]] | None = None) -> list[dict[str, Any]]:
     """spec 阶段的两条派发纪律:该起 Android 分析代理;spec 该由子代理写。
 
     门槛:spec 之后已出现别的阶段(spec 已收尾)才评 —— 阶段进行中
-    analyzer 可能还没起,评早了是误报。"""
+    analyzer 可能还没起,评早了是误报。
+    pool_agents = 同一 run 其它 root 会话的血缘 agent(带 sid8):spec 可以从首启会话开始、在 loop engine
+    续接的主线里结束(DiceRoller 0903),analyzer 起在前一个会话里就不算没起。"""
     stage_seq = [str(s.get("stage") or "") for s in trace.get("stages") or []]
     spec_idx = [i for i, name in enumerate(stage_seq)
                 if "spec" in name and name != "setup"]
@@ -327,12 +361,25 @@ def _check_spec_analyzer(trace: dict[str, Any]) -> list[dict[str, Any]]:
                    if str(a.get("stage")) in spec_stages
                    and not str(a.get("agent_id", "")).startswith("__main__")]
     if not any("analyzer" in str(a.get("type") or "").lower() for a in spec_agents):
-        out.append(_finding(
-            "spec-no-analyzer", "warn",
-            "spec 阶段未起分析代理",
-            "spec 阶段没有出现 Android 分析类子代理(analyzer)—— 源码理解可能只靠主线粗读。",
-            anchor={"stage": sorted(spec_stages)[0]},
-        ))
+        elsewhere = [a for a in pool_agents or []
+                     if "analyzer" in str(a.get("type") or "").lower()
+                     and "spec" in str(a.get("stage") or "")]
+        if elsewhere:
+            sids = sorted({str(a.get("sid8") or "?") for a in elsewhere})
+            out.append(_finding(
+                "spec-no-analyzer", "info",
+                "分析代理起在管线主线之外的会话",
+                f"主线的 spec 阶段没起 Android 分析代理,但同一 run 的会话 {'、'.join(sids)} 起过 "
+                f"{len(elsewhere)} 个 —— spec 从那里开始、在主线里收尾。",
+                anchor={"stage": sorted(spec_stages)[0]},
+            ))
+        else:
+            out.append(_finding(
+                "spec-no-analyzer", "warn",
+                "spec 阶段未起分析代理",
+                "spec 阶段没有出现 Android 分析类子代理(analyzer)—— 源码理解可能只靠主线粗读。",
+                anchor={"stage": sorted(spec_stages)[0]},
+            ))
     if spec_agents and not any(a.get("n_spec_w") for a in spec_agents):
         out.append(_finding(
             "spec-main-write", "warn",
@@ -400,11 +447,16 @@ _CANON_STAGE_ORDER = {
     "a2h-execute": 4,
     "a2h-verify": 5, "arkts-visual-verify": 5,
     "a2h-retrospect": 6,
+    # 管线收尾之后的两轮改码(DiceRoller 0903 实录):a2h-build 编译修复循环、ecat-refine ECAT 对抗式
+    # visual verify(判别器出单、修复方改码)。都在 execute 之后改鸿蒙码 → 修复侧
+    "a2h-build": 7, "ecat-refine": 7,
 }
 #: 分界线:execute 之后(序 > 4)全部是修复
 _GEN_LAST_ORDER = _CANON_STAGE_ORDER["a2h-execute"]
 #: workflow 自定义阶段名的词根兜底(dynamic workflow 不走 skill 词表)
-_FIX_STAGE_WORDS = ("verify", "fix", "repair", "retrospect")
+#: 用户口径(2026-09-04):只有主流水线(run/spec/plan/execute)是生成,dt verify / visual verify /
+#: ECAT / build 循环这些全是修复 —— 词根兜底覆盖没进上表的新阶段名
+_FIX_STAGE_WORDS = ("verify", "fix", "repair", "retrospect", "refine", "ecat", "build")
 
 
 def stage_order(stage: str | None) -> int | None:
@@ -440,11 +492,18 @@ def check_fix_chains(chains: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """
     if not chains:
         return []
+    created = [c for c in chains if c.get("kind") == "created"]
+    template = [c for c in chains if c.get("kind") == "template"]
+    tag = {"created": "(修复期新建)", "template": "(模板未改)"}
     shown = " · ".join(
         f"{str(c.get('file') or '').rsplit('/', 1)[-1]}"
-        f"(生成:{str((c.get('generator') or {}).get('desc') or '')[:24]})"
+        + tag.get(str(c.get("kind")), f"(生成:{str((c.get('generator') or {}).get('desc') or '')[:24]})")
         for c in chains[:5])
     more = f" 等 {len(chains)} 个文件" if len(chains) > 5 else ""
+    if created:
+        more += f";其中 {len(created)} 个是生成期没有、修复期补建的"
+    if template:
+        more += f";{len(template)} 个是模板/外部原样留到修复期才改的"
     cross = sum(1 for c in chains if c.get("gen_session") or c.get("fix_session"))
     stage = next((str((c.get("generator") or {}).get("stage"))
                   for c in chains if (c.get("generator") or {}).get("stage")), None)
@@ -489,7 +548,9 @@ _LEVEL_ORDER = {"error": 0, "warn": 1, "info": 2}
 
 def build_audit(trace: dict[str, Any],
                 pipeline: tuple[str, ...] = DEFAULT_PIPELINE,
-                fix_chains: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+                fix_chains: list[dict[str, Any]] | None = None,
+                pool_builds: list[dict[str, Any]] | None = None,
+                pool_agents: list[dict[str, Any]] | None = None) -> dict[str, Any]:
     """跑全部规则,findings 按严重度排序。纯函数,不 I/O。
     fix_chains = 两原子账本算好的返修链(filestory.build_fix_chains);不传(摘要端点、进行中的
     会话)就没有返修追溯卡 —— 这里不再从血缘层另算。"""
@@ -500,8 +561,8 @@ def build_audit(trace: dict[str, Any],
     findings = [
         *_check_skill_failures(trace),
         *_check_script_failures(trace),
-        *_check_execute_build(trace),
-        *_check_spec_analyzer(trace),
+        *_check_execute_build(trace, pool_builds),
+        *_check_spec_analyzer(trace, pool_agents),
         *_check_verify_emulator(trace),
         *_check_aborted_agents(trace),
         *_check_snapshot_agents(trace),
