@@ -1,0 +1,7 @@
+chain 4 AboutUsPage.ets: agree=True 具体度 工具=5 原始=5 一致性 工具=4 原始=5 更可信=control | 冲突 4
+    一致。主标签不同(A=「spec 写错」，B=「漏读」)，但事实分析指向同一根因：conv-aboutus 与 slice6-risk 都从未打开 AppScope/app.json5，只凭「label 即应用名」的二手表述写下 info.appInfo.label，而实际字面量是引用串 $string:app_name；两份都认定该表由 conv-aboutus 自己写入(A 的证据 4 明说是
+    B 用「读时该段为空(07:23:39)」与「自己回填(07:33:55)」两个时间戳直接钉死了 spec 与代码的先后，还提供了同轮同映射的对照组(base3-network 读了 app.json5 就写对)，结论与标签完全落在证据上；A 的取证同样扎实，但把主标签定为「spec 写错」与它自己承认的「spec 是事后追记、slice6 只是平移」相冲突，且关键的 VM 修复内容它无法核实。
+    冲突: 07-24T09:51 发生了什么：A 称 AppScope/app.json5@v2 是该时刻的「实录外修改」、写者不明，并据此说 07:31 时 label 是否已是 $string:app_name 无法证实；B 称 09:51:27 是 base3-network 执行 cat AppScope/app.json5 的一次读取，读到的就是 $string:app_name(是读不是写)，并
+    冲突: 修复方对 F012ViewModel.ets 的改法：A 明确列为无法确认(#16935 为 python 脚本改写，账本中该文件仍只有 v1，新正文不在账上)；B 给出具体内容(20:56:12 python 补丁将 appInfo.label 换成 resourceManager.getStringByNameSync('app_name')，并加 !label.startsWith('$')
+    冲突: spec 在因果链中的位置：A 的证据 3 称「spec 直接开出错误处方，VM 逐字照抄」，把 spec@v2:51 当作 slice6 错值的来源；B 的证据 5/6 主张 spec 段落原本为空、由 conv-aboutus 07:33:55 回填，是下游产物，slice6 的错值直接搬自 14:21:25 读到的 AboutUsPage.ets 代码。A 自己的证据 4 又承认 spec 
+    冲突: 运行期症状：B 有真机 UI 树逐字返回 '$string:app_name' 及 P0 finding 原文(18:05:30/18:22:50)；A 全程只在 fixer 派发词里间接提到该 finding 名，未引用任何设备侧证据(非矛盾，但覆盖面不同)。

@@ -1,0 +1,376 @@
+[
+ {
+  "label": "legacy_about",
+  "rep": 1,
+  "cost_usd": 1.6375885000000001,
+  "wall_s": 254.0,
+  "num_turns": 18,
+  "tool_calls": 17,
+  "tool_chars": 119394,
+  "usage": {
+   "input": 28,
+   "cache_create": 93208,
+   "cache_read": 739569,
+   "output": 13311
+  },
+  "per_tool": {
+   "ToolSearch": {
+    "n": 1,
+    "chars": 0
+   },
+   "guide": {
+    "n": 1,
+    "chars": 1523
+   },
+   "sessions": {
+    "n": 1,
+    "chars": 7698
+   },
+   "file": {
+    "n": 6,
+    "chars": 10615
+   },
+   "diff": {
+    "n": 3,
+    "chars": 4769
+   },
+   "blame": {
+    "n": 2,
+    "chars": 12780
+   },
+   "agent": {
+    "n": 3,
+    "chars": 82009
+   }
+  },
+  "verdict": "spec 写错（根因：引入者与 spec 作者都漏读 AppScope/app.json5）",
+  "call_sequence": [
+   "ToolSearch",
+   "guide",
+   "sessions",
+   "file",
+   "diff",
+   "diff",
+   "blame",
+   "blame",
+   "agent",
+   "file",
+   "file",
+   "file",
+   "agent",
+   "diff",
+   "file",
+   "agent",
+   "file"
+  ]
+ },
+ {
+  "label": "legacy_about",
+  "rep": 2,
+  "cost_usd": 1.4543525000000002,
+  "wall_s": 193.8,
+  "num_turns": 17,
+  "tool_calls": 16,
+  "tool_chars": 113908,
+  "usage": {
+   "input": 24,
+   "cache_create": 85353,
+   "cache_read": 636287,
+   "output": 11190
+  },
+  "per_tool": {
+   "ToolSearch": {
+    "n": 1,
+    "chars": 0
+   },
+   "guide": {
+    "n": 1,
+    "chars": 1523
+   },
+   "sessions": {
+    "n": 1,
+    "chars": 7698
+   },
+   "file": {
+    "n": 5,
+    "chars": 6892
+   },
+   "diff": {
+    "n": 3,
+    "chars": 4769
+   },
+   "blame": {
+    "n": 1,
+    "chars": 27637
+   },
+   "agent": {
+    "n": 2,
+    "chars": 61237
+   },
+   "action": {
+    "n": 2,
+    "chars": 4152
+   }
+  },
+  "verdict": "spec 写错(叠加漏读)",
+  "call_sequence": [
+   "ToolSearch",
+   "guide",
+   "sessions",
+   "file",
+   "diff",
+   "diff",
+   "blame",
+   "agent",
+   "file",
+   "file",
+   "action",
+   "file",
+   "agent",
+   "file",
+   "action",
+   "diff"
+  ]
+ },
+ {
+  "label": "cur_about",
+  "rep": 1,
+  "cost_usd": 0.9242240000000002,
+  "wall_s": 148.7,
+  "num_turns": 14,
+  "tool_calls": 13,
+  "tool_chars": 62342,
+  "usage": {
+   "input": 18,
+   "cache_create": 55741,
+   "cache_read": 342274,
+   "output": 7705
+  },
+  "per_tool": {
+   "ToolSearch": {
+    "n": 1,
+    "chars": 0
+   },
+   "guide": {
+    "n": 1,
+    "chars": 2199
+   },
+   "sessions": {
+    "n": 1,
+    "chars": 789
+   },
+   "file": {
+    "n": 2,
+    "chars": 4594
+   },
+   "diff": {
+    "n": 2,
+    "chars": 1178
+   },
+   "blame": {
+    "n": 1,
+    "chars": 415
+   },
+   "agent": {
+    "n": 2,
+    "chars": 45461
+   },
+   "action": {
+    "n": 3,
+    "chars": 7706
+   }
+  },
+  "verdict": "转换错(读全了仍写错)",
+  "call_sequence": [
+   "ToolSearch",
+   "guide",
+   "sessions",
+   "file",
+   "diff",
+   "diff",
+   "blame",
+   "agent",
+   "action",
+   "agent",
+   "action",
+   "action",
+   "file"
+  ]
+ },
+ {
+  "label": "cur_about",
+  "rep": 2,
+  "cost_usd": 0.9046034999999999,
+  "wall_s": 120.7,
+  "num_turns": 16,
+  "tool_calls": 15,
+  "tool_chars": 60788,
+  "usage": {
+   "input": 18,
+   "cache_create": 55329,
+   "cache_read": 348373,
+   "output": 6963
+  },
+  "per_tool": {
+   "ToolSearch": {
+    "n": 1,
+    "chars": 0
+   },
+   "guide": {
+    "n": 1,
+    "chars": 2199
+   },
+   "sessions": {
+    "n": 1,
+    "chars": 789
+   },
+   "file": {
+    "n": 2,
+    "chars": 1630
+   },
+   "diff": {
+    "n": 3,
+    "chars": 3641
+   },
+   "blame": {
+    "n": 2,
+    "chars": 560
+   },
+   "agent": {
+    "n": 2,
+    "chars": 45461
+   },
+   "action": {
+    "n": 3,
+    "chars": 6508
+   }
+  },
+  "verdict": "spec 写错(叠加漏读:未读 AppScope/app.json5)",
+  "call_sequence": [
+   "ToolSearch",
+   "guide",
+   "sessions",
+   "file",
+   "diff",
+   "diff",
+   "blame",
+   "blame",
+   "diff",
+   "agent",
+   "agent",
+   "action",
+   "action",
+   "action",
+   "file"
+  ]
+ },
+ {
+  "label": "raw_about",
+  "rep": 1,
+  "cost_usd": 2.5243654999999996,
+  "wall_s": 403.2,
+  "num_turns": 30,
+  "tool_calls": 29,
+  "tool_chars": 142067,
+  "usage": {
+   "input": 52,
+   "cache_create": 106211,
+   "cache_read": 1692133,
+   "output": 24567
+  },
+  "per_tool": {
+   "Bash": {
+    "n": 29,
+    "chars": 142067
+   }
+  },
+  "verdict": "漏读(该读没读)",
+  "call_sequence": [
+   "Bash",
+   "Bash",
+   "Bash",
+   "Bash",
+   "Bash",
+   "Bash",
+   "Bash",
+   "Bash",
+   "Bash",
+   "Bash",
+   "Bash",
+   "Bash",
+   "Bash",
+   "Bash",
+   "Bash",
+   "Bash",
+   "Bash",
+   "Bash",
+   "Bash",
+   "Bash",
+   "Bash",
+   "Bash",
+   "Bash",
+   "Bash",
+   "Bash",
+   "Bash",
+   "Bash",
+   "Bash",
+   "Bash"
+  ]
+ },
+ {
+  "label": "raw_about",
+  "rep": 2,
+  "cost_usd": 2.3462384999999997,
+  "wall_s": 417.9,
+  "num_turns": 33,
+  "tool_calls": 32,
+  "tool_chars": 86985,
+  "usage": {
+   "input": 66,
+   "cache_create": 75021,
+   "cache_read": 1970979,
+   "output": 24337
+  },
+  "per_tool": {
+   "Bash": {
+    "n": 32,
+    "chars": 86985
+   }
+  },
+  "verdict": "漏读（该读没读）—— 目标侧一条 `cat AppScope/app.json5` 从未执行；上游 spec 措辞含糊是诱因",
+  "call_sequence": [
+   "Bash",
+   "Bash",
+   "Bash",
+   "Bash",
+   "Bash",
+   "Bash",
+   "Bash",
+   "Bash",
+   "Bash",
+   "Bash",
+   "Bash",
+   "Bash",
+   "Bash",
+   "Bash",
+   "Bash",
+   "Bash",
+   "Bash",
+   "Bash",
+   "Bash",
+   "Bash",
+   "Bash",
+   "Bash",
+   "Bash",
+   "Bash",
+   "Bash",
+   "Bash",
+   "Bash",
+   "Bash",
+   "Bash",
+   "Bash",
+   "Bash",
+   "Bash"
+  ]
+ }
+]

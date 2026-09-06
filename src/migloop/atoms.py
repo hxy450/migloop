@@ -422,7 +422,8 @@ def file_atom(ledger: Ledger, hint: str, v: int | None = None,
                 "t": rel_time(r.ts, ledger.t0),
                 "v": r.version, "at": ledger.feeds.get((path, r.seq)),
                 "start": r.start, "n": r.n, "dep": r.dep, "certain": r.certain,
-                "seen": [list(x) for x in r.seen] if r.seen else None}
+                "seen": [list(x) for x in r.seen] if r.seen else None,
+                "seen_n": len(r.seen or ()), "full": r.full}
                for r in st.reads]
     return {
         "path": path, "v": vers[-1].v if vers else 0, "n_versions": len(st.versions),

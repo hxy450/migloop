@@ -1138,6 +1138,30 @@ def test_blame_changed_lists_only_lines_the_fix_replaced(tmp_path: Any) -> None:
     assert first is not None and first["lines"] == [] and first["prev_v"] is None and "创建版" in first["note"]
 
 
+def test_grep_hit_reads_are_not_labeled_full_text(tmp_path: Any) -> None:
+    """0723 AboutUsPage 重跑:slice6-risk 对 AppFormInfoManager.ets 只有一次 grep 方法名(命中 6 行),账本按 stdout
+    对账记成读是对的,但 file 的读者列表把它标成「全文」,调查 agent 据此判「读全了仍写错」—— 原始转录组戳穿了。
+    读的范围三种说法:全文快照 / 行段 / 命中 N 行(grep、head 前缀对账出来的);都不是的写「范围未知」,不许冒充全文。"""
+    main = [
+        *_call("2026-01-01T00:00:00Z", "t0", "Write", {"file_path": "/proj/entry/A.ets", "content": "a\nfoo\nc\n"}),
+        *_call("2026-01-01T00:00:10Z", "t1", "Bash", {"command": "cd /proj && grep -n foo entry/A.ets"}, out="2:foo\n"),
+        *_read_call("2026-01-01T00:00:20Z", "t2", "/proj/entry/A.ets", "a\nfoo\nc\n"),
+        *_call("2026-01-01T00:00:30Z", "t3", "Read", {"file_path": "/proj/entry/A.ets", "offset": 2, "limit": 1}, "…",
+               toolUseResult={"type": "text", "file": {"filePath": "/proj/entry/A.ets", "content": "foo\n",
+                                                        "startLine": 2, "numLines": 1, "totalLines": 3}}),
+    ]
+    led = _ledger(tmp_path, main)
+    readers = atoms.file_atom(led, "A.ets", None)["readers"]        # type: ignore[index]
+    assert [(r["seen_n"], r["full"], r["start"]) for r in readers] == [(1, False, None), (0, True, 1), (0, False, 2)]
+    text = atoms_text.render_file(led, "A.ets", None, root="/proj")
+    lines = [ln for ln in text.splitlines() if ln.startswith("- 主会话")]
+    assert "命中 1 行" in lines[0] and "全文" not in lines[0]
+    assert "全文" in lines[1]
+    assert "2-2行" in lines[2]
+    agent_txt = atoms_text.render_agent(led, MAIN_ID, None, root="/proj")
+    assert "[命中 1 行 写前读]" in agent_txt and "[2-2行 写前读]" in agent_txt
+
+
 def test_script_literal_used_as_mapping_value_is_not_a_write(tmp_path: Any) -> None:
     """DiceRoller 0903 主会话 v55:heredoc python 初始化 progress.json,正文里
     "hmos_page_map": {"MainActivity": "entry/src/main/ets/pages/Index.ets"} 只是数据值,却被全文倾向兜底

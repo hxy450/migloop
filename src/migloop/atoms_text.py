@@ -33,12 +33,25 @@ def _ref(seq: Any, t: str | None) -> str:
     return f"(#{seq} {t})" if t else f"(#{seq})"
 
 
+def _read_span(r: dict[str, Any]) -> str:
+    """一条读到底读了多少:全文快照 / 行段 / 命中 N 行(grep、head 前缀从 stdout 对账出来的)/ 范围未知。
+    0723 复跑教训:slice6-risk 对 AppFormInfoManager.ets 只 grep 过方法名,读者列表却标「全文」,
+    调查 agent 据此判「读全了仍写错」—— 不是全文的不许冒充全文。"""
+    if r.get("start") is not None and r.get("n") is not None and not r.get("full"):
+        return f"{r['start']}-{r['start'] + r['n'] - 1}行"
+    seen_n = r.get("seen_n") or len(r.get("seen") or ())
+    if seen_n:
+        return f"命中 {seen_n} 行"
+    return "全文" if r.get("full") else "范围未知"
+
+
 def _read_tags(r: dict[str, Any]) -> str:
     t = []
     if r.get("stale"):
         t.append(f"▲旧版 v{r['v']}/{r['latest_v']}")
-    if r.get("start") is not None and r.get("n") is not None and not r.get("full"):
-        t.append(f"{r['start']}-{r['start'] + r['n'] - 1}行")
+    span = _read_span(r)
+    if span != "全文":
+        t.append(span)
     if r.get("dep"):
         t.append("依赖读")
     if r.get("self_written"):
@@ -137,8 +150,7 @@ def render_file(ledger: atoms.Ledger, hint: str, v: int | None = None, root: str
     readers = [r for r in fa["readers"] if r["v"] == anchor]
     out.append(f"## 读了 @v{anchor} 的 agent(下游,{len(readers)})")
     for r in readers:
-        span = (f"{r['start']}-{r['start'] + r['n'] - 1}行" if r["start"] is not None and r["n"] is not None
-                else "全文")
+        span = _read_span(r)
         flags = ("" if r["certain"] else " · 版本就近绑定(不确定)") + (" · 依赖读" if r["dep"] else "")
         out.append(f"- {_who(ledger, r['by'], r['at'])} | {r['ts'][5:16]} {r.get('t') or ''} | {span}{flags}")
     if content:

@@ -1,0 +1,51 @@
+[
+ {
+  "chain": 4,
+  "file": "AboutUsPage.ets",
+  "treat_is_A": true,
+  "verdict": {
+   "agree": true,
+   "agree_note": "一致。主标签不同(A=「spec 写错」，B=「漏读」)，但事实分析指向同一根因：conv-aboutus 与 slice6-risk 都从未打开 AppScope/app.json5，只凭「label 即应用名」的二手表述写下 info.appInfo.label，而实际字面量是引用串 $string:app_name；两份都认定该表由 conv-aboutus 自己写入(A 的证据 4 明说是「对自己实现的事后追记」，B 的证据 5 用「读时为空→自己回填」坐实)，也都认定 slice6 只是把缺陷平移进 VM、修复方靠读 app.json5 + string.json 才定位。差别在于 A 把主标签挂在被回填的 spec 上，B 把主标签挂在漏读动作上。",
+   "a_specificity": 5,
+   "b_specificity": 5,
+   "a_consistency": 4,
+   "b_consistency": 5,
+   "conflicts": [
+    "07-24T09:51 发生了什么：A 称 AppScope/app.json5@v2 是该时刻的「实录外修改」、写者不明，并据此说 07:31 时 label 是否已是 $string:app_name 无法证实；B 称 09:51:27 是 base3-network 执行 cat AppScope/app.json5 的一次读取，读到的就是 $string:app_name(是读不是写)，并断言「正确答案 07-24 上午就在仓里」。同一时间点被判为写入 vs 读取。",
+    "修复方对 F012ViewModel.ets 的改法：A 明确列为无法确认(#16935 为 python 脚本改写，账本中该文件仍只有 v1，新正文不在账上)；B 给出具体内容(20:56:12 python 补丁将 appInfo.label 换成 resourceManager.getStringByNameSync('app_name')，并加 !label.startsWith('$') 兜底)。同一事实一方称不可核、一方称已核。",
+    "spec 在因果链中的位置：A 的证据 3 称「spec 直接开出错误处方，VM 逐字照抄」，把 spec@v2:51 当作 slice6 错值的来源；B 的证据 5/6 主张 spec 段落原本为空、由 conv-aboutus 07:33:55 回填，是下游产物，slice6 的错值直接搬自 14:21:25 读到的 AboutUsPage.ets 代码。A 自己的证据 4 又承认 spec 是事后追记、slice6「只是平移到 VM」，与其证据 3 的表述互相拉扯。",
+    "运行期症状：B 有真机 UI 树逐字返回 '$string:app_name' 及 P0 finding 原文(18:05:30/18:22:50)；A 全程只在 fixer 派发词里间接提到该 finding 名，未引用任何设备侧证据(非矛盾，但覆盖面不同)。"
+   ],
+   "preferred": "B",
+   "reason": "B 用「读时该段为空(07:23:39)」与「自己回填(07:33:55)」两个时间戳直接钉死了 spec 与代码的先后，还提供了同轮同映射的对照组(base3-network 读了 app.json5 就写对)，结论与标签完全落在证据上；A 的取证同样扎实，但把主标签定为「spec 写错」与它自己承认的「spec 是事后追记、slice6 只是平移」相冲突，且关键的 VM 修复内容它无法核实。",
+   "_cost": 0.231282
+  },
+  "preferred_method": "control",
+  "treat": {
+   "cost_usd": 1.6375885000000001,
+   "num_turns": 18,
+   "wall_s": 254.0,
+   "verdict": "spec 写错（根因：引入者与 spec 作者都漏读 AppScope/app.json5）",
+   "usage": {
+    "input": 28,
+    "cache_create": 93208,
+    "cache_read": 739569,
+    "output": 13311
+   },
+   "calls": 17
+  },
+  "control": {
+   "cost_usd": 2.5243654999999996,
+   "num_turns": 30,
+   "wall_s": 403.2,
+   "verdict": "漏读(该读没读)",
+   "usage": {
+    "input": 52,
+    "cache_create": 106211,
+    "cache_read": 1692133,
+    "output": 24567
+   },
+   "calls": 29
+  }
+ }
+]

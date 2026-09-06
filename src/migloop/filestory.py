@@ -105,6 +105,7 @@ class ReadRec:
     certain: bool             # False = 状态未知时的就近绑定
     dep: bool = False
     seen: tuple[tuple[int, str], ...] | None = None   # 看见的行(行号, 原文)
+    full: bool = False        # 读到的是全文快照;不是全文、没有行段、没有看见的行 = 范围未知,不许冒充全文
 
 
 @dataclass
@@ -284,7 +285,7 @@ def build_stories(events: list[Ev]) -> dict[str, FileStory]:
                     self_read_version = 1
                     certain = False
             st.reads.append(ReadRec(e.ts, e.seq, e.agent, self_read_version,
-                                    e.start, e.n, certain, e.dep, seen=e.seen))
+                                    e.start, e.n, certain, e.dep, seen=e.seen, full=e.full))
         else:
             raise ValueError(f"未知事件类型: {e.kind}")
     return stories

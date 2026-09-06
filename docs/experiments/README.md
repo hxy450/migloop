@@ -11,6 +11,13 @@
 - `ledger/`:工具在这个 run 上的状态快照:`status-49d451b1.json`(4 条链、8 段、修复方名片)、`sessions-49d451b1.txt`(sessions 工具原文)、`chains-49d451b1.json`、`stage-marks.json`(run 级阶段时刻,execute 结束 16:46:29)、`version_ledger.txt`(28 个修复版本逐版 diff 摘要,人工对账用)、`coverage.txt`(机械对账输出)。
 - `harness/`:`run_probe.py`(跑一组:`--run-level --template ... --raw-dir <转录目录> [--hybrid]`)、`judge_run.py`(盲评)、`coverage.py`(段 / 版本覆盖对账)、`dice_status.py`(链与段快照)、`tool_text.py`(不经模型直接调工具渲染)、`version_ledger.py`、`scope_probe.py`(链范围探针)、`show_call.py`(看某次调用原文)、`list_chains.py`、`mcp-migloop.json`(MCP 配置,指向本仓 src)。脚本里有本机绝对路径,换机器要改。
 
+## 2026-09-06-aboutuspage-three-arms/ —— 同一条链,legacy 工具 / 现在的工具 / 原始转录各 2 次
+
+- `prompts/*.as-sent.md`:三组实际发出的 prompt;`harness/prompt_template_legacy.md`(09-02 七步路径,MCP 版)、`prompt_template_A.md`(现在的工具,变体 A)、`prompt_template_raw0723.md`(09-02 对照组原话的模板版)、`mcp-legacy.json`(MCP 指到 legacy 分支)。
+- `reports/<组>-rep<k>.md`:六份报告原文。`metrics/runs.json`:费用、时间、调用序列、每工具字符。
+- `judge/`:三对盲评(现在 vs 原始、legacy vs 原始、现在 vs legacy)的 JSON 与摘要。
+- `harness/measure_tool_text.py`:同一会话同一组调用在两版代码下的文本体量对比脚本。
+
 ## 2026-09-03-per-chain/ —— 按链调查(给链坐标)
 
 - `prompt_template.md`(baseline)、`_A.md`(sessions file= + blame changed)、`_B.md`(折叠窗口,已否决)、`_raw.md`(原始组)、`_H.md`(超集组)。
