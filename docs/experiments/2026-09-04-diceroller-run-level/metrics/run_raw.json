@@ -1,0 +1,100 @@
+{
+ "label": "run_raw",
+ "model": "opus",
+ "num_turns": 44,
+ "duration_ms": 912874,
+ "wall_s": 917.0,
+ "cost_usd": 5.585483,
+ "usage": {
+  "input_tokens": 88,
+  "cache_creation_input_tokens": 189201,
+  "cache_read_input_tokens": 5027730,
+  "output_tokens": 47101,
+  "output_tokens_details": {
+   "thinking_tokens": 16555
+  },
+  "server_tool_use": {
+   "web_search_requests": 0,
+   "web_fetch_requests": 0
+  },
+  "service_tier": "standard",
+  "cache_creation": {
+   "ephemeral_1h_input_tokens": 189201,
+   "ephemeral_5m_input_tokens": 0
+  },
+  "inference_geo": "not_available",
+  "iterations": [
+   {
+    "input_tokens": 2,
+    "output_tokens": 14661,
+    "cache_read_input_tokens": 201740,
+    "cache_creation_input_tokens": 2776,
+    "cache_creation": {
+     "ephemeral_5m_input_tokens": 0,
+     "ephemeral_1h_input_tokens": 2776
+    },
+    "type": "message"
+   }
+  ],
+  "speed": "standard"
+ },
+ "tool_calls": 43,
+ "per_tool": {
+  "Bash": {
+   "n": 43,
+   "chars": 257500
+  }
+ },
+ "tool_chars": 257500,
+ "usage_from_transcript": {
+  "input": 88,
+  "cache_create": 189201,
+  "cache_read": 5027730,
+  "output": 47101
+ },
+ "call_sequence": [
+  "Bash",
+  "Bash",
+  "Bash",
+  "Bash",
+  "Bash",
+  "Bash",
+  "Bash",
+  "Bash",
+  "Bash",
+  "Bash",
+  "Bash",
+  "Bash",
+  "Bash",
+  "Bash",
+  "Bash",
+  "Bash",
+  "Bash",
+  "Bash",
+  "Bash",
+  "Bash",
+  "Bash",
+  "Bash",
+  "Bash",
+  "Bash",
+  "Bash",
+  "Bash",
+  "Bash",
+  "Bash",
+  "Bash",
+  "Bash",
+  "Bash",
+  "Bash",
+  "Bash",
+  "Bash",
+  "Bash",
+  "Bash",
+  "Bash",
+  "Bash",
+  "Bash",
+  "Bash",
+  "Bash",
+  "Bash",
+  "Bash"
+ ]
+}

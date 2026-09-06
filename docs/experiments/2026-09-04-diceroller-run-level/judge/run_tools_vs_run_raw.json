@@ -1,0 +1,158 @@
+[
+ {
+  "rep": 1,
+  "treat_is_A": true,
+  "verdict": {
+   "a_segments": [
+    "Index.ets v4–v6 | visual-fixer agent-a4874344c8fb6228d | T+4:02–4:03 — Roll 按钮运行时大写 ROLL + ButtonType.Normal/borderRadius(4)/shadow(合并为一段)",
+    "Index.ets v7 | 主会话·81e0a463 v77 直接写盘 | T+4:12 — class Dice → export class Dice",
+    "Index.ets v8–v10 | UI-T Step2 ID 注入 agent-aa1ccf93d575837a2 | T+4:42 — 注入 main_root / main_toolbar_title / main_dice_placeholder",
+    "EntryAbility.ets v4–v6 + 新建 entry/src/main/ets/test/TestDataSetup.ets | UI-T Step3 agent-a711c5d09fb676814 | T+4:50–4:51 — want 测试桥(三常量 + consumeTestWant + onNewWant)",
+    "entry/oh-package.json5 v2 | UT Step3 agent-ac20d808e5bc6be60 v8 | T+4:22 — devDependencies 补 @ohos/hypium 1.0.21",
+    "AppScope/app.json5 v4 + AppScope/resources/base/media 三件套 | agent-a87804892da9cfc8b(账本名 fix-errobserver) | T+6:52 — bundleName/vendor/icon 改写 + cp 分层图标",
+    "EntryAbility.ets v7–v9 | agent-a27497cfed8c44856(账本名 fix-uitest) | T+6:53 — errorManager 全局未捕获异常观察者",
+    "Index.ets v11(import/常量) + v18(调用点) | fix-index agent-a228e9716d833cbf3 | T+6:53 — console.error → hilog.error",
+    "Index.ets v22 + spec/placeholder-registry.md v5 | fix-index v12/v14 | T+6:53 — 占位注释去 token 化 + 注册表 location 扩到使用点(代码零改动)",
+    "Index.ets v11/v12/v13/v15/v16/v17/v19/v20/v21/v23 | fix-index | T+6:53 — 10 处注释卫生,剥离 Android/Kotlin/Material 溯源",
+    "附(不入返修链):entry/src/ohosTest/.../P0001_MainActivity_UI.test.ets v12–v20 | gate-build agent-ab171858f8e6d6a08 | T+6:52–6:54 — 6 条 TODO 注释改写",
+    "附(不入返修链):entry/src/ohosTest/ets/test/spec/F001_dice-roll.test.ets v2–v4 | agent-a7a4b445e36d5383f | T+6:52–6:54 — 删「stub 恒产 3」推测句"
+   ],
+   "b_segments": [
+    "A1 toolkit-fact-indexer/extractors/ast_index.py | 主会话(android-fact-tree)| 17:04:46 — parse(str)→parse(bytes),裸 except 吞致命错",
+    "A2 arkts-visual-verify/scripts/assert_run_success.sh | 主会话(a2h-functional-merge)| 18:24:09 — functional_checks.tested 加 .total fallback",
+    "B1 Index.ets | visual-fixer agent-a4874344c8fb6228d | 18:29:03–21 — rollLabel 运行时大写 ROLL",
+    "B2 Index.ets | 同上 | 18:29:21 — ButtonType.Normal + borderRadius(4) + shadow",
+    "C1 Index.ets | 主会话 arkts-ut-verifier | 18:39:07 — export class Dice",
+    "C2 新建 entry/src/ohosTest/ets/test/spec/F001_dice-roll.test.ets | agent-a3dee39ee51d8c82a | 18:42:22",
+    "C3 entry/src/ohosTest/ets/test/List.test.ets 两次重写 | agent-ac1d7fa32a05796ea 18:43:36 / agent-adfd3f8bcc1cfe28e 19:19:51",
+    "C4 ohosTest 基础设施整体补全(OpenHarmonyTestRunner.ets、TestAbility.ets、testability/pages/Index.ets、ohosTest/module.json5、color.json、test_pages.json、media/icon.png、oh-package.json5 hypium)| agent-ac20d808e5bc6be60 | 18:48:41–18:49:07",
+    "C5 Index.ets 注入 3 个 .id() + 新建 entry/src/main/ets/test/testable-id-manifest.md | agent-aa1ccf93d575837a2 | 19:08:28–19:09:22",
+    "C6 新建 TestDataSetup.ets + EntryAbility.ets want 测试桥 | agent-a711c5d09fb676814 | 19:17:04–19:17:35",
+    "C7 新建 entry/src/ohosTest/ets/test/ui/P0001_MainActivity_UI.test.ets(10 个 it)| agent-a711c5d09fb676814 | 19:18:38",
+    "C8 P0001 UI 用例编译修复:删 readDiceFaceText 探针、AC11/AC01/AC09/AC21/AC22/AC16 降级弱断言 | agent-a52d61ac7ab7033ba | 19:26:35–19:27:31",
+    "C9 启动通道二分诊断:TestAbility.ets 临时诊断码后回滚、ohosTest/module.json5 加 process=entry_test_host、P0001 改启动通道 | agent-a52d61ac7ab7033ba | 19:45:29–19:54:51",
+    "C10 spec/placeholder-registry.md 统计头 0→1 | 主会话 arkts-ui-verifier | 20:17:06",
+    "D build/复核阶段 20:23–21:07 | 主会话及子代理 | --psb→--pb 修正、uitest daemon 泄漏、replay_ui_cases.py(零源码改动)",
+    "E1 AppScope/app.json5 身份字段 + AppScope 分层图标三件套 cp | agent-a87804892da9cfc8b | 21:19:00–21:19:08",
+    "E2 EntryAbility.ets errorManager 全局异常观察者 | agent-a27497cfed8c44856 | 21:19:24–21:19:39",
+    "E3 Index.ets console.error → hilog.error | agent-a228e9716d833cbf3 | 21:19:36",
+    "E4 注释卫生 ~24 处:Index.ets + P0001_MainActivity_UI.test.ets + F001_dice-roll.test.ets | agent-a228e9716d833cbf3 / agent-ab171858f8e6d6a08 / agent-a7a4b445e36d5383f | 21:19:16–21:20:21(编译门 agent-a635575c78cd15ff6)",
+    "F1 spec/decision-ledger.md 新增 D-004 + 审批流水 | iteration-1/2 Generator | 21:48:24–22:02:31",
+    "F2 .ecat/agents/generator/memory/ 6 个记忆文件新建与多轮修订 | Discriminator/Generator | 21:12–22:02",
+    "F3 iteration 1→2 ΔH=0、work list 一字未变(disallowedTools 禁改评估器)| loop agent | 21:27–22:09"
+   ],
+   "only_a": [
+    "spec/placeholder-registry.md v5(fix-index v14,T+6:53,把 P-RES-TRANS-002 的 location 扩到覆盖使用点)——B 只记了 20:17 主会话那次统计头 0→1,没有这一次 ECAT 期的登记修改",
+    "把 Index.ets v22 的占位注释改写单独成段并明确「.accessibilityText($r('app.string.todo')) 代码一行未动」——B 把它并进 E4 的 ~24 处笼统计数,未区分代码/注释边界",
+    "ohosTest 两个测试文件的逐版本归属与版本区间(P0001 v12–v20 归 gate-build agent-ab171858f8e6d6a08、F001 v2–v4 归 agent-a7a4b445e36d5383f)——B 只给聚合的 E4",
+    "三个 ecat fix agent「账本显示名 ↔ 实际派发词错位」(fix-errobserver 实际改 app.json5、fix-uitest 实际改 errorManager、fix-uttest 实际做编译门)的显式更正",
+    "对不可复原项的显式标注:oh-package.json5@v2 属盲写无法复原全文、AppScope media 落盘 Bash 被标「未解析读写(变量路径)」、build-profile.json5 的 ohosTest target 无法确认"
+   ],
+   "only_b": [
+    "A1 ast_index.py 的 tree-sitter parse(str)→parse(bytes) 修复及「裸 except 把致命错吞成空树」的链路诊断",
+    "A2 assert_run_success.sh 的 tested/total schema 契约漂移假红修复",
+    "C2/C3/C7 测试文件的新建与 List.test.ets 两次重写(A 只在附录提到测试目录的注释改写)",
+    "C4 ohosTest 基础设施的逐文件清单(TestRunner/TestAbility 错版本、testability/pages/Index.ets 缺失、module.json5 引用不存在的 $media:layered_image/$media:startIcon/$color:start_window_background、color.json/test_pages.json/icon.png 新建)——A 只列了其中的 oh-package.json5 一项",
+    "C8 getAccessibilityText 不存在导致 6 条断言降级为弱断言(测试 oracle 实质性削弱)",
+    "C9 emulator 6.0.0.112 上共宿进程启动 entry 页 jscrash、module.json5 加 process=entry_test_host、CHECK-10 判 DEFERRED、ui 0/10 UNREACHABLE",
+    "C10 主会话 20:17 把 placeholder-registry 统计头 0→1",
+    "D 复核期的验证流程自身缺陷(--psb 非法旗标、uitest start-daemon 泄漏致 RET_ERR_CONNECTION_EXIST、新增 replay_ui_cases.py 等价通道 10/10 PASS、三次 build 全绿)",
+    "F1 decision-ledger.md D-004 补账与 iteration-2 复验流水",
+    "F2 .ecat generator memory 六文件的完整清单与沉淀意义",
+    "F3 iteration 1→2 ΔH=+0.0000、work list 8 条一字未变,根因是 loop agent 被 --disallowedTools 禁止编辑评估器 → 误报结构性无解",
+    "startIcon.png 实测 68 字节 1×1 灰度占位图、脚手架默认图标从未被替换",
+    "判别器各维度分数(app_identity=0.6 / crash_risk=0.125 / placeholder=1.0 / style=0.0136,其余五维全 0)与 priority_overrides 9 条全标 low",
+    "getStringSync deprecated WARN 遗留未修(verify-report CHECK-2:Index.ets:62)",
+    "CHECK-2 因 codelinter 不在本 SDK 安装路径而退化成只看 hvigor 诊断"
+   ],
+   "agree_on_shared": false,
+   "agree_note": "共同段共 9 处(Roll 按钮、export Dice、id 注入、want 测试桥、hypium 依赖、AppScope 身份/图标、errorManager、console→hilog、注释卫生+占位)。其中 8 处归因一致:export Dice / id 注入 / 测试桥三段两份都归到「生成链路无可测性契约、测试设计排在代码生成之后」(A 叫「编排顺序」、B 叫「服务层契约未纳入被测面可见性 + 模板 V1/V2 装饰器不匹配」,主标签不同但事实指向同一上游);hypium 一段都归到测试基础设施在 execute 期无人负责;AppScope 身份一段两份都锁定「派发词以不存在的 D-009 为由设硬边界 + CHECK-4 对模板默认值判 PASS」,连 worker 自己 grep 不到 D-009 仍放行这一关键细节都一致;errorManager 一段都归「Android 无对应物、照抄链天然抄不出、spec/plan 无平台必做项清单」;console→hilog 都锁定是 visual-fixer 在修复期自己引入的,不是 execute 产物;注释卫生与占位误报都归「ECAT 规则与 a2h 溯源约定互斥 + 检测器 grep 口径缺陷」,且都指出判别器/记忆文件自己已推翻部分判定。唯一实质分歧是 Roll 按钮段:A 归「page spec 全篇未提 textAllCaps/圆角/elevation(漏写) + converter 读了 themes.xml 仍只落配色(转换错)」,B 归「analyzer §3.4.3 其实记录了 textAllCaps,是 AC14 把 uiautomator 逻辑文本当显示文本写反,converter 15:50 明确看到矛盾后主动服从 AC」——B 的版本里错误 AC 是主动挡回正确实现,与 A 的「两环都没写到」在事实层面不相容。",
+   "a_specificity": 5,
+   "b_specificity": 5,
+   "a_consistency": 4,
+   "b_consistency": 5,
+   "a_rootcause": 4,
+   "b_rootcause": 5,
+   "conflicts": [
+    "Roll 大写的成因:A 称 page_0001_MainActivity.md@v3:19/27「全篇未提 textAllCaps、圆角、elevation」,converter 属「读全了仍写错」的纯转换错;B 称 analyzer 在 §3.4.3(agent-a1cdbdfd0be2dd5ff.jsonl:63,14:47:19)已写下 textAllCaps 继承 Material 样式,converter 在 agent-a349784d2663f1f0a.jsonl:61(15:50:09)逐字权衡后因 AC14 主动放弃大写。两者对「事实是否被记录」「converter 是否知情」直接矛盾。",
+    "ohosTest 基础设施来源:A 称「execute 根本没产测试基础设施,整棵 entry/src/ohosTest/ 树都是 T+4:18 之后才建的」;B 称 TestRunner/TestAbility/module.json5 在 verify 之前已存在且内容错误(写回结果为 updated 而非 created,agent-ac20d808e5bc6be60.jsonl:22),根因是 Stage 0 脚手架模板骨架残缺且自相矛盾。B 自己已标注该归因无法百分百确认。",
+    "AppScope 图标资产的性质:A 引 ECAT iteration-2 记忆(feedback_app-json5-template-defaults.md@v4)称 0.07KB 的 foreground/background 是 Android Studio 模板自适应图标、「同类等价而非占位缺口」,并称打包期已验证 4/4 引用可解析;B 实测为 68 字节 1×1 占位图(md5 e44e7ec…)、称「真图标始终没有落地」,并把 verify-report CHECK-4「md5 一致 PASS」列为无支撑证据的矛盾点。",
+    "placeholder-registry 的修改归属与时点:A 记为 fix-index v14 在 T+6:53(ECAT iteration 0)扩写 P-RES-TRANS-002 的 location;B 记为主会话 arkts-ui-verifier 在 20:17:06 把统计头 0→1、且 ECAT 期未再动该文件。两份各自缺对方那一次写入。",
+    "registry_total=0 的机制:A 归因于注册表解析正则只认单中段 P-ID、`P-RES-TRANS-002` 被静默丢弃;B 归因于 registry append 路径不维护统计头(陈旧账),且统计头 20:17 已修正为 1 后检测器仍读到 0。两种机制解释互斥(是解析器丢弃,还是数据本身已修而检测器口径另有问题)。",
+    "bundleName 是否算真缺陷:A 判定「#10/#11/#14/#15 至少一半是检测器误报」,真正有实质的只有 icon 指针切换;B 判定为「三重失守」的真实缺陷(prompt/skill/CHECK-4 三道关全放行),仅承认 iteration-1 的前缀启发式对 com.example.diceroller 是误报。对同一批 work item 的实质性判断相反。"
+   ],
+   "preferred": "B",
+   "reason": "两份坐标都可回查、共同段结论大体一致,但 B 覆盖了 A 完全缺失的整片区域(Stage 0 脚手架 ohosTest 残缺骨架、验证工具自身的 bug、getAccessibilityText 导致的断言降级与 ui 0/10 UNREACHABLE、ECAT iteration 1–2 因禁改评估器而 ΔH=0 空转),并且在 Roll 按钮这条最贵的段上给出了更上游、有 converter 原始 thinking 佐证的根因(错误 AC 主动挡回正确实现),每条根因都配了具体可落地的「该改」动作;A 在 src/main 切片上的 blame 级归属和对不可复原项的坦白更细,但把测试基础设施和验证链路整体排除在外,削弱了「管线该改哪一环」的完整性。",
+   "_cost": 0.7161095000000001
+  },
+  "preferred_method": "control",
+  "treat": {
+   "cost_usd": 5.8892145,
+   "num_turns": 74,
+   "wall_s": 761.7,
+   "usage": {
+    "input": 148,
+    "cache_create": 156145,
+    "cache_read": 6782611,
+    "output": 37357
+   },
+   "calls": 73,
+   "per_tool": {
+    "ToolSearch": {
+     "n": 1,
+     "chars": 0
+    },
+    "guide": {
+     "n": 1,
+     "chars": 2199
+    },
+    "sessions": {
+     "n": 1,
+     "chars": 3772
+    },
+    "Bash": {
+     "n": 10,
+     "chars": 19514
+    },
+    "index": {
+     "n": 8,
+     "chars": 23907
+    },
+    "file": {
+     "n": 15,
+     "chars": 34800
+    },
+    "diff": {
+     "n": 20,
+     "chars": 7824
+    },
+    "agent": {
+     "n": 13,
+     "chars": 94998
+    },
+    "blame": {
+     "n": 4,
+     "chars": 1620
+    }
+   }
+  },
+  "control": {
+   "cost_usd": 5.585483,
+   "num_turns": 44,
+   "wall_s": 917.0,
+   "usage": {
+    "input": 88,
+    "cache_create": 189201,
+    "cache_read": 5027730,
+    "output": 47101
+   },
+   "calls": 43,
+   "per_tool": {
+    "Bash": {
+     "n": 43,
+     "chars": 257500
+    }
+   }
+  }
+ }
+]

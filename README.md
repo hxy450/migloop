@@ -9,6 +9,8 @@
 - [MigLoop 设计说明](./docs/design.md)：目标、证据口径、数据结构和实现方式
 - [开发与架构指南](./docs/development.md)：目录分层、adapter 契约、测试和扩展方式
 - [MigLoop 与 CANNBot-Insight 对比](./docs/comparison-cannbot.md)：定位、能力、优缺点与演进建议
+- [返修链路调查:我们在做什么、为什么、做到了哪一步](./docs/fixchain-research.md):目的、两原子账本与 MCP 工具、数据在哪、实验与结论、决策日志、下一步(2026-09-06 起工具主干在本仓 dev/fixchain)
+- [实验产物](./docs/experiments/README.md):prompt、报告、盲评、覆盖对账、harness 脚本
 
 ## 使用(推荐:单文件 `dist/migloop-lineage.pyz`)
 

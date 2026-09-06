@@ -1,0 +1,162 @@
+{
+ "label": "run_tools",
+ "model": "opus",
+ "num_turns": 74,
+ "duration_ms": 750001,
+ "wall_s": 761.7,
+ "cost_usd": 5.8892145,
+ "usage": {
+  "input_tokens": 148,
+  "cache_creation_input_tokens": 156145,
+  "cache_read_input_tokens": 6782611,
+  "output_tokens": 37357,
+  "output_tokens_details": {
+   "thinking_tokens": 17010
+  },
+  "server_tool_use": {
+   "web_search_requests": 0,
+   "web_fetch_requests": 0
+  },
+  "service_tier": "standard",
+  "cache_creation": {
+   "ephemeral_1h_input_tokens": 156145,
+   "ephemeral_5m_input_tokens": 0
+  },
+  "inference_geo": "not_available",
+  "iterations": [
+   {
+    "input_tokens": 2,
+    "output_tokens": 10826,
+    "cache_read_input_tokens": 171426,
+    "cache_creation_input_tokens": 3218,
+    "cache_creation": {
+     "ephemeral_5m_input_tokens": 0,
+     "ephemeral_1h_input_tokens": 3218
+    },
+    "type": "message"
+   }
+  ],
+  "speed": "standard"
+ },
+ "tool_calls": 73,
+ "per_tool": {
+  "ToolSearch": {
+   "n": 1,
+   "chars": 0
+  },
+  "guide": {
+   "n": 1,
+   "chars": 2199
+  },
+  "sessions": {
+   "n": 1,
+   "chars": 3772
+  },
+  "Bash": {
+   "n": 10,
+   "chars": 19514
+  },
+  "index": {
+   "n": 8,
+   "chars": 23907
+  },
+  "file": {
+   "n": 15,
+   "chars": 34800
+  },
+  "diff": {
+   "n": 20,
+   "chars": 7824
+  },
+  "agent": {
+   "n": 13,
+   "chars": 94998
+  },
+  "blame": {
+   "n": 4,
+   "chars": 1620
+  }
+ },
+ "tool_chars": 188634,
+ "usage_from_transcript": {
+  "input": 148,
+  "cache_create": 156145,
+  "cache_read": 6782611,
+  "output": 37357
+ },
+ "call_sequence": [
+  "ToolSearch",
+  "guide",
+  "sessions",
+  "Bash",
+  "index",
+  "index",
+  "file",
+  "diff",
+  "diff",
+  "diff",
+  "diff",
+  "diff",
+  "diff",
+  "diff",
+  "diff",
+  "diff",
+  "diff",
+  "diff",
+  "diff",
+  "diff",
+  "diff",
+  "diff",
+  "diff",
+  "diff",
+  "diff",
+  "diff",
+  "diff",
+  "index",
+  "agent",
+  "file",
+  "agent",
+  "file",
+  "agent",
+  "agent",
+  "file",
+  "agent",
+  "index",
+  "index",
+  "index",
+  "file",
+  "file",
+  "file",
+  "file",
+  "agent",
+  "agent",
+  "file",
+  "file",
+  "agent",
+  "agent",
+  "agent",
+  "index",
+  "index",
+  "file",
+  "file",
+  "blame",
+  "blame",
+  "blame",
+  "blame",
+  "agent",
+  "agent",
+  "agent",
+  "Bash",
+  "Bash",
+  "Bash",
+  "Bash",
+  "Bash",
+  "Bash",
+  "Bash",
+  "Bash",
+  "Bash",
+  "file",
+  "file",
+  "file"
+ ]
+}

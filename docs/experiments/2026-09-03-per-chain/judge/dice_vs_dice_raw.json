@@ -1,0 +1,199 @@
+[
+ {
+  "chain": 0,
+  "file": "EntryAbility.ets",
+  "treat_is_A": true,
+  "verdict": {
+   "agree": true,
+   "agree_note": "一致。两份主标签都是「编排问题」,且事实分析同构:该修复是纯新增的全局异常观察者注册(import 补 errorManager + onCreate 调用 + 类尾私有方法 errorManager.on('error', observer)),而生成方派发词全文只覆盖页面转换、沉浸式安全区四层契约、F001 行为契约与 stub 规则,不含任何异常处理/崩溃可观测性条目;需求由后续 ECAT 工作单首次引入,且工作单自述「HarmonyOS 框架约束、无 Android 对应物,不要参考 Android 源码」。两份都据此判定「不是生成方漏做,而是生成时刻需求不在任务范围内」,并都以「修复方读了 SDK d.ts、生成方全程没碰」作为对照但明确否认这是检索缺陷。",
+   "a_specificity": 4,
+   "b_specificity": 5,
+   "a_consistency": 4,
+   "b_consistency": 5,
+   "conflicts": [
+    "被修行是否含「替换」语义:A 称 blame(v6, changed=True) 列出「被替换的 1 行 import」并标注「归属未知(断点后)」;B 称三处 Edit 的 old_string 都原样保留在 new_string 中,「无一行被替换语义」。同一处 import 改动被记为替换 vs 纯追加。",
+    "import 行字面的最终来源:A 断言该行来自生成方 v2 写入原文(action #2564 首行完全一致);B 追溯得更上游,称 import 行与 hilog.info(...'onCreate') 出自 DevEco 脚手架模板(生成方 Read agent-a349784d2663f1f0a.jsonl:48),生成方只是 Write 时原样沿用。A 把生成方当作字面来源,B 把生成方当作转录者。",
+    "对 @kit.AbilityKit.d.ts 的访问方式:A 记为「读了 @kit.AbilityKit.d.ts(#450,看见 46 行 import errorManager ...)」;B 记为对该文件的 grep(:35)。读取全文 vs 检索命中,取证动作不同。",
+    "对 @kit.ArkTS 路径被纠正的依据:A 说是据 @kit.AbilityKit.d.ts 第 46 行看到 errorManager 导出而改;B 说是因为 @kit.ArkTS 在本镜像 grep 零命中才改用 @kit.AbilityKit。同一结论给出两条不同的直接触发证据。",
+    "对锚点行 this.consumeTestWant(want) 的处置:B 明确归给后续写者 agent-a711c5d09fb676814.jsonl:37(19:17:21Z);A 将 v2→v5 期间 UI-T Step3 的三版写入列为「未逐版核查」,仅凭 diff 判断未触及新增区域。A 的未核查项在 B 处已闭合。"
+   ],
+   "preferred": "B",
+   "reason": "两份定性与主证据链等价,但 B 的引用可回查性更高(jsonl 行号+uuid+绝对 UTC 时间戳+带时间界的全库 grep 零命中这一可证伪断言),且把 A 明确留空的两处(锚点行归属、v2–v5 中间写入)追到了具体写者,同时 A 自身还带一处未消解的「替换 vs 纯新增」表述张力。",
+   "_cost": 0.09362050000000001
+  },
+  "preferred_method": "control",
+  "treat": {
+   "cost_usd": 0.7984344999999999,
+   "num_turns": 16,
+   "wall_s": 146.6,
+   "verdict": "编排问题(生成侧从未被要求做全局异常观察者,规格与派发词都没有这一项)",
+   "usage": {
+    "input": 20,
+    "cache_create": 41823,
+    "cache_read": 342453,
+    "output": 8237
+   },
+   "calls": 15
+  },
+  "control": {
+   "cost_usd": 1.1501249999999998,
+   "num_turns": 22,
+   "wall_s": 268.9,
+   "verdict": "编排问题",
+   "usage": {
+    "input": 28,
+    "cache_create": 48295,
+    "cache_read": 558354,
+    "output": 15419
+   },
+   "calls": 21
+  }
+ },
+ {
+  "chain": 1,
+  "file": "Index.ets",
+  "treat_is_A": true,
+  "verdict": {
+   "agree": true,
+   "agree_note": "两份主标签都是「编排问题」，且事实骨架高度重合：①修复只动注释文本 + 一处 console.error→hilog，被判违规的 .accessibilityText($r('app.string.todo')) 一字未改，真正落地的是 placeholder-registry；②被点名的『首屏占位/TODO 锚点』注释出自 ID 注入环节（A 记为「UI-T Step2 ID 注入@v10」，B 记为 agent-aa1ccf93d575837a2），不是生成方；③Material/console.error 那几处出自另一个中途 agent（A：「修 round-1 视觉差异」，B：agent-a4874344c8fb6228d），只是命名口径不同；④两份都认定『注释里不许留 Android/Kotlin/Material 溯源、不许出现 TODO/占位』这条规则在生成期不存在，首次出现在修复方自己的派发词里——即缺陷来自约束集在时间上后置下发，而非执行方失误。定性与因果链一致。",
+   "a_specificity": 4,
+   "b_specificity": 5,
+   "a_consistency": 4,
+   "b_consistency": 4,
+   "conflicts": [
+    "生成方是否通读 Android 源码：A 明确写『生成方是否读过 MainActivity.kt / activity_main.xml 全文无法确认（#2507–#2514 的 Read 未绑定文件）』，B 则断言『它也读全了 MainActivity.kt 与 activity_main.xml（agent-a349784d2663f1f0a.jsonl L33/L35）』。同一事实一方判为不可核实、一方给出锚点确认。",
+    "缺陷是怎么被提出来的：A 说触发点是主会话·2f01bcdc #365（T+6:49）读 Index.ets@v10 时看见 MainActivity.kt 溯源注释、临时把『注释卫生』塞进 work list；B 说 work list 头部写着 `Discriminator output could not be parsed`、条目是 fallback 的 TODO/占位 token 扫描产物。两种生成机制互不提及、未被对方证据覆盖。",
+    "非生成方注释条目的清点对不上：A 把 v14/v17/v23 记为 Material textAllCaps（一处）、Material Widget.MaterialComponents.Button、strings.xml:3；B 记为 textAllCaps 两处 + Material Widget…Button 一处，清单里没有 strings.xml:3 这一项。",
+    "归属推定的可靠性自述冲突：A 承认 v4–v10 内容未知、blame changed=True 返回『归属未知（断点后）』、v13/v16 等行归入 v2 是由 v2→v3 diff 上下文行推定；B 对同一区间的行级归属给出唯一记录行、uuid 与绝对时间戳（如 15:52:02.314Z / 19:08:41.246Z / 18:29:03–18:29:21Z），不存在断点。"
+   ],
+   "preferred": "B",
+   "reason": "结论相同，但 B 的每条关键事实都锚到唯一 jsonl 行号、uuid 与绝对时间戳并直引原始 Write 全文，可逐条回查；A 的核心归属自承是跨 v4–v10 未知区间的 diff 推定，却仍给出「高」置信，可核验强度弱一档。",
+   "_cost": 0.175668
+  },
+  "preferred_method": "control",
+  "treat": {
+   "cost_usd": 0.900452,
+   "num_turns": 12,
+   "wall_s": 157.1,
+   "verdict": "编排问题",
+   "usage": {
+    "input": 20,
+    "cache_create": 47836,
+    "cache_read": 374636,
+    "output": 9269
+   },
+   "calls": 11
+  },
+  "control": {
+   "cost_usd": 1.1522985000000001,
+   "num_turns": 19,
+   "wall_s": 285.8,
+   "verdict": "编排问题",
+   "usage": {
+    "input": 28,
+    "cache_create": 44111,
+    "cache_read": 565169,
+    "output": 17044
+   },
+   "calls": 18
+  }
+ },
+ {
+  "chain": 2,
+  "file": "F001_dice-roll.test.ets",
+  "treat_is_A": false,
+  "verdict": {
+   "agree": true,
+   "agree_note": "事实分析基本同源:两份都认定被修的三行注释由生成方 agent-a3dee39ee51d8c82a 在首次写入时引入(A 称 Write@18:42:22,B 称 v1,且都说明此前无第三方写者),都认定 'stub' 措辞来自 test-case-template.md 的自审/示例口径,都确认生成方全文读过 Index.ets 并看到真实实装,都确认生成方派发词只禁『占位断言』而无禁词规则、禁词规则只在两小时后的 ECAT/修复派发词中首次出现,也都确认修复是纯措辞、断言/采样次数/it 名/import 零改动。主标签不同:A 记为『转换错(读全了仍写错)』把责任落在生成方的落笔转换,B 记为『编排问题』把责任落在模板教用词、规则下游才出现且从未回灌;但两者的证据条目几乎一一对应,A 的证据 4/5 本身就是 B 的编排论据,属同一类根因的不同切面。",
+   "a_specificity": 5,
+   "b_specificity": 4,
+   "a_consistency": 4,
+   "b_consistency": 4,
+   "conflicts": [
+    "对同一注释性质的判断相反:A 称生成方『读全了设计文档与源码仍写出与自己全 GREEN、无 stub 结论相矛盾的注释』(即注释本身是错的);B 明确称『生成方并非误判实装……注释是反事实假设而非 stale 描述』(即注释内容不算错,错的是下游禁词门)。",
+    "Index.ets 真实实装的行号不一致:A 引修复方派发词记为 18-20 行,B 记为『看见 17-20 行真实实现』。",
+    "对修复方读取记录的掌握不一致(非直接矛盾但结论强度冲突):A 明确列出修复方读了 F001 测试文件(:22)与 Index.ets(:24),据此断言『信息面上两边一样』;B 则称 fix-identity 的 #509/#510 两次 Read 目标未解析、未展开核实,却仍下了『修复方读的是主会话转交的已核实事实』的判断。",
+    "对 v3 改写是否严格等价的表述有出入:B 自称『语义一字不改』,但其所列 v3 由 `stub 产出 undefined/NaN/0/7` 改为 `产出越界值或 NaN/undefined`,具体取值 0/7 被泛化;A 只说『不动逻辑、断言原样』,未主张语义逐字等价。"
+   ],
+   "preferred": "A",
+   "reason": "A 的引用可回查性更强(绝对 UTC 时间戳、uuid、jsonl 行号、stage-marks 分段、全量写入扫描闭环,并解析了 B 未能解析的修复方读取目标),尽管其『转换错』主标签比 B 的『编排问题』更可争议,而 B 的模板行号(§3:193、§2.6:168/172)是 A 缺失的少数增量。",
+   "_cost": 0.1275945
+  },
+  "preferred_method": "control",
+  "treat": {
+   "cost_usd": 0.692216,
+   "num_turns": 18,
+   "wall_s": 124.1,
+   "verdict": "编排问题",
+   "usage": {
+    "input": 16,
+    "cache_create": 38092,
+    "cache_read": 238756,
+    "output": 7555
+   },
+   "calls": 17
+  },
+  "control": {
+   "cost_usd": 1.141365,
+   "num_turns": 21,
+   "wall_s": 269.2,
+   "verdict": "转换错(读全了仍写错)",
+   "usage": {
+    "input": 34,
+    "cache_create": 45808,
+    "cache_read": 647324,
+    "output": 14282
+   },
+   "calls": 20
+  }
+ },
+ {
+  "chain": 3,
+  "file": "P0001_MainActivity_UI.test.ets",
+  "treat_is_A": true,
+  "verdict": {
+   "agree": true,
+   "agree_note": "两份主标签完全相同,都定性为「编排问题」,且事实链指向同一根因:修复全部为注释改写、零代码改动;被改注释在生成时是对 spec/manifest 中 oracle 值(todo='TODO')与 Android 溯源的忠实转写;「注释不得出现大写 TODO / 剥离 Android 措辞」这类规则在生成方派发词里根本不存在,只在 ECAT 检测阶段与 fixer 派发词中才出现,属于事后追加规则回溯性判旧注释违规。两者也都认定修复方读取更少/未补读 spec,差距在派发词而非能力。分歧只在支撑机制的侧重:A 额外论证检测器正则误报与「禁改 spec/」导致引入者结构性无法补登记位;B 额外论证被改每一行都能在生成方全文读过的 spec/manifest 找到同源原句,以及上游 spec 写者派发词同样零规则。这属于互补而非定性不一致。",
+   "a_specificity": 4,
+   "b_specificity": 5,
+   "a_consistency": 4,
+   "b_consistency": 5,
+   "conflicts": [
+    "被修行来源的计数与归属不一致:A 称 a711c5d09fb676814 贡献 7 行、a52d1ac7ab7033ba 贡献 4 行(合计 11);B 称 9 处修改中 6 条源自 a711 首次 Write、3 条源自 a52d(合计 9)。",
+    "对修复方读取行为的描述不一致:A 称 #541/#558/#567 三条记录「全是写前读」目标测试文件,并断言「引入者和修复方的读取集差距为零」;B 记录修复方为 1 次 Read(行 23)+ 3 次 grep/git diff 自检(行 45/49/78),并明确修复方读得更少——因为引入方完整读过 spec(13597 字符)、manifest 与模板(19387 字符)。「差距为零」与 B 的记录相矛盾。",
+    "触发条目数不一致:A 称 fixer 派发词 work list 为 6 条 Unregistered placeholder 命中;B 称记录中该判据字符串出现 13 处且命中对象正是这些注释行。",
+    "对「注释卫生/Android 措辞」条款来源的描述略有出入:A 称其「不在 work list 里」、是 fixer 派发词额外追加;B 称 ECAT 判据命中的即这些注释行、fixer 派发词中有点名三条 Android 措辞的「注释卫生(强制)」段落——是否属于同一份 work list 两报告口径不同。"
+   ],
+   "preferred": "B",
+   "reason": "B 的每条证据都锚定到可回查的一手记录(jsonl 文件路径+行号+uuid+绝对时间戳、spec/manifest 具体行号的同源句对照、模板中关键词出现次数为 0),且未出现超出证据的断言;A 虽定性相同并补充了检测器误报机制,但存在「读取集差距为零」「结构性地无法补登记位」这类与其自述未核实内容相抵触的推断。",
+   "_cost": 0.1184425
+  },
+  "preferred_method": "control",
+  "treat": {
+   "cost_usd": 1.103648,
+   "num_turns": 15,
+   "wall_s": 186.7,
+   "verdict": "编排问题",
+   "usage": {
+    "input": 30,
+    "cache_create": 51953,
+    "cache_read": 633002,
+    "output": 10579
+   },
+   "calls": 14
+  },
+  "control": {
+   "cost_usd": 1.0761525,
+   "num_turns": 20,
+   "wall_s": 255.5,
+   "verdict": "编排问题",
+   "usage": {
+    "input": 28,
+    "cache_create": 42647,
+    "cache_read": 562385,
+    "output": 14638
+   },
+   "calls": 19
+  }
+ }
+]

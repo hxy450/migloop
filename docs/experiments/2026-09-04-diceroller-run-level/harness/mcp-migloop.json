@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "migloop": {
+      "command": "C:/Users/hongy/projects/migbot-elite/.venv/Scripts/python.exe",
+      "args": ["-m", "migloop.mcp_server"],
+      "env": {
+        "PYTHONPATH": "C:/Users/hongy/projects/migloop/src",
+        "PYTHONIOENCODING": "utf-8",
+        "PYTHONUTF8": "1"
+      }
+    }
+  }
+}

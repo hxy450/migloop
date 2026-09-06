@@ -1,0 +1,36 @@
+
+## AppScope\app.json5  (rework, 修复版本 1 个)
+  v4   T+6:52   fix-identity             native    - "bundleName": "com.example.myapplication", | - "vendor": "example", | + "bundleName": "com.example.diceroller", …(+3 行)
+
+## entry\oh-package.json5  (template, 修复版本 1 个)
+  v2   T+4:22   UT Step3 编译跑测出报告         native    - "devDependencies": {} | + "devDependencies": { | + "@ohos/hypium": "1.0.21" …(+1 行)
+
+## entry\src\main\ets\entryability\EntryAbility.ets  (rework, 修复版本 6 个)
+  v4   T+4:50   UI-T Step3 生成 P0001 测试   native    +import { TestDataSetup } from '../test/TestDataSetup'; | +// UI 测试桥键（arkts-ui-verifier step3，设计 §F；非业务键，仅测试 want 场景有意义） | +const TEST_MODE_KEY: string = '__TEST_MODE__'; …(+3 行)
+  v5   T+4:51   UI-T Step3 生成 P0001 测试   native    + // UI 测试桥（模板 §6.1）：want 测试参数 → AppStorage 桥键 + mock 数据注入 | + this.consumeTestWant(want); | + onNewWant(want: Want, launchParam: AbilityConstant.LaunchParam): void { …(+4 行)
+  v6   T+4:51   UI-T Step3 生成 P0001 测试   native    + /** | + * UI 测试桥（arkts-ui-verifier step3，设计 §F）： | + * 读 want 测试参数写 AppStorage 桥键（__TEST_MODE__ / __TARGET_PAGE__）。 …(+23 行)
+  v7   T+6:53   fix-errobserver          native    -import { UIAbility, AbilityConstant, Want } from '@kit.AbilityKit'; | +import { UIAbility, AbilityConstant, Want, errorManager } from '@kit.AbilityKit';
+  v8   T+6:53   fix-errobserver          native    + // 全局未捕获异常观察者：尽早注册，覆盖后续全部生命周期（HarmonyOS 框架能力，无 Android 对应物） | + this.registerGlobalErrorObserver();
+  v9   T+6:53   fix-errobserver          native    + /** | + * 全局未捕获异常观察者（HarmonyOS 框架约束，无 Android 对应物）： | + * errorManager.on('error') 注册进程级观察者，未捕获异常杀死进程前落 hilog， …(+14 行)
+
+## entry\src\main\ets\pages\Index.ets  (rework, 修复版本 20 个)
+  v4   T+4:02   修 round-1 视觉差异           native    + // Roll 按钮文案：Material textAllCaps=true 的运行时等价形态。 | + // Android 源串 strings.xml:3 仍为 "Roll"，由主题在渲染层转大写显示 "ROLL"； | + // 这里同样保持资源串单一事实源，aboutToAppear 运行时取串后 toUpperCase（失败时兜底即目标形态并 fail loud） …(+1 行)
+  v5   T+4:02   修 round-1 视觉差异           native    + // Material textAllCaps 运行时转换等价物：取 app.string.roll 资源串（"Roll"）后大写， | + // 与 Android 主题对 Button 文本的渲染层大写形态一致；资源串本身不改（忠实复刻 C12） | + aboutToAppear(): void { …(+9 行)
+  v6   T+4:03   修 round-1 视觉差异           native    - Button($r('app.string.roll')) | + // 形态溯源（Material Widget.MaterialComponents.Button 默认）： | + // textAllCaps 渲染大写（rollLabel，见 aboutToAppear）+ 4dp 小圆角矩形（Normal+borderRadius 4，非 ArkUI 默认 Capsule） …(+5 行)
+  v7   T+4:12   主会话·81e0a463             native    -class Dice { | +// export 仅为 arkxtest 单测可见性放宽（arkts-ut-verifier Step1 设计决定）；不抽独立文件——spec 服务层契约「内聚 Index.ets」 | +export class Dice {
+  v8   T+4:42   UI-T Step2 ID 注入         native    + // UI 测试锚点：页面根 landmark（A8，id-inject §1） | + .id('main_root')
+  v9   T+4:42   UI-T Step2 ID 注入         native    + // UI 测试锚点：标题栏文本（A2，id-inject §1） | + .id('main_toolbar_title')
+  v10  T+4:42   UI-T Step2 ID 注入         native    + // UI 测试锚点：首屏占位（A2 变体，承载 accessibilityText='TODO' 断言锚，id-inject §1） | + .id('main_dice_placeholder')
+  v11  T+6:53   fix-index                native    -// 结构溯源: app/src/main/res/layout/activity_main.xml + Theme.DiceRoller（DarkActionBar 变体） | -// 行为溯源: app/src/main/java/com/example/diceroller/MainActivity.kt（spec/baseline/features/F001-dice-roll.md） | -// 页面溯源: spec/baseline/ui-snapshots/page_0001_MainActivity（view.xml 为合成版，尺寸取自源布局） …(+6 行)
+  v12  T+6:53   fix-index                native    -/** Android 端同文件内聚的领域类：Dice(6).roll() → [1, numSides] 均匀随机整数（F001） */ | +/** 同文件内聚的领域类：Dice(6).roll() → [1, numSides] 均匀随机整数（F001） */
+  v13  T+6:53   fix-index                native    - /** Kotlin (1..numSides).random() 的行为等价换算：Math.random() ∈ [0,1) → floor(r*n)+1 ∈ [1,n] 闭区间 */ | + /** 均匀随机整数的行为等价换算：Math.random() ∈ [0,1) → floor(r*n)+1 ∈ [1,n] 闭区间 */
+  v14  T+6:53   fix-index                native    - // Roll 按钮文案：Material textAllCaps=true 的运行时等价形态。 | - // Android 源串 strings.xml:3 仍为 "Roll"，由主题在渲染层转大写显示 "ROLL"； | - // 这里同样保持资源串单一事实源，aboutToAppear 运行时取串后 toUpperCase（失败时兜底即目标形态并 fail loud） …(+3 行)
+  v15  T+6:53   fix-index                native    - // 6 面逐键查表（F001-AC03..AC08）：穷举 6 键、不落 else 通配，对应 Kotlin when (diceRoll) 各分支 | + // 6 面逐键查表（F001-AC03..AC08）：穷举 6 键、不落 else 通配，逐点数分支映射骰面资源
+  v16  T+6:53   fix-index                native    - // Android rollDice() 等价：每次点击无条件刷新（AC21，无"相同则跳过"短路）； | + // 掷骰触发：每次点击无条件刷新点数（AC21，无"相同则跳过"短路）；
+  v17  T+6:53   fix-index                native    - // Material textAllCaps 运行时转换等价物：取 app.string.roll 资源串（"Roll"）后大写， | - // 与 Android 主题对 Button 文本的渲染层大写形态一致；资源串本身不改（忠实复刻 C12） | + // 渲染层大写的运行时转换等价物：取 app.string.roll 资源串（"Roll"）后大写， …(+1 行)
+  v18  T+6:53   fix-index                native    - console.error(`Index rollLabel uppercase failed: ${JSON.stringify(err)}`) | + hilog.error(DOMAIN, TAG, 'rollLabel uppercase failed: %{public}s', JSON.stringify(err))
+  v19  T+6:53   fix-index                native    - // 全屏前景列：自身背景 = colorPrimaryVariant（Android statusBarColor 的透出区，AC18）， | + // 全屏前景列：自身背景 = colorPrimaryVariant（沉浸式状态下状态栏透出区，AC18），
+  v20  T+6:53   fix-index                native    - // 自绘标题栏（Theme.DarkActionBar 等价，AC23）：56vp + colorPrimary 底 + on_primary 标题（DayNight 自动切换） | + // 自绘标题栏（深色标题栏主题等价形态，AC23）：56vp + colorPrimary 底 + on_primary 标题（DayNight 自动切换）
+  v21  T+6:53   fix-index                native    - // 内容区：ConstraintLayout → RelativeContainer（约束 1:1 还原： | - // 骰子图 top+bottom 双锚容器居中；Button 锚骰子图 Bottom + marginTop 16、水平居中） | + // 内容区：RelativeContainer 约束 1:1 还原： …(+1 行)
+  v22  T+6:53   fix-index                native    - // UI 测试锚点：首屏占位（A2 变体，承载 accessibilityText='TODO' 断言锚，id-inject §1） | + // UI 测试锚点：未掷态骰面槽（A2 变体，accessibilityText 绑 string.json:todo，id-inject §1；D-002 忠实复刻）
+  v23  T+6:53   fix-index                native    - // 形态溯源（Material Widget.MaterialComponents.Button 默认）： | + // 形态溯源（标准实体按钮默认形态）：

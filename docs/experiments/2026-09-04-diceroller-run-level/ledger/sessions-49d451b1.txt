@@ -1,0 +1,64 @@
+# 返修链(4)
+前序会话: 1d2ef418, a329e202, 70f369a3, 1f681af9, 2f01bcdc, 257fed22, 332534c3, 593d4e86, 39f11a1e, efdc8b71, 93b416e6, 5bee19c2, 109f17ad, 78b5856c, 81e0a463, aab6a114 · 跨会话链 3
+- AppScope/app.json5 | 生成方 Stage 0b 应用身份落地(a2h-execute) id=agent-a39c5351955d3cd6b | 修复方 Fix app.json5 template identity(ecat-refine) id=agent-a87804892da9cfc8b | 生成于 T+1:09 · 修复于 T+6:52 | 生成于会话 81e0a463 | 修复于前序会话 2f01bcdc(回合内返修)
+  行级归属: 断点后归属未知 3 行
+  修复方(按先后): Fix app.json5 template identity 文件v4 @T+6:52
+  修因(Fix app.json5 template identity): 改动面确认：本次任务仅触碰 `AppScope/app.json5` + AppScope media 三件新增文件；git 里 entry 下的 3 个文件改动（EntryAbility.ets / Index.ets / P0001 测试）是并行任务的既有改动，我未触碰（详汇报末尾“需暴露事项”）。
+
+---
+
+# 汇报 — ECAT iteration 0：App 身份修复（skill: arkts-app-identity）
+
+## 一、Work list 逐条结果
+
+| # | 项目 | 结果 | 说明 |
+|---|------|------
+- entry/oh-package.json5 | 生成期未改 · 模板/外部原样(问:为什么生成期没改它) | 修复方 UT Step3 编译跑测出报告(arkts-visual-verify) id=agent-ac20d808e5bc6be60 | 修复于 T+4:22 | 修复于前序会话 81e0a463(回合内返修)
+  行级归属: 生成期未改动的模板/外部文件,无生成侧写者
+  修复方(按先后): UT Step3 编译跑测出报告 文件v2 @T+4:22
+  修因(UT Step3 编译跑测出报告): 全部完成。自检 ALL_PASS，无 BLOCKERS。
+
+```
+BUILD: SUCCESSFUL（主 HAP + 测试 HAP 首轮双过，0 修复轮）
+RAW: Tests run=3 Pass=3 Failure=0 Error=0 Ignore=0
+COVERAGE: 100%（UT 域 1/1 AC=AC02；22 条按 ut-design 判归 visual/ui/static 域不计分母）   PASS_RATE: 100%（3/3 GREEN）
+TOP_RED: 无（3/3 全 GREEN）
+REPORT: spec/test/ut-r
+- entry/src/main/ets/entryability/EntryAbility.ets | 生成方 Stage 1 转换 page_0001(a2h-execute) id=agent-a349784d2663f1f0a | 修复方 UI-T Step3 生成 P0001 测试(arkts-visual-verify) id=agent-a711c5d09fb676814 | 生成于 T+1:25 · 修复于 T+4:50 | 生成于会话 81e0a463 | 修复于前序会话 81e0a463(回合内返修)
+  行级归属: 纯新增 60 行、断点后归属未知 1 行
+  修复方(按先后): UI-T Step3 生成 P0001 测试 文件v4-6 @T+4:50 · Add global error observer 文件v7-9 @T+6:53
+  修因(UI-T Step3 生成 P0001 测试): 全部核验通过。收尾报告：
+
+```
+MODE: generate
+PAGE_SCOPE: P0001
+GENERATED_FILES:
+  - entry/src/ohosTest/ets/test/ui/P0001_MainActivity_UI.test.ets
+SRC_FILES_MODIFIED:
+  - entry/src/main/ets/entryability/EntryAbility.ets（仅追加：import TestDataSetup + 3 个桥常量 +
+    onCreate 末行调 consumeTestWant + 新增
+  修因(Add global error observer): ## DONE — 全局未捕获异常观察者已注册
+
+### 修改文件
+`/private/tmp/claude-502/-Users-fengyi-Workspace-migbot-set-hmigbot-plus/12b07daf-a671-4616-96a1-c214864ee609/scratchpad/dice-hmos/entry/src/main/ets/entryability/EntryAbility.ets`（唯一改动文件，+20 行）
+
+### 新增代码块
+
+import（合并进既有 `@kit.AbilityKit` 行，未新增独立 
+- entry/src/main/ets/pages/Index.ets | 生成方 Stage 1 转换 page_0001(a2h-execute) id=agent-a349784d2663f1f0a | 修复方 修 round-1 视觉差异(arkts-visual-verify) id=agent-a4874344c8fb6228d | 生成于 T+1:25 · 修复于 T+4:02 | 生成于会话 81e0a463 | 修复于前序会话 81e0a463(回合内返修)
+  被修 51 行 · 原作者 Stage 1 转换 page_0001(13行, id=agent-a349784d2663f1f0a)、修 round-1 视觉差异(7行, id=agent-a4874344c8fb6228d)、UI-T Step2 ID 注入(1行, id=agent-aa1ccf93d575837a2) · 其它 {'insert': 30}
+  修复方(按先后): 修 round-1 视觉差异 文件v4-6 @T+4:02 · 主会话(编排/直接写盘) · arkts-visual-verify 文件v7 @T+4:12 · UI-T Step2 ID 注入 文件v8-10 @T+4:42 · Fix Index.ets placeholder flags 文件v11-23 @T+6:53
+  修因(修 round-1 视觉差异): 自检全部通过。Round 1 修复完成，返回结构化结果。
+
+## 修复摘要
+
+**诊断（三层证据）**：sbs 双端图确认左 Android=“ROLL” 全大写 + Material 小圆角矩形 + 下缘淡投影，右 HMOS=“Roll” 原样 + Capsule 胶囊无投影。Android 源 `themes.xml` parent=`Theme.MaterialComponents.DayNight.DarkActionBar`（material 1.4.0）→ 无 style Button 走 `Widget.MaterialComponents
+  修因(UI-T Step2 ID 注入): 全部完成。最终核验：Index.ets 仅新增 3 条 `.id()` 链式行 + 3 行注释，未触碰任何既有逻辑/样式行；manifest 7 个段全部落盘。
+
+```
+PAGE_SCOPE: P0001
+ID_INJECTIONS:
+  P0001: 3   （main_root:148 / main_toolbar_title:78 / main_dice_placeholder:103，行号为注入后 grep 实测）
+ID_NOT_INJECTED:
+  P0001: ["imageView:109（既有，Android @id/imageVie
+  修因(Fix Index.ets placeholder flags): API Error: Connection lost mid-response. The response above may be incomplete.

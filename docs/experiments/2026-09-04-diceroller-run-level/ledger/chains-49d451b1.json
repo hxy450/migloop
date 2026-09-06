@@ -1,0 +1,150 @@
+{
+ "sid": "49d451b1",
+ "cwd": "/private/tmp/claude-502/-Users-fengyi-Workspace-migbot-set-hmigbot-plus/12b07daf-a671-4616-96a1-c214864ee609/scratchpad/dice-hmos",
+ "cross": {
+  "priors": [
+   "1d2ef418",
+   "a329e202",
+   "70f369a3",
+   "1f681af9",
+   "2f01bcdc",
+   "257fed22",
+   "332534c3",
+   "593d4e86",
+   "39f11a1e",
+   "efdc8b71",
+   "93b416e6",
+   "5bee19c2",
+   "109f17ad",
+   "78b5856c",
+   "81e0a463",
+   "aab6a114"
+  ],
+  "n_cross": 3
+ },
+ "t0": "2026-09-03T14:26:14.856Z",
+ "chains": [
+  {
+   "i": 0,
+   "file": "app.json5",
+   "file_abs": "/private/tmp/claude-502/-Users-fengyi-Workspace-migbot-set-hmigbot-plus/12b07daf-a671-4616-96a1-c214864ee609/scratchpad/dice-hmos/AppScope/app.json5",
+   "gen_id": "agent-a39c5351955d3cd6b",
+   "gen_desc": "Stage 0b 应用身份落地",
+   "gen_stage": "a2h-execute",
+   "fix_id": "agent-a87804892da9cfc8b",
+   "fix_desc": "Fix app.json5 template identity",
+   "fix_stage": "ecat-refine",
+   "fix_versions": [
+    4
+   ],
+   "lines": null,
+   "gen_session": "81e0a463",
+   "fix_session": "2f01bcdc",
+   "n_fixers": 1,
+   "reason": ""
+  },
+  {
+   "i": 1,
+   "file": "oh-package.json5",
+   "file_abs": "/private/tmp/claude-502/-Users-fengyi-Workspace-migbot-set-hmigbot-plus/12b07daf-a671-4616-96a1-c214864ee609/scratchpad/dice-hmos/entry/oh-package.json5",
+   "gen_id": null,
+   "gen_desc": "生成期未改(模板/外部原样)",
+   "gen_stage": null,
+   "fix_id": "agent-ac20d808e5bc6be60",
+   "fix_desc": "UT Step3 编译跑测出报告",
+   "fix_stage": "arkts-visual-verify",
+   "fix_versions": [
+    2
+   ],
+   "lines": null,
+   "gen_session": null,
+   "fix_session": "81e0a463",
+   "n_fixers": 1,
+   "reason": ""
+  },
+  {
+   "i": 2,
+   "file": "EntryAbility.ets",
+   "file_abs": "/private/tmp/claude-502/-Users-fengyi-Workspace-migbot-set-hmigbot-plus/12b07daf-a671-4616-96a1-c214864ee609/scratchpad/dice-hmos/entry/src/main/ets/entryability/EntryAbility.ets",
+   "gen_id": "agent-a349784d2663f1f0a",
+   "gen_desc": "Stage 1 转换 page_0001",
+   "gen_stage": "a2h-execute",
+   "fix_id": "agent-a711c5d09fb676814",
+   "fix_desc": "UI-T Step3 生成 P0001 测试",
+   "fix_stage": "arkts-visual-verify",
+   "fix_versions": [
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+   ],
+   "lines": null,
+   "gen_session": "81e0a463",
+   "fix_session": "81e0a463",
+   "n_fixers": 2,
+   "reason": ""
+  },
+  {
+   "i": 3,
+   "file": "Index.ets",
+   "file_abs": "/private/tmp/claude-502/-Users-fengyi-Workspace-migbot-set-hmigbot-plus/12b07daf-a671-4616-96a1-c214864ee609/scratchpad/dice-hmos/entry/src/main/ets/pages/Index.ets",
+   "gen_id": "agent-a349784d2663f1f0a",
+   "gen_desc": "Stage 1 转换 page_0001",
+   "gen_stage": "a2h-execute",
+   "fix_id": "agent-a4874344c8fb6228d",
+   "fix_desc": "修 round-1 视觉差异",
+   "fix_stage": "arkts-visual-verify",
+   "fix_versions": [
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23
+   ],
+   "lines": {
+    "touched": 51,
+    "from": [
+     {
+      "id": "agent-a349784d2663f1f0a",
+      "desc": "Stage 1 转换 page_0001",
+      "n": 13
+     },
+     {
+      "id": "agent-a4874344c8fb6228d",
+      "desc": "修 round-1 视觉差异",
+      "n": 7
+     },
+     {
+      "id": "agent-aa1ccf93d575837a2",
+      "desc": "UI-T Step2 ID 注入",
+      "n": 1
+     }
+    ],
+    "other": {
+     "insert": 30
+    }
+   },
+   "gen_session": "81e0a463",
+   "fix_session": "81e0a463",
+   "n_fixers": 4,
+   "reason": ""
+  }
+ ]
+}

@@ -1,0 +1,199 @@
+[
+ {
+  "chain": 0,
+  "file": "EntryAbility.ets",
+  "treat_is_A": true,
+  "verdict": {
+   "agree": true,
+   "agree_note": "一致。两份主标签同为「编排问题」,事实分析也同构:修复为纯增量(补 import + onCreate 插桩 + 类尾 registerGlobalErrorObserver),无被改错的行可归责;`errorManager` 在全实录最早出现于 2026-09-03T21:07:47.178Z 的 ECAT 工作单注入(257fed22...jsonl:1, queue-operation),晚于生成方写 EntryAbility 约 5 小时 16 分(A 记 T+1:25→T+6:41,B 记 15:51:35Z→21:07:47Z,两者时间差吻合);生成方派发词全文无任何异常/崩溃可观测性要求;工作单原文自称「HarmonyOS 框架约束、无 Android 对应物、不要参考 Android 源码」,故排除「源码没读全/转换错」。结论同为:需求缺席于生成期的编排,而非任何人写错。",
+   "a_specificity": 4,
+   "b_specificity": 5,
+   "a_consistency": 4,
+   "b_consistency": 5,
+   "conflicts": [
+    "import 行的归属:A 记为「断点后归属未知」,来自 v1(内容未知)/v2(实录外修改),账本里没有引入者;B 直接追到 DevEco 脚手架模板(生成方 Read 结果 agent-a349784d2663f1f0a.jsonl:48 第 1 行),并由生成方 Write 原样沿用(同文件:71, uuid 37dd40dd, 15:51:35Z)。",
+    "是否存在被替换行:A 称 v7 替换了 1 行(blame@v7 changed=True,「唯一被替换的 1 行是 v6 行 1 的 import」);B 称三次 Edit 的 old_string 都原样保留在 new_string 里,「无一行被替换语义」,即替换 0 行。",
+    "脚手架/模板的可得性:A 在「无法确认」里称 EntryAbility.ets@v6 注释引用的「模板 §6.1/§6.2」不在生成方读取集、账本无该版本条目,并称若存在则定性可能转向「spec 漏写」;B 则称生成方读过既有 EntryAbility 脚手架(agent-a349784d2663f1f0a.jsonl:47)并照抄了生命周期骨架。二者可能指不同物件,但对「生成方是否见过 EntryAbility 模板类来源」的表述相反。",
+    "修复方读 @kit.AbilityKit.d.ts 的方式:A 记为一条读取记录(#476)并看到第 46 行 `import errorManager from '@ohos.app.ability.errorManager';`;B 记为 grep(:35)。属轻微记述冲突。",
+    "修复方 v2/v3 的输入可见性:A 称修复方两版「没有绑定任何读记录,即时输入不可见」;B 则给出修复方在同一 agent 转录内的 d.ts 读取(:29/:35/:37)与产出说明(:58, 21:20:35Z),不存在输入不可见的缺口。"
+   ],
+   "preferred": "B",
+   "reason": "两份定性与关键时间线互证,但 B 的每条断言都锚到 jsonl 行号+uuid+时间戳,并把 A 留作「归属未知」的那行 import 实际追到脚手架来源与生成方 Write,未闭合项更少。",
+   "_cost": 0.186312
+  },
+  "preferred_method": "control",
+  "treat": {
+   "cost_usd": 1.047597,
+   "num_turns": 21,
+   "wall_s": 231.0,
+   "verdict": "编排问题",
+   "usage": {
+    "input": 30,
+    "cache_create": 43274,
+    "cache_read": 629980,
+    "output": 11853
+   },
+   "calls": 20
+  },
+  "control": {
+   "cost_usd": 1.1501249999999998,
+   "num_turns": 22,
+   "wall_s": 268.9,
+   "verdict": "编排问题",
+   "usage": {
+    "input": 28,
+    "cache_create": 48295,
+    "cache_read": 558354,
+    "output": 15419
+   },
+   "calls": 21
+  }
+ },
+ {
+  "chain": 1,
+  "file": "Index.ets",
+  "treat_is_A": true,
+  "verdict": {
+   "agree": true,
+   "agree_note": "两份主标签同为「编排问题」，且事实链一致：修复只动注释文本+console→hilog，代码语义/id/布局零改动；被判违规的 `.accessibilityText($r('app.string.todo'))` 未改，改的是 placeholder-registry；被剥的 Android 溯源注释分属生成方与 a4874344344d... 两个上游写者，那条被判 Unregistered placeholder 的注释实为 ID 注入方 agent-aa1ccf93d575837a2 于 19:08 写入；核心论据也相同——「注释卫生／禁 TODO 占位」规则是修复轮才由主会话派发词追加的，晚于生成(15:52)与注入(19:08)，属事后新增且超出 ECAT work list 范围的编排指令。B 额外补了一条 A 没有的因果（注释措辞抄自 id-inject 设计文件，早于注入 109 秒），是加强而非分歧。",
+   "a_specificity": 4,
+   "b_specificity": 5,
+   "a_consistency": 3,
+   "b_consistency": 4,
+   "conflicts": [
+    "生成方受影响注释行数：A 记为 conv-page-0001 共 11 行（且 A 自身在『被修行的来源』说 a4874344344d... 7 行、在证据 3 又说 6 行，前后不一）；B 逐处点名只有 7 处来自生成方、3 处来自 a4874344344d...",
+    "ECAT work list 条目数：A 明确称『触发本次返修的判定只有 3 条』并逐条列出；B 引用了『第 6 条命中 oracle TODO = manifest 注释』，隐含 work list 至少 6 条",
+    "『注释卫生』全库首现时刻：A 的 grep 结论是 21:10（= work list 时刻 T+6:44）；B 精确到 21:16:51.046Z 且定位在修复方派发词 L84，两者相差约 6 分钟，且 A 的『首现 21:10』与它自己『该规则由主会话派发时追加』的叙述存在张力",
+    "编辑条数与被改行的对账：A 称 13 版=13 次注释改写（含 v19 日志替换、v23 token 改写）；B 列出的具体行号只有 9 处注释 + L66 + L57 = 11 处，与其自述的 13 条 Edit 及 7+3 处来源统计（10 处注释）互相对不齐"
+   ],
+   "preferred": "B",
+   "reason": "结论相同的前提下，B 的每条关键事实都锚到唯一记录行号+毫秒时间戳（含生成方原始 Write 的 uuid 与 spec 措辞污染源），可回查性更强，且没有 A 那种行数自相矛盾（7 vs 6、11 行自认未逐版 blame 却直接采信）。",
+   "_cost": 0.192209
+  },
+  "preferred_method": "control",
+  "treat": {
+   "cost_usd": 1.1704939999999997,
+   "num_turns": 31,
+   "wall_s": 238.7,
+   "verdict": "编排问题",
+   "usage": {
+    "input": 36,
+    "cache_create": 48856,
+    "cache_read": 769392,
+    "output": 11746
+   },
+   "calls": 30
+  },
+  "control": {
+   "cost_usd": 1.1522985000000001,
+   "num_turns": 19,
+   "wall_s": 285.8,
+   "verdict": "编排问题",
+   "usage": {
+    "input": 28,
+    "cache_create": 44111,
+    "cache_read": 565169,
+    "output": 17044
+   },
+   "calls": 18
+  }
+ },
+ {
+  "chain": 2,
+  "file": "F001_dice-roll.test.ets",
+  "treat_is_A": false,
+  "verdict": {
+   "agree": true,
+   "agree_note": "事实层面高度一致：同一被修文件、同一修复方(agent-a7a4b445e36d5383f)、三次纯注释修改(逻辑/断言/采样次数/it 名/import 零改动)、三行均由生成方 agent-a3dee39ee51d8c82a 首次写入、生成方写入前已读到 Index.ets 中 Math.floor(Math.random()*…)+1 的真实实现、'stub' 只是对假想坏实现的条件性推测句而非 stale 引用、生成方派发词只禁『占位断言』而无注释禁词、修复方派发词才带禁词口径、协调者中途追加授权才有后两次修改——这些两份逐条吻合。主标签不同：A 记为『转换错(读全了仍写错)』把责任落在生成方的落笔转换，B 记为『编排问题』把责任落在规则/口径的时序与流程；但 A 的证据第 5 条(『引入时手里没有能拦住它的规则』)与 B 的第 4 条实质同义，属同一事实集上的归责视角差异，非事实分歧。",
+   "a_specificity": 5,
+   "b_specificity": 4,
+   "a_consistency": 4,
+   "b_consistency": 5,
+   "conflicts": [
+    "ECAT 命中记录的描述不一致：A 写作 `[high] Unregistered placeholder（约 48 行注释）`(读作『约 48 行注释』的数量表述)，B 写作 work list 项 `line: 48, snippet: \"// stub 恒产 3 …\"`(读作命中第 48 行)。同一条记录只能二取一，至少一方转述有误(B 的形式与 v1 行号对得上，更可能是 A 的措辞歧义)。",
+    "'stub' 措辞来源的归因不同：A 指向 references/test-case-template.md §2.6 示例注释与 §3 自审句(并称生成方读过该模板)，B 全程未提模板文件，只把来源归到派发词『不写占位断言……见模版 §3』+ 收尾自审。两者可并存(都指向模版 §3)，但 B 若做过同样的模板检索本应提及，属覆盖面差异而非硬冲突。"
+   ],
+   "preferred": "B",
+   "reason": "两份事实基本可互证时，B 的定性与共有事实更自洽——注释是条件性推测句、禁词口径比产物晚 2.5 小时且生成方当时无规则可依，且 B 对『扫描器规则文件不在账本内』的不可确认边界交代得更准；A 引用粒度更细(jsonl 行号/uuid/时间戳/模板出处)但其『转换错』的核心理由(注释与自身『全 GREEN』结论矛盾)与它自己把这些行称作『推测句』、以及第 5 条『当时无规则可拦』相抵，结论略超出证据。",
+   "_cost": 0.22455500000000003
+  },
+  "preferred_method": "treat",
+  "treat": {
+   "cost_usd": 0.874123,
+   "num_turns": 22,
+   "wall_s": 195.5,
+   "verdict": "编排问题",
+   "usage": {
+    "input": 24,
+    "cache_create": 36920,
+    "cache_read": 427902,
+    "output": 11497
+   },
+   "calls": 21
+  },
+  "control": {
+   "cost_usd": 1.141365,
+   "num_turns": 21,
+   "wall_s": 269.2,
+   "verdict": "转换错(读全了仍写错)",
+   "usage": {
+    "input": 34,
+    "cache_create": 45808,
+    "cache_read": 647324,
+    "output": 14282
+   },
+   "calls": 20
+  }
+ },
+ {
+  "chain": 3,
+  "file": "P0001_MainActivity_UI.test.ets",
+  "treat_is_A": true,
+  "verdict": {
+   "agree": true,
+   "agree_note": "一致。两份主标签都是「编排问题」，A 多加了「自动指标误报 + 生成期无此约束」的子限定，B 强调「规则缺失贯穿 spec→execute 全段」，但事实分析同构：(1) 修复只改注释、零代码、断言未动；(2) 被改措辞是对 spec/manifest 中 oracle 值与 Android 溯源的忠实转写，不是内容错误；(3) 生成方派发词与模板里根本没有「注释卫生/剥离 Android 引用」这条约束；(4) 该约束首次出现在 ECAT/placeholder 检测阶段，且是 token 级字面扫描，对已登记项属误报。二者是同一根因的两个侧面（A 侧重检测器误报，B 侧重规则事后新增），不构成定性分歧。",
+   "a_specificity": 4,
+   "b_specificity": 5,
+   "a_consistency": 4,
+   "b_consistency": 5,
+   "conflicts": [
+    "被修行数与来源拆分不一致：A 称合计 11 行（生成方 a711c5d0 7 行 + a52d61ac 4 行，并引用修复方收尾「11 处注释改写、22 行 diff」），B 称 9 处 Edit（生成方 6 条 + a52d61ac 3 条）。",
+    "对 a52d61ac7ab7033ba 派发词的可核性相反：A 直接引用其指令内容「不要改 oracle 值」，B 明确写「meta.json description 为空，其派发词内容未核」。",
+    "修复方的读取记录不一致：A 称 gate-build 全生命周期三次读目标文件（#578@v11、#596/#605@v19，均为写前读），B 称全程只有 1 次 Read 目标文件（行 23）外加 3 条 grep/git diff 自检（行 45/49/78）。",
+    "对触发源/work list 出处的定位相反：A 指名 257fed22.jsonl:1 @21:07:47 与 2f01bcdc.jsonl:1 @21:10:29 为派发触发源，B 称该判据字符串在 7 个会话中都出现、无法定位是哪个判别器会话产出这份 work list。",
+    "对「规则在生成期是否存在」的断言强度冲突：A 断言「生成期不存在这条约束」并给出最早出现时刻 21:16:51/21:17:10/21:18:19（对比文件 v1 写于 19:18），B 则明说无法证明该规则在 19:18 时是否已以生成方可读的形式存在于仓库中。",
+    "对检测器判据的可查证据不同源：A 称 spec/placeholder-registry.md@v5 第 100 行已把 P-RES-TRANS-002 标为 registered、第 114 行为检测器契约，据此判定「Unregistered」是误报；B 未提及该注册表文件，只经 manifest 行 36 佐证 D-002 登记，并声明未找到判据的规则定义文件。"
+   ],
+   "preferred": "B",
+   "reason": "B 的每条结论都锚到可直接回查的 jsonl 行号/uuid/毫秒时间戳与 spec 原文行号，并把「规则是否在生成期已存在」「判别器出处」等未证项的边界划得更准；A 的关键计数（11 处/22 行 diff）依赖修复方自述、且存在 gate-build 版本号与 agent 身份的混用，结论强度略超其证据。",
+   "_cost": 0.24628599999999998
+  },
+  "preferred_method": "control",
+  "treat": {
+   "cost_usd": 1.2848534999999999,
+   "num_turns": 32,
+   "wall_s": 255.4,
+   "verdict": "编排问题(自动指标误报 + 生成期无此约束),非内容错误",
+   "usage": {
+    "input": 32,
+    "cache_create": 59148,
+    "cache_read": 684475,
+    "output": 13902
+   },
+   "calls": 31
+  },
+  "control": {
+   "cost_usd": 1.0761525,
+   "num_turns": 20,
+   "wall_s": 255.5,
+   "verdict": "编排问题",
+   "usage": {
+    "input": 28,
+    "cache_create": 42647,
+    "cache_read": 562385,
+    "output": 14638
+   },
+   "calls": 19
+  }
+ }
+]
