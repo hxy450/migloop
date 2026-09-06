@@ -26,8 +26,6 @@ import heapq
 from dataclasses import dataclass, field
 from typing import Any
 
-from migloop.audit import agent_is_fixer
-
 #: 非 agent 的版本作者:外部输入(没人写过,链的天然叶子)与实录外改动
 EXTERNAL = "__external__"
 OUTBAND = "__outband__"
@@ -61,7 +59,6 @@ class Ev:
     via: str = "tool"               # 来路:tool | shell | script(字面量推断)
     #: read: 从 stdout 对账出来的"看见了哪几行"((行号, 原文)…);grep -n / head 前缀
     seen: tuple[tuple[int, str], ...] | None = None
-    stage: str | None = None        # 管线阶段(记录归属戳):版本文件据此知道每版写在哪个阶段
 
 
 @dataclass
@@ -77,7 +74,6 @@ class Version:
     sealed: bool = False      # opaque 被观测封口
     by_ver: int | None = None  # 写者的 agent 版本号(观测/外部版本无)
     via: str = "tool"         # 写者来路;观测/外部 = observe
-    stage: str | None = None  # 写这一版时的管线阶段(修复方判定:execute 之后即修复)
 
 
 @dataclass
@@ -151,8 +147,7 @@ def build_stories(events: list[Ev]) -> dict[str, FileStory]:
         own = by == e.agent
         v = Version(v=len(st.versions) + 1, ts=e.ts, seq=e.seq, by=by,
                     source=source, content=content, diff=diff, diff_kind=diff_kind,
-                    by_ver=e.aver if own else None, via=e.via if own else "observe",
-                    stage=e.stage if own else None)
+                    by_ver=e.aver if own else None, via=e.via if own else "observe")
         st.versions.append(v)
         return v
 
@@ -497,9 +492,6 @@ def build_fix_chains(
     agent_meta: dict[str, dict[str, Any]],
     is_fixer: dict[str, bool],
     ets_only: bool = True,
-    *,
-    session_of: dict[str, str] | None = None,
-    fix_sessions: set[str] | None = None,
 ) -> list[dict[str, Any]]:
     """返修链 —— 全部从编年史算,旧 blame/crosschain 退役。
 
@@ -507,10 +499,7 @@ def build_fix_chains(
     生成方 = 被修行的原作者(逐行签名,确定性);行级不可得时退回该文件的
     全部非修复写手并标注原因。diff = 修复版本的引擎真 diff 档位。
     agent_meta/is_fixer 来自血缘层(desc/stage/派发词),按引擎 agent id 松配
-    ("agent-<id>" ↔ "<id>","__main__:*" 互认)。
-    fix_sessions:跨会话池里只有这些会话(sid8)的写才可能是修复 —— 修复方只认当前会话,
-    前序生成轮里 execute 之后的写一律生成侧(老口径);None = 不限。session_of 由账本给
-    (agent id → sid8)。"""
+    ("agent-<id>" ↔ "<id>","__main__:*" 互认)。"""
     def meta_of(eng_agent: str) -> dict[str, Any]:
         key = eng_agent[6:] if eng_agent.startswith("agent-") else eng_agent
         if key in agent_meta:
@@ -526,33 +515,14 @@ def build_fix_chains(
         key = eng_agent[6:] if eng_agent.startswith("agent-") else eng_agent
         return bool(is_fixer.get(key))
 
-    def fixer_of_ver(ver: Version) -> bool:
-        if (fix_sessions is not None and session_of is not None
-                and session_of.get(ver.by) not in fix_sessions):
-            return False
-        # 账本自带的阶段优先(主会话逐笔、子 agent 继承派发时阶段):正式口径 execute 之后全是修复,
-        # 主会话在 verify 阶段亲手改的也算;没有归属戳(codex / 旧记录)退回血缘层的 agent 级判定
-        if ver.stage:
-            return agent_is_fixer({"stage": ver.stage})
-        return fixer_of(ver.by)
-
-    def meta_at(eng_agent: str, ver: Version | None) -> dict[str, Any]:
-        """名片带上这一版所在的阶段:主会话横跨全程,按版本给;子 agent 血缘层没给时用账本的。"""
-        m = meta_of(eng_agent)
-        if ver is None or not ver.stage:
-            return m
-        if eng_agent.startswith("__main__"):
-            return {**m, "stage": ver.stage, "desc": "主会话(编排/直接写盘) · " + ver.stage}
-        return m if m.get("stage") else {**m, "stage": ver.stage}
-
     chains: list[dict[str, Any]] = []
     for path, st in sorted(stories.items()):
         if ets_only and not path.endswith(".ets"):
             continue
         fix_vs = [v.v for v in st.versions
-                  if v.by not in (EXTERNAL, OUTBAND) and fixer_of_ver(v)]
+                  if v.by not in (EXTERNAL, OUTBAND) and fixer_of(v.by)]
         gen_vs = [v.v for v in st.versions
-                  if v.by not in (EXTERNAL, OUTBAND) and not fixer_of_ver(v)]
+                  if v.by not in (EXTERNAL, OUTBAND) and not fixer_of(v.by)]
         if not fix_vs or not gen_vs:
             continue
         touched, origins, other, broken = fixed_line_origins(st, fix_vs)
@@ -580,42 +550,23 @@ def build_fix_chains(
                 broken = "、".join(f"{names[k]} {n} 行"
                                    for k, n in other.items())
         gid, fid = gen_ids[0], fix_agents[0]
-        # 主会话横跨全程:名片按它在这个文件上第一笔生成 / 第一笔修复所在的阶段给
-        first_gen: dict[str, Version] = {}
-        for v in gen_vs:
-            first_gen.setdefault(st.versions[v - 1].by, st.versions[v - 1])
-        first_fix: dict[str, Version] = {}
-        for v in fix_vs:
-            first_fix.setdefault(st.versions[v - 1].by, st.versions[v - 1])
-        gm, fm = meta_at(gid, first_gen.get(gid)), meta_at(fid, first_fix.get(fid))
-
-        # vers = 修复方写修复版本时自己的 agent 版本号:主会话只有这几笔是修复,页面按版本号着色
-        fix_vers: dict[str, set[int]] = {}
-        for v in fix_vs:
-            ver = st.versions[v - 1]
-            if ver.by_ver is not None:
-                fix_vers.setdefault(ver.by, set()).add(ver.by_ver)
-
+        gm, fm = meta_of(gid), meta_of(fid)
         chains.append({
             "file": path.rsplit("/", 1)[-1],
             "file_abs": path,
-            # 时刻:生成方在这个文件上第一笔生成 / 修复方第一笔修复(T+ 换算在文本层与页面做)
-            "gen_at": first_gen[gid].ts if gid in first_gen else None,
-            "fix_at": first_fix[fid].ts if fid in first_fix else None,
             "generator": {"id": gid, "desc": str(gm.get("desc") or gid)[:40],
                           "stage": gm.get("stage"),
                           "prompt": str(gm.get("prompt") or "")[:200]},
-            "generators": [{"id": g, "desc": str(meta_at(g, first_gen.get(g)).get("desc") or g)[:40],
-                            "stage": meta_at(g, first_gen.get(g)).get("stage"),
+            "generators": [{"id": g, "desc": str(meta_of(g).get("desc") or g)[:40],
+                            "stage": meta_of(g).get("stage"),
                             "prompt": str(meta_of(g).get("prompt") or "")[:200]}
                            for g in gen_ids],
             "fixer": {"id": fid, "desc": str(fm.get("desc") or fid)[:40],
                       "stage": fm.get("stage"),
                       "note": str(fm.get("note") or "")[:280]},
-            "fixers_all": [{"id": f, "desc": str(meta_at(f, first_fix.get(f)).get("desc") or f)[:40],
-                            "stage": meta_at(f, first_fix.get(f)).get("stage"),
-                            "note": str(meta_of(f).get("note") or "")[:280],
-                            "vers": sorted(fix_vers.get(f, set()))}
+            "fixers_all": [{"id": f, "desc": str(meta_of(f).get("desc") or f)[:40],
+                            "stage": meta_of(f).get("stage"),
+                            "note": str(meta_of(f).get("note") or "")[:280]}
                            for f in fix_agents],
             "lines": lines,
             "blame_broken": broken if lines is None else None,
@@ -624,24 +575,6 @@ def build_fix_chains(
             "diff": [],   # 页面吃 /fileversions + /filediff,不再内嵌摘要
         })
     return chains
-
-
-def chain_entry_lists(chains: list[dict[str, Any]],
-                      ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    """链页首屏入口(被修文件 / 修复方)直接从链来 —— 与「02 风险点」返修追溯卡、fixchain-data
-    同一口径,不再另从血缘层算一遍。修复方按首次出现排序,同一 id 只留一张卡。"""
-    fixes = [{"id": str(c.get("file_abs") or c.get("file")), "label": str(c.get("file"))}
-             for c in chains]
-    fixers: list[dict[str, Any]] = []
-    seen: set[str] = set()
-    for c in chains:
-        for f in c.get("fixers_all") or []:
-            fid = str(f.get("id"))
-            if fid in seen:
-                continue
-            seen.add(fid)
-            fixers.append({"id": fid, "label": str(f.get("desc") or fid)[:60]})
-    return fixes, fixers
 
 
 # ═══════════════ Web 载荷(瘦身序列化;内容与 diff 正文留在服务端按需取) ═══════════════

@@ -168,8 +168,7 @@ def _check_aborted_agents(trace: dict[str, Any]) -> list[dict[str, Any]]:
     首屏「白烧 OUTPUT」指标卡已撤,这里是该信息的唯一出口。"""
     by_stage: dict[str, list[dict[str, Any]]] = {}
     for a in trace.get("agents") or []:
-        # 主会话快照的"异常收尾"是快照截断的假象,由 agent-snapshot 规则单独点名
-        if not a.get("aborted") or a.get("snapshot_of_main"):
+        if not a.get("aborted"):
             continue
         by_stage.setdefault(str(a.get("stage") or "?"), []).append(a)
     out = []
@@ -186,37 +185,6 @@ def _check_aborted_agents(trace: dict[str, Any]) -> list[dict[str, Any]]:
             anchor={"stage": st, "ts": rows[0].get("start_ts")},
         ))
     return out
-
-
-def _check_snapshot_agents(trace: dict[str, Any]) -> list[dict[str, Any]]:
-    """子代理记录是主会话快照:上传上来的转录 uuid 全部落在主会话里(adapter 标 snapshot_of_main)。
-
-    这是会话上传侧的问题(migbot-runtime-src#46),不是迁移本身的问题;但这些"代理"的工具、
-    token、收尾状态全是主会话的影子,甘特里表现为从会话开头铺到派发时刻、末端异常收尾的长条。
-    只点名不剔除 —— 分析页忠实呈现上传内容,遮掉就没人修;归因去重在两原子账本做。
-    判据是 uuid 集合包含,零误报,定 error:要运行时的人处理。
-    """
-    rows = [a for a in trace.get("agents") or [] if a.get("snapshot_of_main")]
-    if not rows:
-        return []
-    by_stage: dict[str, int] = {}
-    for a in rows:
-        st = str(a.get("stage") or "?")
-        by_stage[st] = by_stage.get(st, 0) + 1
-    ranked = sorted(by_stage.items(), key=lambda kv: -kv[1])
-    stages_txt = "、".join(f"{st} {n} 个" for st, n in ranked)
-    names = "、".join(f"{a.get('type') or '?'}·{str(a.get('agent_id'))[:8]}" for a in rows[:3])
-    more = f" 等 {len(rows)} 个" if len(rows) > 3 else ""
-    return [_finding(
-        "agent-snapshot", "error",
-        f"子代理记录是主会话快照 · {len(rows)} 个",
-        f"{names}{more}上传上来的转录与主会话完全重合(记录 uuid 全部落在主会话里),"
-        "不是这些代理自己的轨迹 —— 它们的工具、token、收尾状态都不可信,甘特里表现为从会话开头"
-        f"铺到派发时刻、末端异常收尾的长条(分布:{stages_txt})。这是会话上传侧的问题,"
-        "需要运行时修复(migbot-runtime-src#46);迁移产物本身不受影响。",
-        agents=[str(a.get("agent_id")) for a in rows],
-        anchor={"stage": ranked[0][0]},
-    )]
 
 
 def _check_pipeline_gap(trace: dict[str, Any],
@@ -420,8 +388,7 @@ def stage_order(stage: str | None) -> int | None:
 
 
 def agent_is_fixer(a: dict[str, Any]) -> bool:
-    """修复方判定 —— 口径只此一处:唯一用武之地是账本的 filestory.build_fix_chains(逐笔版本的
-    阶段)与它的血缘层兜底映射;「02 风险点」返修追溯卡、链页首屏、迁移全程轮间连接都吃它算的链。
+    """修复方判定 —— 单会话链与跨会话链(crosschain)共用,口径只此一处。
 
     正式口径:**a2h-execute 结束就是修复开始的标志,之后所有的都是修复**。
     判据是规范阶段序 > execute,不是 per-agent 的类型/描述关键词:
@@ -433,35 +400,149 @@ def agent_is_fixer(a: dict[str, Any]) -> bool:
     return (stage_order(a.get("stage")) or 0) > _GEN_LAST_ORDER
 
 
-def check_fix_chains(chains: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """返修追溯 —— 链由两原子账本算(filestory.build_fix_chains,逐笔版本按阶段判修复方),
-    这里只把它包成「02 风险点」的一张卡:点名文件与生成方、跨会话计数、跳转链页。
-    修复/生成的划分只在账本那一层;不再从血缘层另算一遍,免得两处口径漂移。
+def _check_verify_fix_traceback(trace: dict[str, Any]) -> list[dict[str, Any]]:
+    """验证阶段返修追溯:verify/修复代理改写的文件,就是生成环节的薄弱点。
+
+    成链两个来源(都是实录,零推断):
+    ① fixer 判定 —— 写手的 stage 含 verify,或类型含 fixer/visual;
+    ② 跨阶段接手 —— 晚阶段写手改早阶段写手的文件(阶段序来自 stages
+      实录;同阶段多写手不算,那是并行分片的正常组装)。
+    每条链带展开数据(chain):生成方读过的 spec 页(依据)、派发指令摘录、
+    修复方的收尾说明(修因快赢版 —— Edit diff 明文不落盘,详见分析问答)。
     """
+    lin = trace.get("lineage") or {}
+    by_id = {str(a.get("agent_id")): a for a in _lineage_agents(trace)}
+    da_by_id = {str(a.get("agent_id")): a for a in trace.get("agents") or []}
+    stage_order: dict[str, int] = {}
+    for i, st in enumerate(trace.get("stages") or []):
+        stage_order.setdefault(str(st.get("stage")), i)
+
+    is_fixer = agent_is_fixer
+
+    def ordinal(a: dict[str, Any]) -> int:
+        return int(stage_order.get(str(a.get("stage")), -1))
+
+    # spec 页 -> 作者(agent)索引:链路的上半段 —— spec 也是 agent 写的,
+    # 写 spec 的 agent 读过的源码才是整条链的源头(血缘 specs.authors 实录)
+    spec_by_path = {str(x.get("path")): x for x in lin.get("specs") or []}
+
+    def spec_pages_of(paths: list[str]) -> list[dict[str, Any]]:
+        pages = []
+        for sp in paths:
+            authors = []
+            for aid in (spec_by_path.get(sp) or {}).get("authors") or []:
+                aa = by_id.get(str(aid))
+                if aa is None:
+                    continue
+                authors.append({
+                    "id": str(aid),
+                    "desc": str(aa.get("desc") or aid)[:40],
+                    "stage": aa.get("stage"),
+                    "android_reads": [str(x) for x in (aa.get("android_reads") or [])[:8]],
+                    "n_android": aa.get("n_android") or 0,
+                })
+            pages.append({"path": sp, "authors": authors})
+        return pages
+
+    chains = []
+    for f in lin.get("files") or []:
+        if f.get("kind") != "ets":
+            continue
+        ws = [by_id[w] for w in f.get("writers") or [] if w in by_id]
+        gens = [a for a in ws if not is_fixer(a)]
+        fixes = [a for a in ws if is_fixer(a)]
+        if not fixes:
+            # 跨阶段接手:同文件的写手横跨不同阶段,最晚阶段者视为修复方。
+            # 主线合成条目不参与 —— 主线横跨全程,spec 搭骨架 execute 完善
+            # 是正常编排演进,不是"生成方的产物被修了"(AntennaPod 实测排噪)。
+            known = [a for a in ws if ordinal(a) >= 0
+                     and not str(a.get("agent_id", "")).startswith("__main__")]
+            if len({ordinal(a) for a in known}) >= 2:
+                known.sort(key=ordinal)
+                gens, fixes = [known[0]], [known[-1]]
+        if not (gens and fixes):
+            continue
+        g, fx = gens[0], fixes[0]
+        gid, fid = str(g.get("agent_id")), str(fx.get("agent_id"))
+        # 行级归属(blame 重放)可用时:生成方 = 被修行的原作者,不再取文件首写手。
+        # takeovers 只在重放未断链时由 adapter 落盘,这里无需再查 blame_broken。
+        lines_info: dict[str, Any] | None = None
+        tk = next((t0 for t0 in f.get("takeovers") or []
+                   if str(t0.get("by")) == fid and t0.get("from")), None)
+        if tk:
+            origins = {str(k): int(v) for k, v in dict(tk["from"]).items()}
+            top = max(origins, key=lambda k: origins[k])
+            if top != fid and top in by_id:
+                g = by_id[top]
+                gid = top
+            lines_info = {
+                "touched": int(tk.get("lines") or sum(origins.values())),
+                "from": [{"id": k,
+                          "desc": str((by_id.get(k) or {}).get("desc") or k)[:40],
+                          "n": origins[k]}
+                         for k in sorted(origins, key=lambda k: -origins[k])[:4]],
+            }
+        chain_row: dict[str, Any] = {
+            "file": str(f.get("path")),
+            "generator": {
+                "id": gid,
+                "desc": str(g.get("desc") or gid)[:40],
+                "stage": g.get("stage"),
+                "spec_reads": [str(x) for x in (g.get("spec_reads") or [])[:5]],
+                "shared_reads": [str(x) for x in (g.get("shared_reads") or [])[:3]],
+                "android_reads": [str(x) for x in (g.get("android_reads") or [])[:4]],
+                "n_android": g.get("n_android") or 0,
+                "prompt": str((da_by_id.get(gid) or {}).get("prompt_excerpt") or "")[:200],
+            },
+            "spec_pages": spec_pages_of([str(x) for x in (g.get("spec_reads") or [])[:5]]),
+            "fixer": {
+                "id": fid,
+                "desc": str(fx.get("desc") or fid)[:40],
+                "stage": fx.get("stage"),
+                "note": str((da_by_id.get(fid) or {}).get("result") or "")[:280],
+            },
+            "lines": lines_info,
+            "blame_broken": f.get("blame_broken"),
+            "generators": [
+                {"id": str(a.get("agent_id")),
+                 "desc": str(a.get("desc") or a.get("agent_id"))[:40],
+                 "stage": a.get("stage"),
+                 "prompt": str((da_by_id.get(str(a.get("agent_id"))) or {})
+                               .get("prompt_excerpt") or "")[:200]}
+                for a in (
+                    [a0 for a0 in gens
+                     if str(a0.get("agent_id"))
+                     in {x["id"] for x in (lines_info or {}).get("from", [])}]
+                    if lines_info else gens) or gens],
+            "fixers_all": [
+                {"id": str(a.get("agent_id")),
+                 "desc": str(a.get("desc") or a.get("agent_id"))[:40],
+                 "stage": a.get("stage"),
+                 "note": str((da_by_id.get(str(a.get("agent_id"))) or {})
+                             .get("result") or "")[:280]}
+                for a in fixes],
+            "diff": [dict(c, by_desc=str((by_id.get(str(c.get("by"))) or {})
+                                         .get("desc") or c.get("by"))[:40])
+                     for c in f.get("changes") or []
+                     if str(c.get("by")) in {str(a.get("agent_id")) for a in fixes}][:6],
+        }
+        chains.append(chain_row)
     if not chains:
         return []
-    shown = " · ".join(
-        f"{str(c.get('file') or '').rsplit('/', 1)[-1]}"
-        f"(生成:{str((c.get('generator') or {}).get('desc') or '')[:24]})"
-        for c in chains[:5])
+    shown = " · ".join(f"{c['file'].rsplit('/', 1)[-1]}(生成:{c['generator']['desc'][:24]})"
+                       for c in chains[:5])
     more = f" 等 {len(chains)} 个文件" if len(chains) > 5 else ""
-    cross = sum(1 for c in chains if c.get("gen_session") or c.get("fix_session"))
-    stage = next((str((c.get("generator") or {}).get("stage"))
-                  for c in chains if (c.get("generator") or {}).get("stage")), None)
+    ex_stage = next((str(s.get("stage")) for s in trace.get("stages") or []
+                     if "execute" in str(s.get("stage") or "")), None)
     finding = _finding(
         "verify-fix-traceback", "info",
         "返修追溯",
-        f"修复轮改写了 {len(chains)} 个生成产物:{shown}{more}"
-        + (f"(其中 {cross} 条跨会话)" if cross else "")
-        + " —— 点开链路看生成方依据(spec 页/派发指令)与修复方说明;逐行归属与 diff 在链页。",
-        paths=[str(c.get("file_abs") or c.get("file")) for c in chains],
-        anchor={"stage": stage} if stage else None,
+        f"修复轮改写了 {len(chains)} 个生成产物:{shown}{more} —— 点开链路看"
+        "生成方依据(spec 页/派发指令)与修复方说明;具体 diff 用分析问答翻记录。",
+        paths=[c["file"] for c in chains],
+        anchor={"stage": ex_stage} if ex_stage else None,
     )
-    finding["chain"] = [
-        {"file": c.get("file"), "file_abs": c.get("file_abs"),
-         "generator": c.get("generator"), "fixer": c.get("fixer"), "lines": c.get("lines"),
-         "gen_session": c.get("gen_session"), "fix_session": c.get("fix_session")}
-        for c in chains[:40]]
+    finding["chain"] = chains[:20]
     return [finding]
 
 
@@ -488,11 +569,8 @@ _LEVEL_ORDER = {"error": 0, "warn": 1, "info": 2}
 
 
 def build_audit(trace: dict[str, Any],
-                pipeline: tuple[str, ...] = DEFAULT_PIPELINE,
-                fix_chains: list[dict[str, Any]] | None = None) -> dict[str, Any]:
-    """跑全部规则,findings 按严重度排序。纯函数,不 I/O。
-    fix_chains = 两原子账本算好的返修链(filestory.build_fix_chains);不传(摘要端点、进行中的
-    会话)就没有返修追溯卡 —— 这里不再从血缘层另算。"""
+                pipeline: tuple[str, ...] = DEFAULT_PIPELINE) -> dict[str, Any]:
+    """跑全部规则,findings 按严重度排序。纯函数,不 I/O。"""
     # 启用集 = 用户点名的六条经验检测。其余规则(管线跳步/盲写/输入缺失/
     # spec 覆盖缺口/异常收尾/返工)代码与测试保留但暂不启用 —— 风险点面板
     # 不放自由发挥的东西,逐条评审后再回来。pipeline 参数供未启用的
@@ -504,8 +582,7 @@ def build_audit(trace: dict[str, Any],
         *_check_spec_analyzer(trace),
         *_check_verify_emulator(trace),
         *_check_aborted_agents(trace),
-        *_check_snapshot_agents(trace),
-        *check_fix_chains(fix_chains or []),
+        *_check_verify_fix_traceback(trace),
     ]
     findings.sort(key=lambda f: _LEVEL_ORDER.get(f["level"], 9))
     counts = {"error": 0, "warn": 0, "info": 0}
@@ -517,5 +594,5 @@ def build_audit(trace: dict[str, Any],
         "checked": ["skill-fail", "script-fail", "execute-no-build",
                     "spec-no-analyzer", "spec-main-write", "verify-no-emulator",
                     "verify-no-install", "verify-no-screenshot", "aborted-agent",
-                    "agent-snapshot", "verify-fix-traceback"],
+                    "verify-fix-traceback"],
     }

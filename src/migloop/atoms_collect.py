@@ -44,7 +44,6 @@ _READISH = re.compile(r"read_text|\.read\(\)|json\.load\(|readlines|open\(|readF
 _TEAM = re.compile(r'^\s*<teammate-message\s+teammate_id="([^"]*)"(?:\s+summary="([^"]*)")?[^>]*>\n?',
                    re.S)
 _SCRIPT_RUN = re.compile(r"\.(?:py|js|mjs|sh)$")
-_PS_ASSIGN = re.compile(r"\$(\w+)\s*=\s*(['\"])([^'\"\n]+)\2")
 _PATHLINE = re.compile(r"^(.+?):(\d+)[:-]")
 _LINEONLY = re.compile(r"^(\d+)[:-]")
 _ERRISH = ("no such file", "cat:")
@@ -121,142 +120,6 @@ def _literal_ops(code: str, base: str | None) -> list[FileOp]:
     return ops
 
 
-#: bash 习惯:S=/sdk/api; sed -n '570,625p' $S/x.d.ts —— 同一条命令里赋了字面量的变量可代换;
-#: 值里带 $ / 反引号 / 通配的(f=$(find …))不是字面量,照旧放弃
-_SH_ASSIGN = re.compile(r"(?:^|[;&|(]\s*|\b(?:export|local)\s+)([A-Za-z_]\w*)="
-                        r"(?:(['\"])([^'\"\n$`]*)\2|([^\s;&|()$`*?]+))")
-#: 静态列表循环:for f in a.md b.md; do …$f…; done —— 项全是字面量时展开成逐项命令
-_FOR_LOOP = re.compile(r"\bfor\s+(\w+)\s+in\s+([^;\n]+?)\s*;\s*do\s+(.*?)\s*;?\s*done\b", re.S)
-_HDR = re.compile(r"^==> (.+?) <==$", re.M)
-_READ_VERB = re.compile(r"\b(cat|sed|head|tail|grep|rg|egrep|fgrep|awk|Get-Content|Select-String)\b")
-_WRITE_VERB = re.compile(r"(>>?|\btee\b|\bcp\b|\bmv\b|sed -i)")
-
-
-def _substitute_vars(text: str) -> str:
-    """同一条命令里赋了字面量的变量代换到引用处(PowerShell $p='…' 与 bash S=… 两种写法)。"""
-    subs: dict[str, str] = {}
-    for m in _PS_ASSIGN.finditer(text):
-        subs[m.group(1)] = m.group(3)
-    for m in _SH_ASSIGN.finditer(text):
-        val = m.group(3) if m.group(3) is not None else m.group(4)
-        if val:
-            subs.setdefault(m.group(1), val)
-    for name, lit in subs.items():
-        esc = re.escape(name)
-        pat = r"\$\{" + esc + r"\}|\$" + esc + r"(?!\w)"
-        text = re.sub(pat, lit.replace("\\", "\\\\"), text)   # 替换串里的反斜杠要自转义
-    return text
-
-
-def _expand_loops(text: str) -> str:
-    """静态列表循环展开;项里有变量/通配/命令替换(for f in *.md / $(seq …))解不开,原样留着。"""
-    def rep(m: re.Match[str]) -> str:
-        var, items_s, body = m.group(1), m.group(2), m.group(3)
-        if re.search(r"[$`*?{]", items_s) or re.search(r"\b(for|while|until)\b", body):
-            return m.group(0)
-        items = [w.strip("'\"") for w in items_s.split()]
-        if not items or len(items) > 200:
-            return m.group(0)
-        pat = re.compile(r"\$\{" + re.escape(var) + r"\}|\$" + re.escape(var) + r"(?!\w)")
-        return "; ".join(pat.sub(lambda _m, it=it: it.replace("\\", "\\\\"), body) for it in items)
-    return _FOR_LOOP.sub(rep, text)
-
-
-def _grep_stdout_reads(out: str, base: str | None, has_n: bool, names_only: bool,
-                       ops: list[FileOp]) -> list[FileOp]:
-    """目录 grep / rg / 通配目标:命令里看不出读了哪些文件,stdout 里写着(path:line:text /
-    -l 的文件名清单)—— 按 stdout 反证成读。已有显式目标的读只补 seen。"""
-    if not out.strip() or out.lower().startswith(_ERRISH):
-        return []
-    have = {o.path: o for o in ops if o.op == "read"}
-    new: list[FileOp] = []
-    if names_only:
-        for line in out.splitlines():
-            tok = re.sub(r":\d+$", "", line.strip())      # grep -c 的 path:count
-            if not tok or tok.startswith("Binary file") or not _path_of(tok):
-                continue
-            p = _resolve(tok, base)
-            if p and p not in have:
-                op = FileOp("read", p, "shell", dep=True)
-                have[p] = op
-                new.append(op)
-        return new
-    hits: dict[str, list[tuple[int, str]]] = {}
-    for line in out.splitlines():
-        if line.startswith("Binary file"):
-            continue
-        if has_n:
-            m = _HITLINE.match(line)
-            if not m or not m.group("p") or not _path_of(m.group("p")):
-                continue
-            p = _resolve(m.group("p"), base)
-            if p:
-                hits.setdefault(p, []).append((int(m.group("ln")), m.group("t")))
-        else:
-            m2 = re.match(r"^([^\s:]+?):(.*)$", line)
-            if not m2 or not _path_of(m2.group(1)):
-                continue
-            p = _resolve(m2.group(1), base)
-            if p:
-                hits.setdefault(p, [])
-    if not hits:
-        # 管道里 sed/awk 把 grep 输出改了形状(path  ->  X):行首 token 是路径就算读到了这个文件
-        for line in out.splitlines():
-            lead = re.match(r"^\s*(\S+?)(?=\s|:|$)", line)
-            if not lead or not _path_of(lead.group(1)):
-                continue
-            p = _resolve(lead.group(1), base)
-            if p:
-                hits.setdefault(p, [])
-    for p, pairs in hits.items():
-        seen = tuple(sorted({num: t for num, t in pairs}.items())) or None
-        if p in have:
-            if seen and not have[p].seen:
-                have[p].seen = seen
-            continue
-        op = FileOp("read", p, "shell", seen=seen)
-        have[p] = op
-        new.append(op)
-    return new
-
-
-def _head_header_reads(out: str, base: str | None, ops: list[FileOp]) -> list[FileOp]:
-    """head 多个文件的 stdout 按 ==> path <== 分段:每段就是该文件被看见的前几行。"""
-    parts = _HDR.split(out)
-    if len(parts) < 3:
-        return []
-    have = {o.path: o for o in ops if o.op == "read"}
-    new: list[FileOp] = []
-    for raw_path, body in zip(parts[1::2], parts[2::2]):
-        p = _resolve(raw_path.strip(), base) if _path_of(raw_path.strip()) else None
-        if not p:
-            continue
-        lines = body.strip("\n").split("\n") if body.strip("\n") else []
-        seen = tuple((i + 1, t) for i, t in enumerate(lines))
-        if p in have:
-            have[p].seen, have[p].start, have[p].n = seen or None, 1, len(lines) or None
-            continue
-        op = FileOp("read", p, "shell", start=1, n=len(lines) or None, seen=seen or None)
-        have[p] = op
-        new.append(op)
-    return new
-
-
-def _unresolved_reason(cmd: str) -> str | None:
-    """解析不出读写、但命令明显在读写文件:给出原因,进动作 detail —— 不许静默。"""
-    if re.search(r"python3? -c|node -e|<<\s*['\"]?\w+", cmd):
-        return "脚本黑盒"
-    if not _READ_VERB.search(cmd) and not _WRITE_VERB.search(cmd):
-        return None
-    if re.search(r"\$\(|`", cmd):
-        return "命令替换路径"
-    if re.search(r"\$\{?[A-Za-z_]\w*\}?", cmd):
-        return "变量路径"
-    if re.search(r"[*?]", cmd):
-        return "通配路径"
-    return None
-
-
 def _head_word(words: list[str]) -> tuple[str, list[str]]:
     ws = list(words)
     while ws and (_VAR_ASSIGN.match(ws[0]) or ws[0].lower() in _PREFIX_SKIP):
@@ -267,25 +130,16 @@ def _head_word(words: list[str]) -> tuple[str, list[str]]:
     return (head[:-4] if head.endswith(".exe") else head), ws[1:]
 
 
-def _shell_analyze(cmd: str, cwd: object, scripts: dict[str, str],
-                   out: str = "") -> tuple[list[FileOp], bool]:
-    """一条 shell 命令 → 文件读写 + 「有写能力但目标不全可知」标记。out = stdout,目录 grep /
-    多文件 head 这类命令里看不出目标的,按 stdout 反证。"""
+def _shell_analyze(cmd: str, cwd: object, scripts: dict[str, str]) -> tuple[list[FileOp], bool]:
+    """一条 shell 命令 → 文件读写 + 「有写能力但目标不全可知」标记。"""
     ops: list[FileOp] = []
     capable = False
     text, bodies = _strip_heredocs((cmd or "").replace("\\\n", " "))
-    # 同一条命令里赋了字面量的变量代换到引用处(PowerShell / bash 两种写法);静态列表循环展开。
-    # 没赋值的($HOME 等)、项带通配的循环照旧放弃
-    text = _expand_loops(_substitute_vars(text))
-    grep_ctx: list[tuple[str | None, bool, bool]] = []   # (当时的 cwd, 有 -n, 只出名字)
+    whole = parse_shell(cmd or "")
     base = _resolve(cwd, None) if isinstance(cwd, str) and cwd else None
-    hd_target: str | None = None
-    if bodies and ">" in (cmd or ""):
-        # 整条只在 heredoc 落盘时解析一次(找唯一的重定向目标);其余按段解析已够,
-        # 省掉的这一遍 parse_shell 是 collect_cc 里最贵的一段(2505 次调用 ~1.5s)
-        whole = parse_shell(text)
-        if len(whole.writes) == 1 and len(bodies) == 1:
-            hd_target = _resolve(whole.writes[0], base)
+    hd_target = (_resolve(whole.writes[0], base)
+                 if len(whole.writes) == 1 and len(whole.scripts) == 1 and ">" in (cmd or "")
+                 else None)
 
     def add(op: str, raw: str, via: str = "shell", **kw: Any) -> None:
         p = _resolve(raw, base)
@@ -301,17 +155,6 @@ def _shell_analyze(cmd: str, cwd: object, scripts: dict[str, str],
             tgt = next((w for w in args if not w.startswith("-")), None)
             base = None if (tgt is None or "$" in tgt or tgt == "-") else _resolve(tgt, base)
             continue
-        if head in ("grep", "rg", "egrep", "fgrep"):
-            short = [a for a in args if a.startswith("-") and not a.startswith("--")]
-            longf = [a for a in args if a.startswith("--")]
-            names_only = (any(c in f for f in short for c in "lLc")
-                          or any(f.startswith(("--files-with", "--count")) for f in longf))
-            recursive = (head == "rg" or any(c in f for f in short for c in "rR")
-                         or any(f.startswith(("--recursive", "--include")) for f in longf))
-            has_n = any("n" in f for f in short) or "--line-number" in longf
-            targets = [a for a in args if not a.startswith("-")][1:]
-            if recursive or not targets or any(_path_of(t) is None for t in targets):
-                grep_ctx.append((base, has_n, names_only))
         io = parse_shell(seg)
         for p in io.writes:
             add("write", p)
@@ -343,12 +186,6 @@ def _shell_analyze(cmd: str, cwd: object, scripts: dict[str, str],
                 else:
                     ops += _literal_ops(body, base)
                     capable = capable or bool(_WRITEISH.search(body))
-    if out and grep_ctx:
-        gb, has_n, names_only = grep_ctx[-1]
-        ops += _grep_stdout_reads(out, gb, has_n, names_only, ops)
-    if out and "==> " in out and any(_head_word([t[0] for t in _tokenize(s) if t[2] == ""])[0]
-                                       in ("head", "tail") for s in _split_segments(text)):
-        ops += _head_header_reads(out, base, ops)
     for body in bodies:
         if hd_target is not None:
             for op in ops:
@@ -360,8 +197,8 @@ def _shell_analyze(cmd: str, cwd: object, scripts: dict[str, str],
     return ops, capable
 
 
-def shell_file_ops(cmd: str, cwd: object, scripts: dict[str, str], out: str = "") -> list[FileOp]:
-    return _shell_analyze(cmd, cwd, scripts, out)[0]
+def shell_file_ops(cmd: str, cwd: object, scripts: dict[str, str]) -> list[FileOp]:
+    return _shell_analyze(cmd, cwd, scripts)[0]
 
 
 # ═══════════════ 工具 → 动作 ═══════════════
@@ -488,13 +325,9 @@ def _file_ops(name: str, inp: dict[str, Any], out: str, tur: Any, cwd: object,
             ops.append(FileOp("write", p, "tool"))
     elif name in ("Bash", "PowerShell"):
         cmd = str(inp.get("command") or "")
-        ops, capable = _shell_analyze(cmd, cwd, scripts, out)
+        ops, capable = _shell_analyze(cmd, cwd, scripts)
         if capable:
             detail["write_capable"] = True
-        if not ops:
-            why = _unresolved_reason(cmd)
-            if why:
-                detail["unresolved"] = why      # 不许静默:解析不了的读写要能报出自己
         tgt = _clean_single_cat(cmd)
         if tgt and out.strip() and not out.lower().startswith(_ERRISH):
             p = _resolve(tgt, _resolve(cwd, None))
@@ -536,29 +369,24 @@ def _kind_of(name: str, ops: list[FileOp]) -> str:
     return "other"
 
 
-def _to_ev(op: FileOp, agent: str, ts: str, seq: int, stage: str | None = None) -> Ev:
+def _to_ev(op: FileOp, agent: str, ts: str, seq: int) -> Ev:
     kind = {"read": "read", "delete": "delete", "edit": "edit",
             "write": "wfull" if op.content is not None else "wopaque"}[op.op]
     return Ev(ts, seq, kind, op.path, agent, content=op.content, old=op.old, new=op.new,
               replace_all=op.replace_all, start=op.start, n=op.n, full=op.full, dep=op.dep,
-              via=op.via, seen=op.seen, stage=stage)
+              via=op.via, seen=op.seen)
 
 
 def _walk(path: str, agent_id: str, session: str, seq: list[int],
           scripts: dict[str, str]) -> AgentRec:
     rec = AgentRec(id=agent_id, session=session)
-    pend: dict[str, tuple[str, str, Any, Any, int, str | None]] = {}   # id -> (ts, name, inp, cwd, 行号, 阶段)
+    pend: dict[str, tuple[str, str, Any, Any, int]] = {}   # id -> (ts, name, inp, cwd, 行号)
 
     def nxt() -> int:
         seq[0] += 1
         return seq[0]
 
     last_text: str | None = None
-    is_sub = not agent_id.startswith("__main__")
-    # 管线阶段来自 harness 给每条记录盖的归属戳(attributionSkill,取冒号后),无戳的记录沿用上一枚;
-    # 子 agent 自己的第一枚戳就是它的阶段(没有戳时由 build_ledger 继承派发时父的阶段)
-    from migloop.adapters.claude import PIPELINE_SKILLS
-    cur_stage: str | None = None
     with open(path, encoding="utf-8", errors="ignore") as stream:
         for line_no, line in enumerate(stream):
             try:
@@ -567,11 +395,6 @@ def _walk(path: str, agent_id: str, session: str, seq: list[int],
                 continue
             ts = str(r.get("timestamp") or "")
             cwd = r.get("cwd")
-            attr = str(r.get("attributionSkill") or "").split(":")[-1]
-            if attr in PIPELINE_SKILLS:
-                cur_stage = attr
-                if is_sub and rec.stage is None:
-                    rec.stage = attr
             if r.get("isCompactSummary"):
                 rec.actions.append(Action(ts, nxt(), "compact", "compact"))
             m = r.get("message")
@@ -601,11 +424,10 @@ def _walk(path: str, agent_id: str, session: str, seq: list[int],
                     if str(b.get("text") or "").strip():
                         last_text = str(b["text"]).strip()
                 elif b.get("type") == "tool_use":
-                    pend[str(b.get("id"))] = (ts, str(b.get("name")), b.get("input") or {}, cwd, line_no,
-                                               cur_stage)
+                    pend[str(b.get("id"))] = (ts, str(b.get("name")), b.get("input") or {}, cwd, line_no)
                 elif b.get("type") == "tool_result" and str(b.get("tool_use_id")) in pend:
                     tuid = str(b.get("tool_use_id"))
-                    uts, name, inp, ucwd, use_line, stage = pend.pop(tuid)
+                    uts, name, inp, ucwd, use_line = pend.pop(tuid)
                     ok = not b.get("is_error", False)
                     ops: list[FileOp] = []
                     detail: dict[str, Any] = _basic_detail(name, inp)
@@ -613,15 +435,15 @@ def _walk(path: str, agent_id: str, session: str, seq: list[int],
                         ops, detail = _file_ops(name, inp, _text_of(b.get("content")),
                                                 r.get("toolUseResult"), ucwd, scripts)
                     act = Action(uts, nxt(), name, _kind_of(name, ops), ok=ok, detail=detail,
-                                 src=(path, use_line, line_no), tuid=tuid, stage=stage)
+                                 src=(path, use_line, line_no), tuid=tuid)
                     for op in ops:
                         # 写在调用时刻发生,读的内容在结果时刻进上下文
-                        ev = _to_ev(op, agent_id, ts if op.op == "read" else uts, nxt(), stage)
+                        ev = _to_ev(op, agent_id, ts if op.op == "read" else uts, nxt())
                         act.files.append(FileRef("read" if op.op == "read" else
                                                  "delete" if op.op == "delete" else "write",
                                                  op.path, ev))
                     rec.actions.append(act)
-    for uts, name, _inp, _cwd, _line, _stage in pend.values():
+    for uts, name, _inp, _cwd, _line in pend.values():
         rec.actions.append(Action(uts, nxt(), name, "other", ok=None))
     rec.result = last_text
     return rec
@@ -638,260 +460,6 @@ def collect_cc(main_jsonl: str, seq: list[int]) -> dict[str, AgentRec]:
         for fn in sorted(glob.glob(os.path.join(sub, "*.jsonl"))):
             stem = os.path.splitext(os.path.basename(fn))[0]
             agents[stem] = _walk(fn, stem, sid8, seq, scripts)
-    return agents
-
-
-# ═══════════════ codex 侧:与 CC 同一套语义 ═══════════════
-#
-# rollout 记录 = {type, timestamp, payload}。exec 的输入是内嵌 JS(tools.exec_command /
-# tools.apply_patch),输出是 "Script completed|failed … Output:\n" + JSON 块({exit_code, output});
-# spawn_agent / send_message / wait_agent 是 collaboration 命名空间的 function_call。
-# 子 rollout 用 spawn_agent(fork_turns=all)把父的对话整段复制进来 —— 记录 id 相同,按 id 去重。
-
-_ENCRYPTED = re.compile(r"^gAAAA[A-Za-z0-9_\-]{40,}$")
-
-
-def _json_args(raw: Any) -> dict[str, Any]:
-    if isinstance(raw, dict):
-        return raw
-    if isinstance(raw, str) and raw.lstrip().startswith("{"):
-        try:
-            j = json.loads(raw)
-            return j if isinstance(j, dict) else {}
-        except json.JSONDecodeError:
-            return {}
-    return {}
-
-
-def _codex_stdout(out_text: str) -> tuple[bool, str]:
-    """exec 外壳 → (成败, 真正的 stdout)。"""
-    ok = not out_text.lstrip().startswith("Script failed")
-    idx = out_text.find("Output:\n")
-    body = out_text[idx + len("Output:\n"):] if idx >= 0 else out_text
-    body = body.lstrip("\n")
-    if body.startswith("{"):
-        try:
-            j = json.loads(body)
-            if isinstance(j, dict) and "output" in j:
-                if isinstance(j.get("exit_code"), int) and j["exit_code"] != 0:
-                    ok = False
-                return ok, str(j.get("output") or "")
-        except json.JSONDecodeError:
-            pass
-    return ok, body
-
-
-def _patch_ops(patch: str, cwd: object) -> list[FileOp]:
-    """apply_patch(V4A)→ 文件读写:Add File = 全文写,Update File 每个 hunk = edit(与 Edit 工具同档),
-    Delete File = 删除;无上下文的纯追加锚不住,降级为内容未知的写。"""
-    from migloop.adapters import codex
-
-    header = re.compile(r"^\*\*\* (Add|Update|Delete) File:\s*(.+?)\s*$", re.M)
-    matches = list(header.finditer(patch or ""))
-    ops: list[FileOp] = []
-    for pos, match in enumerate(matches):
-        body_end = matches[pos + 1].start() if pos + 1 < len(matches) else len(patch)
-        body = patch[match.end():body_end]
-        action, raw_path = match.group(1), match.group(2).strip()
-        # 不走 codex._resolve_path:它用 os.path.abspath,在 Windows 上会给 posix 路径补盘符
-        p = _resolve(raw_path, _resolve(cwd, None))
-        if not p:
-            continue
-        if action == "Add":
-            content = "\n".join(line[1:] for line in codex._patch_body_lines(body) if line.startswith("+"))
-            ops.append(FileOp("write", p, "tool", content=content + "\n"))
-        elif action == "Delete":
-            ops.append(FileOp("delete", p, "tool"))
-        else:
-            for hunk in codex._patch_chunks(body):
-                old_lines: list[str] = []
-                new_lines: list[str] = []
-                for kind, lines in hunk:
-                    if kind in ("ctx", "del"):
-                        old_lines += lines
-                    if kind in ("ctx", "add"):
-                        new_lines += lines
-                if not old_lines:
-                    ops.append(FileOp("write", p, "tool"))
-                    continue
-                ops.append(FileOp("edit", p, "tool", old="\n".join(old_lines), new="\n".join(new_lines)))
-    return ops
-
-
-def _codex_exec_ops(raw_arg: Any, out_text: str, cwd: object,
-                    scripts: dict[str, str]) -> tuple[list[FileOp], dict[str, Any], bool]:
-    """一次 exec:解 JS → shell 命令(复用 CC 的解析 + stdout 对账)+ apply_patch。返回 (ops, detail, ok)。"""
-    from migloop.adapters import codex
-
-    if isinstance(raw_arg, str) and raw_arg.lstrip().startswith("{"):
-        js = str(codex._decode_arguments(raw_arg).get("input") or raw_arg)
-    else:
-        js = str(raw_arg or "")
-    ok, stdout = _codex_stdout(out_text)
-    detail: dict[str, Any] = {}
-    ops: list[FileOp] = []
-    shell_calls = codex._extract_shell_calls(js, str(cwd) if cwd else None)
-    for sc in shell_calls:
-        cmd = str(sc.get("command") or "")
-        wdir = sc.get("workdir") or cwd
-        detail.setdefault("cmd", " ".join(cmd.split())[:200])
-        # 单条 shell 调用时 stdout 就是它的:目录 grep / 多文件 head 按 stdout 反证(与 CC 的 Bash 同一套)
-        single = len(shell_calls) == 1 and ok
-        sub_ops, capable = _shell_analyze(cmd, wdir, scripts, stdout if single else "")
-        if capable:
-            detail["write_capable"] = True
-        if single and not sub_ops:
-            why = _unresolved_reason(cmd)
-            if why:
-                detail["unresolved"] = why      # 不许静默(与 CC 同一条规矩)
-        if len(shell_calls) == 1 and ok:
-            tgt = _clean_single_cat(cmd)
-            if tgt and stdout.strip() and not stdout.lower().startswith(_ERRISH):
-                p = _resolve(tgt, _resolve(wdir, None))
-                if p:
-                    sub_ops.append(FileOp("read", p, "shell", content=stdout, full=True))
-            else:
-                _attach_stdout(cmd, _strip_heredocs(cmd.replace("\\\n", " "))[0], stdout, sub_ops)
-        ops += sub_ops
-    for patch in codex._extract_apply_patches(js):
-        detail.setdefault("cmd", "apply_patch")
-        ops += _patch_ops(patch, cwd)
-    return ops, detail, ok
-
-
-def _walk_codex(path: str, agent_id: str, session: str, seq: list[int], scripts: dict[str, str],
-                seen_ids: set[str]) -> AgentRec:
-    rec = AgentRec(id=agent_id, session=session)
-    is_sub = not agent_id.startswith("__main__")
-    pend: dict[str, tuple[str, str, Any, Any, int]] = {}   # call_id -> (ts, name, raw_arg, cwd, 行号)
-    cwd: Any = None
-    last_text: str | None = None
-
-    def nxt() -> int:
-        seq[0] += 1
-        return seq[0]
-
-    with open(path, encoding="utf-8", errors="ignore") as stream:
-        for line_no, line in enumerate(stream):
-            try:
-                r = json.loads(line)
-            except Exception:
-                continue
-            pl = r.get("payload") if isinstance(r.get("payload"), dict) else {}
-            ts = str(r.get("timestamp") or "")
-            if r.get("type") in ("session_meta", "turn_context") and pl.get("cwd"):
-                cwd = pl.get("cwd")
-            pid = pl.get("id")
-            if isinstance(pid, str):
-                if pid in seen_ids:
-                    continue                          # fork 复制来的父记录:不是这个 agent 的动作
-                seen_ids.add(pid)
-            t = pl.get("type")
-            if t == "message":
-                text = _text_of(pl.get("content"))
-                role = pl.get("role")
-                if role == "user" and text.strip():
-                    rec.actions.append(Action(ts, nxt(), "inbox", "inbox",
-                                              detail={"from": "parent" if is_sub else "user",
-                                                      "summary": None, "text": text}))
-                    if is_sub and rec.prompt is None:
-                        rec.prompt = text
-                elif role == "assistant" and text.strip():
-                    last_text = text.strip()
-            elif t in ("function_call", "custom_tool_call"):
-                raw_arg = pl.get("arguments") if pl.get("arguments") is not None else pl.get("input")
-                pend[str(pl.get("call_id"))] = (ts, str(pl.get("name")), raw_arg, cwd, line_no)
-            elif t in ("function_call_output", "custom_tool_call_output") and str(pl.get("call_id")) in pend:
-                cid = str(pl.get("call_id"))
-                uts, name, raw_arg, ucwd, use_line = pend.pop(cid)
-                out_text = _text_of(pl.get("output"))
-                ops: list[FileOp] = []
-                detail: dict[str, Any] = {}
-                ok: bool = True
-                kind = "other"
-                if name == "exec":
-                    full_ops, detail, ok = _codex_exec_ops(raw_arg, out_text, ucwd, scripts)
-                    kind = _kind_of("exec", full_ops)
-                    ops = full_ops if ok else []
-                elif name == "spawn_agent":
-                    args = _json_args(raw_arg)
-                    try:
-                        out = json.loads(out_text) if out_text.strip().startswith("{") else {}
-                    except json.JSONDecodeError:
-                        out = {}
-                    msg = str(args.get("message") or "")
-                    detail = {"name": args.get("task_name"), "subagent_type": args.get("agent_type"),
-                              "description": args.get("task_name"), "model": None,
-                              "prompt": None if _ENCRYPTED.match(msg) else (msg or None),
-                              "prompt_encrypted": bool(_ENCRYPTED.match(msg)),
-                              "task_path": out.get("task_name") if isinstance(out, dict) else None}
-                    kind = "dispatch"
-                elif name == "send_message":
-                    args = _json_args(raw_arg)
-                    msg = str(args.get("message") or "")
-                    detail = {"to": args.get("agent") or args.get("nickname") or args.get("to"),
-                              "summary": None, "text": None if _ENCRYPTED.match(msg) else msg}
-                    kind = "message"
-                else:
-                    arg_text = raw_arg if isinstance(raw_arg, str) else json.dumps(raw_arg, ensure_ascii=False)
-                    detail = {"args": arg_text[:200]}
-                act = Action(uts, nxt(), name, kind, ok=ok, detail=detail,
-                             src=(path, use_line, line_no), tuid=cid)
-                for op in ops:
-                    ev = _to_ev(op, agent_id, ts if op.op == "read" else uts, nxt())
-                    act.files.append(FileRef("read" if op.op == "read" else
-                                             "delete" if op.op == "delete" else "write", op.path, ev))
-                rec.actions.append(act)
-    for uts, name, _a, _c, _l in pend.values():
-        rec.actions.append(Action(uts, nxt(), name, "other", ok=None))
-    rec.result = last_text
-    return rec
-
-
-def collect_codex(root_jsonl: str, seq: list[int],
-                  sessions_root: str | None = None) -> dict[str, AgentRec]:
-    """codex 会话(主 rollout + 子代理 rollout 树)→ {agent_id: AgentRec},派发边按
-    spawn_agent 输出的 task_name ↔ 子 rollout 的 agent_path 对齐。"""
-    from migloop.adapters import codex
-
-    tree = codex.discover_rollout_tree(root_jsonl, sessions_root)
-    scripts: dict[str, str] = {}
-    seen_ids: set[str] = set()
-    agents: dict[str, AgentRec] = {}
-    by_rid: dict[str, str] = {}
-    by_task: dict[str, str] = {}
-    sid8 = ""
-    for i, item in enumerate(tree):
-        rid = str((item.get("meta") or {}).get("id") or os.path.basename(str(item.get("path"))))
-        if i == 0:
-            sid8 = rid[:8]
-        who = ("__main__:" + rid[:8]) if i == 0 else "agent-" + rid[:12]
-        rec = _walk_codex(str(item.get("path")), who, sid8, seq, scripts, seen_ids)
-        rec.name = item.get("nickname") or (item.get("agent_path") or "").rsplit("/", 1)[-1] or None
-        rec.kind = item.get("agent_role")
-        rec.description = item.get("agent_path")
-        agents[who] = rec
-        by_rid[rid] = who
-        if item.get("agent_path"):
-            by_task[str(item["agent_path"])] = who
-        if item.get("parent") and str(item["parent"]) in by_rid:
-            rec.parent = by_rid[str(item["parent"])]
-    for a in agents.values():
-        for act in a.actions:
-            if act.kind == "dispatch":
-                child = by_task.get(str(act.detail.get("task_path") or ""))
-                if child:
-                    act.detail["child"] = child
-                    agents[child].parent = agents[child].parent or a.id
-            elif act.kind == "message" and act.detail.get("to") in by_task:
-                act.detail["to_id"] = by_task[str(act.detail["to"])]
-    # 阶段:codex 记录没有归属戳,主线每笔动作按适配器的阶段区间(读 SKILL.md 的边界 + 去噪)
-    # 回填;子 rollout 与 CC 子代理同一规矩 —— 由 build_ledger 继承派发时的阶段
-    main = agents.get("__main__:" + sid8)
-    if main is not None:
-        stages = codex.stage_intervals(root_jsonl, sessions_root)
-        for act in main.actions:
-            act.stage = codex.stage_at(stages, act.ts)
     return agents
 
 

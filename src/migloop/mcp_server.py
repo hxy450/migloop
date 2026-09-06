@@ -5,7 +5,7 @@
 
     python -m migloop.mcp_server
 
-在 Claude Code 里注册:``claude mcp add migloop -- python -m migloop.mcp_server``。
+在 Claude Code 里注册:``claude mcp add migloop -- python -m migloop.mcp_server``(需要 ``mcp`` 包)。
 所有工具都要 sid(会话 id 或其 8 位前缀);账本按 sid 的池子(同工程兄弟会话)整包缓存。
 """
 
@@ -42,12 +42,6 @@ GUIDE = """\
 agent 工具给的每条动作/读取后面的 (#n) 是动作号;action(id, n) 返回那次工具调用的完整原始输入与输出
 (命令原文、grep 命中、cat 出来的全文、Read 到的内容)。摘要看不清时直接展开,不要猜。
 读记录下的"看见 615: …"是从 stdout 对账出来的行:agent 在那次调用里确实看到了这一行。
-摘要只给前 3 行和全部行号,原文用 action(id, n) 拉 —— 两者是同一份信息,摘要只负责让你知道该展开哪次。
-读不一定是全文:每条读带范围标签([570-625行] / 看见的行 / 依赖读=内容没进上下文)。核一条读有两条路:
-action(id, n) 是模型当时眼睛里看到的原始输出;file(path, v, content=True, start=570, n=56) 是账本复原的
-第 v 版里那一段。两者对不上就是线索(实录外改动、就近绑定的版本)。
-**主会话动辄几百次调用,整个生命周期一次查会撑爆上下文**:查主会话一律带窗口
-agent(id, v, since=v-1),只看喂养第 v 版的输入;子 agent 通常几十次调用,可以不带。
 
 ## 建议的调查路径
 1. sessions(sid) 看返修链:被修文件、修复方、被修行数与 ★ 原作者、修因。
@@ -72,7 +66,7 @@ def _rt() -> Any:
 
 def build_server(backend: Any | None = None) -> Any:
     """backend 提供三个 async 方法:get_ledger(sid) / get_session_cwd(sid) / get_fixchain(sid)。
-    默认用 service.McpBackend(与 ``migloop serve`` 共用账本缓存);别的宿主注入自己的服务层。"""
+    hmigbot 默认用 routes 模块(共用 HTTP 端点的账本缓存);server 侧注入自己的服务层。"""
     from mcp.server.fastmcp import FastMCP
 
     srv = FastMCP("migloop-atoms",
@@ -117,12 +111,11 @@ def build_server(backend: Any | None = None) -> Any:
                                       start=start, n=n)
 
     @srv.tool()
-    async def agent(sid: str, id: str, v: int | None = None, since: int | None = None) -> str:
+    async def agent(sid: str, id: str, v: int | None = None) -> str:
         """版本 agent 原子:身份、派发者与派发词全文、收件箱、≤v 逐版的效应与输入(读绑文件版本、
-        ▲旧版/行段/写前读等标)、收尾输出。id 可带或不带 agent- 前缀;v 空 = 整个生命周期;
-        since 给了只看 (since, v] 这段版本 —— 主会话动辄几百次调用,查它必须带窗口。"""
+        ▲旧版/行段/写前读等标)、收尾输出。id 可带或不带 agent- 前缀;v 空 = 整个生命周期。"""
         ledger, cwd = await _ctx(sid)
-        return atoms_text.render_agent(ledger, id, v, root=cwd, since=since)
+        return atoms_text.render_agent(ledger, id, v, root=cwd)
 
     @srv.tool()
     async def blame(sid: str, path: str, v: int | None = None, start: int | None = None,

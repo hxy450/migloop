@@ -9,6 +9,7 @@
 - [MigLoop 设计说明](./docs/design.md)：目标、证据口径、数据结构和实现方式
 - [开发与架构指南](./docs/development.md)：目录分层、adapter 契约、测试和扩展方式
 - [MigLoop 与 CANNBot-Insight 对比](./docs/comparison-cannbot.md)：定位、能力、优缺点与演进建议
+- [legacy/mcp-2026-09-02 分支说明](./docs/legacy-2026-09-02.md):AboutUsPage 首次对照赢最多的那一版工具(hmigbot@22d88c0e)冻结在这条分支,含当时三段派发词原话与数字;主干在 dev/fixchain
 
 ## 使用(推荐:单文件 `dist/migloop-lineage.pyz`)
 

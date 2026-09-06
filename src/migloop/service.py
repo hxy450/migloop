@@ -116,9 +116,9 @@ def _collect(fmt: str, roots: list[str]) -> Any:
     agents: dict[str, Any] = {}
     for p in roots:
         if fmt == "codex":
-            agents.update(atoms_collect.collect_codex(p, seq))
-        else:
-            agents.update(atoms_collect.collect_cc(p, seq))
+            # 22d88c0e 的收集器只有 CC 一线(codex 对齐是 09-02 下午之后的事)
+            raise SessionLookupError("legacy/mcp-2026-09-02 的两原子只支持 Claude Code 会话")
+        agents.update(atoms_collect.collect_cc(p, seq))
     return atoms.build_ledger(agents)
 
 
@@ -209,7 +209,7 @@ def fixchain_payload(path: str) -> dict[str, Any]:
             cross = {"priors": [str((t.get("meta") or {}).get("session_id") or "")[:8]
                                 for t in prior_traces],
                      "n_cross": n_cross}
-        payload = {"chains": chains, "cross": cross, "t0": ledger.t0}
+        payload = {"chains": chains, "cross": cross, "t0": getattr(ledger, "t0", "")}
         _put(_FIXCHAIN_CACHE, path, (key, payload))
         return payload
 
@@ -225,13 +225,12 @@ def report_trace(path: str, *, static: bool = False, with_chains: bool = True,
     不支持两原子的来源(DevEco)没有返修追溯卡,其余审计照出。"""
     data = dict(extract_trace(path, storage_root))
     fmt = _fmt_of(data)
-    chains: list[dict[str, Any]] | None = None
     if with_chains and fmt in _ATOM_FORMATS:
         try:
-            chains = list(fixchain_payload(path).get("chains") or [])
+            fixchain_payload(path)   # 预热链缓存(链页首屏从缓存拿);22d88c0e 的 build_audit 没有 fix_chains 入参
         except Exception:
-            chains = None                          # 链算不出不拖垮报告
-    data["audit"] = audit.build_audit(data, fix_chains=chains)
+            pass                     # 链算不出不拖垮报告(与主干同一处理)
+    data["audit"] = audit.build_audit(data)
     cwd = str((data.get("meta") or {}).get("cwd") or "")
     later = later_roots(fmt, path, cwd)
     prior = prior_roots(fmt, path, cwd)[:1]
@@ -248,6 +247,22 @@ def report_html(path: str) -> str:
     return build_html(report_trace(path), load_template())
 
 
+def _chain_entry_lists(chains: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """链页首屏的入口列表(22d88c0e 的 filestory 还没有 chain_entry_lists,这里按同一形状算)。"""
+    fixes = [{"id": c.get("file_abs") or c.get("file"), "label": str(c.get("file") or "").rsplit("/", 1)[-1]}
+             for c in chains]
+    fixers: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for c in chains:
+        for f in c.get("fixers_all") or [c.get("fixer") or {}]:
+            fid = str(f.get("id") or "")
+            if not fid or fid in seen:
+                continue
+            seen.add(fid)
+            fixers.append({"id": fid, "label": str(f.get("desc") or fid)[:60]})
+    return fixes, fixers
+
+
 def fixchain_light(path: str) -> dict[str, Any]:
     """链页首屏:入口列表只从链缓存拿(没缓存先空着,页面拿到 fixchain-data 自己填)。"""
     data = extract_trace(path)
@@ -262,7 +277,7 @@ def fixchain_light(path: str) -> dict[str, Any]:
     with _LOCK:
         hit = _FIXCHAIN_CACHE.get(path)
     if hit is not None:
-        fixes, fixers = filestory.chain_entry_lists(list(hit[1].get("chains") or []))
+        fixes, fixers = _chain_entry_lists(list(hit[1].get("chains") or []))
     later_paths = later_roots(fmt, path, cwd)
     later = None
     if later_paths:
@@ -310,8 +325,7 @@ def atom_json(path: str, tool: str, args: dict[str, Any]) -> dict[str, Any] | No
     if tool == "agent":
         if not args.get("id"):
             raise ValueError("id")
-        return atoms.agent_atom(ledger, str(args["id"]), _opt_int(args, "v"),
-                                since=_opt_int(args, "since"))
+        return atoms.agent_atom(ledger, str(args["id"]), _opt_int(args, "v"))
     if tool == "blame":
         if not args.get("path"):
             raise ValueError("path")
@@ -343,8 +357,7 @@ def atom_text(path: str, tool: str, args: dict[str, Any]) -> str:
                                       diff=_flag(args, "diff", "0"),
                                       start=_opt_int(args, "start"), n=_opt_int(args, "n"))
     if tool == "agent" and args.get("id"):
-        return atoms_text.render_agent(ledger, str(args["id"]), _opt_int(args, "v"), root=cwd,
-                                       since=_opt_int(args, "since"))
+        return atoms_text.render_agent(ledger, str(args["id"]), _opt_int(args, "v"), root=cwd)
     if tool == "blame" and args.get("path"):
         return atoms_text.render_blame(ledger, str(args["path"]), _opt_int(args, "v"),
                                        _opt_int(args, "start"), _opt_int(args, "n"), root=cwd)

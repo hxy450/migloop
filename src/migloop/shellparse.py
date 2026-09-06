@@ -58,19 +58,14 @@ _SUBST = re.compile(r"\$\(([^()]*)\)|`([^`]*)`")
 _VAR_ASSIGN = re.compile(r"^[A-Za-z_]\w*=")
 #: 实参要长得像带扩展名的文件路径;变量/通配一律放弃
 _PATHISH = re.compile(r"^.+\.[A-Za-z0-9]{1,6}$")
-#: 点文件(.gitignore / .npmrc / .env):没有"扩展名"但是实打实的文件
-_DOTFILE = re.compile(r"^\.[\w.-]{1,40}$")
 _SED_RANGE = re.compile(r"^(\d+),(\d+)p$")
 _NUM = re.compile(r"^\d+[smh]?$")
 
 
-def _path_of(tok: str, quoted: bool = False, dotfile: bool = False) -> str | None:
-    """dotfile=True 时点文件也算路径 —— 只给真读写文件的命令(cat/grep/sed/重定向)用,
-    jq 的 .summary 这类过滤器实参不能被当成文件。"""
+def _path_of(tok: str, quoted: bool = False) -> str | None:
     if not tok or "$" in tok or "*" in tok or "?" in tok or tok.startswith("-"):
         return None
-    if not _PATHISH.match(tok) and not (
-            dotfile and _DOTFILE.match(tok.replace("\\", "/").rsplit("/", 1)[-1])):
+    if not _PATHISH.match(tok):
         return None
     if " " in tok and not quoted:       # 裸空格 = 多半是分词错;引号包的才算
         return None
@@ -215,7 +210,7 @@ def _classify(seg: str, io: ShellIO) -> None:
         nxt = toks[i + 1][0] if i + 1 < len(toks) else None
         nxt_q = toks[i + 1][1] if i + 1 < len(toks) else False
         if op in (">", ">>"):
-            p = _path_of(nxt or "", nxt_q, True)
+            p = _path_of(nxt or "", nxt_q)
             if p:
                 io.writes.append(p)
             i += 2
@@ -242,8 +237,7 @@ def _classify(seg: str, io: ShellIO) -> None:
     cmd = cmd[:-4] if cmd.endswith(".exe") else cmd
     rest = args[1:]
     flags = [v for v, _q in rest if v.startswith("-")]
-    dot_ok = cmd in _READERS or cmd in _GREPPERS or cmd in ("sed", "awk", "diff")
-    paths = [p for v, q in rest if (p := _path_of(v, q, dot_ok))]
+    paths = [p for v, q in rest if (p := _path_of(v, q))]
 
     if cmd in _NEUTRAL:
         return
@@ -261,7 +255,7 @@ def _classify(seg: str, io: ShellIO) -> None:
         # grep -viE "schemas.android|w3.org" (纯管道过滤)、grep "X::class.java" f.kt
         nonflag = [(v, q) for v, q in rest if not v.startswith("-")]
         io.content_reads.extend(
-            p for v, q in nonflag[1:] if (p := _path_of(v, q, True)))
+            p for v, q in nonflag[1:] if (p := _path_of(v, q)))
         return
     if cmd == "sed":
         if any(f == "-i" or (f.startswith("-i") and len(f) <= 3) for f in flags):

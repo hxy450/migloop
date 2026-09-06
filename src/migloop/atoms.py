@@ -18,7 +18,6 @@ import json
 import os
 import re
 from dataclasses import dataclass, field, replace
-from datetime import datetime
 from typing import Any
 
 from migloop.filestory import (
@@ -60,7 +59,6 @@ class Action:
     #: 任何动作都能按需展开完整 input/output,不存内容不占内存,信息不丢
     src: tuple[str, int, int] | None = None
     tuid: str | None = None
-    stage: str | None = None   # 管线阶段:记录的归属戳(attributionSkill);子 agent 无戳时继承派发时阶段
 
 
 @dataclass
@@ -75,7 +73,6 @@ class AgentRec:
     parent_ver: int | None = None      # 父 agent 派发它时所处的版本
     prompt: str | None = None          # 派发指令全文
     result: str | None = None          # 收尾输出(最后一段正文)
-    stage: str | None = None           # 子 agent 的阶段(自己记录的戳,否则派发时父的阶段);主会话横跨全程,无
     actions: list[Action] = field(default_factory=list)
 
     @property
@@ -89,8 +86,6 @@ class Ledger:
     agents: dict[str, AgentRec]
     #: (path, 读事件 seq) → 这条读喂养的 agent 版本;文件原子列读者(下游)时用
     feeds: dict[tuple[str, int], int] = field(default_factory=dict)
-    #: 池子里最早一条动作的时刻(迁移开始)—— T+ 相对时刻的零点
-    t0: str = ""
 
 
 def _number(a: AgentRec) -> None:
@@ -108,22 +103,6 @@ def _number(a: AgentRec) -> None:
             ref.ev = replace(ref.ev, aver=act.ver)
 
 
-def rel_time(ts: str | None, t0: str | None) -> str:
-    """相对迁移开始的时刻 T+h:mm(池子里最早一条动作为零点,跨天小时累加);解析不了给空串。
-    跨 agent 对先后靠它:动作号只在单个 agent 内有序。"""
-    if not ts or not t0:
-        return ""
-    try:
-        a = datetime.fromisoformat(str(ts).replace("Z", "+00:00"))
-        b = datetime.fromisoformat(str(t0).replace("Z", "+00:00"))
-    except ValueError:
-        return ""
-    mins = int((a - b).total_seconds() // 60)
-    sign = "-" if mins < 0 else "+"
-    mins = abs(mins)
-    return f"T{sign}{mins // 60}:{mins % 60:02d}"
-
-
 def _head(text: str | None) -> str:
     return _WS.sub(" ", text or "").strip()[:120]
 
@@ -131,19 +110,10 @@ def _head(text: str | None) -> str:
 def _link_dispatches(agents: dict[str, AgentRec]) -> None:
     """父的 dispatch 动作 ↔ 子 AgentRec:先按派发词开头对齐,退而按 id 前缀
     (CC 子代理 id = 'a' + name + '-' + hash)。连上后把名片抄给子,子 id 回写父动作。"""
-    # 收集器已经连好的边(codex 按 task_path 对齐):只差把父的版本号填上
-    for a in agents.values():
-        for act in a.actions:
-            child = agents.get(str(act.detail.get("child") or "")) if act.kind == "dispatch" else None
-            if child is not None and child.parent_ver is None:
-                child.parent = a.id
-                child.parent_ver = act.ver
-                if child.stage is None:
-                    child.stage = act.stage
     orphans = [c for c in agents.values() if c.parent is None and not c.id.startswith("__main__")]
     for a in agents.values():
         for act in a.actions:
-            if act.kind != "dispatch" or not act.ok or act.detail.get("child"):
+            if act.kind != "dispatch" or not act.ok:
                 continue
             name = str(act.detail.get("name") or "")
             want = _head(act.detail.get("prompt"))
@@ -155,8 +125,6 @@ def _link_dispatches(agents: dict[str, AgentRec]) -> None:
             if hit is None:
                 continue
             hit.parent, hit.parent_ver = a.id, act.ver
-            if hit.stage is None:
-                hit.stage = act.stage
             hit.name = hit.name or (name or None)
             hit.kind = hit.kind or act.detail.get("subagent_type")
             hit.description = hit.description or act.detail.get("description")
@@ -164,34 +132,10 @@ def _link_dispatches(agents: dict[str, AgentRec]) -> None:
             act.detail["child"] = hit.id
 
 
-def _fill_stages(agents: dict[str, AgentRec]) -> None:
-    """阶段下沉到每笔动作与事件:子 agent 自己的记录没有归属戳时整个生命周期继承派发时的阶段;
-    主会话逐笔按记录的戳。版本文件由此知道每一版写在哪个阶段(修复方判定:execute 之后即修复)。"""
-    changed = True
-    while changed:   # 沿派发边传到底:子的子在链接时父动作还没有阶段,这里补齐
-        changed = False
-        for a in agents.values():
-            for act in a.actions:
-                if act.stage is None and a.stage:
-                    act.stage = a.stage
-                    changed = True
-                child = (agents.get(str(act.detail.get("child") or ""))
-                         if act.kind == "dispatch" else None)
-                if child is not None and child.stage is None and act.stage:
-                    child.stage = act.stage
-                    changed = True
-    for a in agents.values():
-        for act in a.actions:
-            if act.stage:
-                for ref in act.files:
-                    ref.ev = replace(ref.ev, stage=act.stage)
-
-
 def build_ledger(agents: dict[str, AgentRec]) -> Ledger:
     for a in agents.values():
         _number(a)
     _link_dispatches(agents)
-    _fill_stages(agents)
     events = [ref.ev for a in agents.values() for act in a.actions for ref in act.files]
     stories = build_stories(events)
     index: dict[tuple[str, int], int] = {}
@@ -210,8 +154,7 @@ def build_ledger(agents: dict[str, AgentRec]) -> Ledger:
                 if ref.op == "read":
                     feeds[(ref.path, ref.ev.seq)] = act.at
                     ref.certain = certain.get((ref.path, ref.ev.seq), True)
-    t0 = min((act.ts for a in agents.values() for act in a.actions if act.ts), default="")
-    return Ledger(stories, agents, feeds, t0)
+    return Ledger(stories, agents, feeds)
 
 
 # ═══════════════ 两个查询 ═══════════════
@@ -273,15 +216,6 @@ def action_raw(ledger: Ledger, agent_id: str, seq: int) -> dict[str, Any] | None
     for b in ((res_rec or {}).get("message") or {}).get("content") or []:
         if isinstance(b, dict) and b.get("type") == "tool_result" and b.get("tool_use_id") == act.tuid:
             out = _text_of(b.get("content"))
-    # codex rollout:调用与结果都在 payload 里,按 call_id 对上
-    for rec, is_use in ((use_rec, True), (res_rec, False)):
-        pl = rec.get("payload") if isinstance(rec, dict) and isinstance(rec.get("payload"), dict) else None
-        if pl is None or str(pl.get("call_id")) != str(act.tuid):
-            continue
-        if is_use and inp is None:
-            inp = pl.get("arguments") if pl.get("arguments") is not None else pl.get("input")
-        if not is_use and not out:
-            out = _text_of(pl.get("output"))
     if isinstance(res_rec, dict):
         tur = res_rec.get("toolUseResult")
     return {"seq": act.seq, "ts": act.ts, "tool": act.tool, "kind": act.kind, "ok": act.ok,
@@ -338,7 +272,7 @@ def file_atom(ledger: Ledger, hint: str, v: int | None = None,
     out = []
     for ver in vers:
         row: dict[str, Any] = {
-            "v": ver.v, "ts": ver.ts, "t": rel_time(ver.ts, ledger.t0), "by": ver.by,
+            "v": ver.v, "ts": ver.ts, "by": ver.by,
             "by_name": _agent_label(ledger.agents, ver.by),
             "by_ver": ver.by_ver, "via": ver.via, "source": ver.source,
             "diff_kind": ver.diff_kind, "sealed": ver.sealed,
@@ -351,14 +285,13 @@ def file_atom(ledger: Ledger, hint: str, v: int | None = None,
         out.append(row)
     content = vers[-1].content if vers else None
     readers = [{"by": r.by, "by_name": _agent_label(ledger.agents, r.by), "ts": r.ts,
-                "t": rel_time(r.ts, ledger.t0),
                 "v": r.version, "at": ledger.feeds.get((path, r.seq)),
                 "start": r.start, "n": r.n, "dep": r.dep, "certain": r.certain,
                 "seen": [list(x) for x in r.seen] if r.seen else None}
                for r in st.reads]
     return {
         "path": path, "v": vers[-1].v if vers else 0, "n_versions": len(st.versions),
-        "versions": out, "readers": readers, "t0": ledger.t0,
+        "versions": out, "readers": readers,
         "content": content if with_content else None, "content_known": content is not None,
         "breaks": [{"ts": b.ts, "kind": b.kind, "detail": b.detail} for b in st.breaks],
     }
@@ -387,9 +320,8 @@ def ledger_index(ledger: Ledger) -> dict[str, Any]:
         agents.append({
             "id": a.id, "label": _agent_label(ledger.agents, a.id) or a.id,
             "kind": a.kind, "session": a.session, "parent": a.parent,
-            "parent_ver": a.parent_ver, "n_versions": a.n_versions, "stage": a.stage,
+            "parent_ver": a.parent_ver, "n_versions": a.n_versions,
             "n_reads": sum(1 for act in a.actions for ref in act.files if ref.op == "read"),
-            "n_unresolved": sum(1 for act in a.actions if act.detail.get("unresolved")),
             "first_ts": a.actions[0].ts if a.actions else "",
         })
     agents.sort(key=lambda x: (x["session"], x["first_ts"]))
@@ -400,12 +332,9 @@ def _versions_at(st: FileStory, ts: str) -> int:
     return sum(1 for ver in st.versions if ver.ts <= ts)
 
 
-def agent_atom(ledger: Ledger, agent_id: str, v: int | None = None,
-               since: int | None = None) -> dict[str, Any] | None:
+def agent_atom(ledger: Ledger, agent_id: str, v: int | None = None) -> dict[str, Any] | None:
     """版本 agent:≤ver 的全部动作(读绑文件版本、写产出版本)、派发指令、收件箱、
-    父/子边、收尾输出。v=None = 整个生命周期(锚之后的动作打 after_anchor)。
-    since = 窗口下界:只给喂养 (since, v] 这段版本的动作 —— 主会话动辄几百次调用,
-    整个生命周期一次给出会撑爆调查 agent 的上下文,查主会话必须带窗口。"""
+    父/子边、收尾输出。v=None = 整个生命周期(锚之后的动作打 after_anchor)。"""
     a = ledger.agents.get(agent_id) or ledger.agents.get(f"agent-{agent_id}")
     if a is None:
         return None
@@ -415,10 +344,9 @@ def agent_atom(ledger: Ledger, agent_id: str, v: int | None = None,
     effect_ts = {act.ver: act.ts for act in a.actions if act.ver is not None}
 
     def keep(act: Action) -> bool:
-        k = act.ver if act.ver is not None else act.at
-        if since is not None and k <= since:
-            return False
-        return v is None or k <= anchor
+        if v is None:
+            return True
+        return act.ver <= anchor if act.ver is not None else act.at <= anchor
 
     acts = [act for act in a.actions if keep(act)]
     reads: list[dict[str, Any]] = []
@@ -430,11 +358,9 @@ def agent_atom(ledger: Ledger, agent_id: str, v: int | None = None,
         detail = act.detail
         if act.kind == "dispatch":
             detail = {k: val for k, val in act.detail.items() if k != "prompt"}
-        row: dict[str, Any] = {"seq": act.seq, "ts": act.ts, "t": rel_time(act.ts, ledger.t0),
-                               "tool": act.tool, "kind": act.kind,
+        row: dict[str, Any] = {"seq": act.seq, "ts": act.ts, "tool": act.tool, "kind": act.kind,
                                "ok": act.ok, "ver": act.ver, "at": act.at, "files": [],
-                               "detail": detail, "expandable": act.src is not None,
-                               "stage": act.stage}
+                               "detail": detail, "expandable": act.src is not None}
         for ref in act.files:
             row["files"].append({"op": ref.op, "path": ref.path, "v": ref.v, "via": ref.ev.via})
             if ref.op == "read":
@@ -442,8 +368,7 @@ def agent_atom(ledger: Ledger, agent_id: str, v: int | None = None,
                 anchor_ts = effect_ts.get(act.at) or act.ts
                 latest = _versions_at(st, anchor_ts) if st else None
                 reads.append({
-                    "seq": act.seq, "ts": ref.ev.ts, "t": rel_time(ref.ev.ts, ledger.t0),
-                    "path": ref.path, "v": ref.v, "via": ref.ev.via,
+                    "seq": act.seq, "ts": ref.ev.ts, "path": ref.path, "v": ref.v, "via": ref.ev.via,
                     "seen": [list(x) for x in ref.ev.seen] if ref.ev.seen else None,
                     "start": ref.ev.start, "n": ref.ev.n, "full": ref.ev.full, "dep": ref.ev.dep,
                     "certain": ref.certain,
@@ -453,8 +378,7 @@ def agent_atom(ledger: Ledger, agent_id: str, v: int | None = None,
                     "stale": bool(latest is not None and ref.v is not None and ref.v < latest),
                 })
             else:
-                writes.append({"ts": ref.ev.ts, "t": rel_time(ref.ev.ts, ledger.t0),
-                               "path": ref.path, "v": ref.v, "op": ref.op,
+                writes.append({"ts": ref.ev.ts, "path": ref.path, "v": ref.v, "op": ref.op,
                                "ver": act.ver, "via": ref.ev.via})
         timeline.append(row)
     parent = None
@@ -471,7 +395,7 @@ def agent_atom(ledger: Ledger, agent_id: str, v: int | None = None,
         "description": a.description, "model": a.model,
         "label": _agent_label(ledger.agents, a.id) or a.id,
         "parent": parent, "prompt": a.prompt, "inbox": inbox, "children": children,
-        "n_versions": n, "v": anchor, "since": since, "t0": ledger.t0,
+        "n_versions": n, "v": anchor,
         "reads": reads, "writes": writes, "actions": timeline,
         "result": {"text": a.result, "after_anchor": True} if a.result else None,
     }

@@ -28,11 +28,6 @@ def _who(ledger: atoms.Ledger, by: str, ver: int | None) -> str:
     return atoms.agent_label(ledger, by) + (f" v{ver}" if ver is not None else "")
 
 
-def _ref(seq: Any, t: str | None) -> str:
-    """动作引用 (#n T+h:mm):动作号给 action 展开用,T+ 给跨 agent 对先后用。"""
-    return f"(#{seq} {t})" if t else f"(#{seq})"
-
-
 def _read_tags(r: dict[str, Any]) -> str:
     t = []
     if r.get("stale"):
@@ -69,10 +64,8 @@ def render_index(ledger: atoms.Ledger, kind: str | None = None, query: str | Non
         for a in ags[:limit]:
             parent = (f" 派发自 {atoms.agent_label(ledger, a['parent'])}@v{a['parent_ver']}"
                       if a.get("parent") else "")
-            stage = f" | 阶段 {a['stage']}" if a.get("stage") else ""
-            unres = f" · 未解析读写 {a['n_unresolved']}" if a.get("n_unresolved") else ""
             out.append(f"- {a['label']} | id={a['id']} | {a.get('kind') or 'agent'} | 会话 {a['session']}"
-                       f" | {a['n_versions']} 版 · 读 {a['n_reads']}{unres}{stage}{parent}")
+                       f" | {a['n_versions']} 版 · 读 {a['n_reads']}{parent}")
         if len(ags) > limit:
             out.append(f"  …还有 {len(ags) - limit} 个,用 query 缩小")
     if kind != "agent":
@@ -130,7 +123,7 @@ def render_file(ledger: atoms.Ledger, hint: str, v: int | None = None, root: str
         if not vv["content_known"]:
             extra.append("内容未知")
         mark = " ◀" if vv["v"] == anchor else ""
-        out.append(f"- v{vv['v']} ← {_who(ledger, vv['by'], vv['by_ver'])} | {vv['ts'][5:16]} {vv.get('t') or ''} | "
+        out.append(f"- v{vv['v']} ← {_who(ledger, vv['by'], vv['by_ver'])} | {vv['ts'][5:19]} | "
                    f"{vv['diff_kind']}" + (" · " + " · ".join(extra) if extra else "") + mark)
         if diff and vv.get("diff"):
             out.append("```diff\n" + _clip(vv["diff"], 6000) + "\n```")
@@ -140,7 +133,7 @@ def render_file(ledger: atoms.Ledger, hint: str, v: int | None = None, root: str
         span = (f"{r['start']}-{r['start'] + r['n'] - 1}行" if r["start"] is not None and r["n"] is not None
                 else "全文")
         flags = ("" if r["certain"] else " · 版本就近绑定(不确定)") + (" · 依赖读" if r["dep"] else "")
-        out.append(f"- {_who(ledger, r['by'], r['at'])} | {r['ts'][5:16]} {r.get('t') or ''} | {span}{flags}")
+        out.append(f"- {_who(ledger, r['by'], r['at'])} | {r['ts'][5:19]} | {span}{flags}")
     if content:
         if fa["content"] is None:
             out.append("## 内容: 无法复原")
@@ -160,21 +153,18 @@ def render_file(ledger: atoms.Ledger, hint: str, v: int | None = None, root: str
 
 
 def render_agent(ledger: atoms.Ledger, agent_id: str, v: int | None = None,
-                 root: str = "", full_text: bool = True, since: int | None = None) -> str:
-    ag = atoms.agent_atom(ledger, agent_id, v, since=since)
+                 root: str = "", full_text: bool = True) -> str:
+    ag = atoms.agent_atom(ledger, agent_id, v)
     if ag is None:
         return f"账本里没有该 agent: {agent_id}"
     anchor = ag["v"]
-    out = [f"# agent {ag['label']}  id={ag['id']}  v{anchor} / 共 {ag['n_versions']} 版"
-           + (f"  窗口 v{since + 1}–v{anchor}(只给喂养这段版本的动作)" if since is not None else "")]
+    out = [f"# agent {ag['label']}  id={ag['id']}  v{anchor} / 共 {ag['n_versions']} 版"]
     ident = [ag.get("kind") or "agent", f"会话 {ag['session']}"]
     if ag.get("model"):
         ident.append(ag["model"])
     if ag.get("description"):
         ident.append(ag["description"])
     out.append("身份: " + " · ".join(ident))
-    if ag.get("t0"):
-        out.append(f"时刻: 动作号旁的 T+h:mm 相对迁移开始 {ag['t0']}(池子里最早一条动作),跨 agent 对先后用它")
     if ag["parent"]:
         out.append(f"派发自: {ag['parent']['name'] or ag['parent']['id']} @v{ag['parent']['ver']}"
                    f"  (id={ag['parent']['id']})")
@@ -202,15 +192,12 @@ def render_agent(ledger: atoms.Ledger, agent_id: str, v: int | None = None,
         slot = by_ver[k]
         late = k > anchor
         head = f"### v{k}" if k <= ag["n_versions"] else "### 收尾后"
-        stg = next((a.get("stage") for a in slot["eff"] if a.get("stage")), None)
-        if stg:
-            head += f" · 阶段 {stg}"
         if late:
             head += " (锚点之后,非因果)"
         out.append(head)
         for a in slot["eff"]:
             d = a["detail"]
-            tag = " " + _ref(a["seq"], a.get("t"))
+            tag = f" (#{a['seq']})"
             if a["kind"] == "dispatch":
                 out.append(f"- 派发 {d.get('name') or d.get('description') or '子agent'}"
                            + (f"  (子 agent id={d['child']})" if d.get("child") else "") + tag)
@@ -227,27 +214,19 @@ def render_agent(ledger: atoms.Ledger, agent_id: str, v: int | None = None,
                     out.append(f"- {a['tool']}" + ("" if a["ok"] else "(失败)")
                                + (f": {d['cmd']}" if d.get("cmd") else "") + tag)
         for r in reads_by_at.get(k, []):
-            out.append(f"  读 {rel(r['path'], root)}@v{r['v']}{_read_tags(r)} {_ref(r['seq'], r.get('t'))}")
-            # 看见的行与 action(#n) 是同一份信息:摘要只留前 3 行 + 全部行号 + 总数,原文按需展开。
-            # 行号必须露出来(复跑教训:第 615 行不在摘要里,调查员就没去展开 #4641)
-            seen = r.get("seen") or []
-            for ln, t in seen[:3]:
-                out.append(f"      看见 {ln}: {_clip(t.strip(), 160)}")
-            if len(seen) > 3:
-                nums = ", ".join(str(ln) for ln, _t in seen[:40])
-                more = f" …(共 {len(seen)} 个)" if len(seen) > 40 else ""
-                out.append(f"      …共 {len(seen)} 行,行号 {nums}{more};action(#{r['seq']}) 展开原文")
+            out.append(f"  读 {rel(r['path'], root)}@v{r['v']}{_read_tags(r)} (#{r['seq']})")
+            # 看见的行全给(每行截 200 字):复跑实测,只给前 8 行时调查员没去展开 #4641,
+            # 关键的第 615 行就漏了 —— 这里省的 token 远不如漏证据贵
+            for ln, t in (r.get("seen") or [])[:60]:
+                out.append(f"      看见 {ln}: {_clip(t.strip(), 200)}")
+            if r.get("seen") and len(r["seen"]) > 60:
+                out.append(f"      …看见的共 {len(r['seen'])} 行,action(#{r['seq']}) 可展开原文")
         others = [a for a in slot["inp"] if a["kind"] not in ("read", "inbox")]
         for a in others:
             d = a["detail"]
             desc = d.get("cmd") or d.get("pattern") or d.get("skill") or d.get("url") or ""
-            if d.get("unresolved"):
-                # 解析不了的读写不许静默:调查员据此知道该展开哪次 action 看原文
-                out.append(f"  ⚠ 未解析读写({d['unresolved']}) {a['tool']}: {_clip(desc, 120)} "
-                           + _ref(a["seq"], a.get("t")))
-                continue
             out.append(f"  {a['tool']}" + ("" if a["ok"] else "(失败)") + (f": {desc}" if desc else "")
-                       + " " + _ref(a["seq"], a.get("t")))
+                       + f" (#{a['seq']})")
         inboxes = [a for a in slot["inp"] if a["kind"] == "inbox"]
         if inboxes:
             out.append(f"  收件 {len(inboxes)} 条(见上)")
@@ -324,15 +303,8 @@ def render_chains(payload: dict[str, Any], root: str = "") -> str:
         g, fx = c.get("generator") or {}, c.get("fixer") or {}
         line = (f"- {rel(str(c.get('file_abs') or c.get('file')), root)} | 生成方 {g.get('desc')}({g.get('stage')})"
                 f" id={g.get('id')} | 修复方 {fx.get('desc')}({fx.get('stage')}) id={fx.get('id')}")
-        t0 = str(payload.get("t0") or "")
-        if c.get("fix_at"):
-            g_t = atoms.rel_time(c.get("gen_at"), t0) or str(c.get("gen_at") or "?")[5:16]
-            f_t = atoms.rel_time(c.get("fix_at"), t0) or str(c.get("fix_at"))[5:16]
-            line += f" | 生成于 {g_t} · 修复于 {f_t}"
         if c.get("gen_session"):
             line += f" | 生成于会话 {c['gen_session']}"
-        if c.get("fix_session"):
-            line += f" | 修复于前序会话 {c['fix_session']}(回合内返修)"
         out.append(line)
         if c.get("lines"):
             frm = "、".join(f"{x.get('desc')}({x.get('n')}行, id={x.get('id')})" for x in c["lines"].get("from") or [])

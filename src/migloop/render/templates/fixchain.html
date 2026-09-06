@@ -235,16 +235,11 @@
     }
     // 端点地址可由宿主注入(server 把页面挂在别的路径下);缺省是 hmigbot 的 insight1 路由
     var SIDQ = encodeURIComponent(DATA.sid || DATA.sid8 || "");
-    // 看板空窗承载时由看板注入 __API_BASE__(浏览器眼里的 API origin);直开页面时空串,走同源相对路径。
-    // 服务端只给相对路径 —— 按 Host 头拼绝对地址在反代 / TLS 终结下会拼错
-    var API_BASE = window.__API_BASE__ || "";
-    function absUrl(u) { return (!u || /^https?:\/\//i.test(u)) ? u : API_BASE + u; }
     var U = DATA.urls || {};
-    U.data = absUrl(U.data || ("/api/insight1/fixchain-data/" + SIDQ));
-    U.atom = absUrl(U.atom || ("/api/insight1/atom/" + SIDQ));
-    U.filediff = absUrl(U.filediff || ("/api/insight1/filediff/" + SIDQ));
+    U.data = U.data || ("/api/insight1/fixchain-data/" + SIDQ);
+    U.atom = U.atom || ("/api/insight1/atom/" + SIDQ);
+    U.filediff = U.filediff || ("/api/insight1/filediff/" + SIDQ);
     if (!("report" in U)) U.report = "/insight1/report/";     // null = 前序会话不给链接
-    if (U.report) U.report = absUrl(U.report);
     function reportLink(s) {
       if (!U.report) return "<b>" + s + "</b>";
       return '<a href="' + U.report + s + '" target="_blank" rel="noopener" style="font-weight:700">' + s + " ↗</a>";
@@ -254,16 +249,7 @@
     // 没有返修链也开门:任何 文件@v / agent vN 都能当根,返修入口只是最常用的一个入口
     DATA.fixes = DATA.fixes || [];
     document.getElementById("wrap").hidden = false;
-    var noneChip = null;
-    function refreshNone(chains) {
-      // 首屏 fixes 只是账本缓存的快照(可能为空),链装配完再定一次;生成轮给后继轮的链页当入口
-      if (noneChip) { noneChip.remove(); noneChip = null; }
-      if (chains && chains.length) return;
-      var t = "本轮<b>没有识别出返修链</b> · 从左栏任选一个版本开始";
-      if (DATA.later && DATA.later.url) t += ' · 修复轮在会话 <a href="' + DATA.later.url + '" style="font-weight:700">' + DATA.later.sid8 + " ↗</a>";
-      noneChip = chip(t);
-    }
-    refreshNone(DATA.fixes);
+    if (!DATA.fixes.length) chip("本轮<b>没有识别出返修链</b> · 从左栏任选一个版本开始");
     var fixChip = chip("<b>" + DATA.fixes.length + "</b> 个被修文件");
     var fxrChip = chip("<b>" + (DATA.fixers || []).length + "</b> 个修复方");
     var loadChip = chip("⏳ 账本装配中…(首次约 1 分钟,之后即开)", "load-chip");
@@ -288,27 +274,11 @@
     var chainByFile = {};
     var fixerIds = {};
     (DATA.fixers || []).forEach(function (f) { fixerIds[agentKey(f.id)] = 1; });
-    var fixerVers = {};      // 主会话只有部分版本是修复(verify 阶段亲手改的那几笔):按 agent 版本号着色
-    function isFixAt(aid, ver) {
-      var k = agentKey(aid);
-      if (!fixerIds[k]) return false;
-      var fv = fixerVers[k];
-      return !fv || ver == null || !!fv[ver];
-    }
     var dataReady = false;
     var IDX = null;          // /atom/index:全部文件 + agent
     var agentById = {};
 
-    function relT(ts) {
-      // T+h:mm 相对迁移开始(池子里最早一条动作);算不出退回 MM-DD HH:MM
-      if (!ts) return "?";
-      var d = (new Date(ts) - new Date(DATA.t0 || "")) / 60000;
-      if (!DATA.t0 || isNaN(d)) return String(ts).slice(5, 16).replace("T", " ");
-      var m = Math.round(Math.abs(d)), h = Math.floor(m / 60), mm = m % 60;
-      return "T" + (d < 0 ? "-" : "+") + h + ":" + (mm < 10 ? "0" : "") + mm;
-    }
     function indexData(d) {
-      DATA.t0 = d.t0 || DATA.t0;
       chainByFile = {};
       var fixes = [], fixersSeen = {}, fixers = [];
       (d.chains || []).forEach(function (c) {
@@ -321,18 +291,13 @@
         (c.fixers_all || []).forEach(function (f) {
           regAgent(f.id, { kind: "fixer", label: f.desc, stage: f.stage, note: f.note });
           fixerIds[agentKey(f.id)] = 1;
-          if (String(f.id).indexOf("__main__") === 0 && f.vers && f.vers.length) {
-            fixerVers[agentKey(f.id)] = fixerVers[agentKey(f.id)] || {};
-            f.vers.forEach(function (v) { fixerVers[agentKey(f.id)][v] = 1; });
-          }
           if (!fixersSeen[agentKey(f.id)]) {
             fixersSeen[agentKey(f.id)] = 1;
             fixers.push({ id: f.id, label: f.desc || agentKey(f.id).slice(0, 24) });
           }
         });
       });
-      DATA.fixes = fixes; DATA.fixers = fixers;
-      refreshNone(d.chains);
+      if (fixes.length) { DATA.fixes = fixes; DATA.fixers = fixers; }
       dataReady = true;
       fixChip.innerHTML = "<b>" + DATA.fixes.length + "</b> 个被修文件";
       fxrChip.innerHTML = "<b>" + (DATA.fixers || []).length + "</b> 个修复方";
@@ -343,14 +308,14 @@
       renderRail();
       if (!XT) { renderEmptyCanvas(); openFromHash(); }
     }
-    fetch(U.data, { credentials: "include" })
+    fetch(U.data, { credentials: "same-origin" })
       .then(function (r) { return r.json(); })
       .then(function (d) {
         if (d && d.chains) { indexData(d); }
         else { loadChip.textContent = "返修链装配失败:" + ((d || {}).error || "未知"); }
       })
       .catch(function (e) { loadChip.textContent = "返修链装配失败:" + e; });
-    fetch(U.atom + "/index", { credentials: "include" })
+    fetch(U.atom + "/index", { credentials: "same-origin" })
       .then(function (r) { return r.json(); })
       .then(function (j) {
         if (!j || j.error) { idxChip.textContent = "目录装配失败:" + ((j || {}).error || "未知"); return; }
@@ -368,7 +333,7 @@
       if (store[key]) { cb(store[key]); return; }
       if (cbs[key]) { cbs[key].push(cb); return; }
       cbs[key] = [cb];
-      fetch(url, { credentials: "include" }).then(function (r) { return r.json(); })
+      fetch(url, { credentials: "same-origin" }).then(function (r) { return r.json(); })
         .then(function (j) {
           var list = cbs[key] || []; delete cbs[key];
           if (j && !j.error) { store[key] = j; list.forEach(function (f) { f(j); }); }
@@ -458,7 +423,7 @@
           var who = vv.by === "__external__" ? "外部输入" : vv.by === "__outband__" ? "实录外修改"
                   : (vv.by_name || agentLabelOf(vv.by)) + (vv.by_ver != null ? " v" + vv.by_ver : "");
           vers.appendChild(vline("v" + vv.v, "← " + who + " · " + vv.diff_kind + (vv.lines != null ? " · " + vv.lines + " 行" : ""),
-            isFixAt(vv.by, vv.by_ver) ? "fix" : "", function () { openRoot({ kind: "file", path: path, v: vv.v }); }));
+            fixerIds[agentKey(vv.by)] ? "fix" : "", function () { openRoot({ kind: "file", path: path, v: vv.v }); }));
         });
       });
     }
@@ -711,8 +676,7 @@
       document.getElementById("rootlbl").innerHTML = "从 <b></b> 出发";
       document.getElementById("rootlbl").querySelector("b").textContent = text;
       clearBtn.classList.add("show");
-      // 看板用 about:blank 空窗 document.write 承载本页时,改 URL 可能抛 SecurityError —— 不能拖垮渲染
-      if (hash != null && location.hash !== "#" + hash) { try { history.replaceState(null, "", "#" + hash); } catch (_e) {} }
+      if (hash != null && location.hash !== "#" + hash) history.replaceState(null, "", "#" + hash);
       renderRail();
     }
     function openFileRoot(path, v) {
@@ -788,7 +752,7 @@
     }
     function nodeCls(node) {
       var c;
-      if (node.kind === "agent") c = node.isDispatch ? "dispatch" : (isFixAt(node.aid, node.anchorVer) || node.isFixer) ? "fix" : "gen" + (node.sharp ? " sharp" : "");
+      if (node.kind === "agent") c = node.isDispatch ? "dispatch" : (fixerIds[agentKey(node.aid)] || node.isFixer) ? "fix" : "gen" + (node.sharp ? " sharp" : "");
       else if (node.kind === "leaf") c = "leaf";
       else c = "file" + (node.stale ? " stale" : "");
       if (node.isRoot) c += " root";
@@ -984,7 +948,7 @@
     }
     function diffInto(holder, path, v) {
       holder.textContent = "加载 diff…";
-      fetch(U.filediff + "?file=" + encodeURIComponent(path) + "&v=" + v, { credentials: "include" })
+      fetch(U.filediff + "?file=" + encodeURIComponent(path) + "&v=" + v, { credentials: "same-origin" })
         .then(function (r) { return r.json(); })
         .then(function (j) {
           if (!j.diff) { holder.textContent = "(无 diff 正文:" + (j.diff_kind || j.error || "未知") + ")"; return; }
@@ -1089,7 +1053,7 @@
             mid.appendChild(el("span", "who ext", vv.by === "__external__" ? "外部输入" : "实录外修改"));
           } else {
             var who = lnk((vv.by_name || agentLabelOf(vv.by)) + (vv.by_ver != null ? " v" + vv.by_ver : ""),
-                          "who" + (isFixAt(vv.by, vv.by_ver) ? " fix" : ""),
+                          "who" + (fixerIds[agentKey(vv.by)] ? " fix" : ""),
                           function () { openRoot({ kind: "agent", id: vv.by, v: vv.by_ver }); });
             who.style.fontWeight = "600";
             mid.appendChild(who);
@@ -1165,19 +1129,7 @@
           }
         }
         sc.appendChild(genKv);
-        var fixKv = kv("修复方", (fx.desc || "?") + "(" + (fx.stage || "?") + ")");
-        if (c.fix_session && DATA.sid8 && c.fix_session !== DATA.sid8) {
-          // 前序轮自己回合内的返修:修复方不在当前会话(修复/生成只是账本之上的一层划分)
-          if (U.report) {
-            var fl = el("a", null, " · 修复于前序会话 " + c.fix_session + "(回合内返修)↗");
-            fl.href = U.report + c.fix_session; fl.target = "_blank"; fl.rel = "noopener";
-            fixKv.appendChild(fl);
-          } else {
-            fixKv.appendChild(document.createTextNode(" · 修复于前序会话 " + c.fix_session + "(回合内返修)"));
-          }
-        }
-        sc.appendChild(fixKv);
-        if (c.fix_at) sc.appendChild(kv("时刻", "生成于 " + relT(c.gen_at) + " · 修复于 " + relT(c.fix_at) + "(T+ 相对迁移开始)"));
+        sc.appendChild(kv("修复方", (fx.desc || "?") + "(" + (fx.stage || "?") + ")"));
         if (c.lines) {
           sc.appendChild(kv("被修行", c.lines.touched + " 行 · 原作者 " + (c.lines.from || []).map(function (x) { return x.desc + "(" + x.n + "行)"; }).join("、") + " · 树上标 ★"));
         } else if (c.blame_broken) {
@@ -1216,7 +1168,7 @@
           pre = el("pre", "diffblock", "加载原文…");
           r.appendChild(pre);
           lk.textContent = " 收起";
-          fetch(API + "/action?id=" + encodeURIComponent(curAgentId) + "&seq=" + a.seq, { credentials: "include" })
+          fetch(API + "/action?id=" + encodeURIComponent(curAgentId) + "&seq=" + a.seq, { credentials: "same-origin" })
             .then(function (x) { return x.json(); })
             .then(function (j) {
               if (!j || j.error) { pre.textContent = "(" + ((j || {}).error || "失败") + ")"; return; }
@@ -1321,7 +1273,7 @@
     }
     function drawerAgent(node) {
       side.innerHTML = "";
-      var isFix = isFixAt(node.aid, node.anchorVer) || node.isFixer;
+      var isFix = fixerIds[agentKey(node.aid)] || node.isFixer;
       var rootSpec = node.isRoot ? null : { kind: "agent", id: node.aid, v: node.anchorVer };
       var hd = head(isFix ? "fix" : "gen", "Agent 原子" + (node.anchorVer != null ? " · 截至 v" + node.anchorVer : " · 全程"), agentLabelOf(node.aid), agentKey(node.aid), rootSpec);
       side.appendChild(hd);
@@ -1380,7 +1332,7 @@
       clearBtn.classList.remove("show");
       curRootKey = null;
       document.getElementById("rootlbl").textContent = "两原子探索树 —— 版本文件 × 版本 agent,任何一个版本都能当根";
-      if (location.hash) { try { history.replaceState(null, "", location.pathname + location.search); } catch (_e) {} }
+      if (location.hash) history.replaceState(null, "", location.pathname + location.search);
       renderEmptyCanvas();
       renderRail();
       side.innerHTML = "";

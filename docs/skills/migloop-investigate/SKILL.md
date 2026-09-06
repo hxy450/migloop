@@ -10,9 +10,7 @@ description: 用 MigLoop 两原子工具(版本文件 × 版本 agent)对一个�
 
 ## 工具面(七个;本地 HTTP 文本端点 = MCP 工具的同一份输出)
 
-基址 `BASE = http://127.0.0.1:<port>/api/insight1/atom/<sid>/text`(`migloop <目标> --serve` 启动时
-打印;hmigbot 里是 18601),全部 GET,返回纯文本。MCP 接法同一份工具面:
-`claude mcp add migloop -- python -m migloop.mcp_server`。
+基址 `BASE = http://127.0.0.1:18601/api/insight1/atom/<sid>/text`,全部 GET,返回纯文本。
 用 `curl -s -G "<BASE>/<tool>" --data-urlencode "path=..." --data-urlencode "v=..."`(路径必须 urlencode)。
 
 | 工具 | 参数 | 给你什么 |
@@ -81,10 +79,3 @@ description: 用 MigLoop 两原子工具(版本文件 × 版本 agent)对一个�
 - 只用工具的输出下结论;每个断言都要能指回某次工具调用。
 - 不改任何文件,不跑迁移工程的构建;这是只读调查。
 - 输出精简:证据链 3–8 条,不要把工具原文整段贴回来。
-
-## 窗口纪律(主会话必须带窗口)
-
-主会话动辄几百次工具调用,`agent(main_id)` 整个生命周期一次给出是十几万字符,一次调用就撑爆上下文。
-查主会话一律 `agent(id, v, since=v-1)`:链已经告诉你它在第 v 版写的,你要看的是喂养第 v 版的输入,
-不是它一生。子 agent 通常几十次调用,可以不带 since。看见的行摘要只给前 3 行和全部行号,
-行号就是"该展开哪次"的指示 —— 原文一律 `action(id, n)`。

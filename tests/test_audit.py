@@ -15,7 +15,6 @@ from migloop.audit import (
     _check_missing_inputs,
     _check_pipeline_gap,
     _check_rework,
-    _check_snapshot_agents,
     _check_spec_orphan,
     build_audit,
 )
@@ -219,7 +218,7 @@ def test_findings_sorted_by_severity_and_counted() -> None:
     # 此夹具触发 execute-no-build(error) + aborted-agent(warn,已启用)
     assert [f["level"] for f in audit["findings"]] == ["error", "warn"]
     assert audit["counts"] == {"error": 1, "warn": 1, "info": 0}
-    assert len(audit["checked"]) == 11
+    assert len(audit["checked"]) == 10
 
 
 def test_clean_trace_yields_empty_findings() -> None:
@@ -347,53 +346,195 @@ def test_findings_carry_evidence_anchor() -> None:
     assert by["execute-no-build"]["anchor"] == {"stage": "a2h-execute"}
 
 
-def test_fix_chains_card_wraps_ledger_chains() -> None:
-    """返修追溯卡只包账本算好的链:文件、生成方点名、跨会话计数、锚到生成阶段;
-    不传链(摘要端点 / 进行中的会话)不出卡,也不再从血缘层另算。"""
-    chains = [{
-        "file": "A.ets", "file_abs": "/p/e/A.ets",
-        "generator": {"id": "g1", "desc": "conv A", "stage": "a2h-execute"},
-        "fixer": {"id": "f1", "desc": "vf", "stage": "arkts-visual-verify"},
-        "fixers_all": [{"id": "f1", "desc": "vf"}], "lines": {"touched": 3},
-        "gen_session": "aaaaaaaa",
-    }]
-    fs = [f for f in build_audit(_trace(), fix_chains=chains)["findings"]
-          if f["rule"] == "verify-fix-traceback"]
+def test_verify_fix_traceback_links_fixer_to_generator() -> None:
+    """返修追溯:同一文件既有 execute 生成方又有 verify/fixer 修复方才成链;
+    只有生成方(没返修)或只有修复方(修的是别处带来的文件)都不报。"""
+    t = _trace(
+        stages=[{"stage": "a2h-execute"}, {"stage": "a2h-verify"}],
+        tools=[{"name": "Bash", "brief": "hdc shell aa start", "ok": True,
+                "stage": "a2h-verify"},
+               {"name": "Bash", "brief": "hdc install x.hap", "ok": True,
+                "stage": "a2h-verify"},
+               {"name": "Bash", "brief": "hdc shell snapshot_display", "ok": True,
+                "stage": "a2h-verify"},
+               {"name": "Bash", "brief": "ohpm install", "ok": True,
+                "stage": "a2h-execute"}],
+        lineage={"agents": [
+            {"agent_id": "g1", "desc": "converter P12", "stage": "a2h-execute",
+             "type": "a2h-activity-converter", "role": "execute", "n_ets": 1,
+             "n_spec_read": 1, "shared_reads": [], "lines_android": 0, "n_proj": 1},
+            {"agent_id": "f1", "desc": "visual fix round1", "stage": "a2h-verify",
+             "type": "visual-fixer", "role": "execute", "n_ets": 1,
+             "n_spec_read": 1, "shared_reads": [], "lines_android": 0, "n_proj": 3},
+        ], "specs": [], "files": [
+            {"path": "entry/ets/pages/A.ets", "kind": "ets", "writers": ["g1", "f1"]},
+            {"path": "entry/ets/pages/B.ets", "kind": "ets", "writers": ["g1"]},
+        ]},
+    )
+    fs = [f for f in build_audit(t)["findings"] if f["rule"] == "verify-fix-traceback"]
     assert len(fs) == 1
     f = fs[0]
-    assert f["level"] == "info" and f["paths"] == ["/p/e/A.ets"]
-    assert "conv A" in f["detail"] and "1 条跨会话" in f["detail"]
-    assert f["anchor"] == {"stage": "a2h-execute"}
-    assert f["chain"][0]["fixer"]["id"] == "f1" and f["chain"][0]["gen_session"] == "aaaaaaaa"
-    assert not [x for x in build_audit(_trace())["findings"] if x["rule"] == "verify-fix-traceback"]
-    assert not [x for x in build_audit(_trace(), fix_chains=[])["findings"]
+    assert f["level"] == "info"
+    assert f["paths"] == ["entry/ets/pages/A.ets"], "只有被返修的 A 成链"
+    assert "converter P12" in f["detail"], "点名生成方"
+    assert f["anchor"] == {"stage": "a2h-execute"}, "跳到生成环节现场"
+    # 没有修复方参与时静默
+    quiet = _trace(lineage={"agents": [
+        {"agent_id": "g1", "desc": "c", "stage": "a2h-execute",
+         "type": "a2h-activity-converter", "n_proj": 1}],
+        "specs": [], "files": [
+        {"path": "e/A.ets", "kind": "ets", "writers": ["g1"]}]})
+    assert not [x for x in build_audit(quiet)["findings"]
                 if x["rule"] == "verify-fix-traceback"]
 
 
-# ---------- 主会话快照 ----------
+def test_traceback_chain_carries_five_link_evidence() -> None:
+    """链路展开:生成方(依据 spec/派发指令) + 修复方(修因文本)。"""
+    t = _trace(
+        stages=[{"stage": "a2h-execute"}, {"stage": "a2h-verify"}],
+        agents=[{"agent_id": "g1", "prompt_excerpt": "转换 F014 睡眠定时器页", "result": ""},
+                {"agent_id": "f1", "prompt_excerpt": "", "result": "修正了导航参数传递:route 缺 param 导致空白页"}],
+        lineage={"agents": [
+            {"agent_id": "g1", "desc": "converter P12", "stage": "a2h-execute",
+             "type": "a2h-activity-converter", "spec_reads": ["spec/baseline/features/F014.md"]},
+            {"agent_id": "f1", "desc": "visual fix r1", "stage": "a2h-verify",
+             "type": "visual-fixer"},
+        ], "specs": [], "files": [
+            {"path": "entry/ets/pages/A.ets", "kind": "ets", "writers": ["g1", "f1"]},
+        ]},
+    )
+    f = [x for x in build_audit(t)["findings"] if x["rule"] == "verify-fix-traceback"][0]
+    c = f["chain"][0]
+    assert c["generator"]["spec_reads"] == ["spec/baseline/features/F014.md"]
+    assert "睡眠定时器" in c["generator"]["prompt"]
+    assert "导航参数传递" in c["fixer"]["note"], "修因 = fixer 的收尾说明"
 
 
-def test_snapshot_agents_named_and_kept_out_of_aborted() -> None:
-    """上传上来的子代理转录是主会话快照:单独点名(error),不再算异常收尾。"""
-    t = _trace(agents=[
-        {"agent_id": "a1", "type": "hmos-builder", "stage": "a2h-execute",
-         "aborted": "interrupted", "output_tokens": 100, "snapshot_of_main": True},
-        {"agent_id": "a2", "type": "hmos-builder", "stage": "arkts-visual-verify",
-         "aborted": "interrupted", "output_tokens": 100, "snapshot_of_main": True},
-        {"agent_id": "a3", "desc": "real", "stage": "a2h-execute",
-         "aborted": "api_error", "output_tokens": 7},
-    ])
-    found = {f["rule"]: f for f in build_audit(t)["findings"]}
-    snap = found["agent-snapshot"]
-    assert snap["level"] == "error"
-    assert snap["agents"] == ["a1", "a2"]
-    assert snap["anchor"]["stage"] == "a2h-execute"
-    assert "a2h-execute 1 个" in snap["detail"]
-    assert "arkts-visual-verify 1 个" in snap["detail"]
-    assert "#46" in snap["detail"], "指向运行时 issue,让人知道该去哪修"
-    assert found["aborted-agent"]["agents"] == ["a3"], "快照的异常收尾是假象,不进异常收尾卡"
+def test_traceback_generalizes_to_cross_stage_takeover() -> None:
+    """泛化:没有 fixer 类型时,跨阶段接手(晚阶段写手)也成链;
+    同阶段多写手(并行分片组装)不算修复,不成链。"""
+    cross = _trace(
+        stages=[{"stage": "a2h-spec"}, {"stage": "a2h-execute"}],
+        lineage={"agents": [
+            {"agent_id": "s1", "desc": "spec writer", "stage": "a2h-spec",
+             "type": "a2h-migration-worker"},
+            {"agent_id": "e1", "desc": "late closer", "stage": "a2h-execute",
+             "type": "general-purpose"},
+        ], "specs": [], "files": [
+            {"path": "e/Cfg.ets", "kind": "ets", "writers": ["s1", "e1"]},
+        ]},
+    )
+    fs = [x for x in build_audit(cross)["findings"] if x["rule"] == "verify-fix-traceback"]
+    assert len(fs) == 1
+    assert fs[0]["chain"][0]["fixer"]["desc"] == "late closer"
+
+    same_stage = _trace(
+        stages=[{"stage": "a2h-execute"}],
+        lineage={"agents": [
+            {"agent_id": "e1", "desc": "conv A", "stage": "a2h-execute", "type": "x"},
+            {"agent_id": "e2", "desc": "conv B", "stage": "a2h-execute", "type": "x"},
+        ], "specs": [], "files": [
+            {"path": "e/A.ets", "kind": "ets", "writers": ["e1", "e2"]},
+        ]},
+    )
+    assert not [x for x in build_audit(same_stage)["findings"]
+                if x["rule"] == "verify-fix-traceback"], "同阶段并行分片不算修复"
+
+    mainline = _trace(
+        stages=[{"stage": "a2h-spec"}, {"stage": "a2h-execute"}],
+        lineage={"agents": [
+            {"agent_id": "__main__:a2h-spec", "desc": "主线spec", "stage": "a2h-spec", "type": "main-thread"},
+            {"agent_id": "__main__:a2h-execute", "desc": "主线exec", "stage": "a2h-execute", "type": "main-thread"},
+        ], "specs": [], "files": [
+            {"path": "e/W.ets", "kind": "ets", "writers": ["__main__:a2h-spec", "__main__:a2h-execute"]},
+        ]},
+    )
+    assert not [x for x in build_audit(mainline)["findings"]
+                if x["rule"] == "verify-fix-traceback"], "主线跨阶段自我完善是编排演进,不算修复"
 
 
-def test_snapshot_rule_quiet_without_flag() -> None:
-    t = _trace(agents=[{"agent_id": "aY", "aborted": "interrupted", "output_tokens": 1}])
-    assert not _direct(_check_snapshot_agents, t)
+def test_traceback_generator_follows_line_blame() -> None:
+    """有行级接手台账时,生成方 = 被修行的原作者,不再取文件首写手。"""
+    t = _trace(
+        stages=[{"stage": "a2h-execute"}, {"stage": "a2h-verify"}],
+        lineage={"agents": [
+            {"agent_id": "g0", "desc": "converter P3", "stage": "a2h-execute",
+             "type": "a2h-activity-converter",
+             "spec_reads": ["spec/baseline/features/F003.md"]},
+            {"agent_id": "g1", "desc": "converter P12", "stage": "a2h-execute",
+             "type": "a2h-activity-converter"},
+            {"agent_id": "f1", "desc": "visual fix r1", "stage": "a2h-verify",
+             "type": "visual-fixer"},
+        ], "specs": [], "files": [
+            {"path": "entry/ets/pages/A.ets", "kind": "ets",
+             "writers": ["g1", "g0", "f1"],
+             "takeovers": [{"by": "f1", "lines": 3, "from": {"g0": 3}}],
+             "blame_broken": None},
+        ]},
+    )
+    f = [x for x in build_audit(t)["findings"] if x["rule"] == "verify-fix-traceback"][0]
+    c = f["chain"][0]
+    assert c["generator"]["id"] == "g0", "被修 3 行的原作者是 g0,不是首写手 g1"
+    assert c["generator"]["spec_reads"] == ["spec/baseline/features/F003.md"]
+    assert c["lines"] == {"touched": 3, "from": [{"id": "g0", "desc": "converter P3", "n": 3}]}
+
+
+def test_traceback_blame_broken_falls_back_to_writers() -> None:
+    """重放断链时退回文件级首写手,并把原因带给 UI。"""
+    t = _trace(
+        stages=[{"stage": "a2h-execute"}, {"stage": "a2h-verify"}],
+        lineage={"agents": [
+            {"agent_id": "g1", "desc": "converter P12", "stage": "a2h-execute",
+             "type": "a2h-activity-converter"},
+            {"agent_id": "f1", "desc": "visual fix r1", "stage": "a2h-verify",
+             "type": "visual-fixer"},
+        ], "specs": [], "files": [
+            {"path": "entry/ets/pages/A.ets", "kind": "ets",
+             "writers": ["g1", "f1"], "blame_broken": "edit-miss"},
+        ]},
+    )
+    f = [x for x in build_audit(t)["findings"] if x["rule"] == "verify-fix-traceback"][0]
+    c = f["chain"][0]
+    assert c["generator"]["id"] == "g1"
+    assert c.get("lines") is None
+    assert c["blame_broken"] == "edit-miss"
+
+
+def test_closer_inside_execute_is_generator_not_fixer() -> None:
+    """execute 内部的收尾(group closer 修 build error)属于**生成侧** ——
+    正式口径:a2h-execute 结束才是修复开始的标志。把一组产出收尾到可编译
+    是"生成完成"的一部分,返修是交付之后别人回来改。
+    (取代旧的 TEMP-closer 临时判定,见 memory migloop-fixer-closer-temp-debt)"""
+    t = _trace(
+        stages=[{"stage": "a2h-execute"}],
+        lineage={"agents": [
+            {"agent_id": "g1", "desc": "Slice 5 F008 主题", "stage": "a2h-execute",
+             "type": "general-purpose"},
+            {"agent_id": "c1", "desc": "Batch 7 closer", "stage": "a2h-execute",
+             "type": "general-purpose"},
+        ], "specs": [], "files": [
+            {"path": "e/A.ets", "kind": "ets", "writers": ["g1", "c1"]},
+        ]},
+    )
+    assert not [x for x in build_audit(t)["findings"]
+                if x["rule"] == "verify-fix-traceback"]
+
+
+def test_traceback_needs_stage_after_execute() -> None:
+    """同一组 agent,把写手挪到 verify 阶段就成链 —— 判据只有阶段。"""
+    t = _trace(
+        stages=[{"stage": "a2h-execute"}, {"stage": "arkts-visual-verify"}],
+        lineage={"agents": [
+            {"agent_id": "g1", "desc": "Slice 5 F008 主题", "stage": "a2h-execute",
+             "type": "general-purpose"},
+            {"agent_id": "f1", "desc": "Batch 7 收尾", "stage": "arkts-visual-verify",
+             "type": "general-purpose"},
+        ], "specs": [], "files": [
+            {"path": "e/A.ets", "kind": "ets", "writers": ["g1", "f1"]},
+        ]},
+    )
+    fs = [x for x in build_audit(t)["findings"] if x["rule"] == "verify-fix-traceback"]
+    assert len(fs) == 1
+    c = fs[0]["chain"][0]
+    assert c["fixer"]["id"] == "f1"
+    assert c["generator"]["id"] == "g1"
