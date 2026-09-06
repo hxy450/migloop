@@ -93,8 +93,14 @@ def render_index(ledger: atoms.Ledger, kind: str | None = None, query: str | Non
               and (not q or q in f["path"].lower())]
         out.append(f"## 文件 ({len(fs)})")
         for f in fs[:limit]:
-            tag = f"{f['n_versions']} 版" + ("" if f["has_writer"] else " · 只被读过(外部输入)")
-            out.append(f"- {rel(f['path'], root)} | {f['kind']} | {tag} · 读 {f['n_reads']}")
+            if f["has_writer"]:
+                tag = f"{f['n_versions']} 版"
+            elif not f["n_versions"] and f.get("n_touches"):
+                tag = "只被脚本碰过(方向不明)"
+            else:
+                tag = f"{f['n_versions']} 版 · 只被读过(外部输入)"
+            touch = f" · 碰过 {f['n_touches']}" if f.get("n_touches") else ""
+            out.append(f"- {rel(f['path'], root)} | {f['kind']} | {tag} · 读 {f['n_reads']}{touch}")
         if len(fs) > limit:
             out.append(f"  …还有 {len(fs) - limit} 个,用 query/kind 缩小")
     return "\n".join(out)
@@ -143,8 +149,9 @@ def render_file(ledger: atoms.Ledger, hint: str, v: int | None = None, root: str
         if not vv["content_known"]:
             extra.append("内容未知")
         mark = " ◀" if vv["v"] == anchor else ""
+        ptr = f" (#{vv['seq']})" if vv.get("seq") is not None else ""   # 写它那次调用,action 一跳展开
         out.append(f"- v{vv['v']} ← {_who(ledger, vv['by'], vv['by_ver'])} | {vv['ts'][5:16]} {vv.get('t') or ''} | "
-                   f"{vv['diff_kind']}" + (" · " + " · ".join(extra) if extra else "") + mark)
+                   f"{vv['diff_kind']}" + (" · " + " · ".join(extra) if extra else "") + ptr + mark)
         if diff and vv.get("diff"):
             out.append("```diff\n" + _clip(vv["diff"], 6000) + "\n```")
     readers = [r for r in fa["readers"] if r["v"] == anchor]
@@ -153,6 +160,12 @@ def render_file(ledger: atoms.Ledger, hint: str, v: int | None = None, root: str
         span = _read_span(r)
         flags = ("" if r["certain"] else " · 版本就近绑定(不确定)") + (" · 依赖读" if r["dep"] else "")
         out.append(f"- {_who(ledger, r['by'], r['at'])} | {r['ts'][5:16]} {r.get('t') or ''} | {span}{flags}")
+    if fa.get("touches"):
+        # 脚本碰过它但账本判不出读写:不立版本,只给指针 —— 展开 action 看原文,别当它没被改过
+        out.append(f"## 碰过它、方向不明的调用({len(fa['touches'])}) —— 不立版本;action(id, n) 展开看是读是写")
+        for t in fa["touches"]:
+            out.append(f"- {_who(ledger, t['by'], t['by_ver'])} | {t['ts'][5:16]} {t.get('t') or ''} | {t['reason']}"
+                       f" | action(#{t['seq']})")
     if content:
         if fa["content"] is None:
             out.append("## 内容: 无法复原")
@@ -412,6 +425,26 @@ def render_chains(payload: dict[str, Any], root: str = "", file: str | None = No
         for ff in c.get("fixers_all") or []:
             if ff.get("note"):
                 out.append(f"  修因({ff.get('desc')}): {_clip(ff['note'], 400)}")
+    touched = payload.get("touched") or []
+    if touched:
+        # 链是「确定的写」算出来的;脚本碰过但方向不明的工程文件不在链里,指针摆在这里,别让它隐身。
+        # 0723 有 83 次(vv-static-B 一张数据表就碰了 24 个 .ets),按文件归组,agent id 单列一张对照表
+        t0 = str(payload.get("t0") or "")
+        by_path: dict[str, list[dict[str, Any]]] = {}
+        for t in touched:
+            by_path.setdefault(str(t["path"]), []).append(t)
+        out.append(f"## 修复期被脚本碰过、方向不明的工程文件({len(by_path)} 个文件,{len(touched)} 次)"
+                   " —— 不在链里;action(agent id, #n) 展开看是不是写")
+        ids: dict[str, str] = {}
+        for path, ts in by_path.items():
+            parts = []
+            for t in ts:
+                name = str(t.get("by_name") or t["by"])
+                ids.setdefault(name, str(t["by"]))
+                when = atoms.rel_time(t.get("ts"), t0) or str(t.get("ts") or "")[5:16]
+                parts.append(f"{name} v{t.get('by_ver')} #{t['seq']} {when} {t.get('reason')}")
+            out.append(f"- {rel(path, root)} | {len(ts)} 次 | " + " · ".join(parts))
+        out.append("  agent id: " + ", ".join(f"{n} = {i}" for n, i in ids.items()))
     return "\n".join(out)
 
 

@@ -247,6 +247,10 @@ def fixchain_payload(path: str) -> dict[str, Any]:
         chains = filestory.build_fix_chains(ledger.stories, meta_map, fixer_map,
                                             root=cwd or None, fix_after=ledger.fix_after)
         session_of = {k: a.session for k, a in ledger.agents.items()}
+        # 脚本碰过但方向不明的工程文件:不在链里,指针摆在链旁边(0723 修复真正改错值的 F012ViewModel 就靠它露面)
+        touched = filestory.fix_period_touches(ledger.stories, root=cwd or None, fix_after=ledger.fix_after)
+        for t in touched:
+            t["by_name"] = atoms.agent_label(ledger, str(t["by"]))
         cur_sid8 = str(meta.get("session_id") or "")[:8]
         cur_ledger_sid = ledger_main_sid8(ledger, path, fmt, cur_sid8)
         n_cross = 0
@@ -265,7 +269,7 @@ def fixchain_payload(path: str) -> dict[str, Any]:
             cross = {"priors": [str((t.get("meta") or {}).get("session_id") or "")[:8]
                                 for t in prior_traces],
                      "n_cross": n_cross}
-        payload = {"chains": chains, "cross": cross, "t0": ledger.t0}
+        payload = {"chains": chains, "cross": cross, "t0": ledger.t0, "touched": touched}
         _put(_FIXCHAIN_CACHE, path, (key, payload))
         return payload
 

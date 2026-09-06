@@ -536,6 +536,23 @@ def test_build_fix_chains_scope_is_project_code_under_root() -> None:
     assert is_project_code("C:/w/build/x.ets", "C:\\w\\") is False
 
 
+def test_fix_period_touches_lists_project_files_touched_after_execute() -> None:
+    """修复期被脚本碰过、方向不明的工程文件:只列指针不立版本;范围与链同一口径(root 之下的代码/配置);
+    有 fix_after 按时刻,没有按阶段名。"""
+    from migloop.filestory import FileStory, Touch, fix_period_touches
+    st = {
+        "/p/entry/src/main/ets/A.ets": FileStory("/p/entry/src/main/ets/A.ets", touches=[
+            Touch("T01", 5, "agent-g", 1, "脚本黑盒", "a2h-execute"),
+            Touch("T03", 9, "agent-f", 2, "脚本黑盒", "arkts-visual-verify")]),
+        "/p/spec/x.md": FileStory("/p/spec/x.md", touches=[Touch("T03", 11, "agent-f", 2, "脚本黑盒", None)]),
+        "/tmp/y.ets": FileStory("/tmp/y.ets", touches=[Touch("T03", 12, "agent-f", 2, "脚本黑盒", None)]),
+    }
+    got = fix_period_touches(st, root="/p", fix_after="T02")
+    assert [(t["file"], t["seq"], t["by"], t["by_ver"], t["has_versions"]) for t in got] \
+        == [("A.ets", 9, "agent-f", 2, False)]
+    assert [t["seq"] for t in fix_period_touches(st, root="/p")] == [9]          # 没 marks:按阶段名
+
+
 def test_build_fix_chains_marks_template_file_first_modified_in_fix_phase() -> None:
     """生成期从没写过、修复期才改的模板/外部文件(0723 的 module.json5、color.json;DiceRoller 的 oh-package.json5)
     不是「修复期新建」—— 文件一直在,是生成期没改它。单独一种 kind=template,问题从"为什么没有它"变成

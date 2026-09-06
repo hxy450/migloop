@@ -165,7 +165,9 @@ def test_script_literal_tendency_fallback_only_for_small_scripts(tmp_path: Any) 
     led = _ledger(tmp_path, main)
     assert led.stories["/proj/ui/page.md"].versions[0].via == "script"      # 小脚本:倾向兜底照旧
     assert "/proj/spec/static.json" in led.stories                            # 显式 open(...,'w') 照旧
-    assert not any(p.endswith(".ets") for p in led.stories)                   # 数据表里的路径不再是写
+    ets = {p: st for p, st in led.stories.items() if p.endswith(".ets")}
+    assert ets and not any(st.versions for st in ets.values())               # 数据表里的路径不再是写…
+    assert sum(len(st.touches) for st in ets.values()) == 6                   # …只记「碰过、方向不明」
     runs = [a for a in led.agents[MAIN_ID].actions if a.tool == "Bash"]
     assert runs[0].detail.get("unresolved") is None
     assert runs[1].detail.get("unresolved") == "脚本字面量方向不明"
@@ -1160,6 +1162,43 @@ def test_grep_hit_reads_are_not_labeled_full_text(tmp_path: Any) -> None:
     assert "2-2行" in lines[2]
     agent_txt = atoms_text.render_agent(led, MAIN_ID, None, root="/proj")
     assert "[命中 1 行 写前读]" in agent_txt and "[2-2行 写前读]" in agent_txt
+
+
+def test_script_touch_shows_on_file_atom_and_index(tmp_path: Any) -> None:
+    """0723 AboutUsPage:修复方用 python heredoc 读改写 F012ViewModel.ets(既读又写,方向不猜),账本只在修复方的
+    时间线上挂 ⚠,file(F012ViewModel) 显示只有一版 —— 从文件这边看不见有人碰过它。碰过的路径记成 touch:不立版本、
+    不猜方向,file 原子列出来带动作号;版本脊柱也带写它那次调用的动作号,展开一跳可达;从没写过只被碰过的文件也进目录。"""
+    script = ("cd /proj && python3 - <<'PYEOF'\np='entry/F.ets'\ns=open(p).read()\nopen(p,'w').write(s.replace('a','b'))\n"
+              "q='entry/New.ets'\nt=open(q).read()\nopen(q,'w').write(t)\nPYEOF")
+    main = [
+        *_call("2026-01-01T00:00:00Z", "t0", "Write", {"file_path": "/proj/entry/F.ets", "content": "a\n"}),
+        *_call("2026-01-01T00:00:10Z", "t1", "Bash", {"command": script}, out="ok"),
+    ]
+    led = _ledger(tmp_path, main)
+    write_act = next(a for a in led.agents[MAIN_ID].actions if a.tool == "Write")
+    bash = next(a for a in led.agents[MAIN_ID].actions if a.tool == "Bash")
+    assert bash.detail.get("unresolved") and bash.detail["touched"] == ["/proj/entry/F.ets", "/proj/entry/New.ets"]
+    assert len(led.stories["/proj/entry/F.ets"].versions) == 1                       # 没猜出一版写
+    fa = atoms.file_atom(led, "F.ets", None)
+    assert fa["versions"][0]["seq"] == write_act.seq                                 # 写 v1 那次调用的动作号
+    assert [(t["by"], t["seq"], t["reason"]) for t in fa["touches"]] == [(MAIN_ID, bash.seq, bash.detail["unresolved"])]
+    text = atoms_text.render_file(led, "F.ets", None, root="/proj")
+    assert f"(#{write_act.seq})" in text and "碰过它、方向不明" in text and f"action(#{bash.seq})" in text
+    new = atoms.file_atom(led, "New.ets", None)
+    assert new is not None and new["n_versions"] == 0 and len(new["touches"]) == 1
+    assert "只被脚本碰过(方向不明)" in atoms_text.render_index(led, "ets", None, root="/proj")
+
+
+def test_render_chains_lists_fix_period_touches() -> None:
+    """sessions 末尾列出修复期被脚本碰过、方向不明的工程文件:不在链里,但指针在,模型看到就能展开。"""
+    payload = {"chains": [], "cross": None, "t0": "2026-01-01T00:00:00Z",
+               "touched": [{"path": "/p/entry/src/main/ets/viewmodels/F012ViewModel.ets", "file": "F012ViewModel.ets",
+                            "by": "agent-afix", "by_name": "fixer-r1", "by_ver": 17, "ts": "2026-01-01T01:00:00Z",
+                            "seq": 23261, "reason": "脚本黑盒", "has_versions": True}]}
+    text = atoms_text.render_chains(payload, root="/p")
+    assert "修复期被脚本碰过、方向不明的工程文件(1 个文件,1 次)" in text
+    assert "- entry/src/main/ets/viewmodels/F012ViewModel.ets | 1 次 | fixer-r1 v17 #23261 T+1:00 脚本黑盒" in text
+    assert "fixer-r1 = agent-afix" in text                                    # 展开要 agent id,给一张对照表
 
 
 def test_script_literal_used_as_mapping_value_is_not_a_write(tmp_path: Any) -> None:

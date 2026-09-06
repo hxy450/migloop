@@ -27,6 +27,7 @@ from migloop.filestory import (
     OUTBAND,
     Ev,
     FileStory,
+    Touch,
     build_stories,
     find_story_path,
     line_origins,
@@ -210,6 +211,7 @@ def build_ledger(agents: dict[str, AgentRec]) -> Ledger:
             index[(path, r.seq)] = r.version
             certain[(path, r.seq)] = r.certain
     feeds: dict[tuple[str, int], int] = {}
+    act_seq: dict[tuple[str, int], int] = {}
     for a in agents.values():
         for act in a.actions:
             for ref in act.files:
@@ -217,6 +219,17 @@ def build_ledger(agents: dict[str, AgentRec]) -> Ledger:
                 if ref.op == "read":
                     feeds[(ref.path, ref.ev.seq)] = act.at
                     ref.certain = certain.get((ref.path, ref.ev.seq), True)
+                else:
+                    act_seq[(ref.path, ref.ev.seq)] = act.seq
+            # 脚本碰过但方向不明的路径:不立版本,挂到文件原子上(没写过的文件也进目录),指针指回这次调用
+            for p in act.detail.get("touched") or []:
+                st = stories.setdefault(p, FileStory(p))
+                st.touches.append(Touch(act.ts, act.seq, a.id, act.ver if act.ver is not None else act.at,
+                                        str(act.detail.get("unresolved") or "方向不明"), act.stage))
+    for path, st in stories.items():
+        for ver in st.versions:
+            ver.act_seq = act_seq.get((path, ver.seq))
+        st.touches.sort(key=lambda t: (t.ts, t.seq))
     t0 = min((act.ts for a in agents.values() for act in a.actions if act.ts), default="")
     return Ledger(stories, agents, feeds, t0)
 
@@ -408,7 +421,7 @@ def file_atom(ledger: Ledger, hint: str, v: int | None = None,
         row: dict[str, Any] = {
             "v": ver.v, "ts": ver.ts, "t": rel_time(ver.ts, ledger.t0), "by": ver.by,
             "by_name": _agent_label(ledger.agents, ver.by),
-            "by_ver": ver.by_ver, "via": ver.via, "source": ver.source,
+            "by_ver": ver.by_ver, "seq": ver.act_seq, "via": ver.via, "source": ver.source,
             "diff_kind": ver.diff_kind, "sealed": ver.sealed,
             "lines": (ver.content.count("\n") + 1) if ver.content else None,
             "has_diff": ver.diff is not None,
@@ -425,9 +438,12 @@ def file_atom(ledger: Ledger, hint: str, v: int | None = None,
                 "seen": [list(x) for x in r.seen] if r.seen else None,
                 "seen_n": len(r.seen or ()), "full": r.full}
                for r in st.reads]
+    touches = [{"by": t.by, "by_name": _agent_label(ledger.agents, t.by), "by_ver": t.by_ver,
+                "ts": t.ts, "t": rel_time(t.ts, ledger.t0), "seq": t.seq, "reason": t.reason}
+               for t in st.touches]
     return {
         "path": path, "v": vers[-1].v if vers else 0, "n_versions": len(st.versions),
-        "versions": out, "readers": readers, "t0": ledger.t0,
+        "versions": out, "readers": readers, "touches": touches, "t0": ledger.t0,
         "content": content if with_content else None, "content_known": content is not None,
         "breaks": [{"ts": b.ts, "kind": b.kind, "detail": b.detail} for b in st.breaks],
     }
@@ -449,7 +465,7 @@ def ledger_index(ledger: Ledger) -> dict[str, Any]:
         files.append({
             "path": path, "kind": file_kind(path), "n_versions": len(st.versions),
             "has_writer": any(ver.by not in (EXTERNAL, OUTBAND) for ver in st.versions),
-            "n_reads": len(st.reads),
+            "n_reads": len(st.reads), "n_touches": len(st.touches),
         })
     agents = []
     for a in ledger.agents.values():

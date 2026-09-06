@@ -92,6 +92,7 @@ class Version:
     by_ver: int | None = None  # 写者的 agent 版本号(观测/外部版本无)
     via: str = "tool"         # 写者来路;观测/外部 = observe
     stage: str | None = None  # 写这一版时的管线阶段(修复方判定:execute 之后即修复)
+    act_seq: int | None = None  # 写它那次工具调用的动作号(action 展开用),build_ledger 回填
 
 
 @dataclass
@@ -118,11 +119,23 @@ class Break:
 
 
 @dataclass
+class Touch:
+    """脚本碰过这个路径但方向不明(既读又写 / 判不出):不立版本、不猜读写,只留动作号让人展开 action 看原文。"""
+    ts: str
+    seq: int                  # 动作号(action 展开用)
+    by: str
+    by_ver: int | None
+    reason: str
+    stage: str | None = None
+
+
+@dataclass
 class FileStory:
     path: str
     versions: list[Version] = field(default_factory=list)
     reads: list[ReadRec] = field(default_factory=list)
     breaks: list[Break] = field(default_factory=list)
+    touches: list[Touch] = field(default_factory=list)
 
 
 def _udiff(a: str | None, b: str | None) -> str | None:
@@ -690,6 +703,28 @@ def is_project_code(path: str, root: str | None) -> bool:
     if low.endswith(_CODE_EXT):
         return True
     return low.endswith(".json") and "resources" in parts[:-1]
+
+
+def fix_period_touches(stories: dict[str, FileStory], *, root: str | None = None,
+                       fix_after: str | None = None) -> list[dict[str, Any]]:
+    """修复期被脚本碰过、方向不明的工程文件:不猜它是不是写,只把指针摆到链的清单旁边。
+    范围与链同一口径(is_project_code);有 fix_after 按时刻,没有按阶段名。
+    0723 AboutUsPage 那次修复真正改错值的是 F012ViewModel.ets,修复方用 python heredoc 读改写,
+    账本没立版本、不成链,从 sessions 出发永远看不见它 —— 这里把它列出来。"""
+    key = ts_norm(fix_after) if fix_after else None
+    out: list[dict[str, Any]] = []
+    for path, st in sorted(stories.items()):
+        if not st.touches or not is_project_code(path, root):
+            continue
+        for t in st.touches:
+            if key is not None:
+                if ts_norm(t.ts) < key:
+                    continue
+            elif not agent_is_fixer({"stage": t.stage}):
+                continue
+            out.append({"path": path, "file": path.rsplit("/", 1)[-1], "by": t.by, "by_ver": t.by_ver,
+                        "ts": t.ts, "seq": t.seq, "reason": t.reason, "has_versions": bool(st.versions)})
+    return out
 
 
 def _first_seen_writers(st: FileStory, vs: list[int]) -> list[str]:

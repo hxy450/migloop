@@ -100,14 +100,16 @@ def _resolve(p: object, base: str | None) -> str | None:
 _TENDENCY_MAX_LITERALS = 3
 
 
-def _literal_ops(code: str, base: str | None) -> tuple[list[FileOp], int]:
+def _literal_ops(code: str, base: str | None) -> tuple[list[FileOp], int, list[str]]:
     """脚本正文里的文件字面量 → 读/写。按紧邻的调用形态判方向;判不出的只在小脚本里按
-    全文倾向(只写/只读)兜底,其余放弃并计数 —— 宁可漏,但要能报出自己。返回 (ops, 放弃的字面量数)。"""
+    全文倾向(只写/只读)兜底,其余放弃并计数 —— 宁可漏,但要能报出自己。
+    返回 (ops, 放弃的字面量数, 放弃的那些路径):放弃的不猜方向,记成「碰过」,让 file / sessions 能把指针摆出来。"""
     body_w, body_r = bool(_WRITEISH.search(code)), bool(_READISH.search(code))
     lits = list(_LIT.finditer(code))
     tendency_ok = len(lits) <= _TENDENCY_MAX_LITERALS
     ops: list[FileOp] = []
     undetermined = 0
+    touched: list[str] = []
     for m in lits:
         after = code[m.end():m.end() + 40]
         before = code[max(0, m.start() - 40):m.start()]
@@ -131,11 +133,14 @@ def _literal_ops(code: str, base: str | None) -> tuple[list[FileOp], int]:
             op = "read"
         else:
             undetermined += 1
+            tp = _resolve(m.group(1), base)
+            if tp and tp not in touched:
+                touched.append(tp)
             continue
         p = _resolve(m.group(1), base)
         if p:
             ops.append(FileOp(op, p, "script"))
-    return ops, undetermined
+    return ops, undetermined, touched
 
 
 #: bash 习惯:S=/sdk/api; sed -n '570,625p' $S/x.d.ts —— 同一条命令里赋了字面量的变量可代换;
@@ -285,12 +290,13 @@ def _head_word(words: list[str]) -> tuple[str, list[str]]:
 
 
 def _shell_analyze(cmd: str, cwd: object, scripts: dict[str, str],
-                   out: str = "") -> tuple[list[FileOp], bool, int]:
-    """一条 shell 命令 → (文件读写, 「有写能力但目标不全可知」标记, 放弃方向判定的脚本字面量数)。
+                   out: str = "") -> tuple[list[FileOp], bool, int, list[str]]:
+    """一条 shell 命令 → (文件读写, 「有写能力但目标不全可知」标记, 放弃方向判定的脚本字面量数, 放弃的路径)。
     out = stdout,目录 grep / 多文件 head 这类命令里看不出目标的,按 stdout 反证。"""
     ops: list[FileOp] = []
     capable = False
     undetermined = 0
+    touched: list[str] = []
     text, bodies = _strip_heredocs((cmd or "").replace("\\\n", " "))
     # 同一条命令里赋了字面量的变量代换到引用处(PowerShell / bash 两种写法);静态列表循环展开。
     # 没赋值的($HOME 等)、项带通配的循环照旧放弃
@@ -350,9 +356,10 @@ def _shell_analyze(cmd: str, cwd: object, scripts: dict[str, str],
                 add("delete", p)
         if head in _PY and "-c" in args and args.index("-c") + 1 < len(args):
             code = args[args.index("-c") + 1]
-            lit_ops, und = _literal_ops(code, base)
+            lit_ops, und, tch = _literal_ops(code, base)
             ops += lit_ops
             undetermined += und
+            touched += tch
             capable = capable or bool(_WRITEISH.search(code))
         if head in _RUNNERS:
             run = next((w for w in args if _SCRIPT_RUN.search(w) and not w.startswith("-")), None)
@@ -361,9 +368,10 @@ def _shell_analyze(cmd: str, cwd: object, scripts: dict[str, str],
                 if body is None:
                     capable = True                # 会话外脚本:目标不可知
                 else:
-                    lit_ops, und = _literal_ops(body, base)
+                    lit_ops, und, tch = _literal_ops(body, base)
                     ops += lit_ops
                     undetermined += und
+                    touched += tch
                     capable = capable or bool(_WRITEISH.search(body))
     if out and grep_ctx:
         gb, has_n, names_only = grep_ctx[-1]
@@ -377,15 +385,25 @@ def _shell_analyze(cmd: str, cwd: object, scripts: dict[str, str],
                 if op.op == "write" and op.path == hd_target:
                     op.content, op.via = body, "shell"
             continue
-        lit_ops, und = _literal_ops(body, base)
+        lit_ops, und, tch = _literal_ops(body, base)
         ops += lit_ops
         undetermined += und
+        touched += tch
         capable = capable or bool(_WRITEISH.search(body))
-    return ops, capable, undetermined
+    return ops, capable, undetermined, touched
 
 
 def shell_file_ops(cmd: str, cwd: object, scripts: dict[str, str], out: str = "") -> list[FileOp]:
     return _shell_analyze(cmd, cwd, scripts, out)[0]
+
+
+def _note_touched(detail: dict[str, Any], touched: list[str], ops: list[FileOp]) -> None:
+    """脚本里出现了路径但方向不明的,记成「碰过」:不立版本、不猜读写,file / sessions 把指针摆出来让人展开。
+    0723 修复方用 python heredoc 读改写 F012ViewModel.ets,既读又写就放弃了,文件那边看不见有人碰过它。"""
+    seen = {o.path for o in ops}
+    tch = sorted({p for p in touched if p not in seen})
+    if tch:
+        detail["touched"] = tch
 
 
 # ═══════════════ 工具 → 动作 ═══════════════
@@ -539,7 +557,7 @@ def _file_ops(name: str, inp: dict[str, Any], out: str, tur: Any, cwd: object,
             ops.append(FileOp("write", p, "tool"))
     elif name in ("Bash", "PowerShell"):
         cmd = str(inp.get("command") or "")
-        ops, capable, undetermined = _shell_analyze(cmd, cwd, scripts, out)
+        ops, capable, undetermined, touched = _shell_analyze(cmd, cwd, scripts, out)
         if capable:
             detail["write_capable"] = True
         if not ops:
@@ -548,6 +566,7 @@ def _file_ops(name: str, inp: dict[str, Any], out: str, tur: Any, cwd: object,
                 detail["unresolved"] = why      # 不许静默:解析不了的读写要能报出自己
         if undetermined and "unresolved" not in detail:
             detail["unresolved"] = "脚本字面量方向不明"
+        _note_touched(detail, touched, ops)
         tgt = _clean_single_cat(cmd)
         if tgt and out.strip() and not out.lower().startswith(_ERRISH):
             p = _resolve(tgt, _resolve(cwd, None))
@@ -848,7 +867,7 @@ def _codex_exec_ops(raw_arg: Any, out_text: str, cwd: object,
         detail.setdefault("cmd", " ".join(cmd.split())[:200])
         # 单条 shell 调用时 stdout 就是它的:目录 grep / 多文件 head 按 stdout 反证(与 CC 的 Bash 同一套)
         single = len(shell_calls) == 1 and ok
-        sub_ops, capable, undetermined = _shell_analyze(cmd, wdir, scripts, stdout if single else "")
+        sub_ops, capable, undetermined, touched = _shell_analyze(cmd, wdir, scripts, stdout if single else "")
         if capable:
             detail["write_capable"] = True
         if single and not sub_ops:
@@ -857,6 +876,7 @@ def _codex_exec_ops(raw_arg: Any, out_text: str, cwd: object,
                 detail["unresolved"] = why      # 不许静默(与 CC 同一条规矩)
         if undetermined and "unresolved" not in detail:
             detail["unresolved"] = "脚本字面量方向不明"
+        _note_touched(detail, touched, sub_ops)
         if len(shell_calls) == 1 and ok:
             tgt = _clean_single_cat(cmd)
             if tgt and stdout.strip() and not stdout.lower().startswith(_ERRISH):
