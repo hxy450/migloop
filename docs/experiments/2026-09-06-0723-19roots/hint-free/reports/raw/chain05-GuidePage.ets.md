@@ -1,0 +1,18 @@
+```
+文件: entry/src/main/ets/pages/GuidePage.ets  修复方: visual-fixer(fixer-r1, toolUseId toolu_01APi9vUJuvdDSBK2JqMebM4, 会话 ff019d8a / subagents/agent-a68daf720e780b4c2.jsonl)  修改时间: 2026-07-26T20:46:28Z ~ 21:29:04Z(4 次 Edit)
+修复改了什么: 三处——(1) 返回按钮 Image 由 `.width(24).height(24).padding(20)` 改为 `.width(10+20*2).height(16+20*2)`；(2) 新增 `const TRACK_HEIGHT = 4`，把进度条两条 Row 的 `.height('100%')`/`.borderRadius(10)` 改成 `TRACK_HEIGHT`/`TRACK_HEIGHT/2`；(3) 给宿主 Swiper 加 `.padding({bottom: this.windowModel.windowBottomPadding})`。
+修复的依据: round-1 双端实机行走 + 截图像素比对产出的三张单：`SYSTEMIC_image-no-explicit-size`(fixer prompt 第 1 行即点名「GuidePage.ets:172 那处要连 padding 一起改——ArkUI 的 padding 计入已声明尺寸，内容区为负」)、`ALIGN_PGuideActivity_component_mismatch_progress-bar`(agent-a68daf...:439「轨道被画满整个 65px…视觉厚度约为安卓的 4 倍」)、`ALIGN_PGuideDifficulty1Fragment_layout_drift_bottom-buttons`(:569「底部按钮行整体下移约 2.7% 屏高」)。改前 fixer 自己回源取证：读 activity_guide.xml:24-32(:163)、`sips` 量 ic_guide_back.webp = 30x48px(:166)、cat seekbar_horizontal_style.xml 见三层 `<size android:height="4dp"/>`(:467)。
+被改代码的来源: 返回按钮与 progressBar 两处均由生成轮 conv-guide(agentType `a2h-activity-converter`)首写——9b3105a2/subagents/agent-aconv-guide-979179ee8c5e2b3d.jsonl:64 Write，2026-07-24T02:07:48.449Z，uuid b9a09eef-0456-4093-abb9-17832d9320ac；依据是它读到的 activity_guide.xml(iv_back `wrap_content`+`padding 20dp`；sb_change `200dp x 20dp`)，24x24 是无源猜测(全程未探过 webp 固有尺寸)，20vp 满高轨道来自把 SeekBar 的控件框高当成了轨道高。同日 18:34:49(agent-aslice15-guide-...:181 Write)整页重写时把这两段原样搬运。底部避让是纯新增：conv-guide/slice15 都按 arkts-immersive-safearea 只做了顶部 `guideTopInset`，底部从未接 `windowBottomPadding`。
+生成时为什么没做好: 断在「资源摘要」这一环——conv-guide 只 grep 了 spec/baseline/plans/resource-mapping.md(:38/:39)，而该文件第 551 行对 seekbar_horizontal_style.xml 只记了颜色和「radius 34dp」，把决定粗细的 `<size android:height="4dp"/>` 漏掉了，converter 遂照摘要写满高；同理 ui-migration-pitfalls.md(:34/:35)只有 P-15(objectFit)，没有「padding 计入已声明尺寸 / Image 不写尺寸会撑满父容器」这条，知识库里根本没有能拦住 `.width(24).padding(20)` 的规则。
+是否必要: 必要(前两处) / 存疑(第三处)——返回箭头内容盒为负导致图标零绘制、轨道粗 4 倍都是确证的可见缺陷；底部 padding 方向对但量级未验(fixer 按 prompt「不重编不复测」落盘)。
+证据(每条带位置):
+  1. 四次修改及新旧串：agent-a68daf720e780b4c2.jsonl:168 / :469 / :473 / :580(2026-07-26T20:46:28.160Z…21:29:04.142Z)。
+  2. 修复方身份与授权：agent-a68daf720e780b4c2.meta.json(`agentType: visual-fixer`, `name: fixer-r1`)+ 同文件:1 的任务书直接写明 GuidePage.ets:172 的 padding 语义。
+  3. 缺陷现象与判据：主会话 ff019d8a-5172-4cdd-8ce3-77a21682c1b6.jsonl:1446/1666 —「back arrow never renders on 4 guide pages… Node exists, tap works (verified: page-back + progress 33.4%→16.6%)」；:439 记进度条填充比例逐页与安卓一致、仅轨道粗细不同。
+  4. 真值来源：agent-a68daf...:467 的 seekbar_horizontal_style.xml 三层 `<size android:height="4dp"/>`；:166 `ic_guide_back.webp pixelWidth:30 pixelHeight:48`(@3x → 10x16vp)。
+  5. 原始写者与依据：agent-aconv-guide-979179ee8c5e2b3d.jsonl:18/:19 读 activity_guide.xml(iv_back wrap_content+padding 20dp、sb_change 200x20dp) → :64 Write 出 `.width(24).height(24).padding(20)` 与两条 `.height('100%')`。
+  6. 摘要漏真值：同文件:38/:39 —— conv-guide 对 seekbar 只做了 grep，命中的 resource-mapping.md:551 仅有颜色与「radius 34dp」，全文件中它见过的唯一「dp 尺寸」就是这个 34dp，从未 Read 过 drawable 原文。
+  7. 缺陷被搬运：agent-aslice15-guide-a061e53a1d9503b4.jsonl:181(2026-07-24T18:34:49.727Z)整页 Write 中两段代码逐字未变；此后生成轮对该文件的唯一 Edit(agent-agroup3-closer-...:186)只改箭头函数块体，与本次三处无关。
+无法确认的部分: (a) 第三处 `.padding({bottom: windowBottomPadding})` 是否真把按钮行推回安卓的 86.9%——fixer 按 prompt 明令「不重编、不复测」，转录里没有改后截图或复量；(b) resource-mapping.md 是哪个生成轮 agent 产出、为何漏掉 `<size>`，本次未追到它的写入记录；(c) 返回按钮改后 50x56vp 的点击热区比安卓 wrap_content+padding 实际热区是否等价，无实测。
+置信: 高——三处改动的旧串/新串、驱动它的三张单、fixer 现场取的两个真值(4dp、30x48px)、以及首写者的 Write 记录和它当时看到的全部输入(activity_guide.xml + resource-mapping 摘要)都在转录里逐条对得上；仅第三处的效果未验证。
+```

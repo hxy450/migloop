@@ -1,0 +1,18 @@
+```
+文件: entry/src/main/ets/pages/LoginPage.ets  修复方: visual-fixer「fixer-r1」(agent-a68daf720e780b4c2, spawnDepth=1, 由 ff019d8a 主会话 toolu_01APi9vUJuvdDSBK2JqMebM4 派发)  修改时间: 2026-07-26T21:17:19.756Z
+修复改了什么: 在 LoginPage 的 NavDestination 尾部（`.hideTitleBar(true)` 之后）新增 `.onBackPressed(() => { this.navPathStack.pop(); return true })` + 6 行溯源注释，让系统 BACK 键复用左上角返回箭头那条 `pop()` 出栈逻辑；同一 pass 里顺带给 ChoiceTemplatePage / TemplatePreviewPage 补同样回调（GuidePage 语义不等价，明确不改）。
+修复的依据: round-1 真机 finding `spec/fix/round-1/ui/CRASH_PLoginActivity_back_failed_LoginActivity_to_MineFragment.md`（P1/CRASH，multimodal-severity=high，is_migration_bug=true）——「连续 2 次 uinput -K -d 2 后 dumpLayout 仍是登录页，紧接着点 (90,200) 返回箭头一次即落回 MineFragment」。修复前 fixer 自己做了三步定位：grep 全仓 `onBackPress`/`setInterception` 排除「恒 return true 拦截」；`sed -n '415,440p'` 确认本页 NavDestination 尾部只有 `.hideTitleBar(true)`；`grep -A6 onBackPressed ManageRenewPage.ets` 取对照写法后照抄（agent-a68daf720e780b4c2.jsonl:440-449）。
+被改代码的来源: 纯新增。前一版由生成轮子 agent `aconv-login`（9b3105a2/subagents/agent-aconv-login-251236e9c3d44116.jsonl:55, 2026-07-24T02:35:44.418Z 的 Write，14990 字符）写成，原始文件全文不含 "onBackPressed"，尾部只有 `.hideTitleBar(true)` + `.onReady(...)`。它没写的原因在它自己的收尾报告里可见：Navigation 映射表是**从 Android 源码里显式出现的触发点**逐条推导的（「返回图标 → pop()」「loginLiveData 成功 finish() → pop()」），而 `LoginActivity.kt` 未重写 `onBackPressed`，系统返回是基类隐式行为，在源码里没有对应符号 → 不在表内 → 不生成。整个 aconv-login 转录 79 行从未出现 "onBackPressed" 一词。
+生成时为什么没做好: 缺一条跨页强制规则——"NavDestination 必落 onBackPressed" 只存在于各 conv 子 agent 的个人判断里（aconv-managerenew 主动补了并注释「Android BaseBusinessActivity 默认返回（finish）→ 出栈」，aconv-login 没补），skill/规范未把 Activity 的隐式返回语义列为必映射项，closer/批次收口也没做这项一致性检查，于是生成结束时全仓 4 个 NavDestination 页漏挂。
+是否必要: 必要——症状是真机实测的功能性缺陷（手势/BACK 退出登录页这条主路径失效），修法与同仓已验证页完全一致且零副作用；但 fixer 给出的"根因"（NavDestination 默认出栈在本页失效）是相关性推断而非机制证明。
+证据(每条带位置):
+  1. 修复动作原文：agent-a68daf720e780b4c2.jsonl:449, toolu_01UNWUAT38jZasQJZnJAwctb, 2026-07-26T21:17:19.756Z — Edit old_string 为 `.hideTitleBar(true)\n  }\n}`，new_string 插入 `.onBackPressed(...pop(); return true)`。
+  2. 修改前该处确无回调：agent-a68daf720e780b4c2.jsonl:443/445（grep 只返回 `422: .hideTitleBar(true)`；sed 415-440 显示尾部直接闭合）。
+  3. 真机证据与 finding 落盘：agent-a96b301d9764dca23.jsonl（vv-t1-A02，general-purpose）:414, 2026-07-26T16:59:31.304Z 建单（severity P1、similarity 0.95）；:416, 17:00:03.776Z 写入 s3 描述「连续 2 次 uinput -K -d 2 后 dumpLayout 仍是登录页…点返回箭头一次即落回 MineFragment」。
+  4. 原始写者与写法：9b3105a2/subagents/agent-aconv-login-251236e9c3d44116.jsonl:55, 2026-07-24T02:35:44.418Z（Write，`'onBackPressed' in content == False`）；同文件:77, 02:39:11.559Z 的 Navigation 表只列「返回图标 / 服务条款 / loginLiveData / AppLoadDialog」四项，无系统返回键。
+  5. 同类页的相反做法（证明是 agent 间不一致而非统一规则）：9b3105a2/subagents/agent-aconv-managerenew-b9f5799b407aa4aa.jsonl:80, 2026-07-24T05:34:44.438Z 写 `.onBackPressed(() => { /* Android BaseBusinessActivity 默认返回（finish）→ 出栈 */ this.navPathStack.pop(); return true })`。
+  6. 漏挂是面上的：agent-a68daf720e780b4c2.jsonl:451-452, 21:17:25.775Z — 修完 LoginPage 后脚本扫全仓，仍有 ChoiceTemplatePage / GuidePage / TemplatePreviewPage 三页缺该回调。
+  7. fixer 自陈根因是排除法+对照法，非机制证明：agent-a68daf720e780b4c2.jsonl:615, 21:41:39.026Z 回填 finding 的「假设根因」段落，并明确记「GuidePage 未补（安卓侧 finish() 等价退出应用，pop() 语义不等价，无真值前不臆改）」。
+无法确认的部分: (a) BACK 被吞的**真实机制**无法确认——转录里没有 hilog/异常栈，fixer 只证明了"挂了回调的页正常、没挂的页失效"这一相关性，而 ArkUI NavDestination 理论上应默认出栈，所以"默认行为在本页未生效"仍是假设；(b) 本次修改**未经复验**——fixer 在本次会话内没有 hvigor 编译、没有重新装包、没有再打一次 BACK（唯一后置动作是 21:29:11.002Z 的 `git diff --name-only` 越界检查，:583），round-2 是否复测该单在本目录转录里查不到闭环记录。
+置信: 高（对"改了什么、依据什么、原来谁写的、为什么没写"四问，每一问都有直接的 tool_use 原文与时间戳对应，且有 managerenew 反例交叉印证）；仅"必要性"一项因根因未坐实与缺复验而略打折扣。
+```

@@ -1,0 +1,19 @@
+```
+文件: entry/src/main/module.json5  修复方: visual-fixer(fixer-r1 / agent-a68daf720e780b4c2)  修改时间: 2026-07-26T21:27:59.817Z
+修复改了什么: 在 `abilities[]` 末尾新增两个条目 —— `WXEntryAbility`(./ets/wxapi/WXEntryAbility.ets) 与 `WXPayEntryAbility`(./ets/wxapi/WXPayEntryAbility.ets)，均 `launchType: "singleton"` + `exported: true`，并附一段长注释说明「skills 有意留空、待微信鸿蒙版 SDK 文档」；同一轮里新建了这两个 Ability 源文件。
+修复的依据: 修复轮的两张 feat finding —— `WXCallbackActivity_01_no_wxentry_callback_ability.md` / `BaseWXPayEntryActivity_01_no_wxpay_callback_ability.md`。fixer 在 agent-a68daf720e780b4c2.jsonl:548 直接 sed 出其「## 4. 源码缺口 / ## 5. 修复建议」：「module.json5:33 — abilities[] 缺 WXEntryAbility 条目」「handleWant 零调用点」「F003ViewModel.ets:351 注释声明的 WXEntryAbility 不存在，authListener 注册后永远收不到回调，形成半条链」；建议 2 逐字给了 srcEntry/launchType/exported 的写法，并明确「skills 先查 SDK 文档确认，别照抄 EntryAbility 的 skills」——fixer 照此执行且照此留空。
+被改代码的来源: 纯新增。module.json5 本身是 DevEco 工程模板产物（生成轮第一次接触是 agent-aentry-setup-07108f5df45c357c.jsonl:34 的 `cat`，只读不写）；生成轮对它只有两处编辑——base3-network 加 cleartextTraffic/权限、group1b-closer 加 EntryAbility 的深链 skills，`abilities[]` 始终只有 EntryAbility。没写 WX 两个 Ability 的原因是：team-lead 给 conv-wxcallback 的任务书把这个 Activity 定性为 `no_ui 回调处理类`，输出钉死为 `components/WxCallbackHandler.ets`，并要求「不写共享文件」；同时把「WXEntryActivity 注册」直接归入「华为侧无等价，属三方 SDK → 用 PLACEHOLDER」。
+生成时为什么没做好: 生成链路的**任务分派环**——team-lead 的转换任务书把「宿主 Ability 注册」误并入「微信 SDK 入仓」占位，并禁止 converter 写 module.json5，于是这半条纯 ArkTS 接线被合法地挂进 P-S2-012 占位、再无 owner 认领。
+是否必要: 必要 —— 生成侧留下的是一条自相矛盾的半链（handler 与发起侧都实装、注释还指名 WXEntryAbility，但落点 Ability 不存在），补齐宿主是纯 ArkTS 工作、不依赖 SDK；但 skills 留空意味着系统回跳仍不能真正投递，闭环未完成。
+证据(每条带位置):
+  1. 修复本体：ff019d8a-.../subagents/agent-a68daf720e780b4c2.jsonl:565，2026-07-26T21:27:59.817Z，Edit old_string=`}\n    ],\n    "extensionAbilities": [` → new_string 插入 WXEntryAbility / WXPayEntryAbility 两块 + skills 留空注释。
+  2. 修复依据（finding 原文）：同文件 :548 的 Bash 与 :549 的 tool_result，2026-07-26T21:26:06.374Z，「module.json5:33 — abilities[] 缺 WXEntryAbility 条目」「先查 SDK 文档确认，别照抄 EntryAbility 的 skills」。
+  3. finding 作者：ff019d8a-.../subagents/agent-afcfbf677a4e5864a.jsonl:175（vv-static-B，「B系列静态验收」），2026-07-26T18:01:07.439Z Write，kind=IMPL_MISSING / severity=P1 / is_migration_bug=true / disposition=manual_review；配对单在同文件 :173。
+  4. module.json5 生成侧从未有人写 abilities：agent-aentry-setup-07108f5df45c357c.jsonl:34（2026-07-24T02:25:36.688Z，仅 cat）；唯二编辑为 agent-abase3-network-f9a03317492be8c4.jsonl:210（2026-07-24T10:00:10.306Z）与 agent-agroup1b-closer-3fdb5cb0c394f474.jsonl:112（2026-07-24T15:02:15.198Z，改的是 EntryAbility 的 skills）。
+  5. 根因（任务书）：agent-aconv-wxcallback-3f5b8f543d8ac407.jsonl:1，2026-07-24T04:57:48.654Z，「你产出的不是 UI struct，而是一个【回调处理类】」「输出 entry/src/main/ets/components/WxCallbackHandler.ets」「微信 SDK 具体接入（IWXAPI/handleIntent/**WXEntryActivity 注册**）→ 华为侧无等价…用 PLACEHOLDER」「不编译、**不写共享文件**」。
+  6. 占位被登记、缺口被"合法化"：同文件 :131，2026-07-24T05:11:51.861Z 报告 `P-S2-012 … trigger=微信登录 SDK 入仓（… / WXEntryAbility 注册）`。
+  7. 断链留到下游无人补：agent-aslice2-auth-ac8d92aebe3693fc.jsonl:213（2026-07-24T12:16:53.671Z）写下「回调经 WXEntryAbility → WxCallbackHandler.onResp → 本 VM 回流」却只实装发起侧；agent-agroup1-closer-7d56a8390ddc19ae.jsonl:50（2026-07-24T12:39:01.541Z）复核时读到该注释仍未补 Ability。
+  8. 修复后自检：agent-a68daf720e780b4c2.jsonl:624-625，2026-07-26T21:42:40.452Z，`✅ module.json5 可解析; abilities = ['EntryAbility','WXEntryAbility','WXPayEntryAbility']` + 新增两个 .ets 文件。
+无法确认的部分: ①微信鸿蒙版 SDK 真实的回跳落点契约（是否要求特定 Ability 名/skills/scheme）——整段转录里没有任何一方查过 SDK 文档，fixer 也明说「不能臆造」，故"这样注册后能否被拉起"未经验证；②fixer 只做了 JSON 语法解析，未编译、未跑设备，实际生效性未证；③conv-wxpayentry 的任务书原文我未逐字读（只读了 conv-wxcallback 的），支付侧同因属推断——但两者 customAgentType 同为 a2h-activity-converter、产物同为 handler 而非 Ability。
+置信: 高 —— 改动、依据 finding、finding 作者、module.json5 生成侧全部编辑历史、以及把 Ability 注册误判为 SDK 占位的那句任务书原文，都在转录里逐条对上了；不确定的只剩 SDK 外部契约与运行时验证。
+```

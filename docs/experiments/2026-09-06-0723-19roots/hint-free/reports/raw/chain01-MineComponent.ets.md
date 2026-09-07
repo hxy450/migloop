@@ -1,0 +1,19 @@
+```
+文件: entry/src/main/ets/components/MineComponent.ets  修复方: fixer-r1 / agentType=visual-fixer(agent-a68daf720e780b4c2，由 ff019d8a 主会话派发，toolUseId toolu_01APi9vUJuvdDSBK2JqMebM4)  修改时间: 2026-07-26T20:42:48Z – 20:44:35Z（5 处 Edit）
+修复改了什么: 给三处没写 width/height 的 Image 补上按资源像素÷3 算出的显式尺寸（设置行箭头 12x12 + flexShrink(0)、四宫格图标 48x48、VIP 字标按会员态 160.7x19 / 121x20）；并把顶部 header 的 Stack 高度钉死 128vp、装饰头图改 aspectRatio(1080/648) 溢出，不再由它决定头区高度。同时把原来「留固有尺寸」的错误注释改写成解释性警告。
+修复的依据: round-1 finding 单 + 自测资源像素。SYSTEMIC_image-no-explicit-size 被列为 P0（agent-a68daf720e780b4c2.jsonl:1 派单表：「ArkUI 的 Image 不写 .width/.height 时不取固有尺寸而是撑满父容器」，affects 6 单）；四张 ALIGN_PMineFragment_* 单在 :119-120 被整篇读入，含安卓基线 dump 坐标（`免费次数[105,1114]`…）与鸿蒙实测（右值被顶到 x=113、横幅下移约 117vp）；:34 先 Read 了 sbs 对比拼图；:122-123 用 sips 实测资源像素（36x36 / 144x144 / 363x60 / 482x57 / 1080x648），fix 里的数字全部等于该实测值 ÷3。
+被改代码的来源: 生成轮 converter 子 agent `aconv-minefrag`（agent-aconv-minefrag-0c34d8c25c9daec8.jsonl:69，Write 全文，2026-07-24T06:28:42Z，uuid 26a3c9e1）。它的依据是两条：(a) pitfall 目录 P-15「Android ImageView 默认 FIT_CENTER，ArkUI 默认 Cover → 显式 .objectFit(ImageFit.Contain)」——该条只讲缩放模式、不讲尺寸（:50 读入）；(b) 它 Read 的既有文件 MinePage.ets 头注释里的既定约定「尺寸取自源布局 XML 的 layout_width/height，未标注尺寸的图标留固有尺寸交 icon-sizing 自愈」（:27），该约定最早由 agent-aconv-mine-bb78af185c44860a.jsonl:82（07-24T05:10:11Z）写入。converter 明知没设尺寸并把责任显式移交给下游 icon-sizing skill，还在交付报告里把「P-15（4 处 Image 显式 Contain）」当作已完成项上报（:87）。
+生成时为什么没做好: 接收方从未被调用——`.claude/skills/arkts-icon-sizing/scripts/icon_autofix.py` 存在且正是干这个的，但它只在 structural-closure 的 pipeline 模式里被委托，而 FV-1 那次 `run_loop.sh --mode pipeline` 在 macOS 崩溃（Nuitka 打包 sys.executable 指向不可执行的 Python dylib），团队 lead 降级为手动直调 leaf detector，5 项只跑了 2 项，漏掉的第一项就是 icon-sizing 自愈。
+是否必要: 必要 —— 前三处是 P0 级信息缺失（8 次复用的 MineTabSettingBar 里 Image 与 layoutWeight(1) 的 Text 抢空间，7 条标题被压成 0 宽整体不渲染），第四处 header 高度必要但其 128vp 常量属于推算值，存疑。
+证据（每条带位置）:
+  1. 修复方身份与动作：ff019d8a-.../subagents/agent-a68daf720e780b4c2.meta.json（`"agentType":"visual-fixer","name":"fixer-r1","spawnDepth":1`）；5 处 Edit 见同目录 agent-a68daf720e780b4c2.jsonl:130 / :132 / :135 / :144 / :146。
+  2. 修复依据（派单）：agent-a68daf720e780b4c2.jsonl:1（2026-07-26T20:33:34Z）「SYSTEMIC_image-no-explicit-size — P0。ArkUI 的 Image 不写 .width/.height 时不取固有尺寸而是撑满父容器」。
+  3. 修复依据（finding 正文 + 实测像素）：同文件 :119-120（四张 ALIGN_PMineFragment_* 单全文，含 §4 精确到 MineComponent.ets:880-882 / 521-523 / 389-437）与 :122-123（sips 测得 icon_mine_right_arrow 36x36、四宫格 144x144、字标 363x60 与 482x57、头图 1080x648）。
+  4. 被改代码的原始写入：9b3105a2-.../subagents/agent-aconv-minefrag-0c34d8c25c9daec8.jsonl:69（Write，06:28:42Z）含被改掉的原注释「icon_mine_top_bg：match_parent + adjustViewBounds → 满宽、按固有比例（P-15 需显式 Contain）」。
+  5. converter 的规则依据：同文件 :50（P-15 pitfall 原文，只规定 objectFit，无尺寸要求）、:27（MinePage.ets 头注释「未标注尺寸的图标留固有尺寸交 icon-sizing 自愈」）、:87（converter 自报「P-15（4 处 Image 显式 Contain）」已达成）。
+  6. 该约定的更上游出处：9b3105a2-.../subagents/agent-aconv-mine-bb78af185c44860a.jsonl:82（Write，2026-07-24T05:10:11Z）首次写下「固有尺寸交 icon-sizing 自愈」。
+  7. 生成链路断点：9b3105a2-85ec-4889-9786-b3c220f06754.jsonl:5405（工具输出「detectors 实跑: ['audit_skeletons_scope_all','verify_closure_ledger']；run_loop.sh --mode pipeline crashes on macOS (Nuitka sys.executable…)」）与 :5412（lead 自述「pipeline 模式本应跑 5 项，我漏了 3 项：icon-sizing 自愈 ← 就是这次的病根…这是我的执行疏漏，不是 converter 的问题」，2026-07-25T04:44:16Z）；:3546 显示 icon_autofix.py 早已被写进 pipeline 设计。
+  8. 生成轮知情但未修：主会话最后一条时间戳 2026-07-25T04:47:23Z（:5416），根因分析写完即结束，代码一直带病到 07-26 修复轮。
+无法确认的部分: 这次改动是否真的收敛——派单明确要求「不重编、不复测」（:1 收尾条款），本目录内也没有 round-2 verifier 转录可查。header-height 的 128vp 是按 XML 约束 60+68 推算，而该 finding §2 自己写的基线实测是 160dp/480px@3x（与推算的 148dp 不一致），且 §7 reach_path 标注「unknown — Phase 2 baseline 缺失」，与 §1「Android Phase 2 实测基线」互相矛盾，故该常量与 aspectRatio+clip(false) 的实际视觉效果无法确认；VIP 字标 160.7vp 这种非整数 vp 的取整表现同样未验证。
+置信: 高 —— 修改、依据单、原始 Write、所依据的 P-15 规则原文、以及断链环节（icon_autofix 未被调用的 lead 自述）全部有直接引文且时间线连贯；仅 header 那处修复的正确性因缺复测证据而降级。
+```

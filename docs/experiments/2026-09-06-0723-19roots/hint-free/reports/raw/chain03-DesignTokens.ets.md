@@ -1,0 +1,19 @@
+```
+文件: entry/src/main/ets/components/common/DesignTokens.ets   修复方: visual-fixer「fixer-r1」(agent-a68daf720e780b4c2)   修改时间: 2026-07-26T20:35:31.687Z（uuid f69a850f-584b-4605-a8f3-d39d9196147f）
+修复改了什么: 在 `Palette` 类尾部（`BTN_GRADIENT_END` 之后）追加一个新常量 `static readonly DIALOG_MASK: string = '#8C000000'`（α≈0.55），并在 doc 注释里写明"每个 new CustomDialogController 都必须显式带上本常量"；随后用脚本把它灌进 24 个文件 / 51 个控制器站点。纯新增，未删改任何既有 token。
+修复的依据: 派单里的 SYSTEMIC 条目 `SYSTEMIC_dialog-mask-too-light`——"各 CustomDialogController 补 maskColor:'#8C000000'（对齐安卓 dimAmount≈0.55）。建议抽共享常量"（agent-a68daf720e780b4c2.jsonl:1, 2026-07-26T20:33:34.783Z）。该单背后是真机双端截图逐像素采样：同一底屏 plain=(241,246,250)，安卓 dimmed=(109,111,113)→α≈0.548，鸿蒙 dimmed=(193,197,200)→α≈0.199（agent-a2360912ac99796fb.jsonl:225, 2026-07-26T18:10:28.859Z），跨 2 trip / 3 弹窗复现达 systemic 阈值。'#8C000000' 里 0x8C/255=0.549 即由此反解。
+被改代码的来源: 纯新增。原文件由生成轮 base 层 agent `abase6-common` 一次性 Write（agent-abase6-common-abd92f9d4c08420d.jsonl:163, 2026-07-24T11:11:53.387Z，uuid 7e3cbe87）。它没写这条，是因为自己在文件头声明了三条取值来源——`resources/base/element/{color,float}.json`（Stage 0 从 colors.xml/dimens.xml 机械迁移）、Android 控件源码默认值、`magic-numbers-report.md` 跨页高频统计。弹窗遮罩是 Android 的 **窗口属性**（`BaseDialogFragment.dimAmount`/FLAG_DIM_BEHIND），不落在 colors.xml 里，因此三条来源全不覆盖，天然出局。
+生成时为什么没做好: 断在"弹窗宿主接线"这一环——`dimAmount=0.55` 被 slice1-uibase 采到并写成 `F020ViewModel.dimAmount = 0.55` 的"契约"后甩给调用方，而调用方 slice11-startup 把"安卓基类默认值"直接等同于"ArkUI 默认遮罩"，构造 controller 时干脆不设 maskColor，无人验证这个等式（实测 0.199 ≠ 0.55）。
+是否必要: 必要——像素实测的 α 0.199 vs 0.548 是硬差异，且 51 个站点确实需要一个共享常量而非 51 份字面量；且修复方按 builder 分了两类，未把 AppLoadDialog（安卓侧 override 0.0f）一起压暗，方向正确。
+证据(每条带位置):
+  1. 修复的 Edit 全文（old/new_string）：`ff019d8a-.../subagents/agent-a68daf720e780b4c2.jsonl:68`，2026-07-26T20:35:31.687Z，uuid f69a850f-584b-4605-a8f3-d39d9196147f。
+  2. 派单原文（SYSTEMIC 三条表格，含"建议抽共享常量"）：同文件 `:1`，2026-07-26T20:33:34.783Z。
+  3. 真机像素取证：`agent-a2360912ac99796fb.jsonl:225`，2026-07-26T18:10:28.859Z —— `ANDROID … scrim_alpha≈0.548 / HMOS … scrim_alpha≈0.199`；同处记 root_cause_hint 指向 `SplashPage.ets:188-206 未设 maskColor`。
+  4. 原始 DesignTokens.ets 的三条取值来源自述（解释为什么没有遮罩 token）：`9b3105a2-.../subagents/agent-abase6-common-abd92f9d4c08420d.jsonl:163`，2026-07-24T11:11:53.387Z。
+  5. 契约被采到却没落地：`agent-aslice1-uibase-79f3dddc4854b98b.jsonl:79`（uuid 5a78a733，2026-07-24T12:03:11.990Z）写 `dimAmount: number = 0.55`，注释"源 BaseDialogFragment.dimAmount = 0.55f（:47）→ 调用方 CustomDialogController 的 maskColor""避免 20 个调用点各自硬编码遮罩系数"。
+  6. 调用方真的没接：`agent-aslice11-startup-50a0622bcfe4a588.jsonl:236`，2026-07-24T16:00:31.136Z 写 SplashPage 的 LaunchAgreementDialog controller，只有 `alignment/customStyle/autoCancel/isModal`——正是证据 3 指认的那一处。
+  7. 同一 agent 的不对称处理（证明是假设失效而非疏漏）：同文件 `:146`，2026-07-24T15:43:18 对 AppLoadDialog 显式写 `maskColor: Color.Transparent // dimAmount = 0.0f`；而 `:53` 对未覆写基类默认值的弹窗写"基类默认值本弹窗未覆写（…dimAmount=0.55）→ 宿主以默认 CustomDialogController 构造即可"（该注释原文由 `agent-aconv-algofiling-a0654e08f3686dd7.jsonl:98`，2026-07-24T07:05:37.990Z 首写）。
+  8. 修复确实收敛到调用点、且做了分类：`agent-a68daf720e780b4c2.jsonl:77/80/103`（扫描出无 maskColor 的 controller 清单 → 脚本批量插入，WorksComponent/AppLoadDialog 标 `import=-` 跳过），最终自述"51 个控制器全补齐 … 24 文件 / 51 站点。按 builder 两分（这是单里没说、我查源码才定的）：`BaseDialogFragment.kt:47 dimAmount = 0.55f` 是默认，但 `AppLoadDialog.kt:93 override = 0.0f`"。
+无法确认的部分: 转录里没有修复后的复测/重编记录（派单明令"不重编、不复测"，agent-a68daf720e780b4c2.jsonl:1），所以 α 是否真回到 ≈0.55、51 处插入是否全部编译通过，本目录内无法确认；`AppLoadDialog.kt:93` 的 override 只见于 fixer 转述，未在本目录读到 Kotlin 原文；DesignTokens.ets 落盘后是否还被非 Write/Edit 途径（sed/python 脚本）改过，未逐字节核对。
+置信: 高——修改点、依据单、像素取证、上游两位写者的原始 Write 全部有确切的 JSONL 行号与时间戳互相咬合，且 gen 轮同一 agent 对 0.0f 与 0.55f 的不对称处理直接坐实了失效环节；扣分只在修复效果未经复测。
+```

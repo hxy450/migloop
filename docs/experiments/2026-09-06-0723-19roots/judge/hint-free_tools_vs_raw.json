@@ -1,0 +1,957 @@
+[
+ {
+  "chain": 0,
+  "file": "HomeTabComponent.ets",
+  "treat_is_A": true,
+  "verdict": {
+   "agree": true,
+   "agree_note": "定性一致：两份都把根因落在生成轮 conv-hometab(a2h-activity-converter)这一环——Image 未写显式尺寸/未按固有比例反推，且都指出同一批伴生缺陷(storagePermissionGranted 由 slice17-home 按 P-S9-010 写入、PermissionIntroHost 从未进 build 树、stepCell 三元/热区问题)，都判定修复必要。主标签措辞不同：A 归为「漏读资源真值 + ArkUI/Android 尺寸语义反向」(智能体自身读取集缺失)，B 归为「输入与验证缺陷」(view.xml 合成、bounds 全空、pitfalls 无对应条目、禁止编译)，但两者描述的是同一失效链的不同侧面(缺真值 + 缺规则 + 无渲染回归)，事实分析一致。",
+   "a_specificity": 4,
+   "b_specificity": 5,
+   "a_consistency": 4,
+   "b_consistency": 4,
+   "conflicts": [
+    "顶图三行的逐行归属：A 明确称 v19:369-371 在 blame 里是「归属未知(断点后)」、首版内容未入账，只能归到首版转换产物；B 则断定横幅 Image 出自 conv-hometab 的 Write(jsonl:57, 2026-07-24T03:16:15Z)并给出其自陈依据。一方称不可确证、另一方称已确证。",
+    "参考文档是否缺条目：A 把「ui-migration-pitfalls.md@v1 是否本来就有『Image 必须显式尺寸』」列为无法确认、只是推断；B 断言该文件读取结果里 P-01…P-27 全量枚举、图像相关仅 P-15，无 aspectRatio/adjustViewBounds 字样。",
+    "PermissionIntroHost 挂载的必要性/事实前提：A 称 fixer 自判该浮层在鸿蒙恒不 show 并标「需人工裁定」，等于挂了个不会显示的宿主(存疑)；B 将其列入「四处都有 round-1 真机取证」的必要修复(取证实为三处 grep 全在注释)。",
+    "生成轮原写者对横幅的书面依据：A 说 conv-hometab 把 adjustViewBounds 直译成 objectFit(Contain)、全程无 icon_home_top_bg 像素读；B 说其自陈依据是 D-008「不硬编码 bounds」与「banner Image relies on intrinsic aspect sizing，与 GuideDifficulty1Component 一致」。两者对同一决策给出的原因记录不同(疏漏 vs 有意的既定原则)。",
+    "修复动作的计量口径：A 记为 v20–v22 三个版本 + 3 次不立版本脚本改写(#23225/#23292/#23360)；B 记为 5 处实质改动、时间窗 2026-07-26T20:47:22Z–21:07:55Z，并额外列出「一处悬空块注释归位」。可能只是账本粒度不同，但改动条目数对不齐。",
+    "A 称 v22 全文因 edit-miss 盲写断点不可复原、文件全貌只能拼出；B 未提该断点，且以 build-verify-r1 编译 PASS 作为收尾闭环。"
+   ],
+   "preferred": "B",
+   "reason": "B 的证据是可直接回查的一手转录坐标(jsonl 行号 + UTC 时间戳 + tool_use id)，并把 A 只能推断的两项(生成轮原始 Write、pitfalls 无对应条目)实测坐实、还补上了编译验证闭环；A 在 PermissionIntroHost 存疑与置信度上校准更好，但其归属链在首版断点处断掉。",
+   "_cost": 0.215097
+  },
+  "preferred_method": "control",
+  "treat": {
+   "cost_usd": 1.5746684999999998,
+   "num_turns": 20,
+   "wall_s": 277.8,
+   "verdict": "",
+   "usage": {
+    "input": 28,
+    "cache_create": 84036,
+    "cache_read": 656047,
+    "output": 16183
+   },
+   "calls": 19
+  },
+  "control": {
+   "cost_usd": 1.612092,
+   "num_turns": 31,
+   "wall_s": 286.9,
+   "verdict": "",
+   "usage": {
+    "input": 40,
+    "cache_create": 64027,
+    "cache_read": 1060714,
+    "output": 17578
+   },
+   "calls": 30
+  }
+ },
+ {
+  "chain": 1,
+  "file": "MineComponent.ets",
+  "treat_is_A": true,
+  "verdict": {
+   "agree": false,
+   "agree_note": "两份在故障机理、修复内容与必要性上完全一致：都认定 ArkUI 的 Image 不写 width/height 会撑满父容器、转换器留下「固有尺寸交 icon-sizing 自愈」的注释、右箭头挤掉 layoutWeight(1) 的标题导致 7 条设置项不渲染，且补的尺寸数值（12x12 / 48x48 / 160.7x19 / 121x20 / aspectRatio 1080/648）逐个相同。但「生成时为什么没做好」的定性不同层：A 归到输入知识库缺陷（ui-migration-pitfalls P-15 只讲 objectFit、无尺寸条款，转换器照做必然丢尺寸），B 归到交接断链（转换器是明知故留、显式移交下游 icon_autofix.py，而该步因 run_loop.sh pipeline 在 macOS 崩溃被 lead 降级手动、5 项只跑 2 项而从未执行；P-15 缺尺寸条款只是其中 (a) 条依据）。这不是同一根因的不同标签，而是 A 未触及 B 所指的断链环节，属互补但不同的定性。",
+   "a_specificity": 4,
+   "b_specificity": 5,
+   "a_consistency": 4,
+   "b_consistency": 4,
+   "conflicts": [
+    "「固有尺寸交 icon-sizing 自愈」这句措辞的作者：A 称因 v14 断点无法逐行归属、作者「尤其无法确认」；B 直接定位到 agent-aconv-mine-bb78af185c44860a.jsonl:82（2026-07-24T05:10:11Z 首次写入，经 MinePage.ets 头注释被 converter 继承）。",
+    "被改代码的可证性：A 称 v14-v18 内容未知、被改 4 行是否 conv-minefrag 原文只能靠数量与措辞推定；B 称原注释原文就在 converter 的 Write 转录里（aconv-minefrag jsonl:69）可直读，两者对同一事实的可证明性判断相反。",
+    "中间写者：A 记录 slice17-home v19-v36（#17606-#17718）在生成与修复之间动过该文件（且 v19 有一次实录外修改）；B 的时间线从 07-24 06:28 Write 直接跳到 07-26 20:42 修复，无任何中间写者。",
+    "修复动作条数：A 称 v26-v30 五个版本外「另有 1 次未立版的脚本写入」，用 python heredoc 给 icon_bg_open_vip 补了 .aspectRatio(990/240)（#23238）；B 只列 5 处 Edit（:130/:132/:135/:144/:146），既无 990/240 也无脚本写入。",
+    "补尺寸的 Image 处数：A 表述为「4 处 Image 补 width/height」但证据里 v26/v27/v28 只有三处；B 表述为「三处 Image」（VIP 两态算一处）。数值一致，计数口径冲突。",
+    "128vp 的来源：A 判断该数值应是转引自 ALIGN_..._header-height 单、未见 fixer 重读 fragment_mine.xml；B 判断是按 XML 约束 60+68 推算，并指出与 finding §2 自记的基线实测 160dp/480px@3x 不符。",
+    "P-15 在 converter 交付报告中的性质：A 引其自陈「P-15（4 处 Image 显式 Contain）」作为「生成时依据吻合」的正面佐证；B 引同一句作为 converter 明知未设尺寸仍把该项当已完成上报的问题点。同一条记录，事实解读相反。",
+    "断链归责：B 引 lead 自述「这是我的执行疏漏，不是 converter 的问题」（jsonl:5412）；A 全文不提 icon_autofix.py / pipeline 崩溃，并把责任落在知识库与转换器执行上。"
+   ],
+   "preferred": "B",
+   "reason": "B 的每条结论都锚定到可回查的一手坐标（jsonl 行号 + UTC 时间戳 + uuid/toolUseId + meta.json 字段原文），并进一步找到并引证了真正的断链环节（icon-sizing 自愈从未被调用及其崩溃原因与 lead 自述），而 A 的因果链止于 P-15 文档缺陷、且自承核心归属受 v14 断点阻断只能推定。",
+   "_cost": 0.24778199999999997
+  },
+  "preferred_method": "control",
+  "treat": {
+   "cost_usd": 1.4209865000000004,
+   "num_turns": 24,
+   "wall_s": 215.7,
+   "verdict": "",
+   "usage": {
+    "input": 28,
+    "cache_create": 78184,
+    "cache_read": 632623,
+    "output": 12845
+   },
+   "calls": 23
+  },
+  "control": {
+   "cost_usd": 1.1680705,
+   "num_turns": 21,
+   "wall_s": 235.7,
+   "verdict": "",
+   "usage": {
+    "input": 28,
+    "cache_create": 52338,
+    "cache_read": 562531,
+    "output": 14459
+   },
+   "calls": 20
+  }
+ },
+ {
+  "chain": 2,
+  "file": "WorksComponent.ets",
+  "treat_is_A": false,
+  "verdict": {
+   "agree": true,
+   "agree_note": "定性一致:两份都判为「路由名与 pageMap 注册名不匹配的单点错误」——conv-worksfrag 首写 WorksComponent.ets 时把 Android 类名 PPTFilePage 当成路由名,而真值 'PptFilePage' 早已由 batch2-closer 注册在 SplashPage.ets 的 pageMap 里;两份都认定生成侧的直接失败环节是「没读到 SplashPage.ets 这个唯一路由真值源」,下游收口只看编译故未拦截;两份都认定修复必要、且都赞成只改调用方不动 pageMap。A 的主标签偏「工具输出被 head 截断导致误用旧先例」,B 的主标签偏「漏读 + 派发词未指定真值源」,标签措辞不同但事实链条同构,属一致。",
+   "a_specificity": 5,
+   "b_specificity": 4,
+   "a_consistency": 5,
+   "b_consistency": 4,
+   "conflicts": [
+    "未读到 pageMap 的机制不同:A 断言存在一条 06:25:38 的 `grep ... | head` 查名命令、返回被截断到第 10 个文件(止于 RefundProgressPage.ets)因而漏掉 SplashPage.ets;B 列出的 conv-worksfrag v1 读取集(#10812–#10879)完全不含这条查名动作,只说『读取集里没有 SplashPage.ets』。",
+    "『路由名=Android 类名』这一错误约定的来源不同:A 归因于工程内已有成文先例(TemplatePreviewPage.ets:338 尾注 + pageMap 的 'PPTTemplatePreviewPage' 分支);B 归因于直接读了 PPTFilePage.kt 与 PptFilePage.ets@v5 头部溯源注释『Android 类: …page.PPTFilePage』。两者指向不同的证据来源。",
+    "pageMap 注册时间:A 为 2026-07-24T02:39:56.487Z,B 为 07-24T02:41,相差约 1 分钟(可能是写入 vs 落账时点,但账面不一致)。",
+    "改动规模不一致:A 描述为改 1 处字面量 + 订正注释 + 补 1 行防复发说明;B 描述为替换 2 行(v11:583/586)、新增 4 行、补 2 行警示。",
+    "fixer 的核验动作不同:A 只记录 fixer 跑了全仓 push 字面量与 pageMap 20 条 name 的差集(结果为空);B 只记录 fixer 在 #23243 亲自读 SplashPage.ets@v52[375-385] 核对。两份各自缺对方所述的那一步。",
+    "对工单旁证 TemplatePreviewPage.ets:255 的态度冲突:A 把它作为工单三点静态对照之一原样采信;B 明确表示在 conv-worksfrag 当时读到的 TemplatePreviewPage.ets@v5 的 148-264 行里没找到该调用,无法确认生成时该正确样例是否存在。",
+    "附带的图标尺寸批改的记录完整度:A 称有脚本 targets(含 WorksComponent.ets:686)、结果行与改后 BUILD PASS 可查;B 称该次改动『账本未立版本、内容未被完整记录』。"
+   ],
+   "preferred": "A",
+   "reason": "A 的坐标落在原始转录层(jsonl 行号 + toolu id + 绝对时间戳),给出了可回查的失败瞬间(截断的 grep 输入输出),并把因果推断与已证事实明确分离(自陈『不排除它本就打算沿用类名约定』『bug 从未在设备复现』),而 B 的关键动机断言(『它的依据是 Android 侧类名』)在同等证据强度下未作等价保留。",
+   "_cost": 0.194708
+  },
+  "preferred_method": "control",
+  "treat": {
+   "cost_usd": 0.9791304999999999,
+   "num_turns": 15,
+   "wall_s": 148.6,
+   "verdict": "",
+   "usage": {
+    "input": 24,
+    "cache_create": 54709,
+    "cache_read": 441581,
+    "output": 8382
+   },
+   "calls": 14
+  },
+  "control": {
+   "cost_usd": 1.7663659999999999,
+   "num_turns": 31,
+   "wall_s": 300.7,
+   "verdict": "",
+   "usage": {
+    "input": 50,
+    "cache_create": 65513,
+    "cache_read": 1342322,
+    "output": 17521
+   },
+   "calls": 30
+  }
+ },
+ {
+  "chain": 3,
+  "file": "DesignTokens.ets",
+  "treat_is_A": true,
+  "verdict": {
+   "agree": false,
+   "agree_note": "两份在上位判断上一致——都认定 DesignTokens 缺 DIALOG_MASK 只是下游表现,真正问题是生成期安卓的窗口级 dim(BaseDialogFragment.dimAmount=0.55f)没有映射成 ArkUI 的 maskColor,且都同意修复必要、都同意 AppLoadDialog 因 override=0.0f 应排除、都引同一份像素实测(α≈0.55 vs ≈0.20)与「抽共享常量」处方。但断点定位在事实层面不同,不只是标签差异:A 认为窗口属性在弹窗转换环被整条丢弃(转换器只读子类与 layout xml,未读基类),B 则举证该值已被 slice1-uibase 采集并写成 dimAmount=0.55 的契约、转换器也读过基类并显式注释「宿主以默认 Controller 构造即可」,断点在宿主接线层把安卓基类默认值误等同于 ArkUI 默认遮罩。两者是「值从未到达」与「值到达但被错误假设消费」的实质分歧,故判为不一致。",
+   "a_specificity": 4,
+   "b_specificity": 5,
+   "a_consistency": 4,
+   "b_consistency": 5,
+   "conflicts": [
+    "断点环节:A 称转换器只读子类与 layout xml、把窗口属性「整条丢了」(并以 conv-launchagree 读取集无 BaseDialogFragment.kt 佐证);B 则以 aslice1-uibase.jsonl:79 写 `dimAmount: number = 0.55`(注释直指 BaseDialogFragment.kt:47 → 调用方 maskColor)和 aconv-algofiling.jsonl:98 的「基类默认值未覆写→宿主以默认 CustomDialogController 构造即可」证明该值已被采集并下传,断点在宿主未接。",
+    "生成期是否「无一处带 maskColor」:A 断言 51 个站点无一带 maskColor、「生成期无一处」;B 证据 7 显示 slice11-startup 在生成轮(:146,2026-07-24T15:43:18)就对 AppLoadDialog 显式写了 `maskColor: Color.Transparent // dimAmount = 0.0f`。",
+    "base6-common 的取值来源:A 说派发词把来源限定为两类鸿蒙侧既有产物(color/float.json + Stage 1 高频字面量),并强调「全程未读任何安卓弹窗基类」;B 说文件头自述三条来源,其中第二条即「Android 控件源码默认值」。若 B 属实,A 的「只从鸿蒙侧归纳」表述不成立。",
+    "Controller 调用点的作者归属:A 把 51 个站点归给弹窗转换环(a2h-activity-converter / conv-* 系列);B 把 SplashPage 的 LaunchAgreementDialog controller 归给装配层 slice11-startup(aslice11-startup.jsonl:236)。同一处代码指认了不同写者。",
+    "像素实测的底屏与采样值:A 记「安卓 255→115、鸿蒙 255→204」(隐含底屏为 255);B 记同底屏 plain=(241,246,250)、安卓 dimmed=(109,111,113)、鸿蒙 (193,197,200)。α 结论一致(≈0.55/≈0.20),但原始采样数值对不上,至少一方为近似转述。"
+   ],
+   "preferred": "B",
+   "reason": "B 的每条证据都落到可回查的 JSONL 文件+行号+ISO 时间戳+uuid 并附原文引用,且用同一 agent 对 0.0f 与 0.55f 的不对称处理正面坐实断点;而 A 的核心定性只验证了一个转换器,还被自己「无法确认」第 2 条(6 个转换器手里有 0.55 却未写 maskColor)从内部削弱。",
+   "_cost": 0.24352700000000002
+  },
+  "preferred_method": "control",
+  "treat": {
+   "cost_usd": 1.466041,
+   "num_turns": 20,
+   "wall_s": 215.4,
+   "verdict": "",
+   "usage": {
+    "input": 34,
+    "cache_create": 75973,
+    "cache_read": 790588,
+    "output": 12370
+   },
+   "calls": 19
+  },
+  "control": {
+   "cost_usd": 1.4549725000000002,
+   "num_turns": 19,
+   "wall_s": 261.1,
+   "verdict": "",
+   "usage": {
+    "input": 38,
+    "cache_create": 62114,
+    "cache_read": 918081,
+    "output": 14911
+   },
+   "calls": 18
+  }
+ },
+ {
+  "chain": 4,
+  "file": "AboutUsPage.ets",
+  "treat_is_A": true,
+  "verdict": {
+   "agree": true,
+   "agree_note": "两份定性指向同一类根因:迁移过程中把安卓 appName 的鸿蒙等价物认定为 AppScope/app.json5 的 label,并假定 bundleManager.getBundleInfoForSelf().appInfo.label 会解析 `$string:app_name` 引用串,无人验证,导致页面渲染出字面量;修复内容(页面递 context + abilityContext() helper + VM 改走 resourceManager 按名解析)、P0 定级、必要性判定三者完全一致。主标签差异在于责任链上溯到哪个节点:A 归到转换环节 conv-aboutus 无依据外推并把结论回填 baseline spec 放大一次,B 归到更上游的 Stage 0 资源转换把 appName 路由出去后未落地、下游只继承语义结论。二者是同一条链上的不同断点描述,缺陷机理叙述一致。",
+   "a_specificity": 4,
+   "b_specificity": 5,
+   "a_consistency": 4,
+   "b_consistency": 5,
+   "conflicts": [
+    "conv-aboutus 采用 appInfo.label 的依据不同:A 称其为无依据外推(派发词只授权 getBundleInfoForSelf 用于 versionName,且 v1 读取集 #5865–#5973 中无 AppScope/app.json5);B 称其有明确上游依据(Stage 0 resource-mapping.md §2/§11 的等价判定,conv-aboutus :121 明确引用)。",
+    "`appInfo.label` 代码的首写者/首写位置不同:A 称病灶首现于 slice6-risk 写的 F012ViewModel.ets@v1(#19882),依据是 baseline spec page_0031@v3:51 的状态接口表;B 称 conv-aboutus 于 07-24T07:31:58 先写在页面里(:99),slice6-risk 只是原样下沉进 VM(:200),并未提及 spec 状态表这条依据。",
+    "上游断点定位互不覆盖:A 认定关键放大环节是 conv-aboutus v4 把自己的结论回填进 baseline spec page_0031@v3(#5993),B 全文未提该回填;B 认定断点在 astage0-resources 把 appName 路由给 arkts-app-identity 后未落地(:225/238/259),A 全文未提 Stage 0 与 resource-mapping.md。",
+    "fixer 照抄的仓内既有惯例出处不同:A 称是 AppFormInfoManager.ets@v9:88-90 与 F006Repository.ets:66(v18 #23264 grep 到);B 称是 MineComponent.ets:853-855 的同名 abilityContext()(:256-257 grep 到)。",
+    "finding 单据的来源不同:A 记为「外部输入 T+78:19」、来源未归因;B 归因到 visual-verify(agent-a2360912ac99796fb.jsonl:331)用 render_finding_skeleton.py 于 18:22:39.925Z 生成。"
+   ],
+   "preferred": "B",
+   "reason": "B 的证据链一直回溯到原始 oracle(鸿蒙实测 dump 的字面量与 bounds、安卓基线逐字文案、finding front matter 字段)并给出跨会话可逐行回查的 jsonl 行号+uuid+绝对时间戳,对首写点与上游判定给出了直接原文引用而非推断,A 则在关键的「conv-aboutus 为何这么写」上依赖读取集缺失的反证推断。",
+   "_cost": 0.22354799999999997
+  },
+  "preferred_method": "control",
+  "treat": {
+   "cost_usd": 1.4987755,
+   "num_turns": 22,
+   "wall_s": 225.7,
+   "verdict": "",
+   "usage": {
+    "input": 32,
+    "cache_create": 75795,
+    "cache_read": 820541,
+    "output": 13153
+   },
+   "calls": 21
+  },
+  "control": {
+   "cost_usd": 1.4637684999999998,
+   "num_turns": 26,
+   "wall_s": 489.1,
+   "verdict": "",
+   "usage": {
+    "input": 40,
+    "cache_create": 59380,
+    "cache_read": 921887,
+    "output": 16281
+   },
+   "calls": 25
+  }
+ },
+ {
+  "chain": 5,
+  "file": "GuidePage.ets",
+  "treat_is_A": true,
+  "verdict": {
+   "agree": true,
+   "agree_note": "定性一致:两份都把根因落在生成轮 conv-guide 首写 GuidePage.ets 时未取到安卓侧真值——返回图标 24vp 是无源自定(未量 ic_guide_back.webp 的 30x48px)、进度条轨道把 SeekBar 20vp 控件框高当成轨道高(未读 seekbar_horizontal_style.xml 的 4dp),底部避让则是从未有人写过的纯新增,后续 slice15/closer 只是原样搬运。主标签措辞不同(A=「漏读/未顺指针回源」,B=「资源摘要漏记真值 + pitfalls 知识库缺规则」),但事实分析同属「真值未送达/未回源取证」这一类根因,故算一致;差别在断点环节定位到哪个中间产物。",
+   "a_specificity": 4,
+   "b_specificity": 5,
+   "a_consistency": 4,
+   "b_consistency": 5,
+   "conflicts": [
+    "轨道倍率:A 称「轨道粗约 5 倍」(20vp 框 vs 4dp 真值),B 引 finding 称「视觉厚度约为安卓的 4 倍」「被画满整个 65px」——同一现象给出两个量级。",
+    "finding 可读性:A 明确称 ALIGN_PGuideActivity_component_mismatch_progress-bar.md@v1 原文「无法复原(外部输入无快照)、判据强度与处方不可见」,B 却直接引用其内容与坐标(agent-a68daf...:439)。",
+    "行级归属:A 称 blame 在 v13/v14 处报「归属未知(断点后)」,归属只能靠 conv-guide 结题自述 + v11 diff 推断;B 则以 conv-guide jsonl:64 Write(2026-07-24T02:07:48.449Z, uuid b9a09eef…)、slice15:181 逐字搬运、group3-closer:186 与本次无关,把同一归属当作已证。",
+    "第三处(底部 padding)的必要性:A 判「必要」,并断言底部按钮压手势条;B 判「存疑」,称方向对但量级未验,且 fixer 按 prompt「不重编不复测」,转录中无改后截图或复量。",
+    "生成期断点位置:A 说 conv-guide 已全文读 activity_guide.xml 并看到 `:43 progressDrawable=…` 指针却未回源,并把 spec page_0002_GuideActivity.md 未解析 progressDrawable 列为失效环;B 说 conv-guide 对 seekbar 只 grep 了 resource-mapping.md(:38/:39),该摘要 :551 仅记颜色与 radius 34dp、漏掉 `<size android:height=\"4dp\"/>`,并把 ui-migration-pitfalls.md 缺规则列为第二失效环——两份指认的失效文件不同。",
+    "drawable 版本对账:A 指出 fixer 读的是 `platform-res/` 下的同名 drawable,与生成期 `res/` 下那份是否逐字相同「账本未直接对账」;B 未区分路径,直接把 fixer 读到的 4dp 当作生成期同一份真值使用。"
+   ],
+   "preferred": "B",
+   "reason": "B 的证据坐标可直接回查到转录行号、时间戳与 uuid(首写 Write、逐字搬运、无关 Edit 三段闭合),恰好补上了 A 自认被 blame 断点挡住的行级归属,且对未验证项(第三处效果、摘要来源、热区等价)划界更清楚。",
+   "_cost": 0.232142
+  },
+  "preferred_method": "control",
+  "treat": {
+   "cost_usd": 1.4093445,
+   "num_turns": 25,
+   "wall_s": 203.9,
+   "verdict": "",
+   "usage": {
+    "input": 38,
+    "cache_create": 66983,
+    "cache_read": 894729,
+    "output": 11615
+   },
+   "calls": 24
+  },
+  "control": {
+   "cost_usd": 1.5486264999999997,
+   "num_turns": 24,
+   "wall_s": 293.2,
+   "verdict": "",
+   "usage": {
+    "input": 42,
+    "cache_create": 62267,
+    "cache_read": 1047613,
+    "output": 16005
+   },
+   "calls": 23
+  }
+ },
+ {
+  "chain": 6,
+  "file": "HomePage.ets",
+  "treat_is_A": true,
+  "verdict": {
+   "agree": true,
+   "agree_note": "两份定性指向同一类根因:安卓 colors.xml 里同名 token color_home_tab_bg(#202022)被按资源名/注释当成底栏实际色,写死进给 conv-home 的派发指令,而 activity_home.xml:21 ll_bottom_tab 实际引用 @color/white;conv-home 读到了 white 仍照指令裁决为深色,slice17-home 整文件重写时原样带下,最终 HomePage.ets 的两处注释只是这一误判的文本残留。两份对『本次修复只动注释、真正生效的是 color.json 的 #ff202022→#ffFFFFFF』、对修复依据(SYSTEMIC_home-tab-bar-dark-background 单 §5 点名要求订正 :461 注释)、对 conv-home『知情仍服从』的书面裁决完全一致。主标签不同:A 记为『转换错(读全了仍写错)』把落点放在转换/派发环,B 记为『分析环 ref-doc-analyzer 误读』并把转换环视为被上游硬约束,属同一链条上责任切点的差异,事实叙述一致。",
+   "a_specificity": 4,
+   "b_specificity": 5,
+   "a_consistency": 4,
+   "b_consistency": 4,
+   "conflicts": [
+    "派发词里 #202022 的来源:A 称『主会话@v82 窗口内没有喂养该版本的读取,#202022 从何而来无法确认』;B 给出完整来源链并带坐标(ref-doc-analyzer jsonl:175 @07-23T12:42:54 → ui-manifest 主会话 9b3105a2:520 → F018 验收标准 :1378 → team-lead 指令 conv-home jsonl:1)。同一问题一方判不可查、一方判已查证。",
+    "责任环与 converter 自由度:A 判 conv-home『证据齐备仍写错』(读过 activity_home.xml@v1 #7586 与 colors.xml #7592),即转换环有可纠错空间;B 判误读已被逐级固化成硬约束,converter『即使看见 white 也只能裁决服从』。对同一份裁决记录给出相反的可归责判断。",
+    "最后落笔者:A 指出 HomePage.ets@v24 存在『实录外修改』断点,blame 显示『归属未知(断点后)』,461/11 两行最后落笔者无法确认;B 直接把最终文件内容归到 slice17-home 的 Write(jsonl:218,uuid 99e13f9c),全文未提及任何断点或归属缺口。",
+    "resource-mapping.md 这一依据:A 判定 conv-home 自称的『resource-mapping.md 亦锚定深色』无读取记录支撑(唯一相关调用 #7622 是失败的 grep),标为无法确认;B 把同一句原样作为裁决证据引用(jsonl L79/L83),未标注存疑。",
+    "必要性判断(评价分歧而非纯事实冲突):A 判 HomePage.ets 这两处『可免』(注释对渲染零影响,真正修复在 color.json);B 判『必要』。分歧部分来自评价对象不同——A 只评注释改动,B 把 color.json 底色改动一并计入。"
+   ],
+   "preferred": "B",
+   "reason": "两份定性一致且都诚实标注了盲区,但 B 的每一环(误读起点→manifest→验收标准→指令→落盘→发现→修复→构建验证)都能指回带行号、UTC 时间戳和 uuid 的具体转录位置,并补上了 A 明确自认无法确认的『#202022 出处』,还额外指出修复后 token 名实不符的语义漂移风险;A 的坐标多为内部版本号/记录号,关键上游一环留白。",
+   "_cost": 0.23019700000000004
+  },
+  "preferred_method": "control",
+  "treat": {
+   "cost_usd": 1.201844,
+   "num_turns": 23,
+   "wall_s": 205.1,
+   "verdict": "",
+   "usage": {
+    "input": 32,
+    "cache_create": 57051,
+    "cache_read": 653232,
+    "output": 12120
+   },
+   "calls": 22
+  },
+  "control": {
+   "cost_usd": 1.510686,
+   "num_turns": 33,
+   "wall_s": 292.0,
+   "verdict": "",
+   "usage": {
+    "input": 44,
+    "cache_create": 56053,
+    "cache_read": 969146,
+    "output": 18543
+   },
+   "calls": 32
+  }
+ },
+ {
+  "chain": 7,
+  "file": "LoginPage.ets",
+  "treat_is_A": false,
+  "verdict": {
+   "agree": true,
+   "agree_note": "一致。A 的主标签是「转换器规则供给缺口」(BACK→Activity 默认 finish 的约定从未写进 _common.md/参考文档/任务参数),B 的主标签是「页面 spec 未登记 BACK 回边 + 派发词没下『返回 pop()』硬要求」;措辞与切面不同,但事实分析同一——生成期喂给 conv-login 的全部输入(规范文档、页面 spec、派发约束、参考页)都不含返回键信号,converter 只能照抄同样缺该回调的兄弟页,因此属输入侧的规则/约束供给缺失,而非 converter 实现缺陷。两份在「纯新增、依据 round-1 真机缺陷单、对照 ManageRenewPage.ets:265-269 补齐、修复必要、同轮同 agent 另改了返回图标 24→12x19vp、修复后无编译/回归复验」上完全一致。",
+   "a_specificity": 5,
+   "b_specificity": 4,
+   "a_consistency": 4,
+   "b_consistency": 5,
+   "conflicts": [
+    "conv-login 读入的参考页数量与身份:A 只列 ChoiceTemplatePage(:40) 与 GuidePage(:50) 两份,并据此推出「恰好抽到两个没有标题栏返回箭头的参考页」;B 列为 ChoiceTemplatePage@v3、GuidePage、HomePage、SplashPage 四份全文读(#7996/#7998)。",
+    "生成期派发/任务参数条数:A 称三条(D-008 / 资源映射 / 沉浸式 Layer 3);B 称四条(D-008 不硬编码 bounds / $r() 资源 / 沉浸式 Layer 3 / export Builder)。",
+    "「Android LoginActivity 未重写 onBackPressed」是否已直接取证:A 称直接读过 LoginActivity.kt(:21)且 onBackPress 计数为 0,并把它当作「源码驱动的转换器无可转之物」的依据;B 明确说未取到 LoginActivity.kt 原文,该说法只有 fixer-r1 与 ManageRenewPage:266 注释的旁证。",
+    "缺陷单正文的可及性:A 直接引用了单子 anchor 原文(「Android LoginActivity 为独立 Activity,系统返回键默认 finish() 回上一页」)并称 fixer 未采纳其建议 #2;B 称 finding 正文属外部输入、无法复原,只能凭来源行与 fixer 的引用。",
+    "生成期的写法与文件尾部内容:A 称 conv-login 于 2026-07-24T02:35:44.418Z 一次性 Write 出全文,NavDestination 尾部为 .hideTitleBar(true) + .onReady(...);B 称该页由 conv-login 分 v1–v3(文件 v2–v4)生成、再由 slice2-auth v15–v39 续写,且 v24 同位置 .hideTitleBar(true) 之后直接闭合、未提及 .onReady(A 以「后被别的 agent 删除、删除者不可考」解释,但该解释本身未取证)。",
+    "对生成期是否可能一度存在又被删掉 onBackPressed:A 断言「自生成起全文 0 处、纯新增」并给高置信;B 保留 v5 为「实录外修改」断点、v25–v32 内容未知,只肯用 v24/v32 两端佐证,不完全排除中间版本有过。"
+   ],
+   "preferred": "A",
+   "reason": "两份定性同源且都带坐标,但 A 把真机复现(两次 uinput BACK 后 dumpLayout 不变、点返回箭头即回 MineFragment)、缺陷单生成命令、原始 Write 及六份输入的逐份计数全部落到了可回查的行号与时间戳,而 B 的两项关键事实(缺陷单正文、Android 源码行为)自承为二手或未取证——不过 B 的不确定性划界更严谨,A 的「恰好抽到两个无返回箭头的参考页」与高置信定级略超出其证据。",
+   "_cost": 0.23640299999999997
+  },
+  "preferred_method": "control",
+  "treat": {
+   "cost_usd": 1.3441095,
+   "num_turns": 22,
+   "wall_s": 237.5,
+   "verdict": "",
+   "usage": {
+    "input": 32,
+    "cache_create": 65673,
+    "cache_read": 679091,
+    "output": 13844
+   },
+   "calls": 21
+  },
+  "control": {
+   "cost_usd": 1.9207710000000002,
+   "num_turns": 32,
+   "wall_s": 328.6,
+   "verdict": "",
+   "usage": {
+    "input": 54,
+    "cache_create": 69111,
+    "cache_read": 1489544,
+    "output": 19313
+   },
+   "calls": 31
+  }
+ },
+ {
+  "chain": 8,
+  "file": "MemberCenterPage.ets",
+  "treat_is_A": false,
+  "verdict": {
+   "agree": false,
+   "agree_note": "在「返修那一层」两份完全一致：都认定 private static priceDigits/priceSuffix 的可见性错误由同轮 visual-fixer(fixer-r1/agent-a68daf720e780b4c2) 在双 Span 改造时引入，build-verify-r1(agent-af0e3d2ae54dbf769) 的修复是纯可见性放宽、未回退语义、且必要（改前 ArkTS 报 Property is private @1222/1223，改后 BUILD PASS）；也都引用同一份 ALIGN finding 与同一句 root_cause_hint「安卓 SpannableString 多级字号被压成一个 Text」，并都指出 visual-fixer 按职责不重编导致错误必然漏到编译环。但对「生成期为什么没做好」的定性指向两类不同根因：A 判为转换 worker 的分支建模错误（有源码真值却只照搬 if 分支、丢掉 else 的 replaceSpan 语义，明确称『不是缺证据』），B 判为输入缺失（生成环 conv-member 根本没读 spec 指定的 anchor .kt，『漏读源码』），且责任 agent 也不同，故整体不算一致。",
+   "a_specificity": 5,
+   "b_specificity": 5,
+   "a_consistency": 4,
+   "b_consistency": 4,
+   "conflicts": [
+    "单个 30vp Text 价格实现的作者不同：A 归 slice8-pay（2026-07-24T16:04:37.440Z 整文件 Write，称其覆盖了 conv-member 02:35 的版本）；B 归 conv-member@v1（blame MemberCenterPage.ets@v7:1148-1152，含『rollingTextView(滚动数字,30vp 加粗)』注释），并称 slice8-pay@v7 只把 1149 行换成 animatedPrice 数据源。二者部分可调和（整文件 Write 与行级 blame 的归属口径不同），但结论层面互斥。",
+    "转换环是否掌握安卓真值：A 举证 slice8-pay 上下文中已有 MemberCenterActivitiy.kt 全文（jsonl:24，含 if/else 两分支原文），据此断言『不是缺证据』；B 举证 conv-member 的读取集 #8132–#8171 无任何 .kt，据此断言根因是漏读。两份各自只覆盖了自己认定的那个 agent，对对方点名的 agent 均未表态。",
+    "生成缺陷根因类别冲突：A=语义建模/分支映射错误；B=源码未读入的输入缺口。二者指向不同的流程改进方向。",
+    "后缀字号是否达标：A 指出 finding 建议后缀约 22vp（￥:数字:后缀≈1:2.5:1.4）而实际取 16vp，属未解释的偏离；B 转述 ALIGN 期望为『￥16/数字30/后缀中号』并未提及任何偏离，读来像已对齐。",
+    "范围差异（非严格事实矛盾）：A 把 fixer-r1 的两 Span 语义改动与 build-verify-r1 的可见性修正同列为本次返修链的两层；B 只把 build-verify-r1 的 v10-v11 两行算作『修复』，把 fixer-r1 改动整体归入『被改代码的来源』。"
+   ],
+   "preferred": "B",
+   "reason": "两份坐标同样致密，但 B 用版本级 diff/blame + 记录号把「谁写了这几行」与「谁只改了数据源」分开核到，并逐条圈出不可核实项（v8-v11 全文、struct 名 ProductItemCard、ForEach→双 Span 的动机）；A 在同等证据密度下把一次整文件 Write 直接等同于作者归属，进而得出更强的『不是缺证据』结论，同时自称『无推测环节』却含意图推断，越证风险更高。",
+   "_cost": 0.28112800000000004
+  },
+  "preferred_method": "treat",
+  "treat": {
+   "cost_usd": 1.561372,
+   "num_turns": 25,
+   "wall_s": 271.0,
+   "verdict": "",
+   "usage": {
+    "input": 38,
+    "cache_create": 72016,
+    "cache_read": 894900,
+    "output": 15679
+   },
+   "calls": 24
+  },
+  "control": {
+   "cost_usd": 1.9469779999999997,
+   "num_turns": 36,
+   "wall_s": 442.4,
+   "verdict": "",
+   "usage": {
+    "input": 60,
+    "cache_create": 53194,
+    "cache_read": 1602434,
+    "output": 20215
+   },
+   "calls": 35
+  }
+ },
+ {
+  "chain": 9,
+  "file": "MinePage.ets",
+  "treat_is_A": false,
+  "verdict": {
+   "agree": true,
+   "agree_note": "一致。两份都把根因落在生成轮 conv-mine 写 MinePage.ets 时未给头区 Stack/图片任何显式尺寸约束，并把补尺寸寄托给一个从未真正生效的『icon-sizing 自愈』下游环节；两份引用的判据单同源（SYSTEMIC_image-no-explicit-size + ALIGN_PMineFragment_layout_drift_header-height），处方（Stack .height(128)+.clip(false)，128=60+68）与『同构副本必须同修』的必要性判断也一致。主标签不同：A 归为『交接接收方未被调用（pipeline/FV-1 漏跑 detector），converter 无责』，B 归为『转换错（丢约束链 + 依赖不存在的兜底），converter 有责』——这是责任归属的分歧，事实链条本身是同一条。",
+   "a_specificity": 5,
+   "b_specificity": 4,
+   "a_consistency": 4,
+   "b_consistency": 4,
+   "conflicts": [
+    "修复范围：A 称本次修复含 4 处 Image 补显式 vp 尺寸（20:45:15 python heredoc 四段 replace，assert count==1）+ header Stack 钉高两步；B 称 MinePage.ets@v40 的 diff 只有 .height(128) 与 .clip(false)（替换 0 行、新增 4 行），完全没有图标尺寸改动。",
+    "icon-sizing 环节是否存在：A 称 arkts-icon-sizing/icon_autofix.py 是 pipeline 5 项 detector 之一，因 run_loop.sh 在 macOS 崩溃、主会话降级只跑 2/5 而被漏掉（存在但未执行）；B 称 index(query=\"icon-sizing\") 返回 agent 0 / 文件 0，该环节在账本里从未存在。",
+    "生成方责任定性：A 引主会话自陈『converter 责任：无』，认为文件头注释是显式交接而非疏忽；B 直接定性为『转换错』——把 iv_vip_enter 的 layout_constraintTop_toBottomOf 链丢成无约束叠放。",
+    "MinePage 的可达性：A 断言其为真实注册路由（MineActivity 独立全屏页，非 MineComponent Tab）且未给该断言配坐标；B 明确列为无法确认——是否注册进 pageMap、实际可达性本次证据不足。",
+    "128 这个数值的来源：A 说是自己从 fragment_mine.xml:60-68 + 头像 marginTop 60 + 68 外推、对 MinePage 无直接视觉证据；B 说 finding 单 §5 处方逐字给出『外层 Stack 显式约束 60+68=128vp』。",
+    "被改版本的上一手：A 的链路里文件自 conv-mine 一次性 Write 后直接到修复；B 称前一版 v39 的写者是 slice17-home v29(#17632)，A 完全未提及这一环。"
+   ],
+   "preferred": "A",
+   "reason": "A 的四环（改动本体、判据单、原作者、失效点）都能落到 jsonl 行号+时间戳+uuid 并有主会话同因 RCA 自陈，因果机制比 B 仅凭一次 index 空查询推断『环节不存在』更可核查；B 在归属边界上更克制，但对修复范围的描述可能漏计了同批的图标尺寸补丁。",
+   "_cost": 0.23445999999999997
+  },
+  "preferred_method": "control",
+  "treat": {
+   "cost_usd": 1.6757594999999998,
+   "num_turns": 22,
+   "wall_s": 367.2,
+   "verdict": "",
+   "usage": {
+    "input": 30,
+    "cache_create": 71300,
+    "cache_read": 728490,
+    "output": 15040
+   },
+   "calls": 21
+  },
+  "control": {
+   "cost_usd": 1.5770319999999998,
+   "num_turns": 21,
+   "wall_s": 268.5,
+   "verdict": "",
+   "usage": {
+    "input": 42,
+    "cache_create": 66699,
+    "cache_read": 1109086,
+    "output": 14139
+   },
+   "calls": 20
+  }
+ },
+ {
+  "chain": 10,
+  "file": "SplashPage.ets",
+  "treat_is_A": false,
+  "verdict": {
+   "agree": true,
+   "agree_note": "定性一致：两份都把根因落在生成期——SplashActivity 专用主题 Theme.SeceretBox.Launch 的 android:windowFullscreen=true 这个「主题级全屏」真值从未进入转换 agent 的上下文，转换只按 needs_immersive_safearea=true 装配了四层沉浸式（背景穿透系统栏，不隐藏），因此缺少 setWindowSystemBarEnable([]) 这一动作；两份也都判定该修复必要，且都确认生成期没有任何隐藏/还原状态栏的代码。主标签措辞不同（A=页面规格用 page_type=full_screen_page 启发式顶替了主题真值，属「规格漏传」；B=conv-splash 读取集里没有 AndroidManifest.xml/themes.xml，属「漏读」），但两者描述的是同一环的输入侧与输出侧：派发/规格只给了沉浸式布尔量，真值虽被 ref-doc-analyzer 采集却没下发到 conv-splash。A 另外补了「旧沉浸方案由 entry-setup 按 team-lead 任务书写入」，B 未涉及该写者但引用了 v53:518-520 同一段四层沉浸代码，属覆盖面差异而非事实分歧。真正的分歧在修复范围界定与必要性论证角度（A 从安卓侧主题不可替代论证，B 从 Navigation 宿主不触发销毁回调、全屏态泄漏论证）。",
+   "a_specificity": 5,
+   "b_specificity": 5,
+   "a_consistency": 4,
+   "b_consistency": 4,
+   "conflicts": [
+    "修复范围：A 认定修复=两笔写入（21:20:10 python 补 import/setSystemBarsVisible/aboutToAppear 隐藏/aboutToDisappear 还原 + 21:20:24 onRoute 首行还原）；B 认定修复=仅 v53 那 5 行 onRoute 插入，并把 14 秒前同一 agent 的脚本写归为「未立版的黑盒写入」而非本次修复本体。两份对『谁写、何时写』一致，对『哪些算这条返修链』不一致。",
+    "修因单可得性：A 称在 jsonl:439 拿到该单原文并引用 §3/§4/§5（含 WindowScene [0,0][1216,126]、root 从 y=127 起、两步处方），还认定作者为 visual-verify 子 agent vv-t1-A01（similarity=0.73/status=fail/verify_confidence=high）；B 称该单为外部输入、读取时无全文快照、内容不可复原，只能由 slug 与读记录推断，未识别作者。两者对同一份单据的证据可得性直接矛盾。",
+    "AndroidManifest.xml 中 SplashActivity 指定主题的行号：A 记为 :102，B 记为 :99。",
+    "themes.xml 中 windowFullscreen 的位置：A 记为 :17-23 区块含该属性，B 记为 :17 起、:20 为 windowFullscreen=true（且 :18 为 cutout shortEdges）。",
+    "对 aboutToDisappear 还原的处理描述：B 表述为把还原「挪到」onRoute，但同段又给出 blame「替换/删除 0 行、新增 5 行」；A 明确 aboutToDisappear 的还原仍作为兜底保留。按 0 行删除，B 的『挪』与 A 的『两处并存』在事实上不能同时成立。",
+    "还原点覆盖的可判定性：A 把「onRoute/aboutToDisappear 之外的出口是否漏还原」列为无法从转录判断的留白；B 则据 v52:165-169（group2b-closer 写明 pushPathByName 不触发 onPageHide）断言若只留 aboutToDisappear 就会泄漏全屏态。B 给出了 A 声称拿不到的机制判据。"
+   ],
+   "preferred": "A",
+   "reason": "A 的链路更完整且每环都落到可回查的原始转录（修改本体、修因单原文与作者、旧代码写者及其上游任务书、真值采集点与 0 命中对照），而 B 因账本未收录脚本写入把修复窄化为 5 行、并自认关键单据不可复原且 v53 复原全文与实盘差 43 行；不过 B 用 Navigation 回调机制补上了 A 明确留白的还原覆盖问题，这一点比 A 强。",
+   "_cost": 0.25314200000000003
+  },
+  "preferred_method": "control",
+  "treat": {
+   "cost_usd": 1.7311064999999999,
+   "num_turns": 24,
+   "wall_s": 246.5,
+   "verdict": "",
+   "usage": {
+    "input": 38,
+    "cache_create": 84955,
+    "cache_read": 1038451,
+    "output": 14422
+   },
+   "calls": 23
+  },
+  "control": {
+   "cost_usd": 1.6717394999999995,
+   "num_turns": 27,
+   "wall_s": 321.2,
+   "verdict": "",
+   "usage": {
+    "input": 54,
+    "cache_create": 59327,
+    "cache_read": 1296057,
+    "output": 17134
+   },
+   "calls": 26
+  }
+ },
+ {
+  "chain": 11,
+  "file": "TemplatePreviewPage.ets",
+  "treat_is_A": true,
+  "verdict": {
+   "agree": true,
+   "agree_note": "定性一致：两份都把根因落在生成轮的转换环节——Android 的 match_parent + layout_marginHorizontal=15dp 被逐属性直译为 ArkUI 的 .width('100%') + .margin({left/right:dp_15})，而 ArkUI 的 margin 外扩于已声明尺寸，导致溢出父宽 30vp 把页面底色盖住；两份也都认定原始写者是 conv-preview/aconv-preview 的首次写入、放大因素是 ui-migration-pitfalls.md 缺这条规则 +「禁止编译」导致生成期无几何/渲染 oracle，并都记录了 fixer 推翻工单「缺 #F7F7F7 底色 token」处方、实测 color_page_bg 本就正确的改判。分歧只在修复范围与完成度，不在根因归类。",
+   "a_specificity": 4,
+   "b_specificity": 5,
+   "a_consistency": 3,
+   "b_consistency": 4,
+   "conflicts": [
+    "修复范围：A 称全文件只有一处 hunk（仅把 this.StepBar() 包进 Row + padding，替换 2 行/新增 10 行，704→712 行）；B 称有两次修改动作——2026-07-26T21:12:32 的 Bash-python 四处补丁 + 21:14:28 的 Edit，且同一轮还改了底部 CTA。",
+    "白卡自身横向 margin 是否被移除：A 称 v8:393-399 的 .width('100%') 与 .margin({top:dp_10,left:dp_15,right:dp_15}) 原样保留，因此修复「必要但不完整」、左侧内缩变 30vp；B 称 python 补丁第②项就是「去 StepBar 左右 margin」，margin 已下沉为外层容器 padding。",
+    "圆点行是否被修：A 称工单 §4 第 3 条（圆点行应改四等分）在 v8 未处理、0.064–0.937 vs 0.155–0.845 的错位仍在；B 称补丁新增了 StepCell（4×layoutWeight(1)，首尾透明 Divider 占位）已改为四等分。",
+    "代码中是否存在 SpaceBetween：A 转述工单「圆点行 SpaceBetween 应改四等分」并按真实缺陷处理；B 称 fixer 实测代码里根本没有 SpaceBetween（同文件:410-411），工单该条描述失实。",
+    "缺陷面/工单数量：A 只涉及 ALIGN_..._step-card 一张单、全程未提 CTA；B 有 step-card 与 bottom-cta 两张单，并给出 CTA 紫色渐变跨度 0.0→0.9992（安卓 0.042→0.958）的像素实测。",
+    "顶部间距：A 断言修复后 Row margin top 10 + 卡片 margin top 10 = 20vp 的新增偏差；B 的描述（margin 已下沉为 padding）下该推论不成立。",
+    "ui-migration-pitfalls.md 已有条目清点：A 称读到的 52-181 行「只有 P-12」并声明 1-51 行未展开、不能断言全文；B 称条目表含 P-07/P-12/P-14/P-15 且脚本判定全文 has 'match_parent': False。两者都认为缺该规则，但对文档现有条目的盘点不一致。"
+   ],
+   "preferred": "B",
+   "reason": "B 的证据锚定在原始转录坐标（jsonl 行号、uuid、毫秒级时间戳、逐字引文）且覆盖了同文件的两处缺陷，而 A 的关键差异化结论「只改了一处、白卡 margin 仍在、圆点行未修」与它自己引用的 fixer 收尾原文（该 sweep 明列 TemplatePreviewPage 的 CTA + 步骤卡）相抵触，更像是版本快照漏记了 21:12 那次经 Bash-python 而非 Edit/Write 的落盘。",
+   "_cost": 0.283049
+  },
+  "preferred_method": "control",
+  "treat": {
+   "cost_usd": 1.336392,
+   "num_turns": 20,
+   "wall_s": 267.9,
+   "verdict": "",
+   "usage": {
+    "input": 26,
+    "cache_create": 65041,
+    "cache_read": 553338,
+    "output": 16304
+   },
+   "calls": 19
+  },
+  "control": {
+   "cost_usd": 2.1742945,
+   "num_turns": 30,
+   "wall_s": 336.9,
+   "verdict": "",
+   "usage": {
+    "input": 60,
+    "cache_create": 79751,
+    "cache_read": 1839183,
+    "output": 18203
+   },
+   "calls": 29
+  }
+ },
+ {
+  "chain": 12,
+  "file": "DevicePrefs.ets",
+  "treat_is_A": true,
+  "verdict": {
+   "agree": true,
+   "agree_note": "一致。两份都把根因定在编排/派发环:主会话在给各 slice 的派发词里把 D-010(androidId)硬定为「保持挂起、不得臆造取值」,而 Base-3 的活体打靶早已证明后端只校验非空+格式,这份证据始终没有回流去解冻该约束;两份都判定上游 base5-preferences(androidId 不是 MMKV 键、不在其源文件范围)与 slice2-auth(按硬约束写空串)均无过错,修复都是纯新增的『测试解锁』且都判为必要。主标签措辞不同(A『编排环阻塞项决策』vs B『编排器派发纪律』),事实分析同一。",
+   "a_specificity": 4,
+   "b_specificity": 5,
+   "a_consistency": 4,
+   "b_consistency": 4,
+   "conflicts": [
+    "『空串必失败』是否有直接实测:A 明确写『账本里没有 androidId 传空串导致 initUser 失败的实测』,空值只打过 imei,必要性靠 NOT NULL 约束+非空 probe 推得;B 则把 agent-abase3-network:23 读到的 spec 行(『空串直接触发 SQLIntegrityConstraintViolationException』,标注 2026-07-23 probe 实测)列为『空串必失败的原始实证』,并据此断言『游客注册 100% 失败』。",
+    "同一次活体打靶的响应字段名互斥:A 记为内层 `status=0`,B 记为 `code:0`(其余 body、HTTP 200、32 位 token 一致;B 另有 userId=28309661)。",
+    "触发来源的描述不同:A 说触发是主会话自查 #1632 的 grep,并称 T+37:53→T+38:53 这一小时『账本无收件记录』;B 则给出明确的用户指令(主会话:5146,`/arkts-visual-verify 请修复下当前的登录问题`,02:54:51)作为触发。若两者指同一时段,A 的『无收件记录』与 B 的用户指令记录相矛盾。"
+   ],
+   "preferred": "B",
+   "reason": "B 的每条证据都落到可直接回查的原始 JSONL 文件名+行号、UTC 时间戳与提交号(c184680),给出了正反两侧 probe、修复后编译结果,并主动指出与题面前提(ff019d8a 修复轮)的冲突;A 虽四路互证且对缺口交代诚实,但坐标停在版本号/记录号层级,可回查性弱一档。",
+   "_cost": 0.217371
+  },
+  "preferred_method": "control",
+  "treat": {
+   "cost_usd": 1.5930185,
+   "num_turns": 22,
+   "wall_s": 260.8,
+   "verdict": "",
+   "usage": {
+    "input": 32,
+    "cache_create": 84277,
+    "cache_read": 740195,
+    "output": 15136
+   },
+   "calls": 21
+  },
+  "control": {
+   "cost_usd": 1.195943,
+   "num_turns": 27,
+   "wall_s": 248.1,
+   "verdict": "",
+   "usage": {
+    "input": 34,
+    "cache_create": 45846,
+    "cache_read": 712784,
+    "output": 15164
+   },
+   "calls": 26
+  }
+ },
+ {
+  "chain": 13,
+  "file": "PreferenceKeys.ets",
+  "treat_is_A": true,
+  "verdict": {
+   "agree": true,
+   "agree_note": "定性一致：两份都判定这不是生成期的代码缺陷，而是一个被有意登记的前向引用/阻塞占位（D-010 / P-BASE3-003，androidId 后端 NOT NULL、鸿蒙无等价 API）一路漂到修复轮才由主会话拍板；都认定 PreferenceKeys.ets 的改动是纯新增、Base-5 当初不写该键是正确的（Android 侧 ANDROID_ID 出自 Settings.Secure 而非 MMKV 键），都认定修复必要但属临时『测试解锁』、终态待联调。主标签措辞不同：A 叫『卡在决策环』（D-010 停在 pending-approval，且 Base-5 派发词未列 decision-ledger 为输入），B 叫『卡在 forward-ref 转派环』（P-BASE3-003 resolve_by=Slice 2 Step 3c，接盘的 slice2-auth 被任务书明令禁止自行取值）——指的是同一条阻塞链上的相邻两环，事实分析互补而非互斥。旁证：A 的相对时标差（T+22:35→T+38:56 = 16h21m）与 B 的绝对时标差（07-24T10:38:49→07-25T02:59:41）完全吻合，两份在时间线上互相印证。",
+   "a_specificity": 4,
+   "b_specificity": 5,
+   "a_consistency": 4,
+   "b_consistency": 4,
+   "conflicts": [
+    "『后端只校验非空+16-hex 格式』这条依据是否有实证：A 明确列为无法核实（称 base3-network 收尾只记了 initUser HTTP 200 / status=0 / 32 位 token，没有针对 androidId 取值的对照实验）；B 则给出 agent-abase3-network-...:138/268，称 LIVE PROBE 请求体本身就带伪造值 androidId=\"a1b2c3d4e5f60718\" 且返回 200/code=0、userId=28309661。同一份 base3 记录，一方说没有、一方说逐字有，属事实层面直接冲突。",
+    "触发事件是否有记录：A 称触发本次修改的运行时失败在账本里找不到对应动作，v240 窗口只读了若干源文件、无 probe 或失败日志读取；B 则给出主会话:5146 的 `/arkts-visual-verify 请修复下当前的登录问题` 用户指令与 :5164 的根因判定（F003Repository.ets:385 传空串 → NOT NULL 违约）。",
+    "占位的下游归属：A 称 D-010 全程停在 pending-approval、唯一 canonical 登记点在 network/AppFormInfoManager.ets 的 P-BASE3-003，未提任何接盘方；B 称该占位已明确 resolve_by=Slice 2 Step 3c 并转派给 slice2-auth（任务书硬约束 2 禁止其自行取值）。两说可以并存，但 A 对『执行期按占位规则合法放行』的叙述遗漏了这一次已发生的转派。",
+    "落地与验证：B 记录了修复后 hvigorw assembleHap 编译 BUILD SUCCESSFUL 并提交 commit c184680（:5226/:5230/:5231/:5232）；A 只记到三处文件在 T+38:56–38:57 成组落地，未提编译与提交。此为覆盖差异，非直接矛盾。",
+    "次要：B 称『键来源表列 5 个 Kotlin 常量文件』但只列举出 4 个（MMKVUtil.kt / UserData.kt / MMKVKeyExt.kt / AppContant.kt）；A 对 Base-5 输入源的描述则是 feature-base.md §5 + Android MMKV 键定义 + Base-1/Base-4 产出，粒度不同。"
+   ],
+   "preferred": "B",
+   "reason": "B 的锚点是唯一可回查的绝对坐标（jsonl 行号 + ISO 时间戳 + uuid + commit c184680），并补上了 A 自认无法核实的两项关键证据（触发指令与探针请求体中的伪造 androidId），还主动核验并纠正了题面关于 ff019d8a 的前提；其唯一超证据处是把一次单向成功探针说成『证明后端只校验非空+格式』（缺反例对照），比 A 的证据缺口更轻。",
+   "_cost": 0.22340799999999997
+  },
+  "preferred_method": "control",
+  "treat": {
+   "cost_usd": 1.5452115000000002,
+   "num_turns": 17,
+   "wall_s": 245.3,
+   "verdict": "",
+   "usage": {
+    "input": 26,
+    "cache_create": 85810,
+    "cache_read": 647071,
+    "output": 14474
+   },
+   "calls": 16
+  },
+  "control": {
+   "cost_usd": 1.4037054999999998,
+   "num_turns": 24,
+   "wall_s": 278.6,
+   "verdict": "",
+   "usage": {
+    "input": 40,
+    "cache_create": 58833,
+    "cache_read": 866769,
+    "output": 15199
+   },
+   "calls": 23
+  }
+ },
+ {
+  "chain": 14,
+  "file": "F003Repository.ets",
+  "treat_is_A": false,
+  "verdict": {
+   "agree": true,
+   "agree_note": "两份定性一致:根因不是切片 agent 的编码疏漏,而是生成期的占位/策略环节——Base-3 的 P-BASE3-003(『androidId 保持挂起、不臆造取值、方案待联调』)与它自己记录的 probe 事实(空串必触发 NOT NULL 违约、游客注册失败)相互矛盾,该禁令又被主会话派发词原样下发,导致 slice2-auth 明知会断链仍照令写空串;修复方为同一主会话在 arkts-visual-verify 阶段注入 DevicePrefs.getOrCreateAndroidId() 生成的 16-hex 实值。两份对『被改代码作者(agent-aslice2-auth-ac8d92aebe3693fc)』『修改必要性』『作者读全了 canonical 文件仍按令执行』的事实判断完全重合,措辞标签(A『占位策略缺过渡口子』/ B『spec 策略自相矛盾』)只是同一因果的两种表述。",
+   "a_specificity": 5,
+   "b_specificity": 4,
+   "a_consistency": 5,
+   "b_consistency": 4,
+   "conflicts": [
+    "触发信号:A 指名直接触发是用户 2026-07-25T02:54:51.105Z 在 /arkts-visual-verify 下的『请修复下当前的登录问题』(9b3105a2…jsonl:5146),并给出 02:56 grep、02:57:23 诊断的完整链;B 则称触发信号无法确认,#1631→#1632 约 1 小时『账本里既无收件记录也无真机报错/probe 动作』。",
+    "修复后的验证:A 称当轮只做 hvigorw 编译(:5226-5227)、修复方自陈未跑视觉对比管线,但次日 ff019d8a 会话真机 login_hmos 3/3 SUCCESS(agent-a40ff8f053f80637d.jsonl:228)从下游反证;B 称修复后是否复验『也无记录,v12 之后只有 v244 的读取』,其账本未覆盖 A 引用的下游真机验证。",
+    "修复后代码的确切形态:A 引 Edit 原文为 `setPrivacyInfo(operators, DevicePrefs.getOrCreateAndroidId(), '')`(直接调用);B 的 diff 证据(证据 1)写作 `setPrivacyInfo(operators, androidId, '')`(经局部变量),与 B 自己摘要里的『换成 DevicePrefs.getOrCreateAndroidId()』也不严格一致。",
+    "被替换代码的行数:B 证据 2 称 blame 显示被替换 5 行归属 slice2-auth@文件v1,末尾『无法确认的部分』又称『不涉及被修的这 6 行』;A 未给行数,故此项为 B 内部数字不自洽而非两份实质对立。"
+   ],
+   "preferred": "A",
+   "reason": "A 的每条证据都落在可回查的绝对坐标(jsonl 行号+uuid+UTC 时间戳+commit 短哈希)并原文引用禁令与 probe 结果,还主动指出题面对『哪一轮是修复轮』的表述与转录不符;B 的坐标全部依赖内部版本号/记录号体系,缺触发环节,且存在 5 行/6 行、直接调用/局部变量等自身细节不一致。",
+   "_cost": 0.18192300000000003
+  },
+  "preferred_method": "control",
+  "treat": {
+   "cost_usd": 1.2779599999999998,
+   "num_turns": 19,
+   "wall_s": 358.2,
+   "verdict": "",
+   "usage": {
+    "input": 26,
+    "cache_create": 52231,
+    "cache_read": 546188,
+    "output": 12672
+   },
+   "calls": 18
+  },
+  "control": {
+   "cost_usd": 1.6944199999999998,
+   "num_turns": 23,
+   "wall_s": 380.8,
+   "verdict": "",
+   "usage": {
+    "input": 46,
+    "cache_create": 68278,
+    "cache_read": 1078070,
+    "output": 18823
+   },
+   "calls": 22
+  }
+ },
+ {
+  "chain": 15,
+  "file": "WXEntryAbility.ets",
+  "treat_is_A": true,
+  "verdict": {
+   "agree": true,
+   "agree_note": "两份定性完全同源:同为「生成轮 conv-wxcallback 的派单书把宿主 Ability + module.json5 注册误并入三方 SDK 占位 P-S2-012,且输出被限死为单文件 WxCallbackHandler.ets,导致纯 ArkTS 可做的宿主 Ability 掉出产物清单;下游 Slice 2 只偿还 P-S2-013,无人认领」。A 落点为「a2h-execute 的派发/任务切分」,B 落点为「占位分类过宽 + 单文件产出边界」,措辞不同但事实链(派单书原文、占位号、closer 只解 P-S2-013、修复为纯新增)逐条一致;两者对『必要性』也一致(必要但端到端不通,handleIntent 仍是占位、skills 留空)。两份的时间坐标虽一为相对(T+77:58→T+81:24)、一为绝对(18:01:07→21:26:56),间隔均约 3h26m,可互证同一事件序列。",
+   "a_specificity": 4,
+   "b_specificity": 5,
+   "a_consistency": 5,
+   "b_consistency": 4,
+   "conflicts": [
+    "编译/验证结论是否存在:A 称『下游只有 build-verify-r1 v6 的依赖读,编译/验证结论不在实录中』;B 证据 7 给出 agent-af0e3d2ae54dbf769.jsonl:54(21:47:53)BUILD_STATUS: PASS 且确认新增 wxapi 两文件已参与编译。二者不能同真。",
+    "修复依据的完整性:A 只列 spec 单 §3/§5 与 fixer 的两次读单;B 另列主会话派单时的显式授权(主会话 jsonl:1712,20:33:31,『这一半现在就能做…那部分保持挂起』)。A 未提及此记录,若 B 属实则 A 的依据链不完整。",
+    "fixer 取名 handleIntent 的证据出处:A 归因于 fixer 用 sed 读 WxCallbackHandler.ets@v15 225-275 行(#23540);B 归因于生成轮占位表(WxCallbackHandler.ets:255 handleIntent())。结论相同(未照抄单里的 handleWant),但指向的原始记录不同。",
+    "B 内部小张力(非跨报告冲突):既引用本轮的 BUILD_STATUS: PASS,又在『无法确认』中称本轮明令『不重编不复测』,需靠『静态过 pass』的解释调和。"
+   ],
+   "preferred": "B",
+   "reason": "两份定性一致且质量都高,但 B 的坐标可直接回查到转录行号、tool_use id 与绝对时间戳,并含『缺席实证』(grep/find 未命中)与下游编译记录,证伪成本更低;A 的证据多为版本号/记录号的二级索引,且自认未核 feature-plan 是否别处派过该任务。",
+   "_cost": 0.17203000000000002
+  },
+  "preferred_method": "control",
+  "treat": {
+   "cost_usd": 1.1504205,
+   "num_turns": 17,
+   "wall_s": 173.7,
+   "verdict": "",
+   "usage": {
+    "input": 28,
+    "cache_create": 62023,
+    "cache_read": 582125,
+    "output": 9496
+   },
+   "calls": 16
+  },
+  "control": {
+   "cost_usd": 0.9597665,
+   "num_turns": 14,
+   "wall_s": 184.4,
+   "verdict": "",
+   "usage": {
+    "input": 18,
+    "cache_create": 49595,
+    "cache_read": 351277,
+    "output": 11450
+   },
+   "calls": 13
+  }
+ },
+ {
+  "chain": 16,
+  "file": "WXPayEntryAbility.ets",
+  "treat_is_A": false,
+  "verdict": {
+   "agree": true,
+   "agree_note": "两份定性一致:都判为「生成期任务切分/责任边界漏项」——no_ui 回调页只被安排产出 WxPayEntryHandler 模块,宿主 UIAbility + module.json5 注册这一半不在任何 agent 的产出清单内,后续 slice8-pay 的单写者纪律(禁碰共享工程文件)又堵死补齐路径,group-closer 只把它当 SDK 占位(P-S8-034)登记;两份都认定修复为纯新增、必要、且不依赖 SDK 入仓。唯一措辞差异是责任落点:A 强调 conv-wxpayentry 在文件头主动把宿主「外推给支付切片」,B 强调上游派发词本就没把宿主列进【输出】清单;二者是同一事实链的两个环节,不构成定性分歧。",
+   "a_specificity": 5,
+   "b_specificity": 4,
+   "a_consistency": 5,
+   "b_consistency": 4,
+   "conflicts": [
+    "编译验证:A 引主会话 ff019d8a:1761(2026-07-26T21:48:28.597Z)report.md「BUILD PASS…WXPayEntryAbility.ets 已由 module.json5 声明入口并参与编译」;B 称派发词明令不重编不复测,下游只有 build-verify-r1 v6 的一次依赖读、无编译/运行结论。二者对「是否存在编译验证结论」直接矛盾。",
+    "P-S8-034 的写入方:A 给出 group2-closer 转录直引(agent-agroup2-closer-b7ebd5ae592d3c5d.jsonl:570,2026-07-24T17:20:01.118Z)确指写入者;B 称 placeholder-registry.md@v57「无法复原(盲写)」、写入方不可考,同时又在证据 5 里把该登记归给 slice8-pay 收尾——既与 A 冲突,也与 B 自身表述相左。",
+    "07-24 15:37 前后对 WxPayEntryHandler.ets 的动作:A 记为 slice8-pay 在 15:37:39 只是「读过 handler」(:119-120);B 记为 WxPayEntryHandler.ets@v2 是该时点的「实录外修改」、内容未知。对同一时刻是读还是写存在事实分歧。",
+    "手册/派发对 handler 的定性措辞:A 记 slice8-pay 任务书把 components/WxPayEntryHandler.ets 列入「本 Slice 要接线的已有 UI」文件清单;B 记为「已存在勿新建」。属同一文档的不同引述,若为同一句则无实质冲突,若为不同条目则两份各缺一半。"
+   ],
+   "preferred": "A",
+   "reason": "A 的每条证据都带 uuid+绝对时间戳+转录行号且互相印证,并给出 B 声称不可复原的 P-S8-034 写入方,可回查性更强;B 唯一更稳的是对「未复测/未编译」的保留,但这一点尚被 A 的 report.md 直引部分覆盖。",
+   "_cost": 0.181068
+  },
+  "preferred_method": "control",
+  "treat": {
+   "cost_usd": 1.276868,
+   "num_turns": 17,
+   "wall_s": 182.9,
+   "verdict": "",
+   "usage": {
+    "input": 24,
+    "cache_create": 75761,
+    "cache_read": 511438,
+    "output": 10473
+   },
+   "calls": 16
+  },
+  "control": {
+   "cost_usd": 1.0047735000000002,
+   "num_turns": 15,
+   "wall_s": 209.3,
+   "verdict": "",
+   "usage": {
+    "input": 30,
+    "cache_create": 41822,
+    "cache_read": 577679,
+    "output": 11829
+   },
+   "calls": 14
+  }
+ },
+ {
+  "chain": 17,
+  "file": "module.json5",
+  "treat_is_A": true,
+  "verdict": {
+   "agree": true,
+   "agree_note": "两份定性一致:均判定为「生成轮任务分派/派发词误判 + 禁写共享文件」导致的责任真空——把『WXEntryActivity 注册』整体归入三方 SDK 占位(P-S2-012 kind=thirdparty-sdk),而其中『module.json5 宿主 Ability 注册』本是纯 ArkTS 接线;两份对修复内容(纯新增 WXEntryAbility/WXPayEntryAbility、singleton/exported、skills 有意留空待 D-013)、依据单(vv-static-B 的 WXCallbackActivity_01 + BaseWXPayEntryActivity_01,P1/manual_review)、必要性(is_migration_bug=true,发起侧已注册监听而回流侧零宿主)的事实分析完全重合。A 额外强调『半修』,B 额外强调『拆成两半』,是同一结论的不同措辞。",
+   "a_specificity": 5,
+   "b_specificity": 5,
+   "a_consistency": 5,
+   "b_consistency": 4,
+   "conflicts": [
+    "上一版写者归属:A 明确 module.json5@v4 由 group1b-closer v4(#12169)所写,并解释其 slice 授权只含深链 skills;B 在『被改代码的来源』中称『前一版的写者(conv-wxcallback)』,但 B 自己的证据 6 又列出生成轮仅 base3-network 与 group1b-closer 两次 Edit,且明说 conv-wxcallback 被限定只写 WxCallbackHandler.ets、禁写共享文件——两份结论冲突,且 B 内部亦不自洽。",
+    "原 abilities[] 来源与改动次数:B 断言『生成轮全程无人 Write module.json5、只有两次不碰 abilities 的 Edit』,据此反推 abilities[] 来自 DevEco 模板;A 则记录 module.json5@v3(T+26:52,68 行)被标为『实录外修改』、写者与动机不在账内,即存在第三次未归属改动。二者可用『实录外改动不进转录』调和,但作为事实陈述互斥,且 B 已自标该项为反证。",
+    "F003ViewModel.ets 行号:A 引 :344(已注册监听),B 引 :351(『回调经 WXEntryAbility → WxCallbackHandler.onResp → 本 VM 监听器回流』注释)。可能是同一文件的两个不同锚点,但两份互不覆盖、无法交叉印证。"
+   ],
+   "preferred": "A",
+   "reason": "两份证据具体度相当,但 A 在『谁写了上一版、为何没写』这条关键责任链上给出自洽且可回查的归属,而 B 在同一处自相矛盾(称 conv-wxcallback 为前一版写者却又证明它从未写过该文件),并把文件初始来源建立在负向推断上。",
+   "_cost": 0.212526
+  },
+  "preferred_method": "treat",
+  "treat": {
+   "cost_usd": 1.1246815,
+   "num_turns": 16,
+   "wall_s": 153.4,
+   "verdict": "",
+   "usage": {
+    "input": 24,
+    "cache_create": 67639,
+    "cache_read": 460947,
+    "output": 8645
+   },
+   "calls": 15
+  },
+  "control": {
+   "cost_usd": 1.2653545,
+   "num_turns": 29,
+   "wall_s": 264.2,
+   "verdict": "",
+   "usage": {
+    "input": 38,
+    "cache_create": 46741,
+    "cache_read": 798743,
+    "output": 15863
+   },
+   "calls": 28
+  }
+ },
+ {
+  "chain": 18,
+  "file": "color.json",
+  "treat_is_A": false,
+  "verdict": {
+   "agree": true,
+   "agree_note": "定性一致。主标签措辞不同——A 归到「设计令牌表/上游指令链被三层背书」,B 归到「转换错:派发词把配色结论前置、converter 用它压过布局锚点」——但事实分析同一条:安卓 activity_home.xml:21 的 ll_bottom_tab 真值是 @color/white,color_home_tab_bg(#202022) 是从 colors.xml 机械搬运的值,派发指令预先写死了「底部导航深色背景 #202022」,conv-home 在明知布局为白底的情况下作出「底栏配色冲突裁决」服从指令,color.json 只是被牵连的取值处;两份都认定修复必要、都指出唯一副作用是该 token 自此与安卓 colors.xml 不再同值、都建议改引用指向 white 更彻底。",
+   "a_specificity": 5,
+   "b_specificity": 4,
+   "a_consistency": 4,
+   "b_consistency": 5,
+   "conflicts": [
+    "被改值的写者:A 认定是生成轮 stage0-resources(agent-astage0-resources-a72c95c804e188d5,2026-07-24T01:36:29)搬运落盘;B 认定 color.json@v1 是外部输入、@v2 是实录外修改,生成侧「无记录写者」,stage0-resources(#21366)只是核对「99 条 OK」而非写入。",
+    "#202022 结论的上游出处:A 定位到主会话 9b3105a2:520 令牌表 →:1378 F018 验收标准 →:1925 派单指令三级链条并称其自洽;B 称主会话 v82 窗口只有派发动作、无读记录,页面 spec page_0009_HomeActivity.md@v2 也未提配色,该结论的上游依据在账本里是断的、无法核实。",
+    "conv-home 引用的 resource-mapping:A 视其为存在(引 stage0-resources:203 已把该 token 登记为 #ff202022,并把「resource-mapping.md 锚定深色」当作 converter 的实际论据之一);B 称该引用在 conv-home 读取集中没有对应读记录、其自查 grep(#7622)还失败,判为无法核实。",
+    "HomePage.ets:461 的行级归属:A 直接把该行归给 conv-home(:68 写下 barBackgroundColor),并称 slice17-home 后续只是原样保留;B 称该行 blame 为「归属未知(断点后)」,因 07-24T20:07 slice17-home 脚本写入造成 outband-change 断点,只能靠 conv-home 的收尾报告推定。",
+    "A 额外断言「该 token 在安卓侧其实是废弃/未被布局引用的死资源」,B 无此说法且其证据链中亦无支撑;此为 A 单方主张。"
+   ],
+   "preferred": "A",
+   "reason": "两份核心事实一致,但 A 把上游致错链一路钉到主会话令牌表、验收标准、派单指令三处带行号的出处(正是 B 自认断掉、只能推断的那一段),证据覆盖更完整、时间线可回查,代价只是「死资源」等个别未举证的旁支断言;B 的校准更诚实(置信中、三处存疑明列),可作为 A 上游环节的怀疑清单。",
+   "_cost": 0.195181
+  },
+  "preferred_method": "control",
+  "treat": {
+   "cost_usd": 1.4727590000000002,
+   "num_turns": 24,
+   "wall_s": 245.0,
+   "verdict": "",
+   "usage": {
+    "input": 48,
+    "cache_create": 56447,
+    "cache_read": 1132364,
+    "output": 13612
+   },
+   "calls": 23
+  },
+  "control": {
+   "cost_usd": 1.2272999999999998,
+   "num_turns": 18,
+   "wall_s": 212.2,
+   "verdict": "",
+   "usage": {
+    "input": 28,
+    "cache_create": 58066,
+    "cache_read": 614066,
+    "output": 13507
+   },
+   "calls": 17
+  }
+ }
+]

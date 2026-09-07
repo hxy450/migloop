@@ -1,0 +1,19 @@
+```
+文件: entry/src/main/ets/components/HomeTabComponent.ets  修复方: fixer-r1(visual-fixer, task a68daf720e780b4c2, 由主会话 ff019d8a 在 uuid 06221b4d-f63a-4b8e-8cb1-f480cf4f7f13 派发)  修改时间: 2026-07-26T20:47:22Z – 21:07:55Z(5 处实质改动)
+修复改了什么: ① 顶部横幅 Image 补 `.aspectRatio(1080/660)`(P0 SYSTEMIC image-no-explicit-size)；② 文档导入链路重写——删掉会话级 `storagePermissionGranted` 短路、改走 `F008ViewModel`+`DocImportRouter.isGranted/requestPermission`，并在 build 树挂上从未挂载过的 `PermissionIntroHost()`(附带补 common/hilog import 与 DOMAIN/TAG)；③ 文档选中态外层 `Row` 补 `.hitTestBehavior(HitTestMode.Transparent)`；④ 步骤 1 单元由 `this.stepCell('1', 三元, …)` 内联展开；⑤ 一处悬空块注释归位。
+修复的依据: 真机 round-1 视觉/功能验收产出的 defect 卡，fixer 逐条 sed 读原文后改。横幅卡给了量化证据与 root_cause_hint(`agent-a68daf720e780b4c2.jsonl:172`：dump 节点 `Image[0,127][1216,743]` 高/宽=0.507 vs 资源固有 660/1080=0.611，「HomeTabComponent.ets:369-371 没有显式高度…ArkUI 不像 adjustViewBounds 那样按固有比例反推高度」)；派发 prompt 已把 SYSTEMIC 与 4 条 P0 逐条点名(`ff019d8a…jsonl:1712`，含「`PermissionIntroHost()` 从未出现在任何页面 build() 里」「`HomeTabComponent.ets:262-286` 的 confirmOperate 跳过了 DocumentViewPicker」)。
+被改代码的来源: 横幅 Image、双 Tab 包裹 Row、stepCell 三元均出自生成轮 `conv-hometab`(customAgentType=a2h-activity-converter，`agent-aconv-hometab-afeccbf00da93597.jsonl:57` Write，2026-07-24T03:16:15Z；:63 自检又删掉 `.alignSelf`)，其自陈依据是「合成 view.xml → 不硬编码 bounds(D-008)」(文件头)与「banner Image relies on intrinsic aspect sizing，project-consistent with GuideDifficulty1Component」(:80)。`storagePermissionGranted` 是生成轮 `slice17-home`(a2h-migration-worker)在 `agent-aslice17-home-cbf5a21e1ea6963a.jsonl:249/253`(2026-07-24T19:47Z)按 P-S9-010「华为侧不需要 MANAGE_EXTERNAL_STORAGE 等价权限、授权态退化为会话级」写入。`PermissionIntroHost()` 属纯新增：生成轮只写了 import 与注释、没落进 build 树。
+生成时为什么没做好: 卡在 conv-hometab 这一环的输入与验证——它读的 `ui-migration-pitfalls.md` 只有 P-15(objectFit 默认值)，没有任何 adjustViewBounds→aspectRatio 的条目，而基线快照 `view_xml_synthesized:true`、全部 node `bounds=""`，加上任务书「⚠️ 禁止编译」，于是既无规则、无实测高度、也无渲染回归能拦住这条。
+是否必要: 必要，四处都有 round-1 真机取证(横幅 0.507 vs 0.611、左半页签连点 4 次 dumpLayout 无变化、PermissionIntroHost 三处 grep 全在注释)，且修复后编译 PASS。
+证据(每条带位置):
+  1. 修复 Edit 本体：`ff019d8a…/subagents/agent-a68daf720e780b4c2.jsonl:176`(2026-07-26T20:47:22.889Z, toolu_013QvDMQKBRpHuHWozEtKPzi) 在 `.width('100%')` 与 `.objectFit(Contain)` 之间插入 `.aspectRatio(1080 / 660)`。
+  2. 判据卡原文：同文件 `:171-172`，fixer 用 `sed` 读 `spec/fix/round-1/ui/ALIGN_PHomeFragment_layout_drift_header-banner-height.md`，含实测比例与 root_cause_hint。
+  3. 卡的作者与聚类：`agent-a8ef23a1c410ba9c9.jsonl:273/279/298`(vv-t2-A03, 2026-07-26T20:17–20:20Z)写该卡；聚成 SYSTEMIC 见 `ff019d8a…jsonl:1682`(20:25:38Z)——P0、affects 6 单、suggested_files 第 4 条即 HomeTabComponent.ets。
+  4. 原代码与依据：`agent-aconv-hometab-afeccbf00da93597.jsonl:57`(Write) / `:63`(删 alignSelf) / `:80`(「relies on intrinsic aspect sizing」)。
+  5. 输入缺陷：`agent-aconv-hometab-…jsonl:9/15` 的 Read 结果——meta.json `"view_xml_synthesized": true`、`"confidence": "medium"`，view.xml 每个 node `bounds=""`。
+  6. 知识缺口：同文件 `:49` 读到的 ui-migration-pitfalls.md 全量条目里无 `aspectRatio`/`adjustViewBounds` 字样(P-01…P-27 标题已枚举，图像相关只有 P-15)。
+  7. 另三处的判据与改法：`:355-356`(读 HomeFragment_01/02 卡，dead_handler 取证)、`:361`(Bash 补 hitTestBehavior + 内联展开步骤 1)、`:293/295/300/307`(文档导入重写 + 挂 PermissionIntroHost)。
+  8. 事后编译：`agent-af0e3d2ae54dbf769.jsonl:54`(build-verify-r1) BUILD_STATUS: PASS，2 条错误全在 MemberCenterPage，与本文件无关。
+无法确认的部分: (a) 修复后没有再跑一轮真机截图比对——转录到 `ff019d8a…jsonl:1773` 结束，只有编译 PASS，`aspectRatio` 的实际渲染效果未被复验；(b) fixer 的 thinking 块在转录中为空(`:161/164/167/175`)，它选 `1080/660` 而非其它写法(如显式 `.height()`)的取舍过程无法还原，只能凭 Edit 里的注释推断；(c) 步骤 1 的 @Builder 值参问题：pitfalls 里当时**已有** P-24(把动态值当 @Builder 值参→定格首帧)且 conv-hometab 读过，为何仍这样写，转录里没有可归因的记录。
+置信: 高——每处改动都能对上「defect 卡 → fixer 工具调用 → 生成轮原始 Write/Edit」三点闭链，且原作者的书面依据(D-008、P-S9-010、GuideDifficulty1Component 先例)在生成轮转录里逐字可查；唯一软的一环是修复效果未经二次渲染验证。
+```

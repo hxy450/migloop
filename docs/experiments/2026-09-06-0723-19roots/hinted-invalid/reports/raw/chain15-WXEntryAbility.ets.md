@@ -1,0 +1,19 @@
+```
+文件: entry/src/main/ets/wxapi/WXEntryAbility.ets  修复方: visual-fixer 修复 round-1(agent-a68daf720e780b4c2 / name=fixer-r1, agentType=visual-fixer)  修改时间: 2026-07-26T21:26:56.736Z(uuid b0a801b6-0c4c-4708-8296-e168c6de2f30)
+修复改了什么: 不是改而是**整文件新建** —— 写了一个 `export default class WXEntryAbility extends UIAbility`,`onCreate`/`onNewWant` 都把 want 交 `WxCallbackHandler.getInstance().handleIntent(want)`,并把 `onFinish` 注入 `terminateSelf()`、末尾再无条件兜一次自关闭;同一批还在 `module.json5` 的 `abilities[]` 里补了 `WXEntryAbility`/`WXPayEntryAbility` 声明(skills 有意留空,注明待微信鸿蒙版 SDK 文档)。
+修复的依据: 单 `spec/fix/round-1/feat/WXCallbackActivity_01_no_wxentry_callback_ability.md` 的「§4 源码缺口 + §5 修复建议」,fixer 在 21:26:06 读到:「module.json5:33 abilities[] 缺 WXEntryAbility」「WxCallbackHandler.ets:253-257 handleWant 零调用点」「F003ViewModel.ets:351 注释声明的 WXEntryAbility 不存在,authListener 注册后永远收不到回调 —— 半条链」,建议 1/2/4 逐条对应它写出的 onCreate+onNewWant 分发、module.json5 注册(且明确「skills 按 SDK 文档补,别照抄 EntryAbility」)、SDK 未入仓期的兜底自关闭。
+被改代码的来源: 纯新增,此前无人写。回调分发器 `WxCallbackHandler.ets` 是生成轮 conv-wxcallback(a2h-activity-converter,2026-07-24T05:05:58)按 page_0037_WXCallbackActivity(page_type=no_ui)产的,它在文件里直接写下「宿主微信入口 UIAbility(WXEntryAbility,SDK 门面)自行终止」——把宿主当作既存前提;但它的任务书只给了一个输出文件且要求「不写共享文件」,并把「WXEntryActivity 注册」整体划进三方 SDK 占位 P-S2-012。随后 slice2-auth(07-24T12:16)接了发起侧 `setAuthListener` 并留下注释「回调经 WXEntryAbility → WxCallbackHandler.onResp」,同样受「单写者纪律:禁碰共享文件」约束,把 module.json5 移交 group-closer;group1-closer 的任务书里没有这一项。
+生成时为什么没做好: 派单环节把「宿主 UIAbility + module.json5 注册」这条纯 ArkTS 接线错误地折进了 P-S2-012 这个 thirdparty-sdk 占位,于是它既不属 converter(单文件、禁写共享文件)、也不属 slice(禁碰 module.json5)、closer 又没被交办 —— 三方都合规,缺口无主。
+是否必要: 必要,但只补齐了可静态验证的那一半 —— 发起侧监听已注册而回流侧无落地 Ability 是真断链;不过 skills 留空 + `handleIntent` 仍是 P-S2-012 占位,SDK 入仓前微信回跳实际仍到不了这张 Ability。
+证据(每条带位置):
+  1. 新建动作: `ff019d8a-.../subagents/agent-a68daf720e780b4c2.jsonl:557` Write,2026-07-26T21:26:56.736Z,uuid b0a801b6;同 agent :565 Edit module.json5 补两条 abilities;:626 收尾自述「(新增) entry/src/main/ets/wxapi/WXEntryAbility.ets」。
+  2. 依据来源: 同文件 `:549`(2026-07-26T21:26:06.374Z tool_result)finding §4/§5 全文,含 module.json5:33 / handleWant 零调用点 / F003ViewModel.ets:351 四条缺口。
+  3. 单的作者与判据: `ff019d8a-.../subagents/agent-afcfbf677a4e5864a.jsonl`(name=vv-static-B,B系列静态验收):161(17:56:34)把 WXCallbackActivity 判为 `structurally_unreachable/orphan/defect`,:175(18:01:07)Write 该 md;判据含 Android 侧 `pay/src/main/AndroidManifest.xml:13` + activity-alias `${applicationId}.wxapi.WXEntryActivity` 为活代码。
+  4. 被引用代码的写者: `9b3105a2-.../subagents/agent-aconv-wxcallback-3f5b8f543d8ac407.jsonl:70`(2026-07-24T05:05:58.801Z Write WxCallbackHandler.ets),文件内即含「宿主微信入口 UIAbility(WXEntryAbility,SDK 门面)自行终止」。
+  5. 生成侧派单边界: 同文件 `:1`(04:57:48)任务书 —— 【输出】仅 WxCallbackHandler.ets、「微信 SDK 具体接入(IWXAPI/handleIntent/WXEntryActivity 注册)→ 属三方 SDK,用 PLACEHOLDER」、「不写共享文件」;`:131` 结项报告把 P-S2-012 的 trigger 明确写成「…/WXEntryAbility 注册」。
+  6. 另一半边界: `9b3105a2-.../subagents/agent-aslice2-auth-ac8d92aebe3693fc.jsonl:1`(11:54:37)「单写者纪律:只写本 Slice 自身 page/VM/repository,禁碰共享文件…全部移交 group-closer」;:213/:331 写下 F003ViewModel 的「回调经 WXEntryAbility」注释却未建该 Ability。
+  7. 无人接盘: 主生成会话 `9b3105a2-...jsonl` 全文 grep `ets/wxapi` 命中 0;`agent-agroup1-closer-...jsonl:1`(12:36:47)的五步任务书只列 embed/cross_slice_edits/资源/编译/handoff,无 wx 宿主 Ability 条目。
+  8. 未验证: 该 fixer 转录内 `hvigor|assembleHap` 的 5 处命中全是 skill 说明文本与 `:583` 的 git 越界自检,**没有实际编译**新文件。
+无法确认的部分: ① 微信鸿蒙版 SDK 是否真要求 `WXEntryAbility` 这一命名/skills 契约 —— 两侧都以「待 SDK 文档」挂起,仓内无据可查;② 新文件是否能通过 ArkTS 编译(本轮未编译,也未见后续 round 的复检记录);③ `handler.onFinish` 与末尾无条件 `terminateSelf()` 会否重复终止,转录内无运行证据。
+置信: 高 —— 新建动作、依据单、单的作者、生成侧三处派单边界均有转录原文直接对应;仅「是否必要」的下半段(SDK 入仓后是否即通)因 SDK 不在仓内而只能标未验证。
+```

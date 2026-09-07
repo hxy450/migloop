@@ -1217,3 +1217,26 @@ def test_script_literal_used_as_mapping_value_is_not_a_write(tmp_path: Any) -> N
     assert not any(p.endswith(".ets") for p in led.stories)
     run = next(a for a in led.agents[MAIN_ID].actions if a.tool == "Bash")
     assert run.detail.get("unresolved") == "脚本字面量方向不明"
+
+
+def test_render_chains_with_file_only_lists_that_files_touches() -> None:
+    """sessions 带 file 时,末尾的「碰过」附录也只列这个文件:0723 上不过滤会把 54 个不相干文件(6.5K 字)
+    塞进每一根调查的上下文。只被碰过、没有链的文件,带 file 问它也要能看到自己的碰过记录。"""
+    touched = [{"path": "/p/entry/src/main/ets/viewmodels/F012ViewModel.ets", "file": "F012ViewModel.ets",
+                "by": "agent-afix", "by_name": "fixer-r1", "by_ver": 17, "ts": "2026-01-01T01:00:00Z",
+                "seq": 23261, "reason": "脚本黑盒", "has_versions": True},
+               {"path": "/p/entry/src/main/ets/pages/AboutUsPage.ets", "file": "AboutUsPage.ets",
+                "by": "agent-afix", "by_name": "fixer-r1", "by_ver": 18, "ts": "2026-01-01T01:05:00Z",
+                "seq": 23300, "reason": "脚本黑盒", "has_versions": True}]
+    chain = {"file": "entry/src/main/ets/pages/AboutUsPage.ets", "file_abs": "/p/entry/src/main/ets/pages/AboutUsPage.ets",
+             "kind": "rework", "generator": {"desc": "slice6", "stage": "gen", "id": "agent-ag"},
+             "fixer": {"desc": "fixer-r1", "stage": "fix", "id": "agent-afix"}}
+    payload = {"chains": [chain], "cross": None, "t0": "2026-01-01T00:00:00Z", "touched": touched}
+    text = atoms_text.render_chains(payload, root="/p", file="AboutUsPage.ets")
+    assert "修复期被脚本碰过、方向不明的工程文件(1 个文件,1 次)" in text
+    assert "- entry/src/main/ets/pages/AboutUsPage.ets | 1 次 | fixer-r1 v18 #23300" in text
+    assert "F012ViewModel" not in text
+    text2 = atoms_text.render_chains(payload, root="/p", file="F012ViewModel.ets")
+    assert "返修链(0/1,只看 F012ViewModel.ets)" in text2
+    assert "- entry/src/main/ets/viewmodels/F012ViewModel.ets | 1 次 | fixer-r1 v17 #23261" in text2
+    assert "AboutUsPage" not in text2

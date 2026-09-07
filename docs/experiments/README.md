@@ -24,3 +24,11 @@
 - `judge/*.json`:DiceRoller 4 条链的三组两两盲评。
 - `runs-summary.jsonl`:所有按链运行的一行摘要(0723 与 DiceRoller)。
 - `judge.py`、`analyze_runs.py`:按链的评委与用量画像脚本。
+
+## 2026-09-06-0723-19roots/ —— 0723 全部 19 根,纯工具 vs 原始转录,两组都只给文件名
+
+- `prompts/prompt_template_seg_tools0.md` / `prompt_template_seg_raw0.md`:正式两组的模板(只有 `{sid}` `{file}` 两个占位符);`prompt_template_seg.md` / `prompt_template_seg_raw.md`:作废第一轮的模板(原始组被给了修复方 / 转录路径 / 时间)。
+- `hint-free/`:正式一轮。`reports/<tools|raw>/chainNN-<文件>.md` 38 份报告原文;`prompts-as-sent/` 实发提示词;`metrics-<arm>.json` 逐根费用、轮次、token、调用序列;`summary-<arm>.json` 汇总。
+- `hinted-invalid/`:作废的第一轮,同样布局,只作记录。
+- `judge/hint-free_tools_vs_raw.json`:19 根盲评(A/B 随机,`treat_is_A` 记录谁是谁)。
+- `harness/`:`run_probe.py`(`--chains 0,1,2 --label X --template T [--raw-dir 转录目录]`)、`judge.py`、`seg_summary.py`(汇总一组)、`seg_compare.py`(两组并排)、`seg_anatomy.py`(逐调用解剖:agent 带不带 since、sessions 碰过节、原始组找人阶段、每轮上下文)、`seq_dump.py`(逐调用序列)、`judge_tally.py`(解盲汇总)、`chains-ff019d8a.json`(19 根)。脚本里有本机绝对路径。

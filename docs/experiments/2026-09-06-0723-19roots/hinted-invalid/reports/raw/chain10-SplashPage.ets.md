@@ -1,0 +1,19 @@
+```
+文件: entry/src/main/ets/pages/SplashPage.ets  修复方: visual-fixer(fixer-r1, agent-a68daf720e780b4c2)  修改时间: 2026-07-26T21:20:24.982Z（同一改动的前半在 21:20:10.255Z）
+修复改了什么: 给开屏页补「进页隐藏系统栏 / 跳走还原」——import 加 `window`、新增私有方法 `setSystemBarsVisible()`（`win.setWindowSystemBarEnable([])` ↔ `['status','navigation']`）、`aboutToAppear` 末尾隐藏、`aboutToDisappear` 兜底还原；21:20:24.982Z 这一笔专门把还原插到 `onRoute()` 首行（跳 GuidePage/HomePage 那一拍）。
+修复的依据: round-1 finding `ui/ALIGN_PSplashActivity_extra_element_status-bar.md`（P1，真机双端对比：安卓开屏顶部无状态栏、鸿蒙多出 `WindowScene [0,0][1216,126]` 且根内容从 y=127 起；§5 逐条要求「进页 setWindowSystemBarEnable([])、离开时还原成 ['status','navigation']」）。改前 fixer 自己回源取证：`AndroidManifest.xml:102` 给 SplashActivity 单独指定 `@style/Theme.SeceretBox.Launch`，`themes.xml:17-23` 含 `windowFullscreen=true`，且全工程只有开屏页用该主题。
+被改代码的来源: `onRoute()` 是生成轮 slice11-startup 子 agent 写的（2026-07-24T16:00:31.136Z），依据是 SplashActivity.gotoHome 的两个落点，注释写明「SplashPage 是入口页、不入栈，被压入的目标页盖住它即等价于源码 finish()」——它对齐的是**导航语义**，主题/系统栏不在其职责内；系统栏这部分属**纯新增**。文件本体由 conv-splash（a2h-activity-converter，2026-07-24T02:07:13.800Z）首写，只按 `needs_immersive_safearea=true` 做了沉浸式 Layer 2/3（expandSafeArea + WindowModel 避让），它读的是 page spec / meta.json / view.xml / activity_splash.xml / SplashActivity.kt，**从未读 AndroidManifest.xml 或 themes.xml**，所以不知道有 `windowFullscreen=true`。
+生成时为什么没做好: 断在 ui-snapshot 抽取那一环——它把「Activity 主题是全屏」压成了一个布尔 `needs_immersive_safearea=true`（meta.json 虽把 themes.xml 列进 style_sources 却没抽任何主题属性），而 arkts-immersive-safearea skill 的四层架构只讲「穿透 + 避让」、通篇不含 `setWindowSystemBarEnable`，于是「隐藏系统栏」这个语义在 spec→skill→converter 链路上整段丢失。
+是否必要: 必要，安卓侧是主题级全屏、expandSafeArea 只让背景穿透不隐藏系统栏，两者不可互相替代，且还原点挂 onRoute 而非 aboutToDisappear 的判断与该页「Navigation 宿主、压子页不销毁」的既有事实一致。
+证据(每条带位置):
+  1. 本次修改：ff019d8a-.../subagents/agent-a68daf720e780b4c2.jsonl:488（21:20:24.982Z，Edit：onRoute 首行插 `this.setSystemBarsVisible(true)`）；同一改动前半在 :485（21:20:10.255Z，python 脚本：import window + aboutToAppear 隐藏 + setSystemBarsVisible helper + aboutToDisappear 兜底）。
+  2. 依据的 finding 正文：同文件 :439（21:16:34.311Z）——§3「鸿蒙侧存在 WindowScene [0,0][1216,126]、root [0,127]…」、§4「SplashPage.ets:505-516 只做了 expandSafeArea 沉浸（Layer 2），未做状态栏隐藏」、§5 两步处方。
+  3. fixer 的回源取证：同文件 :476–:479（21:19:26.974Z–21:19:38.507Z，grep 出 AndroidManifest.xml:102 的 `Theme.SeceretBox.Launch` 与 themes.xml:17-23 的 `windowFullscreen=true`）；自评记录在 :615（21:41:39.026Z，写入 finding §6 的 attempt 日志）。
+  4. finding 的出处：ff019d8a-.../subagents/agent-aa2d7cdfd6a5cf89f.jsonl:208（2026-07-26T15:40:57.221Z，`render_finding_skeleton.py --id ALIGN_PSplashActivity_extra_element_status-bar --severity P1 --suggested-files SplashPage.ets,EntryAbility.ets`），批次 manifest 见同文件 :235（SplashActivity fail / sim=0.73）。
+  5. 被改代码原作者：9b3105a2-.../subagents/agent-aslice11-startup-50a0622bcfe4a588.jsonl:236（2026-07-24T16:00:31.136Z，写入 `private onRoute` 及「入口页、不入栈…等价 finish()」注释）。
+  6. 文件首写与其输入面：9b3105a2-.../subagents/agent-aconv-splash-9d5902d803bbcde6.jsonl:71（2026-07-24T02:07:13.800Z，Write，含「沉浸式 Layer 3 安全区模型桩」WindowModel）；其读取记录 :7/:15/:17/:23/:25 全是 spec/layout/kt，无 manifest/themes。
+  7. 抽取环丢信息：同文件 :9（page_0001_SplashActivity.md「## 沉浸式：本页面 needs_immersive_safearea = true …按四层架构实施（spec 不列 API）」）与 :16（meta.json `page_type=full_screen_page`，style_sources 含 themes.xml 但无任何 theme 属性字段）。
+  8. 上游其实知道这条事实但没传下来：9b3105a2-.../subagents/agent-aref-doc-analyzer-d4e8fbf7e1d0dbac.jsonl:175（2026-07-23T12:42:54.795Z，参考文档 §3.4.2 主题表已写明 `Theme.SeceretBox.Launch → windowFullscreen = true`）；而全生成会话 grep `setWindowSystemBarEnable` 命中 0 处。
+无法确认的部分: (a) 这次改动是否重编译并真机复验——本轮转录内未见针对 SplashPage 的 round-2 截图/像素复核；(b) 还原只挂了「路由」这一个出口，而 SplashPage 的 aboutToAppear 注释自述「宿主侧三个出口：路由 / 协议页跳转 / 退出应用」（同 agent 文件 :484），协议 WebView 页被压入时状态栏是否仍处隐藏态，转录内无证据可判；(c) finding 同时点名的 EntryAbility（Layer 1）fixer 明确未改，是否影响首屏前的极早期一帧，无法确认。
+置信: 高——修改内容、依据 finding、回源取证、原作者与首写者、spec 抽取缺口五段都能直接指到具体行号与时间戳，且「生成会话零处 setWindowSystemBarEnable」是可穷举验证的负向证据。
+```

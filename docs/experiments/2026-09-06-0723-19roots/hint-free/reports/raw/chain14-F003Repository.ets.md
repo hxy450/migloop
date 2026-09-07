@@ -1,0 +1,19 @@
+```
+文件: entry/src/main/ets/repositories/F003Repository.ets  修复方: 9b3105a2 主会话本体(assistant,非子 agent),在 /arkts-visual-verify 修复登录任务下(session 9b3105a2-85ec-4889-9786-b3c220f06754)  修改时间: 2026-07-25T03:00:19.095Z(加 import,uuid 153d90cc)+ 2026-07-25T03:00:41.345Z(改 collectPrivacyInfo,uuid 4a4f1396),提交 c184680 @03:02:43
+修复改了什么: 给 F003AuthGatedInit.collectPrivacyInfo() 的 androidId 参数注入实值——`AppFormInfoManager.setPrivacyInfo(operators, '', '')` 改成 `setPrivacyInfo(operators, DevicePrefs.getOrCreateAndroidId(), '')`,并补 `import { DevicePrefs }`、改写该方法的说明注释(配套新增 DevicePrefs.getOrCreateAndroidId() 与 PreferenceKeys.KEY_ANDROID_ID)。
+修复的依据: 用户 02:54:51 下达「请修复下当前的登录问题」;修复方 02:56 grep 出 `F003Repository.ets:385` 传空串,02:57:23 判定「后端 NOT NULL 列违约 → 游客注册失败 → 拿不到 token → 登录全链阻塞」,并援引生成轮 Base-3 的活体打靶结论「后端只校验 androidId 非空 + 格式合法(16-hex)」作为可注入自造值的凭据;取值模式照抄同仓已有的 `DevicePrefs.getOrCreateMarkId()` 读时兜底。
+被改代码的来源: 生成轮子 agent `aslice2-auth`(agent-aslice2-auth-ac8d92aebe3693fc)于 2026-07-24T12:09:13.743Z 首次 Write F003Repository.ets 时写下,连同注释「本方法按现状传空串……不在此处编造设备标识」。依据是它收到的任务书硬约束第 2 条:「D-010 androidId……保持挂起、不要臆造取值……方案需联调确认,你不要擅自定」,以及 spec/placeholder-registry.md:568 的 P-BASE3-003 条目「**不臆造 UUID 冒充解决**(那会把问题推迟到联调才暴露)」。它做的完全是被指令要求的事,并在收尾报告里明确声明「D-010/D-011 保持挂起:未臆造 androidId」。
+生成时为什么没做好: 卡在 Base-3 建立的占位策略这一环——同一次打靶既证明了「空串必挂」又证明了「任意合法 16-hex 可通」,但 P-BASE3-003 只登记为「等联调敲定」的悬挂项并禁止下游自行取值,没有留「测试环境先用稳定自造值解锁、联调再替换」的过渡口子,于是切片 agent 只能照章传空串,把一个已知会 100% 打断登录链的缺口带到了交付。
+是否必要: 必要——它是登录链上的硬阻塞(后端 USER_INFO.ANDROID_ID 为 NOT NULL,空串直接 SQLIntegrityConstraintViolationException),不改则游客注册拿不到 token,后续一切接口不可用;次日 ff019d8a 会话在真机上跑通登录(3/3 SUCCESS)从下游反证了这一点。
+证据(每条带位置):
+  1. 修复两处 Edit 原文:9b3105a2-85ec-4889-9786-b3c220f06754.jsonl:5214(uuid 153d90cc-05a3-4805-a5a1-319d392d8469)与 :5221(uuid 4a4f1396-9667-423f-8f85-66f732c1230d),old_string 即 `setPrivacyInfo(operators, '', '')`。
+  2. 触发与诊断:同文件 :5146(2026-07-25T02:54:51.105Z,/arkts-visual-verify「请修复下当前的登录问题」)、:5157 grep 结果 `385: AppFormInfoManager.setPrivacyInfo(operators, '', '')`、:5164(02:57:23.720Z)「androidId 传空串 → 登录全链阻塞。✗ 这就是当前的登录问题」。
+  3. 修复所凭的实证:agent-abase3-network-f9a03317492be8c4.jsonl:23(2026-07-24T09:39:27.237Z)「❌ androidId 不允许为空——空串直接触发 SQLIntegrityConstraintViolationException;✅ imei/oaid 允许为空」;同文件 :135/:138(09:46:25/09:46:41)LIVE PROBE `POST http://dev-api.whiap.cn/user/initUser` 带 `androidId:"a1b2c3d4e5f60718"` 得 [PASS]。
+  4. 被改代码的作者与原文:agent-aslice2-auth-ac8d92aebe3693fc.jsonl:193(2026-07-24T12:09:13.743Z,uuid 7b070d38-92c7-4231-99f8-0ff4eacd337a)Write 全文含该行与「不在此处编造设备标识」注释。
+  5. 作者的书面依据:同文件 :1(2026-07-24T11:54:37.217Z)任务书「D-010……保持挂起、不要臆造取值……但方案需联调确认,你不要擅自定」;:85(11:56:24.265Z)读到 placeholder-registry.md:568 的 P-BASE3-003「不臆造 UUID 冒充解决」。
+  6. 作者收尾自述:同文件 :421(2026-07-24T12:35:05.891Z)「D-010/D-011 保持挂起:未臆造 androidId……androidId 传空串即与不调用本方法完全等价」。
+  7. 修复的验证深度:9b3105a2…jsonl:5226-5227(03:01:14→03:02:14)只做了 hvigorw 编译(BUILD SUCCESSFUL),:5238 修复方自陈「按你要求,修完即返回,没有跑视觉对比管线」——当轮未在设备上验证登录。
+  8. 下游反证:ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a40ff8f053f80637d.jsonl:228(2026-07-26T17:39:35.930Z)login_hmos 配方 3/3 SUCCESS,「我的」tab 出现 `ID:28299590`,即游客注册→绑定手机号全链通。
+无法确认的部分: (a) 题面把 ff019d8a 称作「修复轮」,但该会话全程没有对 F003Repository.ets 的任何 Edit/Write——它只在 agent-a40ff8f053f80637d.jsonl:71(2026-07-26T17:21:25.799Z)grep 读过一次;真正的修复发生在 9b3105a2 主会话尾部 07-25 的 /arkts-visual-verify 修复阶段(前一次提交 b3869bc 已标「a2h-execute 全部完成」,即生成轮已收尾)。(b) 修复提交只含 PreferenceKeys/DevicePrefs/F003Repository 三个文件,无法确认 canonical 登记点 P-BASE3-003(network/AppFormInfoManager.ets)与 spec/placeholder-registry.md 是否被同步改写——若未改,现在代码里注入实值、登记表仍写「不臆造」,两处口径不一致。(c) 后端最终方案(ODID/AAID 还是放开约束)在转录范围内始终未敲定。
+置信: 高——修复的两次 Edit、被删代码的首次 Write、写它时收到的禁令原文、以及禁令背后的活体打靶数据都在转录里逐条可见且时间线自洽;唯一打折的是题面对「哪一轮是修复轮」的表述与转录不符,已在上面说明。
+```

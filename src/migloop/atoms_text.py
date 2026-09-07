@@ -372,15 +372,18 @@ def render_diff(ledger: atoms.Ledger, hint: str, v: int, root: str = "") -> str:
 def render_chains(payload: dict[str, Any], root: str = "", file: str | None = None) -> str:
     """file 给了只回目标文件那条链(文件名 / 相对路径 / 绝对路径都行):调查一条链不必把全部链读一遍。"""
     chains = payload.get("chains") or []
+    touched = payload.get("touched") or []
     total = len(chains)
     if file:
         want = file.replace("\\", "/").lstrip("/")
-        chains = [c for c in chains
-                  if any(str(p).replace("\\", "/") == want or str(p).replace("\\", "/").endswith("/" + want)
-                         for p in (c.get("file_abs"), c.get("file")) if p)]
-        if not chains:
+        chains = [c for c in chains if any(_same_file(p, want) for p in (c.get("file_abs"), c.get("file")) if p)]
+        # 「碰过」附录也只列这个文件:0723 上全列是 54 个文件 6.5K 字,每根调查从第二次调用起就一直背着
+        touched = [t for t in touched if _same_file(t["path"], want)]
+        if not chains and not touched:
             return f"# 返修链(0/{total},只看 {want})\n没有匹配的链;不带 file 看全部,或先用 index 确认路径。"
         out = [f"# 返修链({len(chains)}/{total},只看 {want})"]
+        if not chains:
+            out.append("没有匹配的链(下面只有脚本碰过的记录);不带 file 看全部,或先用 index 确认路径。")
     else:
         out = [f"# 返修链({total})"]
     cross = payload.get("cross") or {}
@@ -425,7 +428,6 @@ def render_chains(payload: dict[str, Any], root: str = "", file: str | None = No
         for ff in c.get("fixers_all") or []:
             if ff.get("note"):
                 out.append(f"  修因({ff.get('desc')}): {_clip(ff['note'], 400)}")
-    touched = payload.get("touched") or []
     if touched:
         # 链是「确定的写」算出来的;脚本碰过但方向不明的工程文件不在链里,指针摆在这里,别让它隐身。
         # 0723 有 83 次(vv-static-B 一张数据表就碰了 24 个 .ets),按文件归组,agent id 单列一张对照表
@@ -446,6 +448,12 @@ def render_chains(payload: dict[str, Any], root: str = "", file: str | None = No
             out.append(f"- {rel(path, root)} | {len(ts)} 次 | " + " · ".join(parts))
         out.append("  agent id: " + ", ".join(f"{n} = {i}" for n, i in ids.items()))
     return "\n".join(out)
+
+
+def _same_file(p: object, want: str) -> bool:
+    """文件名 / 相对路径 / 绝对路径都能对上 want。"""
+    s = str(p).replace("\\", "/")
+    return s == want or s.endswith("/" + want)
 
 
 def _vrange(vs: list[int]) -> str:
