@@ -1,0 +1,45 @@
+[
+ {
+  "chain": 2,
+  "file": "EntryAbility.ets",
+  "treat_is_A": true,
+  "verdict": {
+   "a_links": 10,
+   "b_links": 8,
+   "a_leaf": "三个叶子都落到池外/技能层：环4 test-case-template.md@v1（技能参考模板，411行无写者）、环7 ECAT work list item 13（会话入口注入，账本无写者无上游读→判为池外输入并停）、环9 EntryAbility.ets@v1（DevEco 脚手架模板，被替换那行 blame 到 __external__@v1）。主因果线终点是脚手架模板+Android 无对应物。",
+   "b_leaf": "两个终点：环6 ECAT crash_risk 硬检测器（管线组件，权重配置 crash_risk:0.1 可引，实现在 migloop 项目内规则禁止读→停在边界）、环8 Android ground truth MainActivity.kt（23行，无 UncaughtExceptionHandler，池外输入，追溯终止）。",
+   "shared_links": 5,
+   "shared_verdict_agree": 4,
+   "same_entry": true,
+   "entry_note": "同一环：converter 子 agent a349784d2663f1f0a 写 EntryAbility@v2（A 环8 #4234@L71 = B 环7 jsonl:71，15:51），两份都定「缺」。差别只在归因的池外物料：A 指脚手架 v1 + 派发词把范围限死在沉浸式/安全区与 F001 行为契约；B 指 Android 对照物本身不存在该能力、1:1 口径下无从得知。两条理由互补不互斥。两份也都把 @kit.ArkTS 那笔排除在入口之外（A 判传递、B 判错但未致害）。",
+   "a_checkable": 5,
+   "b_checkable": 5,
+   "a_consistency": 4,
+   "b_consistency": 4,
+   "conflicts": [
+    "脚手架 EntryAbility 初版行数：A 记 35 行（@v1），B 记 34 行（agent-a349784d2663f1f0a.jsonl:48）。",
+    "work list item 13 是否有上游：A 断言「账本里无写者、无上游读＝池外输入」并停（仅在无法确认(b)里承认查不出扫出者）；B 定位到两跳上游——Discriminator 会话 257fed22（该文案在其输入里已逐字存在，257fed22:3/:130）与管线内 crash_risk 硬检测器（81e0a463:28 权重配置）。A 的「零上游」是账本范围内的空命中被当作全局否定。",
+    "进入点 converter 的输入集：A 列出六项读取（MainActivity.kt #4179@L33、activity_main.xml #4181@L35、page_0001 spec@v3 #4209@L51、F001@v6 #4211@L53、SKILL.md #4215@L57 及派发词）；B 称「它的全部输入是」只有任务书、脚手架、SKILL.md（另加环8 的 MainActivity.kt），漏列 spec@v3 / F001@v6 / activity_main.xml。",
+    "本轮修复 diff 的范围：A 把 v4–v6 的 40 行 UI 测试桥计入「修复轮 61 行 = 60 插入 + 1 替换」并作为支线 A 追链；B 把同一批写入定为 19:17 的既有现状（任务书「现状」段交底），只把 errobserver 的 1 替换 + 20 插入当作本次修复，未把另 40 行纳入链条。"
+   ],
+   "preferred": "A",
+   "reason": "A 对该文件 11 个版本做到无遗漏归属（含被替换行的 __external__ blame、三笔零改动 shell 写入）、每环都有 path@v + 记录号坐标、并明标唯一一处二手转述；进入点的输入枚举比 B 完整（六项读取 vs B 断言的「全部输入」三项），而 B 虽多追两跳、且有闭环验证，却在最关键的入口环给出了超出证据的绝对判断并只覆盖 61 行改动中的 21 行。",
+   "more_actionable": "B",
+   "_cost": 0.5059275
+  },
+  "preferred_method": "treat",
+  "actionable_method": "control",
+  "treat": {
+   "cost_usd": 1.3175115,
+   "num_turns": 25,
+   "wall_s": 250.1,
+   "calls": 24
+  },
+  "control": {
+   "cost_usd": 1.672602,
+   "num_turns": 26,
+   "wall_s": 343.4,
+   "calls": 25
+  }
+ }
+]
