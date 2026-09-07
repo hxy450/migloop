@@ -385,7 +385,7 @@ def _window(text: str, cap: int, offset: int = 0, find: str = "") -> tuple[str, 
     total = len(text)
     note = ""
     if find:
-        pos = text.find(find, max(offset, 0))
+        pos = text.lower().find(find.lower(), max(offset, 0))
         if pos < 0:
             note = f"「{find}」在第 {offset} 字之后未命中;"
         else:

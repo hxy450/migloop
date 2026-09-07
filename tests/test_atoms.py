@@ -2056,7 +2056,7 @@ def test_action_find_works_on_thinking_text(tmp_path: Any) -> None:
     main = [_rec("2026-01-01T00:00:00Z", "assistant", [{"type": "thinking", "thinking": body}])]
     led = _ledger(tmp_path, main)
     seq = led.agents[MAIN_ID].actions[0].seq
-    text = atoms_text.render_action(led, MAIN_ID, seq, max_chars=500, find="DECISION")
+    text = atoms_text.render_action(led, MAIN_ID, seq, max_chars=500, find="decision")   # 不分大小写,和 search 一样
     assert "DECISION keep Roll" in text and "未命中" not in text and "offset=" in text
 
 
