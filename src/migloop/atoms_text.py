@@ -330,7 +330,8 @@ def render_agent(ledger: atoms.Ledger, agent_id: str, v: int | None = None,
         inboxes = [a for a in slot["inp"] if a["kind"] == "inbox"]
         if inboxes:
             out.append(f"  收件 {len(inboxes)} 条(见上)")
-    if ag["result"] and ag["result"]["text"]:
+    # 收尾是最后一版之后的事:问第 v 版(v 不是最后一版)时不给,按版本切
+    if ag["result"] and ag["result"]["text"] and (v is None or anchor >= ag["n_versions"]):
         out.append("## 收尾输出(锚点之后,非因果证据)\n" + _clip(ag["result"]["text"], 4000))
     return "\n".join(out)
 

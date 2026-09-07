@@ -1569,3 +1569,16 @@ def test_search_file_first_appearance_and_reader_hits(tmp_path: Any) -> None:
 def test_search_requires_anchor(tmp_path: Any) -> None:
     led = _ledger(tmp_path, [])
     assert "必须带起点" in atoms_text.render_search(led, "x", root="/proj")
+
+
+def test_render_agent_omits_result_before_last_version(tmp_path: Any) -> None:
+    """agent(id, v) 问的是它写第 v 版时手里有什么;v 不是最后一版,收尾输出是之后的事,不给。"""
+    main = [*_call("2026-01-01T00:00:00Z", "t1", "Write", {"file_path": "/proj/a.ets", "content": "x\n"},
+                   "File created successfully at: /proj/a.ets"),
+            *_call("2026-01-01T00:00:10Z", "t2", "Write", {"file_path": "/proj/b.ets", "content": "y\n"},
+                   "File created successfully at: /proj/b.ets"),
+            _rec("2026-01-01T00:00:20Z", "assistant", [{"type": "text", "text": "全部完成,两个文件已落盘"}])]
+    led = _ledger(tmp_path, main)
+    assert "收尾输出" not in atoms_text.render_agent(led, MAIN_ID, 1, root="/proj")
+    assert "两个文件已落盘" in atoms_text.render_agent(led, MAIN_ID, 2, root="/proj")
+    assert "两个文件已落盘" in atoms_text.render_agent(led, MAIN_ID, root="/proj")
