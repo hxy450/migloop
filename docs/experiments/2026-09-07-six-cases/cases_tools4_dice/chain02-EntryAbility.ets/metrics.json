@@ -1,0 +1,328 @@
+{
+ "label": "cases_tools4_dice",
+ "chain": 2,
+ "file": "EntryAbility.ets",
+ "rep": 1,
+ "model": "opus",
+ "session_id": "c372c1e6-fec3-4c1a-92ce-af1cece206ec",
+ "is_error": false,
+ "num_turns": 24,
+ "duration_ms": 251742,
+ "duration_api_ms": 239822,
+ "wall_s": 253.9,
+ "cost_usd": 1.47394,
+ "usage": {
+  "input_tokens": 40,
+  "cache_creation_input_tokens": 64183,
+  "cache_read_input_tokens": 961760,
+  "output_tokens": 13974,
+  "output_tokens_details": {
+   "thinking_tokens": 8261
+  },
+  "server_tool_use": {
+   "web_search_requests": 0,
+   "web_fetch_requests": 0
+  },
+  "service_tier": "standard",
+  "cache_creation": {
+   "ephemeral_1h_input_tokens": 64183,
+   "ephemeral_5m_input_tokens": 0
+  },
+  "inference_geo": "not_available",
+  "iterations": [
+   {
+    "input_tokens": 2,
+    "output_tokens": 3856,
+    "cache_read_input_tokens": 76663,
+    "cache_creation_input_tokens": 2835,
+    "cache_creation": {
+     "ephemeral_5m_input_tokens": 0,
+     "ephemeral_1h_input_tokens": 2835
+    },
+    "type": "message"
+   }
+  ],
+  "speed": "standard"
+ },
+ "result_chars": 4248,
+ "verdict": "",
+ "at": "2026-09-07T09:13:24",
+ "transcript": {
+  "usage": {
+   "input": 40,
+   "cache_create": 64183,
+   "cache_read": 961760,
+   "output": 13974
+  },
+  "turns": 20,
+  "tool_calls": 23,
+  "per_tool": {
+   "ToolSearch": {
+    "n": 1,
+    "chars": 0
+   },
+   "guide": {
+    "n": 1,
+    "chars": 4287
+   },
+   "sessions": {
+    "n": 1,
+    "chars": 1579
+   },
+   "file": {
+    "n": 4,
+    "chars": 7173
+   },
+   "index": {
+    "n": 3,
+    "chars": 3946
+   },
+   "agent": {
+    "n": 6,
+    "chars": 38843
+   },
+   "search": {
+    "n": 5,
+    "chars": 2542
+   },
+   "action": {
+    "n": 1,
+    "chars": 4240
+   },
+   "blame": {
+    "n": 1,
+    "chars": 330
+   }
+  },
+  "tool_chars": 62940,
+  "seq": [
+   {
+    "tool": "ToolSearch",
+    "input": {
+     "query": "select:mcp__migloop__guide,mcp__migloop__sessions,mcp__migloop__index,mcp__migloop__file,mcp__migloop__agent,mcp__migloop__search,mcp__migloop__blame,mcp__migloop__diff,mcp__migloop__action",
+     "max_results": 10
+    },
+    "chars": 0,
+    "ts": "2026-09-07T13:09:15.708Z",
+    "is_error": false
+   },
+   {
+    "tool": "guide",
+    "input": {},
+    "chars": 4287,
+    "ts": "2026-09-07T13:09:18.395Z",
+    "is_error": false
+   },
+   {
+    "tool": "sessions",
+    "input": {
+     "file": "EntryAbility.ets"
+    },
+    "chars": 1579,
+    "ts": "2026-09-07T13:09:21.917Z",
+    "is_error": false
+   },
+   {
+    "tool": "file",
+    "input": {
+     "path": "entry/src/main/ets/entryability/EntryAbility.ets"
+    },
+    "chars": 1235,
+    "ts": "2026-09-07T13:09:34.857Z",
+    "is_error": false
+   },
+   {
+    "tool": "file",
+    "input": {
+     "path": "entry/src/main/ets/entryability/EntryAbility.ets",
+     "diff": true,
+     "v_from": 4,
+     "v_to": 6
+    },
+    "chars": 3200,
+    "ts": "2026-09-07T13:09:39.712Z",
+    "is_error": false
+   },
+   {
+    "tool": "file",
+    "input": {
+     "path": "entry/src/main/ets/entryability/EntryAbility.ets",
+     "diff": true,
+     "v_from": 7
+    },
+    "chars": 2234,
+    "ts": "2026-09-07T13:09:47.637Z",
+    "is_error": false
+   },
+   {
+    "tool": "file",
+    "input": {
+     "path": "design/P0001_MainActivity.md"
+    },
+    "chars": 504,
+    "ts": "2026-09-07T13:10:06.738Z",
+    "is_error": false
+   },
+   {
+    "tool": "index",
+    "input": {
+     "query": "template"
+    },
+    "chars": 3586,
+    "ts": "2026-09-07T13:10:06.740Z",
+    "is_error": false
+   },
+   {
+    "tool": "agent",
+    "input": {
+     "id": "agent-a711c5d09fb676814"
+    },
+    "chars": 8202,
+    "ts": "2026-09-07T13:10:11.880Z",
+    "is_error": false
+   },
+   {
+    "tool": "index",
+    "input": {
+     "query": "UI-T Step1"
+    },
+    "chars": 179,
+    "ts": "2026-09-07T13:10:25.729Z",
+    "is_error": false
+   },
+   {
+    "tool": "index",
+    "input": {
+     "query": "errobserver"
+    },
+    "chars": 181,
+    "ts": "2026-09-07T13:10:26.003Z",
+    "is_error": false
+   },
+   {
+    "tool": "agent",
+    "input": {
+     "id": "agent-a70e555065a1dddd1"
+    },
+    "chars": 9669,
+    "ts": "2026-09-07T13:10:28.620Z",
+    "is_error": false
+   },
+   {
+    "tool": "agent",
+    "input": {
+     "id": "agent-a27497cfed8c44856"
+    },
+    "chars": 6762,
+    "ts": "2026-09-07T13:10:43.965Z",
+    "is_error": false
+   },
+   {
+    "tool": "search",
+    "input": {
+     "q": "未捕获异常",
+     "agent": "__main__:2f01bcdc",
+     "v": 5
+    },
+    "chars": 644,
+    "ts": "2026-09-07T13:10:52.101Z",
+    "is_error": false
+   },
+   {
+    "tool": "agent",
+    "input": {
+     "id": "__main__:2f01bcdc",
+     "v": 5,
+     "since": 3
+    },
+    "chars": 512,
+    "ts": "2026-09-07T13:10:59.506Z",
+    "is_error": false
+   },
+   {
+    "tool": "agent",
+    "input": {
+     "id": "__main__:2f01bcdc",
+     "v": 3,
+     "since": 0
+    },
+    "chars": 3810,
+    "ts": "2026-09-07T13:11:03.375Z",
+    "is_error": false
+   },
+   {
+    "tool": "action",
+    "input": {
+     "id": "__main__:2f01bcdc",
+     "seq": 468,
+     "find": "errorManager",
+     "max_chars": 4000
+    },
+    "chars": 4240,
+    "ts": "2026-09-07T13:11:09.705Z",
+    "is_error": false
+   },
+   {
+    "tool": "agent",
+    "input": {
+     "id": "agent-a349784d2663f1f0a",
+     "v": 2
+    },
+    "chars": 9888,
+    "ts": "2026-09-07T13:11:19.536Z",
+    "is_error": false
+   },
+   {
+    "tool": "search",
+    "input": {
+     "q": "errorManager",
+     "until_ts": "2026-09-03T15:51:35.645Z"
+    },
+    "chars": 211,
+    "ts": "2026-09-07T13:11:26.141Z",
+    "is_error": false
+   },
+   {
+    "tool": "search",
+    "input": {
+     "q": "__test_mode__",
+     "until_ts": "2026-09-03T15:51:35.645Z"
+    },
+    "chars": 212,
+    "ts": "2026-09-07T13:11:26.631Z",
+    "is_error": false
+   },
+   {
+    "tool": "search",
+    "input": {
+     "q": "uncaught-exception observer",
+     "until_ts": "2026-09-03T21:19:00.000Z"
+    },
+    "chars": 776,
+    "ts": "2026-09-07T13:11:41.499Z",
+    "is_error": false
+   },
+   {
+    "tool": "search",
+    "input": {
+     "q": "EntryAbility",
+     "file": "spec/test/ui-test/design/P0001_MainActivity.md"
+    },
+    "chars": 699,
+    "ts": "2026-09-07T13:11:42.316Z",
+    "is_error": false
+   },
+   {
+    "tool": "blame",
+    "input": {
+     "path": "entry/src/main/ets/entryability/EntryAbility.ets",
+     "v": 9,
+     "changed": true
+    },
+    "chars": 330,
+    "ts": "2026-09-07T13:12:25.078Z",
+    "is_error": false
+   }
+  ]
+ }
+}

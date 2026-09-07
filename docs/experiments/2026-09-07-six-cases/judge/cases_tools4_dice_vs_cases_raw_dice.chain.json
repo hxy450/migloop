@@ -1,0 +1,45 @@
+[
+ {
+  "chain": 2,
+  "file": "EntryAbility.ets",
+  "treat_is_A": true,
+  "verdict": {
+   "a_links": 8,
+   "b_links": 8,
+   "a_leaf": "两条终止于可命名的叶子：支线甲到池外输入（ECAT critic 清单/审计结论经会话开场指令注入，#468@L3，并自认作者与生成脚本无法确认）；支线乙到技能定义（arkts-ui-verifier 的 test-design-template.md / test-case-template.md / id-inject-design-template.md，index 标『1 版·只被读过（外部输入）·上游 0/0 跳』）；生成侧环 8 另落在池外的 Android 源码（MainActivity.kt / activity_main.xml / themes.xml）",
+   "b_leaf": "主链停在池外边界但未进入：环 6 到 ECAT crash_risk 硬检测器（管线组件而非会话，权重见 81e0a463:28 14:35:18；实现在 migloop 项目内、规则禁止读取，只能由输入/输出文本反推）；生成侧环 8 到池外输入 Android ground truth MainActivity.kt（23 行，无 UncaughtExceptionHandler）",
+   "shared_links": 5,
+   "shared_verdict_agree": 4,
+   "same_entry": true,
+   "entry_note": "同一环、同一次写：converter 于 2026-09-03T15:51:35 写 EntryAbility.ets（A：conv-page-0001 #4252@L71 生成 v2；B：agent-a349784d2663f1f0a.jsonl:71），两份都判「缺」。证据路径不同且互补：A 用带范围行的全池零命中（errorManager / __test_mode__，并声明『内容未知 54 版』），B 逐条枚举 converter 全部四路输入（15:37:36 任务书只含 AC01–AC23 与 needs_immersive_safearea、15:39:05 的 34 行脚手架、15:39:25 的 immersive SKILL.md、15:38:27 的 23 行 MainActivity.kt）均不含崩溃可观测性要求。真正分歧不在进入点，而在上游是否另存在一处「错」：B 判环 3 派发词自填未核实的 @kit.ArkTS 为「错（未致害）」，A 在环 1 记录了同一事实却判环 2「传递」并断言『全链没有一处错』——就此点 B 的定性更站得住，因为该错误路径确由派发方写入、只是被下游 d.ts 探测当场纠正。",
+   "a_checkable": 5,
+   "b_checkable": 4,
+   "a_consistency": 4,
+   "b_consistency": 4,
+   "conflicts": [
+    "work_list 第 13 条的上游：A 判为池外审计报告经会话开场指令注入，并明写『作者与生成脚本无法确认』；B 判为 ECAT crash_risk 硬检测器整仓静态扫描直传（score=0.125，权重配置 81e0a463:28）。A 称不可知的那一段，B 给出了具名来源。",
+    "会话 257fed22 的角色：A 记为『另一个主会话在 T+6:41(#1135@L3) 也收到同一条，但那轮 EntryAbility.ets 未被改动，原因无法确认』；B 记为 Discriminator（21:07:47 入队 / 21:13:34 输出、被明令不得自查仓库、只做汇总并写入 generator memory）。两份指向同一条记录（都落在该会话第 3 行）却给出互斥的身份，B 的身份判定同时解释了 A 留白的『那轮为何没改文件』。",
+    "派发词 @kit.ArkTS 的定性：事实一致（都记录派发方给了错路径、worker 探 d.ts 改成 @kit.AbilityKit），判定相反——A 环 2『传递』且总结『全链没有一处错』，B 环 3『错（未致害）』。",
+    "『uncaught-exception observer』文案的分布：A 称 ≤2026-09-03T21:19 的全池检索『文件 0 个、只命中两个主会话的指令』；B 却指出该模式在 21:12:47/53 已被写入 generator memory 文件 feedback_global-crash-observer.md，且 21:13:34 的 Discriminator 输出(:130)中也有。A 的范围行含『内容未知 304 版』可部分兜底，但两者对同一时间窗内该文案落点的描述不一致。"
+   ],
+   "preferred": "A",
+   "reason": "两份进入点相同且都站得住，但 A 每一环都给出写者脊柱（path@v + #记录@行）、把否定证据的检索范围逐条写明、覆盖了本文件被修行数主体的 UI 测试桥支线并追到技能定义这一可编辑叶子，且『无法确认』清单最诚实；B 在上游根（检测器→Discriminator）和闭环验证上更深，但缺文件版本坐标、把读不到实现的环 6 仍判『传递』，并把 60 行测试桥排除在链外。",
+   "more_actionable": "B",
+   "_cost": 0.4711545
+  },
+  "preferred_method": "treat",
+  "actionable_method": "control",
+  "treat": {
+   "cost_usd": 1.47394,
+   "num_turns": 24,
+   "wall_s": 253.9,
+   "calls": 23
+  },
+  "control": {
+   "cost_usd": 1.672602,
+   "num_turns": 26,
+   "wall_s": 343.4,
+   "calls": 25
+  }
+ }
+]
