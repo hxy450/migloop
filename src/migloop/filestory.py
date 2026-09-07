@@ -95,6 +95,7 @@ class Version:
     via: str = "tool"         # 写者来路;观测/外部 = observe
     stage: str | None = None  # 写这一版时的管线阶段(修复方判定:execute 之后即修复)
     act_seq: int | None = None  # 写它那次工具调用的动作号(action 展开用),build_ledger 回填
+    partial: str | None = None      # 内容未知但脚本字面量里给了正文的一部分(渲染器写出的缺陷单)
     gen_runs: tuple[int, ...] = ()  # source=generated:候选的脚本运行动作号(首见之前最近几次)
     batch: int = 0                  # source=generated:同一批运行生成的文件数
 

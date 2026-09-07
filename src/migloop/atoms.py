@@ -327,6 +327,27 @@ def build_ledger(agents: dict[str, AgentRec]) -> Ledger:
         for sts in batches.values():
             for st in sts:
                 st.versions[0].batch = len(sts)
+    # 渲染器写出的文件:正文以字面量出现在脚本调用参数里 —— 按文件名挂成首版的部分内容,写者 = 跑脚本的 agent
+    partials: dict[str, list[tuple[str, str, Action, str]]] = {}
+    for a in agents.values():
+        for act in a.actions:
+            for name, text in act.detail.get("partials") or []:
+                partials.setdefault(name, []).append((act.ts, a.id, act, text))
+    for path, st in stories.items():
+        if not st.versions:
+            continue
+        v0 = st.versions[0]
+        if v0.content is not None or v0.source not in ("external", "generated"):
+            continue
+        cands = [c for c in partials.get(path.rsplit("/", 1)[-1], []) if c[0] <= v0.ts]
+        if not cands:
+            continue
+        ts_, aid, act, text = cands[-1]
+        v0.partial = text
+        if v0.source == "external":
+            v0.by, v0.by_ver, v0.source, v0.via, v0.act_seq = aid, act.at, "generated", "script-run", act.seq
+            v0.gen_runs = (act.seq,)
+        st.touches.append(Touch(act.ts, act.seq, aid, act.at, "脚本字面量里给了正文(部分内容)", act.stage))
     for path, st in stories.items():
         for ver in st.versions:
             if ver.source != "generated":
@@ -582,6 +603,7 @@ def file_atom(ledger: Ledger, hint: str, v: int | None = None,
             row["diff"] = ver.diff
         out.append(row)
     content = vers[-1].content if vers else None
+    partial = vers[-1].partial if (vers and content is None) else None
     readers = [{"by": r.by, "by_name": _agent_label(ledger.agents, r.by), "ts": r.ts,
                 "t": rel_time(r.ts, ledger.t0), "seq": ledger.read_act.get((path, r.seq)), "via": r.via,
                 "v": r.version, "at": ledger.feeds.get((path, r.seq)),
@@ -596,6 +618,7 @@ def file_atom(ledger: Ledger, hint: str, v: int | None = None,
         "path": path, "v": vers[-1].v if vers else 0, "n_versions": len(st.versions),
         "versions": out, "readers": readers, "touches": touches, "t0": ledger.t0,
         "content": content if with_content else None, "content_known": content is not None,
+        "partial": partial if with_content else None, "partial_known": partial is not None,
         "breaks": [{"ts": b.ts, "kind": b.kind, "detail": b.detail} for b in st.breaks],
     }
 
@@ -874,15 +897,16 @@ def search_file(ledger: Ledger, hint: str, q: str, v: int | None = None) -> dict
     vers = st.versions if v is None else st.versions[:max(v, 0)]
     rows = []
     for ver in vers:
-        if ver.content is None or ql not in ver.content.lower():
+        body, partial = (ver.content, False) if ver.content is not None else (ver.partial, True)
+        if body is None or ql not in body.lower():
             continue
         snips = []
-        for i, ln in enumerate(ver.content.split("\n"), 1):
+        for i, ln in enumerate(body.split("\n"), 1):
             if ql in ln.lower():
-                snips.append((i, _WS.sub(" ", ln).strip()[:160]))
+                snips.append((0 if partial else i, _WS.sub(" ", ln).strip()[:160]))
         rows.append({"v": ver.v, "by": ver.by, "by_ver": ver.by_ver, "seq": ver.act_seq,
                      "line": ledger.lines.get(ver.act_seq or -1), "t": rel_time(ver.ts, ledger.t0),
-                     "snips": snips[:3], "n": len(snips)})
+                     "snips": snips[:3], "n": len(snips), "partial": partial})
     readers = []
     for r in st.reads:
         if not r.seen:
@@ -908,15 +932,18 @@ def search_pool(ledger: Ledger, q: str, until_ts: str, since_ts: str | None = No
         for ver in st.versions:
             if ver.ts > until_ts or (since_ts and ver.ts < since_ts):
                 continue
-            if ver.content is None:
+            body = ver.content if ver.content is not None else ver.partial
+            if body is None:
                 unknown += 1
                 continue
-            if ql in ver.content.lower():
-                ln, snip = next(((i, _WS.sub(" ", t).strip()[:160]) for i, t in enumerate(ver.content.split("\n"), 1)
+            if ql in body.lower():
+                ln, snip = next(((i, _WS.sub(" ", t).strip()[:160]) for i, t in enumerate(body.split("\n"), 1)
                                  if ql in t.lower()), (None, ""))
                 files.append({"path": path, "v": ver.v, "by": ver.by, "by_ver": ver.by_ver, "seq": ver.act_seq,
                               "line": ledger.lines.get(ver.act_seq or -1), "t": rel_time(ver.ts, ledger.t0),
-                              "ln": ln, "snip": snip, "n": sum(1 for t in ver.content.split("\n") if ql in t.lower())})
+                              "ln": None if ver.content is None else ln, "snip": snip,
+                              "n": sum(1 for t in body.split("\n") if ql in t.lower()),
+                              "partial": ver.content is None})
                 break                                          # 每个文件只报首次出现
     agents = []
     for aid in ledger.agents:

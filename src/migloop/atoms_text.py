@@ -163,7 +163,8 @@ def render_file(ledger: atoms.Ledger, hint: str, v: int | None = None, root: str
     out.append(f"完整路径: {fa['path']}")
     if vv_anchor is not None:
         out.append("这一版内容: " + ("可复原" if vv_anchor["content_known"]
-                                  else "无法复原 —— " + _unknown_reason(vv_anchor))
+                                  else ("部分已知(脚本字面量里的正文,不是全文;content=1 看)" if fa.get("partial_known")
+                                        else "无法复原 —— " + _unknown_reason(vv_anchor)))
                    + _hops(ledger, ("f", fa["path"], anchor)) + "(累计/窗口口径;每次 agent↔文件转换算一跳,派发算一跳)")
     for b in fa["breaks"]:
         out.append(f"⚠ 断点 {b['kind']} @ {b['ts'][:19]}: {b['detail']}")
@@ -213,7 +214,10 @@ def render_file(ledger: atoms.Ledger, hint: str, v: int | None = None, root: str
             out.append(f"- {_who(ledger, t['by'], t['by_ver'])} | {t['ts'][5:16]} {t.get('t') or ''} | {t['reason']}"
                        f" | action{_ref(t['seq'], None, lines.get(t['seq']))}")
     if content:
-        if fa["content"] is None:
+        if fa["content"] is None and fa.get("partial"):
+            out.append("## 内容(部分,脚本字面量里的正文;行号不是文件行号)")
+            out.append("```\n" + _clip(str(fa["partial"]), 6000) + "\n```")
+        elif fa["content"] is None:
             out.append("## 内容: 无法复原")
         else:
             body = fa["content"].replace("\n", "\n", 1).split("\n")
@@ -756,9 +760,10 @@ def render_search(ledger: atoms.Ledger, q: str, agent: str | None = None, v: int
         row = rows[i]
         ref = " " + _ref(row["seq"], row.get("t"), row.get("line")) if row.get("seq") else ""
         out.append(f"- v{row['v']} ← {_who(ledger, row['by'], row['by_ver'])}{ref} · 命中 {row['n']} 行"
-                   f"  → blame(v={row['v']}) / agent(写者, since=写它之前的版本)")
+                   + ("(部分内容:脚本字面量)" if row.get("partial") else "")
+                   + f"  → blame(v={row['v']}) / agent(写者, since=写它之前的版本)")
         for ln, snip in row["snips"]:
-            out.append(f"    第 {ln} 行: {snip}")
+            out.append(f"    {'第 ' + str(ln) + ' 行: ' if ln else '(行号未知) '}{snip}")
         # 命中行没变的后续版本折成一行(HomePage.ets 29 版曾把同两行原样列 29 遍)
         j = i + 1
         while j < len(rows) and [s for _l, s in rows[j]["snips"]] == [s for _l, s in row["snips"]] and rows[j]["n"] == row["n"]:

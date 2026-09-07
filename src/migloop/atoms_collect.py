@@ -297,6 +297,39 @@ def _py_script_ops(code: str, base: str | None) -> list[FileOp]:
     return ops
 
 
+_DOC_EXT = re.compile(r"\.(?:md|json5?|txt|ya?ml|csv)$", re.I)
+
+
+def _py_partial_writes(code: str) -> list[tuple[str, str]]:
+    """python 正文里「某个调用把一个文档路径和几段长字符串一起传进去」(fill(UI/'x.md', exp=…, act=…)):
+    渲染器写出来的文件账本拿不到全文,但正文就在这些字面量里 —— 按文件名记成「部分内容」。"""
+    try:
+        tree = ast.parse(code)
+    except SyntaxError:
+        return []
+    out: list[tuple[str, str]] = []
+
+    def doc_name(node: ast.AST) -> str | None:
+        if isinstance(node, ast.Constant) and isinstance(node.value, str) and _DOC_EXT.search(node.value):
+            return node.value.rsplit("/", 1)[-1]
+        if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Div):
+            return doc_name(node.right)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "Path" and node.args:
+            return doc_name(node.args[0])
+        return None
+
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        args = list(node.args) + [kw.value for kw in node.keywords]
+        names = [n for n in (doc_name(a) for a in args) if n]
+        texts = [a.value for a in args if isinstance(a, ast.Constant) and isinstance(a.value, str)
+                 and len(a.value) >= 20 and not _DOC_EXT.search(a.value)]
+        if len(names) == 1 and texts:
+            out.append((names[0], "\n".join(texts)))
+    return out
+
+
 def _literal_ops(code: str, base: str | None) -> tuple[list[FileOp], int, list[str]]:
     """脚本正文里的文件字面量 → 读/写。按紧邻的调用形态判方向;判不出的只在小脚本里按
     全文倾向(只写/只读)兜底,其余放弃并计数 —— 宁可漏,但要能报出自己。
@@ -912,6 +945,9 @@ def _file_ops(name: str, inp: dict[str, Any], out: str, tur: Any, cwd: object,
             detail["probed"] = hints["probed"]
         if hints["out_dirs"]:
             detail["out_dirs"] = hints["out_dirs"]
+        partials = [pw for body in _strip_heredocs(cmd.replace("\\\n", " "))[1] for pw in _py_partial_writes(body)]
+        if partials:
+            detail["partials"] = partials
         for op in ops:
             # heredoc 落盘的 .py/.sh 也进脚本表:之后 python3 它时按脚本内容推断读写,不再当黑盒
             if op.op == "write" and op.content is not None and _SCRIPT_RUN.search(op.path):

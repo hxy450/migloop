@@ -2243,3 +2243,37 @@ def test_loop_with_echo_separator_attaches_sections_as_seen_lines(tmp_path: Any)
     assert "读者的读结果里命中过" in text and "行号未知" in text and "第 0 行" not in text
     agent_txt = atoms_text.render_agent(led, MAIN_ID, None, root="/proj", seen=True)
     assert "看见 2 行,行号未知" in agent_txt
+
+
+# ═══════════════ 脚本渲染出的文件:字面量正文记成「部分内容」 ═══════════════
+
+_FILL = ("python3 - <<'PYEOF'\nfrom pathlib import Path\nUI = Path('spec/fix/round-1/ui')\n"
+         "def fill(p, exp, act):\n    t = p.read_text()\n    p.write_text(t.replace('<<EXP>>', exp).replace('<<ACT>>', act))\n"
+         "fill(UI/'ALIGN_PSplashActivity_extra_element_status-bar.md',\n"
+         "     exp=\"\"\"安卓开屏页顶部没有状态栏,全屏沉浸(themes.xml windowFullscreen=true)\"\"\",\n"
+         "     act=\"\"\"鸿蒙开屏页顶部多一条灰带;源码缺口 entry/src/main/ets/entryability/EntryAbility.ets:unknown 未调用 setWindowSystemBarEnable\"\"\")\n"
+         "print('filled')\nPYEOF")
+
+
+def test_script_literal_body_becomes_partial_content_and_writer(tmp_path: Any) -> None:
+    """vv-t1-A01 #26723 的 fill(UI/'ALIGN_….md', exp=…, act=…) 把缺陷单正文当参数传给渲染器;文件由渲染器写出,
+    账本记「外部输入、内容无法复原」,工具组据此判「缺」。字面量正文要记成该文件首版的部分内容,写者是跑脚本的 agent。"""
+    doc = "/proj/spec/fix/round-1/ui/ALIGN_PSplashActivity_extra_element_status-bar.md"
+    vv = [_rec("2026-01-01T00:00:00Z", "user", "写单"),
+          *_call("2026-01-01T00:00:10Z", "v1", "Bash", {"command": _FILL}, "filled")]
+    main = [*_call("2026-01-01T00:00:00Z", "m1", "Agent", {"name": "vv-1", "prompt": "写单"}, "done",
+                   toolUseResult={"agentId": "v1"}),
+            *_call("2026-01-01T01:00:00Z", "t1", "Bash", {"command": f"sed -n '1,3p' {doc}"}, "# ALIGN\n## 2. 期望\n")]
+    led = _ledger(tmp_path, main, {"agent-v1": vv})
+    act = led.agents["agent-v1"].actions[1]
+    assert act.detail["partials"][0][0] == "ALIGN_PSplashActivity_extra_element_status-bar.md"
+    st = led.stories[doc]
+    v0 = st.versions[0]
+    assert v0.source == "generated" and v0.by == "agent-v1" and v0.content is None
+    assert v0.partial and "EntryAbility.ets:unknown" in v0.partial
+    res = atoms.search_file(led, doc, "EntryAbility")
+    assert res and res["first"] == 1 and res["versions"][0]["partial"]
+    text = atoms_text.render_file(led, doc, 1, root="/proj", content=True)
+    assert "部分已知" in text and "EntryAbility.ets:unknown" in text
+    pool = atoms.search_pool(led, "setWindowSystemBarEnable", until_ts="2026-01-01T02:00:00Z")
+    assert [r["path"] for r in pool["files"]] == [doc]
