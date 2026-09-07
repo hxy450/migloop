@@ -413,7 +413,8 @@ def atom_text(path: str, tool: str, args: dict[str, Any]) -> str:
         return atoms_text.render_file(ledger, str(args["path"]), _opt_int(args, "v"), root=cwd,
                                       content=_flag(args, "content", "0"),
                                       diff=_flag(args, "diff", "0"),
-                                      start=_opt_int(args, "start"), n=_opt_int(args, "n"))
+                                      start=_opt_int(args, "start"), n=_opt_int(args, "n"),
+                                      readers=_flag(args, "readers", "0"))
     if tool == "agent" and args.get("id"):
         return atoms_text.render_agent(ledger, str(args["id"]), _opt_int(args, "v"), root=cwd,
                                        since=_opt_int(args, "since"),

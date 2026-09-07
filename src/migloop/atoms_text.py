@@ -141,7 +141,9 @@ def _unknown_reason(vv: dict[str, Any]) -> str:
 
 def render_file(ledger: atoms.Ledger, hint: str, v: int | None = None, root: str = "",
                 content: bool = False, diff: bool = False,
-                start: int | None = None, n: int | None = None) -> str:
+                start: int | None = None, n: int | None = None, readers: bool = False) -> str:
+    """默认只给写者脊柱与碰过:单根往上追看的是写者。读者是下游,归并阶段才用(指南漏条款波及了哪些页),
+    默认一行计数,readers=True 展开;按词找读者用 search(file=)。"""
     fa = atoms.file_atom(ledger, hint, v, with_diff=diff, with_content=content)
     if fa is None:
         return f"账本里没有该文件: {hint}"
@@ -174,14 +176,17 @@ def render_file(ledger: atoms.Ledger, hint: str, v: int | None = None, root: str
                    f"{vv['diff_kind']}" + (" · " + " · ".join(extra) if extra else "") + ptr + mark)
         if diff and vv.get("diff"):
             out.append("```diff\n" + _clip(vv["diff"], 6000) + "\n```")
-    readers = [r for r in fa["readers"] if r["v"] == anchor]
-    out.append(f"## 读了 @v{anchor} 的 agent(下游,{len(readers)})—— action 展开能看到它读到的原文")
-    for r in readers:
-        span = _read_span(r)
-        flags = ("" if r["certain"] else " · 版本就近绑定(不确定)") + (" · 依赖读" if r["dep"] else "")
-        flags += " · 注入" if r.get("via") == "inject" else ""
-        ptr = " " + _ref(r["seq"], None, lines.get(r["seq"])) if r.get("seq") is not None else ""
-        out.append(f"- {_who(ledger, r['by'], r['at'])} | {r['ts'][5:16]} {r.get('t') or ''} | {span}{flags}{ptr}")
+    rlist = [r for r in fa["readers"] if r["v"] == anchor]
+    if not readers:
+        out.append(f"## 读者 {len(rlist)} 个(下游;readers=1 展开;按词找用 search(file=))")
+    else:
+        out.append(f"## 读了 @v{anchor} 的 agent(下游,{len(rlist)})—— action 展开能看到它读到的原文")
+        for r in rlist:
+            span = _read_span(r)
+            flags = ("" if r["certain"] else " · 版本就近绑定(不确定)") + (" · 依赖读" if r["dep"] else "")
+            flags += " · 注入" if r.get("via") == "inject" else ""
+            ptr = " " + _ref(r["seq"], None, lines.get(r["seq"])) if r.get("seq") is not None else ""
+            out.append(f"- {_who(ledger, r['by'], r['at'])} | {r['ts'][5:16]} {r.get('t') or ''} | {span}{flags}{ptr}")
     if fa.get("touches"):
         # 脚本碰过它但账本判不出读写:不立版本,只给指针 —— 展开 action 看原文,别当它没被改过
         out.append(f"## 碰过它、方向不明的调用({len(fa['touches'])}) —— 不立版本;action(id, n) 展开看是读是写")

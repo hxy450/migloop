@@ -125,13 +125,14 @@ def build_server(backend: Any | None = None) -> Any:
 
     @srv.tool()
     async def file(sid: str, path: str, v: int | None = None, content: bool = False,
-                   diff: bool = False, start: int | None = None, n: int | None = None) -> str:
+                   diff: bool = False, start: int | None = None, n: int | None = None,
+                   readers: bool = False) -> str:
         """版本文件原子:≤v 的写者脊柱(写者 agent 版本/来路/diff)、读了这一版的 agent、复原全文。
         path 可给文件名、相对路径或绝对路径;v 空 = 最新版;content=True 给全文(start/n 裁行窗口);
         diff=True 附每版 diff。"""
         ledger, cwd = await _ctx(sid)
         return atoms_text.render_file(ledger, path, v, root=cwd, content=content, diff=diff,
-                                      start=start, n=n)
+                                      start=start, n=n, readers=readers)
 
     @srv.tool()
     async def agent(sid: str, id: str, v: int | None = None, since: int | None = None,

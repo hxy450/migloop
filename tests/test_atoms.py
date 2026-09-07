@@ -1157,7 +1157,7 @@ def test_grep_hit_reads_are_not_labeled_full_text(tmp_path: Any) -> None:
     led = _ledger(tmp_path, main)
     readers = atoms.file_atom(led, "A.ets", None)["readers"]        # type: ignore[index]
     assert [(r["seen_n"], r["full"], r["start"]) for r in readers] == [(1, False, None), (0, True, 1), (0, False, 2)]
-    text = atoms_text.render_file(led, "A.ets", None, root="/proj")
+    text = atoms_text.render_file(led, "A.ets", None, root="/proj", readers=True)
     lines = [ln for ln in text.splitlines() if ln.startswith("- 主会话")]
     assert "命中 1 行" in lines[0] and "全文" not in lines[0]
     assert "全文" in lines[1]
@@ -1498,7 +1498,7 @@ def test_refs_carry_transcript_line(tmp_path: Any) -> None:
             *_read_call("2026-01-01T00:00:10Z", "t2", "/proj/a.ets", "x\n")]
     led = _ledger(tmp_path, main)
     assert "@L1" in atoms_text.render_agent(led, MAIN_ID, root="/proj")
-    ftext = atoms_text.render_file(led, "a.ets", root="/proj")
+    ftext = atoms_text.render_file(led, "a.ets", root="/proj", readers=True)
     assert "@L1" in ftext and "@L3" in ftext
 
 
@@ -1596,3 +1596,16 @@ def test_render_agent_result_is_an_index_line(tmp_path: Any) -> None:
     say = [a for a in led.agents[MAIN_ID].actions if a.kind == "say"][-1]
     assert f"#{say.seq}@L" in tail and "action" in tail and len(tail) < len(long)
     assert long in str(atoms.action_raw(led, MAIN_ID, say.seq)["input"])
+
+
+def test_render_file_readers_off_by_default(tmp_path: Any) -> None:
+    """单根往上追只看写者;读者是下游,归并阶段(指南漏条款波及了哪些页)才用。file() 默认一行计数,readers=1 展开。"""
+    main = [*_call("2026-01-01T00:00:00Z", "t1", "Write", {"file_path": "/proj/g.md", "content": "rule\n"},
+                   "File created successfully at: /proj/g.md"),
+            *_read_call("2026-01-01T00:00:10Z", "t2", "/proj/g.md", "rule\n"),
+            *_read_call("2026-01-01T00:00:20Z", "t3", "/proj/g.md", "rule\n")]
+    led = _ledger(tmp_path, main)
+    text = atoms_text.render_file(led, "g.md", root="/proj")
+    assert "读者 2 个" in text and "readers=1" in text and "| 全文 (#" not in text            # 读者行不铺
+    full = atoms_text.render_file(led, "g.md", root="/proj", readers=True)
+    assert full.count("| 全文 (#") == 2
