@@ -1582,3 +1582,17 @@ def test_render_agent_omits_result_before_last_version(tmp_path: Any) -> None:
     assert "收尾输出" not in atoms_text.render_agent(led, MAIN_ID, 1, root="/proj")
     assert "两个文件已落盘" in atoms_text.render_agent(led, MAIN_ID, 2, root="/proj")
     assert "两个文件已落盘" in atoms_text.render_agent(led, MAIN_ID, root="/proj")
+
+
+def test_render_agent_result_is_an_index_line(tmp_path: Any) -> None:
+    """除派发指令外 agent 全是索引:收尾只给开头和那段「说」的动作号,全文 action 展开。"""
+    long = "收尾:" + "生成了很多文件," * 60
+    main = [*_call("2026-01-01T00:00:00Z", "t1", "Write", {"file_path": "/proj/a.ets", "content": "x\n"},
+                   "File created successfully at: /proj/a.ets"),
+            _rec("2026-01-01T00:00:20Z", "assistant", [{"type": "text", "text": long}])]
+    led = _ledger(tmp_path, main)
+    txt = atoms_text.render_agent(led, MAIN_ID, root="/proj")
+    tail = txt.split("## 收尾输出", 1)[1]
+    say = [a for a in led.agents[MAIN_ID].actions if a.kind == "say"][-1]
+    assert f"#{say.seq}@L" in tail and "action" in tail and len(tail) < len(long)
+    assert long in str(atoms.action_raw(led, MAIN_ID, say.seq)["input"])
