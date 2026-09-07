@@ -1658,3 +1658,47 @@ def test_ledger_meta_carries_parent_for_chains(tmp_path: Any) -> None:
     led = _ledger(tmp_path, main, {"agent-a1": sub})
     meta = service._merge_ledger_meta({}, led)
     assert meta["a1"]["parent"] == MAIN_ID and meta["a1"]["parent_name"]
+
+
+def test_agent_window_does_not_reprint_prompt(tmp_path: Any) -> None:
+    """agent(id, v, since) 问的是一段窗口:派发指令在 v0 就有了,窗口里不重印(每次 3K,窗口本身才 1.4K)。"""
+    sub = [_rec("2026-01-01T00:00:00Z", "user", "转换首页,底栏深色"),
+           *_call("2026-01-01T00:00:10Z", "s1", "Write", {"file_path": "/proj/a.ets", "content": "1\n"},
+                  "File created successfully at: /proj/a.ets"),
+           *_call("2026-01-01T00:00:20Z", "s2", "Write", {"file_path": "/proj/b.ets", "content": "2\n"},
+                  "File created successfully at: /proj/b.ets")]
+    main = [*_call("2026-01-01T00:00:00Z", "m1", "Agent", {"name": "conv-home", "prompt": "转换首页,底栏深色"}, "done",
+                   toolUseResult={"agentId": "a1"})]
+    led = _ledger(tmp_path, main, {"agent-a1": sub})
+    win = atoms_text.render_agent(led, "conv-home", 2, root="/proj", since=1)
+    assert "底栏深色" not in win and "派发指令: 见 agent" in win
+    assert "底栏深色" in atoms_text.render_agent(led, "conv-home", 2, root="/proj")
+
+
+def test_sub_agent_header_notes_definition_outside_transcript(tmp_path: Any) -> None:
+    """conv-mine 的「固有尺寸交 icon-sizing 自愈」在它全部记录里没有来源:来自类型定义(系统提示),转录不含。头部要说。"""
+    sub = [_rec("2026-01-01T00:00:00Z", "user", "转换"),
+           *_call("2026-01-01T00:00:10Z", "s1", "Write", {"file_path": "/proj/a.ets", "content": "1\n"},
+                  "File created successfully at: /proj/a.ets")]
+    main = [*_call("2026-01-01T00:00:00Z", "m1", "Agent", {"name": "conv-x", "subagent_type": "a2h-activity-converter",
+                                                            "prompt": "转换"}, "done", toolUseResult={"agentId": "a1"})]
+    led = _ledger(tmp_path, main, {"agent-a1": sub})
+    text = atoms_text.render_agent(led, "conv-x", root="/proj")
+    assert "a2h-activity-converter" in text and "不在转录里" in text
+
+
+def test_fix_basis_lists_docs_read_before_first_fix_write(tmp_path: Any) -> None:
+    """链上的「修因」以前是修复方的收尾摘要(51/51 处理完…),对这个文件没信息;换成它写第一笔修复前读的单。"""
+    from migloop import filestory, service
+    main = [*_call("2026-01-01T00:00:00Z", "t1", "Write", {"file_path": "/proj/entry/A.ets", "content": "a\n"},
+                   "File created successfully at: /proj/entry/A.ets"),
+            *_read_call("2026-01-01T02:00:00Z", "t2", "/proj/spec/fix/round-1/ui/ALIGN_A_bug.md", "fix it\n"),
+            *_call("2026-01-01T02:00:10Z", "t3", "Write", {"file_path": "/proj/entry/A.ets", "content": "b\n"}, "ok")]
+    led = _ledger(tmp_path, main)
+    chains = filestory.build_fix_chains(led.stories, {}, {}, root="/proj", fix_after="2026-01-01T01:00:00Z")
+    assert chains and chains[0]["file"] == "A.ets"
+    service.attach_fix_basis(chains, led)
+    basis = chains[0]["fixers_all"][0]["basis"]
+    assert [b["file"] for b in basis] == ["ALIGN_A_bug.md"] and basis[0]["seq"]
+    text = atoms_text.render_chains({"chains": chains, "cross": None, "t0": led.t0, "touched": []}, root="/proj")
+    assert "依据" in text and "ALIGN_A_bug.md" in text

@@ -248,7 +248,13 @@ def render_agent(ledger: atoms.Ledger, agent_id: str, v: int | None = None,
     if ag["parent"]:
         out.append(f"派发自: {ag['parent']['name'] or ag['parent']['id']} @v{ag['parent']['ver']}"
                    f"  (id={ag['parent']['id']})")
-    if ag["prompt"]:
+        if ag.get("kind"):
+            # 它的类型定义(技能 / agent 说明)由 harness 放进系统提示,转录里没有:conv-mine 的「固有尺寸交
+            # icon-sizing 自愈」在它全部记录里找不到来源,就是这一层;search 到不了,别把零命中当「杜撰」
+            out.append(f"定义: 类型 {ag['kind']} 的说明来自系统提示,不在转录里 —— 它写的东西若在其记录里找不到来源,多半出自这里")
+    if ag["prompt"] and since is not None:
+        out.append(f"## 派发指令: 见 agent({ag['id']}, v=1)(窗口查询不重印,{len(ag['prompt'])} 字)")
+    elif ag["prompt"]:
         out.append("## 派发指令(全文)\n" + (_clip(ag["prompt"], 12000) if full_text else _clip(ag["prompt"], 600)))
     inbox = [m for m in ag["inbox"] if not (ag["prompt"] and m["text"] == ag["prompt"])]
     if inbox:
@@ -491,8 +497,13 @@ def render_chains(payload: dict[str, Any], root: str = "", file: str | None = No
                      for ff in fixers]
             out.append("  修复方(按先后): " + " · ".join(parts))
         for ff in c.get("fixers_all") or []:
-            if ff.get("note"):
-                out.append(f"  修因({ff.get('desc')}): {_clip(ff['note'], 400)}")
+            if ff.get("basis"):
+                # 修复方写第一笔修复之前读的单:这是「凭什么改」的直接指针,比它的收尾摘要有信息
+                items = ", ".join(f"{b['file']}" for b in ff["basis"][:6]) + (" …" if len(ff["basis"]) > 6 else "")
+                ref = _ref(ff["basis"][0]["seq"], None, ff["basis"][0].get("line"))
+                out.append(f"  依据({ff.get('desc')}): 写第一笔修复前读了 {items} {ref}")
+            elif ff.get("note"):
+                out.append(f"  修因({ff.get('desc')}): {_clip(ff['note'], 200)}")
     if touched:
         # 链是「确定的写」算出来的;脚本碰过但方向不明的工程文件不在链里,指针摆在这里,别让它隐身。
         # 0723 有 83 次(vv-static-B 一张数据表就碰了 24 个 .ets),按文件归组,agent id 单列一张对照表

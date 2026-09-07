@@ -228,6 +228,38 @@ def _merge_ledger_meta(meta_map: dict[str, dict[str, Any]], ledger: Any) -> dict
     return merged
 
 
+_BASIS_HINT = ("spec/fix/", "spec/visual-verify/", "/docs/", "spec/baseline/")
+
+
+def attach_fix_basis(chains: list[dict[str, Any]], ledger: Any) -> None:
+    """给每条链的每个修复方补「依据」:它写这个文件第一笔修复之前(喂养那一版的窗口里)读过的单 / spec / 文档。
+    链上原来只有修复方的收尾摘要(51/51 处理完…),对这个文件没信息;依据是「凭什么改」的直接指针。"""
+    for c in chains:
+        st = ledger.stories.get(c.get("file_abs"))
+        if st is None:
+            continue
+        for ff in c.get("fixers_all") or []:
+            fvers = ff.get("fvers") or []
+            a = atoms.resolve_agent(ledger, str(ff.get("id") or ""))
+            if not fvers or a is None:
+                continue
+            first_v = min(fvers)
+            by_ver = next((v.by_ver for v in st.versions if v.v == first_v), None)
+            if by_ver is None:
+                continue
+            basis = []
+            for act in a.actions:
+                if act.at != by_ver or act.ver is not None:
+                    continue
+                for ref in act.files:
+                    p = ref.path.replace("\\", "/")
+                    if ref.op == "read" and p != c.get("file_abs") and (any(h in p for h in _BASIS_HINT) or p.endswith(".md")):
+                        basis.append({"file": p.rsplit("/", 1)[-1], "path": p, "v": ref.v, "seq": act.seq,
+                                      "line": ledger.lines.get(act.seq)})
+            seen: set[str] = set()
+            ff["basis"] = [b for b in basis if not (b["path"] in seen or seen.add(b["path"]))]
+
+
 def fixchain_payload(path: str) -> dict[str, Any]:
     """chains + cross + t0 —— 全部从两原子账本算;修复方判定只在 filestory.build_fix_chains。"""
     data = extract_trace(path)
@@ -247,6 +279,7 @@ def fixchain_payload(path: str) -> dict[str, Any]:
         # 修复方按 execute 结束时刻判(run 级 stage-marks 给的 fix_after),链根只认工程根目录下的代码与配置
         chains = filestory.build_fix_chains(ledger.stories, meta_map, fixer_map,
                                             root=cwd or None, fix_after=ledger.fix_after)
+        attach_fix_basis(chains, ledger)
         session_of = {k: a.session for k, a in ledger.agents.items()}
         # 脚本碰过但方向不明的工程文件:不在链里,指针摆在链旁边(0723 修复真正改错值的 F012ViewModel 就靠它露面)
         touched = filestory.fix_period_touches(ledger.stories, root=cwd or None, fix_after=ledger.fix_after)
