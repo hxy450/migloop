@@ -22,6 +22,11 @@ def rel(path: str, root: str) -> str:
     return p
 
 
+#: 正文类记录在时间线上的叫法
+_TEXT_KINDS = {"say": "说", "think": "想", "instruction": "指令", "inject": "注入技能", "system": "系统提示",
+               "notify": "通知", "interrupt": "打断"}
+
+
 def _who(ledger: atoms.Ledger, by: str, ver: int | None) -> str:
     if by in _EXT_LABEL:
         return _EXT_LABEL[by]
@@ -268,6 +273,10 @@ def render_agent(ledger: atoms.Ledger, agent_id: str, v: int | None = None,
         others = [a for a in slot["inp"] if a["kind"] not in ("read", "inbox")]
         for a in others:
             d = a["detail"]
+            if a["kind"] in _TEXT_KINDS:
+                out.append(f"  {_TEXT_KINDS[a['kind']]}: {_clip(d.get('skill') or d.get('text') or '', 120)} "
+                           + _ref(a["seq"], a.get("t")))
+                continue
             desc = d.get("cmd") or d.get("pattern") or d.get("skill") or d.get("url") or ""
             if d.get("unresolved"):
                 # 解析不了的读写不许静默:调查员据此知道该展开哪次 action 看原文

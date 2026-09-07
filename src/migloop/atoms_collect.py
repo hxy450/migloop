@@ -43,8 +43,46 @@ _WRITEISH = re.compile(r"write_text|write_bytes|open\([^)]*['\"][wa]|\.write\(|j
                        r"os\.rename|\.rename\(|os\.remove|unlink\(", re.I)
 _READISH = re.compile(r"read_text|\.read\(\)|json\.load\(|readlines|open\(|readFile|"
                       r"Get-Content|glob\(", re.I)
-_TEAM = re.compile(r'^\s*<teammate-message\s+teammate_id="([^"]*)"(?:\s+summary="([^"]*)")?[^>]*>\n?',
-                   re.S)
+#: 主会话里收到的汇报带一句前缀「Another Claude session sent a message:」—— 0723 149 条汇报曾因此一条没记
+_TEAM = re.compile(r'^\s*(?:Another Claude session sent a message:\s*)?'
+                   r'<teammate-message\s+teammate_id="([^"]*)"(?:[^>]*?\ssummary="([^"]*)")?[^>]*>\n?', re.S)
+#: 正文类记录在索引行里只留开头;全文按指针展开
+_TEXT_HEAD = 600
+
+
+def _head(text: str) -> str:
+    return text.strip()[:_TEXT_HEAD]
+
+
+def _classify_user_text(raw: str, cwd: object) -> tuple[str | None, dict[str, Any], FileOp | None]:
+    """user 侧不是工具结果、不是收件的文本:技能注入 / 操作者指令(含 /技能 调用)/ 系统提示 / 任务通知 / 打断。
+    本地命令回显(<local-command-*>)是噪音。注入的技能同时算那份 SKILL.md 的一次读(via=inject),
+    让「指南缺条款」这类归因能从文件侧走到所有被灌过它的 agent。"""
+    s = raw.lstrip()
+    if not s:
+        return None, {}, None
+    head = s[:600]
+    if "<skill-format>true</skill-format>" in head:
+        m = re.search(r"<command-name>([^<]+)</command-name>", head)
+        name = (m.group(1) if m else "?").strip().lstrip("/")
+        body = s.split("</skill-format>", 1)[1] if "</skill-format>" in s else s
+        p = _resolve(f".claude/skills/{name}/SKILL.md", _resolve(cwd, None))
+        op = FileOp("read", p, "inject") if p else None
+        return "inject", {"skill": name, "text": _head(body), "chars": len(body)}, op
+    if s.startswith(("<command-name>", "<command-message>")):
+        m = re.search(r"<command-name>([^<]+)</command-name>", head)
+        a = re.search(r"<command-args>([^<]*)</command-args>", head)
+        return "instruction", {"text": ((m.group(1) if m else "") + " " + (a.group(1) if a else "")).strip(),
+                               "slash": True}, None
+    if s.startswith(("<local-command-stdout>", "<local-command-caveat>")):
+        return None, {}, None
+    if s.startswith("<system-reminder>"):
+        return "system", {"text": _head(s)}, None
+    if s.startswith("<task-notification>"):
+        return "notify", {"text": _head(s)}, None
+    if s.startswith("[Request interrupted"):
+        return "interrupt", {"text": _head(s)}, None
+    return "instruction", {"text": _head(s)}, None
 _SCRIPT_RUN = re.compile(r"\.(?:py|js|mjs|sh)$")
 _PS_ASSIGN = re.compile(r"\$(\w+)\s*=\s*(['\"])([^'\"\n]+)\2")
 _PATHLINE = re.compile(r"^(.+?):(\d+)[:-]")
@@ -801,26 +839,20 @@ def _walk(path: str, agent_id: str, session: str, seq: list[int],
             content = m.get("content")
             blocks = content if isinstance(content, list) else \
                 [{"type": "text", "text": content}] if isinstance(content, str) else []
+            said: list[str] = []
+            thought: list[str] = []
+            utexts: list[str] = []
             for b in blocks:
                 if not isinstance(b, dict):
                     continue
                 if b.get("type") == "text" and m.get("role") == "user":
-                    raw = str(b.get("text") or "")
-                    tm = _TEAM.match(raw)
-                    is_sub = not agent_id.startswith("__main__")
-                    if tm or (is_sub and rec.prompt is None and raw.strip()
-                              and not raw.lstrip().startswith("<")):
-                        # teammate-message 是收件;子代理没包装的首条文本就是派发词本身
-                        text = raw[tm.end():] if tm else raw
-                        text = re.sub(r"\s*</teammate-message>\s*$", "", text)
-                        rec.actions.append(Action(ts, nxt(), "inbox", "inbox", detail={
-                            "from": tm.group(1) if tm else "dispatcher",
-                            "summary": tm.group(2) if tm else None, "text": text}))
-                        if rec.prompt is None and is_sub:
-                            rec.prompt = text
+                    utexts.append(str(b.get("text") or ""))       # 整条记录合起来归类(见下)
                 elif b.get("type") == "text" and m.get("role") == "assistant":
                     if str(b.get("text") or "").strip():
                         last_text = str(b["text"]).strip()
+                        said.append(last_text)
+                elif b.get("type") == "thinking" and str(b.get("thinking") or "").strip():
+                    thought.append(str(b["thinking"]).strip())
                 elif b.get("type") == "tool_use":
                     pend[str(b.get("id"))] = (ts, str(b.get("name")), b.get("input") or {}, cwd, line_no,
                                                stage_now(ts))
@@ -842,6 +874,35 @@ def _walk(path: str, agent_id: str, session: str, seq: list[int],
                                                  "delete" if op.op == "delete" else "write",
                                                  op.path, ev))
                     rec.actions.append(act)
+            if utexts and m.get("role") == "user":
+                raw = "\n".join(utexts)
+                tm = _TEAM.match(raw)
+                is_sub = not agent_id.startswith("__main__")
+                if tm or (is_sub and rec.prompt is None and raw.strip()
+                          and not raw.lstrip().startswith("<")):
+                    # teammate-message 是收件;子代理没包装的首条文本就是派发词本身
+                    text = raw[tm.end():] if tm else raw
+                    text = re.sub(r"\s*</teammate-message>\s*$", "", text)
+                    rec.actions.append(Action(ts, nxt(), "inbox", "inbox", detail={
+                        "from": tm.group(1) if tm else "dispatcher",
+                        "summary": tm.group(2) if tm else None, "text": text},
+                        src=(path, line_no, line_no), stage=stage_now(ts)))
+                    if rec.prompt is None and is_sub:
+                        rec.prompt = text
+                else:
+                    ukind, udetail, uop = _classify_user_text(raw, cwd)
+                    if ukind:
+                        uact = Action(ts, nxt(), ukind, ukind, detail=udetail,
+                                      src=(path, line_no, line_no), stage=stage_now(ts))
+                        if uop is not None:
+                            uact.files.append(FileRef("read", uop.path,
+                                                      _to_ev(uop, agent_id, ts, nxt(), stage_now(ts))))
+                        rec.actions.append(uact)
+            # agent 自己说的话 / 想的话:一条记录一条索引,喂养下一版;全文按指针展开
+            for kind, texts in (("say", said), ("think", thought)):
+                if texts:
+                    rec.actions.append(Action(ts, nxt(), kind, kind, detail={"text": _head("\n".join(texts))},
+                                              src=(path, line_no, line_no), stage=stage_now(ts)))
     for uts, name, _inp, _cwd, _line, _stage in pend.values():
         rec.actions.append(Action(uts, nxt(), name, "other", ok=None))
     rec.result = last_text

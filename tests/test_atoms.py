@@ -1373,3 +1373,84 @@ def test_script_dir_literal_gives_out_dir_hint(tmp_path: Any) -> None:
     assert run.detail.get("out_dirs") == ["/proj/spec/baseline/ui"]
     st = led.stories["/proj/spec/baseline/ui/page_1.md"]
     assert any("可能由此次运行生成" in t.reason and t.seq == run.seq for t in st.touches)
+
+
+# ═══════════════ 第 2 步:记录补全 —— agent 原子覆盖整份转录 ═══════════════
+
+def test_assistant_text_blocks_are_indexed_and_expandable(tmp_path: Any) -> None:
+    """agent 中途说的话只留了最后一段当收尾,中间的全丢;0723 主会话 670 段 12 万字,「这是我的执行疏漏」
+    「我决定推翻源布局」都在里面,原始组多追的跳全靠它。每段正文一条记录,和动作同一套编号,标喂哪一版,能展开。"""
+    sub = [_rec("2026-01-01T00:00:00Z", "user", "转换 HomePage"),
+           _rec("2026-01-01T00:00:05Z", "assistant", [{"type": "text", "text": "先看布局"}]),
+           *_read_call("2026-01-01T00:00:10Z", "t1", "/proj/a.xml", "<x/>\n"),
+           _rec("2026-01-01T00:00:20Z", "assistant", [{"type": "text", "text": "源布局是白底,但我决定推翻源布局"}]),
+           *_call("2026-01-01T00:00:30Z", "t2", "Write", {"file_path": "/proj/H.ets", "content": "dark\n"},
+                  "File created successfully at: /proj/H.ets"),
+           _rec("2026-01-01T00:00:40Z", "assistant", [{"type": "text", "text": "完成"}])]
+    main = [*_call("2026-01-01T00:00:00Z", "m1", "Agent", {"name": "conv-home", "prompt": "转换 HomePage"}, "done")]
+    led = _ledger(tmp_path, main, {"agent-a1": sub})
+    a = led.agents["agent-a1"]
+    says = [x for x in a.actions if x.kind == "say"]
+    assert [s.detail["text"][:4] for s in says] == ["先看布局", "源布局是", "完成"]
+    write = next(x for x in a.actions if x.kind == "write")
+    assert says[1].at == write.ver and says[1].ver is None           # 喂养这一版,不占版本号
+    raw = atoms.action_raw(led, "agent-a1", says[1].seq)
+    assert raw and "推翻源布局" in str(raw["input"])
+    assert "推翻源布局" in atoms_text.render_agent(led, "agent-a1", root="/proj")
+
+
+def test_teammate_message_with_prefix_is_inbox_on_main(tmp_path: Any) -> None:
+    """子 agent 干完汇报回主会话的记录开头是「Another Claude session sent a message:」,收件匹配只认裸的
+    <teammate-message>,0723 主会话 149 条汇报一条没记 —— 子 agent 结果喂主会话下一次决策的边就断在这。"""
+    main = [_rec("2026-01-01T00:00:00Z", "user",
+                 'Another Claude session sent a message: <teammate-message teammate_id="conv-home" color="blue" '
+                 'summary="首页转换完成">已完成,底栏按深色。</teammate-message>')]
+    led = _ledger(tmp_path, main)
+    inbox = [x for x in led.agents[MAIN_ID].actions if x.kind == "inbox"]
+    assert len(inbox) == 1 and inbox[0].detail["from"] == "conv-home"
+    assert inbox[0].detail["summary"] == "首页转换完成" and "深色" in inbox[0].detail["text"]
+    assert atoms.action_raw(led, MAIN_ID, inbox[0].seq)
+
+
+def test_main_instructions_and_slash_commands_are_indexed(tmp_path: Any) -> None:
+    """主会话没有派发词,操作者的指令就是它的派发词:纯文本指令和 /技能 调用都入账;本地命令回显不算。"""
+    main = [_rec("2026-01-01T00:00:00Z", "user", "开始迁移,先跑 spec"),
+            _rec("2026-01-01T00:01:00Z", "user",
+                 "<command-name>/a2h-spec</command-name><command-message>a2h-spec</command-message>"
+                 "<command-args>--fast</command-args>"),
+            _rec("2026-01-01T00:01:01Z", "user", "<local-command-stdout>Set model to Opus</local-command-stdout>")]
+    led = _ledger(tmp_path, main)
+    ins = [x for x in led.agents[MAIN_ID].actions if x.kind == "instruction"]
+    assert [x.detail["text"] for x in ins] == ["开始迁移,先跑 spec", "/a2h-spec --fast"]
+    assert not [x for x in led.agents[MAIN_ID].actions if x.kind not in ("instruction",)]
+
+
+def test_skill_injection_is_indexed_with_reader_edge(tmp_path: Any) -> None:
+    """灌给 agent 的技能全文(fixer-r1 被灌 12 份 15 万字)一个字不在账上:记成「注入」,
+    并在那份 SKILL.md 上挂一个读者,「指南缺条款」这类归因才能从文件侧走到所有被灌过的 agent。"""
+    main = [_rec("2026-01-01T00:00:00Z", "user",
+                 "<command-message>arkts-x</command-message>\n<command-name>arkts-x</command-name>\n"
+                 "<skill-format>true</skill-format>Base rules…")]
+    led = _ledger(tmp_path, main)
+    inj = [x for x in led.agents[MAIN_ID].actions if x.kind == "inject"]
+    assert len(inj) == 1 and inj[0].detail["skill"] == "arkts-x"
+    st = led.stories["/proj/.claude/skills/arkts-x/SKILL.md"]
+    assert st.reads and st.reads[0].via == "inject" and st.reads[0].by == MAIN_ID
+
+
+def test_thinking_and_system_reminder_are_indexed(tmp_path: Any) -> None:
+    main = [_rec("2026-01-01T00:00:00Z", "assistant", [{"type": "thinking", "thinking": "底栏该用白色"}]),
+            _rec("2026-01-01T00:00:10Z", "user", "<system-reminder>build hook: 3 errors</system-reminder>")]
+    led = _ledger(tmp_path, main)
+    assert [x.kind for x in led.agents[MAIN_ID].actions] == ["think", "system"]
+    assert "白色" in str(atoms.action_raw(led, MAIN_ID, led.agents[MAIN_ID].actions[0].seq)["input"])
+
+
+def test_skill_injection_split_across_blocks_is_one_inject(tmp_path: Any) -> None:
+    """0723 的技能注入记录拆成两个 text 块:<command-message> 一块、<command-name>+正文一块;按块归类会记成
+    一条 instruction 加一条 inject。user 侧文本按整条记录归类。"""
+    main = [_rec("2026-01-01T00:00:00Z", "user",
+                 [{"type": "text", "text": "<command-message>arkts-y</command-message>"},
+                  {"type": "text", "text": "<command-name>arkts-y</command-name>\n<skill-format>true</skill-format>Body"}])]
+    led = _ledger(tmp_path, main)
+    assert [x.kind for x in led.agents[MAIN_ID].actions] == ["inject"]

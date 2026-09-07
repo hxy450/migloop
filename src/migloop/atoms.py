@@ -362,6 +362,13 @@ def action_raw(ledger: Ledger, agent_id: str, seq: int) -> dict[str, Any] | None
     for b in ((res_rec or {}).get("message") or {}).get("content") or []:
         if isinstance(b, dict) and b.get("type") == "tool_result" and b.get("tool_use_id") == act.tuid:
             out = _text_of(b.get("content"))
+    if act.tuid is None and isinstance(use_rec, dict):
+        # 正文 / thinking / 指令 / 收件 / 注入:记录本身就是原文
+        want_type = "thinking" if act.kind == "think" else "text"
+        blocks = (use_rec.get("message") or {}).get("content")
+        texts = ([str(b.get(want_type) or "") for b in blocks if isinstance(b, dict) and b.get("type") == want_type]
+                 if isinstance(blocks, list) else [str(blocks or "")])
+        inp = "\n".join(t for t in texts if t.strip())
     # codex rollout:调用与结果都在 payload 里,按 call_id 对上
     for rec, is_use in ((use_rec, True), (res_rec, False)):
         pl = rec.get("payload") if isinstance(rec, dict) and isinstance(rec.get("payload"), dict) else None
