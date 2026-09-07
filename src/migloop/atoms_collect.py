@@ -639,6 +639,7 @@ def _basic_detail(name: str, inp: dict[str, Any]) -> dict[str, Any]:
 
 
 _NUMBERED = re.compile(r"^\s*(\d+)\t(.*)$")
+_IMAGE_EXT = re.compile(r"\.(?:jpe?g|png|webp|gif|bmp|pdf)$", re.I)
 
 
 def _numbered_lines(out: str) -> list[tuple[int, str]]:
@@ -669,6 +670,17 @@ def _file_ops(name: str, inp: dict[str, Any], out: str, tur: Any, cwd: object,
                                   start=f.get("startLine") or 1, n=f["numLines"]))
         elif isinstance(tur, dict):
             detail["result_type"] = tur.get("type")
+            # 图片 / PDF:结果没有正文,读却真实发生(修复方看双端拼图 MainActivity.jpeg 才知道按钮是 ROLL);
+            # 记 via=image 的依赖读,不立版本 —— 丢了它,「修复侧多看到的截图」就数不到
+            ftype = str((f or {}).get("type") or "") if isinstance(f, dict) else ""
+            p = _resolve(inp.get("file_path"), _resolve(cwd, None))
+            if p and (tur.get("type") == "image" or ftype.startswith(("image/", "application/pdf"))):
+                ops.append(FileOp("read", p, "image", dep=True))
+        elif _IMAGE_EXT.search(str(inp.get("file_path") or "")):
+            # 没有边车、结果正文也空(DiceRoller #4431 Read MainActivity.jpeg):只剩扩展名可认
+            p = _resolve(inp.get("file_path"), _resolve(cwd, None))
+            if p:
+                ops.append(FileOp("read", p, "image", dep=True))
         else:
             # 没有 toolUseResult 边车(服务端切片、Workflow 子代理转录):从结果正文的 "N\t内容" 行号
             # 前缀还原。DiceRoller 0903 生成方读 MainActivity.kt / activity_main.xml 的两条 Read 曾因此消失,

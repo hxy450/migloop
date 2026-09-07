@@ -572,6 +572,7 @@ def ledger_index(ledger: Ledger) -> dict[str, Any]:
         files.append({
             "path": path, "kind": file_kind(path), "n_versions": len(st.versions),
             "has_writer": any(ver.by not in (EXTERNAL, OUTBAND) for ver in st.versions),
+            "n_unknown": sum(1 for ver in st.versions if ver.content is None),
             "n_reads": len(st.reads), "n_touches": len(st.touches),
         })
     agents = []
@@ -629,7 +630,8 @@ def agent_atom(ledger: Ledger, agent_id: str, v: int | None = None,
                                "stage": act.stage}
         for ref in act.files:
             row["files"].append({"op": ref.op, "path": ref.path, "v": ref.v, "via": ref.ev.via})
-            if ref.op == "read" and ref.v is not None:      # 被作废的探测读(假前身)不列进读记录
+            # 被作废的探测读(假前身)不列进读记录;图片读没有版本但要列(via=image)
+            if ref.op == "read" and (ref.v is not None or ref.ev.via == "image"):
                 st = ledger.stories.get(ref.path)
                 anchor_ts = effect_ts.get(act.at) or act.ts
                 latest = _versions_at(st, anchor_ts) if st else None
@@ -651,7 +653,10 @@ def agent_atom(ledger: Ledger, agent_id: str, v: int | None = None,
         timeline.append(row)
     parent = None
     if a.parent:
-        parent = {"id": a.parent, "ver": a.parent_ver,
+        pa = ledger.agents.get(a.parent)
+        pseq = next((act.seq for act in (pa.actions if pa else [])
+                     if act.kind == "dispatch" and act.detail.get("child") == a.id), None)
+        parent = {"id": a.parent, "ver": a.parent_ver, "seq": pseq,
                   "name": _agent_label(ledger.agents, a.parent)}
     children = [{"id": act.detail.get("child"), "name": act.detail.get("name"), "ver": act.ver}
                 for act in acts if act.kind == "dispatch" and act.ok]

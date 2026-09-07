@@ -610,3 +610,15 @@ def test_line_origins_bridge_across_break_by_identical_text() -> None:
     o = line_origins(st)[2]
     assert o[0] == ("A", 1, "bridged") and o[1] is None and o[2] == ("A", 1, "bridged")
     assert line_owners(st)[2] == ["A", None, "A"]
+
+
+def test_first_full_snapshot_fills_unknown_external_content_instead_of_outband() -> None:
+    """DiceRoller AppScope/app.json5:v1 外部输入(cp 的源,内容未知)→ 9 分钟后第一次 Read 全文,被记成 v2「实录外修改」,
+    blame 把模板默认值的三行答成「归属未知(断点后)」。没人写过、内容第一次可见,就是 v1 的内容,不是一次修改。"""
+    evs = [
+        ev("T01", "wderived", "b.json5", agent="A", src="a.json5"),           # a.json5 作为 cp 的源:外部输入,内容未知
+        ev("T02", "read", "a.json5", agent="B", content="x\ny\n", full=True),
+    ]
+    st = build_stories(evs)["a.json5"]
+    assert len(st.versions) == 1 and st.versions[0].source == "external" and st.versions[0].content == "x\ny\n"
+    assert st.breaks == [] and st.reads[-1].version == 1

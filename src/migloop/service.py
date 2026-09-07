@@ -252,17 +252,53 @@ def _evidence_kinds(agent: Any, before_seq: int, n_versions: int = 3) -> dict[st
     return kinds
 
 
-def _doc_writer(ledger: Any, path: str) -> tuple[str | None, int | None, str]:
-    """依据文件是谁写的:有写者取写者;只被碰过(脚本读改写)取碰过它的最后一个 agent。
+#: 读取集差集的分类(顺序即优先级):修复方比生成方多读的每个文件归到一类
+_READ_KIND = (("截图", r"\.(?:jpe?g|png|webp|gif)$|screenshot|/sbs/"), ("真机 dump", r"dump|\.hmos\.xml$"),
+              ("接口", r"\.d\.ts$"), ("配置", r"\.(?:gradle(?:\.kts)?|json5|json|toml|ya?ml|properties)$"),
+              ("安卓源码", r"\.(?:kt|java|xml)$"), ("鸿蒙源码", r"\.ets$"), ("单/文档", r"\.md$"), ("其它", "."))
+
+
+def _read_kind(path: str) -> str:
+    import re as _re
+    return next(k for k, pat in _READ_KIND if _re.search(pat, path))
+
+
+def _read_gap(fix_reads: list[str], gen_reads: set[str]) -> dict[str, list[str]]:
+    """修复方(写第一笔修复前的窗口里)读了而生成方(写生成版之前)没读的文件,按类型分组、保持先后。"""
+    gap: dict[str, list[str]] = {}
+    seen: set[str] = set()
+    for p in fix_reads:
+        if p in gen_reads or p in seen:
+            continue
+        seen.add(p)
+        gap.setdefault(_read_kind(p), []).append(p)
+    # 证据类型在前(截图 / dump / 接口 / 配置),单与源码在后 —— 差集的重点是「生成期缺的是哪一类反馈」
+    return {k: gap[k] for k, _pat in _READ_KIND if k in gap}
+
+
+def _doc_is_about(ledger: Any, b: dict[str, Any], file: str) -> bool:
+    stem = file.rsplit(".", 1)[0].lower()
+    if stem and stem in b["path"].rsplit("/", 1)[-1].lower():
+        return True
+    st = ledger.stories.get(b["path"])
+    ver = st.versions[b["v"] - 1] if (st is not None and b.get("v") and b["v"] <= len(st.versions)) else None
+    return bool(ver is not None and ver.content and file and file in ver.content)
+
+
+def _doc_writer(ledger: Any, path: str, v: int | None, ts: str) -> tuple[str | None, int | None, str]:
+    """依据文件是谁写的:修复方读到的是第 v 版,写者就取 ≤v 里最后一个真写者;只被碰过(脚本读改写)取读之前
+    最后碰过它的 agent。取最后一版会把修复之后才发生的写说成依据(DiceRoller decision-ledger.md 晚 39 分钟的 v2)。
     返回 (agent id, 动作号, 「写」/「脚本碰过」)。"""
     st = ledger.stories.get(path)
     if st is None:
         return None, None, ""
-    for v in reversed(st.versions):
-        if v.by and not str(v.by).startswith("__external__") and v.by != "__outband__":
-            return v.by, v.act_seq, "写"
-    if st.touches:
-        t = st.touches[-1]
+    vers = st.versions if v is None else st.versions[:max(v, 0)]
+    for ver in reversed(vers):
+        if ver.by and not str(ver.by).startswith("__external__") and ver.by != "__outband__":
+            return ver.by, ver.act_seq, "写"
+    before = [t for t in st.touches if t.ts <= ts]
+    if before:
+        t = before[-1]
         return t.by, t.seq, "脚本碰过"
     return None, None, ""
 
@@ -284,6 +320,7 @@ def attach_fix_basis(chains: list[dict[str, Any]], ledger: Any) -> None:
             if by_ver is None:
                 continue
             basis = []
+            fix_reads: list[str] = []
             for act in a.actions:
                 # 修复方常先读单、写别的文件、再写本文件:往前看三版内喂养的读
                 if act.ver is not None or act.at > by_ver or act.at < by_ver - 2:
@@ -294,8 +331,10 @@ def attach_fix_basis(chains: list[dict[str, Any]], ledger: Any) -> None:
                     p = ref.path.replace("\\", "/")
                     if p.endswith("/SKILL.md"):
                         continue
+                    if ref.op == "read" and p != c.get("file_abs"):
+                        fix_reads.append(p)
                     if ref.op == "read" and p != c.get("file_abs") and (any(h in p for h in _BASIS_HINT) or p.endswith(".md")):
-                        wid, wseq, how = _doc_writer(ledger, p)
+                        wid, wseq, how = _doc_writer(ledger, p, ref.v, act.ts)
                         wagent = ledger.agents.get(wid) if wid else None
                         basis.append({"file": "/".join(p.rsplit("/", 2)[-2:]), "path": p, "v": ref.v, "seq": act.seq,
                                       "line": ledger.lines.get(act.seq), "writer": wid,
@@ -308,6 +347,19 @@ def attach_fix_basis(chains: list[dict[str, Any]], ledger: Any) -> None:
                 if b["path"] not in seen:
                     seen.add(b["path"])
                     ff["basis"].append(b)
+            # 同一窗口里常混着别的文件的单(脚本改的文件不立版本,窗口就宽):单名含本文件词干、或单的内容提到本文件的
+            # 才是它的依据;一张都对不上才全列
+            about = [b for b in ff["basis"] if _doc_is_about(ledger, b, str(c.get("file") or ""))]
+            ff["basis_other"] = len(ff["basis"]) - len(about) if about else 0
+            if about:
+                ff["basis"] = about
+            gid = str((c.get("generator") or {}).get("id") or "")
+            ga = atoms.resolve_agent(ledger, gid) if gid else None
+            gen_ver = next((v.by_ver for v in st.versions if v.by == gid), None)
+            if ga is not None and gen_ver is not None:
+                gen_reads = {ref.path.replace("\\", "/") for act in ga.actions if act.at <= gen_ver
+                             for ref in act.files if ref.op == "read"}
+                ff["read_gap"] = _read_gap(fix_reads, gen_reads)
 
 
 def fixchain_payload(path: str) -> dict[str, Any]:
@@ -517,7 +569,9 @@ def atom_text(path: str, tool: str, args: dict[str, Any]) -> str:
                                         since_ts=args.get("since_ts") or None, until_ts=args.get("until_ts") or None,
                                         root=cwd)
     if tool == "action" and args.get("id") and args.get("seq") is not None:
-        return atoms_text.render_action(ledger, str(args["id"]), int(args["seq"]))
+        return atoms_text.render_action(ledger, str(args["id"]), int(args["seq"]),
+                                        max_chars=_opt_int(args, "max_chars") or 20000,
+                                        offset=_opt_int(args, "offset") or 0, find=str(args.get("find") or ""))
     raise ValueError(f"未知工具或缺参数: {tool}")
 
 

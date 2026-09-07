@@ -1812,7 +1812,7 @@ def test_fix_basis_reports_what_fix_side_saw_that_generation_did_not(tmp_path: A
     assert b["file"] == "feat/AboutUs_01.md" and b["writer"] == "agent-v1" and b["writer_how"] == "写"
     assert b["evidence"] == {"真机 dump": 1, "截图": 1}
     text = atoms_text.render_chains({"chains": chains, "cross": None, "t0": led.t0, "touched": []}, root="/proj")
-    assert "修复侧多看到的" in text and "真机 dump" in text and "vv-1" in text
+    assert "依据单的来历" in text and "真机 dump" in text and "vv-1" in text
 
 
 def test_fix_basis_skips_skill_injection(tmp_path: Any) -> None:
@@ -1831,3 +1831,241 @@ def test_fix_basis_skips_skill_injection(tmp_path: Any) -> None:
     service.attach_fix_basis(chains, led)
     files = [b["file"] for b in chains[0]["fixers_all"][0]["basis"]]
     assert files == ["ui/ALIGN_A.md"], files
+
+
+# ═══════════════ 子代理亲手追 DiceRoller Index.ets 撞出的四条 ═══════════════
+
+def test_action_long_output_is_addressable(tmp_path: Any) -> None:
+    """think #4218 有 9.8 万字,action 只回前两万且不说截在哪;调查员要的决策句在后面,只能拿 search 撞。
+    截断处要明说「剩余多少、offset 多少继续」,offset= 从中间起,find= 直接跳到关键词前。"""
+    body = "a" * 5000 + "DECISION keep Roll" + "b" * 5000
+    main = [*_call("2026-01-01T00:00:00Z", "t1", "Bash", {"command": "echo"}, body)]
+    led = _ledger(tmp_path, main)
+    seq = led.agents[MAIN_ID].actions[0].seq
+    head = atoms_text.render_action(led, MAIN_ID, seq, max_chars=1000)
+    assert "共 10018 字" in head and "剩余 9018 字" in head and "offset=1000" in head
+    mid = atoms_text.render_action(led, MAIN_ID, seq, max_chars=1000, offset=4900)
+    assert "DECISION keep Roll" in mid and "第 4901-5900 字" in mid
+    found = atoms_text.render_action(led, MAIN_ID, seq, max_chars=400, find="DECISION")
+    assert "DECISION keep Roll" in found and "offset=" in found
+    miss = atoms_text.render_action(led, MAIN_ID, seq, max_chars=400, find="NOPE")
+    assert "未命中" in miss
+
+
+def test_image_read_is_a_read(tmp_path: Any) -> None:
+    """修复方 Read 了双端拼图 MainActivity.jpeg(#4431),结果是图片没有正文,收集器整条丢掉:时间线里只剩裸 Read,
+    「修复侧多看到的截图」就数不到。图片读记 via=image,不立版本,时间线带文件名。"""
+    jpg = "/proj/spec/visual-verify/sbs/MainActivity.jpeg"
+    main = [*_call("2026-01-01T00:00:00Z", "t1", "Read", {"file_path": jpg}, "",
+                   toolUseResult={"type": "image", "file": {"base64": "x", "type": "image/jpeg"}}),
+            *_call("2026-01-01T00:00:10Z", "t2", "Write", {"file_path": "/proj/entry/A.ets", "content": "a\n"},
+                   "File created successfully at: /proj/entry/A.ets")]
+    led = _ledger(tmp_path, main)
+    act = led.agents[MAIN_ID].actions[0]
+    assert [(r.op, r.path, r.ev.via) for r in act.files] == [("read", jpg, "image")]
+    ag = atoms.agent_atom(led, MAIN_ID, None)
+    assert [r["path"] for r in ag["reads"]] == [jpg]
+    text = atoms_text.render_agent(led, MAIN_ID, None, root="/proj")
+    assert "MainActivity.jpeg" in text and "图片" in text
+
+
+def test_fix_chain_reports_reads_fixer_had_that_generator_lacked(tmp_path: Any) -> None:
+    """Index.ets:修复方读了 button.d.ts(接口)和 build.gradle(配置)才敢定 Material 默认形态,生成方两样都没读;
+    「修复侧多看到的」只列了单,漏掉真正解释修复方为什么更强的两类输入。读取集差集按类型分组摆到链行上。"""
+    from migloop import filestory, service
+    gen = [_rec("2026-01-01T00:00:00Z", "user", "转换 A"),
+           *_read_call("2026-01-01T00:00:10Z", "g1", "/proj/android/A.kt", "class A\n"),
+           *_call("2026-01-01T00:00:20Z", "g2", "Write", {"file_path": "/proj/entry/A.ets", "content": "a\n"},
+                  "File created successfully at: /proj/entry/A.ets")]
+    fix = [_rec("2026-01-01T02:00:00Z", "user", "修 A"),
+           *_read_call("2026-01-01T02:00:05Z", "f1", "/proj/spec/fix/round-1/ui/ALIGN_A.md", "fix\n"),
+           *_read_call("2026-01-01T02:00:10Z", "f2", "/sdk/api/@internal/component/ets/button.d.ts", "declare\n"),
+           *_read_call("2026-01-01T02:00:15Z", "f3", "/proj/android/app/build.gradle", "material 1.4\n"),
+           *_read_call("2026-01-01T02:00:18Z", "f4", "/proj/android/A.kt", "class A\n"),
+           *_call("2026-01-01T02:00:20Z", "f5", "Write", {"file_path": "/proj/entry/A.ets", "content": "b\n"}, "ok")]
+    main = [*_call("2026-01-01T00:00:00Z", "m1", "Agent", {"name": "conv-a", "prompt": "转换 A"}, "done",
+                   toolUseResult={"agentId": "g"}),
+            *_call("2026-01-01T02:00:00Z", "m2", "Agent", {"name": "fixer", "prompt": "修 A"}, "done",
+                   toolUseResult={"agentId": "f"})]
+    led = _ledger(tmp_path, main, {"agent-g": gen, "agent-f": fix})
+    chains = filestory.build_fix_chains(led.stories, {}, {}, root="/proj", fix_after="2026-01-01T01:00:00Z")
+    service.attach_fix_basis(chains, led)
+    gap = chains[0]["fixers_all"][0]["read_gap"]
+    assert gap == {"接口": ["/sdk/api/@internal/component/ets/button.d.ts"],
+                   "配置": ["/proj/android/app/build.gradle"],
+                   "单/文档": ["/proj/spec/fix/round-1/ui/ALIGN_A.md"]}, gap
+    text = atoms_text.render_chains({"chains": chains, "cross": None, "t0": led.t0, "touched": []}, root="/proj")
+    assert "修复方读了而生成方没读: 接口 button.d.ts · 配置 build.gradle · 单/文档 ALIGN_A.md" in text
+
+
+def test_agent_timeline_lists_skill_injection_once(tmp_path: Any) -> None:
+    """注入一份技能在时间线里出现两次(「注入技能」行 + 「读 SKILL.md · 注入」行),12 份就是 24 行噪声。只留注入行。"""
+    main = [_rec("2026-01-01T00:00:00Z", "user",
+                 "<command-message>arkts-x</command-message>\n<command-name>arkts-x</command-name>\n"
+                 "<skill-format>true</skill-format>Base rules…"),
+            *_call("2026-01-01T00:00:10Z", "t1", "Write", {"file_path": "/proj/entry/A.ets", "content": "a\n"},
+                   "File created successfully at: /proj/entry/A.ets")]
+    led = _ledger(tmp_path, main)
+    text = atoms_text.render_agent(led, MAIN_ID, None, root="/proj")
+    assert text.count("arkts-x") == 1 and "读 " not in text.split("## 逐版时间线")[1].split("注入技能")[0]
+    assert "SKILL.md" not in text
+
+
+# ═══════════════ 子代理亲手追 DiceRoller app.json5 撞出的四条 ═══════════════
+
+def test_fix_basis_writer_is_the_writer_of_the_version_the_fixer_read(tmp_path: Any) -> None:
+    """decision-ledger.md 修复方读的是 v1(主会话·81e0a463 写),链行却说「← 主会话·1d2ef418 写」—— 那是修复之后 39 分钟
+    才写的 v2。写者按读到的那一版取。"""
+    from migloop import filestory, service
+    doc = "/proj/spec/decision-ledger.md"
+    w1 = [*_call("2026-01-01T00:30:00Z", "w1", "Write", {"file_path": doc, "content": "D-003 skip icon\n"},
+                 f"File created successfully at: {doc}")]
+    w2 = [*_call("2026-01-01T03:00:00Z", "w2", "Write", {"file_path": doc, "content": "D-003 skip icon\nD-010\n"}, "ok")]
+    main = [*_call("2026-01-01T00:00:00Z", "t1", "Write", {"file_path": "/proj/entry/A.ets", "content": "a\n"},
+                   "File created successfully at: /proj/entry/A.ets"),
+            *_call("2026-01-01T00:29:00Z", "m1", "Agent", {"name": "ledger-writer", "prompt": "写 ledger"}, "done",
+                   toolUseResult={"agentId": "w1"}),
+            *_read_call("2026-01-01T02:00:00Z", "t2", doc, "D-003 skip icon\n"),
+            *_call("2026-01-01T02:00:10Z", "t3", "Write", {"file_path": "/proj/entry/A.ets", "content": "b\n"}, "ok"),
+            *_call("2026-01-01T02:59:00Z", "m2", "Agent", {"name": "ledger-later", "prompt": "补 ledger"}, "done",
+                   toolUseResult={"agentId": "w2"})]
+    led = _ledger(tmp_path, main, {"agent-w1": w1, "agent-w2": w2})
+    chains = filestory.build_fix_chains(led.stories, {}, {}, root="/proj", fix_after="2026-01-01T01:00:00Z")
+    service.attach_fix_basis(chains, led)
+    b = chains[0]["fixers_all"][0]["basis"][0]
+    assert b["v"] == 1 and b["writer"] == "agent-w1", b
+    text = atoms_text.render_chains({"chains": chains, "cross": None, "t0": led.t0, "touched": []}, root="/proj")
+    assert "依据单的来历: spec/decision-ledger.md@v1 ← ledger-writer 写" in text and "ledger-later" not in text
+
+
+def test_agent_result_points_at_parent_dispatch_action(tmp_path: Any) -> None:
+    """fix-identity 的收尾摘要标「截断,共 4249 字 (#1001)」,按它展开得到的是一句 162 字的 say:收尾全文在父会话那条
+    派发调用的结果里。坐标要指向父的派发动作。"""
+    child = [_rec("2026-01-01T00:00:00Z", "user", "修 A"),
+             *_call("2026-01-01T00:00:10Z", "c1", "Write", {"file_path": "/proj/entry/A.ets", "content": "a\n"},
+                    "File created successfully at: /proj/entry/A.ets"),
+             _rec("2026-01-01T00:00:20Z", "assistant", [{"type": "text", "text": "done."}])]
+    main = [*_call("2026-01-01T00:00:00Z", "m1", "Agent", {"name": "fixer", "prompt": "修 A"},
+                   "## 收尾汇报\n" + "vendor 取 diceroller,依据 …" * 40, toolUseResult={"agentId": "c"})]
+    led = _ledger(tmp_path, main, {"agent-c": child})
+    seq = next(a.seq for a in led.agents[MAIN_ID].actions if a.kind == "dispatch")
+    text = atoms_text.render_agent(led, "agent-c", None, root="/proj")
+    assert f"action({MAIN_ID}, {seq})" in text and "收尾输出" in text
+
+
+def test_agent_timeline_collapses_many_skill_injections(tmp_path: Any) -> None:
+    """一个 agent 被灌 17 份技能,时间线里 17 行「注入技能」;与本链有关的只有 1 份。超过三份折成一行点名。"""
+    main = [_rec(f"2026-01-01T00:00:0{i}Z", "user",
+                 f"<command-message>sk{i}</command-message>\n<command-name>sk{i}</command-name>\n"
+                 "<skill-format>true</skill-format>rules…") for i in range(5)]
+    main += _call("2026-01-01T00:01:00Z", "t1", "Write", {"file_path": "/proj/entry/A.ets", "content": "a\n"},
+                  "File created successfully at: /proj/entry/A.ets")
+    led = _ledger(tmp_path, main)
+    text = atoms_text.render_agent(led, MAIN_ID, None, root="/proj")
+    assert "注入技能 5 份: sk0, sk1, sk2, sk3, sk4" in text and text.count("注入技能") == 1
+
+
+# ═══════════════ 子代理亲手追 0723 PreferenceKeys / WXEntryAbility 撞出的 ═══════════════
+
+def test_file_diff_only_shows_the_anchor_version(tmp_path: Any) -> None:
+    """PreferenceKeys.ets@v2 只加了 9 行,file(v=2, diff=1) 却先倒出 v1 的 320 行创建 diff,目标版被截掉,2.3 万字零信息。
+    diff=1 只给第 v 版的 diff;创建版且 content=1 时不再把全文打两遍。"""
+    big = "".join(f"line{i}\n" for i in range(300))
+    main = [*_call("2026-01-01T00:00:00Z", "t1", "Write", {"file_path": "/proj/entry/A.ets", "content": big},
+                   "File created successfully at: /proj/entry/A.ets"),
+            *_call("2026-01-01T00:00:10Z", "t2", "Edit", {"file_path": "/proj/entry/A.ets", "old_string": "line299\n",
+                                                          "new_string": "line299\nNEWKEY\n"}, "ok")]
+    led = _ledger(tmp_path, main)
+    text = atoms_text.render_file(led, "A.ets", 2, root="/proj", diff=True)
+    assert "+NEWKEY" in text and "+line150" not in text and "diff(path, v)" in text
+    creation = atoms_text.render_file(led, "A.ets", 1, root="/proj", diff=True, content=True)
+    assert creation.count("line150") == 1
+
+
+def test_fix_basis_prefers_docs_about_the_file(tmp_path: Any) -> None:
+    """WXEntryAbility.ets:修复方同一窗口里读了 4 张 MineFragment 的 ALIGN 单和 1 张 WXCallbackActivity_01 单,链行列的是前四张,
+    真正的依据不在列表里 —— 照它走会追进错误分支。单名含文件词干、或单的内容提到该文件的排前,其余只计数。"""
+    from migloop import filestory, service
+    other = "/proj/spec/fix/round-1/ui/ALIGN_PMineFragment_layout.md"
+    mine = "/proj/spec/fix/round-1/feat/WXCallbackActivity_01_no_wxentry.md"
+    main = [*_call("2026-01-01T00:00:00Z", "t0", "Write", {"file_path": "/proj/entry/B.ets", "content": "b\n"},
+                   "File created successfully at: /proj/entry/B.ets"),
+            *_read_call("2026-01-01T02:00:00Z", "t1", other, "MineFragment 指示器颜色\n"),
+            *_read_call("2026-01-01T02:00:05Z", "t2", mine, "缺 WXEntryAbility.ets:回调 Ability 未建\n"),
+            *_call("2026-01-01T02:00:10Z", "t3", "Write", {"file_path": "/proj/entry/wxapi/WXEntryAbility.ets",
+                                                          "content": "export default class WXEntryAbility {}\n"},
+                   "File created successfully at: /proj/entry/wxapi/WXEntryAbility.ets")]
+    led = _ledger(tmp_path, main)
+    chains = filestory.build_fix_chains(led.stories, {}, {}, root="/proj", fix_after="2026-01-01T01:00:00Z")
+    service.attach_fix_basis(chains, led)
+    c = next(c for c in chains if c["file"] == "WXEntryAbility.ets")
+    ff = c["fixers_all"][0]
+    assert [b["path"] for b in ff["basis"]] == [mine] and ff["basis_other"] == 1
+    text = atoms_text.render_chains({"chains": chains, "cross": None, "t0": led.t0, "touched": []}, root="/proj")
+    assert "WXCallbackActivity_01_no_wxentry.md" in text and "另 1 张单与本文件无关" in text
+
+
+def test_index_marks_versions_with_unknown_content(tmp_path: Any) -> None:
+    main = [*_call("2026-01-01T00:00:00Z", "t1", "Bash", {"command": "python gen.py > /proj/entry/F.ets"}, "")]
+    led = _ledger(tmp_path, main)
+    text = atoms_text.render_index(led, "ets", "F.ets", root="/proj")
+    assert "1 版内容未知" in text
+
+
+def test_guide_carries_the_hands_on_lessons() -> None:
+    from migloop import mcp_server
+    g = mcp_server.GUIDE
+    assert "search(q, agent=主会话" in g and "blame(path, v, start=行号, n=1)" in g
+    assert "offset=" in g and "find=" in g and "created 链先问三件事" in g
+    assert "传递 / 错 / 缺" in g and "故障进入点" in g
+
+
+# ═══════════════ 真会话复核后的四条 ═══════════════
+
+def test_image_read_without_sidecar_is_still_a_read(tmp_path: Any) -> None:
+    """DiceRoller #4431 Read MainActivity.jpeg:CC 转录里这条没有 toolUseResult 边车,结果正文也是空 —— 只剩扩展名可认。"""
+    jpg = "/proj/spec/visual-verify/sbs/MainActivity.jpeg"
+    main = [*_call("2026-01-01T00:00:00Z", "t1", "Read", {"file_path": jpg}, "")]
+    led = _ledger(tmp_path, main)
+    act = led.agents[MAIN_ID].actions[0]
+    assert [(r.op, r.path, r.ev.via) for r in act.files] == [("read", jpg, "image")]
+
+
+def test_chain_generator_is_an_agent_even_when_replaced_lines_are_external(tmp_path: Any) -> None:
+    """app.json5:v1 外部输入(模板默认值,内容首见于 Read)、v2 app-identity 改版本号、v3 修复改 bundleName。
+    被修的 3 行来自 v1,blame 归到外部输入是对的;但链的「生成方」要是 app-identity(生成期真写过它的 agent),
+    「原作者」里外部来源写成人话。"""
+    from migloop import filestory
+    f = "/proj/AppScope/app.json5"
+    main = [*_read_call("2026-01-01T00:00:00Z", "r1", f, "bundleName: com.example.app\nversion: 1.0.0\n"),
+            *_call("2026-01-01T00:00:10Z", "e1", "Edit", {"file_path": f, "old_string": "1.0.0", "new_string": "1.0"}, "ok"),
+            *_call("2026-01-01T02:00:00Z", "e2", "Edit", {"file_path": f, "old_string": "com.example.app",
+                                                          "new_string": "com.example.dice"}, "ok")]
+    led = _ledger(tmp_path, main)
+    chains = filestory.build_fix_chains(led.stories, {}, {}, root="/proj", fix_after="2026-01-01T01:00:00Z")
+    c = chains[0]
+    assert c["generator"]["id"] == MAIN_ID
+    assert c["lines"]["from"][0]["id"] == filestory.EXTERNAL and "外部输入" in c["lines"]["from"][0]["desc"]
+    text = atoms_text.render_chains({"chains": chains, "cross": None, "t0": led.t0, "touched": []}, root="/proj")
+    assert "原作者 外部输入(模板/脚手架默认值)(1行" in text and "生成方 __external__" not in text
+
+
+def test_action_find_works_on_thinking_text(tmp_path: Any) -> None:
+    """think #4218 的 9.8 万字在 action 的「输入」里,输出为空;find=AC14 报「未命中」是找错了侧。"""
+    body = "x" * 3000 + "DECISION keep Roll" + "y" * 3000
+    main = [_rec("2026-01-01T00:00:00Z", "assistant", [{"type": "thinking", "thinking": body}])]
+    led = _ledger(tmp_path, main)
+    seq = led.agents[MAIN_ID].actions[0].seq
+    text = atoms_text.render_action(led, MAIN_ID, seq, max_chars=500, find="DECISION")
+    assert "DECISION keep Roll" in text and "未命中" not in text and "offset=" in text
+
+
+def test_read_gap_render_dedups_basenames_and_flags_mixed_window() -> None:
+    chains = [{"kind": "rework", "file": "A.ets", "file_abs": "/p/A.ets", "gen_at": None, "fix_at": None,
+               "generator": {"id": "g", "desc": "g"}, "generators": [], "fixer": {"id": "f", "desc": "f"},
+               "fixers_all": [{"id": "f", "desc": "f", "vers": [1], "fvers": [2], "at": "2026-01-01T00:00:00Z",
+                               "basis": [], "basis_other": 2,
+                               "read_gap": {"鸿蒙源码": ["/p/a/X.ets", "/p/b/X.ets", "/p/c/X.ets"]}}],
+               "lines": None, "blame_broken": None, "fix_versions": [2], "breaks": [], "diff": []}]
+    text = atoms_text.render_chains({"chains": chains, "cross": None, "t0": None, "touched": []}, root="/p")
+    assert "鸿蒙源码 X.ets ×3" in text and "窗口内混有别的文件的读" in text

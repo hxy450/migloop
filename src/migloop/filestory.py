@@ -311,6 +311,16 @@ def build_stories(events: list[Ev]) -> dict[str, FileStory]:
                     s.content = snap
                     s.interval_base = snap
                     self_read_version = len(st.versions)
+                elif (st.versions and st.versions[-1].content is None
+                      and st.versions[-1].source in ("external", "generated")
+                      and s.interval_base is None and not st.breaks):
+                    # 外部输入 / 批量生成的首版没人读过全文:第一张快照是「内容首次可见」,不是实录外修改
+                    # (DiceRoller app.json5 的模板默认值曾因此成了 v2 断点后的「归属未知」)
+                    st.versions[-1].content = snap
+                    st.versions[-1].sealed = True
+                    s.content = snap
+                    s.interval_base = snap
+                    self_read_version = len(st.versions)
                 elif st.versions:
                     # 盲写/miss 之后的重锚:实录外的状态由观测揭示
                     add_version(st, e, OUTBAND, "outband", snap,
@@ -646,11 +656,13 @@ def build_fix_chains(
         gen_ids: list[str]
         if origins:
             from_rows: list[dict[str, Any]] = [
-                {"id": k, "desc": str(meta_of(k).get("desc") or k)[:40], "n": n}
+                {"id": k, "desc": _origin_desc(k, meta_of), "n": n}
                 for k, n in sorted(origins.items(), key=lambda kv: -kv[1])]
             lines: dict[str, Any] | None = {"touched": touched, "from": from_rows,
                                             "other": other or None}
-            gen_ids = [str(r["id"]) for r in from_rows]
+            # 被修行的原作者可以是外部输入(模板默认值首见于 Read 之后就能归到它),但链的生成方只认 agent:
+            # 问「生成时为什么没改」要问生成期真写过它的那个
+            gen_ids = [str(r["id"]) for r in from_rows if r["id"] not in (EXTERNAL, OUTBAND)] or gen_agents
         else:
             lines = None
             gen_ids = gen_agents
@@ -759,6 +771,14 @@ def fix_period_touches(stories: dict[str, FileStory], *, root: str | None = None
             out.append({"path": path, "file": path.rsplit("/", 1)[-1], "by": t.by, "by_ver": t.by_ver,
                         "ts": t.ts, "seq": t.seq, "reason": t.reason, "has_versions": bool(st.versions)})
     return out
+
+
+def _origin_desc(k: str, meta_of: Any) -> str:
+    if k == EXTERNAL:
+        return "外部输入(模板/脚手架默认值)"
+    if k == OUTBAND:
+        return "实录外修改"
+    return str(meta_of(k).get("desc") or k)[:40]
 
 
 def _first_seen_writers(st: FileStory, vs: list[int]) -> list[str]:

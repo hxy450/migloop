@@ -44,6 +44,8 @@ file 原子末尾的「碰过它、方向不明的调用」与 sessions 末尾�
 被修的真文件可能只在这里露面(0723 修复真正改错值的 F012ViewModel.ets 就是修复方用 python heredoc 改的)。
 agent 工具给的每条动作/读取后面的 (#n) 是动作号;action(id, n) 返回那次工具调用的完整原始输入与输出
 (命令原文、grep 命中、cat 出来的全文、Read 到的内容)。摘要看不清时直接展开,不要猜。
+几万字的 think / 结果超过 max_chars 会截断并说明剩余多少:offset= 从第几字继续,find= 跳到关键词前
+—— 找决策句用它,别拿 search 撞。子 agent 的收尾全文在父会话那条派发调用的结果里(收尾行给了坐标)。
 读记录下的"看见 615: …"是从 stdout 对账出来的行:agent 在那次调用里确实看到了这一行。
 摘要只给前 3 行和全部行号,原文用 action(id, n) 拉 —— 两者是同一份信息,摘要只负责让你知道该展开哪次。
 读不一定是全文:每条读带范围标签([570-625行] / 看见的行 / 依赖读=内容没进上下文)。核一条读有两条路:
@@ -51,7 +53,8 @@ action(id, n) 是模型当时眼睛里看到的原始输出;file(path, v, conten
 第 v 版里那一段。两者对不上就是线索(实录外改动、就近绑定的版本)。
 **主会话动辄几百次调用,整个生命周期一次查会撑爆上下文**:查主会话一律带窗口
 agent(id, v, since=v-1),只看喂养第 v 版的输入;子 agent 通常几十次调用,整段给 —— 它早期版本读的
-spec 常常就是后来写错的根源,别只看写那一版的窗口。
+spec 常常就是后来写错的根源,别只看写那一版的窗口。主会话一版之内也可能读几十个不相干的文件:问「它写这份
+spec 时凭什么」用 search(q, agent=主会话, v=那一版) 按词切,不要用窗口硬看。
 
 ## search:带起点的按词查找
 `search(sid, q, agent=id或名字, v=, since=)` 只在这个 agent 喂养第 v 版及之前的记录里找:派发词、读到的内容、写入内容、
@@ -67,14 +70,20 @@ spec 常常就是后来写错的根源,别只看写那一版的窗口。
    (.ets/.ts/.js/.json5/.cpp/.h 与 resources/** 下的 .json;spec/docs/构建产物/测试目录不算),三种:
    rework(生成过又被改,问为什么被改)/ created(修复期新建,问为什么生成期没有它)/
    template(模板或外部原样留到修复期才改,问为什么生成期没改它)。
+   created 链先问三件事:baseline 里有没有这一页(index(query=, kind=spec))、有没有派发词把它列为输出
+   (search(q=文件名, agent=主会话, v=))、占位登记里有没有它(search(q=, file=placeholder-registry.md));三问全否 = 无人被指派。
 2. diff(path, v_fix) 看修复到底改了什么;blame(path, v_fix, changed=True) 直接列出修复版替换/删除的
-   那些行及其引入者(owner@since_v)—— 不必对整个文件做 blame。
+   那些行及其引入者(owner@since_v)—— 不必对整个文件做 blame。某一行是谁写的用 blame(path, v, start=行号, n=1)。
+   file(path, v, diff=1) 只给第 v 版的 diff。
 3. agent(owner_id, since_v) 看引入者写那一版时手里有什么:派发词、读过哪些 spec/源码(版本、
    行段、是否旧版)、收件箱有没有改指令。对比修复方 agent 的读取集,找"该读没读"。
 4. 顺着 file(读到的 spec@v) 往上游走,直到找到最早出问题的环节。
 
 ## 结论要求
-定性六类之一并给证据:spec 写错 / 读了旧版 / 漏读(相对修复方的读取集)/ 转换错(读全了仍写错)/
+报告写成整条链:每环「谁、凭什么(坐标)、判定」,判定只有三种 —— 传递 / 错 / 缺(传递=照上游做的;错=有好的输入没用或
+用错;缺=输入里本来就没有)。追到池外输入、批量生成的脚本或技能定义为止,停在中间要说明为什么;指出故障进入点(第一个
+「错」或「缺」所在的环),以及修复侧比生成侧多看到了什么(类型:真机 dump / 截图 / 编译输出 / 接口探测 / 授权口径 / 晚出生的
+现成件)。「错」的细分仍用这六类词:spec 写错 / 读了旧版 / 漏读(相对修复方的读取集)/ 转换错(读全了仍写错)/
 closer 或后续写者破坏 / 源码没读全。每条证据带 `path@v` 或 `agent v` 引用。
 边界:账本里只有**被读过**的安卓源码,从没人读过的文件不存在;标签是线索,盲写/脚本落盘的
 版本内容可能未知,如实说"无法确认"。
@@ -173,11 +182,12 @@ def build_server(backend: Any | None = None) -> Any:
                                         since_ts=since_ts, until_ts=until_ts, root=cwd)
 
     @srv.tool()
-    async def action(sid: str, id: str, seq: int, max_chars: int = 20000) -> str:
+    async def action(sid: str, id: str, seq: int, max_chars: int = 20000, offset: int = 0, find: str = "") -> str:
         """展开 agent 某一次工具调用的完整原始输入与输出(agent 工具时间线里的 #n 就是 seq)。
-        账本是实录的索引,任何摘要不够看时用它拿原文,信息不会丢。"""
+        账本是实录的索引,任何摘要不够看时用它拿原文,信息不会丢。输出超过 max_chars 会截断并说明剩余多少:
+        offset= 从第几字继续,find= 直接跳到关键词前(长 think 里找决策句用它,别拿 search 撞)。"""
         ledger, _cwd = await _ctx(sid)
-        return atoms_text.render_action(ledger, id, seq, max_chars=max_chars)
+        return atoms_text.render_action(ledger, id, seq, max_chars=max_chars, offset=offset, find=find)
 
     return srv
 

@@ -39,3 +39,4 @@
 - `metrics-tools-after.json`:逐根费用、轮次、token、调用序列。`judge/tools-after_vs_raw.json`:与 §4.8 原始组报告的盲评。
 - `harness/`:`tool_mix.py`(按工具用量)、`size_probe.py`(agent 视图体量)、`search_probe.py`(0723 四个带起点查找)、
   `index_gap.py`(转录 vs 账本覆盖对账)、`fake_v1.py` / `external_probe4.py` / `external_pointers.py`(假 v1 / 幽灵路径 / 外部输入指针)、`run_probe.py`。脚本里有本机绝对路径。
+- 2026-09-07-handson/ — 四根子代理只用工具亲手追链(DiceRoller app.json5 / Index.ets,0723 PreferenceKeys / WXEntryAbility):规程、四份链报告与工具体验日志;对应 fixchain-research.md §4.11

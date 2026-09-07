@@ -119,6 +119,8 @@ def render_index(ledger: atoms.Ledger, kind: str | None = None, query: str | Non
             else:
                 tag = f"{f['n_versions']} 版 · 只被读过(外部输入)"
             touch = f" · 碰过 {f['n_touches']}" if f.get("n_touches") else ""
+            if f.get("n_unknown"):
+                touch += f" · {f['n_unknown']} 版内容未知(按词查文件查不到这些版)"
             out.append(f"- {rel(f['path'], root)} | {f['kind']} | {tag} · 读 {f['n_reads']}{touch}")
         if len(fs) > limit:
             out.append(f"  …还有 {len(fs) - limit} 个,用 query/kind 缩小")
@@ -178,8 +180,13 @@ def render_file(ledger: atoms.Ledger, hint: str, v: int | None = None, root: str
         ptr = " " + _ref(vv["seq"], None, lines.get(vv["seq"])) if vv.get("seq") is not None else ""
         out.append(f"- v{vv['v']} ← {_who(ledger, vv['by'], vv['by_ver'])} | {vv['ts'][5:16]} {vv.get('t') or ''} | "
                    f"{vv['diff_kind']}" + (" · " + " · ".join(extra) if extra else "") + ptr + mark)
-        if diff and vv.get("diff"):
-            out.append("```diff\n" + _clip(vv["diff"], 6000) + "\n```")
+        if diff and vv.get("diff") and vv["v"] == anchor:
+            if vv.get("diff_kind") == "creation" and content:
+                out.append("(创建版:diff 即全文,见下面「内容」)")
+            else:
+                out.append("```diff\n" + _clip(vv["diff"], 6000) + "\n```")
+    if diff and anchor > 1:
+        out.append("(只给第 v 版的 diff;其它版本用 diff(path, v))")
     rlist = [r for r in fa["readers"] if r["v"] == anchor]
     if not readers:
         out.append(f"## 读者 {len(rlist)} 个(下游;readers=1 展开;按词找用 search(file=))")
@@ -223,6 +230,10 @@ def _seen_suffix(r: dict[str, Any]) -> str:
         return ""
     nums = ", ".join(str(ln) for ln, _t in seen[:20])
     return f" [行号 {nums}{'…' if len(seen) > 20 else ''}]"
+
+
+def _vtag(r: dict[str, Any]) -> str:
+    return f"@v{r['v']}" if r.get("v") is not None else "(图片,不立版本)"
 
 
 def render_agent(ledger: atoms.Ledger, agent_id: str, v: int | None = None,
@@ -275,6 +286,8 @@ def render_agent(ledger: atoms.Ledger, agent_id: str, v: int | None = None,
         slot["eff" if a["ver"] is not None else "inp"].append(a)
     reads_by_at: dict[int, list[dict[str, Any]]] = {}
     for r in ag["reads"]:
+        if r.get("via") == "inject":
+            continue          # 注入行已经点名了这份技能,SKILL.md 的读边留给 file() 的读者用
         reads_by_at.setdefault(r["at"], []).append(r)
     out.append("## 逐版时间线(每个对外效应 +1 版;读归到它喂养的下一版;(#n@L 行) 是动作号与转录行号,"
                "action(id, n) 可展开该次调用的完整输入输出;同一次调用读的文件合在一行)")
@@ -317,9 +330,9 @@ def render_agent(ledger: atoms.Ledger, agent_id: str, v: int | None = None,
                 ref = _ref(seq, grp[0].get("t"), lines.get(seq))
                 if len(grp) == 1:
                     r = grp[0]
-                    out.append(f"  读 {_short(r['path'], root)}@v{r['v']}{_read_tags(r)}{_seen_suffix(r)} {ref}")
+                    out.append(f"  读 {_short(r['path'], root)}{_vtag(r)}{_read_tags(r)}{_seen_suffix(r)} {ref}")
                 else:
-                    items = [f"{r['path'].rsplit('/', 1)[-1]}@v{r['v']}{_read_tags(r)}{_seen_suffix(r)}" for r in grp[:12]]
+                    items = [f"{r['path'].rsplit('/', 1)[-1]}{_vtag(r)}{_read_tags(r)}{_seen_suffix(r)}" for r in grp[:12]]
                     more = f" …共 {len(grp)} 个" if len(grp) > 12 else ""
                     out.append(f"  读 {len(grp)} 个文件 {ref}: " + ", ".join(items) + more)
                 if seen:
@@ -330,6 +343,14 @@ def render_agent(ledger: atoms.Ledger, agent_id: str, v: int | None = None,
                         if len(sl) > 3:
                             out.append(f"      …共 {len(sl)} 行;action(#{r['seq']}) 展开原文")
         others = [a for a in slot["inp"] if a["kind"] not in ("read", "inbox")]
+        injects = [a for a in others if a["kind"] == "inject"]
+        if len(injects) > 3:
+            # 被灌 17 份技能就是 17 行,与本链有关的多半只有一份:折成一行点名,action 展开各份
+            names = ", ".join(str(a["detail"].get("skill") or "?") for a in injects)
+            first = injects[0]
+            out.append(f"  注入技能 {len(injects)} 份: {names} "
+                       + _ref(first["seq"], first.get("t"), lines.get(first["seq"])))
+            others = [a for a in others if a["kind"] != "inject"]
         for a in others:
             d = a["detail"]
             ref = _ref(a["seq"], a.get("t"), lines.get(a["seq"]))
@@ -349,13 +370,40 @@ def render_agent(ledger: atoms.Ledger, agent_id: str, v: int | None = None,
     if ag["result"] and ag["result"]["text"] and (v is None or anchor >= ag["n_versions"]):
         says = [a for a in ag["actions"] if a["kind"] == "say"]
         ref = " " + _ref(says[-1]["seq"], says[-1].get("t"), lines.get(says[-1]["seq"])) if says else ""
-        out.append(f"## 收尾输出(锚点之后,非因果证据){ref} —— action 展开全文\n"
+        par = ag.get("parent") or {}
+        # 收尾全文在父会话那条派发调用的结果里,子自己的 say 往往只是最后一句
+        where = (f"action({par['id']}, {par['seq']}) 展开全文(父会话派发调用的结果)" if par.get("seq")
+                 else "action 展开全文")
+        out.append(f"## 收尾输出(锚点之后,非因果证据){ref} —— {where}\n"
                    + _clip(" ".join(str(ag["result"]["text"]).split()), 300))
     return "\n".join(out)
 
 
-def render_action(ledger: atoms.Ledger, agent_id: str, seq: int, max_chars: int = 20000) -> str:
-    """一次工具调用的原始输入输出 —— 账本是实录的索引,这里按指针展开原文,不经摘要。"""
+def _window(text: str, cap: int, offset: int = 0, find: str = "") -> tuple[str, str]:
+    """长原文取一段:find 给了就跳到关键词前 200 字;截断处明说剩多少、offset 多少继续 —— 静默前缀截断会让人
+    误以为看到了全文(DiceRoller think #4218 有 9.8 万字,决策句在 2 万字之后)。"""
+    total = len(text)
+    note = ""
+    if find:
+        pos = text.find(find, max(offset, 0))
+        if pos < 0:
+            note = f"「{find}」在第 {offset} 字之后未命中;"
+        else:
+            offset = max(0, pos - 200)
+    offset = max(0, min(offset, total))
+    piece = text[offset:offset + cap]
+    end = offset + len(piece)
+    if offset == 0 and end == total:
+        return piece, note.rstrip(";")
+    rest = total - end
+    note += f"第 {offset + 1}-{end} 字 / 共 {total} 字" + (f";剩余 {rest} 字,offset={end} 继续" if rest else "")
+    return piece, note
+
+
+def render_action(ledger: atoms.Ledger, agent_id: str, seq: int, max_chars: int = 20000,
+                  offset: int = 0, find: str = "") -> str:
+    """一次工具调用的原始输入输出 —— 账本是实录的索引,这里按指针展开原文,不经摘要。
+    offset / find 只作用于输出(长 think / 长结果);输入仍取前 max_chars/3。"""
     import json
 
     raw = atoms.action_raw(ledger, agent_id, seq)
@@ -366,8 +414,15 @@ def render_action(ledger: atoms.Ledger, agent_id: str, seq: int, max_chars: int 
             + (f" · 效应 v{raw['ver']}" if raw["ver"] is not None else f" · 喂 v{raw['at']}"))
     inp = raw["input"]
     inp_text = inp if isinstance(inp, str) else json.dumps(inp, ensure_ascii=False, indent=1)
-    out = [head, "## 输入", "```", _clip(inp_text, max_chars // 3), "```",
-           "## 输出", "```", _clip(raw["output"] or "(空)", max_chars), "```"]
+    if raw["output"]:
+        in_piece, in_note = _clip(inp_text, max_chars // 3), ""
+        piece, note = _window(raw["output"], max_chars, offset, find)
+    else:
+        # think / say / 派发词:正文在输入侧,输出为空 —— offset / find 作用在这一侧
+        in_piece, in_note = _window(inp_text, max_chars, offset, find)
+        piece, note = "(空)", ""
+    out = [head, "## 输入" + (f"({in_note})" if in_note else ""), "```", in_piece, "```",
+           "## 输出" + (f"({note})" if note else ""), "```", piece, "```"]
     tur = raw.get("tool_use_result")
     if isinstance(tur, dict) and isinstance(tur.get("file"), dict):
         f = tur["file"]
@@ -509,16 +564,29 @@ def render_chains(payload: dict[str, Any], root: str = "", file: str | None = No
                 # 修复方写第一笔修复之前读的单:这是「凭什么改」的直接指针,比它的收尾摘要有信息
                 items = ", ".join(f"{b['file']}" for b in ff["basis"][:6]) + (" …" if len(ff["basis"]) > 6 else "")
                 ref = _ref(ff["basis"][0]["seq"], None, ff["basis"][0].get("line"))
-                out.append(f"  依据({ff.get('desc')}): 写第一笔修复前读了 {items} {ref}")
-                # 修复侧比生成侧多看到的:单是谁写的、那人写单前看的是哪一类证据 —— 生成期缺的那类反馈
+                other = f" · 窗口内另 {ff['basis_other']} 张单与本文件无关" if ff.get("basis_other") else ""
+                out.append(f"  依据({ff.get('desc')}): 写第一笔修复前读了 {items} {ref}{other}")
+                # 单的来历:修复方读到的那一版是谁写的、那人写单前看的是哪一类证据(真机 dump / 截图 …)。
+                # 这不是差集 —— 生成方可能读过同一版;真差集在下面「修复方读了而生成方没读」
                 saw = []
                 for b in ff["basis"][:4]:
                     if b.get("writer"):
                         ev = "、".join(f"{k} {n}" for k, n in (b.get("evidence") or {}).items()) or "来源未记"
-                        saw.append(f"{b['file']} ← {b.get('writer_name') or b['writer']} {b.get('writer_how') or '写'}"
+                        saw.append(f"{b['file']}@v{b.get('v')} ← {b.get('writer_name') or b['writer']} {b.get('writer_how') or '写'}"
                                    + (f"(#{b['writer_seq']})" if b.get("writer_seq") else "") + f",此前看了 {ev}")
                 if saw:
-                    out.append("  修复侧多看到的: " + " · ".join(saw))
+                    out.append("  依据单的来历: " + " · ".join(saw))
+            gap = ff.get("read_gap")
+            if gap:
+                parts = []
+                for kind, paths in gap.items():
+                    counts: dict[str, int] = {}
+                    for p in paths:
+                        counts[p.rsplit("/", 1)[-1]] = counts.get(p.rsplit("/", 1)[-1], 0) + 1
+                    names = ", ".join(f"{nm} ×{n}" if n > 1 else nm for nm, n in list(counts.items())[:3])
+                    parts.append(f"{kind} {names}" + (f" …共 {len(counts)}" if len(counts) > 3 else ""))
+                mixed = "(窗口内混有别的文件的读,看类型别看单个文件)" if ff.get("basis_other") else ""
+                out.append("  修复方读了而生成方没读: " + " · ".join(parts) + mixed)
             elif ff.get("note"):
                 out.append(f"  修因({ff.get('desc')}): {_clip(ff['note'], 200)}")
     if touched:
