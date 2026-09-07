@@ -53,6 +53,13 @@ action(id, n) 是模型当时眼睛里看到的原始输出;file(path, v, conten
 agent(id, v, since=v-1),只看喂养第 v 版的输入;子 agent 通常几十次调用,整段给 —— 它早期版本读的
 spec 常常就是后来写错的根源,别只看写那一版的窗口。
 
+## search:带起点的按词查找
+`search(sid, q, agent=id或名字, v=, since=)` 只在这个 agent 喂养第 v 版及之前的记录里找:派发词、读到的内容、写入内容、
+命令与结果、它自己说的话、收件、注入的技能。命中按种类分组,每条带 (#n@L行)、喂哪一版、下一跳(file / diff / action)。
+锚点之后的命中只计数,不混进因果;范围内零命中是可引用的否定证据。派发者后来说的话用 since_ts / until_ts
+(文件时间线上两个版本的时刻)做区间。`search(sid, q, file=path, v=)` 查这个词第一次出现在第几版、谁写的,以及哪些
+读者的读结果里命中过。没有起点的 search 不存在:提到过一个词不等于在这条链的上游,每一跳都要有账本里的边。
+
 ## 建议的调查路径
 1. sessions(sid, file=目标文件) 看那条返修链:被修文件、修复方(按先后分段,各段文件版本与时刻)、被修行数与
    ★ 原作者、修因。查一条链就带 file;不带 file 是全部链的总览。链根只认工程根目录下的代码与配置
@@ -150,6 +157,18 @@ def build_server(backend: Any | None = None) -> Any:
         """某一版的 unified diff(相对前一已知版)。"""
         ledger, cwd = await _ctx(sid)
         return atoms_text.render_diff(ledger, path, v, root=cwd)
+
+    @srv.tool()
+    async def search(sid: str, q: str, agent: str | None = None, v: int | None = None,
+                     since: int | None = None, file: str | None = None, after: bool = False,
+                     since_ts: str | None = None, until_ts: str | None = None) -> str:
+        """带起点的按词查找。agent=(id 或名字)+ v / since:只看它喂养第 v 版及之前的记录(派发词、读到的内容、
+        写入、命令与结果、自述、收件、注入技能),命中按种类分组、带 (#n@L行) 与下一跳;锚点之后的只计数(after=True 才列)。
+        since_ts / until_ts:按时间区间查派发者(用文件时间线上两个版本的时刻)。file=(+ v):这个词首次出现在第几版、
+        谁写的,哪些读者的读结果命中过。必须带 agent= 或 file=,不做全池搜索。"""
+        ledger, cwd = await _ctx(sid)
+        return atoms_text.render_search(ledger, q, agent=agent, v=v, since=since, file=file, after=after,
+                                        since_ts=since_ts, until_ts=until_ts, root=cwd)
 
     @srv.tool()
     async def action(sid: str, id: str, seq: int, max_chars: int = 20000) -> str:

@@ -516,3 +516,86 @@ def _vrange(vs: list[int]) -> str:
         else:
             runs.append((v, v))
     return ",".join(f"v{a}" if a == b else f"v{a}-{b}" for a, b in runs)
+
+
+_SEARCH_KIND = {"prompt": "派发词", "read": "读", "write": "写", "delete": "删", "say": "说", "think": "想",
+                "inbox": "收件", "instruction": "指令", "inject": "注入技能", "system": "系统提示", "notify": "通知",
+                "interrupt": "打断", "dispatch": "派发", "message": "发消息", "other": "命令", "skill": "技能",
+                "compact": "压缩摘要"}
+
+
+def _next_hint(h: dict[str, Any], root: str) -> str:
+    """每条命中带下一跳:模型只能顺着账本里的边走,跳不出去。"""
+    if h["kind"] == "prompt":
+        return "→ agent(派发者, since=派发时的版本) 看它凭什么这么派"
+    if h["kind"] == "read" and h.get("target"):
+        return f"→ file({rel(h['target'], root)}, v={h.get('target_v')}) 看这一版是谁写的;action(#{h['seq']}) 看它读到的原文"
+    if h["kind"] in ("write", "delete") and h.get("target"):
+        return f"→ diff({rel(h['target'], root)}, v={h.get('target_v')}) / blame 看这几行的归属"
+    if h["kind"] == "inbox":
+        return "→ agent(来信的 agent) 看它凭什么这么说"
+    return f"→ action(#{h['seq']}) 展开原文"
+
+
+def render_search(ledger: atoms.Ledger, q: str, agent: str | None = None, v: int | None = None,
+                  since: int | None = None, file: str | None = None, after: bool = False,
+                  since_ts: str | None = None, until_ts: str | None = None, root: str = "") -> str:
+    """带起点的按词查找。agent=:只看它喂养第 v 版及之前的记录(或 since_ts/until_ts 时间区间);
+    file=:只看它到第 v 版为止的内容和读者。没有起点不搜 —— 「提到过」不等于「上游」,每一跳都要有账本里的边。"""
+    if not agent and not file:
+        return ("search 必须带起点:agent=(可带 v / since,或 since_ts / until_ts 时间区间)或 file=(可带 v)。"
+                "不做全池搜索 —— 提到过一个词不等于在这条链的上游;要找谁提过某个名字用 index(query=)。")
+    if agent:
+        res = atoms.search_agent(ledger, agent, q, v, since, after, since_ts, until_ts)
+        if res is None:
+            return f"账本里没有该 agent: {agent}"
+        scope = (f"时间区间 {since_ts or '…'} ~ {until_ts or '…'}" if (since_ts or until_ts)
+                 else f"≤ v{res['v']}" + (f"(窗口 v{since + 1}–v{res['v']})" if since is not None else ""))
+        out = [f"# search 「{q}」 in agent {res['label']}  {scope}  命中 {len(res['hits'])} 条记录"]
+        groups: dict[str, list[dict[str, Any]]] = {}
+        for h in res["hits"]:
+            groups.setdefault(h["kind"], []).append(h)
+        for kind, hs in groups.items():
+            out.append(f"## {_SEARCH_KIND.get(kind, kind)}({len(hs)})")
+            for h in hs[:20]:
+                where = ""
+                if h["kind"] in ("read", "write", "delete") and h.get("target"):
+                    where = f" {rel(h['target'], root)}@v{h.get('target_v')}"
+                elif h.get("targets"):
+                    where = " " + ", ".join(rel(p, root) for p in h["targets"][:3])
+                fed = "" if h["seq"] is None else (f" 效应 v{h['ver']}" if h["ver"] is not None else f" 喂 v{h['at']}")
+                late = " (锚点之后)" if h.get("after") else ""
+                ref = "" if h["seq"] is None else " " + _ref(h["seq"], h.get("t"), h.get("line"))
+                out.append(f"- {_SEARCH_KIND.get(kind, kind)}{where}{fed}{late}{ref} · 命中 {h['n']} 行"
+                           f"  {_next_hint(h, root)}")
+                for ln, snip in h["snips"]:
+                    out.append(f"    {'第 ' + str(ln) + ' 行: ' if ln else ''}{snip}")
+            if len(hs) > 20:
+                out.append(f"  …还有 {len(hs) - 20} 条")
+        if res["excluded_after"]:
+            out.append(f"锚点之后另有 {res['excluded_after']} 条命中(非因果;after=True 可看)")
+        if not res["hits"]:
+            out.append("(范围内没有命中 —— 这是可引用的否定证据:它在写这一版之前没见过这个词)")
+        return "\n".join(out)
+    res2 = atoms.search_file(ledger, str(file), q, v)
+    if res2 is None:
+        return f"账本里没有该文件: {file}"
+    out = [f"# search 「{q}」 in file {rel(res2['path'], root)}  ≤ v{res2['v']}(共 {res2['n_versions']} 版)"]
+    if res2["first"] is None:
+        out.append("这些版本的已知内容里没有这个词(内容未知的版本查不了)")
+    else:
+        out.append(f"首次出现: v{res2['first']}")
+    for row in res2["versions"]:
+        ref = " " + _ref(row["seq"], row.get("t"), row.get("line")) if row.get("seq") else ""
+        out.append(f"- v{row['v']} ← {_who(ledger, row['by'], row['by_ver'])}{ref} · 命中 {row['n']} 行"
+                   f"  → blame(v={row['v']}) / agent(写者, since=写它之前的版本)")
+        for ln, snip in row["snips"]:
+            out.append(f"    第 {ln} 行: {snip}")
+    if res2["readers"]:
+        out.append(f"## 读者的读结果里命中过({len(res2['readers'])})")
+        for r in res2["readers"]:
+            ref = " " + _ref(r["seq"], r.get("t"), r.get("line")) if r.get("seq") else ""
+            out.append(f"- {_who(ledger, r['by'], r['at'])} 读 @v{r['v']}{ref} · 命中 {r['n']} 行")
+            for ln, snip in r["snips"]:
+                out.append(f"    第 {ln} 行: {snip}")
+    return "\n".join(out)

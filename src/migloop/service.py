@@ -424,6 +424,13 @@ def atom_text(path: str, tool: str, args: dict[str, Any]) -> str:
                                        changed=_flag(args, "changed", "0"))
     if tool == "diff" and args.get("path") and args.get("v") is not None:
         return atoms_text.render_diff(ledger, str(args["path"]), int(args["v"]), root=cwd)
+    if tool == "search" and args.get("q"):
+        return atoms_text.render_search(ledger, str(args["q"]), agent=args.get("agent") or args.get("id") or None,
+                                        v=_opt_int(args, "v"), since=_opt_int(args, "since"),
+                                        file=args.get("file") or args.get("path") or None,
+                                        after=_flag(args, "after", "0"),
+                                        since_ts=args.get("since_ts") or None, until_ts=args.get("until_ts") or None,
+                                        root=cwd)
     if tool == "action" and args.get("id") and args.get("seq") is not None:
         return atoms_text.render_action(ledger, str(args["id"]), int(args["seq"]))
     raise ValueError(f"未知工具或缺参数: {tool}")

@@ -1510,3 +1510,62 @@ def test_render_agent_inbox_as_index_lines(tmp_path: Any) -> None:
     led = _ledger(tmp_path, main)
     text = atoms_text.render_agent(led, MAIN_ID, root="/proj")
     assert "来自 w0" in text and "done 0" in text and text.count("正文") < 300
+
+
+# ═══════════════ 第 4 步:带起点的 search ═══════════════
+
+def test_search_agent_is_anchored_and_grouped(tmp_path: Any) -> None:
+    """原始组 38% 的调用是「这个词出现在这个 agent 的哪些记录里」,再往前翻几条记录。我们的版本是带起点的:
+    只看喂养第 v 版及之前的记录,派发词 / 读到的内容 / 写入内容 / 命令 / 结果 / 自述都查,按种类分组,
+    每条带动作号、喂哪一版、下一跳;锚点之后的单列计数,不混进因果。"""
+    sub = [_rec("2026-01-01T00:00:00Z", "user", "底部导航深色背景 #202022,选中 #5B3CFF"),
+           *_read_call("2026-01-01T00:00:10Z", "r1", "/proj/activity_home.xml",
+                       '<LinearLayout\n  android:background="@color/white"\n/>\n'),
+           _rec("2026-01-01T00:00:20Z", "assistant", [{"type": "text", "text": "源布局是白底,但我决定按派发词用深色"}]),
+           *_call("2026-01-01T00:00:30Z", "w1", "Write", {"file_path": "/proj/HomePage.ets", "content": "// 深色底栏 #202022\n"},
+                  "File created successfully at: /proj/HomePage.ets"),
+           *_read_call("2026-01-01T00:00:40Z", "r2", "/proj/other.xml", "white again\n")]
+    main = [*_call("2026-01-01T00:00:00Z", "m1", "Agent", {"name": "conv-home", "prompt": "转换首页"}, "done",
+                   toolUseResult={"agentId": "a1"})]
+    led = _ledger(tmp_path, main, {"agent-a1": sub})
+    res = atoms.search_agent(led, "conv-home", "white", v=1)
+    assert res is not None and res["excluded_after"] == 1                     # v1 之后那次读不算
+    hit = next(h for h in res["hits"] if h["kind"] == "read")
+    assert hit["target"] == "/proj/activity_home.xml" and hit["snips"][0][0] == 2   # 命中在读到内容的第 2 行
+    txt = atoms_text.render_search(led, "white", agent="conv-home", v=1, root="/proj")
+    assert "activity_home.xml@v1" in txt and "第 2 行" in txt and "锚点之后另有 1 条" in txt and "file(" in txt
+    txt2 = atoms_text.render_search(led, "#202022", agent="conv-home", root="/proj")
+    assert "派发词" in txt2 and "写 HomePage.ets@v1" in txt2
+    txt3 = atoms_text.render_search(led, "决定", agent="conv-home", root="/proj")
+    assert "说" in txt3 and "决定按派发词" in txt3
+
+
+def test_search_agent_time_window_for_dispatcher(tmp_path: Any) -> None:
+    """派发者后来说的话(主会话 FV-1 时的「这是我的执行疏漏」)在转换器的版本窗口之外,但在文件时间线上:
+    用文件两个版本的时刻做区间来查,不给整段。"""
+    main = [*_call("2026-01-01T00:00:00Z", "t1", "Write", {"file_path": "/proj/a.ets", "content": "x\n"},
+                   "File created successfully at: /proj/a.ets"),
+            _rec("2026-01-01T01:00:00Z", "assistant", [{"type": "text", "text": "icon 自愈没跑,这是我的执行疏漏"}]),
+            *_call("2026-01-01T02:00:00Z", "t2", "Write", {"file_path": "/proj/a.ets", "content": "y\n"}, "ok")]
+    led = _ledger(tmp_path, main)
+    res = atoms.search_agent(led, MAIN_ID, "疏漏", since_ts="2026-01-01T00:00:00Z", until_ts="2026-01-01T02:00:00Z")
+    assert res is not None and [h["kind"] for h in res["hits"]] == ["say"]
+    assert not atoms.search_agent(led, MAIN_ID, "疏漏", since_ts="2026-01-01T00:00:00Z", until_ts="2026-01-01T00:30:00Z")["hits"]
+
+
+def test_search_file_first_appearance_and_reader_hits(tmp_path: Any) -> None:
+    """这个词第一次出现在第几版、谁写的;哪些读者的读结果里命中过它 —— blame 只回答给定版本的行归属,回答不了首次出现。"""
+    main = [*_call("2026-01-01T00:00:00Z", "w1", "Write", {"file_path": "/proj/spec/p.md", "content": "a\n"},
+                   "File created successfully at: /proj/spec/p.md"),
+            *_call("2026-01-01T00:01:00Z", "w2", "Write", {"file_path": "/proj/spec/p.md", "content": "a\nappName from label\n"}, "ok"),
+            *_call("2026-01-01T00:02:00Z", "g1", "Bash", {"command": "grep -n appName /proj/spec/p.md"}, "2:appName from label")]
+    led = _ledger(tmp_path, main)
+    res = atoms.search_file(led, "p.md", "appName")
+    assert res is not None and res["first"] == 2 and [x["v"] for x in res["versions"]] == [2]
+    txt = atoms_text.render_search(led, "appName", file="p.md", root="/proj")
+    assert "首次出现: v2" in txt and "第 2 行" in txt and "读者" in txt
+
+
+def test_search_requires_anchor(tmp_path: Any) -> None:
+    led = _ledger(tmp_path, [])
+    assert "必须带起点" in atoms_text.render_search(led, "x", root="/proj")

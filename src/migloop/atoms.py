@@ -640,3 +640,178 @@ def agent_atom(ledger: Ledger, agent_id: str, v: int | None = None,
         "reads": reads, "writes": writes, "actions": timeline,
         "result": {"text": a.result, "after_anchor": True} if a.result else None,
     }
+
+
+# ═══════════════ 带起点的 search ═══════════════
+
+_TRANSCRIPT_CACHE: dict[str, list[str]] = {}
+
+
+def _transcript_lines(path: str) -> list[str]:
+    """整份转录按行缓存(最多 4 份):search 先用子串在原始行上粗筛,命中的才解析 JSON。"""
+    lines = _TRANSCRIPT_CACHE.get(path)
+    if lines is None:
+        with open(path, encoding="utf-8", errors="ignore") as fh:
+            lines = fh.read().split("\n")
+        if len(_TRANSCRIPT_CACHE) >= 4:
+            _TRANSCRIPT_CACHE.pop(next(iter(_TRANSCRIPT_CACHE)))
+        _TRANSCRIPT_CACHE[path] = lines
+    return lines
+
+
+def _record_texts(rec: dict[str, Any], act: Action) -> dict[str, str]:
+    """一条记录里可搜的文本,按字段:input(工具输入)/ output(工具输出,Read 的用边车里的全文按行号排)/
+    text(正文、指令、收件、注入…)/ thinking。"""
+    out: dict[str, str] = {}
+    msg = rec.get("message") or {}
+    content = msg.get("content")
+    blocks = content if isinstance(content, list) else (
+        [{"type": "text", "text": content}] if isinstance(content, str) else [])
+    texts: list[str] = []
+    thinks: list[str] = []
+    for b in blocks:
+        if not isinstance(b, dict):
+            continue
+        t = b.get("type")
+        if t == "tool_use" and (act.tuid is None or b.get("id") == act.tuid):
+            out["input"] = json.dumps(b.get("input"), ensure_ascii=False)
+        elif t == "tool_result" and (act.tuid is None or b.get("tool_use_id") == act.tuid):
+            out["output"] = _text_of(b.get("content"))
+        elif t == "text":
+            texts.append(str(b.get("text") or ""))
+        elif t == "thinking":
+            thinks.append(str(b.get("thinking") or ""))
+    tur = rec.get("toolUseResult")
+    if isinstance(tur, dict) and isinstance(tur.get("file"), dict) and isinstance(tur["file"].get("content"), str):
+        start = int(tur["file"].get("startLine") or 1)
+        out["output"] = "\n".join(f"{start + i}\t{ln}" for i, ln in enumerate(tur["file"]["content"].split("\n")))
+    if texts:
+        out["text"] = "\n".join(texts)
+    if thinks:
+        out["thinking"] = "\n".join(thinks)
+    return out
+
+
+_NUMBERED = re.compile(r"^\s*(\d+)[\t:→|]")
+
+
+def _snips(text: str, ql: str, cap: int = 3) -> tuple[list[tuple[int | None, str]], int]:
+    """命中的行(带行号前缀的取行号)前 cap 条 + 总命中行数。"""
+    snips: list[tuple[int | None, str]] = []
+    n = 0
+    for ln in text.split("\n"):
+        if ql not in ln.lower():
+            continue
+        n += 1
+        if len(snips) < cap:
+            m = _NUMBERED.match(ln)
+            snips.append((int(m.group(1)) if m else None, _WS.sub(" ", ln).strip()[:160]))
+    return snips, n
+
+
+def search_agent(ledger: Ledger, agent_id: str, q: str, v: int | None = None, since: int | None = None,
+                 after: bool = False, since_ts: str | None = None,
+                 until_ts: str | None = None) -> dict[str, Any] | None:
+    """在一个 agent 的记录里找词,只看喂养第 v 版及之前的(since 给了只看 (since, v]);派发者可改用时间区间
+    since_ts / until_ts(由文件时间线上的两个版本给出)。锚点之后的命中只计数(after=True 才列),不混进因果。
+    命中的字段按记录种类:工具动作看 input / output,说 / 想看正文,指令 / 收件 / 注入看文本。"""
+    a = resolve_agent(ledger, agent_id)
+    if a is None:
+        return None
+    ql = q.lower()
+    n = a.n_versions
+    anchor = n if v is None else max(0, min(v, n))
+    hits: list[dict[str, Any]] = []
+    excluded = 0
+    if a.prompt and ql in a.prompt.lower() and not (since_ts or until_ts):
+        snips, cnt = _snips(a.prompt, ql)
+        hits.append({"kind": "prompt", "tool": "prompt", "seq": None, "line": None, "at": 1, "ver": None,
+                     "ts": "", "t": "", "field": "text", "target": None, "snips": snips, "n": cnt})
+    for act in a.actions:
+        if act.src is None:
+            continue
+        k = act.ver if act.ver is not None else act.at
+        if since_ts or until_ts:
+            if (since_ts and act.ts < since_ts) or (until_ts and act.ts > until_ts):
+                continue
+            in_window = True
+        else:
+            in_window = (since is None or k > since) and k <= anchor
+        path, ui, ri = act.src
+        lines = _transcript_lines(path)
+        idxs = [ui] + ([ri] if ri is not None and ri != ui else [])
+        if not any(i is not None and i < len(lines) and ql in lines[i].lower() for i in idxs):
+            continue
+        if not in_window and not after:
+            excluded += 1
+            continue
+        fields: dict[str, str] = {}
+        for i in idxs:
+            if i is None or i >= len(lines) or ql not in lines[i].lower():
+                continue
+            try:
+                rec = json.loads(lines[i])
+            except Exception:
+                continue
+            for fld, text in _record_texts(rec, act).items():
+                if act.kind in ("say",) and fld != "text":
+                    continue
+                if act.kind == "think" and fld != "thinking":
+                    continue
+                if act.kind in ("inbox", "instruction", "inject", "system", "notify", "interrupt") and fld != "text":
+                    continue
+                if act.kind not in ("say", "think", "inbox", "instruction", "inject", "system", "notify", "interrupt") \
+                        and fld not in ("input", "output"):
+                    continue
+                if ql in text.lower():
+                    fields[fld] = text
+        for fld, text in fields.items():
+            snips, cnt = _snips(text, ql)
+            target = None
+            rs = [ref.path for ref in act.files if ref.op == "read"]
+            ws = [ref.path for ref in act.files if ref.op != "read"]
+            if fld == "output" and rs:
+                target = rs[0] if len(rs) == 1 else None
+            elif fld == "input" and ws:
+                target = ws[0]
+            hits.append({"kind": act.kind, "tool": act.tool, "seq": act.seq, "line": ledger.lines.get(act.seq),
+                         "at": act.at, "ver": act.ver, "ts": act.ts, "t": rel_time(act.ts, ledger.t0),
+                         "field": fld, "target": target,
+                         "targets": rs if fld == "output" else ws,
+                         "target_v": next((ref.v for ref in act.files if ref.path == target), None),
+                         "after": not in_window, "snips": snips, "n": cnt})
+    return {"agent": a.id, "label": _agent_label(ledger.agents, a.id) or a.id, "q": q, "v": anchor, "since": since,
+            "since_ts": since_ts, "until_ts": until_ts, "hits": hits, "excluded_after": excluded}
+
+
+def search_file(ledger: Ledger, hint: str, q: str, v: int | None = None) -> dict[str, Any] | None:
+    """在一个文件到第 v 版为止的内容里找词:哪几版含它(首次出现在第几版、谁写的),哪些读者的读结果里命中过。"""
+    path = find_story_path(ledger.stories, hint)
+    if path is None:
+        return None
+    st = ledger.stories[path]
+    ql = q.lower()
+    vers = st.versions if v is None else st.versions[:max(v, 0)]
+    rows = []
+    for ver in vers:
+        if ver.content is None or ql not in ver.content.lower():
+            continue
+        snips = []
+        for i, ln in enumerate(ver.content.split("\n"), 1):
+            if ql in ln.lower():
+                snips.append((i, _WS.sub(" ", ln).strip()[:160]))
+        rows.append({"v": ver.v, "by": ver.by, "by_ver": ver.by_ver, "seq": ver.act_seq,
+                     "line": ledger.lines.get(ver.act_seq or -1), "t": rel_time(ver.ts, ledger.t0),
+                     "snips": snips[:3], "n": len(snips)})
+    readers = []
+    for r in st.reads:
+        if not r.seen:
+            continue
+        got = [(ln, _WS.sub(" ", t).strip()[:160]) for ln, t in r.seen if ql in t.lower()]
+        if got:
+            seq = ledger.read_act.get((path, r.seq))
+            readers.append({"by": r.by, "at": ledger.feeds.get((path, r.seq)), "v": r.version,
+                            "seq": seq, "line": ledger.lines.get(seq or -1), "t": rel_time(r.ts, ledger.t0),
+                            "snips": got[:3], "n": len(got)})
+    return {"path": path, "q": q, "v": len(vers), "n_versions": len(st.versions),
+            "first": rows[0]["v"] if rows else None, "versions": rows, "readers": readers}
