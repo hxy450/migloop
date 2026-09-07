@@ -245,6 +245,10 @@ def _classify(seg: str, io: ShellIO) -> None:
     dot_ok = cmd in _READERS or cmd in _GREPPERS or cmd in ("sed", "awk", "diff")
     paths = [p for v, q in rest if (p := _path_of(v, q, dot_ok))]
 
+    if cmd == "touch":
+        # 建空文件也是写:0723 的 .keep / 占位文件因此成了「外部输入」
+        io.writes.extend(p for v, q in rest if (p := _path_of(v, q, True)))
+        return
     if cmd in _NEUTRAL:
         return
     if cmd in _READERS:

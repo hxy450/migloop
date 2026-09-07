@@ -195,6 +195,35 @@ def _fill_stages(agents: dict[str, AgentRec]) -> None:
                     ref.ev = replace(ref.ev, stage=act.stage)
 
 
+#: 不算实锤的读的来路:脚本字面量推断、stdout 反证 —— 只有它们支撑的路径可能是拼错的
+_NONAUTH = frozenset({"script", "stdout"})
+
+
+def _sweep_phantoms(stories: dict[str, FileStory]) -> None:
+    """脚本字面量按当时的 cwd 拼出来的路径(只有文件名 / 拼到别的目录下 / 路径段重复):0723 有 327 条。
+    判据:所有版本都是外部输入、所有读都来自脚本字面量,且同名文件另有真凭实据(工具读写过)。
+    这种 story 删掉,指针改挂到同名真文件上(唯一就说对上了,多个就都挂并说路径未定);
+    含正则元字符的直接丢。只有碰过、没有版本的幽灵一样处理。"""
+    auth: dict[str, list[str]] = {}
+    for path, st in stories.items():
+        if any(v.source != "external" for v in st.versions) or any(r.via not in _NONAUTH for r in st.reads):
+            auth.setdefault(path.rsplit("/", 1)[-1], []).append(path)
+    for path in list(stories):
+        st = stories[path]
+        if any(v.source != "external" for v in st.versions) or any(r.via not in _NONAUTH for r in st.reads):
+            continue
+        cands = [p for p in auth.get(path.rsplit("/", 1)[-1], []) if p != path]
+        regexy = bool(re.search(r"[\[\]()+\\]|\.\*", path))
+        if not cands and not regexy:
+            continue
+        reason = "脚本字面量或命令输出里提到(路径按文件名对上)" if len(cands) == 1 else "脚本字面量或命令输出里提到(同名多个,路径未定)"
+        moved = ([Touch(r.ts, r.seq, r.by, None, reason) for r in st.reads]
+                 + [Touch(t.ts, t.seq, t.by, t.by_ver, f"{reason};原记 {t.reason}", t.stage) for t in st.touches])
+        del stories[path]
+        for p in cands:
+            stories[p].touches.extend(moved)
+
+
 def build_ledger(agents: dict[str, AgentRec]) -> Ledger:
     for a in agents.values():
         _number(a)
@@ -202,6 +231,7 @@ def build_ledger(agents: dict[str, AgentRec]) -> Ledger:
     _fill_stages(agents)
     events = [ref.ev for a in agents.values() for act in a.actions for ref in act.files]
     stories = build_stories(events)
+    _sweep_phantoms(stories)
     index: dict[tuple[str, int], int] = {}
     certain: dict[tuple[str, int], bool] = {}
     for path, st in stories.items():
@@ -226,6 +256,28 @@ def build_ledger(agents: dict[str, AgentRec]) -> Ledger:
                 st = stories.setdefault(p, FileStory(p))
                 st.touches.append(Touch(act.ts, act.seq, a.id, act.ver if act.ver is not None else act.at,
                                         str(act.detail.get("unresolved") or "方向不明"), act.stage))
+            # 存在性守卫里探过的路径:文件当时可能不存在,只留指针
+            for p in act.detail.get("probed") or []:
+                st = stories.setdefault(p, FileStory(p))
+                st.touches.append(Touch(act.ts, act.seq, a.id, act.ver if act.ver is not None else act.at,
+                                        "存在性探测,内容未进上下文", act.stage))
+    # 目录级线索:建了目录 / --out 指到目录 / 脚本正文写着这个目录 的运行,该目录下首见即外部的文件挂
+    # 「可能由此次运行生成」—— 只看首见之前的运行(生成后几小时才被读是常态),最近的 3 次,不立版本不猜
+    runs_by_dir: dict[str, list[tuple[str, str, Action]]] = {}
+    for a in agents.values():
+        for act in a.actions:
+            for d in act.detail.get("out_dirs") or []:
+                runs_by_dir.setdefault(d.rstrip("/") + "/", []).append((act.ts, a.id, act))
+    if runs_by_dir:
+        for path, st in stories.items():
+            if not (st.versions and st.versions[0].source == "external"):
+                continue
+            cands = {r[2].seq: r for prefix, runs in runs_by_dir.items() if path.startswith(prefix)
+                     for r in runs if r[0] <= st.versions[0].ts}
+            # 嵌套目录(spec/baseline 与 spec/baseline/ui)各自的运行合在一起,只留最近的 3 次
+            for _ts, aid, act in sorted(cands.values(), key=lambda x: x[0])[-3:]:
+                st.touches.append(Touch(act.ts, act.seq, aid, act.ver if act.ver is not None else act.at,
+                                        "可能由此次运行生成(目录级线索,不立版本)", act.stage))
     for path, st in stories.items():
         for ver in st.versions:
             ver.act_seq = act_seq.get((path, ver.seq))
@@ -522,7 +574,7 @@ def agent_atom(ledger: Ledger, agent_id: str, v: int | None = None,
                                "stage": act.stage}
         for ref in act.files:
             row["files"].append({"op": ref.op, "path": ref.path, "v": ref.v, "via": ref.ev.via})
-            if ref.op == "read":
+            if ref.op == "read" and ref.v is not None:      # 被作废的探测读(假前身)不列进读记录
                 st = ledger.stories.get(ref.path)
                 anchor_ts = effect_ts.get(act.at) or act.ts
                 latest = _versions_at(st, anchor_ts) if st else None

@@ -36,7 +36,8 @@ from migloop.shellparse import (
 )
 
 _EXT = r"(?:md|ets|ts|js|mjs|json5?|py|sh|txt|ya?ml|xml|csv|html|properties|gradle|kts|java|kt)"
-_LIT = re.compile(r"""['"]([^'"\n{}$*?<>|]{2,240}\.""" + _EXT + r""")['"]""")
+#: 含 [ ] ( ) + \ 的不是路径是正则:entry/src/main/ets/[A-Za-z0-9_/]+/.ets 曾进过账本
+_LIT = re.compile(r"""['"]([^'"\n{}$*?<>|\[\]()\\+]{2,240}\.""" + _EXT + r""")['"]""")
 _WRITEISH = re.compile(r"write_text|write_bytes|open\([^)]*['\"][wa]|\.write\(|json\.dump\(|"
                        r"shutil\.(?:copy|move)|writelines|writeFile|Set-Content|Out-File|"
                        r"os\.rename|\.rename\(|os\.remove|unlink\(", re.I)
@@ -51,6 +52,29 @@ _LINEONLY = re.compile(r"^(\d+)[:-]")
 _ERRISH = ("no such file", "cat:")
 _PY = {"python", "python3", "py"}
 _RUNNERS = _PY | {"node", "bash", "sh", "zsh"}
+#: 存在性守卫:[ -f X ] / [[ -e X ]] / test -s X —— 守卫里对 X 的 < 输入读不算读(文件可能根本不存在)
+_PROBE = re.compile(r"(?:\[\[?|\btest)\s+-[efsdrwxL]\s+(\"[^\"]+\"|'[^']+'|[^\s\]]+)")
+#: 脚本/工具的输出实参:指到文件的是写(内容未知),指到目录的是目录级线索
+_OUT_FLAGS = ("--out", "-o", "--output", "--out-dir", "--outdir", "--output-dir", "--dest")
+_OUT_FLAGS_EQ = tuple(f + "=" for f in _OUT_FLAGS)
+#: 脚本正文里的目录字面量("spec/baseline/ui" / "/abs/dir"):脚本有写倾向时当输出目录线索
+_DIR_LIT = re.compile(r"""['"](/?(?:[\w.\-]+/)+[\w.\-]*)['"]""")
+
+
+def _dir_hints(code: str, base: str | None) -> list[str]:
+    """脚本(-c 代码 / heredoc / 账本里有内容的 .py)有写倾向时,正文里的目录字面量就是它可能写到的地方。
+    gen_page_specs.py 的 OUT = ROOT / "spec/baseline/ui" 就是这么被接上的;文件字面量另走 _literal_ops。"""
+    if not _WRITEISH.search(code):
+        return []
+    out: list[str] = []
+    for m in _DIR_LIT.finditer(code):
+        lit = m.group(1).rstrip("/")
+        if not lit or re.search(r"\.\w{1,6}$", lit.rsplit("/", 1)[-1]):
+            continue
+        d = _resolve(lit, base)
+        if d and d not in out:
+            out.append(d)
+    return out
 
 
 @dataclass
@@ -67,6 +91,7 @@ class FileOp:
     new: str | None = None
     replace_all: bool = False
     seen: tuple[tuple[int, str], ...] | None = None
+    created: bool = False          # Write 结果说 File created:写之前文件不存在(假前身作废的依据)
 
 
 # ═══════════════ 路径 ═══════════════
@@ -185,9 +210,11 @@ def _expand_loops(text: str) -> str:
 
 
 def _grep_stdout_reads(out: str, base: str | None, has_n: bool, names_only: bool,
-                       ops: list[FileOp]) -> list[FileOp]:
+                       ops: list[FileOp], listing: bool = False) -> list[FileOp]:
     """目录 grep / rg / 通配目标:命令里看不出读了哪些文件,stdout 里写着(path:line:text /
-    -l 的文件名清单)—— 按 stdout 反证成读。已有显式目标的读只补 seen。"""
+    -l 的文件名清单)—— 按 stdout 反证成读。已有显式目标的读只补 seen。
+    listing=命令里还有 ls/find 之类列目录的段:stdout 里不带 / 的裸名字多半是目录清单,不算读
+    (0723 的 ROOT/SplashPage.ets 这类幽灵路径就是这么来的)。推出来的读标 via=stdout,不算实锤。"""
     if not out.strip() or out.lower().startswith(_ERRISH):
         return []
     have = {o.path: o for o in ops if o.op == "read"}
@@ -197,9 +224,11 @@ def _grep_stdout_reads(out: str, base: str | None, has_n: bool, names_only: bool
             tok = re.sub(r":\d+$", "", line.strip())      # grep -c 的 path:count
             if not tok or tok.startswith("Binary file") or not _path_of(tok):
                 continue
+            if listing and "/" not in tok:
+                continue
             p = _resolve(tok, base)
             if p and p not in have:
-                op = FileOp("read", p, "shell", dep=True)
+                op = FileOp("read", p, "stdout", dep=True)
                 have[p] = op
                 new.append(op)
         return new
@@ -227,6 +256,8 @@ def _grep_stdout_reads(out: str, base: str | None, has_n: bool, names_only: bool
             lead = re.match(r"^\s*(\S+?)(?=\s|:|$)", line)
             if not lead or not _path_of(lead.group(1)):
                 continue
+            if listing and "/" not in lead.group(1):
+                continue
             p = _resolve(lead.group(1), base)
             if p:
                 hits.setdefault(p, [])
@@ -236,7 +267,7 @@ def _grep_stdout_reads(out: str, base: str | None, has_n: bool, names_only: bool
             if seen and not have[p].seen:
                 have[p].seen = seen
             continue
-        op = FileOp("read", p, "shell", seen=seen)
+        op = FileOp("read", p, "stdout", seen=seen)
         have[p] = op
         new.append(op)
     return new
@@ -249,7 +280,7 @@ def _head_header_reads(out: str, base: str | None, ops: list[FileOp]) -> list[Fi
         return []
     have = {o.path: o for o in ops if o.op == "read"}
     new: list[FileOp] = []
-    for raw_path, body in zip(parts[1::2], parts[2::2]):
+    for raw_path, body in zip(parts[1::2], parts[2::2], strict=False):
         p = _resolve(raw_path.strip(), base) if _path_of(raw_path.strip()) else None
         if not p:
             continue
@@ -290,13 +321,20 @@ def _head_word(words: list[str]) -> tuple[str, list[str]]:
 
 
 def _shell_analyze(cmd: str, cwd: object, scripts: dict[str, str],
-                   out: str = "") -> tuple[list[FileOp], bool, int, list[str]]:
-    """一条 shell 命令 → (文件读写, 「有写能力但目标不全可知」标记, 放弃方向判定的脚本字面量数, 放弃的路径)。
+                   out: str = "") -> tuple[list[FileOp], bool, int, list[str], dict[str, list[str]]]:
+    """一条 shell 命令 → (文件读写, 「有写能力但目标不全可知」标记, 放弃方向判定的脚本字面量数, 放弃的路径,
+    线索 {probed: 只探了存在的路径, out_dirs: 输出目录})。
     out = stdout,目录 grep / 多文件 head 这类命令里看不出目标的,按 stdout 反证。"""
     ops: list[FileOp] = []
     capable = False
     undetermined = 0
     touched: list[str] = []
+    probed: set[str] = set()
+    probe_hits: list[str] = []
+    out_dirs: list[str] = []
+    mk_dirs: list[str] = []
+    ran_script = False
+    listing = False
     text, bodies = _strip_heredocs((cmd or "").replace("\\\n", " "))
     # 同一条命令里赋了字面量的变量代换到引用处(PowerShell / bash 两种写法);静态列表循环展开。
     # 没赋值的($HOME 等)、项带通配的循环照旧放弃
@@ -317,6 +355,10 @@ def _shell_analyze(cmd: str, cwd: object, scripts: dict[str, str],
             ops.append(FileOp(op, p, via, **kw))
 
     for seg in _split_segments(text):
+        for pm in _PROBE.finditer(seg):
+            pp = _resolve(pm.group(1).strip("'\""), base)
+            if pp:
+                probed.add(pp)
         words = [t[0] for t in _tokenize(seg) if t[2] == ""]
         head, args = _head_word(words)
         if not head:
@@ -325,6 +367,8 @@ def _shell_analyze(cmd: str, cwd: object, scripts: dict[str, str],
             tgt = next((w for w in args if not w.startswith("-")), None)
             base = None if (tgt is None or "$" in tgt or tgt == "-") else _resolve(tgt, base)
             continue
+        if head in ("ls", "find", "tree", "dir", "get-childitem"):
+            listing = True
         if head in ("grep", "rg", "egrep", "fgrep"):
             short = [a for a in args if a.startswith("-") and not a.startswith("--")]
             longf = [a for a in args if a.startswith("--")]
@@ -343,8 +387,28 @@ def _shell_analyze(cmd: str, cwd: object, scripts: dict[str, str],
             sp = io.spans.get(p)
             add("read", p, start=sp[0] if sp else None, n=sp[1] if sp else None)
         for p in io.dep_reads:
+            rp = _resolve(p, base)
+            if rp is not None and rp in probed:
+                probe_hits.append(rp)          # 守卫里的 wc -l < X:文件可能不存在,只记探测
+                continue
             add("read", p, dep=True)
         pathish = [q for w in args if (q := _path_of(w))]
+        if head in ("mkdir", "new-item"):
+            mk_dirs += [d for w in args if not w.startswith("-") and not any(c in w for c in "{}$*?")
+                        and (d := _resolve(w, base))]
+        if head not in ("grep", "rg", "egrep", "fgrep", "sed", "awk"):
+            for i, w in enumerate(args):
+                val = args[i + 1] if w in _OUT_FLAGS and i + 1 < len(args) else (
+                    w.split("=", 1)[1] if w.startswith(_OUT_FLAGS_EQ) else None)
+                if not val or any(c in val for c in "{}$*?"):
+                    continue
+                capable = True
+                if _path_of(val, True):
+                    add("write", val)          # --out x.json:目标明确,内容未知
+                else:
+                    od = _resolve(val, base)
+                    if od:
+                        out_dirs.append(od)
         if head in ("rm", "remove-item") or (head == "git" and args[:1] == ["rm"]):
             for p in pathish:
                 add("delete", p)
@@ -361,9 +425,11 @@ def _shell_analyze(cmd: str, cwd: object, scripts: dict[str, str],
             undetermined += und
             touched += tch
             capable = capable or bool(_WRITEISH.search(code))
+            out_dirs += _dir_hints(code, base)
         if head in _RUNNERS:
             run = next((w for w in args if _SCRIPT_RUN.search(w) and not w.startswith("-")), None)
             if run:
+                ran_script = True
                 body = scripts.get(os.path.basename(run)) or scripts.get(_resolve(run, base) or "")
                 if body is None:
                     capable = True                # 会话外脚本:目标不可知
@@ -373,9 +439,10 @@ def _shell_analyze(cmd: str, cwd: object, scripts: dict[str, str],
                     undetermined += und
                     touched += tch
                     capable = capable or bool(_WRITEISH.search(body))
+                    out_dirs += _dir_hints(body, base)
     if out and grep_ctx:
         gb, has_n, names_only = grep_ctx[-1]
-        ops += _grep_stdout_reads(out, gb, has_n, names_only, ops)
+        ops += _grep_stdout_reads(out, gb, has_n, names_only, ops, listing)
     if out and "==> " in out and any(_head_word([t[0] for t in _tokenize(s) if t[2] == ""])[0]
                                        in ("head", "tail") for s in _split_segments(text)):
         ops += _head_header_reads(out, base, ops)
@@ -390,7 +457,10 @@ def _shell_analyze(cmd: str, cwd: object, scripts: dict[str, str],
         undetermined += und
         touched += tch
         capable = capable or bool(_WRITEISH.search(body))
-    return ops, capable, undetermined, touched
+        out_dirs += _dir_hints(body, base)
+    if ran_script or capable:
+        out_dirs += mk_dirs
+    return ops, capable, undetermined, touched, {"probed": probe_hits, "out_dirs": list(dict.fromkeys(out_dirs))}
 
 
 def shell_file_ops(cmd: str, cwd: object, scripts: dict[str, str], out: str = "") -> list[FileOp]:
@@ -446,6 +516,23 @@ def _grep_ops(inp: dict[str, Any], out: str, cwd: object) -> list[FileOp]:
         if run:
             ops.append(FileOp("read", p, "tool", start=run[0][0], n=len(run), seen=tuple(run)))
     return ops
+
+
+def _attach_single_cat(tgt: str, out: str, ops: list[FileOp], cwd: object, cmd: str) -> None:
+    """整条命令就是一次 cat:全文进了上下文。目标以 _shell_analyze 沿 cd 链解析出的那条读为准 ——
+    0723 里 `cd 安卓工程 && cat common.gradle` 曾被按记录 cwd 记到工程根下,还带着全文(幽灵路径的大头)。
+    没对上且命令里没有 cd,才按记录 cwd 解析;有 cd 却对不上就放弃,不猜。"""
+    tail = "/" + tgt.replace("\\", "/").lstrip("./")
+    reads = [o for o in ops if o.op == "read" and not o.dep
+             and (o.path == tgt or o.path.endswith(tail))]
+    if len(reads) == 1:
+        reads[0].content, reads[0].full = out, True
+        return
+    if re.search(r"(^|[;&|\s])cd\s", cmd):
+        return
+    p = _resolve(tgt, _resolve(cwd, None))
+    if p:
+        ops.append(FileOp("read", p, "shell", content=out, full=True))
 
 
 def _attach_stdout(cmd: str, text: str, out: str, ops: list[FileOp]) -> None:
@@ -539,7 +626,8 @@ def _file_ops(name: str, inp: dict[str, Any], out: str, tur: Any, cwd: object,
         p = _resolve(inp.get("file_path"), _resolve(cwd, None))
         if p:
             content = str(inp.get("content") or "")
-            ops.append(FileOp("write", p, "tool", content=content))
+            ops.append(FileOp("write", p, "tool", content=content,
+                              created="created successfully" in (out or "").lower()))
             if _SCRIPT_RUN.search(p):
                 scripts[os.path.basename(p)] = content
                 scripts[p] = content
@@ -557,7 +645,7 @@ def _file_ops(name: str, inp: dict[str, Any], out: str, tur: Any, cwd: object,
             ops.append(FileOp("write", p, "tool"))
     elif name in ("Bash", "PowerShell"):
         cmd = str(inp.get("command") or "")
-        ops, capable, undetermined, touched = _shell_analyze(cmd, cwd, scripts, out)
+        ops, capable, undetermined, touched, hints = _shell_analyze(cmd, cwd, scripts, out)
         if capable:
             detail["write_capable"] = True
         if not ops:
@@ -567,11 +655,18 @@ def _file_ops(name: str, inp: dict[str, Any], out: str, tur: Any, cwd: object,
         if undetermined and "unresolved" not in detail:
             detail["unresolved"] = "脚本字面量方向不明"
         _note_touched(detail, touched, ops)
+        if hints["probed"]:
+            detail["probed"] = hints["probed"]
+        if hints["out_dirs"]:
+            detail["out_dirs"] = hints["out_dirs"]
+        for op in ops:
+            # heredoc 落盘的 .py/.sh 也进脚本表:之后 python3 它时按脚本内容推断读写,不再当黑盒
+            if op.op == "write" and op.content is not None and _SCRIPT_RUN.search(op.path):
+                scripts[os.path.basename(op.path)] = op.content
+                scripts[op.path] = op.content
         tgt = _clean_single_cat(cmd)
         if tgt and out.strip() and not out.lower().startswith(_ERRISH):
-            p = _resolve(tgt, _resolve(cwd, None))
-            if p:
-                ops.append(FileOp("read", p, "shell", content=out, full=True))
+            _attach_single_cat(tgt, out, ops, cwd, cmd)
         else:
             _attach_stdout(cmd, _strip_heredocs(cmd.replace("\\\n", " "))[0], out, ops)
     elif name == "Grep":
@@ -618,7 +713,7 @@ def _to_ev(op: FileOp, agent: str, ts: str, seq: int, stage: str | None = None) 
             "write": "wfull" if op.content is not None else "wopaque"}[op.op]
     return Ev(ts, seq, kind, op.path, agent, content=op.content, old=op.old, new=op.new,
               replace_all=op.replace_all, start=op.start, n=op.n, full=op.full, dep=op.dep,
-              via=op.via, seen=op.seen, stage=stage)
+              via=op.via, seen=op.seen, stage=stage, created=op.created)
 
 
 #: 管线技能在阶段**收尾**时调 ``a2h mark-stage``:这些 mark 的时刻是该阶段的结束(DiceRoller 0903 实测,
@@ -867,7 +962,7 @@ def _codex_exec_ops(raw_arg: Any, out_text: str, cwd: object,
         detail.setdefault("cmd", " ".join(cmd.split())[:200])
         # 单条 shell 调用时 stdout 就是它的:目录 grep / 多文件 head 按 stdout 反证(与 CC 的 Bash 同一套)
         single = len(shell_calls) == 1 and ok
-        sub_ops, capable, undetermined, touched = _shell_analyze(cmd, wdir, scripts, stdout if single else "")
+        sub_ops, capable, undetermined, touched, hints = _shell_analyze(cmd, wdir, scripts, stdout if single else "")
         if capable:
             detail["write_capable"] = True
         if single and not sub_ops:
@@ -877,12 +972,13 @@ def _codex_exec_ops(raw_arg: Any, out_text: str, cwd: object,
         if undetermined and "unresolved" not in detail:
             detail["unresolved"] = "脚本字面量方向不明"
         _note_touched(detail, touched, sub_ops)
+        for key in ("probed", "out_dirs"):
+            if hints[key]:
+                detail[key] = list(dict.fromkeys((detail.get(key) or []) + hints[key]))
         if len(shell_calls) == 1 and ok:
             tgt = _clean_single_cat(cmd)
             if tgt and stdout.strip() and not stdout.lower().startswith(_ERRISH):
-                p = _resolve(tgt, _resolve(wdir, None))
-                if p:
-                    sub_ops.append(FileOp("read", p, "shell", content=stdout, full=True))
+                _attach_single_cat(tgt, stdout, sub_ops, wdir, cmd)
             else:
                 _attach_stdout(cmd, _strip_heredocs(cmd.replace("\\\n", " "))[0], stdout, sub_ops)
         ops += sub_ops

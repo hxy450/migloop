@@ -571,3 +571,27 @@ def test_build_fix_chains_marks_template_file_first_modified_in_fix_phase() -> N
     assert t["kind"] == "template" and t["generator"]["id"] is None and "未改" in t["generator"]["desc"]
     assert t["fixer"]["id"] == "agent-f" and t["fix_versions"] == [2] and "未改" in t["blame_broken"]
     assert chains["New.ets"]["kind"] == "created"
+
+
+# ═══════════════ 第 1 步:假前身与依赖读 ═══════════════
+
+def test_write_created_invalidates_unseen_external_prefix() -> None:
+    """此前只被「读」过却从没见过内容的外部版本,遇到结果为 created 的 Write 就是假前身:作废,
+    这次写才是 v1 creation;那些读改记成「碰过」,指针不丢。"""
+    st = build_stories([
+        ev("T01", "read", "a.ets", agent="M"),                       # 内容没进上下文
+        ev("T02", "wfull", "a.ets", agent="C", content="x\n", created=True),
+    ])["a.ets"]
+    assert [(v.v, v.source, v.diff_kind, v.by) for v in st.versions] == [(1, "full", "creation", "C")]
+    assert not st.reads and len(st.touches) == 1 and "尚不存在" in st.touches[0].reason
+
+
+def test_dep_read_of_unseen_file_is_touch_not_version() -> None:
+    """依赖读(< 输入、cp 源)碰到从没见过的文件:内容没进上下文,存在都不确定 —— 只记碰过,不立外部版本。"""
+    st = build_stories([ev("T01", "read", "b.ets", agent="M", dep=True)])["b.ets"]
+    assert not st.versions and not st.reads and len(st.touches) == 1
+
+
+def test_read_record_keeps_via() -> None:
+    st = build_stories([ev("T01", "read", "c.md", agent="M", content="c\n", full=True, via="script")])["c.md"]
+    assert st.reads[0].via == "script"

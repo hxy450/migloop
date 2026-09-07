@@ -1240,3 +1240,136 @@ def test_render_chains_with_file_only_lists_that_files_touches() -> None:
     assert "返修链(0/1,只看 F012ViewModel.ets)" in text2
     assert "- entry/src/main/ets/viewmodels/F012ViewModel.ets | 1 次 | fixer-r1 v17 #23261" in text2
     assert "AboutUsPage" not in text2
+
+
+# ═══════════════ 第 1 步:读写记录修对(0723 复盘出的四类洞) ═══════════════
+
+def test_existence_probe_does_not_create_external_version(tmp_path: Any) -> None:
+    """0723 主会话 #837 查进度:for f in …; do if [ -f X ]; then wc -l < X …。循环展开后 wc 的输入重定向
+    被当成读,给还不存在的 20 个页面文件立了「外部输入」v1,转换器随后的创建反而成了 v2、diff 退成 unknown。
+    存在性守卫里的读不算读,只记「探测」;真正的创建必须是 v1 creation。"""
+    loop = ('for f in A B; do if [ -f "entry/pages/$f.ets" ]; then lines=$(wc -l < "entry/pages/$f.ets"); '
+            'echo "$f: $lines"; else echo "$f: 未生成"; fi; done')
+    main = [*_call("2026-01-01T00:00:00Z", "t1", "Bash", {"command": loop}, "A: 未生成\nB: 未生成"),
+            *_call("2026-01-01T00:01:00Z", "t2", "Write",
+                   {"file_path": "/proj/entry/pages/A.ets", "content": "x\n"},
+                   "File created successfully at: /proj/entry/pages/A.ets")]
+    led = _ledger(tmp_path, main)
+    st = led.stories["/proj/entry/pages/A.ets"]
+    assert [v.source for v in st.versions] == ["full"] and st.versions[0].diff_kind == "creation"
+    assert any("探测" in t.reason for t in st.touches)          # 指针不丢:谁探过它,能展开
+    b = led.stories.get("/proj/entry/pages/B.ets")
+    assert b is None or not b.versions
+
+
+def test_script_literal_short_name_becomes_touch_on_real_file(tmp_path: Any) -> None:
+    """0723 有 327 条幽灵路径:脚本里一个短文件名被按当时的 cwd 拼成新文件(spec/baseline/ui/SplashPage.ets、
+    entry/src/main/ets/SplashPage.ets、只有文件名的 SplashPage.ets…)。短名字要先对已知文件,对上就把指针挂过去,
+    不造文件、不立版本。"""
+    real = "/proj/entry/src/main/ets/pages/SplashPage.ets"
+    main = [*_read_call("2026-01-01T00:00:00Z", "t1", real, "@Entry\n"),
+            *_call("2026-01-01T00:01:00Z", "t2", "Bash",
+                   {"command": "cd spec/baseline/ui && python3 - <<'PY'\ns=open(\"SplashPage.ets\").read()\nprint(len(s))\nPY"},
+                   "12")]
+    led = _ledger(tmp_path, main)
+    assert "/proj/spec/baseline/ui/SplashPage.ets" not in led.stories
+    assert any("按文件名对上" in t.reason for t in led.stories[real].touches)
+
+
+def test_regex_literal_is_not_a_path(tmp_path: Any) -> None:
+    """entry/src/main/ets/[A-Za-z0-9_/]+/.ets 曾被当成文件进了账本(0723 主会话 #1383)。"""
+    main = [*_call("2026-01-01T00:00:00Z", "t1", "Bash",
+                   {"command": "python3 -c \"import re; m=re.search('entry/src/main/ets/[A-Za-z0-9_/]+\\\\.ets', s)\""}, "")]
+    led = _ledger(tmp_path, main)
+    assert not any("[A-Za-z" in p for p in led.stories)
+
+
+def test_touch_and_out_flag_count_as_writes(tmp_path: Any) -> None:
+    """0723 漏掉的写:touch 建的 .keep、脚本 --out 指定的输出文件都成了「外部输入」。--out 指到目录的,
+    记成目录级线索(out_dirs),给后面冒出来的文件挂指针用。"""
+    main = [*_call("2026-01-01T00:00:00Z", "t1", "Bash",
+                   {"command": "mkdir -p spec/x && touch spec/x/.keep && python3 gen.py --out spec/baseline/module-dep-graph.json"},
+                   "ok"),
+            *_call("2026-01-01T00:01:00Z", "t2", "Bash",
+                   {"command": "python3 gen2.py --out spec/baseline/ui"}, "ok")]
+    led = _ledger(tmp_path, main)
+    assert led.stories["/proj/spec/x/.keep"].versions[0].by == MAIN_ID
+    assert led.stories["/proj/spec/baseline/module-dep-graph.json"].versions[0].by == MAIN_ID
+    acts = [a for a in led.agents[MAIN_ID].actions if a.tool == "Bash"]
+    assert acts[-1].detail.get("out_dirs") == ["/proj/spec/baseline/ui"]
+
+
+def test_heredoc_script_body_used_when_run(tmp_path: Any) -> None:
+    """gen_page_specs.py 是 cat > … <<EOF 落盘的,之后 python3 它时账本当黑盒,102 份页面 spec 全成外部输入。
+    heredoc 落盘的脚本也进脚本表,运行时按它的内容推断读写。"""
+    main = [*_call("2026-01-01T00:00:00Z", "t1", "Bash",
+                   {"command": "cat > /tmp/s/gen.py <<'EOF'\nopen('spec/baseline/ui/page_1.md','w').write('x')\nEOF"}, ""),
+            *_call("2026-01-01T00:01:00Z", "t2", "Bash", {"command": "python3 /tmp/s/gen.py"}, "")]
+    led = _ledger(tmp_path, main)
+    st = led.stories["/proj/spec/baseline/ui/page_1.md"]
+    assert st.versions and st.versions[0].by == MAIN_ID and st.versions[0].via == "script"
+
+
+def test_out_dir_hint_marks_files_appearing_under_dir(tmp_path: Any) -> None:
+    """脚本算出路径生成的文件(资源图片、缺陷单、autofix 日志,0723 有 500 多个):建了目录、跑了脚本,
+    紧接着该目录下冒出来的文件挂「可能由此次运行生成」的指针,不立版本不猜。"""
+    main = [*_call("2026-01-01T00:00:00Z", "t1", "Bash", {"command": "mkdir -p spec/out && python3 build_out.py"}, "done"),
+            *_read_call("2026-01-01T00:05:00Z", "t2", "/proj/spec/out/a.md", "generated\n")]
+    led = _ledger(tmp_path, main)
+    st = led.stories["/proj/spec/out/a.md"]
+    assert st.versions[0].source == "external"
+    assert any("可能由此次运行生成" in t.reason and t.seq == led.agents[MAIN_ID].actions[0].seq for t in st.touches)
+
+
+def test_single_cat_after_cd_binds_to_cd_target(tmp_path: Any) -> None:
+    """0723 剩下的幽灵路径大头:`cd /android/AIPPT && cat common.gradle` 的全文快照被按记录 cwd 记到
+    工程根下的 common.gradle,安卓侧那条读反而没有内容。快照要挂到沿 cd 链解析出的那条读上。"""
+    main = [*_call("2026-01-01T00:00:00Z", "t1", "Bash",
+                   {"command": "cd /android/AIPPT && cat common.gradle"}, "apply plugin: 'x'\n")]
+    led = _ledger(tmp_path, main)
+    assert "/proj/common.gradle" not in led.stories
+    st = led.stories["/android/AIPPT/common.gradle"]
+    assert st.reads[0].full and st.versions[0].content == "apply plugin: 'x'\n"
+
+
+def test_single_cat_without_cd_uses_record_cwd(tmp_path: Any) -> None:
+    main = [*_call("2026-01-01T00:00:00Z", "t1", "Bash", {"command": "cat spec/x.md"}, "hello\n")]
+    led = _ledger(tmp_path, main)
+    assert led.stories["/proj/spec/x.md"].reads[0].full
+
+
+def test_ls_listing_in_stdout_is_not_a_read(tmp_path: Any) -> None:
+    """0723 剩下的幽灵路径大头:命令里既有 ls pages/ 又有 grep,grep 的 stdout 对账把 ls 打印的裸文件名
+    也当成路径按当时目录拼出来(ROOT/SplashPage.ets、entry/src/main/ets/SplashPage.ets…)。
+    有列目录命令时,stdout 里不带 / 的裸名字不算读。"""
+    main = [*_call("2026-01-01T00:00:00Z", "t1", "Bash",
+                   {"command": 'cd /proj && ls entry/pages/ && grep -rn "x" entry/pages/Index.ets'},
+                   "A.ets\nB.ets\nentry/pages/Index.ets:3:x")]
+    led = _ledger(tmp_path, main)
+    assert "/proj/A.ets" not in led.stories and "/proj/B.ets" not in led.stories
+    assert led.stories["/proj/entry/pages/Index.ets"].reads[0].seen == ((3, "x"),)
+
+
+def test_stdout_bare_name_under_wrong_dir_becomes_touch_on_real_file(tmp_path: Any) -> None:
+    """stdout 推出来的路径和脚本字面量一样不算实锤:拼错了目录、同名真文件另有其人时,改挂指针。"""
+    real = "/proj/entry/pages/SplashPage.ets"
+    main = [*_read_call("2026-01-01T00:00:00Z", "t1", real, "@Entry\n"),
+            *_call("2026-01-01T00:01:00Z", "t2", "Bash", {"command": "cd spec && grep -l Splash *.md"}, "SplashPage.ets")]
+    led = _ledger(tmp_path, main)
+    assert "/proj/spec/SplashPage.ets" not in led.stories
+    assert any("按文件名对上" in t.reason for t in led.stories[real].touches)
+
+
+def test_script_dir_literal_gives_out_dir_hint(tmp_path: Any) -> None:
+    """gen_page_specs.py 里写着 OUT = ROOT / "spec/baseline/ui",102 份页面 spec 的路径在脚本里拼出来;
+    运行它的那次动作要带上这个目录的线索。生成后几小时才被读的文件也要挂上:线索看「首见之前的运行」,不看时间窗。"""
+    body = ("import os\nOUT = 'spec/baseline/ui'\nfor i in range(3):\n"
+            "    open(os.path.join(OUT, f'page_{i}.md'), 'w').write('x')\n")
+    main = [*_call("2026-01-01T00:00:00Z", "t1", "Bash", {"command": "cat > /tmp/s/gen.py <<'EOF'\n" + body + "EOF"}, ""),
+            *_call("2026-01-01T00:01:00Z", "t2", "Bash", {"command": "python3 /tmp/s/gen.py"}, "ok"),
+            *_read_call("2026-01-01T05:00:00Z", "t3", "/proj/spec/baseline/ui/page_1.md", "generated\n")]
+    led = _ledger(tmp_path, main)
+    run = [a for a in led.agents[MAIN_ID].actions if a.tool == "Bash"][1]
+    assert run.detail.get("out_dirs") == ["/proj/spec/baseline/ui"]
+    st = led.stories["/proj/spec/baseline/ui/page_1.md"]
+    assert any("可能由此次运行生成" in t.reason and t.seq == run.seq for t in st.touches)

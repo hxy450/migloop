@@ -76,6 +76,7 @@ class Ev:
     #: read: 从 stdout 对账出来的"看见了哪几行"((行号, 原文)…);grep -n / head 前缀
     seen: tuple[tuple[int, str], ...] | None = None
     stage: str | None = None        # 管线阶段(记录归属戳):版本文件据此知道每版写在哪个阶段
+    created: bool = False           # wfull: 工具结果说 File created —— 写之前文件不存在
 
 
 @dataclass
@@ -107,6 +108,7 @@ class ReadRec:
     dep: bool = False
     seen: tuple[tuple[int, str], ...] | None = None   # 看见的行(行号, 原文)
     full: bool = False        # 读到的是全文快照;不是全文、没有行段、没有看见的行 = 范围未知,不许冒充全文
+    via: str = "tool"         # 来路:tool | shell | script(字面量推断)—— 幽灵路径清理只看 script 来的读
 
 
 @dataclass
@@ -184,17 +186,34 @@ def build_stories(events: list[Ev]) -> dict[str, FileStory]:
         st.versions.append(v)
         return v
 
-    def write_known(st: FileStory, s: _State, e: Ev, content: str, source: str) -> None:
-        if s.content is not None:
-            diff, kind = _udiff(s.content, content), "true"
-        elif not st.versions:
+    def write_known(st: FileStory, s: _State, e: Ev, content: str, source: str,
+                    creation: bool = False) -> None:
+        if creation or (s.content is None and not st.versions):
             diff, kind = _udiff(None, content), "creation"
+        elif s.content is not None:
+            diff, kind = _udiff(s.content, content), "true"
         else:
             diff, kind = None, "unknown"      # 前态永失:覆盖前没被看过
         add_version(st, e, e.agent, source, content, diff, kind)
         s.content = content
         s.interval_base = content
         s.pending = []                        # 未封口的到此永久失封(如实留白)
+
+    def demote_unseen(st: FileStory, s: _State) -> None:
+        """Write 结果说 created:此前那些「首见即读、内容从未进上下文」的外部版本是探测出来的假前身,
+        作废;绑在它们上面的读改记成碰过,指针不丢。"""
+        n = len(st.versions)
+        st.versions.clear()
+        keep: list[ReadRec] = []
+        for r in st.reads:
+            if r.version <= n:
+                st.touches.append(Touch(r.ts, r.seq, r.by, None, "读时文件尚不存在(Write 结果 created),内容未进上下文"))
+            else:
+                keep.append(r)
+        st.reads = keep
+        s.content = None
+        s.interval_base = None
+        s.pending = []
 
     def write_unknown(st: FileStory, s: _State, e: Ev, source: str) -> None:
         if s.content is not None:
@@ -206,7 +225,16 @@ def build_stories(events: list[Ev]) -> dict[str, FileStory]:
     for e in sorted(events, key=lambda x: (x.ts, x.seq)):
         st, s = story(e.path)
         if e.kind == "wfull":
-            write_known(st, s, e, e.content or "", "full")
+            creation = False
+            if e.created and st.versions:
+                if all(v.source == "external" and v.content is None for v in st.versions):
+                    demote_unseen(st, s)
+                    creation = True
+                elif s.content is not None or any(v.content is not None for v in st.versions):
+                    st.breaks.append(Break(e.ts, e.seq, e.path, "create-conflict",
+                                           "Write 结果为 created,但此前观测到过内容 —— 实录外删除后重建"))
+                    creation = True
+            write_known(st, s, e, e.content or "", "full", creation=creation)
         elif e.kind == "wderived":
             # cp/mv = 对源的依赖读(内容未进上下文) + 对目标的写。依赖读落进
             # 源的编年史,闭包经它流过 cp,边标 dep。
@@ -293,12 +321,16 @@ def build_stories(events: list[Ev]) -> dict[str, FileStory]:
                 elif st.versions:
                     self_read_version = len(st.versions)
                     certain = False
+                elif e.dep:
+                    # 依赖读(< 输入 / cp 源)碰到从没见过的文件:内容没进上下文,存在都不确定 —— 只记碰过
+                    st.touches.append(Touch(e.ts, e.seq, e.agent, e.aver, "依赖读,内容未进上下文,文件此前未见"))
+                    continue
                 else:
                     add_version(st, e, EXTERNAL, "external", None, None, "external")
                     self_read_version = 1
                     certain = False
             st.reads.append(ReadRec(e.ts, e.seq, e.agent, self_read_version,
-                                    e.start, e.n, certain, e.dep, seen=e.seen, full=e.full))
+                                    e.start, e.n, certain, e.dep, seen=e.seen, full=e.full, via=e.via))
         else:
             raise ValueError(f"未知事件类型: {e.kind}")
     return stories
