@@ -2403,14 +2403,14 @@ def test_file_diff_log_is_paged_and_anchor_diff_stays_alone(tmp_path: Any) -> No
     """file 以索引为主:diff=1 不带 v 一页最多 40 版并给续页;带 v 只给第 v 版的 diff,别的版不铺。"""
     main = [*_call("2026-01-01T00:00:00Z", "t0", "Write", {"file_path": "/proj/entry/A.ets", "content": "l\n"},
                    "File created successfully at: /proj/entry/A.ets")]
-    for i in range(1, 50):
+    for i in range(1, 70):
         main += _call(f"2026-01-01T{i // 60:02d}:{i % 60:02d}:00Z", f"t{i}", "Edit",
                       {"file_path": "/proj/entry/A.ets", "old_string": "l\n", "new_string": f"l\nn{i}\n"}, "ok")
     led = _ledger(tmp_path, main)
-    page1 = atoms_text.render_file(led, "A.ets", None, root="/proj", diff=True)
-    assert "+n1\n" in page1 and "+n39\n" in page1 and "+n40\n" not in page1 and "v_from=41" in page1
-    page2 = atoms_text.render_file(led, "A.ets", None, root="/proj", diff=True, v_from=41)
-    assert "+n40\n" in page2 and "+n49\n" in page2 and "+n39\n" not in page2
+    page1 = atoms_text.render_file(led, "A.ets", None, root="/proj", diff=True)      # 一页 60 版:v1–v60 = 第 1–59 次改
+    assert "+n1\n" in page1 and "+n59\n" in page1 and "+n60\n" not in page1 and "v_from=61" in page1
+    page2 = atoms_text.render_file(led, "A.ets", None, root="/proj", diff=True, v_from=61)
+    assert "+n60\n" in page2 and "+n69\n" in page2 and "+n59\n" not in page2
     one = atoms_text.render_file(led, "A.ets", 30, root="/proj", diff=True)
     assert "+n29\n" in one and "+n28\n" not in one and "+n30\n" not in one
 
@@ -2437,3 +2437,16 @@ def test_python_replace_helper_function_calls_are_edits(tmp_path: Any) -> None:
     assert len(idx.versions) == 2 and idx.versions[1].content == "// moved\nexport { A } from 'ui-kit';\nexport { B } from './b';\n"
     assert len(home.versions) == 2 and home.versions[1].content == "import { W, S } from 'ui-kit';\nstruct HomePage {}\n"
     assert not [b for b in home.breaks]
+
+
+def test_file_diff_log_is_compact_only_changed_lines(tmp_path: Any) -> None:
+    """改动日志只列 -/+ 行,不印 hunk 头与上下文行:原始组的 OLD/NEW 表就是这个密度。"""
+    main = [*_call("2026-01-01T00:00:00Z", "t0", "Write", {"file_path": "/proj/entry/A.ets", "content": "a\nb\nc\nd\n"},
+                   "File created successfully at: /proj/entry/A.ets"),
+            *_call("2026-01-01T00:00:01Z", "t1", "Edit", {"file_path": "/proj/entry/A.ets", "old_string": "b\n", "new_string": "B\n"}, "ok")]
+    led = _ledger(tmp_path, main)
+    text = atoms_text.render_file(led, "A.ets", None, root="/proj", diff=True)
+    body = text.split("- v2 ←", 1)[1]
+    assert "-b" in body and "+B" in body and "@@" not in body and "+++" not in body and "\n a\n" not in body
+    full = atoms_text.render_file(led, "A.ets", 2, root="/proj", diff=True)       # 带 v 仍是整段 udiff
+    assert "@@" in full

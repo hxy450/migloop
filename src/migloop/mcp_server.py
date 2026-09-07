@@ -83,7 +83,7 @@ spec 时凭什么」用 search(q, agent=主会话, v=那一版) 按词切,不要
    用 search(q=文件名, since_ts=修复开始时刻, until_ts=结束) 全池查修复期谁提到过它,再 file(那张单, content=1) 看正文。
 2. diff(path, v_fix) 看修复到底改了什么;blame(path, v_fix, changed=True) 直接列出修复版替换/删除的
    那些行及其引入者(owner@since_v)—— 不必对整个文件做 blame。某一行是谁写的用 blame(path, v, start=行号, n=1)。
-   file(path, diff=1) 不带 v 是改动日志:一页最多 40 版、每版截 600 字,v_from/v_to 翻页 —— 问「一个文件为什么被改了
+   file(path, diff=1) 不带 v 是改动日志:一页最多 60 版、只列 -/+ 行、每版截 300 字,v_from/v_to 翻页 —— 问「一个文件为什么被改了
    几十次」才用它,等于把这个文件的全部 Edit 扫一遍;链任务里看某一版改了什么仍用 diff(path, v) 或 file(path, v, diff=1)。
 3. agent(owner_id, since_v) 看引入者写那一版时手里有什么:派发词、读过哪些 spec/源码(版本、
    行段、是否旧版)、收件箱有没有改指令。对比修复方 agent 的读取集,找"该读没读"。
@@ -149,10 +149,10 @@ def build_server(backend: Any | None = None) -> Any:
     async def file(sid: str, path: str, v: int | None = None, content: bool = False,
                    diff: bool = False, start: int | None = None, n: int | None = None,
                    readers: bool = False, v_from: int | None = None, v_to: int | None = None,
-                   diff_chars: int = 600) -> str:
+                   diff_chars: int = 300) -> str:
         """版本文件原子:≤v 的写者脊柱(写者 agent 版本/来路)、读了这一版的 agent、复原全文。
         path 可给文件名、相对路径或绝对路径;v 空 = 最新版;content=True 给全文(start/n 裁行窗口)。
-        diff=True 带 v:只给第 v 版的 diff。diff=True 不带 v:改动日志,一页最多 40 版(每版截 diff_chars 字,
+        diff=True 带 v:只给第 v 版的 diff。diff=True 不带 v:改动日志,一页最多 60 版(只列 -/+ 行,每版截 diff_chars 字,
         创建版只给行数),v_from / v_to 翻页 —— 问「为什么反复改」用它,等于把这个文件的全部 Edit 扫一遍。"""
         ledger, cwd = await _ctx(sid)
         return atoms_text.render_file(ledger, path, v, root=cwd, content=content, diff=diff,

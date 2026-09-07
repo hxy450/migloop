@@ -148,6 +148,14 @@ def _unknown_reason(vv: dict[str, Any]) -> str:
     return "覆盖前未被观测"
 
 
+def _compact_diff(diff: str, cap: int) -> str:
+    """只留删掉的行和加上的行(去掉 --- / +++ / @@ 与上下文行):看反复只需要「改了什么」,不需要 hunk 位置。"""
+    keep = [ln for ln in diff.split("\n")
+            if (ln.startswith("-") or ln.startswith("+")) and not ln.startswith(("---", "+++"))]
+    text = "\n".join(keep)
+    return text if len(text) <= cap else text[:cap] + f"…(截,共 {len(text)} 字;diff(path, v) 看整段)"
+
+
 def _collapse_spine(ledger: atoms.Ledger, rows: list[dict[str, Any]], anchor: int,
                     lines: dict[int, int]) -> list[dict[str, Any]]:
     """同一写者、同一来路、内容已知与否一致的连续 ≥3 版折成一行;锚点版永远单列。折行 = {"_run": 文本}。"""
@@ -182,7 +190,7 @@ def _collapse_spine(ledger: atoms.Ledger, rows: list[dict[str, Any]], anchor: in
 def render_file(ledger: atoms.Ledger, hint: str, v: int | None = None, root: str = "",
                 content: bool = False, diff: bool = False,
                 start: int | None = None, n: int | None = None, readers: bool = False,
-                v_from: int | None = None, v_to: int | None = None, diff_chars: int = 600) -> str:
+                v_from: int | None = None, v_to: int | None = None, diff_chars: int = 300) -> str:
     """默认只给写者脊柱与碰过:单根往上追看的是写者。读者是下游,归并阶段才用(指南漏条款波及了哪些页),
     默认一行计数,readers=True 展开;按词找读者用 search(file=)。"""
     fa = atoms.file_atom(ledger, hint, v, with_diff=diff, with_content=content)
@@ -203,10 +211,10 @@ def render_file(ledger: atoms.Ledger, hint: str, v: int | None = None, root: str
     # file 以索引为主:改动正文只在 diff=1 时给。带 v = 只给第 v 版整段;不带 v = 改动日志,一页最多 40 版
     log = diff and v is None
     lo_v = max(v_from or 1, 1)
-    hi_v = min(v_to or (lo_v + 39), anchor) if log else anchor
+    hi_v = min(v_to or (lo_v + 59), anchor) if log else anchor
     if log:
-        out.append(f"## 写者脊柱 + 每版改动(v{lo_v}–v{hi_v} / 共 {anchor} 版;每版截 {diff_chars} 字,整段用 diff(path, v);"
-                   "创建版 / 整篇重写只给行数;一页最多 40 版,v_from / v_to 翻页)—— 这就是「这个文件全部改动一次扫完」")
+        out.append(f"## 写者脊柱 + 每版改动(v{lo_v}–v{hi_v} / 共 {anchor} 版;只列 -/+ 行,每版截 {diff_chars} 字,整段用 diff(path, v);"
+                   "创建版 / 整篇重写只给行数;一页最多 60 版,v_from / v_to 翻页)—— 这就是「这个文件全部改动一次扫完」")
     elif diff:
         out.append("## 写者脊柱(≤ 这一版)—— 只给第 v 版的 diff(同 diff(path, v));全部版本的改动日志用 file(path, diff=1) 不带 v")
     else:
@@ -245,7 +253,7 @@ def render_file(ledger: atoms.Ledger, hint: str, v: int | None = None, root: str
             elif not log:
                 out.append("```diff\n" + _clip(vv["diff"], 6000) + "\n```")
             else:
-                out.append("```diff\n" + _clip(vv["diff"], diff_chars) + "\n```")
+                out.append("```diff\n" + _compact_diff(vv["diff"], diff_chars) + "\n```")
         elif log and not vv.get("content_known"):
             out.append("  (内容未知,没有 diff;action 展开那次调用看命令)")
     if log and hi_v < anchor:
