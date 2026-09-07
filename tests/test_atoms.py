@@ -2298,3 +2298,29 @@ def test_partial_literals_survive_a_failed_command(tmp_path: Any) -> None:
 def test_guide_tells_how_to_check_fix_round_mentions_of_untouched_files() -> None:
     from migloop import mcp_server
     assert "search(q=文件名, since_ts=修复开始" in mcp_server.GUIDE
+
+
+# ═══════════════ Windows 工程的幽灵路径 ═══════════════
+
+def test_git_bash_and_wsl_drive_paths_normalize_to_drive_letter(tmp_path: Any) -> None:
+    """pod730:Write 用 C:\\Users\\…,bash 里 cat /c/Users/… —— 同一个文件在账本里成了两个。"""
+    main = [*_call("2026-01-01T00:00:00Z", "t1", "Write", {"file_path": "C:\\Users\\x\\proj\\entry\\A.ets", "content": "a\n"},
+                   "File created successfully at: C:\\Users\\x\\proj\\entry\\A.ets"),
+            *_call("2026-01-01T00:00:10Z", "t2", "Bash", {"command": "cat /c/Users/x/proj/entry/A.ets"}, "a\n"),
+            *_call("2026-01-01T00:00:20Z", "t3", "Bash", {"command": "cat /mnt/c/Users/x/proj/entry/A.ets"}, "a\n")]
+    led = _ledger(tmp_path, main)
+    assert [p for p in led.stories if p.endswith("A.ets")] == ["C:/Users/x/proj/entry/A.ets"]
+    assert len(led.stories["C:/Users/x/proj/entry/A.ets"].reads) == 2
+
+
+def test_relative_path_repeating_the_cwd_tail_collapses(tmp_path: Any) -> None:
+    """cwd 在 …/features/shell/src/main/ets,命令写工程相对路径 features/shell/src/main/ets/pages/M.ets:
+    拼出来的 …/ets/features/shell/src/main/ets/pages/M.ets 不存在,读要落到真文件上。"""
+    real = "C:/p/features/shell/src/main/ets/pages/M.ets"
+    main = [*_call("2026-01-01T00:00:00Z", "t1", "Write", {"file_path": real, "content": "m\n"},
+                   f"File created successfully at: {real}"),
+            *_call("2026-01-01T00:00:10Z", "t2", "Bash",
+                   {"command": "cd C:/p/features/shell/src/main/ets && cat features/shell/src/main/ets/pages/M.ets"}, "m\n")]
+    led = _ledger(tmp_path, main)
+    assert [p for p in led.stories if p.endswith("M.ets")] == [real]
+    assert len(led.stories[real].reads) == 1

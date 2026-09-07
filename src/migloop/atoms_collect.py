@@ -147,11 +147,27 @@ class FileOp:
 
 # ═══════════════ 路径 ═══════════════
 
+_DRIVE_ALIAS = re.compile(r"^/(?:mnt/)?([a-zA-Z])(?=/|$)")
+
+
 def _norm_abs(p: str) -> str:
     q = p.replace("\\", "/")
+    m = _DRIVE_ALIAS.match(q)
+    if m and (q.startswith("/mnt/") or len(q) <= 2 or q[2] == "/"):
+        q = m.group(1).upper() + ":" + q[m.end():]        # Git Bash /c/… 与 WSL /mnt/c/… 都是 C:/…
     if len(q) > 1 and q[1] == ":":
-        return q[:2] + posixpath.normpath(q[2:] or "/")
+        return q[:2].upper() + posixpath.normpath(q[2:] or "/")
     return posixpath.normpath(q)
+
+
+def _collapse_repeat(path: str) -> str:
+    """相对路径拼到 cwd 上产生的段落重复(…/a/b/c/a/b/c/x):连续重复 ≥3 段的折掉一份。"""
+    segs = path.split("/")
+    for k in range(min(8, len(segs) // 2), 2, -1):
+        for i in range(0, len(segs) - 2 * k + 1):
+            if segs[i:i + k] == segs[i + k:i + 2 * k]:
+                return "/".join(segs[:i + k] + segs[i + 2 * k:])
+    return path
 
 
 _BAD_PATH_CHARS = frozenset(" \t\n;|\"'<>=")
@@ -166,7 +182,7 @@ def _resolve(p: object, base: str | None) -> str | None:
         return _norm_abs(q)
     if base is None:
         return None
-    return _norm_abs(base.rstrip("/") + "/" + q)
+    return _collapse_repeat(_norm_abs(base.rstrip("/") + "/" + q))
 
 
 # ═══════════════ 脚本字面量 ═══════════════
@@ -176,7 +192,7 @@ def _resolve(p: object, base: str | None) -> str | None:
 _TENDENCY_MAX_LITERALS = 3
 
 
-def _parse_py(code: str) -> ast.AST | None:
+def _parse_py(code: str) -> ast.Module | None:
     """脚本正文按 python 解析;解析不了返回 None,脚本里的非法转义(\\`)这类 SyntaxWarning 不往 stderr 刷。"""
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", SyntaxWarning)
@@ -806,9 +822,11 @@ def _attach_single_cat(tgt: str, out: str, ops: list[FileOp], cwd: object, cmd: 
     """整条命令就是一次 cat:全文进了上下文。目标以 _shell_analyze 沿 cd 链解析出的那条读为准 ——
     0723 里 `cd 安卓工程 && cat common.gradle` 曾被按记录 cwd 记到工程根下,还带着全文(幽灵路径的大头)。
     没对上且命令里没有 cd,才按记录 cwd 解析;有 cd 却对不上就放弃,不猜。"""
-    tail = "/" + tgt.replace("\\", "/").lstrip("./")
+    tq = tgt.replace("\\", "/")
+    nt = _norm_abs(tq) if (tq.startswith("/") or (len(tq) > 1 and tq[1] == ":")) else tq.lstrip("./")
+    tail = "/" + nt.lstrip("/")
     reads = [o for o in ops if o.op == "read" and not o.dep
-             and (o.path == tgt or o.path.endswith(tail))]
+             and (o.path == nt or o.path.endswith(tail))]
     if len(reads) == 1:
         reads[0].content, reads[0].full = out, True
         return
