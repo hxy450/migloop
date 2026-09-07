@@ -450,7 +450,7 @@ def _shell_analyze(cmd: str, cwd: object, scripts: dict[str, str],
                 probe_hits.append(rp)          # 守卫里的 wc -l < X:文件可能不存在,只记探测
                 continue
             add("read", p, dep=True)
-        pathish = [q for w in args if (q := _path_of(w))]
+        pathish = [pq for w in args if (pq := _path_of(w))]
         if head in ("mkdir", "new-item"):
             mk_dirs += [d for w in args if not w.startswith("-") and not any(c in w for c in "{}$*?")
                         and (d := _resolve(w, base))]

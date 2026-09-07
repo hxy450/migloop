@@ -1699,7 +1699,7 @@ def test_fix_basis_lists_docs_read_before_first_fix_write(tmp_path: Any) -> None
     assert chains and chains[0]["file"] == "A.ets"
     service.attach_fix_basis(chains, led)
     basis = chains[0]["fixers_all"][0]["basis"]
-    assert [b["file"] for b in basis] == ["ALIGN_A_bug.md"] and basis[0]["seq"]
+    assert [b["file"] for b in basis] == ["ui/ALIGN_A_bug.md"] and basis[0]["seq"]
     text = atoms_text.render_chains({"chains": chains, "cross": None, "t0": led.t0, "touched": []}, root="/proj")
     assert "依据" in text and "ALIGN_A_bug.md" in text
 
@@ -1758,7 +1758,7 @@ def test_fix_basis_looks_back_three_versions(tmp_path: Any) -> None:
     chains = filestory.build_fix_chains(led.stories, {}, {}, root="/proj", fix_after="2026-01-01T01:00:00Z")
     service.attach_fix_basis(chains, led)
     a = next(c for c in chains if c["file"] == "A.ets")
-    assert [b["file"] for b in a["fixers_all"][0]["basis"]] == ["ALIGN_A.md"]
+    assert [b["file"] for b in a["fixers_all"][0]["basis"]] == ["ui/ALIGN_A.md"]
 
 
 def test_cat_concatenation_is_a_derived_write_with_known_content(tmp_path: Any) -> None:
@@ -1788,3 +1788,46 @@ def test_blame_changed_marks_bridged_owners(tmp_path: Any) -> None:
     assert bl["lines"][0]["owner"] == MAIN_ID and bl["lines"][0]["inferred"] and bl["unknown"] == 0
     txt = atoms_text.render_blame(led, "m.ets", 4, root="/proj", changed=True)
     assert "跨断点同文推定" in txt
+
+
+def test_fix_basis_reports_what_fix_side_saw_that_generation_did_not(tmp_path: Any) -> None:
+    """app.json5 那根的结论不是「谁写错」,是修复侧拿到了生成侧没有的一类信息:有人把应用跑起来看了这一页。
+    链行要写出来:依据的单是谁写的、那人写单之前看的是真机 dump / 截图 / 安卓基线 哪一类。"""
+    from migloop import filestory, service
+    vv = [_rec("2026-01-01T02:00:00Z", "user", "验证 AboutUs 页"),
+          *_read_call("2026-01-01T02:00:10Z", "v1", "/proj/spec/visual-verify/dump/AboutUs.hmos.xml", "<node text=\"$string:app_name\"/>\n"),
+          *_read_call("2026-01-01T02:00:20Z", "v2", "/proj/spec/visual-verify/sbs/AboutUs.jpeg", "\x00"),
+          *_call("2026-01-01T02:00:30Z", "v3", "Write", {"file_path": "/proj/spec/fix/round-1/feat/AboutUs_01.md", "content": "actual: $string:app_name\n"},
+                 "File created successfully at: /proj/spec/fix/round-1/feat/AboutUs_01.md")]
+    main = [*_call("2026-01-01T00:00:00Z", "t1", "Write", {"file_path": "/proj/entry/A.ets", "content": "a\n"},
+                   "File created successfully at: /proj/entry/A.ets"),
+            *_call("2026-01-01T01:59:00Z", "m1", "Agent", {"name": "vv-1", "prompt": "验证 AboutUs 页"}, "done",
+                   toolUseResult={"agentId": "v1"}),
+            *_read_call("2026-01-01T03:00:00Z", "t2", "/proj/spec/fix/round-1/feat/AboutUs_01.md", "actual: $string:app_name\n"),
+            *_call("2026-01-01T03:00:10Z", "t3", "Write", {"file_path": "/proj/entry/A.ets", "content": "b\n"}, "ok")]
+    led = _ledger(tmp_path, main, {"agent-v1": vv})
+    chains = filestory.build_fix_chains(led.stories, {}, {}, root="/proj", fix_after="2026-01-01T01:00:00Z")
+    service.attach_fix_basis(chains, led)
+    b = chains[0]["fixers_all"][0]["basis"][0]
+    assert b["file"] == "feat/AboutUs_01.md" and b["writer"] == "agent-v1" and b["writer_how"] == "写"
+    assert b["evidence"] == {"真机 dump": 1, "截图": 1}
+    text = atoms_text.render_chains({"chains": chains, "cross": None, "t0": led.t0, "touched": []}, root="/proj")
+    assert "修复侧多看到的" in text and "真机 dump" in text and "vv-1" in text
+
+
+def test_fix_basis_skips_skill_injection(tmp_path: Any) -> None:
+    """DiceRoller app.json5:修复方开工前系统注入了六份 SKILL.md(via=inject),它们把「依据」占满,真正读的单反而被挤掉。
+    技能定义不是依据。"""
+    from migloop import filestory, service
+    skill = ("<command-message>a2h-execute</command-message>\n<command-name>a2h-execute</command-name>\n"
+             "<skill-format>true</skill-format># a2h-execute\n做事\n")
+    main = [*_call("2026-01-01T00:00:00Z", "t1", "Write", {"file_path": "/proj/entry/A.ets", "content": "a\n"},
+                   "File created successfully at: /proj/entry/A.ets"),
+            _rec("2026-01-01T02:00:00Z", "user", skill),
+            *_read_call("2026-01-01T02:00:05Z", "t2", "/proj/spec/fix/round-1/ui/ALIGN_A.md", "fix\n"),
+            *_call("2026-01-01T02:00:10Z", "t3", "Write", {"file_path": "/proj/entry/A.ets", "content": "b\n"}, "ok")]
+    led = _ledger(tmp_path, main)
+    chains = filestory.build_fix_chains(led.stories, {}, {}, root="/proj", fix_after="2026-01-01T01:00:00Z")
+    service.attach_fix_basis(chains, led)
+    files = [b["file"] for b in chains[0]["fixers_all"][0]["basis"]]
+    assert files == ["ui/ALIGN_A.md"], files

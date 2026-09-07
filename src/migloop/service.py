@@ -229,6 +229,42 @@ def _merge_ledger_meta(meta_map: dict[str, dict[str, Any]], ledger: Any) -> dict
 
 
 _BASIS_HINT = ("spec/fix/", "spec/visual-verify/", "/docs/", "spec/baseline/")
+#: 修复侧证据的种类:按路径 / 命令形状归类 —— 飞轮要的是「生成时缺了哪一类反馈」
+_EVIDENCE = (("真机 dump", r"dump|\.hmos\.xml$|/xml/"), ("截图", r"\.(?:jpe?g|png|webp)$|screenshot|sbs/"),
+             ("安卓基线", r"android_pilot_project|/res/|\.(?:kt|java)$"), ("编译输出", r"hvigor|build[-_]?log|BUILD"),
+             ("接口探测", r"curl |probe|/api/"), ("spec", r"spec/baseline|\.md$"))
+
+
+def _evidence_kinds(agent: Any, before_seq: int, n_versions: int = 3) -> dict[str, int]:
+    """某个 agent 在动作 before_seq 之前(三版内)读过 / 跑过的证据按种类计数。"""
+    import re as _re
+    at_before = next((a.at for a in agent.actions if a.seq == before_seq), None)
+    kinds: dict[str, int] = {}
+    for act in agent.actions:
+        if act.seq >= before_seq or at_before is None or act.at < at_before - n_versions:
+            continue
+        texts = [ref.path for ref in act.files if ref.op == "read"] + [str(act.detail.get("cmd") or "")]
+        for text in texts:
+            for name, pat in _EVIDENCE:
+                if text and _re.search(pat, text):
+                    kinds[name] = kinds.get(name, 0) + 1
+                    break
+    return kinds
+
+
+def _doc_writer(ledger: Any, path: str) -> tuple[str | None, int | None, str]:
+    """依据文件是谁写的:有写者取写者;只被碰过(脚本读改写)取碰过它的最后一个 agent。
+    返回 (agent id, 动作号, 「写」/「脚本碰过」)。"""
+    st = ledger.stories.get(path)
+    if st is None:
+        return None, None, ""
+    for v in reversed(st.versions):
+        if v.by and not str(v.by).startswith("__external__") and v.by != "__outband__":
+            return v.by, v.act_seq, "写"
+    if st.touches:
+        t = st.touches[-1]
+        return t.by, t.seq, "脚本碰过"
+    return None, None, ""
 
 
 def attach_fix_basis(chains: list[dict[str, Any]], ledger: Any) -> None:
@@ -252,13 +288,26 @@ def attach_fix_basis(chains: list[dict[str, Any]], ledger: Any) -> None:
                 # 修复方常先读单、写别的文件、再写本文件:往前看三版内喂养的读
                 if act.ver is not None or act.at > by_ver or act.at < by_ver - 2:
                     continue
+                if act.kind == "inject":
+                    continue          # 技能注入是系统塞的定义,不是修复方「凭什么改」
                 for ref in act.files:
                     p = ref.path.replace("\\", "/")
+                    if p.endswith("/SKILL.md"):
+                        continue
                     if ref.op == "read" and p != c.get("file_abs") and (any(h in p for h in _BASIS_HINT) or p.endswith(".md")):
-                        basis.append({"file": p.rsplit("/", 1)[-1], "path": p, "v": ref.v, "seq": act.seq,
-                                      "line": ledger.lines.get(act.seq)})
+                        wid, wseq, how = _doc_writer(ledger, p)
+                        wagent = ledger.agents.get(wid) if wid else None
+                        basis.append({"file": "/".join(p.rsplit("/", 2)[-2:]), "path": p, "v": ref.v, "seq": act.seq,
+                                      "line": ledger.lines.get(act.seq), "writer": wid,
+                                      "writer_name": atoms.agent_label(ledger, wid) if wid else None,
+                                      "writer_seq": wseq, "writer_how": how,
+                                      "evidence": _evidence_kinds(wagent, wseq) if (wagent and wseq) else {}})
             seen: set[str] = set()
-            ff["basis"] = [b for b in basis if not (b["path"] in seen or seen.add(b["path"]))]
+            ff["basis"] = []
+            for b in basis:
+                if b["path"] not in seen:
+                    seen.add(b["path"])
+                    ff["basis"].append(b)
 
 
 def fixchain_payload(path: str) -> dict[str, Any]:

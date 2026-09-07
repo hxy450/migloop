@@ -510,6 +510,15 @@ def render_chains(payload: dict[str, Any], root: str = "", file: str | None = No
                 items = ", ".join(f"{b['file']}" for b in ff["basis"][:6]) + (" …" if len(ff["basis"]) > 6 else "")
                 ref = _ref(ff["basis"][0]["seq"], None, ff["basis"][0].get("line"))
                 out.append(f"  依据({ff.get('desc')}): 写第一笔修复前读了 {items} {ref}")
+                # 修复侧比生成侧多看到的:单是谁写的、那人写单前看的是哪一类证据 —— 生成期缺的那类反馈
+                saw = []
+                for b in ff["basis"][:4]:
+                    if b.get("writer"):
+                        ev = "、".join(f"{k} {n}" for k, n in (b.get("evidence") or {}).items()) or "来源未记"
+                        saw.append(f"{b['file']} ← {b.get('writer_name') or b['writer']} {b.get('writer_how') or '写'}"
+                                   + (f"(#{b['writer_seq']})" if b.get("writer_seq") else "") + f",此前看了 {ev}")
+                if saw:
+                    out.append("  修复侧多看到的: " + " · ".join(saw))
             elif ff.get("note"):
                 out.append(f"  修因({ff.get('desc')}): {_clip(ff['note'], 200)}")
     if touched:
