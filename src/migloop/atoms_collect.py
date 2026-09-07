@@ -367,6 +367,56 @@ def _substitute_vars(text: str) -> str:
     return text
 
 
+_ECHO_SEP = re.compile(r"""echo\s+(?:"([^"]*)"|'([^']*)'|(\S+))""")
+
+
+def _loop_sections(text: str, out: str) -> dict[str, list[str]]:
+    """for X in 静态列表; do echo "<前缀>$X<后缀>"; …; done:stdout 按 echo 出来的分隔行切成 {项: 段落行}。
+    只在每一项的分隔行都能在 stdout 里找到时才认 —— 宁可漏。"""
+    m = _FOR_LOOP.search(text)
+    if m is None or not out:
+        return {}
+    var, items_s, body = m.group(1), m.group(2), m.group(3)
+    if re.search(r"[$`*?{]", items_s):
+        return {}
+    items = [w.strip("'\"") for w in items_s.split()]
+    em = _ECHO_SEP.search(body)
+    if em is None:
+        return {}
+    tpl = next(g for g in em.groups() if g is not None)
+    pat = re.compile(r"\$\{" + re.escape(var) + r"\}|\$" + re.escape(var) + r"(?!\w)")
+    if not pat.search(tpl):
+        return {}
+    seps = {it: pat.sub(lambda _m, it=it: it, tpl) for it in items}
+    lines = out.split("\n")
+    starts: list[tuple[int, str]] = []
+    for it, sep in seps.items():
+        idx = next((i for i, ln in enumerate(lines) if ln.strip() == sep.strip()), None)
+        if idx is None:
+            return {}
+        starts.append((idx, it))
+    starts.sort()
+    sections: dict[str, list[str]] = {}
+    for n, (idx, it) in enumerate(starts):
+        end = starts[n + 1][0] if n + 1 < len(starts) else len(lines)
+        sections[it] = [ln for ln in lines[idx + 1:end] if ln.strip()]
+    return sections
+
+
+def _attach_loop_sections(text: str, out: str, ops: list[FileOp]) -> None:
+    """循环里逐个读的文件,把 stdout 的对应段落挂成「看见的行」(行号未知记 0);已有快照 / 命中行的不动。"""
+    sections = _loop_sections(text, out)
+    if not sections:
+        return
+    for op in ops:
+        if op.op != "read" or op.content is not None or op.seen:
+            continue
+        for it, sec in sections.items():
+            if sec and (op.path == it or op.path.endswith("/" + it.lstrip("./"))):
+                op.seen = tuple((0, ln) for ln in sec[:200])
+                break
+
+
 def _expand_loops(text: str) -> str:
     """静态列表循环展开;项里有变量/通配/命令替换(for f in *.md / $(seq …))解不开,原样留着。"""
     def rep(m: re.Match[str]) -> str:
@@ -630,6 +680,8 @@ def _shell_analyze(cmd: str, cwd: object, scripts: dict[str, str],
     if out and "==> " in out and any(_head_word([t[0] for t in _tokenize(s) if t[2] == ""])[0]
                                        in ("head", "tail") for s in _split_segments(text)):
         ops += _head_header_reads(out, base, ops)
+    if out and _FOR_LOOP.search(cmd or ""):
+        _attach_loop_sections((cmd or "").replace("\\\n", " "), out, ops)
     for body in bodies:
         if hd_target is not None:
             for op in ops:

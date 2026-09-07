@@ -236,6 +236,8 @@ def _seen_suffix(r: dict[str, Any]) -> str:
     seen = r.get("seen") or []
     if not seen:
         return ""
+    if all(not ln for ln, _t in seen):
+        return f" [看见 {len(seen)} 行,行号未知]"      # 循环 + echo 分隔切出来的段落
     nums = ", ".join(str(ln) for ln, _t in seen[:20])
     return f" [行号 {nums}{'…' if len(seen) > 20 else ''}]"
 
@@ -348,7 +350,7 @@ def render_agent(ledger: atoms.Ledger, agent_id: str, v: int | None = None,
                     for r in grp:
                         sl = r.get("seen") or []
                         for ln, t in sl[:3]:
-                            out.append(f"      看见 {ln}: {_clip(str(t).strip(), 160)}")
+                            out.append(f"      看见 {ln if ln else '(行号未知)'}: {_clip(str(t).strip(), 160)}")
                         if len(sl) > 3:
                             out.append(f"      …共 {len(sl)} 行;action(#{r['seq']}) 展开原文")
         others = [a for a in slot["inp"] if a["kind"] not in ("read", "inbox")]
@@ -771,5 +773,5 @@ def render_search(ledger: atoms.Ledger, q: str, agent: str | None = None, v: int
             ref = " " + _ref(r["seq"], r.get("t"), r.get("line")) if r.get("seq") else ""
             out.append(f"- {_who(ledger, r['by'], r['at'])} 读 @v{r['v']}{ref} · 命中 {r['n']} 行")
             for ln, snip in r["snips"]:
-                out.append(f"    第 {ln} 行: {snip}")
+                out.append(f"    {'第 ' + str(ln) + ' 行: ' if ln else '(行号未知) '}{snip}")
     return "\n".join(out)

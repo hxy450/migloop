@@ -2222,3 +2222,24 @@ def test_upstream_depth_window_vs_cumulative(tmp_path: Any) -> None:
                    "File created successfully at: /proj/entry/A.ets")]
     led = _ledger(tmp_path, main)
     assert led.depth_max[("f", "/proj/entry/A.ets", 1)] == 2 and led.depth_win[("f", "/proj/entry/A.ets", 1)] == 1
+
+
+# ═══════════════ 循环 + echo 分隔的多文件读:stdout 切给各文件 ═══════════════
+
+def test_loop_with_echo_separator_attaches_sections_as_seen_lines(tmp_path: Any) -> None:
+    """0723 fixer-r1 #25708 用 for 循环 + echo 分隔读四张缺陷单,账本只记「范围未知」;开屏状态栏那张点名了 EntryAbility.ets,
+    工具组据此写成「该文件没进修复轮」。分隔行能对上就把每段挂到对应的读上(行号未知)。"""
+    cmd = ("cd /proj/spec && for f in a.md b.md; do echo \"══ $f\"; sed -n '/^## 2/,/^## 4/p' \"$f\" | head -5; done")
+    out = "══ a.md\n## 2. 期望\nEntryAbility.ets:unknown 未调用 setWindowSystemBarEnable\n══ b.md\n## 2. 期望\n无\n"
+    main = [*_call("2026-01-01T00:00:00Z", "t1", "Bash", {"command": cmd}, out)]
+    led = _ledger(tmp_path, main)
+    act = led.agents[MAIN_ID].actions[0]
+    seen = {r.path.rsplit("/", 1)[-1]: r.ev.seen for r in act.files if r.op == "read"}
+    assert seen["a.md"] == ((0, "## 2. 期望"), (0, "EntryAbility.ets:unknown 未调用 setWindowSystemBarEnable"))
+    assert seen["b.md"] == ((0, "## 2. 期望"), (0, "无"))
+    res = atoms.search_file(led, "a.md", "EntryAbility")
+    assert res and res["readers"] and res["readers"][0]["n"] == 1
+    text = atoms_text.render_search(led, "EntryAbility", file="a.md", root="/proj")
+    assert "读者的读结果里命中过" in text and "行号未知" in text and "第 0 行" not in text
+    agent_txt = atoms_text.render_agent(led, MAIN_ID, None, root="/proj", seen=True)
+    assert "看见 2 行,行号未知" in agent_txt
