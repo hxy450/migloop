@@ -96,7 +96,8 @@ _PROBE = re.compile(r"(?:\[\[?|\btest)\s+-[efsdrwxL]\s+(\"[^\"]+\"|'[^']+'|[^\s\
 _OUT_FLAGS = ("--out", "-o", "--output", "--out-dir", "--outdir", "--output-dir", "--dest")
 _OUT_FLAGS_EQ = tuple(f + "=" for f in _OUT_FLAGS)
 #: 脚本正文里的目录字面量("spec/baseline/ui" / "/abs/dir"):脚本有写倾向时当输出目录线索
-_DIR_LIT = re.compile(r"""['"](/?(?:[\w.\-]+/)+[\w.\-]*)['"]""")
+_DIR_LIT = re.compile(r"""['"]((?:/[\w.\-]+)+/?|(?:[\w.\-]+/)+[\w.\-]*)['"]""")
+_PATH_VAR = re.compile(r"(\w+)\s*=\s*Path\(\s*['\"]([^'\"]+)['\"]\s*\)")
 
 
 def _dir_hints(code: str, base: str | None) -> list[str]:
@@ -104,14 +105,23 @@ def _dir_hints(code: str, base: str | None) -> list[str]:
     gen_page_specs.py 的 OUT = ROOT / "spec/baseline/ui" 就是这么被接上的;文件字面量另走 _literal_ops。"""
     if not _WRITEISH.search(code):
         return []
+    lits = [m.group(1).rstrip("/") for m in _DIR_LIT.finditer(code)]
+    lits = [x for x in lits if x and not re.search(r"\.\w{1,6}$", x.rsplit("/", 1)[-1])]
+    # 脚本自己定义的绝对根(ROOT = Path("/…/aippt_0723") 且后面出现 ROOT / …):相对目录字面量也按它解析;
+    # 根本身只是解析基,不是输出目录 —— 0723 的工程根曾让全工程的文件都挂到 api-inventory 的脚本上
+    is_abs = lambda x: x.startswith("/") or (len(x) > 1 and x[1] == ":")  # noqa: E731
+    base_vars = {m.group(1): m.group(2).rstrip("/") for m in _PATH_VAR.finditer(code)}
+    base_paths = {p for v, p in base_vars.items() if is_abs(p) and re.search(r"\b" + re.escape(v) + r"\s*/", code)}
+    roots = [x for x in lits if is_abs(x)]
     out: list[str] = []
-    for m in _DIR_LIT.finditer(code):
-        lit = m.group(1).rstrip("/")
-        if not lit or re.search(r"\.\w{1,6}$", lit.rsplit("/", 1)[-1]):
+    for lit in lits:
+        if lit in base_paths:
             continue
-        d = _resolve(lit, base)
-        if d and d not in out:
-            out.append(d)
+        bases = [base, *roots] if not is_abs(lit) else [None]
+        for b in bases:
+            d = _resolve(lit, b)
+            if d and d not in out:
+                out.append(d)
     return out
 
 
@@ -130,6 +140,7 @@ class FileOp:
     replace_all: bool = False
     seen: tuple[tuple[int, str], ...] | None = None
     created: bool = False          # Write 结果说 File created:写之前文件不存在(假前身作废的依据)
+    sources: tuple[str, ...] = ()  # cat a b > f 的各段:内容已知就能拼出 f
 
 
 # ═══════════════ 路径 ═══════════════
@@ -419,6 +430,15 @@ def _shell_analyze(cmd: str, cwd: object, scripts: dict[str, str],
             if recursive or not targets or any(_path_of(t) is None for t in targets):
                 grep_ctx.append((base, has_n, names_only))
         io = parse_shell(seg)
+        if head == "cat" and len(io.writes) == 1 and io.content_reads and not bodies:
+            # cat a b > f:各段是依赖读(内容没进上下文),f 是拼接派生的写 —— resource-mapping.md 就是三段拼的
+            srcs = tuple(q for q in (_resolve(p, base) for p in io.content_reads) if q)
+            tgt = _resolve(io.writes[0], base)
+            if tgt and srcs:
+                ops.append(FileOp("write", tgt, "shell", sources=srcs))
+                for q in srcs:
+                    ops.append(FileOp("read", q, "shell", dep=True))
+                continue
         for p in io.writes:
             add("write", p)
         for p in io.content_reads:
@@ -748,10 +768,10 @@ def _kind_of(name: str, ops: list[FileOp]) -> str:
 
 def _to_ev(op: FileOp, agent: str, ts: str, seq: int, stage: str | None = None) -> Ev:
     kind = {"read": "read", "delete": "delete", "edit": "edit",
-            "write": "wfull" if op.content is not None else "wopaque"}[op.op]
+            "write": "wfull" if op.content is not None else ("wconcat" if op.sources else "wopaque")}[op.op]
     return Ev(ts, seq, kind, op.path, agent, content=op.content, old=op.old, new=op.new,
               replace_all=op.replace_all, start=op.start, n=op.n, full=op.full, dep=op.dep,
-              via=op.via, seen=op.seen, stage=stage, created=op.created)
+              via=op.via, seen=op.seen, stage=stage, created=op.created, sources=op.sources)
 
 
 #: 管线技能在阶段**收尾**时调 ``a2h mark-stage``:这些 mark 的时刻是该阶段的结束(DiceRoller 0903 实测,

@@ -77,6 +77,7 @@ class Ev:
     seen: tuple[tuple[int, str], ...] | None = None
     stage: str | None = None        # 管线阶段(记录归属戳):版本文件据此知道每版写在哪个阶段
     created: bool = False           # wfull: 工具结果说 File created —— 写之前文件不存在
+    sources: tuple[str, ...] = ()   # wconcat: cat a b > f 的各段路径
 
 
 @dataclass
@@ -94,6 +95,8 @@ class Version:
     via: str = "tool"         # 写者来路;观测/外部 = observe
     stage: str | None = None  # 写这一版时的管线阶段(修复方判定:execute 之后即修复)
     act_seq: int | None = None  # 写它那次工具调用的动作号(action 展开用),build_ledger 回填
+    gen_runs: tuple[int, ...] = ()  # source=generated:候选的脚本运行动作号(首见之前最近几次)
+    batch: int = 0                  # source=generated:同一批运行生成的文件数
 
 
 @dataclass
@@ -246,6 +249,13 @@ def build_stories(events: list[Ev]) -> dict[str, FileStory]:
                                         src_s.content is not None, dep=True))
             if src_s.content is not None:
                 write_known(st, s, e, src_s.content, "derived")
+            else:
+                write_unknown(st, s, e, "derived")
+        elif e.kind == "wconcat":
+            # cat a b > f:各段在编年史里此刻的内容都已知就拼出 f(派生);有一段未知就只能记未知
+            parts = [states[q].content if q in states else None for q in e.sources]
+            if parts and all(x is not None for x in parts):
+                write_known(st, s, e, "".join(str(x) for x in parts), "derived")
             else:
                 write_unknown(st, s, e, "derived")
         elif e.kind == "wopaque":

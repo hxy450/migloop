@@ -249,7 +249,8 @@ def attach_fix_basis(chains: list[dict[str, Any]], ledger: Any) -> None:
                 continue
             basis = []
             for act in a.actions:
-                if act.at != by_ver or act.ver is not None:
+                # 修复方常先读单、写别的文件、再写本文件:往前看三版内喂养的读
+                if act.ver is not None or act.at > by_ver or act.at < by_ver - 2:
                     continue
                 for ref in act.files:
                     p = ref.path.replace("\\", "/")

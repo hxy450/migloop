@@ -1319,7 +1319,7 @@ def test_out_dir_hint_marks_files_appearing_under_dir(tmp_path: Any) -> None:
             *_read_call("2026-01-01T00:05:00Z", "t2", "/proj/spec/out/a.md", "generated\n")]
     led = _ledger(tmp_path, main)
     st = led.stories["/proj/spec/out/a.md"]
-    assert st.versions[0].source == "external"
+    assert st.versions[0].source == "generated" and st.versions[0].by == MAIN_ID      # 脚本跑出来的:写者是跑脚本的 agent
     assert any("可能由此次运行生成" in t.reason and t.seq == led.agents[MAIN_ID].actions[0].seq for t in st.touches)
 
 
@@ -1702,3 +1702,74 @@ def test_fix_basis_lists_docs_read_before_first_fix_write(tmp_path: Any) -> None
     assert [b["file"] for b in basis] == ["ALIGN_A_bug.md"] and basis[0]["seq"]
     text = atoms_text.render_chains({"chains": chains, "cross": None, "t0": led.t0, "touched": []}, root="/proj")
     assert "依据" in text and "ALIGN_A_bug.md" in text
+
+
+# ═══════════════ 批量生成:脚本跑出来的文件有写者,不是外部输入 ═══════════════
+
+def test_script_generated_files_get_the_run_as_writer(tmp_path: Any) -> None:
+    """0723 的 102 份页面 spec、112 份 ui-snapshots 是主会话跑 gen_page_specs.py 一次生成的,账本却记「外部输入」,
+    归因到 spec 就断了。首版记成「批量生成」:写者 = 跑脚本的 agent(喂养它当时的版本),候选运行的动作号、同批文件数都带上;
+    真正池子外的文件(没人跑过任何脚本指向它)仍是外部输入。"""
+    body = ("import os\nOUT = 'spec/baseline/ui'\nfor i in range(3):\n"
+            "    open(os.path.join(OUT, f'page_{i}.md'), 'w').write('x')\n")
+    main = [*_call("2026-01-01T00:00:00Z", "t1", "Bash", {"command": "cat > /tmp/s/gen.py <<'EOF'\n" + body + "EOF"}, ""),
+            *_call("2026-01-01T00:01:00Z", "t2", "Bash", {"command": "python3 /tmp/s/gen.py"}, "ok"),
+            *_read_call("2026-01-01T03:00:00Z", "t3", "/proj/spec/baseline/ui/page_1.md", "generated 1\n"),
+            *_read_call("2026-01-01T03:01:00Z", "t4", "/proj/spec/baseline/ui/page_2.md", "generated 2\n"),
+            *_read_call("2026-01-01T03:02:00Z", "t5", "/android/app/res/values/colors.xml", "<c/>\n")]
+    led = _ledger(tmp_path, main)
+    run = [a for a in led.agents[MAIN_ID].actions if a.tool == "Bash"][1]
+    v1 = led.stories["/proj/spec/baseline/ui/page_1.md"].versions[0]
+    assert v1.source == "generated" and v1.by == MAIN_ID and v1.via == "script-run"
+    assert v1.gen_runs == (run.seq,) and v1.batch == 2 and v1.act_seq == run.seq
+    assert led.stories["/android/app/res/values/colors.xml"].versions[0].source == "external"
+    text = atoms_text.render_file(led, "page_1.md", root="/proj")
+    assert "批量生成" in text and "同批 2 个" in text and f"#{run.seq}@L" in text
+
+
+def test_generated_writer_prefers_specific_earliest_run_not_project_root(tmp_path: Any) -> None:
+    """page_0031 曾挂到三次 api-inventory 脚本上:脚本里 ROOT = Path("/proj") 被当成输出目录,全工程都匹配。
+    工程根这种覆盖面过大的目录不算线索;脚本里的相对目录按脚本自己的 ROOT 解析;候选按前缀最长、时间最早排。"""
+    gen = ("from pathlib import Path\nROOT = Path('/proj')\nOUT = ROOT / 'spec/baseline/ui'\n"
+           "for i in range(3):\n    (OUT / f'page_{i}.md').write_text('x')\n")
+    other = "from pathlib import Path\nROOT = Path('/proj')\n(ROOT / 'spec/baseline/api/inv.json').write_text('{}')\n"
+    main = [*_call("2026-01-01T00:00:00Z", "t1", "Bash", {"command": "cat > /tmp/s/gen.py <<'EOF'\n" + gen + "EOF"}, ""),
+            *_call("2026-01-01T00:01:00Z", "t2", "Bash", {"command": "cd /tmp/s && python3 gen.py"}, "ok"),
+            *_call("2026-01-01T01:00:00Z", "t3", "Bash", {"command": "python3 - <<'PYEOF'\n" + other + "PYEOF"}, "ok"),
+            *_read_call("2026-01-01T02:00:00Z", "t4", "/proj/spec/baseline/ui/page_1.md", "p1\n"),
+            *_read_call("2026-01-01T02:00:10Z", "t5", "/proj/entry/src/main/ets/X.ets", "x\n")]
+    led = _ledger(tmp_path, main)
+    run = [a for a in led.agents[MAIN_ID].actions if a.tool == "Bash"][1]
+    v1 = led.stories["/proj/spec/baseline/ui/page_1.md"].versions[0]
+    assert v1.source == "generated" and v1.act_seq == run.seq and v1.gen_runs == (run.seq,)
+    assert led.stories["/proj/entry/src/main/ets/X.ets"].versions[0].source == "external"   # 工程根不算线索
+
+
+def test_fix_basis_looks_back_three_versions(tmp_path: Any) -> None:
+    """AboutUsPage:修复方 v16 读缺陷单、v17 写 F012ViewModel、v18 才写本文件;依据要往前看几版。"""
+    from migloop import filestory, service
+    main = [*_call("2026-01-01T00:00:00Z", "t1", "Write", {"file_path": "/proj/entry/A.ets", "content": "a\n"},
+                   "File created successfully at: /proj/entry/A.ets"),
+            *_read_call("2026-01-01T02:00:00Z", "t2", "/proj/spec/fix/round-1/ui/ALIGN_A.md", "fix\n"),
+            *_call("2026-01-01T02:00:05Z", "t3", "Write", {"file_path": "/proj/entry/B.ets", "content": "b\n"},
+                   "File created successfully at: /proj/entry/B.ets"),
+            *_call("2026-01-01T02:00:10Z", "t4", "Write", {"file_path": "/proj/entry/A.ets", "content": "b\n"}, "ok")]
+    led = _ledger(tmp_path, main)
+    chains = filestory.build_fix_chains(led.stories, {}, {}, root="/proj", fix_after="2026-01-01T01:00:00Z")
+    service.attach_fix_basis(chains, led)
+    a = next(c for c in chains if c["file"] == "A.ets")
+    assert [b["file"] for b in a["fixers_all"][0]["basis"]] == ["ALIGN_A.md"]
+
+
+def test_cat_concatenation_is_a_derived_write_with_known_content(tmp_path: Any) -> None:
+    """resource-mapping.md 是 `cat doc_head.md doc_mid.md doc_tail.md > resource-mapping.md` 拼出来的,三段内容都在账上,
+    拼接结果却记「内容未知」,第 615 行是谁写的就查不到。cat 拼接算派生写入:各段已知就拼出来。"""
+    main = [*_call("2026-01-01T00:00:00Z", "t1", "Write", {"file_path": "/proj/tmp/a.md", "content": "A1\nA2\n"},
+                   "File created successfully at: /proj/tmp/a.md"),
+            *_call("2026-01-01T00:00:10Z", "t2", "Write", {"file_path": "/proj/tmp/b.md", "content": "B1\n"},
+                   "File created successfully at: /proj/tmp/b.md"),
+            *_call("2026-01-01T00:00:20Z", "t3", "Bash", {"command": "cat tmp/a.md tmp/b.md > spec/all.md"}, "")]
+    led = _ledger(tmp_path, main)
+    st = led.stories["/proj/spec/all.md"]
+    assert st.versions[0].content == "A1\nA2\nB1\n" and st.versions[0].source == "derived"
+    assert atoms.blame(led, "all.md")["known"]

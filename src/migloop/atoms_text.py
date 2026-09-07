@@ -160,7 +160,11 @@ def render_file(ledger: atoms.Ledger, hint: str, v: int | None = None, root: str
     out.append("## 写者脊柱(≤ 这一版)—— (#n@L 行) 是写它那次调用的动作号与转录行号,action 展开")
     for vv in fa["versions"]:
         extra = []
-        if vv["via"] == "script":
+        if vv.get("source") == "generated":
+            # 不是 agent 读源码写的,是脚本一次跑出来的:归因到这里就该问「这批是怎么生成的」而不是「谁写错了」
+            runs = ", ".join(f"#{s}" for s in vv.get("gen_runs") or [])
+            extra.append(f"批量生成(脚本跑出来的,同批 {vv.get('batch')} 个;候选运行 {runs})")
+        elif vv["via"] == "script":
             extra.append("脚本落盘(字面量推断)")
         elif vv["via"] == "shell":
             extra.append("shell")

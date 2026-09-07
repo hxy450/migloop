@@ -289,19 +289,44 @@ def build_ledger(agents: dict[str, AgentRec]) -> Ledger:
         for act in a.actions:
             for d in act.detail.get("out_dirs") or []:
                 runs_by_dir.setdefault(d.rstrip("/") + "/", []).append((act.ts, a.id, act))
+    # 覆盖面过大的目录不算线索:工程根(ROOT = Path("/…/aippt_0723"))曾让全工程的文件都挂到 api-inventory 的脚本上
+    n_all = max(len(stories), 1)
+    runs_by_dir = {p: r for p, r in runs_by_dir.items()
+                   if not ((cnt := sum(1 for path in stories if path.startswith(p))) >= 50 and cnt >= n_all * 0.25)}
     if runs_by_dir:
+        batches: dict[tuple[str, tuple[int, ...]], list[FileStory]] = {}
         for path, st in stories.items():
             if not (st.versions and st.versions[0].source == "external"):
                 continue
-            cands = {r[2].seq: r for prefix, runs in runs_by_dir.items() if path.startswith(prefix)
-                     for r in runs if r[0] <= st.versions[0].ts}
-            # 嵌套目录(spec/baseline 与 spec/baseline/ui)各自的运行合在一起,只留最近的 3 次
-            for _ts, aid, act in sorted(cands.values(), key=lambda x: x[0])[-3:]:
+            cands: dict[int, tuple[str, str, Action, int]] = {}
+            for prefix, runs in runs_by_dir.items():
+                if not path.startswith(prefix):
+                    continue
+                for ts_, aid_, act_ in runs:
+                    if ts_ <= st.versions[0].ts and (act_.seq not in cands or len(prefix) > cands[act_.seq][3]):
+                        cands[act_.seq] = (ts_, aid_, act_, len(prefix))
+            # 前缀最长的运行最像生成者;同样长的取最早那次(之后的是补丁);最多留 3 个候选
+            recent = [r[:3] for r in sorted(cands.values(), key=lambda x: (-x[3], x[0]))[:3]]
+            for _ts, aid, act in recent:
                 st.touches.append(Touch(act.ts, act.seq, aid, act.ver if act.ver is not None else act.at,
-                                        "可能由此次运行生成(目录级线索,不立版本)", act.stage))
+                                        "可能由此次运行生成(目录级线索)", act.stage))
+            # 脚本跑出来的文件不是「外部输入」:首版记成批量生成,写者是跑脚本的 agent(喂养它当时的版本)。
+            # 0723 的 102 份页面 spec 是 gen_page_specs.py 一次生成的而非 agent 读源码写的 —— 这件事要在账本上看得见
+            agents_of = {aid for _ts, aid, _act in recent}
+            if len(agents_of) == 1:
+                _ts, aid, act = recent[0]
+                v0 = st.versions[0]
+                v0.by, v0.by_ver, v0.source, v0.via = aid, act.at, "generated", "script-run"
+                v0.gen_runs = tuple(a.seq for _t, _a, a in recent)
+                v0.act_seq = act.seq
+                batches.setdefault((aid, v0.gen_runs), []).append(st)
+        for sts in batches.values():
+            for st in sts:
+                st.versions[0].batch = len(sts)
     for path, st in stories.items():
         for ver in st.versions:
-            ver.act_seq = act_seq.get((path, ver.seq))
+            if ver.source != "generated":
+                ver.act_seq = act_seq.get((path, ver.seq))
         st.touches.sort(key=lambda t: (t.ts, t.seq))
     t0 = min((act.ts for a in agents.values() for act in a.actions if act.ts), default="")
     return Ledger(stories, agents, feeds, t0, lines=lines, read_act=read_act)
@@ -502,6 +527,7 @@ def file_atom(ledger: Ledger, hint: str, v: int | None = None,
             "v": ver.v, "ts": ver.ts, "t": rel_time(ver.ts, ledger.t0), "by": ver.by,
             "by_name": _agent_label(ledger.agents, ver.by),
             "by_ver": ver.by_ver, "seq": ver.act_seq, "via": ver.via, "source": ver.source,
+            "gen_runs": list(ver.gen_runs), "batch": ver.batch,
             "diff_kind": ver.diff_kind, "sealed": ver.sealed,
             "lines": (ver.content.count("\n") + 1) if ver.content else None,
             "has_diff": ver.diff is not None,
