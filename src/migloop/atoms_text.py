@@ -595,12 +595,23 @@ def render_search(ledger: atoms.Ledger, q: str, agent: str | None = None, v: int
         out.append("这些版本的已知内容里没有这个词(内容未知的版本查不了)")
     else:
         out.append(f"首次出现: v{res2['first']}")
-    for row in res2["versions"]:
+    rows = res2["versions"]
+    i = 0
+    while i < len(rows):
+        row = rows[i]
         ref = " " + _ref(row["seq"], row.get("t"), row.get("line")) if row.get("seq") else ""
         out.append(f"- v{row['v']} ← {_who(ledger, row['by'], row['by_ver'])}{ref} · 命中 {row['n']} 行"
                    f"  → blame(v={row['v']}) / agent(写者, since=写它之前的版本)")
         for ln, snip in row["snips"]:
             out.append(f"    第 {ln} 行: {snip}")
+        # 命中行没变的后续版本折成一行(HomePage.ets 29 版曾把同两行原样列 29 遍)
+        j = i + 1
+        while j < len(rows) and [s for _l, s in rows[j]["snips"]] == [s for _l, s in row["snips"]] and rows[j]["n"] == row["n"]:
+            j += 1
+        if j > i + 1:
+            span = f"v{rows[i + 1]['v']}" if j == i + 2 else f"v{rows[i + 1]['v']}–v{rows[j - 1]['v']}"
+            out.append(f"- {span} 命中行未变(经 {', '.join(dict.fromkeys(_who(ledger, r['by'], None) for r in rows[i + 1:j]))})")
+        i = j
     if res2["readers"]:
         out.append(f"## 读者的读结果里命中过({len(res2['readers'])})")
         for r in res2["readers"]:

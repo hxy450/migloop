@@ -1609,3 +1609,25 @@ def test_render_file_readers_off_by_default(tmp_path: Any) -> None:
     assert "读者 2 个" in text and "readers=1" in text and "| 全文 (#" not in text            # 读者行不铺
     full = atoms_text.render_file(led, "g.md", root="/proj", readers=True)
     assert full.count("| 全文 (#") == 2
+
+
+def test_search_write_hit_shows_matching_content_line(tmp_path: Any) -> None:
+    """写入 / 派发命中要显示命中的那一行,不是工具输入 JSON 的开头。"""
+    main = [*_call("2026-01-01T00:00:00Z", "w1", "Write", {"file_path": "/proj/a.ets", "content": "x\nfoo bar\ny\n"},
+                   "File created successfully at: /proj/a.ets")]
+    led = _ledger(tmp_path, main)
+    txt = atoms_text.render_search(led, "foo", agent=MAIN_ID, root="/proj")
+    assert "foo bar" in txt and "file_path" not in txt
+
+
+def test_search_file_collapses_unchanged_versions(tmp_path: Any) -> None:
+    """HomePage.ets 29 版里同一处命中被原样列了 29 遍(9 千字):命中行没变的版本折成一行。"""
+    main = [*_call("2026-01-01T00:00:00Z", "w1", "Write", {"file_path": "/proj/h.ets", "content": "a\nappName here\n"},
+                   "File created successfully at: /proj/h.ets"),
+            *_call("2026-01-01T00:01:00Z", "w2", "Write", {"file_path": "/proj/h.ets", "content": "a\nappName here\nb\n"}, "ok"),
+            *_call("2026-01-01T00:02:00Z", "w3", "Write", {"file_path": "/proj/h.ets", "content": "a\nappName here\nb\nc\n"}, "ok"),
+            *_call("2026-01-01T00:03:00Z", "w4", "Write", {"file_path": "/proj/h.ets", "content": "appName moved\n"}, "ok")]
+    led = _ledger(tmp_path, main)
+    txt = atoms_text.render_search(led, "appName", file="h.ets", root="/proj")
+    assert "首次出现: v1" in txt and "v2–v3 命中行未变" in txt and txt.count("appName here") == 1
+    assert "- v4" in txt and "appName moved" in txt

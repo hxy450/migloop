@@ -674,7 +674,10 @@ def _record_texts(rec: dict[str, Any], act: Action) -> dict[str, str]:
             continue
         t = b.get("type")
         if t == "tool_use" and (act.tuid is None or b.get("id") == act.tuid):
-            out["input"] = json.dumps(b.get("input"), ensure_ascii=False)
+            inp = b.get("input") if isinstance(b.get("input"), dict) else {}
+            # 按行找要用真正的内容字段(content / command / new_string / prompt…),不是整段 JSON
+            fields = [str(v) for k, v in inp.items() if isinstance(v, str) and k not in ("file_path", "path", "notebook_path")]
+            out["input"] = "\n".join(fields) if fields else json.dumps(b.get("input"), ensure_ascii=False)
         elif t == "tool_result" and (act.tuid is None or b.get("tool_use_id") == act.tuid):
             out["output"] = _text_of(b.get("content"))
         elif t == "text":
