@@ -2351,6 +2351,7 @@ def test_file_spine_collapses_runs_by_the_same_writer(tmp_path: Any) -> None:
     lines = [ln for ln in text.splitlines() if ln.startswith("- v")]
     assert lines[0].startswith("- v1 ←") and "v2–v9 ←" in lines[1] and "8 版" in lines[1] and lines[2].startswith("- v10 ←")
     assert "(#" in lines[1] and "…" in lines[1]          # 折行带首末动作号
+    assert "主会话" in lines[1] and "__main__" not in lines[1]   # 写者用名片名
     full = atoms_text.render_file(led, "A.ets", 10, root="/proj", diff=True)
     assert "+b" in full                                   # 锚点版的 diff 照给
 

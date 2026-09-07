@@ -148,7 +148,8 @@ def _unknown_reason(vv: dict[str, Any]) -> str:
     return "覆盖前未被观测"
 
 
-def _collapse_spine(rows: list[dict[str, Any]], anchor: int, lines: dict[int, int]) -> list[dict[str, Any]]:
+def _collapse_spine(ledger: atoms.Ledger, rows: list[dict[str, Any]], anchor: int,
+                    lines: dict[int, int]) -> list[dict[str, Any]]:
     """同一写者、同一来路、内容已知与否一致的连续 ≥3 版折成一行;锚点版永远单列。折行 = {"_run": 文本}。"""
     if len(rows) <= 8:
         return rows
@@ -168,7 +169,7 @@ def _collapse_spine(rows: list[dict[str, Any]], anchor: int, lines: dict[int, in
             ptr = ""
             if a.get("seq") is not None and b.get("seq") is not None:
                 ptr = f" (#{a['seq']}@L{lines.get(a['seq'], '?')} … #{b['seq']}@L{lines.get(b['seq'], '?')})"
-            who = f"{_short_by(a['by'])} {bv}".strip()
+            who = f"{atoms.agent_label(ledger, a['by']) or a['by']} {bv}".strip()
             out.append({"_run": f"- v{a['v']}–v{b['v']} ← {who} | {a['ts'][5:16]}–{b['ts'][11:16]} | {a['diff_kind']} ×{j - i + 1}"
                                 f"({j - i + 1} 版){ln}{'' if a['content_known'] else ' · 内容未知'}{ptr}"})
         else:
@@ -176,9 +177,6 @@ def _collapse_spine(rows: list[dict[str, Any]], anchor: int, lines: dict[int, in
         i = j + 1
     return out
 
-
-def _short_by(by: str) -> str:
-    return by
 
 
 def render_file(ledger: atoms.Ledger, hint: str, v: int | None = None, root: str = "",
@@ -203,7 +201,7 @@ def render_file(ledger: atoms.Ledger, hint: str, v: int | None = None, root: str
         out.append(f"⚠ 断点 {b['kind']} @ {b['ts'][:19]}: {b['detail']}")
     out.append("## 写者脊柱(≤ 这一版)—— (#n@L 行) 是写它那次调用的动作号与转录行号,action 展开"
                + (";同一写者连续几版折成一行,file(path, v=某版) 单看" if len(fa["versions"]) > 8 else ""))
-    for vv in _collapse_spine(fa["versions"], anchor, lines):
+    for vv in _collapse_spine(ledger, fa["versions"], anchor, lines):
         if vv.get("_run"):
             out.append(vv["_run"])
             continue
