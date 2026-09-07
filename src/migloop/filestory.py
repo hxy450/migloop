@@ -453,45 +453,24 @@ def build_generation_dag(
 
 
 def line_owners(story: FileStory) -> list[list[str | None]]:
-    """每个版本的逐行作者。确定性计算:相邻**已知**内容做序列比对,equal 块
-    沿承原作者,新增/替换行归本版作者;内容未知的版本 → 整版 None(不猜);
-    未知后的重锚版本,与上一个已知版本比对接续 —— 断点处丢失的只是断点段
-    自己的归属,历史不清零。"""
-    owners_per_version: list[list[str | None]] = []
-    prev_content: str | None = None
-    prev_owners: list[str | None] = []
-    for ver in story.versions:
-        if ver.content is None:
-            owners_per_version.append([])
-            prev_content = None
-            continue
-        cur_lines = ver.content.splitlines()
-        if prev_content is None:
-            # 首版 = 全归作者;断点后的重锚版 = 行归属未知(不猜)
-            cur: list[str | None] = ([ver.by] * len(cur_lines)
-                                     if not owners_per_version
-                                     else [None] * len(cur_lines))
-            owners_per_version.append(cur)
-            prev_content, prev_owners = ver.content, cur
-            continue
-        sm = difflib.SequenceMatcher(None, prev_content.splitlines(),
-                                     cur_lines, autojunk=False)
-        cur = [ver.by] * len(cur_lines)
-        for tag, i1, _i2, j1, j2 in sm.get_opcodes():
-            if tag == "equal":
-                for k in range(j2 - j1):
-                    cur[j1 + k] = prev_owners[i1 + k]
-        owners_per_version.append(cur)
-        prev_content, prev_owners = ver.content, cur
-    return owners_per_version
+    """每个版本的逐行作者(line_origins 去掉版本号与推定标记)。"""
+    return [[o[0] if o else None for o in rows] for rows in line_origins(story)]
 
 
-def line_origins(story: FileStory) -> list[list[tuple[str, int] | None]]:
-    """line_owners 的加强版:每行 (作者, 引入版本)。同一套确定性规则 —— equal 块沿承,
-    新增/替换行归本版;内容未知的版本整版空;断点后重锚版整版 None。"""
-    per_version: list[list[tuple[str, int] | None]] = []
+Origin = tuple[str, int] | tuple[str, int, str] | None
+
+
+def line_origins(story: FileStory) -> list[list[Origin]]:
+    """每行 (作者, 引入版本)。确定性规则:相邻已知内容做序列比对,equal 块沿承,新增/替换行归本版;
+    内容未知的版本整版空。断点(内容未知 / 实录外修改)之后的重锚版:和断点前最后一个已知版本逐行同文的行,
+    归属沿用并标第三项 "bridged"(跨断点同文推定);不同文的行才是 None(断点段里的人可能动过它)。
+    0723 的 MineComponent 在 v14 edit-miss、v19 实录外修改之后 blame 全报「归属未知」,而被修的那几行
+    自 v1 起一字未改 —— 推定标出来,可核、可撤。"""
+    per_version: list[list[Origin]] = []
     prev_content: str | None = None
-    prev: list[tuple[str, int] | None] = []
+    prev: list[Origin] = []
+    last_known_content: str | None = None
+    last_known: list[Origin] = []
     for ver in story.versions:
         if ver.content is None:
             per_version.append([])
@@ -499,11 +478,19 @@ def line_origins(story: FileStory) -> list[list[tuple[str, int] | None]]:
             continue
         cur_lines = ver.content.splitlines()
         if prev_content is None:
-            cur: list[tuple[str, int] | None] = ([(ver.by, ver.v)] * len(cur_lines)
-                                                 if not per_version
-                                                 else [None] * len(cur_lines))
+            cur: list[Origin] = [None] * len(cur_lines)
+            if not per_version:
+                cur = [(ver.by, ver.v)] * len(cur_lines)
+            elif last_known_content is not None:
+                sm0 = difflib.SequenceMatcher(None, last_known_content.splitlines(), cur_lines, autojunk=False)
+                for tag, i1, _i2, j1, j2 in sm0.get_opcodes():
+                    if tag == "equal":
+                        for k in range(j2 - j1):
+                            o = last_known[i1 + k]
+                            cur[j1 + k] = (o[0], o[1], "bridged") if o else None
             per_version.append(cur)
             prev_content, prev = ver.content, cur
+            last_known_content, last_known = ver.content, cur
             continue
         sm = difflib.SequenceMatcher(None, prev_content.splitlines(), cur_lines, autojunk=False)
         cur = [(ver.by, ver.v)] * len(cur_lines)
@@ -513,6 +500,7 @@ def line_origins(story: FileStory) -> list[list[tuple[str, int] | None]]:
                     cur[j1 + k] = prev[i1 + k]
         per_version.append(cur)
         prev_content, prev = ver.content, cur
+        last_known_content, last_known = ver.content, cur
     return per_version
 
 
@@ -525,7 +513,7 @@ def fixed_line_origins(story: FileStory, fix_vs: list[int],
     计入 origins;归不出原作者的行如实分类 —— unknown(断点后逐行归属未知)/
     self(修复方改自己写的行)/insert(纯新增);任一端内容未知则该笔整体无法
     行级归因(计入断链原因)。"""
-    owners = line_owners(story)
+    orig = line_origins(story)
     touched = 0
     origins: dict[str, int] = {}
     other: dict[str, int] = {}
@@ -542,14 +530,17 @@ def fixed_line_origins(story: FileStory, fix_vs: list[int],
             broken = ("no-baseline" if prev is None or prev.content is None
                       else "content-unknown")
             continue
-        prev_owned = owners[idx - 1]
+        prev_orig = orig[idx - 1]
         sm = difflib.SequenceMatcher(None, prev.content.splitlines(),
                                      cur.content.splitlines(), autojunk=False)
         for tag, i1, i2, j1, j2 in sm.get_opcodes():
             if tag in ("replace", "delete"):
                 for k in range(i1, i2):
                     touched += 1
-                    o = prev_owned[k] if k < len(prev_owned) else None
+                    oo = prev_orig[k] if k < len(prev_orig) else None
+                    o = oo[0] if oo else None
+                    if oo is not None and len(oo) == 3:
+                        bump("bridged")            # 归属是跨断点同文推定的,计数单列
                     if o is None:
                         bump("unknown")
                     elif o == cur.by:

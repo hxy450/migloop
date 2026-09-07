@@ -595,3 +595,18 @@ def test_dep_read_of_unseen_file_is_touch_not_version() -> None:
 def test_read_record_keeps_via() -> None:
     st = build_stories([ev("T01", "read", "c.md", agent="M", content="c\n", full=True, via="script")])["c.md"]
     assert st.reads[0].via == "script"
+
+
+# ═══════════════ 跨断点同文推定 ═══════════════
+
+def test_line_origins_bridge_across_break_by_identical_text() -> None:
+    """v2 内容未知(断点),v3 重锚:和 v1 逐行同文的 a、c 归属沿用 v1 的作者并标推定;改了的 b 才是未知。"""
+    from migloop.filestory import line_origins, line_owners
+    st = build_stories([
+        ev("T01", "wfull", "a.ets", agent="A", content="a\nb\nc\n"),
+        ev("T02", "edit", "a.ets", agent="X", old="zzz", new="q"),                 # edit-miss:断点,之后状态未知
+        ev("T03", "read", "a.ets", agent="R", content="a\nB\nc\n", full=True),   # 实录外修改后的重锚
+    ])["a.ets"]
+    o = line_origins(st)[2]
+    assert o[0] == ("A", 1, "bridged") and o[1] is None and o[2] == ("A", 1, "bridged")
+    assert line_owners(st)[2] == ["A", None, "A"]

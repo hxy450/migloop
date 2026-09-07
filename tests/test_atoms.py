@@ -1773,3 +1773,18 @@ def test_cat_concatenation_is_a_derived_write_with_known_content(tmp_path: Any) 
     st = led.stories["/proj/spec/all.md"]
     assert st.versions[0].content == "A1\nA2\nB1\n" and st.versions[0].source == "derived"
     assert atoms.blame(led, "all.md")["known"]
+
+
+def test_blame_changed_marks_bridged_owners(tmp_path: Any) -> None:
+    """MineComponent v26 的 blame 曾给「归属未知(断点后)」:v14 edit-miss、v19 实录外修改,之后的行全丢归属。
+    重锚版里和断点前同文的行沿用原作者并标「跨断点同文推定」。"""
+    main = [*_call("2026-01-01T00:00:00Z", "t1", "Write", {"file_path": "/proj/m.ets", "content": "a\nb\nc\n"},
+                   "File created successfully at: /proj/m.ets"),
+            *_call("2026-01-01T00:01:00Z", "t2", "Edit", {"file_path": "/proj/m.ets", "old_string": "zzz", "new_string": "q"}, "ok"),
+            *_read_call("2026-01-01T00:02:00Z", "t3", "/proj/m.ets", "a\nB\nc\n"),
+            *_call("2026-01-01T00:03:00Z", "t4", "Write", {"file_path": "/proj/m.ets", "content": "X\nB\nc\n"}, "ok")]
+    led = _ledger(tmp_path, main)
+    bl = atoms.blame(led, "m.ets", 4, changed=True)
+    assert bl["lines"][0]["owner"] == MAIN_ID and bl["lines"][0]["inferred"] and bl["unknown"] == 0
+    txt = atoms_text.render_blame(led, "m.ets", 4, root="/proj", changed=True)
+    assert "跨断点同文推定" in txt

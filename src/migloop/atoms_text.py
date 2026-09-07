@@ -399,6 +399,8 @@ def render_blame(ledger: atoms.Ledger, hint: str, v: int | None = None,
         out.append("```")
         for x in bl["lines"]:
             who = f"{x['owner_name'] or x['owner']}@v{x['since_v']}" if x["owner"] else "?"
+            if x.get("inferred"):
+                who += " 跨断点同文推定"
             out.append(f"{x['ln']:>{width}} | {who:<28} | {x['text']}")
         out.append("```")
     return "\n".join(out)
@@ -423,6 +425,8 @@ def _render_blame_changed(ledger: atoms.Ledger, bl: dict[str, Any], root: str) -
         out.append("```")
         for x in bl["lines"]:
             who = f"{x['owner_name'] or x['owner']}@v{x['since_v']}" if x["owner"] else "?"
+            if x.get("inferred"):
+                who += " 跨断点同文推定"
             out.append(f"{x['ln']:>{width}} | {who:<28} | {x['text']}")
         out.append("```")
     return "\n".join(out)
