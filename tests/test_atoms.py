@@ -2397,3 +2397,19 @@ def test_file_diff_log_lists_every_version_change(tmp_path: Any) -> None:
     part = atoms_text.render_file(led, "A.ets", None, root="/proj", diff=True, v_from=4, v_to=5)   # v4 = 第 3 次改
     assert "+new3" in part and "+new4" in part and "+new2" not in part and "+new5" not in part
     assert "v_from" in text or "分页" in text
+
+
+def test_file_diff_log_is_paged_and_anchor_diff_stays_alone(tmp_path: Any) -> None:
+    """file 以索引为主:diff=1 不带 v 一页最多 40 版并给续页;带 v 只给第 v 版的 diff,别的版不铺。"""
+    main = [*_call("2026-01-01T00:00:00Z", "t0", "Write", {"file_path": "/proj/entry/A.ets", "content": "l\n"},
+                   "File created successfully at: /proj/entry/A.ets")]
+    for i in range(1, 50):
+        main += _call(f"2026-01-01T{i // 60:02d}:{i % 60:02d}:00Z", f"t{i}", "Edit",
+                      {"file_path": "/proj/entry/A.ets", "old_string": "l\n", "new_string": f"l\nn{i}\n"}, "ok")
+    led = _ledger(tmp_path, main)
+    page1 = atoms_text.render_file(led, "A.ets", None, root="/proj", diff=True)
+    assert "+n1\n" in page1 and "+n39\n" in page1 and "+n40\n" not in page1 and "v_from=41" in page1
+    page2 = atoms_text.render_file(led, "A.ets", None, root="/proj", diff=True, v_from=41)
+    assert "+n40\n" in page2 and "+n49\n" in page2 and "+n39\n" not in page2
+    one = atoms_text.render_file(led, "A.ets", 30, root="/proj", diff=True)
+    assert "+n29\n" in one and "+n28\n" not in one and "+n30\n" not in one

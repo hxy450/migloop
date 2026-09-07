@@ -200,16 +200,20 @@ def render_file(ledger: atoms.Ledger, hint: str, v: int | None = None, root: str
                    + _hops(ledger, ("f", fa["path"], anchor)) + "(累计/窗口口径;每次 agent↔文件转换算一跳,派发算一跳)")
     for b in fa["breaks"]:
         out.append(f"⚠ 断点 {b['kind']} @ {b['ts'][:19]}: {b['detail']}")
+    # file 以索引为主:改动正文只在 diff=1 时给。带 v = 只给第 v 版整段;不带 v = 改动日志,一页最多 40 版
+    log = diff and v is None
     lo_v = max(v_from or 1, 1)
-    hi_v = min(v_to or anchor, anchor)
-    if diff:
-        out.append(f"## 写者脊柱 + 每版改动(v{lo_v}–v{hi_v};每版截 {diff_chars} 字,整段用 diff(path, v);创建版 / 整篇重写只给行数;"
-                   "超出范围用 v_from / v_to 分页)—— 这就是「这个文件全部改动一次扫完」")
+    hi_v = min(v_to or (lo_v + 39), anchor) if log else anchor
+    if log:
+        out.append(f"## 写者脊柱 + 每版改动(v{lo_v}–v{hi_v} / 共 {anchor} 版;每版截 {diff_chars} 字,整段用 diff(path, v);"
+                   "创建版 / 整篇重写只给行数;一页最多 40 版,v_from / v_to 翻页)—— 这就是「这个文件全部改动一次扫完」")
+    elif diff:
+        out.append("## 写者脊柱(≤ 这一版)—— 只给第 v 版的 diff(同 diff(path, v));全部版本的改动日志用 file(path, diff=1) 不带 v")
     else:
         out.append("## 写者脊柱(≤ 这一版)—— (#n@L 行) 是写它那次调用的动作号与转录行号,action 展开"
-                   + (";同一写者连续几版折成一行,file(path, v=某版) 单看;diff=1 给每版改动" if len(fa["versions"]) > 8 else ""))
-    rows = fa["versions"] if not diff else [r for r in fa["versions"] if lo_v <= r["v"] <= hi_v or r["v"] == anchor]
-    for vv in (rows if diff else _collapse_spine(ledger, rows, anchor, lines)):
+                   + (";同一写者连续几版折成一行,file(path, v=某版) 单看;diff=1 不带 v 给每版改动" if len(fa["versions"]) > 8 else ""))
+    rows = [r for r in fa["versions"] if lo_v <= r["v"] <= hi_v] if log else fa["versions"]
+    for vv in (rows if log else _collapse_spine(ledger, rows, anchor, lines)):
         if vv.get("_run"):
             out.append(vv["_run"])
             continue
@@ -235,15 +239,17 @@ def render_file(ledger: atoms.Ledger, hint: str, v: int | None = None, root: str
         ptr = " " + _ref(vv["seq"], None, lines.get(vv["seq"])) if vv.get("seq") is not None else ""
         out.append(f"- v{vv['v']} ← {_who(ledger, vv['by'], vv['by_ver'])} | {vv['ts'][5:16]} {vv.get('t') or ''} | "
                    f"{vv['diff_kind']}" + (" · " + " · ".join(extra) if extra else "") + ptr + mark)
-        if diff and vv.get("diff"):
+        if diff and vv.get("diff") and (log or vv["v"] == anchor):
             if vv.get("diff_kind") == "creation":
                 out.append(f"  (整篇 {vv.get('lines')} 行,创建版不铺;file(path, v={vv['v']}, content=1) 看)")
-            elif vv["v"] == anchor and v is not None:
+            elif not log:
                 out.append("```diff\n" + _clip(vv["diff"], 6000) + "\n```")
             else:
                 out.append("```diff\n" + _clip(vv["diff"], diff_chars) + "\n```")
-        elif diff and not vv.get("content_known"):
+        elif log and not vv.get("content_known"):
             out.append("  (内容未知,没有 diff;action 展开那次调用看命令)")
+    if log and hi_v < anchor:
+        out.append(f"…v{hi_v + 1}–v{anchor} 还有 {anchor - hi_v} 版:file(path, diff=1, v_from={hi_v + 1}) 续页")
     rlist = [r for r in fa["readers"] if r["v"] == anchor]
     if not readers:
         out.append(f"## 读者 {len(rlist)} 个(下游;readers=1 展开;按词找用 search(file=))")
