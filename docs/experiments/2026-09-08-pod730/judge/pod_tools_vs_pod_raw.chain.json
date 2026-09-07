@@ -1,0 +1,140 @@
+[
+ {
+  "chain": 90,
+  "file": "MainPage.ets",
+  "treat_is_A": true,
+  "verdict": {
+   "a_links": 16,
+   "b_links": 11,
+   "a_leaf": "批量生成脚本产物 —— coverage-matrix.md@v1（主会话 v177 用脚本同批跑出 7 个，#1035@L2118），「MainPage = 11 条 registry 槽宿主」的口径源头；但 A 自承该文件 6 版内容账本全未知，原文无法比对，等于追到叶子却读不到叶子",
+   "b_leaf": "池级脚本 + 明示停线 —— Batch 1 closer(a1e24e9b) 08-10T03:34:06 的全局占位 ID 改写脚本（P-S22-001→007 等，jsonl L245），根因是各 converter 自行铸 ID、无全局分配器；再往外的 a2h-execute skill 骨架与 feature-plan.md 在本目录转录里只有引用无正文，B 明确声明追不动",
+   "shared_links": 12,
+   "shared_verdict_agree": 4,
+   "same_entry": false,
+   "entry_note": "A 定在环 1（脚本生成的 coverage-matrix.md 里那个「11」），B 定在环 2（同一份派发词本身：`placeholders_planned: 无` 与正文「11 条 registry 槽宿主」并存、要求 import 当时不存在的 commons/ui-kit、且「禁止任何编译」）。两者相邻一跳，A 更靠外。B 的进入点更站得住：B 引的是可直接翻的原文坐标（主会话 L2291），且把「禁编译」这条兑现成机械后果 —— 环 5 一串 ArkTS 硬规则违例是 16:52 由 agent 自己用脚本回改，环 10 在 15:24:38 真炸编译（agent-ab1eddfdb2f3ca418.jsonl L56/L62，`Property 'TAG_FEED_SETTINGS' does not exist`，5 处）；而 A 自己写「该文件 6 版内容在账本里全未知…数字本身不可核」「可核的第一个『错』出现在环 5」，等于承认它宣布的进入点无法回查、真正有据的起点被它自己推到了环 5",
+   "a_checkable": 4,
+   "b_checkable": 5,
+   "a_consistency": 4,
+   "b_consistency": 5,
+   "conflicts": [
+    "写者与写入规模：A「126 版、写者 8 个 + 1 次实录外修改」vs B「约 104 次写入 / 12 个 agent（Write/Edit 85 + Bash 约 19）」",
+    "首版形态：A 环 3「v11 写 MainPage.ets@v1 764 行」vs B 环 2「首版是一个 1600+ 行…的壳」（B 自证 08-11T18:37 totalLines 1617）",
+    "Batch 3/4/5 closer 定性：A 环 5/6/7 判「错（源码没读全，归环 3）」vs B 环 3 判「传递（各自按本批共享文件正常补）」",
+    "DEF-6a-01 / audioPlayerFragmentSlot 那处：A 环 10 判「错 —— 同一处重复裁定，环 8 派发词已裁过」vs B 环 6 判「传递 —— 派发词 §B.4 明令两段式『Slice 4 刻意只传 as-built 的 4 项，你要先补组件侧再扩槽参数，顺序不能反』（主会话 L6582）」，对同一份 spec 同一处的含义直接相反",
+    "Slice 10 F027（a80c7d1d）：A 环 11 判「传递，只加评分弹窗挂载/触发/back 守卫」vs B 环 7 判「错 —— 18:37:35 import RATING_DIALOG_RATE_URL、18:39:36 又删并改注释成『刻意不 import』，评分跳转留成未实装」",
+    "Group 3 closer 对 ChildPageEntry：A 环 12 归为与 40 槽口径冲突的又一次重写（错）vs B 环 8 归为「补回环 1 被收窄掉的 entry 字段」的补偿（传递）；且 A 说 ChildPageEntry 被环 3→6→8→10 四个 agent 各改一次，B 的叙事是环 1 收窄→环 8 补回",
+    "末期槽数口径：A 环 15「收尾 commit 订正为 35/41、承认 6 个槽未装配（#39391）」vs B「SlotAssembly 注释 27 of 41」"
+   ],
+   "preferred": "B",
+   "reason": "B 的每一环都锚在秒级时间戳 + 具体 jsonl 行号上、把「禁编译」这个进入点兑现成了一次真实炸编译，并且能区分「计划内的两段式 A→B」（环 6）与「无据的来回」（环 1/7），而 A 虽然多追出 5 环、坐标同样密集，却把三个 batch closer 的正常补充一律判成「源码没读全」、把派发词明令的两段式误读为重复裁定，且它宣布的进入点建立在自己承认读不到的文档上、后 85 版内容未知使后半段大量依赖脚本字面量推断",
+   "more_actionable": "B",
+   "_cost": 0.36046900000000004
+  },
+  "preferred_method": "control",
+  "actionable_method": "control",
+  "treat": {
+   "cost_usd": 3.2056325000000006,
+   "num_turns": 29,
+   "wall_s": 573.3,
+   "calls": 28
+  },
+  "control": {
+   "cost_usd": 2.390992,
+   "num_turns": 25,
+   "wall_s": 573.7,
+   "calls": 24
+  }
+ },
+ {
+  "chain": 90,
+  "file": "HomePage.ets",
+  "treat_is_A": true,
+  "verdict": {
+   "a_links": 11,
+   "b_links": 14,
+   "a_leaf": "停在池内：最上游只到环1「主会话@v255 派发 Convert HomePage」的派发词（判其自相矛盾：Batch/Slice 两套编号并存），没有追到 CONVERTER_RULES 一类池外规则或技能定义；只在环8 点到 Group 3 的 python heredoc 批量脚本，且自认其原文被截断、三处 replace 只逐字核了两处",
+   "b_leaf": "追到池外输入：环1 CONVERTER_RULES.md §1/§3（agent-a0562c2f1d0051433.jsonl:8，Read 全文 167 行）——规则要求把「别人将来会产出什么」写成 FWD-REF 注释却不给回读/校验通道，§3 定 barrel 单写者；另在环14 追到轮次边界（FV-2 后至会话结束无 agent 再碰此文件）",
+   "shared_links": 10,
+   "shared_verdict_agree": 5,
+   "same_entry": false,
+   "entry_note": "A 的进入点是环6 Batch 14 closer（第一个输入齐备却不接线的写者：DownloadsSection.ets 是它交付的、空槽+marker 在它同一次读里 #53354@L44、却只写了一句「Batch 14 已落地」@v19:563/#53377@L75）；B 的进入点是环3 converter 首版（凭越界锚点把 6 个尚不存在组件的参数面/文件名写成断言式注释，四处断言后来全被推翻，如 initialOrder/initialHidden→initialShownTags ab29cc3:193）。对「这次返修实际修的是什么」（FV-1 填两个空 @Builder），A 的进入点更站得住：写空槽+FWD-REF 恰是 B 自己环1 认定的 §1 规则所强制的合规动作，猜错注释并不产生空槽，而 A 用带范围的否定证据（P-S14-A06 从 @v1 到 @v55 一字未改，范围=该文件 ≤v58 已知内容、内容未知 3 版）把「没人接线」钉到具体一环；B 的进入点则是更好的生成期系统性根因，但对本次修复的缺陷本体是偏靶的",
+   "a_checkable": 4,
+   "b_checkable": 5,
+   "a_consistency": 5,
+   "b_consistency": 4,
+   "conflicts": [
+    "「外壳参数由区块自持、宿主不要再传」这句注释的作者不同：A 记为 Batch 13 closer 把 Convert 原写的「宿主传 sectionTitle/moreLinkTitle/numNewItemsText」在 @v16 diff 里反写（且改的是别人的 inboxSectionSlot）；B 记为 Batch 14 closer ad3716f36b338932a（:73/:75, 08-10T20:58）写在 subscriptions/downloads 上，而 Batch 13（a720620, :155–:159）只补了「文件路径 + Batch 13 已落地」",
+    "是否存在 A→B→A 回改：A 明写「严格意义的 A→B→A 回改：未找到」，EchoConfig 只是三次单向搬家；B 环9 给出唯一确认的一例——adf24358:243 的 old_string 恰为 a720620:157 的 new_string，Inbox 路径注被改回环3 的短式",
+    "Stage 3 收尾那一轮做了什么：A 环10 判「只改注释不改槽」（@v52–v55 +23 行，仅往槽注释里追加）；B 环12 记 a9a74b0e 真接了 echoSectionSlot 并加 @Consumer navPathStack + ECHO_ROUTE_NAME 全局路由",
+    "Group 3 批量落盘的成败与机制：A 环8 判「自述 wire 了 downloads、str.replace 不命中静默通过、审计自放行」（#44047@L305 自述 vs P-S14-A06 未变）；B 环8 记为「真接线」并称两侧 python 均带 assert count==1 保护、转录里未见 assert 失败——若 B 属实，A 所述「不命中静默通过」的机制不成立",
+    "派发词本身是否自相矛盾：A 环1 称同一段派发词里 Batch 6/13/14 与 P-S14-Axx/resolve_by=Slice N 两套编号并存、注入机制含糊（判「错」）；B 明写「各批派发词彼此并不矛盾」，把派发侧问题定位为 android_source_anchors 多塞了 8 个越界兄弟类锚点",
+    "写入历史是否已全部归属：A 记 58 版 / 8 个具名写者 + 3 次「实录外修改」（@v8/@v14/@v22，08-10T10:54、08-10T19:20、08-12T01:29，无写者无 diff）；B 记约 50 次写入 / 12 个 agent，每笔都带 agent id 与 jsonl 行号、不存在无主改动，并给出 A 完全未提的 Batch 4 closer、Base-6c、Batch 16 三个写者",
+    "Slice 14 那一环的定性与时序：A 环7 把它放在 Group 3 之前（@v23–v37）、判「传递（照自己的派发词做）」；B 环9 定为 08-12T01:40–01:52、spawnDepth=2 由 Slice 14 worker 再派、判「错」，并称与 Group 3（02:21–02:23）并发写同一文件——B 自报的两个时间区间其实并不重叠"
+   ],
+   "preferred": "B",
+   "reason": "B 每一环都落在可直接回查的原始坐标上（agent id + jsonl 行号 + UTC 秒级时间戳 + tool_use 的 old_string/new_string 原文，甚至用 :243 的 old_string 等于 a720620:157 的 new_string 互证回改），写者集更全、首尾边界可验证，并按任务要求追到了池外规则文件；A 的坐标是账本内的版本号+记录号，覆盖面窄一档且尾部三版内容未知、三次改动无主，虽然它的置信标注（中）和范围化否定证据比 B 自称的「高」更克制",
+   "more_actionable": "B",
+   "_cost": 0.6040215
+  },
+  "preferred_method": "control",
+  "actionable_method": "control",
+  "treat": {
+   "cost_usd": 2.4479705000000003,
+   "num_turns": 31,
+   "wall_s": 614.3,
+   "calls": 30
+  },
+  "control": {
+   "cost_usd": 1.5231405,
+   "num_turns": 14,
+   "wall_s": 397.7,
+   "calls": 13
+  }
+ },
+ {
+  "chain": 90,
+  "file": "AudioPlayerPage.ets",
+  "treat_is_A": true,
+  "verdict": {
+   "a_links": 13,
+   "b_links": 11,
+   "a_leaf": "两支到底：主线追到技能模板 feature-plan-template.md@v1（第189/192行让各 slice 自己改 cross_slice_edits、无互斥字段）+ 批量生成脚本 gen_plans.py@v1（环1）；FV-1 支追到池外输入 —— arkts-structural-closure pipeline 的 13 条 NO_IMPORTER 孤儿清单（环13）",
+   "b_leaf": "追到 spec/转换规则 tools/stage1/CONVERTER_RULES.md §5(:78-88)「缺宿主 vs 被注入组件谁画遮罩的归属条款」（环1）；未上溯到派发样板的生成脚本或计划模板本身（环8 只到主会话派发样板这一层）",
+   "shared_links": 6,
+   "shared_verdict_agree": 4,
+   "same_entry": false,
+   "entry_note": "A 的进入点是环7（Group 4 派发词整段丢掉「禁写 cross_slice_edits／跨文件接线交 group-closer」，三个 slice 首次同时把本文件当自己的可写文件）；B 的进入点是环1（§5 无遮罩归属条款，宿主与 5 个组件 agent 各按同一条规则各画一层），并另立环8（修复落地 10 小时后派发样板仍下发「DEF-35 待修 + 绕过宿主外壳」）为第二独立进入点——环8 与 A 的环11 是同一节点、判定一致。综合看 B 的进入点更站得住：它落在任务要求追到的 spec 层，且后果有第三方实证直引（Batch 19 closer「DEF-35: double scrim confirmed at AudioPlayerPage.ets:853-879, affecting all 5 slots」，主会话:5013），再由环7 closer 亲述「Base-6a 时本方法自画了一层 image_readability_tint 全屏遮罩」闭环，因果两端都有正向证据；A 的环7 主证是一个负向命中（search「cross_slice_edits」在 F014 ≤v37 全部记录里派发词 0 条），虽有 Group 1 对照（#2999@L6355 等）与写者脊柱缺 Group 4 closer（环12）作正向补强，方法上也很干净，但 A 自陈「交错段只能证明陈旧读存在，不能逐行判定谁覆盖了谁」「21 版内容未知」，进入点到危害的那一段自己就打了折；反过来讲，B 的进入点解释的是一个在环7 已闭的返工循环，对 B 自列的残留问题（coverFragmentSlot、语义翻转）没有解释力，而 A 的进入点恰好对准这些仍未收口的部分。",
+   "a_checkable": 5,
+   "b_checkable": 4,
+   "a_consistency": 5,
+   "b_consistency": 4,
+   "conflicts": [
+    "规模口径：A「52 版 / 8 个写者」 vs B「81 次写入 / 18 个 agent」（B 自陈其中 30 余次是 Bash 重定向落盘、只抽查了遮罩/槽相关部分）",
+    "初次转换写 acffcc72b761da1cf 的定性：A 环3 判「传递」（只描述建槽与 FWD-REF，全文未提遮罩）；B 环2 判「错」（宿主侧自画全屏遮罩且错用 image_readability_tint / #80000000，本该是 ohos_id_color_mask_thin）",
+    "Group 4 并发写（a001857f × a5d1351b，08-12T07:25–07:39）的后果：A 环9 判「错」——F014 主读绑在 file v34 而 F013 已推到 v38，file v32 撞 edit-miss、此后 21 版无法复原；B 环9 判「传递」——两方都先读后写自救，直引 a001857f:317 tool_result「the edit applied cleanly」，没造成 5 个弹窗挂两遍",
+    "hilog 常量：A 环10 说 F014 在 file v34 把 shell/SleepTimerDialog 的 DOMAIN/LOG_TAG 口径带进本页、一分钟后在 v39 改回；B 残留3 说文件头 :7 本就有 `const DOMAIN = 0x0000`、只缺 LOG_TAG，agent 修的是真编译错，顺手把已存在的 DOMAIN 也内联成字面量",
+    "FV-1 13 条清单的成色：A 引派发词把「已逐条实测排除假阳」列为修复侧多看到的优势；B 说 FV-1 自己就把 #1/#8 两条判成假阳，且 NO_IMPORTER 只数跨文件 import、漏同文件消费与「有别的 importer 但没被渲染」",
+    "是否存在独立修复轮：A 无法确认④ 明说 sessions(af3e3923) 返回 0 条返修链、本账里没有独立修复轮（唯一带 repair 的 FV-1 属同会话生成期）；B 直接以「修复轮确实没再动它」为既定前提展开残留问题清单",
+    "文件终态最严重残留互不承认：A 称唯一可从 diff 直接确认的是 transcriptDialogSlot（file v43）缺 else/warn、注释与代码不符；B 称最严重是 coverFragmentSlot（P-S1-917，:890）至今空槽、封面页 page_0033 不渲染（08-12T09:15 仍在，agent-a9c5939bd157c6cc7:601），两份都没提对方那一条"
+   ],
+   "preferred": "A",
+   "reason": "A 的每条断言都绑到可回查坐标（file v1–v52 全脊柱、#记录@行号、读取的版本绑定 ▲旧版 v34/39、6 个 diff），负向断言自报搜索范围而不冒充全局否定，还主动列出与任务前提相抵触的事实（sessions 返回 0 条返修链）；B 虽有源码行号与 tool_result 直引，但它自己指定的根因环3「5 个槽全中」只核了 2 个 agent、其余按 closer 结论采信，且把「修复轮没再动它」当既定前提，根因那一环的证据反而最薄。",
+   "more_actionable": "A",
+   "_cost": 0.584136
+  },
+  "preferred_method": "treat",
+  "actionable_method": "treat",
+  "treat": {
+   "cost_usd": 2.4623145,
+   "num_turns": 33,
+   "wall_s": 575.3,
+   "calls": 32
+  },
+  "control": {
+   "cost_usd": 1.8624145,
+   "num_turns": 23,
+   "wall_s": 522.7,
+   "calls": 22
+  }
+ }
+]

@@ -1,0 +1,47 @@
+[
+ {
+  "chain": 90,
+  "file": "HomePage.ets",
+  "treat_is_A": true,
+  "verdict": {
+   "a_links": 15,
+   "b_links": 14,
+   "a_leaf": "池外输入+批量生成脚本：batch_info.py 4 生成的 Batch 4 派发表（#1663@L3327，表内只有 12 条 Android 锚点与 snapshot/page spec 路径、无鸿蒙侧任何参数面），判定「缺」，链到此为止",
+   "b_leaf": "池外输入/规则定义：CONVERTER_RULES.md §1/§3（agent-a0562c2f1d0051433.jsonl:8，全文 167 行 Read），判定「缺」——规则强制用 FWD-REF 注释表达跨范围接线却不给回读/校验通道；向前一端追到 FV-2 之后零改动的轮次边界",
+   "shared_links": 11,
+   "shared_verdict_agree": 7,
+   "same_entry": false,
+   "entry_note": "A 把进入点定在环 2（主会话派发词把「不实现 6 个 Section」与「写出各槽接线」压给同一 agent、8 条 FWD-REF 的 resolve_by 指向不存在的 owner、无人负责合拢）；B 定在环 3（converter 首版把 6 个尚不存在组件的参数名/文件名/模块归属写成断言式注释），并把环 2 降为「越界材料注入」、环 1 降为「无校验通道」。B 的进入点更站得住：它给出了断言逐条被推翻的对应记录（Batch 16 :193「initialOrder/initialHidden 两个名字都不存在」→initialShownTags、Batch 6 :112–:144 EchoSectionDialog.ets→EchoSectionComponent.ets、Base-6c :106 HomeSectionShell 路径、Slice 28 :124 EchoConfig→'echo'），且有反事实（唯一先 grep 组件真实 @Param/@Event 的 ae80d3c :43 就没写错），并显式检验并否掉了 A 的竞争假设（各批派发词彼此不矛盾）；A 的环 2 之责部分被它自己引的 FV-1 诊断削弱——「13 个组件、四道门一致放行」是跨多份派发词的池级现象，指向共享上游规则而非这一条派发词。不过 A 的环 2 作为使能条件（无合拢责任人）仍成立，二者是根因与近因之别。",
+   "a_checkable": 4,
+   "b_checkable": 5,
+   "a_consistency": 4,
+   "b_consistency": 5,
+   "conflicts": [
+    "HomeSectionShell 改指 commons/ui-kit 的写者：A 环 9 称 file v22 为「实录外修改、无写者记录、无依据」；B 环 6 归给 Base-6c agent a16b815247623834b :106 bash（08-11T13:15:40Z），依据 cross-module-closure §2.1 ⑬——而 A 自己的「无法确认」节把同一坐标（Base-6c v8 #8376@L106）列为方向不明的脚本调用",
+    "派发词之间是否冲突：A 环 10 断言环 2（槽由 owning slice 经 registry 注入）与 Slice 14 F006@v33（直接 Mount 自己拥有的槽）「正面冲突、两个派发者两套注入口径」；B 明确写「各批派发词彼此并不矛盾」，把反复归因于无全貌 + 单写者纪律切碎全貌",
+    "是否存在 A→B→A 回改：A 结论「账本内没有严格的 A→B→A 回改」，只有三次搬家与加了又删；B 环 9 给出唯一确认的回改并附对照证据——adf243:243 的 old_string 恰为 a720620:157 的 new_string（Batch 13 补的「InboxSection.ets，Batch 13 已落地」被改回环 3 的短式）",
+    "Batch 6 closer 换 EchoConfig import 的性质：A 环 7 判「错（上游口径互斥：派发词第 4 条要求按源码实现判定，与 EchoSection 独立页共用 EchoConfig 互斥）」；B 环 5 判「传递（凭本批实际产出清单 main:3717）」，且否认存在互斥口径",
+    "写入规模与写者数：A 记 58 版、10 个写者 + 3 处实录外修改、另有 8 条方向不明脚本调用；B 记约 50 次写入 = 41 次 Write/Edit + 9 次 python-heredoc、跨 12 个 agent —— B 的 9 次 heredoc 改写正对应 A 判不出方向的那类调用",
+    "最终三版是否可还原：A 称 v56–v58 内容未知，并报 08-12T17:54:50 一处 edit-miss 断点（old_string「// FWD-REF: P-S14-A06 …」不在已知内容中），最终全文不可复原、残留 FWD-REF 只能核到 v55；B 称 FV-1 在 :67/:69/:74（08-12T17:54–17:55）成功填掉最后两个空槽 downloadsSectionSlot / homeSectionsSettingsDialogSlot 并改写文件头总览，仅缺完整快照"
+   ],
+   "preferred": "B",
+   "reason": "B 每一环都带 agent 标识 + 转录行号 + UTC 时间戳 + old_string/new_string 原文，把 A 判为「无写者、无依据」的三处实录外修改中至少一处还原成真实写者（Base-6c :106 bash），还用 old_string≡new_string 的对照坐实了 A 声称不存在的回改，且首尾边界可直接验证；A 的版本号脊柱与 spec 读者数（readers=1）是真证据但时间/写者坐标更粗，并在同一份报告里既称某处「无写者」又在附录列出其候选记录。",
+   "more_actionable": "B",
+   "_cost": 0.465095
+  },
+  "preferred_method": "control",
+  "actionable_method": "control",
+  "treat": {
+   "cost_usd": 2.1581825,
+   "num_turns": 32,
+   "wall_s": 512.4,
+   "calls": 31
+  },
+  "control": {
+   "cost_usd": 1.5231405,
+   "num_turns": 14,
+   "wall_s": 397.7,
+   "calls": 13
+  }
+ }
+]

@@ -41,3 +41,4 @@
   `index_gap.py`(转录 vs 账本覆盖对账)、`fake_v1.py` / `external_probe4.py` / `external_pointers.py`(假 v1 / 幽灵路径 / 外部输入指针)、`run_probe.py`。脚本里有本机绝对路径。
 - 2026-09-07-handson/ — 四根子代理只用工具亲手追链(DiceRoller app.json5 / Index.ets,0723 PreferenceKeys / WXEntryAbility):规程、四份链报告与工具体验日志;对应 fixchain-research.md §4.11
 - 2026-09-07-six-cases/ — 按口径挑的六根(最多跳 / 耗时最长 / 生成改最多 / 修复改最多 / 最耗 token / 改 36 次没被修),工具组 vs 原始组同题、按环盲评;含任务文本、模板、评委脚本、口径脚本与 DP 跳数脚本;对应 fixchain-research.md §4.12
+- 2026-09-08-pod730/ — 换会话:pod730(Windows、221 agent、无修复阶段)「为什么反复改」三根,两次工具组 vs 原始组、按环盲评;对应 fixchain-research.md §4.13
