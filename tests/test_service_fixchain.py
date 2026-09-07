@@ -27,7 +27,8 @@ def test_fixchain_meta_falls_back_to_ledger_cards_for_agents_lineage_lacks() -> 
     card = meta["a4874344c8fb6228d"]
     assert card["desc"] == "修 round-1 视觉差异" and card["stage"] == "arkts-visual-verify"
     assert len(card["prompt"]) == 200 and len(card["note"]) == 280
-    assert meta["a1111111111111111"] == {"desc": "血缘层名片", "stage": "a2h-plan", "prompt": "", "note": ""}
+    assert meta["a1111111111111111"] == {"desc": "血缘层名片", "stage": "a2h-plan", "prompt": "", "note": "",
+                                        "parent": None, "parent_name": None}
     assert meta["only-lineage"]["desc"] == "账本没有的"
     assert lineage["a4874344c8fb6228d"]["desc"] is None
 

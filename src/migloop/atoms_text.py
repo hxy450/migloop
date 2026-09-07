@@ -467,6 +467,11 @@ def render_chains(payload: dict[str, Any], root: str = "", file: str | None = No
                 line += f" | 生成于 {g_t} · 修复于 {f_t}"
             else:                       # created / template 链没有生成侧时刻
                 line += f" | 修复于 {f_t}"
+        g_parent = g.get("parent")
+        if g_parent and c.get("gen_at") and c.get("fix_at"):
+            # 生成方的派发者在生成→修复这段说过什么、决定过什么,是转换器自己的记录里没有的一层;区间摆到眼前
+            line += (f" | 派发者 {g.get('parent_name') or g_parent}:生成→修复之间它说过什么用 "
+                     f'search(q, agent="{g_parent}", since_ts="{c["gen_at"]}", until_ts="{c["fix_at"]}")')
         if c.get("gen_session"):
             line += f" | 生成于会话 {c['gen_session']}"
         if c.get("fix_session"):

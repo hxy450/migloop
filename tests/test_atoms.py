@@ -1631,3 +1631,30 @@ def test_search_file_collapses_unchanged_versions(tmp_path: Any) -> None:
     txt = atoms_text.render_search(led, "appName", file="h.ets", root="/proj")
     assert "首次出现: v1" in txt and "v2–v3 命中行未变" in txt and txt.count("appName here") == 1
     assert "- v4" in txt and "appName moved" in txt
+
+
+def test_render_chains_gives_dispatcher_interval_hint() -> None:
+    """两次四根验收,模型都没去主会话的生成→修复区间里查「执行疏漏」这类话:sessions 带文件时把派发者和区间摆出来。"""
+    payload = {"chains": [{"file": "entry/src/main/ets/components/MineComponent.ets",
+                           "file_abs": "/p/entry/src/main/ets/components/MineComponent.ets", "kind": "rework",
+                           "generator": {"desc": "conv-minefrag", "stage": "a2h-execute", "id": "agent-aconv",
+                                         "parent": "__main__:9b3105a2", "parent_name": "主会话·9b3105a2"},
+                           "fixer": {"desc": "fixer-r1", "stage": "fix", "id": "agent-afix"},
+                           "gen_at": "2026-07-24T06:28:42Z", "fix_at": "2026-07-26T20:42:48Z"}],
+               "cross": None, "t0": "2026-07-23T12:02:56Z", "touched": []}
+    text = atoms_text.render_chains(payload, root="/p", file="MineComponent.ets")
+    assert "派发者 主会话·9b3105a2" in text
+    assert 'search(q, agent="__main__:9b3105a2", since_ts="2026-07-24T06:28:42Z", until_ts="2026-07-26T20:42:48Z")' in text
+
+
+def test_ledger_meta_carries_parent_for_chains(tmp_path: Any) -> None:
+    """链的生成方名片要带派发者 id 与名字,sessions 才能给出区间提示。"""
+    from migloop import service
+    sub = [_rec("2026-01-01T00:00:01Z", "user", "转换首页"),
+           *_call("2026-01-01T00:00:05Z", "s1", "Write", {"file_path": "/proj/H.ets", "content": "x\n"},
+                  "File created successfully at: /proj/H.ets")]
+    main = [*_call("2026-01-01T00:00:00Z", "m1", "Agent", {"name": "conv-home", "prompt": "转换首页"}, "done",
+                   toolUseResult={"agentId": "a1"})]
+    led = _ledger(tmp_path, main, {"agent-a1": sub})
+    meta = service._merge_ledger_meta({}, led)
+    assert meta["a1"]["parent"] == MAIN_ID and meta["a1"]["parent_name"]

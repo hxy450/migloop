@@ -221,7 +221,8 @@ def _merge_ledger_meta(meta_map: dict[str, dict[str, Any]], ledger: Any) -> dict
             continue
         key = aid[6:] if aid.startswith("agent-") else aid
         card = {"desc": atoms.agent_label(ledger, aid), "stage": a.stage,
-                "prompt": str(a.prompt or "")[:200], "note": str(a.result or "")[:280]}
+                "prompt": str(a.prompt or "")[:200], "note": str(a.result or "")[:280],
+                "parent": a.parent, "parent_name": atoms.agent_label(ledger, a.parent) if a.parent else None}
         cur = merged.get(key)
         merged[key] = card if cur is None else {**card, **{k: v for k, v in cur.items() if v not in (None, "")}}
     return merged

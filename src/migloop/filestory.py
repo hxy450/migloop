@@ -681,7 +681,8 @@ def build_fix_chains(
             "fix_at": first_fix[fid].ts if fid in first_fix else None,
             "generator": {"id": gid, "desc": str(gm.get("desc") or gid)[:40],
                           "stage": gm.get("stage"),
-                          "prompt": str(gm.get("prompt") or "")[:200]},
+                          "prompt": str(gm.get("prompt") or "")[:200],
+                          "parent": gm.get("parent"), "parent_name": gm.get("parent_name")},
             "generators": [{"id": g, "desc": str(meta_at(g, first_gen.get(g)).get("desc") or g)[:40],
                             "stage": meta_at(g, first_gen.get(g)).get("stage"),
                             "prompt": str(meta_of(g).get("prompt") or "")[:200]}
