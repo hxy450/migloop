@@ -96,6 +96,22 @@ class Ledger:
     #: execute 阶段结束时刻(run 级 stage-marks 给的;用户口径:之后的写全是修复)。None = 没有 marks,
     #: 修复方退回按阶段名判。由调用方(routes / server)在建账后填,账本自己不读 marks
     fix_after: str | None = None
+    #: 动作号 → 转录行号(1 起):报告里的 #n 旁边带 @L,不经工具也能回查
+    lines: dict[int, int] = field(default_factory=dict)
+    #: (path, 读事件 seq) → 读它那次调用的动作号:文件原子的读者行带展开指针
+    read_act: dict[tuple[str, int], int] = field(default_factory=dict)
+
+
+def resolve_agent(ledger: Ledger, hint: str) -> AgentRec | None:
+    """id、不带 agent- 前缀的 id、唯一的名字、唯一的 id 后缀都认 —— 模型用「conv-aboutus」这种名字调过好几次落空。"""
+    a = ledger.agents.get(hint) or ledger.agents.get(f"agent-{hint}")
+    if a is not None:
+        return a
+    by_name = [x for x in ledger.agents.values() if x.name == hint]
+    if len(by_name) == 1:
+        return by_name[0]
+    by_tail = [x for k, x in ledger.agents.items() if len(hint) >= 8 and k.endswith(hint)]
+    return by_tail[0] if len(by_tail) == 1 else None
 
 
 def _number(a: AgentRec) -> None:
@@ -242,13 +258,18 @@ def build_ledger(agents: dict[str, AgentRec]) -> Ledger:
             certain[(path, r.seq)] = r.certain
     feeds: dict[tuple[str, int], int] = {}
     act_seq: dict[tuple[str, int], int] = {}
+    read_act: dict[tuple[str, int], int] = {}
+    lines: dict[int, int] = {}
     for a in agents.values():
         for act in a.actions:
+            if act.src is not None:
+                lines[act.seq] = act.src[1] + 1
             for ref in act.files:
                 ref.v = index.get((ref.path, ref.ev.seq))
                 if ref.op == "read":
                     feeds[(ref.path, ref.ev.seq)] = act.at
                     ref.certain = certain.get((ref.path, ref.ev.seq), True)
+                    read_act[(ref.path, ref.ev.seq)] = act.seq
                 else:
                     act_seq[(ref.path, ref.ev.seq)] = act.seq
             # 脚本碰过但方向不明的路径:不立版本,挂到文件原子上(没写过的文件也进目录),指针指回这次调用
@@ -283,7 +304,7 @@ def build_ledger(agents: dict[str, AgentRec]) -> Ledger:
             ver.act_seq = act_seq.get((path, ver.seq))
         st.touches.sort(key=lambda t: (t.ts, t.seq))
     t0 = min((act.ts for a in agents.values() for act in a.actions if act.ts), default="")
-    return Ledger(stories, agents, feeds, t0)
+    return Ledger(stories, agents, feeds, t0, lines=lines, read_act=read_act)
 
 
 # ═══════════════ 两个查询 ═══════════════
@@ -334,7 +355,7 @@ def build_evidence(ledger: Ledger) -> list[dict[str, Any]]:
 
 def action_raw(ledger: Ledger, agent_id: str, seq: int) -> dict[str, Any] | None:
     """按指针展开一次工具调用的完整 input / output(原始记录,不经任何摘要)。"""
-    a = ledger.agents.get(agent_id) or ledger.agents.get(f"agent-{agent_id}")
+    a = resolve_agent(ledger, agent_id)
     if a is None:
         return None
     act = next((x for x in a.actions if x.seq == seq), None)
@@ -491,7 +512,7 @@ def file_atom(ledger: Ledger, hint: str, v: int | None = None,
         out.append(row)
     content = vers[-1].content if vers else None
     readers = [{"by": r.by, "by_name": _agent_label(ledger.agents, r.by), "ts": r.ts,
-                "t": rel_time(r.ts, ledger.t0),
+                "t": rel_time(r.ts, ledger.t0), "seq": ledger.read_act.get((path, r.seq)), "via": r.via,
                 "v": r.version, "at": ledger.feeds.get((path, r.seq)),
                 "start": r.start, "n": r.n, "dep": r.dep, "certain": r.certain,
                 "seen": [list(x) for x in r.seen] if r.seen else None,
@@ -550,7 +571,7 @@ def agent_atom(ledger: Ledger, agent_id: str, v: int | None = None,
     父/子边、收尾输出。v=None = 整个生命周期(锚之后的动作打 after_anchor)。
     since = 窗口下界:只给喂养 (since, v] 这段版本的动作 —— 主会话动辄几百次调用,
     整个生命周期一次给出会撑爆调查 agent 的上下文,查主会话必须带窗口。"""
-    a = ledger.agents.get(agent_id) or ledger.agents.get(f"agent-{agent_id}")
+    a = resolve_agent(ledger, agent_id)
     if a is None:
         return None
     n = a.n_versions
@@ -607,7 +628,7 @@ def agent_atom(ledger: Ledger, agent_id: str, v: int | None = None,
                   "name": _agent_label(ledger.agents, a.parent)}
     children = [{"id": act.detail.get("child"), "name": act.detail.get("name"), "ver": act.ver}
                 for act in acts if act.kind == "dispatch" and act.ok]
-    inbox = [{"ts": act.ts, "from": act.detail.get("from"), "summary": act.detail.get("summary"),
+    inbox = [{"ts": act.ts, "seq": act.seq, "from": act.detail.get("from"), "summary": act.detail.get("summary"),
               "text": act.detail.get("text"), "at": act.at, "after_anchor": act.at > anchor}
              for act in acts if act.kind == "inbox"]
     return {

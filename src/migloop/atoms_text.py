@@ -33,9 +33,19 @@ def _who(ledger: atoms.Ledger, by: str, ver: int | None) -> str:
     return atoms.agent_label(ledger, by) + (f" v{ver}" if ver is not None else "")
 
 
-def _ref(seq: Any, t: str | None) -> str:
-    """动作引用 (#n T+h:mm):动作号给 action 展开用,T+ 给跨 agent 对先后用。"""
-    return f"(#{seq} {t})" if t else f"(#{seq})"
+def _ref(seq: Any, t: str | None, line: int | None = None) -> str:
+    """动作引用 (#n@L行 T+h:mm):动作号给 action 展开用,@L 是转录行号(报告不经工具也能回查),T+ 给跨 agent 对先后用。"""
+    core = f"#{seq}@L{line}" if line else f"#{seq}"
+    return f"({core} {t})" if t else f"({core})"
+
+
+def _short(path: str, root: str) -> str:
+    """工程内相对根;工程外(安卓源码、技能库)只留最后三段 —— 一条读记录曾 150 字,110 字是绝对路径。"""
+    r = rel(path, root)
+    if root and r != path:
+        return r
+    parts = path.replace("\\", "/").split("/")
+    return path if len(parts) <= 4 else "…/" + "/".join(parts[-3:])
 
 
 def _read_span(r: dict[str, Any]) -> str:
@@ -63,6 +73,10 @@ def _read_tags(r: dict[str, Any]) -> str:
         t.append("写前读")
     if r.get("via") == "script":
         t.append("脚本读")
+    elif r.get("via") == "inject":
+        t.append("注入")
+    elif r.get("via") == "stdout":
+        t.append("命令输出推出")
     if r.get("certain") is False:
         t.append("版本就近绑定(不确定)")
     return f" [{' '.join(t)}]" if t else ""
@@ -133,6 +147,7 @@ def render_file(ledger: atoms.Ledger, hint: str, v: int | None = None, root: str
         return f"账本里没有该文件: {hint}"
     anchor = fa["v"]
     vv_anchor = fa["versions"][anchor - 1] if fa["versions"] else None
+    lines = ledger.lines
     out = [f"# 文件 {rel(fa['path'], root)} @v{anchor}  (共 {fa['n_versions']} 版)"]
     out.append(f"完整路径: {fa['path']}")
     if vv_anchor is not None:
@@ -140,7 +155,7 @@ def render_file(ledger: atoms.Ledger, hint: str, v: int | None = None, root: str
                                   else "无法复原 —— " + _unknown_reason(vv_anchor)))
     for b in fa["breaks"]:
         out.append(f"⚠ 断点 {b['kind']} @ {b['ts'][:19]}: {b['detail']}")
-    out.append("## 写者脊柱(≤ 这一版)")
+    out.append("## 写者脊柱(≤ 这一版)—— (#n@L 行) 是写它那次调用的动作号与转录行号,action 展开")
     for vv in fa["versions"]:
         extra = []
         if vv["via"] == "script":
@@ -154,50 +169,66 @@ def render_file(ledger: atoms.Ledger, hint: str, v: int | None = None, root: str
         if not vv["content_known"]:
             extra.append("内容未知")
         mark = " ◀" if vv["v"] == anchor else ""
-        ptr = f" (#{vv['seq']})" if vv.get("seq") is not None else ""   # 写它那次调用,action 一跳展开
+        ptr = " " + _ref(vv["seq"], None, lines.get(vv["seq"])) if vv.get("seq") is not None else ""
         out.append(f"- v{vv['v']} ← {_who(ledger, vv['by'], vv['by_ver'])} | {vv['ts'][5:16]} {vv.get('t') or ''} | "
                    f"{vv['diff_kind']}" + (" · " + " · ".join(extra) if extra else "") + ptr + mark)
         if diff and vv.get("diff"):
             out.append("```diff\n" + _clip(vv["diff"], 6000) + "\n```")
     readers = [r for r in fa["readers"] if r["v"] == anchor]
-    out.append(f"## 读了 @v{anchor} 的 agent(下游,{len(readers)})")
+    out.append(f"## 读了 @v{anchor} 的 agent(下游,{len(readers)})—— action 展开能看到它读到的原文")
     for r in readers:
         span = _read_span(r)
         flags = ("" if r["certain"] else " · 版本就近绑定(不确定)") + (" · 依赖读" if r["dep"] else "")
-        out.append(f"- {_who(ledger, r['by'], r['at'])} | {r['ts'][5:16]} {r.get('t') or ''} | {span}{flags}")
+        flags += " · 注入" if r.get("via") == "inject" else ""
+        ptr = " " + _ref(r["seq"], None, lines.get(r["seq"])) if r.get("seq") is not None else ""
+        out.append(f"- {_who(ledger, r['by'], r['at'])} | {r['ts'][5:16]} {r.get('t') or ''} | {span}{flags}{ptr}")
     if fa.get("touches"):
         # 脚本碰过它但账本判不出读写:不立版本,只给指针 —— 展开 action 看原文,别当它没被改过
         out.append(f"## 碰过它、方向不明的调用({len(fa['touches'])}) —— 不立版本;action(id, n) 展开看是读是写")
         for t in fa["touches"]:
             out.append(f"- {_who(ledger, t['by'], t['by_ver'])} | {t['ts'][5:16]} {t.get('t') or ''} | {t['reason']}"
-                       f" | action(#{t['seq']})")
+                       f" | action{_ref(t['seq'], None, lines.get(t['seq']))}")
     if content:
         if fa["content"] is None:
             out.append("## 内容: 无法复原")
         else:
-            lines = fa["content"].replace("\n", "\n", 1).split("\n")
-            if lines and lines[-1] == "":
-                lines.pop()
+            body = fa["content"].replace("\n", "\n", 1).split("\n")
+            if body and body[-1] == "":
+                body.pop()
             lo = max(start or 1, 1)
-            hi = min(lo + n - 1, len(lines)) if (start and n) else len(lines)
-            out.append(f"## 内容 @v{anchor}(第 {lo}-{hi} 行 / 共 {len(lines)} 行)")
+            hi = min(lo + n - 1, len(body)) if (start and n) else len(body)
+            out.append(f"## 内容 @v{anchor}(第 {lo}-{hi} 行 / 共 {len(body)} 行)")
             width = len(str(hi))
             out.append("```")
             for i in range(lo - 1, hi):
-                out.append(f"{i + 1:>{width}} | {lines[i]}")
+                out.append(f"{i + 1:>{width}} | {body[i]}")
             out.append("```")
     return "\n".join(out)
 
 
+def _seen_suffix(r: dict[str, Any]) -> str:
+    """命中读默认只留行号(看原文用 seen=True 或 action 展开)。行号必须露出来:复跑教训,第 615 行不在摘要里,
+    调查员就没去展开 #4641。"""
+    seen = r.get("seen") or []
+    if not seen:
+        return ""
+    nums = ", ".join(str(ln) for ln, _t in seen[:20])
+    return f" [行号 {nums}{'…' if len(seen) > 20 else ''}]"
+
+
 def render_agent(ledger: atoms.Ledger, agent_id: str, v: int | None = None,
-                 root: str = "", full_text: bool = True, since: int | None = None) -> str:
-    """不带窗口时给整个生命周期(≤v)。曾试过默认折叠非目标版本的窗口(0723 对照实验变体 B):
-    调查员改用逐窗口查询,总字符没省(281K vs 276K),还把 AboutUsPage 那条链从「spec 写错」
-    误判成「漏读」—— 关键证据(v1 读的 spec 页)被折进一行没人点开。整段给出保持不变。"""
+                 root: str = "", full_text: bool = True, since: int | None = None,
+                 reads: bool = True, seen: bool = False) -> str:
+    """默认是索引:头部、派发词全文、收件索引行、逐版效应、读记录按调用合行(安卓路径缩短、看见的行只留行号)、
+    正文索引行、收尾。0723 复盘:agent 整段 1.27 万字里三分之二是读清单和看见的行,报告每根只引 6 个文件名和
+    6 次「看见」;信息不删,只是不默认铺开 —— seen=True 铺原文,reads=False 只给每版读的条数。
+    曾试过默认折叠非目标版本的窗口(变体 B):调查员改用逐窗口查询,总字符没省,还把 AboutUsPage 那条链
+    误判成「漏读」—— 整段仍给,只是压短。"""
     ag = atoms.agent_atom(ledger, agent_id, v, since=since)
     if ag is None:
         return f"账本里没有该 agent: {agent_id}"
     anchor = ag["v"]
+    lines = ledger.lines
     out = [f"# agent {ag['label']}  id={ag['id']}  v{anchor} / 共 {ag['n_versions']} 版"
            + (f"  窗口 v{since + 1}–v{anchor}(只给喂养这段版本的动作)" if since is not None else "")]
     ident = [ag.get("kind") or "agent", f"会话 {ag['session']}"]
@@ -207,7 +238,8 @@ def render_agent(ledger: atoms.Ledger, agent_id: str, v: int | None = None,
         ident.append(ag["description"])
     out.append("身份: " + " · ".join(ident))
     if ag.get("t0"):
-        out.append(f"时刻: 动作号旁的 T+h:mm 相对迁移开始 {ag['t0']}(池子里最早一条动作),跨 agent 对先后用它")
+        out.append(f"时刻: 动作号旁的 T+h:mm 相对迁移开始 {ag['t0']}(池子里最早一条动作),跨 agent 对先后用它;"
+                   "@L 是转录行号")
     if ag["parent"]:
         out.append(f"派发自: {ag['parent']['name'] or ag['parent']['id']} @v{ag['parent']['ver']}"
                    f"  (id={ag['parent']['id']})")
@@ -215,12 +247,12 @@ def render_agent(ledger: atoms.Ledger, agent_id: str, v: int | None = None,
         out.append("## 派发指令(全文)\n" + (_clip(ag["prompt"], 12000) if full_text else _clip(ag["prompt"], 600)))
     inbox = [m for m in ag["inbox"] if not (ag["prompt"] and m["text"] == ag["prompt"])]
     if inbox:
-        out.append(f"## 收件箱({len(inbox)})")
+        out.append(f"## 收件箱({len(inbox)}) —— 一行一条,action 展开全文")
         for m in inbox:
             late = " (锚点之后)" if m["after_anchor"] else ""
             out.append(f"- 喂 v{m['at']}{late} · 来自 {m['from']}" + (f" · {m['summary']}" if m.get("summary") else "")
-                       + "\n  " + _clip(m["text"] or "", 1500).replace("\n", "\n  "))
-    # 逐版:效应 + 喂它的输入
+                       + f" · {_clip(' '.join(str(m.get('text') or '').split()), 160)} "
+                       + _ref(m.get("seq"), None, lines.get(m.get("seq") or -1)))
     by_ver: dict[int, dict[str, list[Any]]] = {}
     for a in ag["actions"]:
         k = a["ver"] if a["ver"] is not None else a["at"]
@@ -229,8 +261,8 @@ def render_agent(ledger: atoms.Ledger, agent_id: str, v: int | None = None,
     reads_by_at: dict[int, list[dict[str, Any]]] = {}
     for r in ag["reads"]:
         reads_by_at.setdefault(r["at"], []).append(r)
-    out.append("## 逐版时间线(每个对外效应 +1 版;读归到它喂养的下一版;(#n) 是动作号,"
-               "action(id, n) 可展开该次调用的完整输入输出)")
+    out.append("## 逐版时间线(每个对外效应 +1 版;读归到它喂养的下一版;(#n@L 行) 是动作号与转录行号,"
+               "action(id, n) 可展开该次调用的完整输入输出;同一次调用读的文件合在一行)")
     for k in sorted(by_ver):
         slot = by_ver[k]
         late = k > anchor
@@ -243,7 +275,7 @@ def render_agent(ledger: atoms.Ledger, agent_id: str, v: int | None = None,
         out.append(head)
         for a in slot["eff"]:
             d = a["detail"]
-            tag = " " + _ref(a["seq"], a.get("t"))
+            tag = " " + _ref(a["seq"], a.get("t"), lines.get(a["seq"]))
             if a["kind"] == "dispatch":
                 out.append(f"- 派发 {d.get('name') or d.get('description') or '子agent'}"
                            + (f"  (子 agent id={d['child']})" if d.get("child") else "") + tag)
@@ -259,32 +291,42 @@ def render_agent(ledger: atoms.Ledger, agent_id: str, v: int | None = None,
                 else:
                     out.append(f"- {a['tool']}" + ("" if a["ok"] else "(失败)")
                                + (f": {d['cmd']}" if d.get("cmd") else "") + tag)
-        for r in reads_by_at.get(k, []):
-            out.append(f"  读 {rel(r['path'], root)}@v{r['v']}{_read_tags(r)} {_ref(r['seq'], r.get('t'))}")
-            # 看见的行与 action(#n) 是同一份信息:摘要只留前 3 行 + 全部行号 + 总数,原文按需展开。
-            # 行号必须露出来(复跑教训:第 615 行不在摘要里,调查员就没去展开 #4641)
-            seen = r.get("seen") or []
-            for ln, t in seen[:3]:
-                out.append(f"      看见 {ln}: {_clip(t.strip(), 160)}")
-            if len(seen) > 3:
-                nums = ", ".join(str(ln) for ln, _t in seen[:40])
-                more = f" …(共 {len(seen)} 个)" if len(seen) > 40 else ""
-                out.append(f"      …共 {len(seen)} 行,行号 {nums}{more};action(#{r['seq']}) 展开原文")
+        rs = reads_by_at.get(k, [])
+        if rs and not reads:
+            out.append(f"  读 {len(rs)} 条(reads=True 展开)")
+        elif rs:
+            groups: dict[int, list[dict[str, Any]]] = {}
+            for r in rs:
+                groups.setdefault(r["seq"], []).append(r)
+            for seq, grp in groups.items():
+                ref = _ref(seq, grp[0].get("t"), lines.get(seq))
+                if len(grp) == 1:
+                    r = grp[0]
+                    out.append(f"  读 {_short(r['path'], root)}@v{r['v']}{_read_tags(r)}{_seen_suffix(r)} {ref}")
+                else:
+                    items = [f"{r['path'].rsplit('/', 1)[-1]}@v{r['v']}{_read_tags(r)}{_seen_suffix(r)}" for r in grp[:12]]
+                    more = f" …共 {len(grp)} 个" if len(grp) > 12 else ""
+                    out.append(f"  读 {len(grp)} 个文件 {ref}: " + ", ".join(items) + more)
+                if seen:
+                    for r in grp:
+                        sl = r.get("seen") or []
+                        for ln, t in sl[:3]:
+                            out.append(f"      看见 {ln}: {_clip(str(t).strip(), 160)}")
+                        if len(sl) > 3:
+                            out.append(f"      …共 {len(sl)} 行;action(#{r['seq']}) 展开原文")
         others = [a for a in slot["inp"] if a["kind"] not in ("read", "inbox")]
         for a in others:
             d = a["detail"]
+            ref = _ref(a["seq"], a.get("t"), lines.get(a["seq"]))
             if a["kind"] in _TEXT_KINDS:
-                out.append(f"  {_TEXT_KINDS[a['kind']]}: {_clip(d.get('skill') or d.get('text') or '', 120)} "
-                           + _ref(a["seq"], a.get("t")))
+                out.append(f"  {_TEXT_KINDS[a['kind']]}: {_clip(d.get('skill') or d.get('text') or '', 120)} {ref}")
                 continue
             desc = d.get("cmd") or d.get("pattern") or d.get("skill") or d.get("url") or ""
             if d.get("unresolved"):
                 # 解析不了的读写不许静默:调查员据此知道该展开哪次 action 看原文
-                out.append(f"  ⚠ 未解析读写({d['unresolved']}) {a['tool']}: {_clip(desc, 120)} "
-                           + _ref(a["seq"], a.get("t")))
+                out.append(f"  ⚠ 未解析读写({d['unresolved']}) {a['tool']}: {_clip(desc, 120)} {ref}")
                 continue
-            out.append(f"  {a['tool']}" + ("" if a["ok"] else "(失败)") + (f": {desc}" if desc else "")
-                       + " " + _ref(a["seq"], a.get("t")))
+            out.append(f"  {a['tool']}" + ("" if a["ok"] else "(失败)") + (f": {desc}" if desc else "") + " " + ref)
         inboxes = [a for a in slot["inp"] if a["kind"] == "inbox"]
         if inboxes:
             out.append(f"  收件 {len(inboxes)} 条(见上)")

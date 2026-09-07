@@ -126,12 +126,15 @@ def build_server(backend: Any | None = None) -> Any:
                                       start=start, n=n)
 
     @srv.tool()
-    async def agent(sid: str, id: str, v: int | None = None, since: int | None = None) -> str:
-        """版本 agent 原子:身份、派发者与派发词全文、收件箱、≤v 逐版的效应与输入(读绑文件版本、
-        ▲旧版/行段/写前读等标)、收尾输出。id 可带或不带 agent- 前缀;v 空 = 整个生命周期;
-        since 给了只看 (since, v] 这段版本 —— 主会话动辄几百次调用,查它必须带窗口;子 agent 整段给。"""
+    async def agent(sid: str, id: str, v: int | None = None, since: int | None = None,
+                    reads: bool = True, seen: bool = False) -> str:
+        """版本 agent 原子(索引):身份、派发者与派发词全文、收件箱一行一条、≤v 逐版的效应与输入
+        (读按调用合行,绑文件版本,▲旧版/行段/命中行号/写前读等标)、它中途说的话一行一条、收尾输出。
+        每条记录带 (#n@L行):action(id, n) 展开原文。id 可带或不带 agent- 前缀,名字唯一也认;
+        v 空 = 整个生命周期;since 给了只看 (since, v] 这段版本 —— 主会话动辄几百次调用,查它必须带窗口。
+        seen=True 把命中读看见的原文行铺出来;reads=False 只给每版读的条数。"""
         ledger, cwd = await _ctx(sid)
-        return atoms_text.render_agent(ledger, id, v, root=cwd, since=since)
+        return atoms_text.render_agent(ledger, id, v, root=cwd, since=since, reads=reads, seen=seen)
 
     @srv.tool()
     async def blame(sid: str, path: str, v: int | None = None, start: int | None = None,

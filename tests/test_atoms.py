@@ -509,7 +509,8 @@ def test_render_agent_marks_action_seq_and_seen_lines(tmp_path: Any) -> None:
                  {"command": "cd /proj && grep -n appName spec/r.md"}, "615:- App 显示名 appName\n")
     led = _ledger(tmp_path, main)
     txt = atoms_text.render_agent(led, MAIN_ID, None, root="/proj")
-    assert "#1" in txt and "615:" in txt and "App 显示名" in txt
+    assert "#1" in txt and "行号 615" in txt and "App 显示名" not in txt      # 默认只留行号
+    assert "App 显示名" in atoms_text.render_agent(led, MAIN_ID, None, root="/proj", seen=True)
     seq = atoms.agent_atom(led, MAIN_ID, None)["actions"][0]["seq"]  # type: ignore[index]
     raw = atoms_text.render_action(led, MAIN_ID, seq)
     assert "grep -n appName" in raw and "615:- App 显示名" in raw
@@ -924,8 +925,9 @@ def test_agent_atom_since_window_and_seen_summary(tmp_path: Any) -> None:
     assert [r["path"] for r in ag["reads"]] == ["/proj/b.md"]           # 喂 v1 的 grep 读不在窗口里
     assert [a["ver"] for a in ag["actions"] if a["ver"] is not None] == [2]
     txt = atoms_text.render_agent(led, MAIN_ID, None, root="/proj")
-    assert txt.count("看见 ") == 3
-    assert "共 5 行" in txt and "615" in txt and "action(#" in txt
+    assert "行号 12, 40, 128, 615, 700" in txt and "看见" not in txt        # 默认只留行号
+    full = atoms_text.render_agent(led, MAIN_ID, None, root="/proj", seen=True)
+    assert full.count("看见 ") == 3 and "共 5 行" in full and "action(#" in full
     win = atoms_text.render_agent(led, MAIN_ID, 2, root="/proj", since=1)
     assert "r.md" not in win and "b.md" in win and "窗口 v2" in win
 
@@ -1183,7 +1185,7 @@ def test_script_touch_shows_on_file_atom_and_index(tmp_path: Any) -> None:
     assert fa["versions"][0]["seq"] == write_act.seq                                 # 写 v1 那次调用的动作号
     assert [(t["by"], t["seq"], t["reason"]) for t in fa["touches"]] == [(MAIN_ID, bash.seq, bash.detail["unresolved"])]
     text = atoms_text.render_file(led, "F.ets", None, root="/proj")
-    assert f"(#{write_act.seq})" in text and "碰过它、方向不明" in text and f"action(#{bash.seq})" in text
+    assert f"(#{write_act.seq}@L" in text and "碰过它、方向不明" in text and f"action(#{bash.seq}@L" in text
     new = atoms.file_atom(led, "New.ets", None)
     assert new is not None and new["n_versions"] == 0 and len(new["touches"]) == 1
     assert "只被脚本碰过(方向不明)" in atoms_text.render_index(led, "ets", None, root="/proj")
@@ -1454,3 +1456,57 @@ def test_skill_injection_split_across_blocks_is_one_inject(tmp_path: Any) -> Non
                   {"type": "text", "text": "<command-name>arkts-y</command-name>\n<skill-format>true</skill-format>Body"}])]
     led = _ledger(tmp_path, main)
     assert [x.kind for x in led.agents[MAIN_ID].actions] == ["inject"]
+
+
+# ═══════════════ 第 3 步:agent 视图索引化 ═══════════════
+
+def test_render_agent_groups_reads_and_hides_seen_by_default(tmp_path: Any) -> None:
+    """slice6 到 v14 那份 3.3 万字里读记录行 1.7 万、看见的行 8 千,报告只引用了 6 个文件名和 6 次「看见」:
+    同一次调用读的几个文件合成一行,安卓路径缩短,看见的行默认只留行号,想看原文用 seen=True。"""
+    main = [*_call("2026-01-01T00:00:00Z", "t1", "Bash",
+                   {"command": "cat /android/AIPPT/app/x.kt /android/AIPPT/app/y.kt"}, "a\nb\n"),
+            *_call("2026-01-01T00:00:10Z", "t2", "Grep",
+                   {"pattern": "hello", "path": "/proj/spec", "output_mode": "content"}, "/proj/spec/a.md:3:hello world"),
+            *_call("2026-01-01T00:00:20Z", "t3", "Write", {"file_path": "/proj/out.ets", "content": "z\n"},
+                   "File created successfully at: /proj/out.ets")]
+    led = _ledger(tmp_path, main)
+    text = atoms_text.render_agent(led, MAIN_ID, root="/proj")
+    assert "读 2 个文件" in text and "x.kt@v1" in text and "y.kt@v1" in text
+    assert "/android/AIPPT/app/x.kt" not in text                       # 安卓路径不整条铺
+    assert "看见" not in text and "行号 3" in text
+    assert "看见 3: hello world" in atoms_text.render_agent(led, MAIN_ID, root="/proj", seen=True)
+    assert "读 3 条" in atoms_text.render_agent(led, MAIN_ID, root="/proj", reads=False)
+
+
+def test_agent_and_action_accept_names(tmp_path: Any) -> None:
+    """模型用「vv-t2-A01」「conv-aboutus」这种名字调 agent 落空过好几次:名字唯一就认。"""
+    sub = [_rec("2026-01-01T00:00:01Z", "user", "转换首页"),
+           *_call("2026-01-01T00:00:05Z", "s1", "Write", {"file_path": "/proj/H.ets", "content": "x\n"},
+                  "File created successfully at: /proj/H.ets")]
+    main = [*_call("2026-01-01T00:00:00Z", "m1", "Agent", {"name": "conv-home", "prompt": "转换首页"}, "done",
+                   toolUseResult={"agentId": "a1"})]
+    led = _ledger(tmp_path, main, {"agent-a1": sub})
+    assert "H.ets" in atoms_text.render_agent(led, "conv-home", root="/proj")
+    seq = next(x.seq for x in led.agents["agent-a1"].actions if x.kind == "write")
+    assert atoms.action_raw(led, "conv-home", seq)
+
+
+def test_refs_carry_transcript_line(tmp_path: Any) -> None:
+    """盲评 17:2 更信原始组,理由几乎全是「行号+时间戳可回查」:动作号旁带转录行号,file 的脊柱和读者行也带。"""
+    main = [*_call("2026-01-01T00:00:00Z", "t1", "Write", {"file_path": "/proj/a.ets", "content": "x\n"},
+                   "File created successfully at: /proj/a.ets"),
+            *_read_call("2026-01-01T00:00:10Z", "t2", "/proj/a.ets", "x\n")]
+    led = _ledger(tmp_path, main)
+    assert "@L1" in atoms_text.render_agent(led, MAIN_ID, root="/proj")
+    ftext = atoms_text.render_file(led, "a.ets", root="/proj")
+    assert "@L1" in ftext and "@L3" in ftext
+
+
+def test_render_agent_inbox_as_index_lines(tmp_path: Any) -> None:
+    """主会话 149 条汇报 35 万字,收件箱默认一行一条,全文按指针展开。"""
+    main = [_rec(f"2026-01-01T00:0{i}:00Z", "user",
+                 f'Another Claude session sent a message: <teammate-message teammate_id="w{i}" summary="done {i}">'
+                 + "正文" * 200 + "</teammate-message>") for i in range(3)]
+    led = _ledger(tmp_path, main)
+    text = atoms_text.render_agent(led, MAIN_ID, root="/proj")
+    assert "来自 w0" in text and "done 0" in text and text.count("正文") < 300

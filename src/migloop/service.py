@@ -416,7 +416,8 @@ def atom_text(path: str, tool: str, args: dict[str, Any]) -> str:
                                       start=_opt_int(args, "start"), n=_opt_int(args, "n"))
     if tool == "agent" and args.get("id"):
         return atoms_text.render_agent(ledger, str(args["id"]), _opt_int(args, "v"), root=cwd,
-                                       since=_opt_int(args, "since"))
+                                       since=_opt_int(args, "since"),
+                                       reads=_flag(args, "reads", "1"), seen=_flag(args, "seen", "0"))
     if tool == "blame" and args.get("path"):
         return atoms_text.render_blame(ledger, str(args["path"]), _opt_int(args, "v"),
                                        _opt_int(args, "start"), _opt_int(args, "n"), root=cwd,
