@@ -647,21 +647,59 @@ def _next_hint(h: dict[str, Any], root: str) -> str:
     return f"→ action(#{h['seq']}) 展开原文"
 
 
+def _render_pool_search(ledger: atoms.Ledger, q: str, until_ts: str, since_ts: str | None, root: str) -> str:
+    res = atoms.search_pool(ledger, q, until_ts, since_ts)
+    win = f"{since_ts} ~ {until_ts}" if since_ts else f"≤ {until_ts}"
+    out = [f"# search 「{q}」 全池 {win}  文件 {len(res['files'])} 个 · agent {len(res['agents'])} 个",
+           f"范围: 这一刻之前 {res['n_agents']} 个 agent 的全部记录 + {res['n_files']} 个文件到这一刻为止的已知内容"
+           + (f";内容未知 {res['unknown_versions']} 版查不了" if res["unknown_versions"] else "")
+           + " —— 这个范围内的零命中才可以写成「那一刻之前没人见过」,引用时把这一行抄上"]
+    if res["files"]:
+        out.append("## 文件里(每个文件只报首次出现)")
+        for r in res["files"][:30]:
+            ref = " " + _ref(r["seq"], r.get("t"), r.get("line")) if r.get("seq") else ""
+            out.append(f"- {rel(r['path'], root)}@v{r['v']} ← {_who(ledger, r['by'], r['by_ver'])}{ref} · 命中 {r['n']} 行"
+                       f"  → search(q, file=) 看逐版;file(path, v={r['v']}) 看写者")
+            if r.get("snip"):
+                out.append(f"    {'第 ' + str(r['ln']) + ' 行: ' if r.get('ln') else ''}{r['snip']}")
+        if len(res["files"]) > 30:
+            out.append(f"  …还有 {len(res['files']) - 30} 个文件")
+    if res["agents"]:
+        out.append("## agent 的记录里(每个 agent 只报最早一条)")
+        for a in res["agents"][:30]:
+            h = a["first"]
+            where = ", ".join(rel(p, root) for p in (h.get("targets") or [])[:2])
+            out.append(f"- {a['label']} · 命中 {a['n']} 条 · 最早 {_SEARCH_KIND.get(h['kind'], h['kind'])}"
+                       + (f" {where}" if where else "") + " " + _ref(h["seq"], h.get("t"), h.get("line"))
+                       + f"  → search(q, agent={a['agent']}, until_ts=…) 看全部")
+            for ln, snip in h["snips"][:1]:
+                out.append(f"    {'第 ' + str(ln) + ' 行: ' if ln else ''}{snip}")
+        if len(res["agents"]) > 30:
+            out.append(f"  …还有 {len(res['agents']) - 30} 个 agent")
+    if not res["files"] and not res["agents"]:
+        out.append("零命中(范围见上一行;内容未知的版本不在内)")
+    return "\n".join(out)
+
+
 def render_search(ledger: atoms.Ledger, q: str, agent: str | None = None, v: int | None = None,
                   since: int | None = None, file: str | None = None, after: bool = False,
                   since_ts: str | None = None, until_ts: str | None = None, root: str = "") -> str:
     """带起点的按词查找。agent=:只看它喂养第 v 版及之前的记录(或 since_ts/until_ts 时间区间);
     file=:只看它到第 v 版为止的内容和读者。没有起点不搜 —— 「提到过」不等于「上游」,每一跳都要有账本里的边。"""
     if not agent and not file:
-        return ("search 必须带起点:agent=(可带 v / since,或 since_ts / until_ts 时间区间)或 file=(可带 v)。"
-                "不做全池搜索 —— 提到过一个词不等于在这条链的上游;要找谁提过某个名字用 index(query=)。")
+        if not until_ts:
+            return ("search 要么带起点(agent= 或 file=),要么全池但只允许带时间上限:search(q, until_ts=…)。"
+                    "全池查只用来核否定(「那一刻之前没人见过 X」),找上游仍要顺 agent / file 的边走。")
+        return _render_pool_search(ledger, q, until_ts, since_ts, root)
     if agent:
         res = atoms.search_agent(ledger, agent, q, v, since, after, since_ts, until_ts)
         if res is None:
             return f"账本里没有该 agent: {agent}"
         scope = (f"时间区间 {since_ts or '…'} ~ {until_ts or '…'}" if (since_ts or until_ts)
                  else f"≤ v{res['v']}" + (f"(窗口 v{since + 1}–v{res['v']})" if since is not None else ""))
-        out = [f"# search 「{q}」 in agent {res['label']}  {scope}  命中 {len(res['hits'])} 条记录"]
+        out = [f"# search 「{q}」 in agent {res['label']}  {scope}  命中 {len(res['hits'])} 条记录",
+               "范围: 只有这个 agent 的记录(派发词 / 读到的内容 / 写入 / 命令 / 说 / 想 / 收件 / 注入);别的 agent 和文件内容不在内。"
+               "零命中只能写「它在这个范围内没见过」;要写「那一刻之前没人见过」用 search(q, until_ts=那一刻) 全池查"]
         groups: dict[str, list[dict[str, Any]]] = {}
         for h in res["hits"]:
             groups.setdefault(h["kind"], []).append(h)
@@ -691,7 +729,10 @@ def render_search(ledger: atoms.Ledger, q: str, agent: str | None = None, v: int
     res2 = atoms.search_file(ledger, str(file), q, v)
     if res2 is None:
         return f"账本里没有该文件: {file}"
-    out = [f"# search 「{q}」 in file {rel(res2['path'], root)}  ≤ v{res2['v']}(共 {res2['n_versions']} 版)"]
+    out = [f"# search 「{q}」 in file {rel(res2['path'], root)}  ≤ v{res2['v']}(共 {res2['n_versions']} 版)",
+           f"范围: 该文件 ≤v{res2['v']} 的已知内容与读者读到的行"
+           + (f";内容未知 {res2['unknown']} 版查不了" if res2.get("unknown") else "")
+           + " —— 别的文件不在内,要查「那一刻之前谁写过 / 见过」用 search(q, until_ts=那一刻)"]
     if res2["first"] is None:
         out.append("这些版本的已知内容里没有这个词(内容未知的版本查不了)")
     else:

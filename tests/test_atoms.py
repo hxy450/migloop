@@ -1569,7 +1569,7 @@ def test_search_file_first_appearance_and_reader_hits(tmp_path: Any) -> None:
 
 def test_search_requires_anchor(tmp_path: Any) -> None:
     led = _ledger(tmp_path, [])
-    assert "必须带起点" in atoms_text.render_search(led, "x", root="/proj")
+    assert "只允许带时间上限" in atoms_text.render_search(led, "x", root="/proj")
 
 
 def test_render_agent_omits_result_before_last_version(tmp_path: Any) -> None:
@@ -2140,3 +2140,43 @@ def test_python_write_replace_inline_is_an_edit_and_unchanged_writeback_is_not_a
     assert not bash.detail.get("unresolved")
     assert led.stories["/proj/entry/F.ets"].versions[-1].content == "b\n"
     assert not led.stories["/proj/entry/New.ets"].versions or led.stories["/proj/entry/New.ets"].versions[0].source == "external"
+
+
+# ═══════════════ 零命中必须带范围;全池只允许带时间上限 ═══════════════
+
+def test_pool_search_is_time_bounded_and_states_scope(tmp_path: Any) -> None:
+    """SplashPage:工具组只在 conv-splash 的记录里搜 windowFullscreen,零命中就写成「生成期各输入里零命中」;
+    实际 AIPPT_design.md@v1:471 和主会话读 themes.xml 都在池里。全池查要带时间上限,结果自带范围。"""
+    w1 = [*_call("2026-01-01T00:30:00Z", "w1", "Write", {"file_path": "/proj/spec/ref/AIPPT_design.md",
+                                                        "content": "# design\nwindowFullscreen = true\n"},
+                 "File created successfully at: /proj/spec/ref/AIPPT_design.md")]
+    main = [*_read_call("2026-01-01T00:20:00Z", "t1", "/proj/android/values/themes.xml",
+                        "<item name=\"android:windowFullscreen\">true</item>\n"),
+            *_call("2026-01-01T00:29:00Z", "m1", "Agent", {"name": "ref-doc", "prompt": "分析设计稿"}, "done",
+                   toolUseResult={"agentId": "w1"}),
+            *_call("2026-01-01T02:00:00Z", "t2", "Bash", {"command": "python3 - <<'EOF'\nopen('/proj/entry/B.ets','w').write(str(1))\nEOF"}, "")]
+    led = _ledger(tmp_path, main, {"agent-w1": w1})
+    res = atoms.search_pool(led, "windowFullscreen", until_ts="2026-01-01T01:00:00Z")
+    # 安卓源码(外部输入)的已知内容也在池里 —— 「生成期没人见过」要连它一起否
+    assert {(r["path"], r["v"], r["by"]) for r in res["files"]} == {("/proj/spec/ref/AIPPT_design.md", 1, "agent-w1"),
+                                                                     ("/proj/android/values/themes.xml", 1, "__external__")}
+    # 写者的 Write 输入里也有这个词:它也算「见过」
+    assert [a["agent"] for a in res["agents"]] == [MAIN_ID, "agent-w1"] and res["agents"][0]["n"] == 1
+    text = atoms_text.render_search(led, "windowFullscreen", until_ts="2026-01-01T01:00:00Z", root="/proj")
+    assert "全池" in text and "范围:" in text and "AIPPT_design.md@v1" in text and "themes.xml" in text
+    early = atoms_text.render_search(led, "windowFullscreen", until_ts="2026-01-01T00:10:00Z", root="/proj")
+    assert "零命中" in early and "范围:" in early
+    late = atoms.search_pool(led, "windowFullscreen", until_ts="2026-01-01T03:00:00Z")
+    assert late["unknown_versions"] == 1                     # B.ets 那版内容未知:范围行要说出来
+    assert "只允许带时间上限" in atoms_text.render_search(led, "windowFullscreen", root="/proj")
+
+
+def test_agent_and_file_search_state_their_scope(tmp_path: Any) -> None:
+    main = [*_call("2026-01-01T00:00:00Z", "t1", "Write", {"file_path": "/proj/entry/A.ets", "content": "a\n"},
+                   "File created successfully at: /proj/entry/A.ets"),
+            *_call("2026-01-01T00:00:10Z", "t2", "Bash", {"command": "python3 - <<'EOF'\nopen('/proj/entry/A.ets','w').write(str(1))\nEOF"}, "")]
+    led = _ledger(tmp_path, main)
+    ag = atoms_text.render_search(led, "zzz", agent=MAIN_ID, root="/proj")
+    assert "范围: 只有这个 agent" in ag and "until_ts" in ag
+    fl = atoms_text.render_search(led, "zzz", file="A.ets", root="/proj")
+    assert "内容未知 1 版查不了" in fl and "范围:" in fl

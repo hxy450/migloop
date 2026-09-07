@@ -850,4 +850,36 @@ def search_file(ledger: Ledger, hint: str, q: str, v: int | None = None) -> dict
                             "seq": seq, "line": ledger.lines.get(seq or -1), "t": rel_time(r.ts, ledger.t0),
                             "snips": got[:3], "n": len(got)})
     return {"path": path, "q": q, "v": len(vers), "n_versions": len(st.versions),
+            "unknown": sum(1 for ver in vers if ver.content is None),
             "first": rows[0]["v"] if rows else None, "versions": rows, "readers": readers}
+
+
+def search_pool(ledger: Ledger, q: str, until_ts: str, since_ts: str | None = None) -> dict[str, Any]:
+    """全池按词查,只允许带时间上限:until_ts 之前所有 agent 的记录 + 所有文件到那一刻为止的已知内容。
+    用途是核否定 —— 「生成期没人见过 X」只能引用这种范围的零命中;找上游仍要走 agent / file 的边。"""
+    ql = q.lower()
+    files = []
+    unknown = 0
+    for path, st in ledger.stories.items():
+        for ver in st.versions:
+            if ver.ts > until_ts or (since_ts and ver.ts < since_ts):
+                continue
+            if ver.content is None:
+                unknown += 1
+                continue
+            if ql in ver.content.lower():
+                ln, snip = next(((i, _WS.sub(" ", t).strip()[:160]) for i, t in enumerate(ver.content.split("\n"), 1)
+                                 if ql in t.lower()), (None, ""))
+                files.append({"path": path, "v": ver.v, "by": ver.by, "by_ver": ver.by_ver, "seq": ver.act_seq,
+                              "line": ledger.lines.get(ver.act_seq or -1), "t": rel_time(ver.ts, ledger.t0),
+                              "ln": ln, "snip": snip, "n": sum(1 for t in ver.content.split("\n") if ql in t.lower())})
+                break                                          # 每个文件只报首次出现
+    agents = []
+    for aid in ledger.agents:
+        res = search_agent(ledger, aid, q, since_ts=since_ts or ledger.t0 or "0", until_ts=until_ts)
+        hits = [h for h in (res or {}).get("hits", []) if h.get("seq") is not None]
+        if hits:
+            h = hits[0]
+            agents.append({"agent": aid, "label": (res or {}).get("label") or aid, "n": len(hits), "first": h})
+    return {"q": q, "until_ts": until_ts, "since_ts": since_ts, "files": files, "agents": agents,
+            "unknown_versions": unknown, "n_agents": len(ledger.agents), "n_files": len(ledger.stories)}
