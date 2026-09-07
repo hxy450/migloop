@@ -573,7 +573,8 @@ MainPage 126 版一页 2.3 万字;原始组同题 24 次调用 9.4 万字。
 22. shell 写的内容未知:`cp x.bak x` 还原、`cat a b > c`(已做)之外,`cp` 的源内容已知时目标也已知(现在只记 wderived 内容未知);
     0723 EntryAbility 20 版未知大半是 .bak 还原。
 23. 「修复轮没动的文件」GUIDE 加了全池查提到,没重跑验证。
-24. pod730 HomePage 三处「实录外修改」里原始组还原了一处真实写者(Base-6c 的 bash 写):找出那种写法,解出来。
+24. ~~pod730 HomePage「实录外修改」里原始组还原的那处 Base-6c 的 bash 写~~ → 是脚本里自定义的批量替换帮助函数
+    `def rep(p, pairs): 读→循环 replace→写` 再 `rep('x.ets', [(old, new)])`;按形状识别、每次调用解成 edit(bb985a7)。
 25. 坐标带绝对时间戳:评委反复信原始组的「UTC 秒级时间戳 + old/new 原文」;(#n@L行) 旁边加时刻,diff 里给 old/new 原文互证。
 26. 再找带修复阶段的会话(migbot-server 导出)验证返修链在 0723 之外的表现。
 16. 判据 / 约束溯源:origin(q) 或 search 不带 agent 只查文件内容(spec / 技能 / ledger),回答「这句话最早出自哪」;
