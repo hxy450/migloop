@@ -2293,3 +2293,8 @@ def test_partial_literals_survive_a_failed_command(tmp_path: Any) -> None:
     led = _ledger(tmp_path, main, {"agent-v1": vv})
     v0 = led.stories[doc].versions[0]
     assert v0.by == "agent-v1" and v0.partial and "EntryAbility.ets:unknown" in v0.partial
+
+
+def test_guide_tells_how_to_check_fix_round_mentions_of_untouched_files() -> None:
+    from migloop import mcp_server
+    assert "search(q=文件名, since_ts=修复开始" in mcp_server.GUIDE

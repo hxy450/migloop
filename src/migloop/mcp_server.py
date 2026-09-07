@@ -79,6 +79,8 @@ spec 时凭什么」用 search(q, agent=主会话, v=那一版) 按词切,不要
    template(模板或外部原样留到修复期才改,问为什么生成期没改它)。
    created 链先问三件事:baseline 里有没有这一页(index(query=, kind=spec))、有没有派发词把它列为输出
    (search(q=文件名, agent=主会话, v=))、占位登记里有没有它(search(q=, file=placeholder-registry.md));三问全否 = 无人被指派。
+   修复轮没动的文件(sessions 里没有它的链)不等于修复侧没看到它:缺陷单可能点了它却把落点路由到别的文件。
+   用 search(q=文件名, since_ts=修复开始时刻, until_ts=结束) 全池查修复期谁提到过它,再 file(那张单, content=1) 看正文。
 2. diff(path, v_fix) 看修复到底改了什么;blame(path, v_fix, changed=True) 直接列出修复版替换/删除的
    那些行及其引入者(owner@since_v)—— 不必对整个文件做 blame。某一行是谁写的用 blame(path, v, start=行号, n=1)。
    file(path, v, diff=1) 只给第 v 版的 diff。
