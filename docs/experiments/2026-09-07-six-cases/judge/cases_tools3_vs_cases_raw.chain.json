@@ -1,0 +1,130 @@
+[
+ {
+  "chain": 5,
+  "file": "GuidePage.ets",
+  "treat_is_A": true,
+  "verdict": {
+   "a_links": 12,
+   "b_links": 9,
+   "a_leaf": "三条支线全部见底：轨道支线到池外输入（seekbar_horizontal_style.xml@v1 全文真值 4dp，环5A）、返回图标支线到池外输入（mipmap-xxhdpi/ic_guide_back.webp 资产，尺寸需探测，环4B）、底部避让支线到技能定义（.claude/skills/arkts-immersive-safearea/SKILL.md@v1 含底部条款且 conv-guide 读过，环5C）；无停在中间的支线",
+   "b_leaf": "生成侧到池外输入 + 技能定义（环9 四项：activity_guide.xml 与 ic_guide_back.webp 输入良好、page_0002_GuideActivity 基线快照 view_xml_synthesized 且 bounds 全空判缺、ui-migration-pitfalls.md 缺两条规则判缺、arkts-immersive-safearea/SKILL.md 输入良好）；修复侧另到批量生成脚本与技能（render_finding_skeleton.py + fill.py，环3）",
+   "shared_links": 8,
+   "shared_verdict_agree": 8,
+   "same_entry": true,
+   "entry_note": "最早进入点两份指向同一个节点同一次写：stage0-resources 完整 cat 了 seekbar_horizontal_style.xml 却在 resource-mapping.md@v1:551 只留颜色与 radius、丢掉 4dp（A 环4A #23247→#23321 / B 环8 :154-155, 2026-07-24T01:44→01:50），判定同为「错」。分支进入点也一一对应：返回图标 A 环2B = B 环6（conv-guide 凭 wrap_content+padding=20dp 的真值写出 24x24 并叠 padding）；底部避让 A 环3C = B 环5（slice15 读过 WindowModel 却只做顶部）。两份时间线可互校（A 的 T+13:48→T+14:05 相差 17 分，与 B 的 01:50→02:07:48 一致）。差别只在陈述框架：A 立一个全局最早进入点、另两支归为支线进入点，并在底部支线上多记一环前置「缺」（环4C：conv-guide 时 WindowModel 尚不存在）；B 把环8 与环6 并列为两个进入点、再注明环8 最早，且不给 conv-guide 的底部缺失单独定性——不是事实分歧。",
+   "a_checkable": 5,
+   "b_checkable": 4,
+   "a_consistency": 5,
+   "b_consistency": 4,
+   "conflicts": [
+    "ui-migration-pitfalls.md@v1 是否载有「ArkUI padding 计入已声明尺寸」条款：B 环9③ 断言「没有」这条和「Image 不写尺寸不取固有尺寸」这条（只列出 P-12/P-15/P-20，未交代检索范围与覆盖度）；A 明确把这一点列进「无法确认」，自述该次读到的 5 条 padding 命中只展开了 3 条（39/151/152 行）。不是硬事实对撞，而是 B 把一次范围有限的零命中说成了文件级否定，A 拒绝下这个结论。",
+    "24 这个数的出处：A 明确列为「无法确认」，怀疑来自 a2h-activity-converter 技能定义（系统提示，不在转录里）；B 环6 直接写「凭空写了 24x24」，把无来源当成了无依据。同一事实，一份存疑一份定性。"
+   ],
+   "preferred": "A",
+   "reason": "两份在所有共同环上判定完全一致、进入点也同一个，但 A 对每条否定断言都写明检索范围与覆盖度（「in conv-guide ≤v1，只含该 agent 的记录」「146 个 agent 全部记录 + 2271 个文件已知内容、内容未知 296 版」），并把没核实的四点单列，而 B 在技能文件与「凭空」两处把范围有限的观察写成了全局否定。",
+   "more_actionable": "B",
+   "_cost": 0.26370899999999997
+  },
+  "preferred_method": "treat",
+  "actionable_method": "control",
+  "treat": {
+   "cost_usd": 1.4810480000000001,
+   "num_turns": 31,
+   "wall_s": 303.7,
+   "calls": 30
+  },
+  "control": {
+   "cost_usd": 2.2238344999999997,
+   "num_turns": 30,
+   "wall_s": 399.9,
+   "calls": 29
+  }
+ },
+ {
+  "chain": 10,
+  "file": "SplashPage.ets",
+  "treat_is_A": true,
+  "verdict": {
+   "a_links": 8,
+   "b_links": 6,
+   "a_leaf": "主链(环1→6)追到池外批量生成脚本:baseline 页面 spec page_0001_SplashActivity.md@v1 ← 主会话·9b3105a2 v21 external·批量生成(同批 58 个,#348@L536),停;进度条支线停在 page spec 的属性映射缺口(第17行「bounds 为空→不得硬编码尺寸」,无条厚→strokeWidth);状态栏支线停在技能定义边界(page_0001 第67–69行把沉浸式甩给 .claude/skills/arkts-immersive-safearea,但未打开 SKILL.md 原文)。三类叶子都够到,其中技能这条只到边界、没进内容。",
+   "b_leaf": "两个池外终点都打开到原文:批量生成脚本 scratchpad/phase_a_build.py(主会话 jsonl:328,2026-07-23T12:33:17.727Z)的 `needs_immersive = page_type == \"full_screen_page\"`、不解析 android:theme、schema 无承载「是否隐藏系统栏」的字段;技能定义 .claude/skills/arkts-immersive-safearea/SKILL.md(conv-splash 读到的 13625 字符全文,setWindowSystemBarEnable/windowFullscreen/隐藏状态栏 0 命中,映射表无 android:windowFullscreen 行)。只覆盖状态栏这一维,返回键/进度条两维未追。",
+   "shared_links": 4,
+   "shared_verdict_agree": 3,
+   "same_entry": false,
+   "entry_note": "不同环,且分属该文件的两个不同缺陷维度:A 的进入点是环3 —— slice11-startup@v38 把只讲「点外不关」的 isModal 外推成「吞掉系统返回键」(返回键维);B 的进入点是环3 —— conv-splash 没打开池内已有的 spec/ref/AIPPT_design.md 里的 windowFullscreen 事实(状态栏维)。A 的进入点更站得住:它是一个有产物的正向误断言,由 blame(v52/v53,changed) 逐行签名=slice11-startup@v38(v51:184/185、v52:215)、该 agent 手上唯一的 isModal 输入 #17232@L98 只写「autoCancel:false + isModal:true → 点外不关」不提 BACK、以及派发词 @v205 硬约束4(D-020 只覆盖 Navigation 外壳)三方互证,「错(转换错)」的定性直接落在证据上。B 把 conv-splash 定为「错(有好的输入没用)」却在同段写环5/环6 是「让它必然漏掉的两个上游空洞」(脚本把 theme 压成一个布尔量、技能里连隐藏系统栏这个动作都不存在),且 AIPPT_design.md 从未被任何任务书路由给它(B 自己的环4:team-lead 只按 meta.json 字段转发),按其自述口径更接近「缺」而非「错」。",
+   "a_checkable": 4,
+   "b_checkable": 5,
+   "a_consistency": 5,
+   "b_consistency": 4,
+   "conflicts": [
+    "AndroidManifest 的 theme 行号:A 记 AndroidManifest.xml:99,B 记 :102 —— 两边引的是 fixer 同一次读(A:#25745@L476/#25748@L478;B: :476-477/:478-479)。",
+    "fixer「还原」这一拍挂在哪个回调:A 记 v56 用 .onNavBarStateChange,并说依据 WebViewPage.ets@v11 的 pop 路径(#25603@L349)判定 onPop 不可靠;B 记 21:20:24.982Z 的 Edit(toolu_01RknAJc4tUhzwpypigkLeRv)把还原搬进 onRoute(),依据是 SplashPage.ets:166-167 的 pushPathByName/onPageHide 注释。若指同一次改动,则回调 API 名与依据来源都对不上。",
+    "vv-t1-A01 手上的真机 dump 成色:A 把「真机 dump 1」直接算作依据单的观测支撑;B 指出转录里那棵 root y=127 的树同时含 Swiper 与引导页进度条 Stack[283,202][933,267],像 Guide 页的 dump,Splash 专属 dump 在转录里没找到。",
+    "conv-splash 手上是否有指向 themes.xml 的指针:B 称 meta.json 的 style_sources 清单里已列 themes.xml(会话内命中 1 次、内容没读),据此定「错」;A 的全池 search(windowFullscreen,until_ts=2026-07-24T18:03:00Z)只报 主会话·9b3105a2/ref-doc-analyzer/AIPPT_design.md@v1:471 命中、conv-splash 不在内,据此定「缺」——对「输入到没到它手上」这一事实前提的记述不一致。"
+   ],
+   "preferred": "A",
+   "reason": "A 覆盖了这次返修的全部维度(返回键/进度条/状态栏)并把主链用 blame 逐行签名+读取集+派发词原文三方互证,同时对每一条零命中都写明范围(until_ts、146 个 agent、2271 个文件、内容未知 789 版)而不说成全局否定;B 更深但只覆盖状态栏一维,且自曝其环2 的关键观测证据可能是误报(205≈同页蒙层 204、dump 疑为 Guide 页)却仍给「高」置信,并对「无任何 conv-* agent 读过它」这类否定未交代检索范围。",
+   "more_actionable": "B",
+   "_cost": 0.3552645
+  },
+  "preferred_method": "treat",
+  "actionable_method": "control",
+  "treat": {
+   "cost_usd": 1.5314665,
+   "num_turns": 29,
+   "wall_s": 303.8,
+   "calls": 28
+  },
+  "control": {
+   "cost_usd": 2.9057869999999992,
+   "num_turns": 36,
+   "wall_s": 536.0,
+   "calls": 35
+  }
+ },
+ {
+  "chain": 90,
+  "file": "EntryAbility.ets",
+  "treat_is_A": true,
+  "verdict": {
+   "a_links": 11,
+   "b_links": 10,
+   "a_leaf": "停在池外事实 + 派发词:环1 把 hvigor/assembleHap 只编译入口可达文件这一池外编译覆盖盲区如实传递,但第一个缺陷判在主会话给 base1-models 的派发词(环2)、并在环8 追到该派发口径被固化成模板;未追到技能定义或批量生成脚本(仅在「无法确认」里提到 v10/v11 等标「脚本落盘(字面量推断)」)",
+   "b_leaf": "技能定义 —— skill arkts-immersive-safearea:只规定 Layer 1(EntryAbility 写 WindowModel)与 Layer 3(各页 AppStorageV2.connect 读),没规定共享 WindowModel 定义落在哪个文件、由谁在何时建立",
+   "shared_links": 9,
+   "shared_verdict_agree": 7,
+   "same_entry": false,
+   "entry_note": "A 判在环2(主会话派发词授权临时自验脚手架却不指定验证宿主/串行锁,导致五个 base agent 都拿唯一入口可达文件 EntryAbility.onCreate 当公共试验台,产生 v6–v30 的 25 版反复,环8 又把该口径模板化外发 7 次);B 判在环1(skill 未规定共享 WindowModel 的归属与建立时机,7 个 converter 各造一份、entry-setup 造第 8 份,直到 batch7-closer 05:15:36 收敛)。B 的进入点更站得住:它落在池外的技能文件本身(符合「追到技能定义为止」),证据是可回查的实测计数(batch7 自测「6 个全屏页加 EntryAbility 各声明一份相同本地桩」agent-abatch7-*.jsonl:52)加上闭环 —— 收敛后 converter 派发词新增硬规则「必须 import 既有共享 WindowModel.ets,禁止自造桩」(agent-aconv-accountinfo-*.jsonl:1),此后再未反复;而 A 的进入点依赖「base 那批改写是缺陷」这一前提,B 出示了派发词原文「必须在入口真正调用一次 barrel 导出的函数…收尾完整还原」与三处还原的执行结果(git checkout 回滚、git status --porcelain 仅剩 ?? events/、残留 grep 计数 0),说明那批是派发词明令的一次性脚手架且还原干净;A 自己也承认 base2/base3 的注入与还原「内容未知,只能按脊柱与行数推」,即其最强一环(环5 判错)部分建立在推断上。但 A 的环8(同一段无宿主口径被复制进 7 条派发词,均给出 #编号@行号)是 B 完全没覆盖的独立证据,故 A 的进入点并非无据,只是层级更浅。",
+   "a_checkable": 4,
+   "b_checkable": 5,
+   "a_consistency": 3,
+   "b_consistency": 4,
+   "conflicts": [
+    "entry-setup 那次 WindowModel 桩的定性与语境:A(环9)称其为「不是反复,是收敛」的有意临时桩,写者自注「Base-6 落地后换共享导入(P-S11-004)」,判定传递;B(环2)称其是全局第 8 份重复桩、凭据注释是「与各页面本地桩同名,AppStorageV2.connect 默认按类型名取键」,判定错。同一次写,一份说是计划内占位、一份说是「选择了复制而非收敛」。",
+    "「barrel 只 import 不调用会被 ArkTS elide / 必须真正调用一次」这条规则的来源与时点:A(环5)说是 base3-network 实测补正,写进 base_03_handoff.md@v1(#3558@L272)并广播,原话「Base-1/2 未记录的坑」,因此 base1/base2 那两轮验证根本不成立(判错);B(环4)说这段话本来就写在 base1/base3/base4 各自的派发词里(agent-abase1-*.jsonl:1 等),base1 只是在 09:13:39/09:13:49 十秒内自纠(判传递)。二者对同一批次是「事后才发现的坑」还是「派发时已明令」直接互斥。",
+    "F012Service.install 的写者归属:A(环10)记在 group2-closer 名下(v38/v39「F012 / F001Service.install」,#14139/#14141);B(环6)记在 group1b 名下(15:01–15:02「F012Service.install() + F014ViewModel.onAbilityCreate + 新增 onNewWant」),group2 16:35 只写 F001Service.install(this.context)。",
+    "修复轮是否「看到」本文件:A 说 sessions(sid, file=EntryAbility.ets) 返回「0/29 没有匹配的链」,据此断言修复轮从未碰过本文件、修复侧多看到的是「没有」;B 说修复轮真机双端截图判出 P1 ALIGN_PSplashActivity_extra_element_status-bar,finding 的「源码缺口」一栏直接点名 entry/src/main/ets/entryability/EntryAbility.ets:unknown —— 未调用 window.setWindowSystemBarEnable([]),并把该文件列进 suggested_files(agent-aa2d7cdfd6a5cf89f.jsonl:208/:221;agent-a68daf720e780b4c2.jsonl:439),只是修复建议把落点改到 SplashPage.aboutToAppear,最终改动清单里才没有它。",
+    "终态行数:A 说 v43 全文 226 行;B 说终态 225 行(来源标为修复轮的行数统计 agent-afcfbf677a4e5864a.jsonl:55)。"
+   ],
+   "preferred": "B",
+   "reason": "B 追到了真正的池外叶子(技能文件的内容缺口)并给出收敛后新增硬规则这一闭环证据,坐标是带时间戳、行号与 commit SHA 的一手转录,且抓到了 A 因一次零命中查询(sessions 0/29)就误判为「修复侧没多看到任何东西」的那条 P1 finding —— 而 A 的核心指控(base1/base2 验证不成立)自陈建立在 20 版内容未知的行数与脊柱推断上。",
+   "more_actionable": "tie",
+   "_cost": 0.41969300000000004
+  },
+  "preferred_method": "control",
+  "actionable_method": "tie",
+  "treat": {
+   "cost_usd": 1.4213580000000001,
+   "num_turns": 27,
+   "wall_s": 291.1,
+   "calls": 26
+  },
+  "control": {
+   "cost_usd": 2.24999,
+   "num_turns": 24,
+   "wall_s": 417.1,
+   "calls": 23
+  }
+ }
+]

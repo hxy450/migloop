@@ -1,0 +1,221 @@
+[
+ {
+  "chain": 0,
+  "file": "HomeTabComponent.ets",
+  "treat_is_A": true,
+  "verdict": {
+   "a_links": 8,
+   "b_links": 10,
+   "a_leaf": "主线6环追到池外输入叶子（安卓 fragment_home.xml@v1，环6，判定传递/叶子），途中另落两个『缺』停点：批量生成的页面 spec page_0010_HomeFragment.md@v1（环4，停在批量生成脚本）与技能参考 ui-migration-pitfalls.md@v1（环5，停在技能定义）；支线B只2环，停在生成期 agent slice17-home@v13（中间，未再上溯）。",
+   "b_leaf": "两条链各5环。链A停在生成侧输入盘点（合成 view.xml bounds=\"\"、Stage-0 技能产物 resource-mapping.md 无像素列、P-15 平台台账无该规则）加同轮兄弟 conv-homedoc 反证，自述『再上游即安卓源码本身』但未把池外输入单列为一环；链B追到 Slice 11 的 FWD-REF: P-S11-066 与 D0『不可达单元不接线』口径本身（技能/规则定义），亦未展开安卓源。",
+   "shared_links": 5,
+   "shared_verdict_agree": 4,
+   "same_entry": true,
+   "entry_note": "主链进入点同一环：两份都定在生成轮 conv-hometab 写 HomeTabComponent.ets v1 的 `.width('100%').objectFit(ImageFit.Contain)`，且理由同构 —— adjustViewBounds=\"true\" 已完整读进上下文（A: #9135@L17 展开237行；B: jsonl:18）、注释里还复述了『按比例』，却没落高度/比例约束，两份均判『错』。次级进入点不同且互斥：A 指生成期 slice17-home@v13 引入 storagePermissionGranted（错），B 指修复轮 vv-static-B 自造的 host_never_mounted 误报（错）—— 而 A 恰把这张单当作环7的有效凭据。就这条支线看 B 的进入点更站得住：B 给了生成侧的正面取证（Slice 16 逐条核过 CreateOutLinePage.kt:325 / FileUploadPage.kt:68 / HomeDocFragment.kt:83 / HomeFragment.kt:215 / PPTFilePage.kt:139 全在 SDK_INT>=R 的 else 分支，依 D0 判不挂），A 对『该不该挂』则未做任何独立核验；但 B 自认无法确认 vv-static-B 是否真读过 PermissionIntroHost.ets 文件头，故只是更站得住、非定论。",
+   "a_checkable": 5,
+   "b_checkable": 4,
+   "a_consistency": 5,
+   "b_consistency": 4,
+   "conflicts": [
+    "PermissionIntroHost 是否该挂：A 环7 把 AppPermissionIntroDialog_01_host_never_mounted.md@v1 当有效凭据、修复方挂载判『传递』（隐含缺陷为真）；B 链B环2 判该单为误报（kind/severity 与 is_migration_bug 自相冲突、自述无安卓基线却指 PermissionIntroHost.ets:51/83 —— 那正是生成侧写明依 D0 不接线之处），并把它列为链B的故障进入点。同一事实两说。",
+    "HomeTabComponent 第三处改动的性质：A 环7 说 v20/v21 删掉了 `storagePermissionGranted` 字段并改挂 F008ViewModel/DocImportRouter（行为变化，且据此把 slice17-home 判『错』）；B 环5 说第三处改动『只是把 P-S9-010 存储权限口径的注释并入 VM 注释块，无行为变化，由链B编辑顺带产生』。",
+    "conv-homedoc 与 conv-hometab 的时间差：A 称姐妹 agent『早 1 分钟(T+15:12)』（而 A 自己给的全池截点是 T+15:16）；B 给绝对时戳 03:07:44.506Z vs 03:16:15.614Z，相差约 8.5 分钟。"
+   ],
+   "preferred": "A",
+   "reason": "A 唯一把主链追到了任务要求的池外输入叶子，且每个断言都带版本+归属坐标（blame v18 366-375 归 conv-hometab@v1 直接坐实『被改的这三行就是生成期写的』），负面结论一律显式限定范围（『≤v1 已知内容』『内容未知 354 版』），B 虽有更直接的原始转录坐标与更锋利的同轮兄弟反证，但链A停在池外输入前一步、链B的『错』判定自认建立在未核实的推断上、且有若干无坐标的聚合断言（grep 计数=0、P-15 用法皆此义、SYSTEMIC 由6页归纳）。",
+   "more_actionable": "B",
+   "_cost": 0.473117
+  },
+  "preferred_method": "treat",
+  "actionable_method": "control",
+  "treat": {
+   "cost_usd": 1.6678750000000002,
+   "num_turns": 29,
+   "wall_s": 296.2,
+   "calls": 28
+  },
+  "control": {
+   "cost_usd": 2.091828,
+   "num_turns": 32,
+   "wall_s": 407.5,
+   "calls": 31
+  }
+ },
+ {
+  "chain": 5,
+  "file": "GuidePage.ets",
+  "treat_is_A": true,
+  "verdict": {
+   "a_links": 9,
+   "b_links": 9,
+   "a_leaf": "两支到底：池外安卓源码（seekbar_horizontal_style.xml@v1、activity_guide.xml@v1，环4a）与技能定义（arkts-immersive-safearea/SKILL.md@v1，环3c）；返回键那支停在「缺」（环2b/3b，称池内本无图元像素尺寸），未触及任何批量生成脚本，修复侧的 ALIGN_*.md 被判为内容不可复原的外部输入而止步",
+   "b_leaf": "三类叶子都到：池外安卓源码 activity_guide.xml + mipmap-xxhdpi/ic_guide_back.webp（环9①）、两份技能定义 ui-migration-pitfalls.md 与 arkts-immersive-safearea/SKILL.md（环9③④）、以及修复侧的批量生成脚本 .claude/skills/arkts-visual-verify/scripts/render_finding_skeleton.py + fill.py（环3）；另把基线快照 page_0002_GuideActivity/ 无安卓截图、view_xml_synthesized=true、bounds 全空判为「缺」（环9②）",
+   "shared_links": 7,
+   "shared_verdict_agree": 6,
+   "same_entry": true,
+   "entry_note": "两份的最早进入点是同一环同一处：stage0-resources 完整 cat 过 seekbar_horizontal_style.xml（A #23247@L154 / B :154-155, 2026-07-24T01:44:26）拿到三层 <size android:height=\"4dp\"/>，却在 resource-mapping.md:551 只留颜色，4dp 丢失（A 环3a = B 环8，均判「错」）。分歧在两条支线：返回键上 A 判「缺」（称池内根本没有像素尺寸输入，故无进入点可言），B 判 conv-guide 环6 就是进入点；底部避让上 A 把进入点放在 conv-guide 环2c，B 放在 slice15 环5。返回键支线 B 的进入点更站得住——B 引 agent-aslice15-guide :152-153 同轮同类 agent 用 python 解 webp 头取过 icon_guide_function_select/ic_guide_scroll_img 的固有尺寸，证明「取像素」这件事在池内可做且已被做过，A 自己也承认 conv-guide 读到的是 wrap_content+padding=20dp（#8681@L18），在「真值说随内容」的前提下凭空写 24x24 是编造而非输入缺失；A 的「缺」建立在一次自陈范围有限（内容未知 296 版）的零命中上。",
+   "a_checkable": 5,
+   "b_checkable": 5,
+   "a_consistency": 4,
+   "b_consistency": 4,
+   "conflicts": [
+    "图元像素尺寸在池内是否存在：A 称「池里没有任何图元像素尺寸」「全池 search『pixelWidth』零命中」「sips 读 webp 真实像素，生成期全池零命中」；B 称生成轮 slice15 agent 在 :152-153 用 python 解 webp 头拿过两个图标的固有尺寸。二者不能同真，且直接决定返回键那环判「缺」还是「错」。",
+    "修复侧对齐单的内容是否可读：A 称 ALIGN_*.md@v1「内容无法复原——读取时没带全文快照」，「粗约 4 倍」「低约 2.7% 屏高」只见于 fixer 写进注释的转述、无法独立核对；B 直接引用三张单的正文原文（back-arrow 单 (0,70)-(180,200) 逐像素全背景色 RGB≈(222,217,249) 且无障碍树 Image [0,130][130,260] 存在；progress-bar 单安卓 bounds [240,174][840,234] 实际只 12-16px；bottom-buttons 单下移约 2.7% 屏高），并指出它们由 vv-t1-A01 用 render_finding_skeleton.py + fill.py 生成。",
+    "底部避让缺失由谁引入：A 说被改的 6 行全部出自 conv-guide@v1，batch2/batch3/slice15/group3 各 closer(v2–v11) 都没碰这 6 行，故 :580 那处归 conv-guide（环2c 错）；B 说 slice15（agent-aslice15-guide，:181 Write，2026-07-24T18:34:49）整页重写并把 6 个「贴底 + marginBottom 30」子屏挂进 Swiper 却只给顶部 guideTopInset()，故底部避让的错在 slice15（环5）。",
+    "fixer 读的 drawable 是哪一份：A 明确记 fixer 打开的是 …/platform-res/drawable/seekbar_horizontal_style.xml（#25736），并把「与 stage0-resources 读的 …/res/drawable/ 下同名文件是否同内容」列入无法确认；B 无保留地说 fixer「cat 了安卓 seekbar_horizontal_style.xml（:466, 21:18:43）拿到 4dp」。",
+    "resource-mapping.md:551 那一行到底留下了什么：A 说只保留轨道色 #1A753FF9 与渐变；B 说只写了颜色和「radius 34dp」。A 未提 radius，B 未提渐变。",
+    "修复动作与建议单的关系：B 说单里建议的是 .width(64).height(64)、fixer 另行实测后写成 10x16dp，是自主判断；A 只把 sips 探测记为 v12 改动的凭据，未提任何 64x64 建议值，也未把「fixer 偏离建议」列为环节属性。"
+   ],
+   "preferred": "B",
+   "reason": "两份链路骨架和最早进入点一致、坐标都可回查，但在两处正面冲突上 B 拿出的是可引的正面证据（slice15 用 python 解 webp 头、三张单的正文与其生成脚本），而 A 给的是它自己已承认范围有限（内容未知 296 版）的零命中和「内容不可复原」，正面命中压过有界否定，且 B 因此多追到了批量生成脚本与基线快照无截图这两个 A 没到的叶子。",
+   "more_actionable": "B",
+   "_cost": 0.433923
+  },
+  "preferred_method": "control",
+  "actionable_method": "control",
+  "treat": {
+   "cost_usd": 1.2106065,
+   "num_turns": 31,
+   "wall_s": 256.6,
+   "calls": 30
+  },
+  "control": {
+   "cost_usd": 2.2238344999999997,
+   "num_turns": 30,
+   "wall_s": 399.9,
+   "calls": 29
+  }
+ },
+ {
+  "chain": 8,
+  "file": "MemberCenterPage.ets",
+  "treat_is_A": true,
+  "verdict": {
+   "a_links": 11,
+   "b_links": 6,
+   "a_leaf": "三类叶子全部追到并停住:池外输入(安卓 activity_member_center.xml@v1,判传递)、批量生成脚本产物(spec/baseline/ui/page_0028_MemberCenterActivitiy.md 与合成 view.xml@v1,bounds 空,判缺)、技能参考(.claude/skills/android-ui-graph-query/references/ui-migration-pitfalls.md@v1,match_parent 零命中,判缺),另加派发方主会话派发词一环",
+   "b_leaf": "只到池外输入(安卓 MemberCenterActivitiy.kt 的运行期真值 / 布局 XML),环 6 顺带引用 spec page_0028(:6-14、:56)与合成 view.xml(bounds 空)但未把它们当独立环追,未触及技能定义层,自述「再往上就是安卓源码本身,属池外」",
+   "shared_links": 4,
+   "shared_verdict_agree": 3,
+   "same_entry": false,
+   "entry_note": "A 主链进入点是环 4 conv-member 把 match_parent+横向 margin 直译成 .width('100%')+margin(判缺,间距缺陷);B 的进入点是环 4 slice8-pay 把带「/天」后缀的整串灌进按纯数字设计的 30vp 槽(判错,字号缺陷)。两者是同一文件的两处不同缺陷,不构成对立:A 的分支 B 环 11 与 B 的环 4 指向同一 agent 的同一次写(#22335@L264 / :264)且同判「错」,证据也同源(kt 已整段在上下文里仍写错)。就各自缺陷看两个进入点都站得住 —— A 的「缺」有三处输入同时缺位撑着(bounds 为空的合成快照、spec 全文 btn_goto_pay 零命中、pitfalls 全文 match_parent 零命中,均给了检索范围),B 的「错」有 kt:271-282 于 :24(15:33:51)进上下文、半小时后 :264(16:04:37)仍写错的时间线撑着。",
+   "a_checkable": 5,
+   "b_checkable": 4,
+   "a_consistency": 5,
+   "b_consistency": 4,
+   "conflicts": [
+    "30vp 价格槽的来源:A 环 11 称 slice8-pay v13(文件 v7)「把整串 priceText 直接挂 .fontSize(30)」、animatedPrice 首现 v7;B 环 5 出示 conv-member 首版(:61)即已写 Text('￥').fontSize(16)+Text(priceText).fontSize(30),即 30vp 槽自 v1 就在,slice8-pay 只是改了灌进去的内容(stripCurrency 后仍含后缀)。B 给了首版代码原文,A 自己也承认「恰在 v7」是按 search 首现推的。",
+    "对 conv-member 同一次写(#9565@L61 / :61,同一时间戳 2026-07-24T02:35:15.167Z)判定相反:A 判「缺」,B 判「传递」—— 两者针对该次写里的不同代码块(底部 CTA 的 width/margin vs 价格 Text),不是同一断言的正面冲突,但同一节点被打了不同标签。",
+    "ALIGN 单的可追溯性:A 把 ALIGN_PMemberCenterActivitiy_* 记为「外部输入、全文无法复原、真正写单的 agent 无法确认」;B 环 3 把同族单 ALIGN_PMemberCenterActivitiy_font_mismatch_product-price-suffix.md 定位到池内 visual-verify「vv-t2-A02」的两次写(:310 建骨架 19:18:30、:349 填正文 19:25:36)并给出其真机 dump 依据。",
+    "conv-member 读到的价格控件依据文件不同:A 环 4 只提 activity_member_center.xml 184-200(#9523@L18);B 环 5 提 item_product_info.xml(:20/:21,tv_product_price 16dp、rollingTextView 30dp)。二者记录号不同、可并存,但 A 未提后者。",
+    "安卓字号真值的行号引用不一致:A 环 10 引 MemberCenterActivitiy.kt:276-282;B 引 :274-283(fixer 回读)与 :271-282(slice8-pay 读入),范围互相错位。"
+   ],
+   "preferred": "A",
+   "reason": "两份的坐标质量都很高,但 A 多走了两层(批量生成脚本产物与技能参考),对每条否定性断言都写明检索范围与「内容未知」的版本数,并把置信自评压到「中」;B 单链更精、每环有时间戳与 uuid,却停在池外、未核 group2/group3-closer 是否碰过价格块就给「高」置信。",
+   "more_actionable": "A",
+   "_cost": 0.40703800000000007
+  },
+  "preferred_method": "treat",
+  "actionable_method": "treat",
+  "treat": {
+   "cost_usd": 1.699631,
+   "num_turns": 30,
+   "wall_s": 327.0,
+   "calls": 29
+  },
+  "control": {
+   "cost_usd": 2.1565269999999996,
+   "num_turns": 25,
+   "wall_s": 366.6,
+   "calls": 24
+  }
+ },
+ {
+  "chain": 10,
+  "file": "SplashPage.ets",
+  "treat_is_A": true,
+  "verdict": {
+   "a_links": 12,
+   "b_links": 6,
+   "a_leaf": "两条链共 12 环。链B(状态栏)追到池外批量生成脚本为止——page spec `page_0001_SplashActivity.md@v1` 由主会话 9b3105a2 v21 批量产出(#348@L536,同批58个),按口径停;链A(返回键)没追到脚本或技能定义,停在池内决策账本 D-020(#1204@L2183)及其「Navigation 不暴露 onBackPressed」这一无来源的 API 前提,再以 onWillDismiss 全池零命中(146 agent/2271 文件/789 版内容未知)作收尾,判「缺」。",
+   "b_leaf": "单条状态栏链 6 环,追到两个池外终点并都给了原文:批量生成脚本 `scratchpad/phase_a_build.py`(主会话 jsonl:328,`needs_immersive = page_type == \"full_screen_page\"`,不解析 android:theme,schema 无「是否隐藏系统栏」字段)与技能定义 `.claude/skills/arkts-immersive-safearea/SKILL.md`(13625 字符全文,setWindowSystemBarEnable/windowFullscreen/隐藏状态栏 均 0 命中)。",
+   "shared_links": 3,
+   "shared_verdict_agree": 2,
+   "same_entry": false,
+   "entry_note": "A 把进入点定在环B4(T+13:53,页面 spec 批量生成时漏掉 themes.xml 的 windowFullscreen),理由是全程最早的一个「错」;B 定在环3(conv-splash 首建 SplashPage.ets 时没用池里已有的好输入),并明确把脚本与技能定义按口径归为「缺」排在其后。B 的进入点更站得住:它给出 conv-splash 手上确实有两个指针——meta.json 的 style_sources 已列 themes.xml(会话内 themes.xml 命中 1 次、内容没读)、AIPPT_design.md 早 11 小时就写全了 `Theme.SeceretBox.Launch { windowFullscreen = true }` + 应用位置 SplashActivity(ref-doc-analyzer jsonl:175/:188),两个都没打开,这是「有好输入没用」的实证;A 判进入点的那一环,自己同时承认「page spec 由批量生成脚本产出,按口径到此为止」且零命中只覆盖「该文件 ≤v1 的已知内容」,等于对一个自认不可完整审计的节点下了「错」,而它给 conv-splash 那一环的「缺」又被 B 的会话命中统计削弱。",
+   "a_checkable": 4,
+   "b_checkable": 5,
+   "a_consistency": 4,
+   "b_consistency": 4,
+   "conflicts": [
+    "ALIGN_PSplashActivity_extra_element_status-bar.md 的出身:A(环B2)判为「外部输入、读取时没带全文快照、内容不可复原」;B(环2)给出池内写者 vv-t1-A01/agent-aa2d7cdfd6a5cf89f 及两条写入记录(jsonl:221 填正文、:235 落 manifest)并引用了正文(取色 205、uitest dumpLayout)。",
+    "该单的时间:A 记 07-26T21:16(T+81:13)落盘;B 记 15:44:44 填正文、15:52:44 落 manifest,21:20:10/21:20:24 才是 fixer 改代码的时刻。",
+    "conv-splash 输入成色:A 说输入清单里只有 page spec/view.xml/meta.json/activity_splash.xml/SplashActivity.kt/SKILL,「没有 AndroidManifest.xml、themes.xml」,故判「缺」;B 说该会话 AndroidManifest 出现 2 次、themes.xml 1 次(在 meta.json 的 style_sources 清单里),只是没读到 theme 行,故判「错」。",
+    "修复所用 API:A 写「import window、setSystemBarsVisible(false)」;B 写「Bash 打补丁调 setWindowSystemBarEnable([])」。",
+    "还原动作挂点:A 说 aboutToDisappear 与 onRoute 都还原;B 说是 Edit 把还原「搬进」onRoute,并把上游单子建议的 aboutToAppear/aboutToDisappear 那半条纠正掉,同时自陈 aboutToDisappear 里那次还原是否成了死代码无法确认。"
+   ],
+   "preferred": "B",
+   "reason": "在两份重叠的状态栏链上,B 每一跳都落到 jsonl 行号+tool_use id+ISO 时间戳的原始转录坐标、追到了两个可复核原文的池外终点,还主动自曝了自己关键证据的瑕疵(dumpLayout 可能取自 Guide 页、205 灰很可能就是蒙层、改动未复编);而 A 在同一批环上把一份 B 用两条写入记录钉死的单子误判成「外部输入、内容不可复原」,并把 conv-splash 的「有好输入没用」降格为「缺」——不过要说明 A 覆盖面更宽(两条链,含 P0 合规链与 D-020 决策账本这一层)。",
+   "more_actionable": "B",
+   "_cost": 0.41177199999999997
+  },
+  "preferred_method": "control",
+  "actionable_method": "control",
+  "treat": {
+   "cost_usd": 1.7309085000000002,
+   "num_turns": 29,
+   "wall_s": 361.1,
+   "calls": 28
+  },
+  "control": {
+   "cost_usd": 2.9057869999999992,
+   "num_turns": 36,
+   "wall_s": 536.0,
+   "calls": 35
+  }
+ },
+ {
+  "chain": 90,
+  "file": "EntryAbility.ets",
+  "treat_is_A": true,
+  "verdict": {
+   "a_links": 18,
+   "b_links": 10,
+   "a_leaf": "双叶子但未及技能/脚本层:环1 追到池外输入(鸿蒙工程模板 EntryAbility v1,07-24T01:59,无人写过);故障侧的根停在池内源码注释——base3-network v5 写 HttpLog.ets@v1:25「由启动序列在 EntryAbility.onCreate 调 setDebug 打开」(#3450@L151)与 slice5-tracking 写 F013Service.ets@v1:181 同句(#21443@L161),即责任被派给一个虚位负责人;另佐以主会话 @v181/@v185/@v199/@v208 的分层派发结构,但没读任何技能定义或批量生成脚本原文",
+   "b_leaf": "技能定义:skill `arkts-immersive-safearea` 的四层架构只规定 Layer1(EntryAbility 写 WindowModel)与 Layer3(各页 AppStorageV2.connect 读),未规定共享 WindowModel 定义落在哪个文件、由谁在何时建立;并顺带追到派发词层(batch7 派发词步骤4、converter 后补硬规则)",
+   "shared_links": 11,
+   "shared_verdict_agree": 8,
+   "same_entry": false,
+   "entry_note": "不同。A 落在环18/环7(base3-network v5 在 HttpLog.ets@v1:25 把接线派给「启动序列」这个虚位负责人,#3450@L151,T+21:48);B 落在环1(skill 未规定共享 WindowModel 的归属与建立时机)。就「故障」进入点而言 A 更站得住:它指向的缺口一路活到用户真机(测试账号 10012345678 被拦 + 截图 #2358@L4997、结论 #2396@L5079),12/14 个写者无一接手;而 B 自己的证据显示它选的进入点在池内已闭环——环3 batch7-closer 05:15:36 收敛为共享 import,且 converter 派发词随后加了「禁止自造桩」硬规则,B 原话「该处再未反复」,即它不是任何遗留缺陷的入口。反过来,若把进入点定义为「结构性反复」的起点,B 的选择更贴题且唯一真正追出了池外(技能定义),A 的根仍在池内一次 agent 写入上",
+   "a_checkable": 4,
+   "b_checkable": 5,
+   "a_consistency": 3,
+   "b_consistency": 4,
+   "conflicts": [
+    "修复轮是否看到该文件:A 称「sessions(file=EntryAbility.ets) 在 29 条链里 0 命中 → 修复轮确实没碰它 / 本身没看到它」;B 给出修复轮 finding 的「源码缺口」直接点名 `EntryAbility.ets:unknown — 未调用 setWindowSystemBarEnable([])` 并列入 suggested_files(agent-aa2d7cdfd6a5cf89f.jsonl:208/:221;agent-a68daf72*.jsonl:439),只是建议被路由到 SplashPage.aboutToAppear、终稿清单里没有它(:627)。「没改」两家一致,「没看到」互斥",
+    "entry-setup 造 WindowModel 桩的性质:A 说是「就地声明本地桩类」并自注计划内(P-S11-004,#12795@L68),环3 是「按 v2 自己登记的计划」删桩,判 传递;B 说派发词(9b3105a2*.jsonl:2096)只说装 Layer1/Layer2、根本没指定桩归属,这是第 8 份重复桩、「选择了复制而非收敛」,判 错。是否存在一份已登记的桩→正式替换计划,两家事实相反",
+    "base1/2/3 临时块内容可否复原:A 称 @v5–@v22 共 18 版「内容未知、shell/脚本落盘字面量推断」,判 无法确认,并据此把全链置信降为「中」;B 逐条给出 abase1 的具体写与自纠行号(:169/:172/:174)、abase3 的 python 就地 patch、abase4 的 TEMP-BASE4-SELFCHECK 与 git checkout(:107/:142)及回滚后 `git status --porcelain` 残留 grep 计数 0(:143),判 传递、置信「高」",
+    "group1-closer 手里是否已有 setDebug 这条输入:A 称它 v1 已读 F013Service.ets@v12 并命中第 203 行 `static setDebug(...)`(#13161@L57),却只接了 install,判 错(有好输入没用);B 对同一次写只记「口径一致、互不覆盖」判 传递,未提该读取",
+    "写入规模口径:A 头部「43 版,写者 12 个」而正文又说「生成期 14 个写者没一个接过这条线」(A 内部自相矛盾);B 记「12 个写者(11 子 agent + 主会话)、26 次 Edit + 1 次 python 就地 patch + 5 次还原/回滚」,与 A 的 43 版对不上"
+   ],
+   "preferred": "B",
+   "reason": "B 每一环都给出「凭什么」的派发词原文与可逐条回查的坐标(jsonl:行号 + 时间戳 + commit 22d2e41),唯一真正追到池外技能定义,并用具体坐标纠正了 A 由「29 条链零命中」外推出的「修复轮没看到这个文件」;A 虽链更长、因果更深,但 18 版内容未知(6 环无法确认)、写者数 12/14 自相矛盾",
+   "more_actionable": "A",
+   "_cost": 0.4488945
+  },
+  "preferred_method": "control",
+  "actionable_method": "treat",
+  "treat": {
+   "cost_usd": 1.2749785,
+   "num_turns": 32,
+   "wall_s": 267.6,
+   "calls": 31
+  },
+  "control": {
+   "cost_usd": 2.24999,
+   "num_turns": 24,
+   "wall_s": 417.1,
+   "calls": 23
+  }
+ }
+]

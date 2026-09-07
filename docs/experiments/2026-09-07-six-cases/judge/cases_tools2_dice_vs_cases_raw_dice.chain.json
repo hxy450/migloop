@@ -1,0 +1,44 @@
+[
+ {
+  "chain": 2,
+  "file": "EntryAbility.ets",
+  "treat_is_A": true,
+  "verdict": {
+   "a_links": 10,
+   "b_links": 8,
+   "a_leaf": "两条线各自落到叶：甲线停在技能定义（环3 arkts-ui-verifier 的桥需求「账本里没有写者」）与两处池外输入（环4 test-design/test-case-template@v1 external T+4:30；环6 EntryAbility.ets@v1 external 脚手架）；乙线停在池外输入（环9 ECAT work_list 第13条，以会话根指令形态入池、池内无写者）。四个叶子，无一停在中间。",
+   "b_leaf": "主链落到池外输入终点（环8 Android ground truth MainActivity.kt，15:38:27，23 行，本身不含 UncaughtExceptionHandler），并在环6 撞到边界后停（ECAT crash_risk 硬检测器为管线组件，实现在 migloop 项目内、规则禁读，只有权重配置坐标 81e0a463 jsonl:28 `crash_risk: 0.1`）；环6 属「停在池边界」，环8 属正规池外叶子。",
+   "shared_links": 5,
+   "shared_verdict_agree": 4,
+   "same_entry": true,
+   "entry_note": "同一环：都落在生成侧 converter 子 agent a349784d2663f1f0a 那一次写（A 记 EntryAbility.ets@v2 #4252@L71 T+1:25，B 记 jsonl:71 15:51:35，时间戳可互相校准——A 的 T0≈14:26 换算后与 B 的绝对钟点吻合），且都判「缺」。差别在因由深度与覆盖面：B 再往前一步把成因钉到环8 Android 对照物本身没有该能力（1:1 迁移口径下无从得知）；A 则把同一进入点同时用于解释甲线（测试桥）与乙线（异常观察者）两簇改动，并附「__test_mode__ / errorManager 在 T+1:25 前全池零命中」的双词否定。",
+   "a_checkable": 5,
+   "b_checkable": 5,
+   "a_consistency": 5,
+   "b_consistency": 4,
+   "conflicts": [
+    "起点文件行数：A 环6 记 EntryAbility.ets@v1「external · 35 行」，B 环7 记 converter 15:39:05 读到的同一份 DevEco 脚手架为「34 行」——同一对象，行数差 1。",
+    "同一份派发词（主会话 2f01bcdc@v5，A #522@L100 / B jsonl:100）的定性相反：A 判「传递」（凭 work_list 第13条 + 通读 EntryAbility.ets@v8），B 判「错（未致害）」（手边有 d.ts 却凭记忆写 `@kit.ArkTS`）。两份对底层事实描述一致——A 自己也写了「把派发词猜的 @kit.ArkTS 订正为 @kit.AbilityKit」——分歧在判定粒度而非事实。",
+    "work_list 第13条还能不能往池内追：A 环9 断言「池内无人写过它」「ECAT 评审报告 = 池外输入，停」；B 用环5、环6 再追出两环（Discriminator 会话 257fed22 输入 jsonl:3 / 输出 jsonl:130、generator memory feedback_global-crash-observer.md 21:12:47、检测器权重配置 81e0a463 jsonl:28）。二者时间窗不重叠（A 的搜索截到 21:10:29，B 的新证据在 21:12 之后），故不是硬矛盾，但对「链是否已到底」结论相反，A 早停了一到两环。"
+   ],
+   "preferred": "A",
+   "reason": "A 覆盖了该文件的两簇改动（+40 行测试桥与 +20 行异常观察者）而 B 只追了观察者一簇（测试桥仅作为「修复侧多看到的」提及、未溯源），且 A 的两处零命中都写明了检索范围与不可查部分（「80 个 agent 全部记录 + 570 个文件已知内容，内容未知 54 版查不了」）、把 v7/v8 无 diff 正文和 agent 系统提示不在账内列为残余风险并只给「中」置信——没有把范围有限的零命中当全局否定；B 则在自认读不到实现的环6 仍给出「传递」判定并报「高」置信。",
+   "more_actionable": "B",
+   "_cost": 0.4249965
+  },
+  "preferred_method": "treat",
+  "actionable_method": "control",
+  "treat": {
+   "cost_usd": 1.372401,
+   "num_turns": 30,
+   "wall_s": 244.4,
+   "calls": 29
+  },
+  "control": {
+   "cost_usd": 1.672602,
+   "num_turns": 26,
+   "wall_s": 343.4,
+   "calls": 25
+  }
+ }
+]
