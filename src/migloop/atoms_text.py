@@ -174,7 +174,8 @@ def render_file(ledger: atoms.Ledger, hint: str, v: int | None = None, root: str
         if vv.get("source") == "generated":
             # 不是 agent 读源码写的,是脚本一次跑出来的:归因到这里就该问「这批是怎么生成的」而不是「谁写错了」
             runs = ", ".join(f"#{s}" for s in vv.get("gen_runs") or [])
-            extra.append(f"批量生成(脚本跑出来的,同批 {vv.get('batch')} 个;候选运行 {runs})")
+            batch = f"同批 {vv.get('batch')} 个;" if vv.get("batch") else ""
+            extra.append(f"批量生成(脚本跑出来的,{batch}候选运行 {runs})")
         elif vv["via"] == "script":
             extra.append("脚本落盘(字面量推断)")
         elif vv["via"] == "shell":
@@ -183,7 +184,9 @@ def render_file(ledger: atoms.Ledger, hint: str, v: int | None = None, root: str
             extra.append("观测封口")
         if vv["lines"] is not None:
             extra.append(f"{vv['lines']} 行")
-        if not vv["content_known"]:
+        if vv.get("partial_known"):
+            extra.append("部分已知(脚本字面量)")
+        elif not vv["content_known"]:
             extra.append("内容未知")
         mark = " ◀" if vv["v"] == anchor else ""
         ptr = " " + _ref(vv["seq"], None, lines.get(vv["seq"])) if vv.get("seq") is not None else ""

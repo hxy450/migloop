@@ -2275,6 +2275,7 @@ def test_script_literal_body_becomes_partial_content_and_writer(tmp_path: Any) -
     assert res and res["first"] == 1 and res["versions"][0]["partial"]
     text = atoms_text.render_file(led, doc, 1, root="/proj", content=True)
     assert "部分已知" in text and "EntryAbility.ets:unknown" in text
+    assert "内容未知" not in text and "同批 0" not in text
     pool = atoms.search_pool(led, "setWindowSystemBarEnable", until_ts="2026-01-01T02:00:00Z")
     assert [r["path"] for r in pool["files"]] == [doc]
 

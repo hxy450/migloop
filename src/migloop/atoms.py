@@ -598,6 +598,7 @@ def file_atom(ledger: Ledger, hint: str, v: int | None = None,
             "lines": (ver.content.count("\n") + 1) if ver.content else None,
             "has_diff": ver.diff is not None,
             "content_known": ver.content is not None,
+            "partial_known": ver.content is None and ver.partial is not None,
         }
         if with_diff:
             row["diff"] = ver.diff
