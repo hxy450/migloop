@@ -2378,3 +2378,22 @@ def test_index_agents_capped_without_query(tmp_path: Any) -> None:
     led = _ledger(tmp_path, main)
     text = atoms_text.render_index(led, "agent", None, root="/proj", limit=1)
     assert "## agent (1)" in text
+
+
+# ═══════════════ file(diff=1) 是全部改动的一次扫 ═══════════════
+
+def test_file_diff_log_lists_every_version_change(tmp_path: Any) -> None:
+    """pod730 MainPage 126 版:原始组一段 python 把全部 Edit 的 old/new 扫出来只要几次调用;file(diff=1) 要给同样的东西 ——
+    每一版一行头 + 改动正文(截 600 字),创建版只给行数,v_from/v_to 分页。"""
+    main = [*_call("2026-01-01T00:00:00Z", "t0", "Write", {"file_path": "/proj/entry/A.ets", "content": "".join(f"l{i}\n" for i in range(50))},
+                   "File created successfully at: /proj/entry/A.ets")]
+    for i in range(1, 7):
+        main += _call(f"2026-01-01T00:00:{i:02d}Z", f"t{i}", "Edit",
+                      {"file_path": "/proj/entry/A.ets", "old_string": f"l{i}\n", "new_string": f"l{i}\nnew{i}\n"}, "ok")
+    led = _ledger(tmp_path, main)
+    text = atoms_text.render_file(led, "A.ets", None, root="/proj", diff=True)
+    assert all(f"+new{i}" in text for i in range(1, 7))          # 六次改动的正文都在
+    assert "+l25" not in text and "整篇 50 行" in text            # 创建版不铺全文
+    part = atoms_text.render_file(led, "A.ets", None, root="/proj", diff=True, v_from=4, v_to=5)   # v4 = 第 3 次改
+    assert "+new3" in part and "+new4" in part and "+new2" not in part and "+new5" not in part
+    assert "v_from" in text or "分页" in text

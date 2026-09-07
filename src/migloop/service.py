@@ -554,7 +554,9 @@ def atom_text(path: str, tool: str, args: dict[str, Any]) -> str:
                                       content=_flag(args, "content", "0"),
                                       diff=_flag(args, "diff", "0"),
                                       start=_opt_int(args, "start"), n=_opt_int(args, "n"),
-                                      readers=_flag(args, "readers", "0"))
+                                      readers=_flag(args, "readers", "0"),
+                                      v_from=_opt_int(args, "v_from"), v_to=_opt_int(args, "v_to"),
+                                      diff_chars=_opt_int(args, "diff_chars") or 600)
     if tool == "agent" and args.get("id"):
         return atoms_text.render_agent(ledger, str(args["id"]), _opt_int(args, "v"), root=cwd,
                                        since=_opt_int(args, "since"),

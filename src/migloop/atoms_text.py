@@ -181,7 +181,8 @@ def _collapse_spine(ledger: atoms.Ledger, rows: list[dict[str, Any]], anchor: in
 
 def render_file(ledger: atoms.Ledger, hint: str, v: int | None = None, root: str = "",
                 content: bool = False, diff: bool = False,
-                start: int | None = None, n: int | None = None, readers: bool = False) -> str:
+                start: int | None = None, n: int | None = None, readers: bool = False,
+                v_from: int | None = None, v_to: int | None = None, diff_chars: int = 600) -> str:
     """默认只给写者脊柱与碰过:单根往上追看的是写者。读者是下游,归并阶段才用(指南漏条款波及了哪些页),
     默认一行计数,readers=True 展开;按词找读者用 search(file=)。"""
     fa = atoms.file_atom(ledger, hint, v, with_diff=diff, with_content=content)
@@ -199,9 +200,16 @@ def render_file(ledger: atoms.Ledger, hint: str, v: int | None = None, root: str
                    + _hops(ledger, ("f", fa["path"], anchor)) + "(累计/窗口口径;每次 agent↔文件转换算一跳,派发算一跳)")
     for b in fa["breaks"]:
         out.append(f"⚠ 断点 {b['kind']} @ {b['ts'][:19]}: {b['detail']}")
-    out.append("## 写者脊柱(≤ 这一版)—— (#n@L 行) 是写它那次调用的动作号与转录行号,action 展开"
-               + (";同一写者连续几版折成一行,file(path, v=某版) 单看" if len(fa["versions"]) > 8 else ""))
-    for vv in _collapse_spine(ledger, fa["versions"], anchor, lines):
+    lo_v = max(v_from or 1, 1)
+    hi_v = min(v_to or anchor, anchor)
+    if diff:
+        out.append(f"## 写者脊柱 + 每版改动(v{lo_v}–v{hi_v};每版截 {diff_chars} 字,整段用 diff(path, v);创建版 / 整篇重写只给行数;"
+                   "超出范围用 v_from / v_to 分页)—— 这就是「这个文件全部改动一次扫完」")
+    else:
+        out.append("## 写者脊柱(≤ 这一版)—— (#n@L 行) 是写它那次调用的动作号与转录行号,action 展开"
+                   + (";同一写者连续几版折成一行,file(path, v=某版) 单看;diff=1 给每版改动" if len(fa["versions"]) > 8 else ""))
+    rows = fa["versions"] if not diff else [r for r in fa["versions"] if lo_v <= r["v"] <= hi_v or r["v"] == anchor]
+    for vv in (rows if diff else _collapse_spine(ledger, rows, anchor, lines)):
         if vv.get("_run"):
             out.append(vv["_run"])
             continue
@@ -227,13 +235,15 @@ def render_file(ledger: atoms.Ledger, hint: str, v: int | None = None, root: str
         ptr = " " + _ref(vv["seq"], None, lines.get(vv["seq"])) if vv.get("seq") is not None else ""
         out.append(f"- v{vv['v']} ← {_who(ledger, vv['by'], vv['by_ver'])} | {vv['ts'][5:16]} {vv.get('t') or ''} | "
                    f"{vv['diff_kind']}" + (" · " + " · ".join(extra) if extra else "") + ptr + mark)
-        if diff and vv.get("diff") and vv["v"] == anchor:
-            if vv.get("diff_kind") == "creation" and content:
-                out.append("(创建版:diff 即全文,见下面「内容」)")
-            else:
+        if diff and vv.get("diff"):
+            if vv.get("diff_kind") == "creation":
+                out.append(f"  (整篇 {vv.get('lines')} 行,创建版不铺;file(path, v={vv['v']}, content=1) 看)")
+            elif vv["v"] == anchor and v is not None:
                 out.append("```diff\n" + _clip(vv["diff"], 6000) + "\n```")
-    if diff and anchor > 1:
-        out.append("(只给第 v 版的 diff;其它版本用 diff(path, v))")
+            else:
+                out.append("```diff\n" + _clip(vv["diff"], diff_chars) + "\n```")
+        elif diff and not vv.get("content_known"):
+            out.append("  (内容未知,没有 diff;action 展开那次调用看命令)")
     rlist = [r for r in fa["readers"] if r["v"] == anchor]
     if not readers:
         out.append(f"## 读者 {len(rlist)} 个(下游;readers=1 展开;按词找用 search(file=))")

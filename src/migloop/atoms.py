@@ -595,7 +595,7 @@ def file_atom(ledger: Ledger, hint: str, v: int | None = None,
             "by_ver": ver.by_ver, "seq": ver.act_seq, "via": ver.via, "source": ver.source,
             "gen_runs": list(ver.gen_runs), "batch": ver.batch,
             "diff_kind": ver.diff_kind, "sealed": ver.sealed,
-            "lines": (ver.content.count("\n") + 1) if ver.content else None,
+            "lines": len(ver.content.splitlines()) if ver.content else None,   # 末尾换行不算一行
             "has_diff": ver.diff is not None,
             "content_known": ver.content is not None,
             "partial_known": ver.content is None and ver.partial is not None,
