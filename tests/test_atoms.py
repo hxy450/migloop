@@ -2324,3 +2324,16 @@ def test_relative_path_repeating_the_cwd_tail_collapses(tmp_path: Any) -> None:
     led = _ledger(tmp_path, main)
     assert [p for p in led.stories if p.endswith("M.ets")] == [real]
     assert len(led.stories[real].reads) == 1
+
+
+def test_python_c_replace_into_new_variable_is_an_edit(tmp_path: Any) -> None:
+    """pod730 #22882:python -c 里 s2 = s.replace('a;', 'a();'); open(p,'w',encoding='utf-8').write(s2) —— 结果赋给新变量,
+    以前当成内容未知的写,之后 85 版全盲。"""
+    cmd = ("cd C:/p && PYTHONIOENCODING=utf-8 python -c \"\nimport re\np='entry/A.ets'\ns=open(p,encoding='utf-8').read()\n"
+           "s2=s.replace('x;','x();')\nopen(p,'w',encoding='utf-8').write(s2)\nprint('replaced:', s.count('x;'))\n\" && grep -n x entry/A.ets")
+    main = [*_call("2026-01-01T00:00:00Z", "t1", "Write", {"file_path": "C:/p/entry/A.ets", "content": "x;\ny\n"},
+                   "File created successfully at: C:/p/entry/A.ets"),
+            *_call("2026-01-01T00:00:10Z", "t2", "Bash", {"command": cmd}, "replaced: 1\n1:x();\n")]
+    led = _ledger(tmp_path, main)
+    st = led.stories["C:/p/entry/A.ets"]
+    assert len(st.versions) == 2 and st.versions[1].content == "x();\ny\n", [(v.source, v.content) for v in st.versions]

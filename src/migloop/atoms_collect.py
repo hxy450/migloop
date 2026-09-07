@@ -282,11 +282,19 @@ def _py_script_ops(code: str, base: str | None) -> list[FileOp]:
                         ops.append(FileOp("read", rp, "script", dep=True))
                     return
                 if (val.func.attr == "replace" and isinstance(val.func.value, ast.Name)
-                        and val.func.value.id == name and name in read_path and len(val.args) >= 2):
+                        and val.func.value.id in read_path and len(val.args) >= 2):
+                    src = val.func.value.id
                     old, new = cs(val.args[0]), cs(val.args[1])
+                    if src != name:                       # s2 = s.replace(...):新变量继承来源文件与已累计的替换
+                        read_path[name] = read_path[src]
+                        edits[name] = list(edits.get(src, []))
+                        if src in dirty:
+                            dirty.add(name)
                     if old is not None and new is not None:
                         edits.setdefault(name, []).append((old, new, len(val.args) < 3))
-                        return
+                    else:
+                        dirty.add(name)
+                    return
             if name in read_path:
                 dirty.add(name)           # s = re.sub(...) / s + x:写回内容算不出
             return
