@@ -87,6 +87,12 @@ def _clip(text: str, cap: int) -> str:
     return text if len(text) <= cap else text[:cap] + f"…(截断,共 {len(text)} 字)"
 
 
+def _hops(ledger: atoms.Ledger, node: tuple[str, str, int]) -> str:
+    """「上游 N/M 跳」:N 累计口径(写之前读过的一切),M 窗口口径(上一效应之后读的);每次 agent↔文件转换算一跳,派发算一跳。"""
+    dm, dw = ledger.depth_max.get(node), ledger.depth_win.get(node)
+    return f" · 上游 {dm}/{dw} 跳" if dm is not None else ""
+
+
 def render_index(ledger: atoms.Ledger, kind: str | None = None, query: str | None = None,
                  root: str = "", limit: int = 300) -> str:
     """目录。kind: agent | ets | spec | src | other | None(全部);query 子串过滤。"""
@@ -121,7 +127,8 @@ def render_index(ledger: atoms.Ledger, kind: str | None = None, query: str | Non
             touch = f" · 碰过 {f['n_touches']}" if f.get("n_touches") else ""
             if f.get("n_unknown"):
                 touch += f" · {f['n_unknown']} 版内容未知(按词查文件查不到这些版)"
-            out.append(f"- {rel(f['path'], root)} | {f['kind']} | {tag} · 读 {f['n_reads']}{touch}")
+            hops = _hops(ledger, ("f", f["path"], f["n_versions"])) if f["n_versions"] else ""
+            out.append(f"- {rel(f['path'], root)} | {f['kind']} | {tag} · 读 {f['n_reads']}{touch}{hops}")
         if len(fs) > limit:
             out.append(f"  …还有 {len(fs) - limit} 个,用 query/kind 缩小")
     return "\n".join(out)
@@ -156,7 +163,8 @@ def render_file(ledger: atoms.Ledger, hint: str, v: int | None = None, root: str
     out.append(f"完整路径: {fa['path']}")
     if vv_anchor is not None:
         out.append("这一版内容: " + ("可复原" if vv_anchor["content_known"]
-                                  else "无法复原 —— " + _unknown_reason(vv_anchor)))
+                                  else "无法复原 —— " + _unknown_reason(vv_anchor))
+                   + _hops(ledger, ("f", fa["path"], anchor)) + "(累计/窗口口径;每次 agent↔文件转换算一跳,派发算一跳)")
     for b in fa["breaks"]:
         out.append(f"⚠ 断点 {b['kind']} @ {b['ts'][:19]}: {b['detail']}")
     out.append("## 写者脊柱(≤ 这一版)—— (#n@L 行) 是写它那次调用的动作号与转录行号,action 展开")
@@ -250,7 +258,8 @@ def render_agent(ledger: atoms.Ledger, agent_id: str, v: int | None = None,
     anchor = ag["v"]
     lines = ledger.lines
     out = [f"# agent {ag['label']}  id={ag['id']}  v{anchor} / 共 {ag['n_versions']} 版"
-           + (f"  窗口 v{since + 1}–v{anchor}(只给喂养这段版本的动作)" if since is not None else "")]
+           + (f"  窗口 v{since + 1}–v{anchor}(只给喂养这段版本的动作)" if since is not None else "")
+           + _hops(ledger, ("a", ag["id"], anchor))]
     ident = [ag.get("kind") or "agent", f"会话 {ag['session']}"]
     if ag.get("model"):
         ident.append(ag["model"])
@@ -536,6 +545,8 @@ def render_chains(payload: dict[str, Any], root: str = "", file: str | None = No
                 line += f" | 生成于 {g_t} · 修复于 {f_t}"
             else:                       # created / template 链没有生成侧时刻
                 line += f" | 修复于 {f_t}"
+            if c.get("hops"):
+                line += f" | 上游 {c['hops'][0]}/{c['hops'][1]} 跳"
         g_parent = g.get("parent")
         if g_parent and c.get("gen_at") and c.get("fix_at"):
             # 生成方的派发者在生成→修复这段说过什么、决定过什么,是转换器自己的记录里没有的一层;区间摆到眼前

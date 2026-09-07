@@ -2180,3 +2180,45 @@ def test_agent_and_file_search_state_their_scope(tmp_path: Any) -> None:
     assert "范围: 只有这个 agent" in ag and "until_ts" in ag
     fl = atoms_text.render_search(led, "zzz", file="A.ets", root="/proj")
     assert "内容未知 1 版查不了" in fl and "范围:" in fl
+
+
+# ═══════════════ 上游最长链:建账时 DP 预存 ═══════════════
+
+def test_upstream_depth_counts_every_agent_file_transition(tmp_path: Any) -> None:
+    """spec.md(池外)→ conv 读 → 写 A.ets@v1 → fixer 读 → 写 A.ets@v2:四次转换,A.ets@v2 上游 4 跳;
+    派发也算一跳(conv 由主会话派发,主会话没读过东西,派发边不加长)。"""
+    from migloop import filestory, service
+    conv = [_rec("2026-01-01T00:00:00Z", "user", "转换 A"),
+            *_read_call("2026-01-01T00:00:10Z", "c1", "/proj/spec/pages/A.md", "spec\n"),
+            *_call("2026-01-01T00:00:20Z", "c2", "Write", {"file_path": "/proj/entry/A.ets", "content": "a\n"},
+                   "File created successfully at: /proj/entry/A.ets")]
+    fix = [_rec("2026-01-01T02:00:00Z", "user", "修 A"),
+           *_read_call("2026-01-01T02:00:10Z", "f1", "/proj/entry/A.ets", "a\n"),
+           *_call("2026-01-01T02:00:20Z", "f2", "Write", {"file_path": "/proj/entry/A.ets", "content": "b\n"}, "ok")]
+    main = [*_call("2026-01-01T00:00:00Z", "m1", "Agent", {"name": "conv-a", "prompt": "转换 A"}, "done",
+                   toolUseResult={"agentId": "c"}),
+            *_call("2026-01-01T02:00:00Z", "m2", "Agent", {"name": "fixer", "prompt": "修 A"}, "done",
+                   toolUseResult={"agentId": "f"})]
+    led = _ledger(tmp_path, main, {"agent-c": conv, "agent-f": fix})
+    assert led.depth_max[("f", "/proj/spec/pages/A.md", 1)] == 0
+    assert led.depth_max[("a", "agent-c", 1)] == 1 and led.depth_max[("f", "/proj/entry/A.ets", 1)] == 2
+    assert led.depth_max[("a", "agent-f", 1)] == 3 and led.depth_max[("f", "/proj/entry/A.ets", 2)] == 4
+    assert led.depth_win[("f", "/proj/entry/A.ets", 2)] == 4
+    assert "上游 4/4 跳" in atoms_text.render_file(led, "A.ets", 2, root="/proj")
+    assert "上游 3/3 跳" in atoms_text.render_agent(led, "agent-f", 1, root="/proj")
+    assert "上游 4/4 跳" in atoms_text.render_index(led, "ets", "A.ets", root="/proj")
+    chains = filestory.build_fix_chains(led.stories, {}, {}, root="/proj", fix_after="2026-01-01T01:00:00Z")
+    service.attach_fix_basis(chains, led)
+    text = atoms_text.render_chains({"chains": chains, "cross": None, "t0": led.t0, "touched": []}, root="/proj")
+    assert "上游 4/4 跳" in text
+
+
+def test_upstream_depth_window_vs_cumulative(tmp_path: Any) -> None:
+    """主会话 v1 读了 spec、v2 才写 A.ets:累计口径把 v1 的读也算进 v2(上下文是累积的),窗口口径只算 v1 之后读的。"""
+    main = [*_read_call("2026-01-01T00:00:00Z", "t1", "/proj/spec/pages/A.md", "spec\n"),
+            *_call("2026-01-01T00:00:10Z", "t2", "Write", {"file_path": "/proj/entry/B.ets", "content": "b\n"},
+                   "File created successfully at: /proj/entry/B.ets"),
+            *_call("2026-01-01T00:00:20Z", "t3", "Write", {"file_path": "/proj/entry/A.ets", "content": "a\n"},
+                   "File created successfully at: /proj/entry/A.ets")]
+    led = _ledger(tmp_path, main)
+    assert led.depth_max[("f", "/proj/entry/A.ets", 1)] == 2 and led.depth_win[("f", "/proj/entry/A.ets", 1)] == 1

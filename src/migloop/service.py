@@ -310,6 +310,10 @@ def attach_fix_basis(chains: list[dict[str, Any]], ledger: Any) -> None:
         st = ledger.stories.get(c.get("file_abs"))
         if st is None:
             continue
+        fv0 = (c.get("fix_versions") or [None])[0]
+        node = ("f", str(c.get("file_abs")), int(fv0)) if fv0 else None
+        if node and node in ledger.depth_max:
+            c["hops"] = (ledger.depth_max[node], ledger.depth_win[node])
         for ff in c.get("fixers_all") or []:
             fvers = ff.get("fvers") or []
             a = atoms.resolve_agent(ledger, str(ff.get("id") or ""))

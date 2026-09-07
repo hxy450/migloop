@@ -100,6 +100,10 @@ class Ledger:
     lines: dict[int, int] = field(default_factory=dict)
     #: (path, 读事件 seq) → 读它那次调用的动作号:文件原子的读者行带展开指针
     read_act: dict[tuple[str, int], int] = field(default_factory=dict)
+    #: 上游最长链(建账时 DP 一遍算完):键 ("f", path, v) / ("a", agent, k),值 = 到池外为止最多经过几次
+    #: agent↔文件转换(派发也算一跳)。depth_max 按累计读(写之前读过的一切都是前驱,诚实上界),depth_win 只按窗口读
+    depth_max: dict[tuple[str, str, int], int] = field(default_factory=dict)
+    depth_win: dict[tuple[str, str, int], int] = field(default_factory=dict)
 
 
 def resolve_agent(ledger: Ledger, hint: str) -> AgentRec | None:
@@ -329,7 +333,47 @@ def build_ledger(agents: dict[str, AgentRec]) -> Ledger:
                 ver.act_seq = act_seq.get((path, ver.seq))
         st.touches.sort(key=lambda t: (t.ts, t.seq))
     t0 = min((act.ts for a in agents.values() for act in a.actions if act.ts), default="")
-    return Ledger(stories, agents, feeds, t0, lines=lines, read_act=read_act)
+    dmax, dwin = _upstream_depths(stories, agents)
+    return Ledger(stories, agents, feeds, t0, lines=lines, read_act=read_act, depth_max=dmax, depth_win=dwin)
+
+
+_LEAF_SOURCES = frozenset({"external", "generated", "outband"})
+_Node = tuple[str, str, int]
+
+
+def _upstream_depths(stories: dict[str, FileStory],
+                     agents: dict[str, AgentRec]) -> tuple[dict[tuple[str, str, int], int], dict[tuple[str, str, int], int]]:
+    """上游最长链:每个节点到池外为止最多经过几次 agent↔文件转换(派发算一跳)。边全部指向更早的时刻,
+    按时间序扫一遍就是 DP:depth = 1 + max(前驱);没有前驱(池外输入 / 批量生成 / 实录外)= 0。
+    0723 全账本 5570 个节点 0.1 秒。累计口径下主会话跑了几百轮,每根都是二三百跳,它量的是管线深度;
+    窗口口径量的是最近一轮手里的东西,两个都存,读的人自己选。"""
+    items: list[tuple[str, int, _Node, list[_Node], list[_Node]]] = []   # (ts, 先后, 节点, 累计前驱, 窗口前驱)
+    for aid, a in agents.items():
+        effects = {act.ver: act for act in a.actions if act.ver is not None}
+        reads_by_at: dict[int, list[_Node]] = {}
+        for act in a.actions:
+            for ref in act.files:
+                if ref.op == "read" and ref.v:
+                    reads_by_at.setdefault(act.at, []).append(("f", ref.path, ref.v))
+        parent: list[_Node] = [("a", a.parent, a.parent_ver)] if a.parent and a.parent_ver else []
+        for k, act in effects.items():
+            cum = [n for at, ns in reads_by_at.items() if at <= k for n in ns] + parent
+            win = list(reads_by_at.get(k, [])) + parent
+            items.append((act.ts, 0, ("a", aid, k), cum, win))
+    for path, st in stories.items():
+        for ver in st.versions:
+            pred: list[_Node] = ([("a", ver.by, ver.by_ver)]
+                                if ver.source not in _LEAF_SOURCES and ver.by in agents and ver.by_ver else [])
+            items.append((ver.ts, 1, ("f", path, ver.v), pred, pred))
+    items.sort(key=lambda x: (x[0], x[1]))
+    dmax: dict[_Node, int] = {}
+    dwin: dict[_Node, int] = {}
+    for _ts, _o, node, cum, win in items:
+        best = max((dmax[p] for p in cum if p in dmax), default=-1)
+        dmax[node] = best + 1 if best >= 0 else 0
+        bw = max((dwin[p] for p in win if p in dwin), default=-1)
+        dwin[node] = bw + 1 if bw >= 0 else 0
+    return dmax, dwin
 
 
 # ═══════════════ 两个查询 ═══════════════
