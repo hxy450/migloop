@@ -13,6 +13,7 @@ agent 身份:主线 = ``__main__:<sid8>``,子代理 = 其 transcript 文件 stem
 
 from __future__ import annotations
 
+import ast
 import glob
 import json
 import os
@@ -172,6 +173,128 @@ def _resolve(p: object, base: str | None) -> str | None:
 #: 全文倾向兜底只对小脚本生效:一张 24 条 .ets 路径的数据表在只写脚本里曾全被当成写目标
 #: (0723 vv-static-B 的 gen_static.py,凭空造出 34 条返修链里的 19 条);字面量多于这个数就不猜方向
 _TENDENCY_MAX_LITERALS = 3
+
+
+def _py_script_ops(code: str, base: str | None) -> list[FileOp]:
+    """python 正文里规整的读改写按 ast 解成确定的读写,解不出的形状不猜(交给字面量层当「碰过」):
+    s = open(p).read() → 读;s = s.replace(old, new[, n]) 后 open(p,'w').write(s) → edit;
+    open(p,'w').write(常量) / Path(p).write_text(常量) / with open(p,'w') as f: f.write(常量) → 全文写;
+    写回的是算出来的东西(re.sub、拼接)→ 内容未知的写(盲写),不是黑盒。"""
+    try:
+        tree = ast.parse(code)
+    except SyntaxError:
+        return []
+    consts: dict[str, str] = {}
+    read_path: dict[str, str] = {}                     # 变量 → 它是哪个文件读出来的内容
+    edits: dict[str, list[tuple[str, str, bool]]] = {}  # 变量 → 累计的 replace
+    dirty: set[str] = set()                            # 变量被解不出的运算改过:写回只能算内容未知
+    ops: list[FileOp] = []
+
+    def cs(node: ast.AST | None) -> str | None:
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            return node.value
+        if isinstance(node, ast.Name):
+            return consts.get(node.id)
+        if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add):
+            a, b = cs(node.left), cs(node.right)
+            return a + b if a is not None and b is not None else None
+        return None
+
+    def opened(call: ast.AST) -> tuple[str | None, str]:
+        """open(P[, mode]) / Path(P) / pathlib.Path(P) → (路径, 模式)"""
+        if not isinstance(call, ast.Call):
+            return None, ""
+        f = call.func
+        name = f.id if isinstance(f, ast.Name) else f.attr if isinstance(f, ast.Attribute) else ""
+        if name not in ("open", "Path") or not call.args:
+            return None, ""
+        mode = cs(call.args[1]) if name == "open" and len(call.args) > 1 else ""
+        for kw in call.keywords:
+            if kw.arg == "mode":
+                mode = cs(kw.value) or ""
+        return cs(call.args[0]), mode or ""
+
+    def emit_write(p: str | None, arg: ast.AST) -> None:
+        rp = _resolve(p, base) if p else None
+        if not rp:
+            return
+        content = cs(arg)
+        if content is not None:
+            ops.append(FileOp("write", rp, "script", content=content))
+            return
+        # write(s.replace(a, b)):就地替换的另一种写法
+        if (isinstance(arg, ast.Call) and isinstance(arg.func, ast.Attribute) and arg.func.attr == "replace"
+                and isinstance(arg.func.value, ast.Name) and read_path.get(arg.func.value.id) == rp
+                and arg.func.value.id not in dirty and len(arg.args) >= 2):
+            old, new = cs(arg.args[0]), cs(arg.args[1])
+            if old is not None and new is not None:
+                for o2, n2, a2 in edits.pop(arg.func.value.id, []):
+                    ops.append(FileOp("edit", rp, "script", old=o2, new=n2, replace_all=a2))
+                ops.append(FileOp("edit", rp, "script", old=old, new=new, replace_all=len(arg.args) < 3))
+                return
+        if isinstance(arg, ast.Name) and read_path.get(arg.id) == rp and arg.id not in dirty:
+            if edits.get(arg.id):
+                for old, new, all_ in edits.pop(arg.id):
+                    ops.append(FileOp("edit", rp, "script", old=old, new=new, replace_all=all_))
+            return                     # 原样写回:内容没变,不立版本(读已经记了)
+        ops.append(FileOp("write", rp, "script"))
+
+    def handle(stmt: ast.stmt) -> None:
+        if isinstance(stmt, ast.Assign) and len(stmt.targets) == 1 and isinstance(stmt.targets[0], ast.Name):
+            name, val = stmt.targets[0].id, stmt.value
+            s = cs(val)
+            if s is not None:
+                consts[name] = s
+                return
+            if isinstance(val, ast.Call) and isinstance(val.func, ast.Attribute):
+                if val.func.attr in ("read", "read_text"):
+                    p, _mode = opened(val.func.value)
+                    rp = _resolve(p, base) if p else None
+                    if rp:
+                        read_path[name] = rp
+                        dirty.discard(name)
+                        ops.append(FileOp("read", rp, "script", dep=True))
+                    return
+                if (val.func.attr == "replace" and isinstance(val.func.value, ast.Name)
+                        and val.func.value.id == name and name in read_path and len(val.args) >= 2):
+                    old, new = cs(val.args[0]), cs(val.args[1])
+                    if old is not None and new is not None:
+                        edits.setdefault(name, []).append((old, new, len(val.args) < 3))
+                        return
+            if name in read_path:
+                dirty.add(name)           # s = re.sub(...) / s + x:写回内容算不出
+            return
+        if isinstance(stmt, ast.Expr) and isinstance(stmt.value, ast.Call) and isinstance(stmt.value.func, ast.Attribute):
+            call = stmt.value
+            if call.func.attr in ("write", "write_text") and call.args:
+                p, _mode = opened(call.func.value)
+                if p:
+                    emit_write(p, call.args[0])
+            return
+        if isinstance(stmt, ast.With) and len(stmt.items) == 1:
+            item = stmt.items[0]
+            p, _mode = opened(item.context_expr)
+            var = item.optional_vars.id if isinstance(item.optional_vars, ast.Name) else None
+            if p and var:
+                for inner in stmt.body:
+                    if (isinstance(inner, ast.Expr) and isinstance(inner.value, ast.Call)
+                            and isinstance(inner.value.func, ast.Attribute) and inner.value.func.attr == "write"
+                            and isinstance(inner.value.func.value, ast.Name) and inner.value.func.value.id == var
+                            and inner.value.args):
+                        emit_write(p, inner.value.args[0])
+                    elif (isinstance(inner, ast.Assign) and len(inner.targets) == 1 and isinstance(inner.targets[0], ast.Name)
+                          and isinstance(inner.value, ast.Call) and isinstance(inner.value.func, ast.Attribute)
+                          and inner.value.func.attr == "read" and isinstance(inner.value.func.value, ast.Name)
+                          and inner.value.func.value.id == var):
+                        rp = _resolve(p, base)
+                        if rp:
+                            read_path[inner.targets[0].id] = rp
+                            ops.append(FileOp("read", rp, "script", dep=True))
+            return
+
+    for stmt in tree.body:
+        handle(stmt)
+    return ops
 
 
 def _literal_ops(code: str, base: str | None) -> tuple[list[FileOp], int, list[str]]:
@@ -478,7 +601,10 @@ def _shell_analyze(cmd: str, cwd: object, scripts: dict[str, str],
                 add("delete", p)
         if head in _PY and "-c" in args and args.index("-c") + 1 < len(args):
             code = args[args.index("-c") + 1]
+            py_ops = _py_script_ops(code, base)
+            ops += py_ops
             lit_ops, und, tch = _literal_ops(code, base)
+            lit_ops = [o for o in lit_ops if o.path not in {o.path for o in py_ops}]
             ops += lit_ops
             undetermined += und
             touched += tch
@@ -510,9 +636,14 @@ def _shell_analyze(cmd: str, cwd: object, scripts: dict[str, str],
                 if op.op == "write" and op.path == hd_target:
                     op.content, op.via = body, "shell"
             continue
+        py_ops = _py_script_ops(body, base)
+        ops += py_ops
         lit_ops, und, tch = _literal_ops(body, base)
-        ops += lit_ops
-        undetermined += und
+        solved = {o.path for o in py_ops}
+        ops += [o for o in lit_ops if o.path not in solved]
+        # ast 解出了读写的路径,字面量层不再对它「放弃」计数(否则动作仍标黑盒)
+        tch = [p for p in tch if p not in solved]
+        undetermined += sum(1 for p in tch) if py_ops else und
         touched += tch
         capable = capable or bool(_WRITEISH.search(body))
         out_dirs += _dir_hints(body, base)

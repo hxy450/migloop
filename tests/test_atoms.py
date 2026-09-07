@@ -423,7 +423,7 @@ def test_action_detail_carries_command_summary(tmp_path: Any) -> None:
 def test_agent_reads_carry_certainty(tmp_path: Any) -> None:
     main = [
         *_call("2026-01-01T00:00:00Z", "t1", "Bash",
-               {"command": "cd /proj && python3 - <<'EOF'\nopen('x.md','w').write('a')\nEOF"}),
+               {"command": "cd /proj && python3 - <<'EOF'\nopen('x.md','w').write(str(1))\nEOF"}),   # 算出来的内容:盲写
         *_call("2026-01-01T00:00:10Z", "t2", "Bash", {"command": "cd /proj && grep -n foo x.md"}),
     ]
     ag = atoms.agent_atom(_ledger(tmp_path, main), MAIN_ID, None)
@@ -1170,8 +1170,9 @@ def test_script_touch_shows_on_file_atom_and_index(tmp_path: Any) -> None:
     """0723 AboutUsPage:修复方用 python heredoc 读改写 F012ViewModel.ets(既读又写,方向不猜),账本只在修复方的
     时间线上挂 ⚠,file(F012ViewModel) 显示只有一版 —— 从文件这边看不见有人碰过它。碰过的路径记成 touch:不立版本、
     不猜方向,file 原子列出来带动作号;版本脊柱也带写它那次调用的动作号,展开一跳可达;从没写过只被碰过的文件也进目录。"""
-    script = ("cd /proj && python3 - <<'PYEOF'\np='entry/F.ets'\ns=open(p).read()\nopen(p,'w').write(s.replace('a','b'))\n"
-              "q='entry/New.ets'\nt=open(q).read()\nopen(q,'w').write(t)\nPYEOF")
+    # 循环里读改写:ast 层不展开循环,字面量层判不出方向 —— 这才是黑盒(规整的单文件 s.replace 已能解成 edit)
+    script = ("cd /proj && python3 - <<'PYEOF'\nfor p in ['entry/F.ets', 'entry/New.ets']:\n    s=open(p).read()\n"
+              "    open(p,'w').write(s.replace('a','b'))\nPYEOF")
     main = [
         *_call("2026-01-01T00:00:00Z", "t0", "Write", {"file_path": "/proj/entry/F.ets", "content": "a\n"}),
         *_call("2026-01-01T00:00:10Z", "t1", "Bash", {"command": script}, out="ok"),
@@ -2069,3 +2070,73 @@ def test_read_gap_render_dedups_basenames_and_flags_mixed_window() -> None:
                "lines": None, "blame_broken": None, "fix_versions": [2], "breaks": [], "diff": []}]
     text = atoms_text.render_chains({"chains": chains, "cross": None, "t0": None, "touched": []}, root="/p")
     assert "鸿蒙源码 X.ets ×3" in text and "窗口内混有别的文件的读" in text
+
+
+# ═══════════════ python heredoc 的规整读改写不是黑盒 ═══════════════
+
+_PY_REPLACE = ("python3 - <<'PYEOF'\n"
+               "p='/proj/entry/A.ets'\n"
+               "s=open(p).read()\n"
+               "old = \"\"\"a\n\"\"\"\n"
+               "new = \"\"\"b\n\"\"\"\n"
+               "assert old in s\n"
+               "s=s.replace(old,new,1)\n"
+               "open(p,'w').write(s)\n"
+               "print('ok')\n"
+               "PYEOF")
+
+
+def test_python_heredoc_replace_is_an_edit(tmp_path: Any) -> None:
+    """0723 fixer-r1 改 MemberCenterPage.ets 全是 python heredoc 的 s.replace(old, new):账本记「脚本黑盒」不立版本,
+    链的修复方成了后面只放宽 private 的 build-verify-r1,故障进入点落错。规整的读改写要解成 edit。"""
+    main = [*_call("2026-01-01T00:00:00Z", "t1", "Write", {"file_path": "/proj/entry/A.ets", "content": "a\nc\n"},
+                   "File created successfully at: /proj/entry/A.ets"),
+            *_call("2026-01-01T00:00:10Z", "t2", "Bash", {"command": _PY_REPLACE}, "ok")]
+    led = _ledger(tmp_path, main)
+    act = led.agents[MAIN_ID].actions[1]
+    assert [(r.ev.kind, r.ev.via) for r in act.files if r.op != "read"] == [("edit", "script")]
+    st = led.stories["/proj/entry/A.ets"]
+    assert len(st.versions) == 2 and st.versions[1].content == "b\nc\n" and st.versions[1].by == MAIN_ID
+    assert not act.detail.get("unresolved") and not act.detail.get("touched")
+
+
+def test_python_heredoc_literal_write_is_a_full_write(tmp_path: Any) -> None:
+    """vv 代理用 python 把缺陷单正文写成文件(open(p,'w').write(\"\"\"…\"\"\") / with open … as f),账本记外部输入、内容未知。"""
+    cmd1 = ("python3 - <<'EOF'\nopen('/proj/spec/fix/x.md','w').write(\"\"\"# x\nbody\n\"\"\")\nEOF")
+    cmd2 = ("python3 - <<'EOF'\nfrom pathlib import Path\ntext = '# y\\n'\nPath('/proj/spec/fix/y.md').write_text(text)\nEOF")
+    cmd3 = ("python3 - <<'EOF'\np = '/proj/spec/fix/z.md'\nwith open(p, 'w') as f:\n    f.write('# z\\n')\nEOF")
+    main = [*_call("2026-01-01T00:00:00Z", "t1", "Bash", {"command": cmd1}, ""),
+            *_call("2026-01-01T00:00:10Z", "t2", "Bash", {"command": cmd2}, ""),
+            *_call("2026-01-01T00:00:20Z", "t3", "Bash", {"command": cmd3}, "")]
+    led = _ledger(tmp_path, main)
+    for path, body in (("/proj/spec/fix/x.md", "# x\nbody\n"), ("/proj/spec/fix/y.md", "# y\n"), ("/proj/spec/fix/z.md", "# z\n")):
+        st = led.stories[path]
+        assert st.versions[0].by == MAIN_ID and st.versions[0].content == body, (path, st.versions[0])
+
+
+def test_python_script_with_loops_stays_a_black_box(tmp_path: Any) -> None:
+    """解不出来的(循环写多个文件、正则替换)照旧当黑盒 + 碰过,不猜。"""
+    cmd = ("python3 - <<'EOF'\nimport re\np='/proj/entry/A.ets'\ns=open(p).read()\ns=re.sub(r'x+','y',s)\nopen(p,'w').write(s)\nEOF")
+    main = [*_call("2026-01-01T00:00:00Z", "t1", "Write", {"file_path": "/proj/entry/A.ets", "content": "xx\n"},
+                   "File created successfully at: /proj/entry/A.ets"),
+            *_call("2026-01-01T00:00:10Z", "t2", "Bash", {"command": cmd}, "")]
+    led = _ledger(tmp_path, main)
+    act = led.agents[MAIN_ID].actions[1]
+    writes = [r for r in act.files if r.op != "read"]
+    assert [(r.op, r.ev.content) for r in writes] == [("write", None)]      # 写了、内容未知:盲写不是黑盒
+    st = led.stories["/proj/entry/A.ets"]
+    assert len(st.versions) == 2 and st.versions[1].content is None
+
+
+def test_python_write_replace_inline_is_an_edit_and_unchanged_writeback_is_not_a_version(tmp_path: Any) -> None:
+    script = ("cd /proj && python3 - <<'PYEOF'\np='entry/F.ets'\ns=open(p).read()\nopen(p,'w').write(s.replace('a','b'))\n"
+              "q='entry/New.ets'\nt=open(q).read()\nopen(q,'w').write(t)\nPYEOF")
+    main = [*_call("2026-01-01T00:00:00Z", "t0", "Write", {"file_path": "/proj/entry/F.ets", "content": "a\n"},
+                   "File created successfully at: /proj/entry/F.ets"),
+            *_call("2026-01-01T00:00:10Z", "t1", "Bash", {"command": script}, out="ok")]
+    led = _ledger(tmp_path, main)
+    bash = next(a for a in led.agents[MAIN_ID].actions if a.tool == "Bash")
+    assert [(r.ev.kind, r.path.rsplit("/", 1)[-1]) for r in bash.files] == [("read", "F.ets"), ("edit", "F.ets"), ("read", "New.ets")]
+    assert not bash.detail.get("unresolved")
+    assert led.stories["/proj/entry/F.ets"].versions[-1].content == "b\n"
+    assert not led.stories["/proj/entry/New.ets"].versions or led.stories["/proj/entry/New.ets"].versions[0].source == "external"
