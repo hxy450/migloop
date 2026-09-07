@@ -19,6 +19,7 @@ import json
 import os
 import posixpath
 import re
+import warnings
 from dataclasses import dataclass
 from typing import Any
 
@@ -175,14 +176,23 @@ def _resolve(p: object, base: str | None) -> str | None:
 _TENDENCY_MAX_LITERALS = 3
 
 
+def _parse_py(code: str) -> ast.AST | None:
+    """脚本正文按 python 解析;解析不了返回 None,脚本里的非法转义(\\`)这类 SyntaxWarning 不往 stderr 刷。"""
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", SyntaxWarning)
+        try:
+            return ast.parse(code)
+        except (SyntaxError, ValueError):
+            return None
+
+
 def _py_script_ops(code: str, base: str | None) -> list[FileOp]:
     """python 正文里规整的读改写按 ast 解成确定的读写,解不出的形状不猜(交给字面量层当「碰过」):
     s = open(p).read() → 读;s = s.replace(old, new[, n]) 后 open(p,'w').write(s) → edit;
     open(p,'w').write(常量) / Path(p).write_text(常量) / with open(p,'w') as f: f.write(常量) → 全文写;
     写回的是算出来的东西(re.sub、拼接)→ 内容未知的写(盲写),不是黑盒。"""
-    try:
-        tree = ast.parse(code)
-    except SyntaxError:
+    tree = _parse_py(code)
+    if tree is None:
         return []
     consts: dict[str, str] = {}
     read_path: dict[str, str] = {}                     # 变量 → 它是哪个文件读出来的内容
@@ -304,9 +314,8 @@ _DOC_EXT = re.compile(r"\.(?:md|json5?|txt|ya?ml|csv)$", re.I)
 def _py_partial_writes(code: str) -> list[tuple[str, str]]:
     """python 正文里「某个调用把一个文档路径和几段长字符串一起传进去」(fill(UI/'x.md', exp=…, act=…)):
     渲染器写出来的文件账本拿不到全文,但正文就在这些字面量里 —— 按文件名记成「部分内容」。"""
-    try:
-        tree = ast.parse(code)
-    except SyntaxError:
+    tree = _parse_py(code)
+    if tree is None:
         return []
     out: list[tuple[str, str]] = []
 
