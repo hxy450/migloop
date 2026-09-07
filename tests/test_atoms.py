@@ -2413,3 +2413,27 @@ def test_file_diff_log_is_paged_and_anchor_diff_stays_alone(tmp_path: Any) -> No
     assert "+n40\n" in page2 and "+n49\n" in page2 and "+n39\n" not in page2
     one = atoms_text.render_file(led, "A.ets", 30, root="/proj", diff=True)
     assert "+n29\n" in one and "+n28\n" not in one and "+n30\n" not in one
+
+
+def test_python_replace_helper_function_calls_are_edits(tmp_path: Any) -> None:
+    """pod730 Base-6c #8376:def rep(p, pairs) 读→循环 replace→写,再 rep('Index.ets', [(old, new)]) —— 账本只记了读,
+    HomePage 后来的快照成了「实录外修改」,评委据此信原始组。帮助函数按形状识别,每次调用解成 edit。"""
+    script = ("cd /proj/features/episodes && python - <<'PY'\n# -*- coding: utf-8 -*-\nimport io\n"
+              "def rep(p, pairs):\n    s=io.open(p,encoding='utf-8').read()\n    for o,n in pairs:\n"
+              "        assert o in s, (p,o[:80]); s=s.replace(o,n,1)\n"
+              "    io.open(p,'w',encoding='utf-8',newline='').write(s); print('ok',p)\n\n"
+              "rep('Index.ets', [\n (\"export { A } from './a';\\n\",\n  \"// moved\\n\"\n  \"export { A } from 'ui-kit';\\n\"),\n])\n"
+              "rep('src/main/ets/pages/HomePage.ets', [(\"import { W } from 'ui-kit';\\n\", \"import { W, S } from 'ui-kit';\\n\")])\nPY")
+    main = [*_call("2026-01-01T00:00:00Z", "t1", "Write", {"file_path": "/proj/features/episodes/Index.ets",
+                                                          "content": "export { A } from './a';\nexport { B } from './b';\n"},
+                   "File created successfully at: /proj/features/episodes/Index.ets"),
+            *_call("2026-01-01T00:00:10Z", "t2", "Write", {"file_path": "/proj/features/episodes/src/main/ets/pages/HomePage.ets",
+                                                          "content": "import { W } from 'ui-kit';\nstruct HomePage {}\n"},
+                   "File created successfully at: /proj/features/episodes/src/main/ets/pages/HomePage.ets"),
+            *_call("2026-01-01T00:00:20Z", "t3", "Bash", {"command": script}, "ok Index.ets\nok src/main/ets/pages/HomePage.ets\n")]
+    led = _ledger(tmp_path, main)
+    idx = led.stories["/proj/features/episodes/Index.ets"]
+    home = led.stories["/proj/features/episodes/src/main/ets/pages/HomePage.ets"]
+    assert len(idx.versions) == 2 and idx.versions[1].content == "// moved\nexport { A } from 'ui-kit';\nexport { B } from './b';\n"
+    assert len(home.versions) == 2 and home.versions[1].content == "import { W, S } from 'ui-kit';\nstruct HomePage {}\n"
+    assert not [b for b in home.breaks]

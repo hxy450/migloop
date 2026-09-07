@@ -232,7 +232,7 @@ def _py_script_ops(code: str, base: str | None) -> list[FileOp]:
             return None, ""
         f = call.func
         name = f.id if isinstance(f, ast.Name) else f.attr if isinstance(f, ast.Attribute) else ""
-        if name not in ("open", "Path") or not call.args:
+        if name not in ("open", "Path") or not call.args:          # io.open / codecs.open 走 Attribute 分支
             return None, ""
         mode = cs(call.args[1]) if name == "open" and len(call.args) > 1 else ""
         for kw in call.keywords:
@@ -327,9 +327,51 @@ def _py_script_ops(code: str, base: str | None) -> list[FileOp]:
                             ops.append(FileOp("read", rp, "script", dep=True))
             return
 
+    replacers = _replace_helpers(tree)
     for stmt in tree.body:
+        if (isinstance(stmt, ast.Expr) and isinstance(stmt.value, ast.Call) and isinstance(stmt.value.func, ast.Name)
+                and stmt.value.func.id in replacers and len(stmt.value.args) >= 2):
+            rp = _resolve(cs(stmt.value.args[0]), base) if cs(stmt.value.args[0]) else None
+            pairs = stmt.value.args[1]
+            items = pairs.elts if isinstance(pairs, (ast.List, ast.Tuple)) else []
+            if rp and items:
+                ops.append(FileOp("read", rp, "script", dep=True))
+                for it in items:
+                    if isinstance(it, (ast.Tuple, ast.List)) and len(it.elts) == 2:
+                        old, new = cs(it.elts[0]), cs(it.elts[1])
+                        if old is not None and new is not None:
+                            ops.append(FileOp("edit", rp, "script", old=old, new=new, replace_all=replacers[stmt.value.func.id]))
+                            continue
+                    ops.append(FileOp("write", rp, "script"))       # 有一对算不出:写回内容未知
+                    break
+            continue
         handle(stmt)
     return ops
+
+
+def _replace_helpers(tree: ast.Module) -> dict[str, bool]:
+    """def f(p, pairs): 读 p → 对 pairs 循环 replace → 写回 p 这种帮助函数:名字 → replace 是否不带 count(全替换)。"""
+    out: dict[str, bool] = {}
+    for node in tree.body:
+        if not isinstance(node, ast.FunctionDef) or len(node.args.args) < 2:
+            continue
+        pairs_name = node.args.args[1].arg
+        has_read = has_write = False
+        loop_replace: bool | None = None
+        for sub in ast.walk(node):
+            if isinstance(sub, ast.Call) and isinstance(sub.func, ast.Attribute):
+                if sub.func.attr in ("read", "read_text"):
+                    has_read = True
+                elif sub.func.attr in ("write", "write_text"):
+                    has_write = True
+            if (isinstance(sub, ast.For) and isinstance(sub.iter, ast.Name) and sub.iter.id == pairs_name
+                    and isinstance(sub.target, (ast.Tuple, ast.List)) and len(sub.target.elts) == 2):
+                for inner in ast.walk(sub):
+                    if isinstance(inner, ast.Call) and isinstance(inner.func, ast.Attribute) and inner.func.attr == "replace":
+                        loop_replace = len(inner.args) < 3
+        if has_read and has_write and loop_replace is not None:
+            out[node.name] = loop_replace
+    return out
 
 
 _DOC_EXT = re.compile(r"\.(?:md|json5?|txt|ya?ml|csv)$", re.I)
