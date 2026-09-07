@@ -2277,3 +2277,18 @@ def test_script_literal_body_becomes_partial_content_and_writer(tmp_path: Any) -
     assert "部分已知" in text and "EntryAbility.ets:unknown" in text
     pool = atoms.search_pool(led, "setWindowSystemBarEnable", until_ts="2026-01-01T02:00:00Z")
     assert [r["path"] for r in pool["files"]] == [doc]
+
+
+def test_partial_literals_survive_a_failed_command(tmp_path: Any) -> None:
+    """vv-t1-A01 #26723:落盘 fill.py 的 heredoc 与首次运行合在一条命令里,运行报错被标 is_error,下一条修好脚本再跑成功。
+    字面量正文是它写下的话,与命令成败无关。"""
+    doc = "/proj/spec/fix/round-1/ui/ALIGN_PSplashActivity_extra_element_status-bar.md"
+    vv = [_rec("2026-01-01T00:00:00Z", "user", "写单"),
+          *_call("2026-01-01T00:00:10Z", "v1", "Bash", {"command": _FILL}, "Exit code 1\nTraceback …", is_error=True),
+          *_call("2026-01-01T00:00:20Z", "v2", "Bash", {"command": "python3 fill.py"}, "filled")]
+    main = [*_call("2026-01-01T00:00:00Z", "m1", "Agent", {"name": "vv-1", "prompt": "写单"}, "done",
+                   toolUseResult={"agentId": "v1"}),
+            *_call("2026-01-01T01:00:00Z", "t1", "Bash", {"command": f"sed -n '1,3p' {doc}"}, "# ALIGN\n")]
+    led = _ledger(tmp_path, main, {"agent-v1": vv})
+    v0 = led.stories[doc].versions[0]
+    assert v0.by == "agent-v1" and v0.partial and "EntryAbility.ets:unknown" in v0.partial

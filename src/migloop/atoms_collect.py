@@ -264,10 +264,11 @@ def _py_script_ops(code: str, base: str | None) -> list[FileOp]:
             if name in read_path:
                 dirty.add(name)           # s = re.sub(...) / s + x:写回内容算不出
             return
-        if isinstance(stmt, ast.Expr) and isinstance(stmt.value, ast.Call) and isinstance(stmt.value.func, ast.Attribute):
+        if isinstance(stmt, ast.Expr) and isinstance(stmt.value, ast.Call):
             call = stmt.value
-            if call.func.attr in ("write", "write_text") and call.args:
-                p, _mode = opened(call.func.value)
+            fn = call.func
+            if isinstance(fn, ast.Attribute) and fn.attr in ("write", "write_text") and call.args:
+                p, _mode = opened(fn.value)
                 if p:
                     emit_write(p, call.args[0])
             return
@@ -945,9 +946,6 @@ def _file_ops(name: str, inp: dict[str, Any], out: str, tur: Any, cwd: object,
             detail["probed"] = hints["probed"]
         if hints["out_dirs"]:
             detail["out_dirs"] = hints["out_dirs"]
-        partials = [pw for body in _strip_heredocs(cmd.replace("\\\n", " "))[1] for pw in _py_partial_writes(body)]
-        if partials:
-            detail["partials"] = partials
         for op in ops:
             # heredoc 落盘的 .py/.sh 也进脚本表:之后 python3 它时按脚本内容推断读写,不再当黑盒
             if op.op == "write" and op.content is not None and _SCRIPT_RUN.search(op.path):
@@ -1116,6 +1114,13 @@ def _walk(path: str, agent_id: str, session: str, seq: list[int],
                     if ok:
                         ops, detail = _file_ops(name, inp, _text_of(b.get("content")),
                                                 r.get("toolUseResult"), ucwd, scripts)
+                    if name in ("Bash", "PowerShell"):
+                        # 脚本字面量里的正文是「agent 写下了这段话」的证据,与命令成败无关
+                        # (vv-t1-A01 落盘 fill.py 的 heredoc 被标 is_error,缺陷单正文就全丢了)
+                        partials = [pw for body in _strip_heredocs(str(inp.get("command") or "").replace("\\\n", " "))[1]
+                                    for pw in _py_partial_writes(body)]
+                        if partials:
+                            detail["partials"] = partials
                     act = Action(uts, nxt(), name, _kind_of(name, ops), ok=ok, detail=detail,
                                  src=(path, use_line, line_no), tuid=tuid, stage=stage)
                     for op in ops:

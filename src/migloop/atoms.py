@@ -339,15 +339,15 @@ def build_ledger(agents: dict[str, AgentRec]) -> Ledger:
         v0 = st.versions[0]
         if v0.content is not None or v0.source not in ("external", "generated"):
             continue
-        cands = [c for c in partials.get(path.rsplit("/", 1)[-1], []) if c[0] <= v0.ts]
-        if not cands:
+        pcands = [c for c in partials.get(path.rsplit("/", 1)[-1], []) if c[0] <= v0.ts]
+        if not pcands:
             continue
-        ts_, aid, act, text = cands[-1]
-        v0.partial = text
+        _pts, paid, pact, ptext = pcands[-1]
+        v0.partial = ptext
         if v0.source == "external":
-            v0.by, v0.by_ver, v0.source, v0.via, v0.act_seq = aid, act.at, "generated", "script-run", act.seq
-            v0.gen_runs = (act.seq,)
-        st.touches.append(Touch(act.ts, act.seq, aid, act.at, "脚本字面量里给了正文(部分内容)", act.stage))
+            v0.by, v0.by_ver, v0.source, v0.via, v0.act_seq = paid, pact.at, "generated", "script-run", pact.seq
+            v0.gen_runs = (pact.seq,)
+        st.touches.append(Touch(pact.ts, pact.seq, paid, pact.at, "脚本字面量里给了正文(部分内容)", pact.stage))
     for path, st in stories.items():
         for ver in st.versions:
             if ver.source != "generated":
