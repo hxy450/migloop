@@ -575,7 +575,8 @@ def render_search(ledger: atoms.Ledger, q: str, agent: str | None = None, v: int
         if res["excluded_after"]:
             out.append(f"锚点之后另有 {res['excluded_after']} 条命中(非因果;after=True 可看)")
         if not res["hits"]:
-            out.append("(范围内没有命中 —— 这是可引用的否定证据:它在写这一版之前没见过这个词)")
+            out.append("(范围内没有命中 —— 只证明这个 agent 在这个范围内没见过这个词;不证明别的 agent 或别的版本没见过,"
+                       "别写成「全实录只有…」)")
         return "\n".join(out)
     res2 = atoms.search_file(ledger, str(file), q, v)
     if res2 is None:

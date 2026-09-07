@@ -32,3 +32,10 @@
 - `hinted-invalid/`:作废的第一轮,同样布局,只作记录。
 - `judge/hint-free_tools_vs_raw.json`:19 根盲评(A/B 随机,`treat_is_A` 记录谁是谁)。
 - `harness/`:`run_probe.py`(`--chains 0,1,2 --label X --template T [--raw-dir 转录目录]`)、`judge.py`、`seg_summary.py`(汇总一组)、`seg_compare.py`(两组并排)、`seg_anatomy.py`(逐调用解剖:agent 带不带 since、sessions 碰过节、原始组找人阶段、每轮上下文)、`seq_dump.py`(逐调用序列)、`judge_tally.py`(解盲汇总)、`chains-ff019d8a.json`(19 根)。脚本里有本机绝对路径。
+
+## 2026-09-07-four-roots-after-optim/ —— 五步优化落地后四根验收(新工具 vs §4.8 的旧工具与原始组)
+
+- `reports/`、`prompts-as-sent/`:MineComponent / DesignTokens / AboutUsPage / HomePage 的新工具报告与实发提示词(模板 `harness/prompt_template_seg_tools1.md`,只比 §4.8 的多一个 search 名字)。
+- `metrics-tools-after.json`:逐根费用、轮次、token、调用序列。`judge/tools-after_vs_raw.json`:与 §4.8 原始组报告的盲评。
+- `harness/`:`tool_mix.py`(按工具用量)、`size_probe.py`(agent 视图体量)、`search_probe.py`(0723 四个带起点查找)、
+  `index_gap.py`(转录 vs 账本覆盖对账)、`fake_v1.py` / `external_probe4.py` / `external_pointers.py`(假 v1 / 幽灵路径 / 外部输入指针)、`run_probe.py`。脚本里有本机绝对路径。
