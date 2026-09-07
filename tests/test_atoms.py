@@ -2337,3 +2337,43 @@ def test_python_c_replace_into_new_variable_is_an_edit(tmp_path: Any) -> None:
     led = _ledger(tmp_path, main)
     st = led.stories["C:/p/entry/A.ets"]
     assert len(st.versions) == 2 and st.versions[1].content == "x();\ny\n", [(v.source, v.content) for v in st.versions]
+
+
+def test_file_spine_collapses_runs_by_the_same_writer(tmp_path: Any) -> None:
+    """pod730 MainPage.ets 126 版:Group 3 closer 连改 33 版,脊柱一屏全是它。同一写者连续 ≥3 版折成一行,锚点版单列。"""
+    main = [*_call("2026-01-01T00:00:00Z", "t0", "Write", {"file_path": "/proj/entry/A.ets", "content": "a\n"},
+                   "File created successfully at: /proj/entry/A.ets")]
+    for i in range(1, 10):
+        main += _call(f"2026-01-01T00:00:{i:02d}Z", f"t{i}", "Edit",
+                      {"file_path": "/proj/entry/A.ets", "old_string": "a\n", "new_string": "a\n" + "b\n" * i}, "ok")
+    led = _ledger(tmp_path, main)
+    text = atoms_text.render_file(led, "A.ets", 10, root="/proj")
+    lines = [ln for ln in text.splitlines() if ln.startswith("- v")]
+    assert lines[0].startswith("- v1 ←") and "v2–v9 ←" in lines[1] and "8 版" in lines[1] and lines[2].startswith("- v10 ←")
+    assert "(#" in lines[1] and "…" in lines[1]          # 折行带首末动作号
+    full = atoms_text.render_file(led, "A.ets", 10, root="/proj", diff=True)
+    assert "+b" in full                                   # 锚点版的 diff 照给
+
+
+def test_big_agent_defaults_to_read_counts_without_a_window(tmp_path: Any) -> None:
+    """pod730 的 closer 一人 52 版,agent(id) 整段 1.8 万字,读清单占大头;超过 25 版又没带 since 窗口,读默认只给条数。"""
+    main = []
+    for i in range(30):
+        main += _read_call(f"2026-01-01T00:{i:02d}:00Z", f"r{i}", f"/proj/spec/{i}.md", "x\n")
+        main += _call(f"2026-01-01T00:{i:02d}:30Z", f"w{i}", "Write", {"file_path": f"/proj/entry/F{i}.ets", "content": "a\n"},
+                      f"File created successfully at: /proj/entry/F{i}.ets")
+    led = _ledger(tmp_path, main)
+    whole = atoms_text.render_agent(led, MAIN_ID, None, root="/proj")
+    assert "读 1 条(reads=True 展开)" in whole and "读 spec/0.md" not in whole and "超过 25 版" in whole
+    window = atoms_text.render_agent(led, MAIN_ID, 30, root="/proj", since=28)
+    assert "读 spec/28.md@v1" in window or "读 spec/29.md@v1" in window
+
+
+def test_index_agents_capped_without_query(tmp_path: Any) -> None:
+    from migloop import service
+    assert service._opt_int({}, "limit") is None
+    main = [*_call("2026-01-01T00:00:00Z", "t1", "Write", {"file_path": "/proj/entry/A.ets", "content": "a\n"},
+                   "File created successfully at: /proj/entry/A.ets")]
+    led = _ledger(tmp_path, main)
+    text = atoms_text.render_index(led, "agent", None, root="/proj", limit=1)
+    assert "## agent (1)" in text

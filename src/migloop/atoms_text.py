@@ -112,7 +112,7 @@ def render_index(ledger: atoms.Ledger, kind: str | None = None, query: str | Non
             out.append(f"- {a['label']} | id={a['id']} | {a.get('kind') or 'agent'} | 会话 {a['session']}"
                        f" | {a['n_versions']} 版 · 读 {a['n_reads']}{unres}{stage}{parent}")
         if len(ags) > limit:
-            out.append(f"  …还有 {len(ags) - limit} 个,用 query 缩小")
+            out.append(f"  …还有 {len(ags) - limit} 个,用 query 缩小(pod730 有 221 个 agent,不带 query 一次就是 3 万字)")
     if kind != "agent":
         fs = [f for f in idx["files"] if (kind is None or f["kind"] == kind)
               and (not q or q in f["path"].lower())]
@@ -148,6 +148,39 @@ def _unknown_reason(vv: dict[str, Any]) -> str:
     return "覆盖前未被观测"
 
 
+def _collapse_spine(rows: list[dict[str, Any]], anchor: int, lines: dict[int, int]) -> list[dict[str, Any]]:
+    """同一写者、同一来路、内容已知与否一致的连续 ≥3 版折成一行;锚点版永远单列。折行 = {"_run": 文本}。"""
+    if len(rows) <= 8:
+        return rows
+    out: list[dict[str, Any]] = []
+    i = 0
+    while i < len(rows):
+        j = i
+        key = (rows[i]["by"], rows[i]["via"], rows[i].get("source"), rows[i]["content_known"], rows[i]["diff_kind"])
+        while (j + 1 < len(rows) and rows[j + 1]["v"] != anchor and rows[j]["v"] != anchor
+               and (rows[j + 1]["by"], rows[j + 1]["via"], rows[j + 1].get("source"), rows[j + 1]["content_known"],
+                    rows[j + 1]["diff_kind"]) == key):
+            j += 1
+        if j - i + 1 >= 3:
+            a, b = rows[i], rows[j]
+            bv = f"v{a['by_ver']}–v{b['by_ver']}" if a.get("by_ver") is not None and b.get("by_ver") is not None else ""
+            ln = (f" · {a['lines']}→{b['lines']} 行" if a.get("lines") is not None and b.get("lines") is not None else "")
+            ptr = ""
+            if a.get("seq") is not None and b.get("seq") is not None:
+                ptr = f" (#{a['seq']}@L{lines.get(a['seq'], '?')} … #{b['seq']}@L{lines.get(b['seq'], '?')})"
+            who = f"{_short_by(a['by'])} {bv}".strip()
+            out.append({"_run": f"- v{a['v']}–v{b['v']} ← {who} | {a['ts'][5:16]}–{b['ts'][11:16]} | {a['diff_kind']} ×{j - i + 1}"
+                                f"({j - i + 1} 版){ln}{'' if a['content_known'] else ' · 内容未知'}{ptr}"})
+        else:
+            out.extend(rows[i:j + 1])
+        i = j + 1
+    return out
+
+
+def _short_by(by: str) -> str:
+    return by
+
+
 def render_file(ledger: atoms.Ledger, hint: str, v: int | None = None, root: str = "",
                 content: bool = False, diff: bool = False,
                 start: int | None = None, n: int | None = None, readers: bool = False) -> str:
@@ -168,8 +201,12 @@ def render_file(ledger: atoms.Ledger, hint: str, v: int | None = None, root: str
                    + _hops(ledger, ("f", fa["path"], anchor)) + "(累计/窗口口径;每次 agent↔文件转换算一跳,派发算一跳)")
     for b in fa["breaks"]:
         out.append(f"⚠ 断点 {b['kind']} @ {b['ts'][:19]}: {b['detail']}")
-    out.append("## 写者脊柱(≤ 这一版)—— (#n@L 行) 是写它那次调用的动作号与转录行号,action 展开")
-    for vv in fa["versions"]:
+    out.append("## 写者脊柱(≤ 这一版)—— (#n@L 行) 是写它那次调用的动作号与转录行号,action 展开"
+               + (";同一写者连续几版折成一行,file(path, v=某版) 单看" if len(fa["versions"]) > 8 else ""))
+    for vv in _collapse_spine(fa["versions"], anchor, lines):
+        if vv.get("_run"):
+            out.append(vv["_run"])
+            continue
         extra = []
         if vv.get("source") == "generated":
             # 不是 agent 读源码写的,是脚本一次跑出来的:归因到这里就该问「这批是怎么生成的」而不是「谁写错了」
@@ -265,6 +302,11 @@ def render_agent(ledger: atoms.Ledger, agent_id: str, v: int | None = None,
     if ag is None:
         return f"账本里没有该 agent: {agent_id}"
     anchor = ag["v"]
+    big_note = ""
+    if reads and since is None and ag["n_versions"] > 25:
+        # pod730 一个 closer 52 版,整段 1.8 万字里读清单占大头:大 agent 不带窗口只给每版读的条数
+        reads = False
+        big_note = "(超过 25 版且没带 since 窗口:读只给条数;reads=1 全铺,或 agent(id, v, since=v-1) 看一版的窗口)"
     lines = ledger.lines
     out = [f"# agent {ag['label']}  id={ag['id']}  v{anchor} / 共 {ag['n_versions']} 版"
            + (f"  窗口 v{since + 1}–v{anchor}(只给喂养这段版本的动作)" if since is not None else "")
@@ -308,7 +350,7 @@ def render_agent(ledger: atoms.Ledger, agent_id: str, v: int | None = None,
             continue          # 注入行已经点名了这份技能,SKILL.md 的读边留给 file() 的读者用
         reads_by_at.setdefault(r["at"], []).append(r)
     out.append("## 逐版时间线(每个对外效应 +1 版;读归到它喂养的下一版;(#n@L 行) 是动作号与转录行号,"
-               "action(id, n) 可展开该次调用的完整输入输出;同一次调用读的文件合在一行)")
+               "action(id, n) 可展开该次调用的完整输入输出;同一次调用读的文件合在一行)" + big_note)
     for k in sorted(by_ver):
         slot = by_ver[k]
         late = k > anchor

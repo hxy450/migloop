@@ -138,10 +138,11 @@ def build_server(backend: Any | None = None) -> Any:
 
     @srv.tool()
     async def index(sid: str, kind: str | None = None, query: str | None = None,
-                    limit: int = 300) -> str:
-        """账本目录:全部 agent 与文件各一行。kind = agent | ets | spec | src | other(空=全部);query 子串过滤。"""
+                    limit: int = 0) -> str:
+        """账本目录:agent 与文件各一行。kind = agent | ets | spec | src | other(空=全部);query 子串过滤。
+        不带 query 只给前 80 条(大会话有两百多个 agent,整张表就是三万字),带 query 给到 300。"""
         ledger, cwd = await _ctx(sid)
-        return atoms_text.render_index(ledger, kind, query, root=cwd, limit=limit)
+        return atoms_text.render_index(ledger, kind, query, root=cwd, limit=limit or (300 if query else 80))
 
     @srv.tool()
     async def file(sid: str, path: str, v: int | None = None, content: bool = False,

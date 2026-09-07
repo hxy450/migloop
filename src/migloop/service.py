@@ -548,7 +548,7 @@ def atom_text(path: str, tool: str, args: dict[str, Any]) -> str:
     ledger = session_ledger(path)
     if tool == "index":
         return atoms_text.render_index(ledger, args.get("kind") or None, args.get("query") or None,
-                                       root=cwd, limit=_opt_int(args, "limit") or 300)
+                                       root=cwd, limit=_opt_int(args, "limit") or (300 if args.get("query") else 80))
     if tool == "file" and args.get("path"):
         return atoms_text.render_file(ledger, str(args["path"]), _opt_int(args, "v"), root=cwd,
                                       content=_flag(args, "content", "0"),
