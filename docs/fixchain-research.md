@@ -660,6 +660,9 @@ cases_tools6(标识在前的格式,其余不变)在跑,用来量引用格式这�
   `probe._trajectory` + `probeBuildTrajectory`;没有转录的老 run 退回账本树。全仓 399 passed。
 - 路线要成为记录只有一条路:模型自己声明。file / agent / action / blame / diff 加可选参数 `via`(从哪个节点、凭哪一行来),
   harness 原样记录,probe 解析成声明边逐条和账本边对照(重合 / 不重合 / 跳 / 无法解析),页面画蓝色虚线,不参与布局。全仓 400 passed。
+- 用户看了 via 的填法(一半是 sessions / search 跳、一次指向没打开过的 v8)后定稿:模型任一时刻站在一个节点上,file / agent 是移动、
+  via 必须逐字等于已打开的节点(索引 = 整个,某版 = 那一版),第一次可写 sessions;blame / diff / action / search 不移动不开节点。
+  服务端 `via.py` 强制,不对不执行;树直接按 via 走,每跳按账本标关系;老 run 退回账本边树。全仓 403 passed。
 
 ## 5. 到目前为止的结论
 

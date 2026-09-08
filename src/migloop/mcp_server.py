@@ -14,6 +14,7 @@ from __future__ import annotations
 from typing import Any
 
 from migloop import atoms, atoms_text
+from migloop import via as via_mod
 
 GUIDE = """\
 # MigLoop 两原子归因指南
@@ -111,11 +112,16 @@ closer 或后续写者破坏 / 源码没读全。每条证据带 `path@v` 或 `a
 边界:账本里只有**被读过**的安卓源码,从没人读过的文件不存在;标签是线索,盲写/脚本落盘的
 版本内容可能未知,如实说"无法确认"。
 
-## 来处(via):每次查询都说你从哪来
-file / agent / action / blame / diff 每次调用都带 via=:你是从哪个节点、凭哪一行决定查它的,坐标照抄工具输出 ——
-`file:<路径>@vN` 或 `agent:<id>@vK`,后面可以跟 `#标识:n@L行` 或几个字(例:`agent:agent-a711c5d09fb676814@v4 读取行 P0001_MainActivity.md@v1`)。
-从 sessions / search 的命中跳过来的写 `sessions` / `search:<词>`;第一步写 `task`。页面把 via 画成你的路线,逐条和账本边对照;
-不填就没有那条路线边。via 是记录不是判断:你从哪来就写哪,不用猜账本里有没有这条边。
+## 位置与来处(via):打开了什么,只能从什么跳
+你任一时刻站在一个节点上。节点只有两种:file(path) / file(path, v) 打开的文件节点,agent(id) / agent(id, v) 打开的 agent 节点;
+不带 v 打开的是「整个」,带 v 打开的是那一版。
+- file / agent 是移动:必须带 via=你现在站的节点,逐字照抄你打开它时的样子 —— 打开索引 file(path) 后 via 写 `file:<路径>`(不带版本);
+  要从某一版出发先 file(path, v=N),via 才能写 `file:<路径>@vN`;agent 同理(`agent:<id>` / `agent:<id>@vK`)。后面可以跟几个字说凭哪一行
+  (例:`file:entry/…/EntryAbility.ets@v8 写者`)。via 不对,调用不执行,会回给你已打开的列表。
+- 第一次 file / agent 写 via=sessions(从返修链摘要进被修文件或修复方),之后不能再用。
+- blame / diff / action / search 不移动、不开节点、不带 via:它们是站在节点上看东西。全池 search 的命中不能当来处 ——
+  要打开命中的节点,得从已打开的节点沿一条边跳过去(先打开那个文件的那一版 / 那个 agent 的那一版)。
+- 页面把你的每一跳画成树(父 = via),每跳再按账本标这两个节点之间有没有写 / 读 / 派发。via 是记录:你从哪来就写哪。
 
 ## 结构化结论(散文链写完后必须再附一段,页面靠它给树上节点着色、点节点看原因)
 另起一个 ```yaml 围栏块,严格按这个格式(未知键、词表外的词、缺版本号都载入失败):
@@ -143,6 +149,14 @@ defects:
 文件坐标用 file() / sessions 打印的路径,agent 坐标用 agent() / index 打印的 id(主会话是 __main__:<会话号前 8 位>);
 修复后的版本只放 repair.after,不进 nodes 标带病;修复后是否仍有问题另起一条缺陷或写在 notes。
 """
+
+
+_VIA_STATES: dict[str, via_mod.ViaState] = {}
+
+
+def via_state(sid: str) -> via_mod.ViaState:
+    """每个 sid 一条路线:已打开的节点。MCP 进程每跑一根就一个,状态放进程里即可。"""
+    return _VIA_STATES.setdefault(sid, via_mod.ViaState())
 
 
 def _rt() -> Any:
@@ -195,31 +209,49 @@ def build_server(backend: Any | None = None) -> Any:
                    readers: bool = False, v_from: int | None = None, v_to: int | None = None,
                    diff_chars: int | None = None, m_from: int = 1, m_n: int = 40, m_all: bool = False, via: str = "") -> str:
         """版本文件原子:≤v 的写者脊柱(写者 agent 版本/来路/证据标签)、读了这一版的 agent、复原全文。
+        via=你现在站的节点(已打开的,逐字照抄:打开索引不带版本,打开某版带 @vN;第一次可写 sessions),不对不执行。
         path 可给文件名、相对路径或绝对路径;v 空 = 最新版;content=True 给全文(start/n 裁行窗口)。
         三种口径:不带 diff = 索引;diff=True 带 v = 只看第 v 版的 diff;diff=True 不带 v = 每版完整 diff,一页 40 版,
         v_from / v_to 翻页(创建版只给行数;diff_chars 只在你明确给时才截)。
         末尾「提到它的命令」= 按文件名 grep 全部命令行 / heredoc / 脚本正文 / 工具输出:没记到读写的按分档逐条列
         (改动类 / 正文提到 / 输出里 / 其他),只读检查折叠(m_all=True 铺),一页 m_n 条,m_from 翻页;每条标它落在哪一版的窗口。"""
         ledger, cwd = await _ctx(sid)
-        return atoms_text.render_file(ledger, path, v, root=cwd, content=content, diff=diff,
-                                      start=start, n=n, readers=readers, v_from=v_from, v_to=v_to,
-                                      diff_chars=diff_chars, m_from=m_from, m_n=m_n, m_all=m_all)
+        st = via_state(sid)
+        err = via_mod.check(ledger, st, via)
+        if err:
+            return err
+        out = atoms_text.render_file(ledger, path, v, root=cwd, content=content, diff=diff,
+                                     start=start, n=n, readers=readers, v_from=v_from, v_to=v_to,
+                                     diff_chars=diff_chars, m_from=m_from, m_n=m_n, m_all=m_all)
+        key = via_mod.resolve_key(ledger, "file", path)
+        if key:
+            st.open(("file", key, v))
+        return out
 
     @srv.tool()
     async def agent(sid: str, id: str, v: int | None = None, since: int | None = None,
                     reads: bool = True, seen: bool = False, until: int | None = None, via: str = "") -> str:
-        """版本 agent 原子(索引):身份、派发者与派发词全文、收件箱一行一条、≤v 逐版的效应与输入
+        """版本 agent 原子(索引):身份、派发者与派发词全文、收件箱一行一条、≤v 逐版的效应与输入。
+        via=你现在站的节点(已打开的,逐字照抄;第一次可写 sessions),不对不执行。
         (读按调用合行,绑文件版本,▲旧版/行段/命中行号/写前读等标)、它中途说的话一行一条、收尾输出。
         每条记录带 (#n@L行):action(id, n) 展开原文。id 可带或不带 agent- 前缀,名字唯一也认;
         v 空 = 整个生命周期;since 给了只看 (since, v] 这段版本 —— 主会话动辄几百次调用,查它必须带窗口。
         seen=True 把命中读看见的原文行铺出来;reads=False 只给每版读的条数。解不出效应的命令直接带「可能碰了 X@v」。
         until=#n:槽截到那条命令为止,之后的输入不算这一版的依据(从一条命令进来只看它之前有什么)。"""
         ledger, cwd = await _ctx(sid)
-        return atoms_text.render_agent(ledger, id, v, root=cwd, since=since, reads=reads, seen=seen, until=until)
+        st = via_state(sid)
+        err = via_mod.check(ledger, st, via)
+        if err:
+            return err
+        out = atoms_text.render_agent(ledger, id, v, root=cwd, since=since, reads=reads, seen=seen, until=until)
+        key = via_mod.resolve_key(ledger, "agent", id)
+        if key:
+            st.open(("agent", key, v))
+        return out
 
     @srv.tool()
     async def blame(sid: str, path: str, v: int | None = None, start: int | None = None,
-                    n: int | None = None, changed: bool = False, via: str = "") -> str:
+                    n: int | None = None, changed: bool = False) -> str:
         """逐行归属:文件@v 每一行是谁在哪一版写的(确定性逐行签名)。start/n 裁窗口,汇总按全文。
         changed=True 把 v 当修复版:只给它替换/删除掉的前一版那些行及其引入者(owner@since_v)和新增行数
         —— 定位被修行的来源用这个,不必整文件 blame。"""
@@ -227,7 +259,7 @@ def build_server(backend: Any | None = None) -> Any:
         return atoms_text.render_blame(ledger, path, v, start, n, root=cwd, changed=changed)
 
     @srv.tool()
-    async def diff(sid: str, path: str, v: int, via: str = "") -> str:
+    async def diff(sid: str, path: str, v: int) -> str:
         """某一版的 unified diff(相对前一已知版)。"""
         ledger, cwd = await _ctx(sid)
         return atoms_text.render_diff(ledger, path, v, root=cwd)
@@ -250,7 +282,7 @@ def build_server(backend: Any | None = None) -> Any:
 
     @srv.tool()
     async def action(sid: str, id: str, seq: int, max_chars: int = 20000, offset: int = 0, find: str = "",
-                     part: str | None = None, via: str = "") -> str:
+                     part: str | None = None) -> str:
         """展开 agent 某一次工具调用的完整原始输入与输出(agent 工具时间线里的 #n 就是 seq)。
         账本是实录的索引,任何摘要不够看时用它拿原文,信息不会丢。输出超过 max_chars 会截断并说明剩余多少:
         part=input/output 选择翻页侧;offset= 从第几字继续,find= 直接跳到关键词前(长 think/写入正文里找决策句用它)。"""

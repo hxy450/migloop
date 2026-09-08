@@ -1338,7 +1338,7 @@
     function probeBuildTrajectory() {
       var T = PROBE && PROBE.trajectory;
       if (!T || !T.nodes || !T.nodes.length) return;
-      XT = { byId: {}, seq: 0, root: null, rights: [], rootKind: T.nodes[0].kind, extra: [], unlinkedDepth: null };
+      XT = { byId: {}, seq: 0, root: null, rights: [], rootKind: T.nodes[0].kind, extra: [], unlinkedDepth: null, sideTitle: T.side_title || null, walk: T.mode === "via" };
       var byId = {};
       T.nodes.forEach(function (n) {
         var node = n.kind === "file"
@@ -1348,6 +1348,9 @@
         node.trajOpened = n.opened || []; node.trajSide = n.side; node.edgeRel = n.edge;
         var b = [];
         if (n.edge) b.push({ cls: "", t: "账本·" + n.edge + (n.skipped ? "·跳过 " + n.skipped + " 版" : "") });
+        else if (n.parent && n.side === "up") b.push({ cls: "stale", t: "账本无此边" });
+        if (n.note) b.push({ cls: "stale", t: n.note });
+        if (n.via && n.side === "up") b.push({ cls: "via", t: "via " + String(n.via).slice(0, 28) });
         if (n.source === "任务") b.push({ cls: "", t: "任务给的" });
         if (n.source === "结论") b.push({ cls: "via", t: "命中未展开" });
         if (n.source === "修复前") b.push({ cls: "stale", t: "修复前" });
@@ -1363,6 +1366,7 @@
         if (n.id === T.root) return;
         var node = byId[n.id];
         if (n.side === "down") { addRight(root, node); return; }
+        if (n.side === "root") return;
         addKid(byId[n.parent] || root, node);
         if (n.side === "unlinked") node.unlinked = true;
         else if (node.depth > maxD) maxD = node.depth;
@@ -1383,7 +1387,7 @@
       });
       // 声明边:模型每次查询说的「我从 X 来」,蓝色虚线;和账本边重合 ✓,不重合橙色 ✗;来处不是节点的只在徽标上标
       XT.via = [];
-      (T.declared || []).forEach(function (d) {
+      (T.mode === "via" ? [] : (T.declared || [])).forEach(function (d) {
         var tn = d.to && byId[d.to];
         if (!tn) return;
         var mark = d.match === "重合" ? "✓" : d.match === "不重合" ? "✗" : d.match === "跳" ? "跳" : d.match === "同一节点" ? "=" : "?";
@@ -1589,7 +1593,7 @@
       svg.setAttribute("width", totalW); svg.setAttribute("height", totalH);
       svg.style.width = totalW + "px"; svg.style.height = totalH + "px";
       for (var d = 0; d <= maxD; d++) {
-        var title = d === 0 ? (root.kind === "file" ? "ROOT · 文件" : "ROOT · agent") : (XT.unlinkedDepth === d ? "查过 · 不在根的上下游" : "上游 " + d);
+        var title = d === 0 ? (root.kind === "file" ? "ROOT · 文件" : "ROOT · agent") : (XT.unlinkedDepth === d ? (XT.sideTitle || "查过 · 不在根的上下游") : (XT.walk ? "第 " + d + " 跳" : "上游 " + d));
         var h = el("div", "colhead" + (d === 0 ? (root.kind === "file" ? " root" : " rootA") : ""), title);
         h.style.left = colX(d) + "px"; h.style.width = NODE_W + "px";
         canvas.appendChild(h);

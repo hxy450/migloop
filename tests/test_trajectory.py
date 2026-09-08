@@ -135,7 +135,7 @@ def test_fixchain_template_builds_ledger_edge_tree() -> None:
     from migloop.service import load_asset
     html = load_asset("fixchain.html")
     for needle in ("probeBuildTrajectory(", "PROBE.trajectory", "node.traj", "不在根的上下游", "前一版", "XT.extra", "出现于",
-                   "XT.via", "wire via", "T.declared"):
+                   "XT.via", "wire via", "T.declared", "账本无此边", "XT.walk"):
         assert needle in html, needle
 
 
@@ -151,29 +151,43 @@ def test_sighting_rules() -> None:
     assert verdict.SCHEMA == "migloop-verdict/1"
 
 
-def test_declared_via_edges_are_recorded_and_checked(tmp_path: Any) -> None:
-    """via = 模型每次查询自己声明的来处,harness 原样记录;probe 解析成声明边并逐条和账本边对照,不改结构。"""
+def test_walk_tree_follows_via_and_labels_ledger_relations(tmp_path: Any) -> None:
+    """有 via 的 run:树 = 打开的节点按 via 挂(打开索引 = 整个,打开某版 = 那一版);每跳按账本标关系;via 不合规的进侧列。"""
     led = _pool(tmp_path)
     calls = [
-        ("sessions", {"file": "A.ets"}, "# 返修链(1)\n- entry/A.ets | 生成方 conv-a id=agent-c | 修复方 fixer id=agent-f\n"),
+        ("sessions", {"file": "A.ets"}, "# 返修链(1)\n"),
         ("file", {"path": "A.ets", "via": "sessions"}, "# entry/A.ets 2 版\n- v1 agent-c v1\n- v2 agent-f v1\n"),
-        ("agent", {"id": "conv-a", "v": 1, "via": "file:entry/A.ets@v1 写者行"}, "# agent-c v1\n读 spec/pages/A.md@v1\n"),
-        ("file", {"path": "spec/pages/A.md", "v": 1, "via": "agent:conv-a@v1 读取行 spec/pages/A.md@v1"}, "# spec/pages/A.md@v1\n"),
-        ("agent", {"id": "fixer", "via": "file:entry/A.ets@v2 写者"}, "# agent-f\n读 entry/A.ets@v1\n"),
-        ("agent", {"id": MAIN_ID, "v": 1, "via": "file:spec/pages/A.md@v1 读者"}, "# 主会话 v1\n"),     # 主会话没读过 A.md:不重合
-        ("blame", {"path": "A.ets", "v": 2, "via": "凭感觉"}, "# blame\n"),
+        ("agent", {"id": "conv-a", "v": 1, "via": "file:entry/A.ets 写者"}, "# agent-c v1\n读 spec/pages/A.md@v1\n"),
+        ("file", {"path": "spec/pages/A.md", "v": 1, "via": "agent:conv-a@v1 读取"}, "# spec/pages/A.md@v1\n"),
+        ("agent", {"id": "fixer", "via": "file:entry/A.ets@v2 写者"}, "# agent-f\n"),         # v2 没打开过:老 run 才会出现,进侧列
+        ("agent", {"id": "fixer", "v": 1, "via": "file:entry/A.ets@v1"}, '{"result": "⛔ via 不是已打开的节点"}'),   # 服务端拒了(客户端包成 JSON 落盘):不算打开
+        ("agent", {"id": MAIN_ID, "v": 1, "via": "agent:conv-a@v1 派发"}, "# 主会话 v1\n"),
+        ("file", {"path": "A.ets", "v": 2, "via": "agent:fixer 写"}, "# entry/A.ets@v2\n"),
+        ("blame", {"path": "A.ets", "v": 2}, "# blame\n"),                                       # 不移动
+        ("file", {"path": "A.ets", "via": "agent:conv-a@v1"}, "# 再看索引\n"),                  # 再次打开同一节点:只加步号
     ]
-    p = probe.probe_payload(led, _run_dir(tmp_path, calls, _block(led), name="via"))
+    p = probe.probe_payload(led, _run_dir(tmp_path, calls, _block(led), name="walk"))
     T = p["trajectory"]
-    d = {x["step"]: x for x in T["declared"]}
-    assert d[2]["match"] == "跳" and d[2]["from"] is None and d[2]["to"] is not None              # 从 sessions 跳过来,不是节点
-    assert (d[3]["from"], d[3]["to"], d[3]["match"]) == ("file:/proj/entry/A.ets@1", "agent:agent-c@1", "重合")   # 账本:conv-a v1 写 v1
-    assert (d[4]["from"], d[4]["to"], d[4]["match"]) == ("agent:agent-c@1", "file:/proj/spec/pages/A.md@1", "重合")
-    assert (d[5]["from"], d[5]["to"], d[5]["match"]) == ("file:/proj/entry/A.ets@2", "agent:agent-f@1", "重合")
-    assert (d[6]["from"], d[6]["to"], d[6]["match"]) == ("file:/proj/spec/pages/A.md@1", f"agent:{MAIN_ID}@1", "不重合")
-    assert d[7]["match"] == "无法解析" and d[7]["from"] is None
-    # 声明边不改结构:主会话 v1 仍按账本挂在 conv-a v1 下(派发),不是挂在 A.md 下
+    assert T["mode"] == "via"
     by = {n["id"]: n for n in T["nodes"]}
-    assert by[f"agent:{MAIN_ID}@1"]["parent"] == "agent:agent-c@1" and by[f"agent:{MAIN_ID}@1"]["edge"] == "派发"
-    # 步骤层原样带 via 文本
-    assert p["steps"][2]["via"] == "file:entry/A.ets@v1 写者行" and p["steps"][0]["via"] == ""
+    root = by[T["root"]]
+    assert root["id"] == "file:/proj/entry/A.ets@-" and root["label"] == "A.ets(索引)" and root["side"] == "root"
+    assert root["opened"] == [2, 10] and root["via"] == "sessions"
+    c = by["agent:agent-c@1"]
+    assert c["parent"] == root["id"] and c["side"] == "up" and c["edge"] == "写者 v1" and c["depth"] == 1
+    a = by["file:/proj/spec/pages/A.md@1"]
+    assert a["parent"] == c["id"] and a["edge"] == "读 v1" and a["depth"] == 2
+    m = by[f"agent:{MAIN_ID}@1"]
+    assert m["parent"] == c["id"] and m["edge"] == "派发自 v1"
+    f = by["agent:agent-f@-"]
+    assert f["side"] == "unlinked" and f["note"] == "via 指向没打开过的节点" and f["parent"] == root["id"]
+    a2 = by["file:/proj/entry/A.ets@2"]
+    assert a2["parent"] == f["id"] and a2["edge"] == "写 v2" and a2["fixed"]                     # 从整个 fixer 跳到它写的 v2
+    # 被拒的那一步没打开 fixer v1;结论点名的 A.ets@v1 同键已在路线上(索引 / v2),不另列侧列,角色落在那些节点上
+    assert "agent:agent-f@1" not in by and "file:/proj/entry/A.ets@1" not in by
+    d = {x["step"]: x["match"] for x in T["declared"]}
+    assert d == {2: "入口", 3: "账本有边", 4: "账本有边", 5: "via 指向没打开过的节点", 6: "被拒(via 不合规,没打开)",
+                 7: "账本有边", 8: "账本有边"}
+    assert p["steps"][2]["via"] == "file:entry/A.ets 写者"
+    # 没有 via 的老 run 仍走账本树
+    assert probe.probe_payload(led, _run_dir(tmp_path, [("file", {"path": "A.ets"}, "x")], _block(led), name="noVia"))["trajectory"]["mode"] == "ledger"

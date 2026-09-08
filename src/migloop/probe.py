@@ -12,7 +12,7 @@ import os
 import re
 from typing import Any
 
-from . import atoms, filestory, verdict
+from . import atoms, filestory, verdict, via
 
 _VERDICT = re.compile(r"判定[::]\s*(传递|错|缺)")
 _LINK = re.compile(r"^环\s*(\d+)[A-Za-z\']?\s*(.*)$")
@@ -297,8 +297,20 @@ def _transcript_results(run_dir: str) -> list[str] | None:
                         txt = "".join(str(x.get("text") or "") for x in c if isinstance(x, dict))
                     else:
                         txt = c if isinstance(c, str) else ""
-                    texts[str(b.get("tool_use_id"))] = txt
+                    texts[str(b.get("tool_use_id"))] = _unwrap_result(txt)
     return [texts.get(t, "") for t in order]
+
+
+def _unwrap_result(txt: str) -> str:
+    """MCP 客户端把工具的字符串返回包成 {"result": "..."} 写进转录;拆出来才是模型看到的正文。"""
+    if txt.lstrip().startswith('{"result"'):
+        try:
+            obj = json.loads(txt)
+        except json.JSONDecodeError:
+            return txt
+        if isinstance(obj, dict) and isinstance(obj.get("result"), str):
+            return obj["result"]
+    return txt
 
 
 def _sight(text: str, kind: str, key: str, v: int | None, ledger: atoms.Ledger | None) -> tuple[bool, bool]:
@@ -404,46 +416,7 @@ def _ledger_relation(ledger: atoms.Ledger, a: dict[str, Any], b: dict[str, Any])
     return rel if st == "true" else None
 
 
-_VIA_RE = re.compile(r"^(file|agent):(\S+?)(?:@v(\d+))?(?=\s|$)")
-
-
-def _parse_via(ledger: atoms.Ledger, text: str) -> dict[str, Any]:
-    """模型声明的来处 → {text, tag, kind, key, v, ok}。tag = task / sessions / search(不是节点的来处);坐标解析失败 ok=False。"""
-    t = str(text or "").strip()
-    out: dict[str, Any] = {"text": t, "tag": None, "kind": None, "key": None, "v": None, "ok": False}
-    if not t:
-        return out
-    low = t.lower()
-    for tag in ("task", "sessions", "search"):
-        if low == tag or low.startswith((tag + ":", tag + " ")):
-            out["tag"] = tag
-            return out
-    m = _VIA_RE.match(t)
-    if not m:
-        return out
-    kind, hint, vs = m.group(1), m.group(2), m.group(3)
-    out["kind"] = kind
-    if kind == "file":
-        key = filestory.find_story_path(ledger.stories, hint)
-    else:
-        a = atoms.resolve_agent(ledger, hint)
-        if a is None and hint.startswith("__main__"):
-            a = verdict._main_agent(ledger, hint.split(":", 1)[-1])
-        key = a.id if a else None
-    if not key:
-        return out
-    out["key"] = key
-    v = int(vs) if vs is not None else None
-    if v is None and _n_versions(ledger, kind, key) == 1:
-        v = 1
-    if v is not None and not (1 <= v <= _n_versions(ledger, kind, key)):
-        return out
-    out["v"] = v
-    out["ok"] = True
-    return out
-
-
-def _trajectory(ledger: atoms.Ledger, run_dir: str, steps: list[dict[str, Any]], root: str | None,
+def _trajectory_ledger(ledger: atoms.Ledger, run_dir: str, steps: list[dict[str, Any]], root: str | None,
                 structured: dict[str, Any] | None, verdicts: dict[str, list[dict[str, Any]]]) -> dict[str, Any] | None:
     texts = _transcript_results(run_dir)
     if texts is None or not root:
@@ -492,14 +465,6 @@ def _trajectory(ledger: atoms.Ledger, run_dir: str, steps: list[dict[str, Any]],
             for r in rows:
                 if r.get("v") is not None:
                     add(str(r["kind"]), key, r["v"], "结论")
-    # 模型声明的来处:坐标能解析的也是它点名的节点,进集合(来源「来处」)
-    vias: dict[int, dict[str, Any]] = {}
-    for s in steps:
-        if s.get("via") and _step_landing(s) is not None and s.get("ok") is not False:
-            pv = _parse_via(ledger, str(s["via"]))
-            vias[int(s["i"])] = pv
-            if pv["ok"] and pv["v"] is not None:
-                add(str(pv["kind"]), str(pv["key"]), pv["v"], "来处")
     # 查过的落点;不带版本的索引 / 全程查询并进同键已有的版本节点
     for s in steps:
         land = _step_landing(s)
@@ -601,40 +566,198 @@ def _trajectory(ledger: atoms.Ledger, run_dir: str, steps: list[dict[str, Any]],
     present = {(n["kind"], n["key"], n["v"]) for n in order}
     for n in order:
         n["unseen"] = len([x for x in _upstream_neighbors(ledger, n["kind"], n["key"], n["v"]) if x not in present])
-    # 声明边:模型说的「我从 X 来查 Y」,逐条和账本边对照;不改结构,只是路线的记录
-    edge_pairs = {(e["from"], e["to"]) for e in edges}
+    ordered = sorted(order, key=lambda n: (0 if n is root_node else 1, n["depth"] if n["side"] == "up" else 10 ** 6, pos[n["id"]]))
+    return {"mode": "ledger", "root": root_node["id"], "nodes": ordered, "edges": edges, "declared": [],
+            "side_title": "查过 · 不在根的上下游"}
 
-    def node_of(kind: str, key: str, v: int | None) -> dict[str, Any] | None:
-        exact = nodes.get(_traj_id(kind, key, v))
-        if exact is not None:
-            return exact
-        same = [n for n in nodes.values() if n["kind"] == kind and n["key"] == key]
-        return same[0] if same else None
 
+# ═══════════════ 按 via 走的树:打开了什么,从什么跳 ═══════════════
+# 有 via 的 run 用这个:节点 = 模型用 file / agent 打开的节点(打开索引就是「整个」,打开某版就是那一版),每个一次;
+# 父 = 它声明的来处(必须是之前打开过的节点,服务端已校验);每一跳再按账本标这两个节点之间有没有写 / 读 / 派发。
+# 不是推断:节点是它打开的,边是它说的,账本关系是核出来的。via 不合规的(老 run)和结论点名没打开的放侧列。
+
+
+def _vrange(vs: list[int]) -> str:
+    vs = sorted(set(vs))
+    if not vs:
+        return ""
+    if len(vs) == 1:
+        return f"v{vs[0]}"
+    if vs == list(range(vs[0], vs[-1] + 1)):
+        return f"v{vs[0]}–v{vs[-1]}"
+    return ",".join(f"v{x}" for x in vs[:4]) + ("…" if len(vs) > 4 else "")
+
+
+def _file_versions(ledger: atoms.Ledger, key: str, v: int | None) -> list[int]:
+    st = ledger.stories.get(key)
+    if st is None:
+        return []
+    return [v] if v is not None else list(range(1, len(st.versions) + 1))
+
+
+def _agent_versions(ledger: atoms.Ledger, key: str, v: int | None) -> list[int]:
+    a = ledger.agents.get(key)
+    if a is None:
+        return []
+    return [v] if v is not None else sorted({act.ver for act in a.actions if act.ver is not None})
+
+
+def _relation_any(ledger: atoms.Ledger, a: dict[str, Any], b: dict[str, Any]) -> str | None:
+    """a → b(模型从 a 跳到 b)在账本里对应哪种关系;节点不带版本 = 那个键的全部版本。
+    返回 '写 v8–v10' / '写者 v8' / '读 v7' / '读者 v3' / '派发 v5' / '派发自 v5' / None。"""
+    if a["kind"] == "file" and b["kind"] == "agent":
+        fv, av = set(_file_versions(ledger, a["key"], a["v"])), set(_agent_versions(ledger, b["key"], b["v"]))
+        st = ledger.stories.get(a["key"])
+        wrote = [ver.v for ver in (st.versions if st else []) if ver.by == b["key"] and ver.by_ver in av and ver.v in fv]
+        if wrote:
+            return "写者 " + _vrange(wrote)
+        ag = ledger.agents.get(b["key"])
+        read = [ref.v for act in (ag.actions if ag else []) for ref in act.files
+                if ref.op == "read" and ref.path == a["key"] and ref.v in fv and ref.certain and not ref.ev.dep
+                and (b["v"] is None or (act.ver if act.ver is not None else act.at) <= b["v"])]
+        return ("读者 " + _vrange(read)) if read else None
+    if a["kind"] == "agent" and b["kind"] == "file":
+        av, fv = set(_agent_versions(ledger, a["key"], a["v"])), set(_file_versions(ledger, b["key"], b["v"]))
+        st = ledger.stories.get(b["key"])
+        wrote = [ver.v for ver in (st.versions if st else []) if ver.by == a["key"] and ver.by_ver in av and ver.v in fv]
+        if wrote:
+            return "写 " + _vrange(wrote)
+        ag = ledger.agents.get(a["key"])
+        read = [ref.v for act in (ag.actions if ag else []) for ref in act.files
+                if ref.op == "read" and ref.path == b["key"] and ref.v in fv and ref.certain and not ref.ev.dep
+                and (a["v"] is None or (act.ver if act.ver is not None else act.at) <= a["v"])]
+        return ("读 " + _vrange(read)) if read else None
+    if a["kind"] == "agent" and b["kind"] == "agent":
+        child = ledger.agents.get(b["key"])
+        if child and child.parent == a["key"] and (a["v"] is None or child.parent_ver == a["v"]):
+            return "派发" + (f" v{child.parent_ver}" if child.parent_ver is not None else "")
+        me = ledger.agents.get(a["key"])
+        if me and me.parent == b["key"] and (b["v"] is None or me.parent_ver == b["v"]):
+            return "派发自" + (f" v{me.parent_ver}" if me.parent_ver is not None else "")
+        return None
+    return None
+
+
+def _rejected(text: str) -> bool:
+    """服务端拒了这次 file / agent(via 不合规):新版以 ⛔ 开头;更早一跑的错误文本没有前缀,按开头词认。"""
+    t = text.lstrip()
+    return t.startswith(via.REJECT) or (t.startswith("via") and "已打开:" in t[:400])
+
+
+def _trajectory_walk(ledger: atoms.Ledger, steps: list[dict[str, Any]], texts: list[str],
+                     structured: dict[str, Any] | None, verdicts: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
+    nodes: dict[str, dict[str, Any]] = {}
+    order: list[dict[str, Any]] = []
+
+    def add(kind: str, key: str, v: int | None, source: str) -> dict[str, Any]:
+        nid = _traj_id(kind, key, v)
+        n = nodes.get(nid)
+        if n is None:
+            n = nodes[nid] = {"id": nid, "kind": kind, "key": key, "v": v, "label": _traj_label(ledger, kind, key, v),
+                              "source": source, "fixed": False, "opened": [], "appears": [], "parent": None,
+                              "edge": None, "skipped": 0, "side": "up", "depth": 0, "unseen": 0, "note": None,
+                              "via": None}
+            order.append(n)
+        return n
+
+    root: dict[str, Any] | None = None
     declared: list[dict[str, Any]] = []
     for s in steps:
-        i = int(s["i"])
-        dv = vias.get(i)
-        land = _step_landing(s)
-        if dv is None or land is None:
+        if s.get("tool") not in ("file", "agent") or s.get("ok") is False:
             continue
-        to = node_of(*land)
-        row: dict[str, Any] = {"step": i, "text": dv["text"], "from": None, "to": to["id"] if to else None, "match": None}
-        if dv["tag"]:
-            row["match"] = "跳"                                  # 从 sessions / search / 任务跳过来,不是节点
-        elif not dv["ok"]:
-            row["match"] = "无法解析"
+        land = _step_landing(s)
+        if land is None:
+            continue
+        i = int(s["i"])
+        kind, key, v = land
+        pv = via.parse(ledger, str(s.get("via") or ""))
+        if i - 1 < len(texts) and _rejected(texts[i - 1]):
+            declared.append({"step": i, "text": pv["text"], "from": None, "to": None, "match": "被拒(via 不合规,没打开)"})
+            continue                                           # 服务端没执行:这一步不算打开
+        n = add(kind, key, v, "查过")
+        n["opened"].append(i)
+        if len(n["opened"]) > 1:
+            continue                                           # 再次打开同一节点:只记步号,不换父
+        n["via"] = pv["text"] or None
+        row: dict[str, Any] = {"step": i, "text": pv["text"], "from": None, "to": n["id"], "match": None}
+        if root is None:
+            root = n
+            n["side"] = "root"
+            row["match"] = "入口" if pv["first"] else ("入口(via 不是 sessions)" if pv["text"] else "入口(没填 via)")
+            if not pv["first"]:
+                n["note"] = "第一跳没写 sessions"
+        elif pv["first"]:
+            n["parent"], n["side"], n["note"] = root["id"], "unlinked", "sessions 只能当第一跳"
+            row["match"] = "跳"
+        elif pv["ok"] and _traj_id(str(pv["kind"]), str(pv["key"]), pv["v"]) in nodes \
+                and nodes[_traj_id(str(pv["kind"]), str(pv["key"]), pv["v"])]["opened"]:
+            src = nodes[_traj_id(str(pv["kind"]), str(pv["key"]), pv["v"])]
+            n["parent"], n["side"] = src["id"], "up"
+            n["edge"] = _relation_any(ledger, src, n)
+            row["from"], row["match"] = src["id"], ("账本有边" if n["edge"] else "账本无此边")
         else:
-            fr = node_of(str(dv["kind"]), str(dv["key"]), dv["v"])
-            row["from"] = fr["id"] if fr else None
-            if fr is None or to is None:
-                row["match"] = "无法解析"
-            elif fr is to:
-                row["match"] = "同一节点"
-            elif (fr["id"], to["id"]) in edge_pairs or (to["id"], fr["id"]) in edge_pairs:
-                row["match"] = "重合"
-            else:
-                row["match"] = "不重合"
+            n["parent"], n["side"] = root["id"], "unlinked"
+            n["note"] = "via 解析不了" if not pv["ok"] else "via 指向没打开过的节点"
+            row["match"] = n["note"]
         declared.append(row)
-    ordered = sorted(order, key=lambda n: (0 if n is root_node else 1, n["depth"] if n["side"] == "up" else 10 ** 6, pos[n["id"]]))
-    return {"root": root_node["id"], "nodes": ordered, "edges": edges, "declared": declared}
+    if root is None:
+        return {"mode": "via", "root": None, "nodes": [], "edges": [], "declared": [], "side_title": "查过 · 不在路线上"}
+    # 结论点名但没打开的:同一个键已经在路线上(整个 / 别的版本)就不另列,角色徽标会落在那个节点上;键都不在路线上的进侧列
+    on_route_keys = {(n["kind"], n["key"]) for n in order}
+
+    def side_add(kind: str, key: str, v: int | None, source: str, note: str) -> dict[str, Any] | None:
+        if (kind, key) in on_route_keys or _traj_id(kind, key, v) in nodes:
+            return nodes.get(_traj_id(kind, key, v))
+        m = add(kind, key, v, source)
+        m["parent"], m["side"], m["note"] = root["id"], "unlinked", note
+        return m
+
+    if structured and not structured.get("errors"):
+        for key, rows in (structured.get("roles") or {}).items():
+            for r in rows:
+                side_add(str(r["kind"]), key, r["v"], "结论", "结论点名,没打开")
+        for f in structured.get("fixed") or []:
+            m = side_add(str(f["kind"]), str(f["key"]), f["v"], "修复落点", "修复落点,没打开")
+            if m is not None:
+                m["fixed"] = True
+    elif verdicts:
+        for key, rows in verdicts.items():
+            for r in rows:
+                if r.get("v") is not None:
+                    side_add(str(r["kind"]), key, r["v"], "结论", "结论点名,没打开")
+    # 出现于(事实标注)、深度、没查的上游邻居数
+    landing_by_step = {s["i"]: _step_landing(s) for s in steps}
+    for n in order:
+        for s in steps:
+            i = int(s["i"])
+            land = landing_by_step.get(i)
+            if land is not None and land[0] == n["kind"] and land[1] == n["key"]:
+                continue
+            if i - 1 < len(texts) and _sight(texts[i - 1], n["kind"], n["key"], n["v"], ledger)[0]:
+                n["appears"].append(i)
+        d = 0
+        cur = n
+        while cur["parent"] is not None and cur["side"] == "up":
+            cur = nodes[cur["parent"]]
+            d += 1
+        n["depth"] = d
+    present = {(n["kind"], n["key"], n["v"]) for n in order}
+    for n in order:
+        n["unseen"] = len([x for x in _upstream_neighbors(ledger, n["kind"], n["key"], n["v"]) if x not in present])
+    edges = [{"from": n["parent"], "to": n["id"], "relation": n["edge"] or "无", "skipped": 0}
+             for n in order if n["parent"] and n["side"] == "up"]
+    return {"mode": "via", "root": root["id"], "nodes": order, "edges": edges, "declared": declared,
+            "side_title": "查过 · 不在路线上"}
+
+
+def _trajectory(ledger: atoms.Ledger, run_dir: str, steps: list[dict[str, Any]], root: str | None,
+                structured: dict[str, Any] | None, verdicts: dict[str, list[dict[str, Any]]]) -> dict[str, Any] | None:
+    """有 via 的 run:按 via 走的树;没有的老 run:账本边树;没有转录:None。"""
+    texts = _transcript_results(run_dir)
+    if texts is None:
+        return None
+    if any(s.get("via") for s in steps if s.get("tool") in ("file", "agent")):
+        if len(texts) < len(steps):
+            texts = texts + [""] * (len(steps) - len(texts))
+        return _trajectory_walk(ledger, steps, texts, structured, verdicts)
+    return _trajectory_ledger(ledger, run_dir, steps, root, structured, verdicts)
