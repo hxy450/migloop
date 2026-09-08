@@ -793,6 +793,7 @@
       if (!node) return;
       selTid = tid;
       drawerFor(node);
+      if (node.traj) { renderTree(tid); return; }          // 轨迹树的节点不沿账本展开 / 折叠,点它只看抽屉
       if (node.kind === "leaf" && node.isStub) { unstub(node); renderTree(node.parent); return; }
       if (node.busy || node.kind === "leaf" || node.isRight || node.possible) { renderTree(tid); return; }
       if (node.expanded) { collapse(node); renderTree(tid); return; }
@@ -1064,7 +1065,7 @@
       ld.appendChild(inp);
       ld.appendChild(btn);
       probeEl.appendChild(ld);
-      if (!PROBE) { probeEl.appendChild(el("div", "sum", "载入一次调查员的跑:它查过的节点打「查 #k」,判过的按 传递 / 错 / 缺 上色,故障进入点描边,没查过的变淡。")); return; }
+      if (!PROBE) { probeEl.appendChild(el("div", "sum", "载入一次调查员的跑:树就是它走过的路(查过的 + 结论点名的节点,每个一次,挂在第一次看到它的那一步下),结论按缺陷 × 版本上色,进入点描边。")); return; }
       if (PROBE.error) { probeEl.appendChild(el("div", "sum", "载入失败:" + PROBE.error)); return; }
       var sum = el("div", "sum", "");
       sum.innerHTML = "<b>" + (PROBE.links || []).length + "</b> 环 · 进入点 <b>" + (PROBE.entry != null ? "环 " + (PROBE.entries || [PROBE.entry]).join(" / ") : "未标") + "</b> · 查过 <b>" + Object.keys(PROBE.byKey).length + "</b> 个节点"
@@ -1307,7 +1308,8 @@
           chip("调查 <b>" + p.run + "</b> · " + entryTxt, "probe-chip");
           var go = function () {
             if (!dataReady) { setTimeout(go, 400); return; }
-            if (XT) probeExpand();
+            if (p.trajectory) probeBuildTrajectory();
+            else if (XT) probeExpand();
             else if (p.root) openRoot({ kind: "file", path: p.root, v: null });
           };
           go();
@@ -1323,7 +1325,66 @@
       });
       if (q.probe) loadProbe(q.probe);
     }
-    // ═══════════ 调查树:查过的节点都要在树上 ═══════════
+    // ═══════════ 调查轨迹树:树 = 模型走过的路 ═══════════
+    // 节点只有 agent@版本 / file@版本 两种:模型真的查过的 + 结论块点名的,每个一次;挂在它第一次出现在返回文本里
+    // 的那一步的落点下(实录的「看到」边);sessions / 全池 search 带进来的挂根、虚线;从没出现过就被查的标「无来源」。
+    // 「+N 未查」是账本里这个节点还有几个上游邻居没被查(只按精确版本数),不展开 —— 要看账本邻居,点节点开抽屉。
+    function probeBuildTrajectory() {
+      var T = PROBE && PROBE.trajectory;
+      if (!T || !T.nodes || !T.nodes.length) return;
+      XT = { byId: {}, seq: 0, root: null, rights: [], rootKind: T.nodes[0].kind };
+      var byId = {};
+      T.nodes.forEach(function (n) {
+        var node = n.kind === "file"
+          ? xtNode("file", { path: n.key, anchorV: n.v, label: n.label })
+          : xtNode("agent", { aid: n.key, anchorVer: n.v, label: n.label });
+        node.traj = true; node.expanded = true; node.children = []; node.edgeKind = n.edge_kind; node.trajSource = n.source;
+        var b = [];
+        if (n.edge_kind === "seen") b.push({ cls: "", t: "#" + n.seen_step + " 看到" + (n.seen_exact ? "" : "·版本未标") });
+        else if (n.edge_kind === "search") b.push({ cls: "via", t: "#" + n.seen_step + " 命中" });
+        else if (n.edge_kind === "none") b.push({ cls: "stale", t: "无来源" });
+        else if (n.edge_kind === "task") b.push({ cls: "", t: "任务给的" });
+        if (n.source === "结论") b.push({ cls: "via", t: "命中未展开" });
+        if (n.fixed) b.push({ cls: "", t: "修复后" });
+        if (n.seen_count > 1) b.push({ cls: "", t: "+" + (n.seen_count - 1) + " 次出现" });
+        if (n.ledger && n.ledger.status === "true") b.push({ cls: "", t: "账本·" + n.ledger.relation });
+        else if (n.ledger && n.ledger.status === "unknown") b.push({ cls: "via", t: "账本·候选" });
+        node.badges = b;
+        byId[n.id] = node;
+      });
+      T.nodes.forEach(function (n) {
+        var node = byId[n.id];
+        if (!n.parent || !byId[n.parent]) { node.isRoot = true; node.depth = 0; XT.root = node.tid; return; }
+        addKid(byId[n.parent], node);
+      });
+      T.nodes.forEach(function (n) {
+        if (n.unseen > 0) addKid(byId[n.id], xtNode("leaf", { label: "+" + n.unseen + " 未查", isRoStub: true }));
+      });
+      var root = XT.byId[XT.root];
+      if (root.kind === "file") setRootLabel(root.label, "F:" + root.path, "file=" + encodeURIComponent(root.path) + "&v=" + (root.anchorV || ""));
+      else setRootLabel(root.label, "A:" + root.aid, "agent=" + encodeURIComponent(root.aid) + "&v=" + (root.anchorVer || ""));
+      selTid = root.tid;
+      drawerFor(root);
+      PROBE.placed = Object.keys(PROBE.byKey).length;
+      PROBE.unplaced = [];
+      var seenRole = {};
+      Object.keys(XT.byId).forEach(function (t) {
+        var saved = PROBE.defect; PROBE.defect = null;
+        probeRolesFor(XT.byId[t]).hit.forEach(function (r) { seenRole[r.defect + "|" + r.key + "|" + r.v] = 1; });
+        PROBE.defect = saved;
+      });
+      var tot = 0, on = 0;
+      Object.keys(PROBE.roleIdx || {}).forEach(function (k) { (PROBE.roleIdx[k] || []).forEach(function (r) { tot++; if (seenRole[r.defect + "|" + r.key + "|" + r.v]) on++; }); });
+      PROBE.rolesTotal = tot; PROBE.rolesOnTree = on;
+      var onTree = {};
+      Object.keys(XT.byId).forEach(function (t) { var pm = probeMark(XT.byId[t]); if (pm && pm.vd) pm.vd.links.forEach(function (no) { onTree[no] = 1; }); });
+      (PROBE.links || []).forEach(function (lk) { lk.onTree = !!onTree[lk.no]; });
+      autoFit = true;
+      autoFloor = null;
+      renderTree(XT.root);
+      renderProbe();
+    }
+    // ═══════════ 调查树(没有轨迹的老 run):查过的节点都要在树上 ═══════════
     // 根开好之后沿账本的边自动往上游长:每一层只展开落在 probe 集合(查过 / 判过 / 提到)里的子节点,其余折成一个
     // 「+N 未查」桩(点开可看);同一个键只展开一次(主会话在很多 agent 的派发边上都会出现,再出现只标「已在上方展开」);
     // 最深 PROBE_DEPTH 层。查过但沿边够不到的节点(模型用 search 跳过去的)列在面板里。
@@ -1563,7 +1624,7 @@
         path.setAttribute("d", "M" + x1 + "," + y1 + " C" + mx + "," + y1 + " " + mx + "," + y2 + " " + x2 + "," + y2);
         var onChain = PROBE && !PROBE.error && probeOnChain(n) && probeOnChain(p);
         path.setAttribute("class", "wire" + (onChain ? (n.possible || p.possible ? " cand" : " chain") : "")
-                                     + (n.possible ? " dashed" : ""));
+                                     + (n.possible || (n.traj && n.edgeKind !== "seen") ? " dashed" : ""));
         frag.appendChild(path);
         (wireByTid[tid] = wireByTid[tid] || []).push(path);
         (wireByTid[n.parent] = wireByTid[n.parent] || []).push(path);
