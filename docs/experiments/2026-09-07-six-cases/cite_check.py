@@ -1,7 +1,7 @@
 """引用核验(机械):两组报告里的坐标能不能核回原文。只证明「位置存在、原文匹配」,不证明结论成立。
 
-工具组坐标:#n@L行·转录标识(按 (标识, 行) 反查账本 by_loc;老格式 #n@L行 要求账本 lines[n] == L)、path@vN(该文件版本数 ≥ N)。
-原始组坐标:<转录文件>.jsonl:行号(池子里有这个文件且行数 ≥ 行号)、toolu_… id(在池子任一转录里出现)。
+工具组坐标:#转录标识:n@L行[/块](旧后缀标识格式也可核;无标识拒绝,多动作同行必须给块号)、path@vN(1 ≤ N ≤ 版本数)。
+原始组坐标:<转录文件>.jsonl:行号(池子里有这个文件且行数 ≥ 行号)、toolu_… id(实际 tool_use 块的 id 定义)。
 用法: python cite_check.py <sid> <result.json>...   → 每份一行 JSON:{total, valid, invalid, drifted, samples}
 也可 import:check_report(ledger, pool, text) -> dict;summary_line(tag, r) -> str。评委脚本把 summary_line 拼进提示词。"""
 from __future__ import annotations
@@ -17,7 +17,6 @@ _TOOL_REF = re.compile(r"#(?:([\w-]+):)?(\d+)@L(\d+)(?:/(\d+))?(?:·([\w-]+))?")
 _FILE_AT = re.compile(r"([\w./-]+\.[A-Za-z0-9]+)@v(\d+)")
 _RAW_LINE = re.compile(r"([\w-]+\.jsonl):(\d+)")
 _TUID = re.compile(r"\btoolu_[A-Za-z0-9]{8,}\b")
-_TUID_DEF = re.compile(r'"id":\s*"(toolu_[A-Za-z0-9]{8,})"')      # 只认 tool_use 块里定义的 id,正文里提到的不算
 
 
 def _line_count(path: str) -> int:
@@ -53,7 +52,17 @@ class Pool:
                 try:
                     with open(p, encoding="utf-8", errors="ignore") as fh:
                         for line in fh:
-                            ids.update(_TUID_DEF.findall(line))
+                            if '"tool_use"' not in line:
+                                continue
+                            try:
+                                record = json.loads(line)
+                            except (ValueError, TypeError):
+                                continue
+                            message = record.get("message") if isinstance(record, dict) else None
+                            blocks = message.get("content") if isinstance(message, dict) else None
+                            if isinstance(blocks, list):
+                                ids.update(b["id"] for b in blocks if isinstance(b, dict)
+                                           and b.get("type") == "tool_use" and isinstance(b.get("id"), str))
                 except OSError:
                     continue
             self._ids = ids
@@ -71,7 +80,8 @@ def check_report(ledger: Any, pool: Pool, text: str) -> dict[str, Any]:
             continue
         from migloop import atoms
         tag = m.group(1) or m.group(5)
-        hit, status = atoms.resolve_ref(ledger, int(m.group(2)), int(m.group(3)), int(m.group(4) or 0), tag)
+        hit, status = atoms.resolve_ref(ledger, int(m.group(2)), int(m.group(3)),
+                                        int(m.group(4)) if m.group(4) is not None else None, tag)
         if hit is not None:
             valid += 1
             if status == "drifted":

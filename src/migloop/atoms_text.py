@@ -102,12 +102,32 @@ def _hops(ledger: atoms.Ledger, node: tuple[str, str, int]) -> str:
     return f" · 上游 {dm}/{dw} 跳" if dm is not None else ""
 
 
+def _scan_note(ledger: atoms.Ledger, agent: str | None = None, seq: int | None = None) -> list[str]:
+    gaps = [g for g in ledger.scan_gaps if (agent is None or g["agent"] == agent)
+            and (seq is None or g["seq"] == seq)]
+    if not gaps:
+        return []
+    return [f"⚠ 提及索引不完备: {len(gaps)} 条记录达到扫描/收集上限,"
+            f"{sum(g['chars'] for g in gaps)} 字符未扫描、{sum(g['mentions'] for g in gaps)} 条提及未收集。"
+            "未扫描区域可能涉及任何文件;零命中不证明没出现。index(kind=scan) 列原文指针,action 可按 part/offset/find 翻页。"]
+
+
 def render_index(ledger: atoms.Ledger, kind: str | None = None, query: str | None = None,
                  root: str = "", limit: int = 300) -> str:
     """目录。kind: agent | ets | spec | src | other | None(全部);query 子串过滤。"""
-    idx = atoms.ledger_index(ledger)
     q = (query or "").lower()
-    out: list[str] = []
+    out: list[str] = _scan_note(ledger)
+    if kind == "scan":
+        gaps = [g for g in ledger.scan_gaps if not q or q in g["agent"].lower() or q == str(g["seq"])]
+        out.append(f"# 扫描缺口 {len(gaps)} 条(不是文件覆盖率)")
+        for g in gaps[:limit]:
+            out.append(f"- {_core(g['seq'], ledger.locs.get(g['seq']))} agent={g['agent']} "
+                       f"未扫 {g['chars']} 字符,未收 {g['mentions']} 条提及;来源={','.join(g['sources']) or '提及数量上限'} "
+                       f"→ action(id={g['agent']}, seq={g['seq']}, part=input/output, find=…)")
+        if len(gaps) > limit:
+            out.append(f"还有 {len(gaps) - limit} 条,增大 limit={len(gaps)} 或 query=agent id / 动作号。")
+        return "\n".join(out)
+    idx = atoms.ledger_index(ledger)
     if kind in (None, "agent"):
         ags = [a for a in idx["agents"]
                if not q or q in str(a["label"]).lower() or q in a["id"].lower()
@@ -205,7 +225,7 @@ def _evidence_label(vv: dict[str, Any]) -> str:
     if src == "opaque":
         return "推导·黑盒写"
     if src == "outband":
-        return "观测·内容变了无写者"
+        return "观测·当前内容,写者未知" if vv.get("state_gap") else "观测·内容变了无写者"
     if src == "external":
         return "观测·首次读到" if known else "首见·内容未进上下文"
     if src == "generated":
@@ -230,12 +250,13 @@ def render_file(ledger: atoms.Ledger, hint: str, v: int | None = None, root: str
     默认一行计数,readers=True 展开;按词找读者用 search(file=)。"""
     fa = atoms.file_atom(ledger, hint, v, with_diff=diff, with_content=content)
     if fa is None:
-        return f"账本里没有该文件: {hint}"
+        return "\n".join([f"账本里没有该文件: {hint}", *_scan_note(ledger)])
     anchor = fa["v"]
     vv_anchor = fa["versions"][anchor - 1] if fa["versions"] else None
     lines = ledger.locs
     out = [f"# 文件 {rel(fa['path'], root)} @v{anchor}  (共 {fa['n_versions']} 版)"]
     out.append(f"完整路径: {fa['path']}")
+    out += _scan_note(ledger)
     if vv_anchor is not None:
         out.append("这一版内容: " + ("可复原" if vv_anchor["content_known"]
                                   else ("部分已知(脚本字面量里的正文,不是全文;content=1 看)" if fa.get("partial_known")
@@ -438,6 +459,7 @@ def render_agent(ledger: atoms.Ledger, agent_id: str, v: int | None = None,
     if ag.get("description"):
         ident.append(ag["description"])
     out.append("身份: " + " · ".join(ident))
+    out += _scan_note(ledger, ag["id"])
     if ag.get("t0"):
         out.append(f"时刻: 动作号旁的 T+h:mm 相对迁移开始 {ag['t0']}(池子里最早一条动作),跨 agent 对先后用它;"
                    "@L 是转录行号")
@@ -583,9 +605,9 @@ def _window(text: str, cap: int, offset: int = 0, find: str = "") -> tuple[str, 
 
 
 def render_action(ledger: atoms.Ledger, agent_id: str, seq: int, max_chars: int = 20000,
-                  offset: int = 0, find: str = "") -> str:
+                  offset: int = 0, find: str = "", part: str | None = None) -> str:
     """一次工具调用的原始输入输出 —— 账本是实录的索引,这里按指针展开原文,不经摘要。
-    offset / find 只作用于输出(长 think / 长结果);输入仍取前 max_chars/3。"""
+    part=input/output 可选择翻页侧;不指定时沿用输出优先、无输出则翻输入。"""
     import json
 
     raw = atoms.action_raw(ledger, agent_id, seq)
@@ -596,7 +618,15 @@ def render_action(ledger: atoms.Ledger, agent_id: str, seq: int, max_chars: int 
             + (f" · 效应 v{raw['ver']}" if raw["ver"] is not None else f" · 喂 v{raw['at']}"))
     inp = raw["input"]
     inp_text = inp if isinstance(inp, str) else json.dumps(inp, ensure_ascii=False, indent=1)
-    if raw["output"]:
+    if part not in (None, "input", "output"):
+        return "part 只能是 input 或 output"
+    if part == "input":
+        in_piece, in_note = _window(inp_text, max_chars, offset, find)
+        piece, note = "(未展开;part=output 查看)", ""
+    elif part == "output":
+        in_piece, in_note = "(未展开;part=input 查看)", ""
+        piece, note = _window(raw["output"], max_chars, offset, find)
+    elif raw["output"]:
         in_piece, in_note = _clip(inp_text, max_chars // 3), ""
         piece, note = _window(raw["output"], max_chars, offset, find)
     else:
@@ -604,6 +634,8 @@ def render_action(ledger: atoms.Ledger, agent_id: str, seq: int, max_chars: int 
         in_piece, in_note = _window(inp_text, max_chars, offset, find)
         piece, note = "(空)", ""
     out = [head]
+    owner = atoms.resolve_agent(ledger, agent_id)
+    out += _scan_note(ledger, owner.id if owner else agent_id, seq)
     eid = atoms.event_id(ledger, agent_id, seq)
     if eid:
         out.append(f"事件 id {eid}(会话:转录:tool_use_id;解析升级也不变,#n 只是本次建账的句柄)")
@@ -911,12 +943,12 @@ def render_search(ledger: atoms.Ledger, q: str, agent: str | None = None, v: int
     file=:只看它到第 v 版为止的内容和读者。没有起点不搜 —— 「提到过」不等于「上游」,每一跳都要有账本里的边。
     kind=write:时间窗口里全池有写能力的命令(断点窗口候选),q 可空。"""
     if kind == "write":
-        return _render_window_writes(ledger, q, since_ts, until_ts, root)
+        return "\n".join([*_scan_note(ledger), _render_window_writes(ledger, q, since_ts, until_ts, root)])
     if not agent and not file:
         if not until_ts:
             return ("search 要么带起点(agent= 或 file=),要么全池但只允许带时间上限:search(q, until_ts=…)。"
                     "全池查只用来核否定(「那一刻之前没人见过 X」),找上游仍要顺 agent / file 的边走。")
-        return _render_pool_search(ledger, q, until_ts, since_ts, root)
+        return "\n".join([*_scan_note(ledger), _render_pool_search(ledger, q, until_ts, since_ts, root)])
     if agent:
         res = atoms.search_agent(ledger, agent, q, v, since, after, since_ts, until_ts)
         if res is None:
@@ -927,6 +959,8 @@ def render_search(ledger: atoms.Ledger, q: str, agent: str | None = None, v: int
                "范围: 只有这个 agent 的记录(派发词 / 读到的内容 / 写入 / 命令 / 说 / 想 / 收件 / 注入);别的 agent 和文件内容不在内。"
                "零命中只能写「它在这个范围内没见过」;要写「那一刻之前没人见过」用 search(q, until_ts=那一刻) 全池查"]
         groups: dict[str, list[dict[str, Any]]] = {}
+        owner = atoms.resolve_agent(ledger, agent)
+        out += _scan_note(ledger, owner.id if owner else agent)
         for h in res["hits"]:
             groups.setdefault(h["kind"], []).append(h)
         for kind, hs in groups.items():
@@ -956,11 +990,12 @@ def render_search(ledger: atoms.Ledger, q: str, agent: str | None = None, v: int
         return "\n".join(out)
     res2 = atoms.search_file(ledger, str(file), q, v)
     if res2 is None:
-        return f"账本里没有该文件: {file}"
+        return "\n".join([f"账本里没有该文件: {file}", *_scan_note(ledger)])
     out = [f"# search 「{q}」 in file {rel(res2['path'], root)}  ≤ v{res2['v']}(共 {res2['n_versions']} 版)",
            f"范围: 该文件 ≤v{res2['v']} 的已知内容与读者读到的行"
            + (f";内容未知 {res2['unknown']} 版查不了" if res2.get("unknown") else "")
            + " —— 别的文件不在内,要查「那一刻之前谁写过 / 见过」用 search(q, until_ts=那一刻)"]
+    out += _scan_note(ledger)
     if res2["first"] is None:
         out.append("这些版本的已知内容里没有这个词(内容未知的版本查不了)")
     else:

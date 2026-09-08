@@ -91,25 +91,22 @@ _SCRIPT_RUN = re.compile(r"\.(?:py|js|mjs|sh)$")
 _SCRIPT_EXT_HINT = re.compile(r"\.(?:py|js|mjs|sh)\b")
 
 
-class ScriptTable(dict[str, list[tuple[str, str]]]):
-    """脚本正文表:名字 / 路径 → [(写入时刻, 正文)]。按运行时刻取当时存在的版本 —— 不拿后来才写的正文解释早先的运行
-    (评审反例:子代理 00:10 跑 fix.py,主会话 00:40 才写出来,曾被拿来解释)。paths 记同名脚本的各个完整路径:
-    运行时先按完整路径查,basename 只在唯一时兜底(评审反例:/tmp/one/fix.py 与 /tmp/two/fix.py 串用)。"""
+class ScriptTable(dict[str, list[tuple[str, str | None]]]):
+    """精确路径 → [(可用时刻, 正文或未知墓碑)]。全池预扫描唯一写入,收集时冻结查历史。
+    正文在调用完成后才可供后续运行推导;未知覆盖、删除、失败和重叠效应使正文失效。"""
 
     def __init__(self) -> None:
         super().__init__()
-        self.paths: dict[str, set[str]] = {}
+        self.frozen = False
+        self.busy_until: dict[str, str] = {}
 
-    def put(self, key: str, ts: str, content: str) -> None:
+    def put(self, key: str, ts: str, content: str | None) -> None:
+        if self.frozen:
+            return                          # 预扫描是唯一写者;正式收集只查历史,不能再执行一次 Edit
+        ts = ts_norm(ts)
         rows = self.setdefault(key, [])
-        if (ts, content) not in rows:
-            rows.append((ts, content))
-            rows.sort()
-        if "/" in key:
-            self.paths.setdefault(os.path.basename(key), set()).add(key)
-
-    def paths_for(self, base: str) -> list[str]:
-        return sorted(self.paths.get(base, ()))
+        rows.append((ts, content))
+        rows.sort(key=lambda row: row[0])    # 同时刻按事件顺序,不能按正文排序;None 是未知/删除墓碑
 
     def body(self, key: str, ts: str | None = None) -> str | None:
         rows = self.get(key) or []
@@ -117,7 +114,8 @@ class ScriptTable(dict[str, list[tuple[str, str]]]):
             return None
         if ts is None:
             return rows[-1][1]
-        prior = [c for t, c in rows if t <= ts]
+        cutoff = ts_norm(ts)
+        prior = [c for t, c in rows if t <= cutoff]
         return prior[-1] if prior else None
 
 
@@ -129,31 +127,57 @@ def _script_body(scripts: dict[str, Any], key: str, ts: str | None = None) -> st
 
 
 def _script_lookup(scripts: dict[str, Any], run: str, base: str | None, ts: str | None) -> str | None:
-    """跑的脚本正文:先按解析出的完整路径,查不到才按 basename,且只在同名脚本唯一时认(两个都不行 = 正文未知)。"""
+    """历史表严格按运行路径查;纯 dict 仅保留 shell_file_ops 调用者提供的显式名字映射。"""
     full = _resolve(run, base)
     body = _script_body(scripts, full, ts) if full else None
     if body is not None:
         return body
-    name = os.path.basename(run.replace("\\", "/"))
     if isinstance(scripts, ScriptTable):
-        cands = [p for p in scripts.paths_for(name) if p != full]
-        if len(cands) == 1:
-            return scripts.body(cands[0], ts)
-        if cands:
-            return None                                    # 同名不止一个,不猜
+        return None                         # cwd 已确定的裸文件名同样是精确路径;唯一同名不证明是同一文件
+    if full and (full in scripts or "/" in run.replace("\\", "/")):
+        return None                         # 明确路径缺失或已失效,不能借另一个同名文件
+    name = os.path.basename(run.replace("\\", "/"))
     return _script_body(scripts, name, ts)
 
 
-def _script_put(scripts: dict[str, Any], key: str, ts: str | None, content: str) -> None:
+def _script_put(scripts: dict[str, Any], key: str, ts: str | None, content: str | None) -> None:
     if isinstance(scripts, ScriptTable):
         scripts.put(key, ts or "", content)
     else:
         scripts[key] = content
 
 
-#: && 之后不算条件分支的前件:几乎不会失败,失败了后件也不会被当成"没执行"来解释
-_ALWAYS_OK = frozenset({"cd", "pushd", "popd", "mkdir", "export", "set", "echo", "true", "source", ".", "touch",
-                        "set-location", "push-location", "new-item"})
+def _update_scripts(scripts: dict[str, Any], ops: list[FileOp], ts: str | None,
+                    done_ts: str | None = None) -> None:
+    """每次文件效应只入表一次。未知覆盖/删除/条件写均使旧正文失效。"""
+    if isinstance(scripts, ScriptTable) and scripts.frozen:
+        return
+    contents: dict[str, str | None] = {}
+    for op in ops:
+        if op.op == "read" or not _SCRIPT_RUN.search(op.path):
+            continue
+        content = None
+        if not op.conditional:
+            if op.op == "write":
+                content = op.content
+            elif op.op == "edit":
+                cur = contents[op.path] if op.path in contents else _script_body(scripts, op.path, ts)
+                if cur is not None and op.old and op.old in cur:
+                    content = cur.replace(op.old, op.new or "", -1 if op.replace_all else 1)
+        contents[op.path] = content
+    for path, content in contents.items():
+        end = done_ts or ts
+        if isinstance(scripts, ScriptTable) and ts and done_ts:
+            prior_end = scripts.busy_until.get(path, "")
+            if prior_end >= ts:
+                content = None                         # 重叠调用的完成顺序不证明实际写入顺序
+                end = max(prior_end, done_ts)
+            scripts.busy_until[path] = end
+        if done_ts and done_ts != ts:
+            _script_put(scripts, path, ts, None)       # 调用尚未返回时不能供其它运行借用
+        _script_put(scripts, path, end, content)
+        if not isinstance(scripts, ScriptTable):
+            _script_put(scripts, os.path.basename(path), end, content)
 
 
 @cache
@@ -195,7 +219,7 @@ def _split_segments_ops(text: str) -> list[tuple[str, str]]:
             i += 2
             continue
         if ch in ";|&\n" or ch in "(){}":
-            flush(";")
+            flush(ch)
             i += 1
             continue
         buf.append(ch)
@@ -264,11 +288,19 @@ def _mention_class(seg: str, tok: str) -> str:
 
 
 def _path_mentions(cmd: str, scripts: dict[str, Any], cwd: object = None, ts: str | None = None,
-                   where: str = "in", cls: str | None = None) -> tuple[list[tuple[str, str, str | None, str, str]], int]:
+                   where: str = "in", cls: str | None = None,
+                   audit: dict[str, Any] | None = None) -> tuple[list[tuple[str, str, str | None, str, str]], int]:
     """命令行 + heredoc 体 + 它跑的脚本正文(或工具输出,where="out")里,长得像路径的词
     → ([(词, 前后文, 解析出的绝对路径|None, 出处 in/body/out, 分档 change/readonly/body/out/other)], 截断数)。
-    不判读写,只记「提到」:原始转录按文件名 grep 能跳出来的,这里一条不少;超过上限的不静默丢,记截断数。"""
-    text = cmd or ""
+    不判读写,只记词法候选;不是全转录完备证明。超过上限记录截断数和未扫描字符数。"""
+    def bounded(text: str, room: int, source: str) -> str:
+        skipped = max(0, len(text) - room)
+        if skipped and audit is not None:
+            audit["mentions_scan_truncated"] = audit.get("mentions_scan_truncated", 0) + skipped
+            audit.setdefault("mentions_scan_sources", []).append(source)
+        return text[:room]
+
+    text = bounded(cmd or "", _SCAN_LIMIT, where)
     cmd_len = len(text)
     spans = _heredoc_spans(text) if where == "in" else []
     bounds = _segment_bounds(text) if where == "in" else []
@@ -278,7 +310,7 @@ def _path_mentions(cmd: str, scripts: dict[str, Any], cwd: object = None, ts: st
         for m in _RUN_WORD.finditer(text):
             body = _script_lookup(scripts, m.group(0), base, ts)
             if body:
-                text += "\n" + body
+                text += bounded("\n" + body, max(0, _SCAN_LIMIT - len(text)), "script")
     out: list[tuple[str, str, str | None, str, str]] = []
     seen: set[str] = set()
     total = 0
@@ -878,7 +910,8 @@ def _head_word(words: list[str]) -> tuple[str, list[str]]:
 
 
 def _shell_analyze(cmd: str, cwd: object, scripts: dict[str, Any],
-                   out: str = "", ts: str | None = None) -> tuple[list[FileOp], bool, int, list[str], dict[str, list[str]]]:
+                   out: str = "", ts: str | None = None,
+                   success: bool = False) -> tuple[list[FileOp], bool, int, list[str], dict[str, list[str]]]:
     """一条 shell 命令 → (文件读写, 「有写能力但目标不全可知」标记, 放弃方向判定的脚本字面量数, 放弃的路径,
     线索 {probed: 只探了存在的路径, out_dirs: 输出目录})。
     out = stdout,目录 grep / 多文件 head 这类命令里看不出目标的,按 stdout 反证。"""
@@ -912,22 +945,35 @@ def _shell_analyze(cmd: str, cwd: object, scripts: dict[str, Any],
             ops.append(FileOp(op, p, via, **kw))
 
     unknown_scripts: list[str] = []
-    prev_head = ""
+    segments = _split_segments_ops(text)
+    # 只有完整、简单 AND 链的成功返回能证明所有前件成功。cd/mkdir/echo 等也会失败,
+    # 后面有 ; true / || / 管道时,整个调用成功不等于分支执行过。
+    control_heads = {"exit", "return", "exec", "if", "then", "else", "for", "while", "until",
+                     "case", "eval", "source", ".", "!", "trap", "fi", "do", "done", "elif", "esac"}
+    opaque_control = (any(sep in ("(", ")", "{", "}") for sep, _ in segments)
+                      or any(_head_word([t[0] for t in _tokenize(seg) if t[2] == ""])[0]
+                             in control_heads for _, seg in segments))
+    simple_and_ok = (success and all(sep in ("", "&&") for sep, _ in segments)
+                     and not opaque_control)
     seg_cond = False
     seg_start = 0
-    for sep, seg in _split_segments_ops(text):
+    heredoc_context: list[tuple[bool, str | None]] = []
+    for sep, seg in segments:
         if seg_cond:
             for o in ops[seg_start:]:
                 o.conditional = True      # && / || 之后:前件成败未知,这一步是否执行了也未知(评审反例 false && cp)
         seg_start = len(ops)
-        seg_cond = sep == "||" or (sep == "&&" and prev_head not in _ALWAYS_OK)
+        seg_cond = sep in ("&&", "||") and not simple_and_ok
+        if opaque_control:
+            seg = re.sub(r"^(?:then|do|else)\s+", "", seg, count=1)  # 仅收条件候选,不求值控制流
+        if "<<" in seg:
+            heredoc_context.append((seg_cond, base))
         for pm in _PROBE.finditer(seg):
             pp = _resolve(pm.group(1).strip("'\""), base)
             if pp:
                 probed.add(pp)
         words = [t[0] for t in _tokenize(seg) if t[2] == ""]
         head, args = _head_word(words)
-        prev_head = head or ""
         if not head:
             continue
         if head in ("cd", "pushd", "set-location", "push-location"):
@@ -1036,17 +1082,22 @@ def _shell_analyze(cmd: str, cwd: object, scripts: dict[str, Any],
         ops += _head_header_reads(out, base, ops)
     if out and _FOR_LOOP.search(cmd or ""):
         _attach_loop_sections((cmd or "").replace("\\\n", " "), out, ops)
-    for body in bodies:
+    for body_index, body in enumerate(bodies):
         if hd_target is not None:
             for op in ops:
                 if op.op == "write" and op.path == hd_target:
                     op.content, op.via = body, "shell"
             continue
-        py_ops = _py_script_ops(body, base)
+        conditional, body_base = (heredoc_context[body_index] if body_index < len(heredoc_context)
+                                  else (True, None))
+        body_start = len(ops)
+        py_ops = _py_script_ops(body, body_base)
         ops += py_ops
-        lit_ops, und, tch = _literal_ops(body, base)
+        lit_ops, und, tch = _literal_ops(body, body_base)
         solved = {o.path for o in py_ops}
         ops += [o for o in lit_ops if o.path not in solved]
+        for op in ops[body_start:]:
+            op.conditional = conditional
         # ast 解出了读写的路径,字面量层不再对它「放弃」计数(否则动作仍标黑盒)
         tch = [p for p in tch if p not in solved]
         undetermined += sum(1 for p in tch) if py_ops else und
@@ -1055,6 +1106,9 @@ def _shell_analyze(cmd: str, cwd: object, scripts: dict[str, Any],
         out_dirs += _dir_hints(body, base)
     if ran_script or capable:
         out_dirs += mk_dirs
+    if opaque_control:
+        for op in ops:
+            op.conditional = True             # 不支持的控制结构不摊平成无条件事实
     return ops, capable, undetermined, touched, {"probed": probe_hits, "out_dirs": list(dict.fromkeys(out_dirs)),
                                                  "unknown_scripts": unknown_scripts}
 
@@ -1196,10 +1250,12 @@ def _numbered_lines(out: str) -> list[tuple[int, str]]:
 
 
 def _file_ops(name: str, inp: dict[str, Any], out: str, tur: Any, cwd: object,
-              scripts: dict[str, Any], ts: str | None = None) -> tuple[list[FileOp], dict[str, Any]]:
+              scripts: dict[str, Any], ts: str | None = None,
+              update_scripts: bool = True) -> tuple[list[FileOp], dict[str, Any]]:
     """成功的调用 → 文件读写 + 附加细节。"""
     detail: dict[str, Any] = _basic_detail(name, inp)
     ops: list[FileOp] = []
+    cond_ops: list[FileOp] = []
     if name == "Read":
         f = tur.get("file") if isinstance(tur, dict) else None
         if isinstance(f, dict) and isinstance(f.get("content"), str) and f.get("numLines"):
@@ -1238,9 +1294,6 @@ def _file_ops(name: str, inp: dict[str, Any], out: str, tur: Any, cwd: object,
             content = str(inp.get("content") or "")
             ops.append(FileOp("write", p, "tool", content=content,
                               created="created successfully" in (out or "").lower()))
-            if _SCRIPT_RUN.search(p):
-                _script_put(scripts, os.path.basename(p), ts, content)
-                _script_put(scripts, p, ts, content)
     elif name in ("Edit", "MultiEdit"):
         p = _resolve(inp.get("file_path"), _resolve(cwd, None))
         edits = inp.get("edits") if name == "MultiEdit" else [inp]
@@ -1249,28 +1302,30 @@ def _file_ops(name: str, inp: dict[str, Any], out: str, tur: Any, cwd: object,
                 ops.append(FileOp("edit", p, "tool", old=str(e.get("old_string") or ""),
                                   new=str(e.get("new_string") or ""),
                                   replace_all=bool(e.get("replace_all"))))
-        if p and _SCRIPT_RUN.search(p):
-            # 改了脚本,脚本表要同步(之后按它跑的运行才解释得对)
-            cur = _script_body(scripts, p, ts) or _script_body(scripts, os.path.basename(p), ts)
-            if cur is not None:
-                for e in edits or []:
-                    if isinstance(e, dict) and str(e.get("old_string") or "") in cur:
-                        cur = cur.replace(str(e.get("old_string") or ""), str(e.get("new_string") or ""), 1)
-                _script_put(scripts, os.path.basename(p), ts, cur)
-                _script_put(scripts, p, ts, cur)
     elif name == "NotebookEdit":
         p = _resolve(inp.get("notebook_path"), _resolve(cwd, None))
         if p:
             ops.append(FileOp("write", p, "tool"))
     elif name in ("Bash", "PowerShell"):
         cmd = str(inp.get("command") or "")
-        ops, capable, undetermined, touched, hints = _shell_analyze(cmd, cwd, scripts, out, ts=ts)
-        cond_ops = [o for o in ops if o.conditional and o.op != "read"]      # 读的证据是它的输出,不受条件分支影响
+        ops, capable, undetermined, touched, hints = _shell_analyze(cmd, cwd, scripts, out, ts=ts, success=True)
+        # 挂可对账输出;条件读仍须退候选,通用 stdout 不能证明它来自哪个分支。
+        tgt = _clean_single_cat(cmd)
+        if tgt and out.strip() and not out.lower().startswith(_ERRISH):
+            _attach_single_cat(tgt, out, ops, cwd, cmd)
+        else:
+            _attach_stdout(cmd, _strip_heredocs(cmd.replace("\\\n", " "))[0], out, ops)
+        cond_ops = [o for o in ops if o.conditional and o.op != "read"]
         if cond_ops:
             # 条件分支里的效应不进正式状态:只记候选路径(build_ledger 挂成「条件分支,是否执行未知(候选写)」),
             # 评审反例:false && 写 A,文件没变,账本却多出一版 b 和一次「实录外修改」
             detail["conditional"] = sorted({o.path for o in cond_ops})
             ops = [o for o in ops if not (o.conditional and o.op != "read")]
+        # 通用 stdout 挂接无法区分分支输出和后续 echo/另一路输出,不能给条件读背书。
+        uncertain_reads = [o for o in ops if o.conditional and o.op == "read"]
+        if uncertain_reads:
+            detail["conditional_reads"] = sorted({o.path for o in uncertain_reads})
+            ops = [o for o in ops if o not in uncertain_reads]
         if capable:
             detail["write_capable"] = True
         if not ops:
@@ -1286,16 +1341,6 @@ def _file_ops(name: str, inp: dict[str, Any], out: str, tur: Any, cwd: object,
             detail["probed"] = hints["probed"]
         if hints["out_dirs"]:
             detail["out_dirs"] = hints["out_dirs"]
-        for op in ops:
-            # heredoc 落盘的 .py/.sh 也进脚本表:之后 python3 它时按脚本内容推断读写,不再当黑盒
-            if op.op == "write" and op.content is not None and _SCRIPT_RUN.search(op.path):
-                _script_put(scripts, os.path.basename(op.path), ts, op.content)
-                _script_put(scripts, op.path, ts, op.content)
-        tgt = _clean_single_cat(cmd)
-        if tgt and out.strip() and not out.lower().startswith(_ERRISH):
-            _attach_single_cat(tgt, out, ops, cwd, cmd)
-        else:
-            _attach_stdout(cmd, _strip_heredocs(cmd.replace("\\\n", " "))[0], out, ops)
     elif name == "Grep":
         mode = str(inp.get("output_mode") or "files_with_matches")
         detail["mode"] = mode
@@ -1316,6 +1361,8 @@ def _file_ops(name: str, inp: dict[str, Any], out: str, tur: Any, cwd: object,
                        "text": inp.get("message") or inp.get("content")})
     elif name == "Skill":
         detail["skill"] = inp.get("skill")
+    if update_scripts:
+        _update_scripts(scripts, ops + cond_ops, ts)
     return ops, detail
 
 
@@ -1432,10 +1479,11 @@ def _walk(path: str, agent_id: str, session: str, seq: list[int],
             said: list[str] = []
             thought: list[str] = []
             utexts: list[str] = []
-            use_blk = 0
-            for b in blocks:
+            text_blocks: dict[str, int] = {}
+            for block_index, b in enumerate(blocks):
                 if not isinstance(b, dict):
                     continue
+                text_blocks.setdefault(str(b.get("type")), block_index)
                 if b.get("type") == "text" and m.get("role") == "user":
                     utexts.append(str(b.get("text") or ""))       # 整条记录合起来归类(见下)
                 elif b.get("type") == "text" and m.get("role") == "assistant":
@@ -1446,8 +1494,7 @@ def _walk(path: str, agent_id: str, session: str, seq: list[int],
                     thought.append(str(b["thinking"]).strip())
                 elif b.get("type") == "tool_use":
                     pend[str(b.get("id"))] = (ts, str(b.get("name")), b.get("input") or {}, cwd, line_no,
-                                               stage_now(ts), use_blk)
-                    use_blk += 1
+                                               stage_now(ts), block_index)
                 elif b.get("type") == "tool_result" and str(b.get("tool_use_id")) in pend:
                     tuid = str(b.get("tool_use_id"))
                     uts, name, inp, ucwd, use_line, stage, blk = pend.pop(tuid)
@@ -1463,7 +1510,7 @@ def _walk(path: str, agent_id: str, session: str, seq: list[int],
                             # 失败不等于没改:`printf x > A; exit 1` 已经写了。不立版本,目标记成候选,指针保留
                             f_ops = _shell_analyze(cmd_text, ucwd, scripts, "", ts=uts)[0]
                             detail["unresolved"] = "命令失败,效应未知(可能已部分执行)"
-                            tch = sorted({o.path for o in f_ops})
+                            tch = sorted({o.path for o in f_ops if o.op != "read"})
                             if tch:
                                 detail["touched"] = tch
                         # 脚本字面量里的正文是「agent 写下了这段话」的证据,与命令成败无关
@@ -1472,13 +1519,11 @@ def _walk(path: str, agent_id: str, session: str, seq: list[int],
                                     for pw in _py_partial_writes(body)]
                         if partials:
                             detail["partials"] = partials
-                        mentions, trunc = _path_mentions(cmd_text, scripts, ucwd, uts)
+                        mentions, trunc = _path_mentions(cmd_text, scripts, ucwd, uts, audit=detail)
                         if ok:
                             # 输出里点名的文件(git status 的 modified、ls、构建报错、grep -rl):命令行里没有,输出里有
                             out_full = _text_of(b.get("content"))
-                            if len(out_full) > _SCAN_LIMIT:
-                                detail["mentions_scan_truncated"] = len(out_full) - _SCAN_LIMIT
-                            om, otrunc = _path_mentions(out_full[:_SCAN_LIMIT], {}, ucwd, uts, where="out")
+                            om, otrunc = _path_mentions(out_full, {}, ucwd, uts, where="out", audit=detail)
                             head_cmd = " ".join(cmd_text.split())[:60]
                             om = [(t, (head_cmd + " ⇒ " + c)[:150], ab, w, k) for t, c, ab, w, k in om]
                             mentions, trunc = mentions + om, trunc + otrunc
@@ -1488,20 +1533,23 @@ def _walk(path: str, agent_id: str, session: str, seq: list[int],
                             detail["mentions_truncated"] = trunc
                     elif name in ("Grep", "Glob") and ok:
                         out_full = _text_of(b.get("content"))
-                        if len(out_full) > _SCAN_LIMIT:
-                            detail["mentions_scan_truncated"] = len(out_full) - _SCAN_LIMIT
-                        om, otrunc = _path_mentions(out_full[:_SCAN_LIMIT], {}, ucwd, uts, where="out")
+                        om, otrunc = _path_mentions(out_full, {}, ucwd, uts, where="out", audit=detail)
                         if om:
                             detail["mentions"] = om
                         if otrunc:
                             detail["mentions_truncated"] = otrunc
                     else:
                         # 派发词点名了谁、发消息说了谁、写别的文件时清单里列了谁:也是「转录里提到它」的行,词法层要有入口
-                        im = _input_text_mentions(name, inp, ucwd, uts)
+                        im = _input_text_mentions(name, inp, ucwd, uts, audit=detail)
                         if im[0]:
                             detail["mentions"] = im[0]
                         if im[1]:
                             detail["mentions_truncated"] = im[1]
+                    if not ok and name in ("Write", "Edit", "MultiEdit", "NotebookEdit"):
+                        target = _resolve(inp.get("file_path") or inp.get("notebook_path"), _resolve(ucwd, None))
+                        if target:
+                            detail["touched"] = [target]
+                            detail["unresolved"] = "调用失败,效应未知(可能已部分执行)"
                     act = Action(uts, nxt(), name, _kind_of(name, ops), ok=ok, detail=detail,
                                  src=(path, use_line, line_no), tuid=tuid, stage=stage, done_ts=ts, blk=blk)
                     for op in ops:
@@ -1522,20 +1570,27 @@ def _walk(path: str, agent_id: str, session: str, seq: list[int],
                     text = re.sub(r"\s*</teammate-message>\s*$", "", text)
                     ib_detail: dict[str, Any] = {"from": tm.group(1) if tm else "dispatcher",
                                                  "summary": tm.group(2) if tm else None, "text": text}
-                    ib_m, ib_t = _path_mentions(text[:_SCAN_LIMIT], {}, cwd, ts, where="text", cls="text")
+                    ib_m, ib_t = _path_mentions(text, {}, cwd, ts, where="text", cls="text", audit=ib_detail)
                     if ib_m:
                         ib_detail["mentions"] = ib_m
                     if ib_t:
                         ib_detail["mentions_truncated"] = ib_t
                     rec.actions.append(Action(ts, nxt(), "inbox", "inbox", detail=ib_detail,
-                                              src=(path, line_no, line_no), stage=stage_now(ts)))
+                                              src=(path, line_no, line_no), stage=stage_now(ts),
+                                              blk=text_blocks.get("text", 0)))
                     if rec.prompt is None and is_sub:
                         rec.prompt = text
                 else:
                     ukind, udetail, uop = _classify_user_text(raw, cwd)
                     if ukind:
+                        um, ut = _path_mentions(raw, {}, cwd, ts, where="text", cls="text", audit=udetail)
+                        if um:
+                            udetail["mentions"] = um
+                        if ut:
+                            udetail["mentions_truncated"] = ut
                         uact = Action(ts, nxt(), ukind, ukind, detail=udetail,
-                                      src=(path, line_no, line_no), stage=stage_now(ts))
+                                      src=(path, line_no, line_no), stage=stage_now(ts),
+                                      blk=text_blocks.get("text", 0))
                         if uop is not None:
                             uact.files.append(FileRef("read", uop.path,
                                                       _to_ev(uop, agent_id, ts, nxt(), stage_now(ts))))
@@ -1545,19 +1600,31 @@ def _walk(path: str, agent_id: str, session: str, seq: list[int],
                 if texts:
                     full = "\n".join(texts)
                     st_detail: dict[str, Any] = {"text": _head(full)}
-                    st_m, st_t = _path_mentions(full[:_SCAN_LIMIT], {}, cwd, ts, where="text", cls="text")
+                    st_m, st_t = _path_mentions(full, {}, cwd, ts, where="text", cls="text", audit=st_detail)
                     if st_m:
                         st_detail["mentions"] = st_m
                     if st_t:
                         st_detail["mentions_truncated"] = st_t
                     rec.actions.append(Action(ts, nxt(), kind, kind, detail=st_detail,
-                                              src=(path, line_no, line_no), stage=stage_now(ts)))
+                                              src=(path, line_no, line_no), stage=stage_now(ts),
+                                              blk=text_blocks.get("thinking" if kind == "think" else "text", 0)))
     for tuid, (uts, name, inp, ucwd, use_line, stage, blk) in pend.items():
         # 没等到结果的调用可能已经产生副作用:指针、tool_use_id、提及都保留,标 unfinished
         detail = _basic_detail(name, inp if isinstance(inp, dict) else {})
         detail["unfinished"] = True
+        if isinstance(inp, dict):
+            possible, more = _file_ops(name, inp, "", None, ucwd, scripts, ts=uts, update_scripts=False)
+            paths = {o.path for o in possible if o.op != "read"} | set(more.get("conditional") or [])
+            if paths:
+                detail["touched"] = sorted(paths)
+                detail["unresolved"] = "调用未完成,效应未知"
+            im, it = _input_text_mentions(name, inp, ucwd, uts, audit=detail)
+            if im:
+                detail["mentions"] = im
+            if it:
+                detail["mentions_truncated"] = it
         if name in ("Bash", "PowerShell") and isinstance(inp, dict):
-            mentions, trunc = _path_mentions(str(inp.get("command") or ""), scripts, ucwd, uts)
+            mentions, trunc = _path_mentions(str(inp.get("command") or ""), scripts, ucwd, uts, audit=detail)
             if mentions:
                 detail["mentions"] = mentions
             if trunc:
@@ -1569,14 +1636,16 @@ def _walk(path: str, agent_id: str, session: str, seq: list[int],
 
 
 def collect_cc(main_jsonl: str, seq: list[int],
-               stage_intervals: list[dict[str, Any]] | None = None) -> dict[str, AgentRec]:
+               stage_intervals: list[dict[str, Any]] | None = None,
+               scripts: ScriptTable | None = None) -> dict[str, AgentRec]:
     """CC 会话(主线 + subagents/)→ {agent_id: AgentRec}。seq 跨会话共用,保证全局可排序。
     stage_intervals = run 级阶段区间(stage_intervals_from_marks),给没有归属戳的会话按时间落阶段。"""
     sid8 = os.path.basename(main_jsonl)[:8]
     sub = os.path.splitext(main_jsonl)[0] + "/subagents"
     sub_files = sorted(glob.glob(os.path.join(sub, "*.jsonl"))) if os.path.isdir(sub) else []
     # 脚本表先扫全池(带写入时刻),再走转录:谁先走谁后走都不该影响「跑的时候脚本长什么样」
-    scripts = _prescan_scripts([main_jsonl, *sub_files])
+    if scripts is None:
+        scripts = _prescan_scripts([main_jsonl, *sub_files])
     main_id = f"__main__:{sid8}"
     agents = {main_id: _walk(main_jsonl, main_id, sid8, seq, scripts, stage_intervals)}
     for fn in sub_files:
@@ -1587,29 +1656,41 @@ def collect_cc(main_jsonl: str, seq: list[int],
     return agents
 
 
-def _input_text_mentions(name: str, inp: dict[str, Any], cwd: object, ts: str) -> tuple[list[tuple[str, str, str | None, str, str]], int]:
+def collect_cc_pool(roots: list[str], seq: list[int],
+                    stage_intervals: list[dict[str, Any]] | None = None) -> dict[str, AgentRec]:
+    """跨会话池共用同一份只读脚本历史,不是每个根会话从空表重来。"""
+    paths = list(dict.fromkeys(p for root in roots for p in
+                              [root, *sorted(glob.glob(os.path.splitext(root)[0] + "/subagents/*.jsonl"))]))
+    scripts = _prescan_scripts(paths)
+    agents: dict[str, AgentRec] = {}
+    for root in roots:
+        agents.update(collect_cc(root, seq, stage_intervals, scripts=scripts))
+    return agents
+
+
+def _input_text_mentions(name: str, inp: dict[str, Any], cwd: object, ts: str,
+                         audit: dict[str, Any] | None = None) -> tuple[list[tuple[str, str, str | None, str, str]], int]:
     """非命令类调用的输入里提到的路径:派发词(Agent / Task 的 prompt)→ dispatch;发消息 → message;
     Write / Edit / MultiEdit 的正文 → content(写别的文件时清单里列了它)。Read / Grep / Glob 的路径参数已是读,不重复。"""
     if name in ("Agent", "Task"):
-        return _path_mentions(str(inp.get("prompt") or "")[:_SCAN_LIMIT], {}, cwd, ts, where="dispatch", cls="dispatch")
+        return _path_mentions(str(inp.get("prompt") or ""), {}, cwd, ts, where="dispatch", cls="dispatch", audit=audit)
     if name == "SendMessage":
-        return _path_mentions(str(inp.get("message") or inp.get("content") or "")[:_SCAN_LIMIT], {}, cwd, ts,
-                              where="message", cls="message")
+        return _path_mentions(str(inp.get("message") or inp.get("content") or ""), {}, cwd, ts,
+                              where="message", cls="message", audit=audit)
     if name == "Write":
-        return _path_mentions(str(inp.get("content") or "")[:_SCAN_LIMIT], {}, cwd, ts, where="content", cls="content")
+        return _path_mentions(str(inp.get("content") or ""), {}, cwd, ts, where="content", cls="content", audit=audit)
     if name in ("Edit", "MultiEdit"):
         edits = inp.get("edits") if name == "MultiEdit" else [inp]
         body = "\n".join(str(e.get("new_string") or "") + "\n" + str(e.get("old_string") or "")
                          for e in (edits or []) if isinstance(e, dict))
-        return _path_mentions(body[:_SCAN_LIMIT], {}, cwd, ts, where="content", cls="content")
+        return _path_mentions(body, {}, cwd, ts, where="content", cls="content", audit=audit)
     return [], 0
 
 
 def _prescan_scripts(paths: list[str]) -> ScriptTable:
-    """全池扫一遍脚本文件(.py/.sh/.js)的写入 / 编辑 / heredoc 落盘,按 tool_result 成败入表(失败的写不算正文),
-    收齐后按时刻回放建表 —— 谁先走谁后走都不影响「跑的时候脚本长什么样」。行级预筛降低解 JSON 的量。
-    评审反例:Write fix.py 报 Permission denied 仍被当正文;子代理 Edit 过的脚本主线运行时用旧正文。"""
-    events: list[tuple[str, int, str, dict[str, Any], Any]] = []     # (ts, 序, 工具, 输入, cwd)
+    """全池脚本效应按发起时刻回放,正文按完成时刻可用。未知覆盖/删除/失败/未完成也入表,
+    但只写未知墓碑;正式收集不能再修改这份表。行级预筛降低解 JSON 的量。"""
+    events: list[tuple[str, int, str, dict[str, Any], Any, str, bool]] = []
     order = 0
     for p in paths:
         if not os.path.isfile(p):
@@ -1620,7 +1701,7 @@ def _prescan_scripts(paths: list[str]) -> ScriptTable:
                 if '"tool_result"' in line:
                     if not pending or not any(t in line for t in pending):
                         continue
-                elif not (('"Write"' in line or '"Edit"' in line or "<<" in line) and _SCRIPT_EXT_HINT.search(line)):
+                elif not (_SCRIPT_EXT_HINT.search(line) and '"tool_use"' in line):
                     continue
                 try:
                     r = json.loads(line)
@@ -1630,7 +1711,7 @@ def _prescan_scripts(paths: list[str]) -> ScriptTable:
                 blocks = m.get("content") if isinstance(m, dict) else None
                 if not isinstance(blocks, list):
                     continue
-                ts = str(r.get("timestamp") or "")
+                ts = ts_norm(str(r.get("timestamp") or ""))
                 for b in blocks:
                     if not isinstance(b, dict):
                         continue
@@ -1641,16 +1722,24 @@ def _prescan_scripts(paths: list[str]) -> ScriptTable:
                         target = str(inp.get("file_path") or "")
                         cmd = str(inp.get("command") or "")
                         if ((name in ("Write", "Edit", "MultiEdit") and _SCRIPT_RUN.search(target))
-                                or (name in ("Bash", "PowerShell") and "<<" in cmd and _SCRIPT_EXT_HINT.search(cmd))):
+                                or (name in ("Bash", "PowerShell") and _SCRIPT_EXT_HINT.search(cmd))):
                             pending[str(b.get("id"))] = (ts, name, inp, r.get("cwd"))
                     elif b.get("type") == "tool_result" and str(b.get("tool_use_id")) in pending:
                         ev = pending.pop(str(b.get("tool_use_id")))
-                        if not b.get("is_error", False):
-                            order += 1
-                            events.append((ev[0], order, ev[1], ev[2], ev[3]))
+                        order += 1
+                        events.append((ev[0], order, ev[1], ev[2], ev[3], ts, not b.get("is_error", False)))
+        for ev in pending.values():
+            order += 1
+            events.append((ev[0], order, ev[1], ev[2], ev[3], ev[0], False))
     table = ScriptTable()
-    for ts, _o, name, inp, cwd in sorted(events, key=lambda e: (e[0], e[1])):
-        _file_ops(name, inp, "", None, cwd, table, ts=ts)     # 副作用:Write 入表、Edit 同步、heredoc 落盘入表
+    for ts, _o, name, inp, cwd, done, ok in sorted(events, key=lambda e: (e[0], e[1])):
+        ops, detail = _file_ops(name, inp, "", None, cwd, table, ts=ts, update_scripts=False)
+        ops += [FileOp("write", p, conditional=True) for p in detail.get("conditional", [])]
+        if not ok:
+            for op in ops:
+                op.conditional = True                  # 失败/未完成也可能已部分覆写,不能继续借用旧正文
+        _update_scripts(table, ops, ts, done)
+    table.frozen = True
     return table
 
 
@@ -1750,7 +1839,8 @@ def _codex_exec_ops(raw_arg: Any, out_text: str, cwd: object,
         detail.setdefault("cmd", " ".join(cmd.split())[:200])
         # 单条 shell 调用时 stdout 就是它的:目录 grep / 多文件 head 按 stdout 反证(与 CC 的 Bash 同一套)
         single = len(shell_calls) == 1 and ok
-        sub_ops, capable, undetermined, touched, hints = _shell_analyze(cmd, wdir, scripts, stdout if single else "")
+        sub_ops, capable, undetermined, touched, hints = _shell_analyze(cmd, wdir, scripts, stdout if single else "",
+                                                                       success=single)
         if capable:
             detail["write_capable"] = True
         if single and not sub_ops:
@@ -1769,10 +1859,18 @@ def _codex_exec_ops(raw_arg: Any, out_text: str, cwd: object,
                 _attach_single_cat(tgt, stdout, sub_ops, wdir, cmd)
             else:
                 _attach_stdout(cmd, _strip_heredocs(cmd.replace("\\\n", " "))[0], stdout, sub_ops)
-        ops += sub_ops
+        conditional = {o.path for o in sub_ops if o.conditional and o.op != "read"}
+        conditional_reads = {o.path for o in sub_ops if o.conditional and o.op == "read"}
+        for key, paths in (("conditional", conditional), ("conditional_reads", conditional_reads)):
+            if paths:
+                detail[key] = sorted(set(detail.get(key) or []) | paths)
+        ops += [o for o in sub_ops if not (o.conditional and (o.op != "read" or o.path in conditional_reads))]
     for patch in codex._extract_apply_patches(js):
         detail.setdefault("cmd", "apply_patch")
         ops += _patch_ops(patch, cwd)
+    if not ok:
+        detail["touched"] = sorted(set(detail.get("touched") or []) | {o.path for o in ops if o.op != "read"})
+        detail["unresolved"] = "调用失败,效应未知(可能已部分执行)"
     return ops, detail, ok
 
 
@@ -1830,7 +1928,7 @@ def _walk_codex(path: str, agent_id: str, session: str, seq: list[int], scripts:
                     full_ops, detail, ok = _codex_exec_ops(raw_arg, out_text, ucwd, scripts)
                     kind = _kind_of("exec", full_ops)
                     mentions, trunc = _path_mentions(raw_arg if isinstance(raw_arg, str)
-                                                     else json.dumps(raw_arg, ensure_ascii=False), scripts, ucwd, uts)
+                                                     else json.dumps(raw_arg, ensure_ascii=False), scripts, ucwd, uts, audit=detail)
                     if mentions:
                         detail["mentions"] = mentions
                     if trunc:
@@ -1859,7 +1957,7 @@ def _walk_codex(path: str, agent_id: str, session: str, seq: list[int], scripts:
                     arg_text = raw_arg if isinstance(raw_arg, str) else json.dumps(raw_arg, ensure_ascii=False)
                     detail = {"args": arg_text[:200]}
                 act = Action(uts, nxt(), name, kind, ok=ok, detail=detail,
-                             src=(path, use_line, line_no), tuid=cid)
+                             src=(path, use_line, line_no), tuid=cid, done_ts=ts)
                 for op in ops:
                     ev = _to_ev(op, agent_id, ts if op.op == "read" else uts, nxt())
                     act.files.append(FileRef("read" if op.op == "read" else

@@ -12,6 +12,8 @@ import json
 import os
 from typing import Any
 
+import pytest
+
 from migloop import atoms, atoms_collect, atoms_text, filestory
 
 CWD = "/proj"
@@ -481,11 +483,19 @@ def test_every_action_can_expand_to_its_raw_io(tmp_path: Any) -> None:
     assert atoms.action_raw(led, MAIN_ID, 999999) is None
 
 
-def test_grep_output_lines_become_seen_evidence(tmp_path: Any) -> None:
+@pytest.mark.parametrize("piped", [False, True])
+def test_grep_output_lines_become_seen_evidence(tmp_path: Any, piped: bool) -> None:
     main = _call("2026-01-01T00:00:00Z", "t1", "Bash",
-                 {"command": "cd /proj && grep -n appName spec/r.md | head -40"},
+                 {"command": "cd /proj && grep -n appName spec/r.md" + (" | head -40" if piped else "")},
                  "152:- appName 在这里\n615:- App 显示名 appName\n")
     led = _ledger(tmp_path, main)
+    if piped:
+        # 只有整条管道的返回码,不能把后级成功当作前级执行证明;原始输出和候选入口仍保留。
+        assert not led.stories["/proj/spec/r.md"].reads
+        action = led.agents[MAIN_ID].actions[0]
+        assert "/proj/spec/r.md" in action.detail["conditional_reads"]
+        assert "615:- App 显示名 appName" in atoms.action_raw(led, MAIN_ID, action.seq)["output"]
+        return
     rd = led.stories["/proj/spec/r.md"].reads[0]
     assert rd.seen == ((152, "- appName 在这里"), (615, "- App 显示名 appName"))
     ag = atoms.agent_atom(led, MAIN_ID, None)

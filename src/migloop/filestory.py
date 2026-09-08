@@ -55,11 +55,11 @@ VerKey = tuple[str, int]
 @dataclass(frozen=True)
 class Ev:
     """归一化事件。收集层(adapter/shellparse)负责把五花八门的原始记录
-    翻译成这六种;引擎只认这个形状。"""
+    翻译成读写/删除与候选屏障;引擎只认这个形状。"""
 
     ts: str
     seq: int
-    kind: str                 # wfull | edit | wopaque | wderived | delete | read
+    kind: str                 # wfull | edit | wopaque | wderived | wconcat | delete | read | candidate
     path: str
     agent: str
     content: str | None = None      # wfull 的全文;read 携带时=观测快照
@@ -100,6 +100,7 @@ class Version:
     gen_runs: tuple[int, ...] = ()  # source=generated:候选的脚本运行动作号(首见之前最近几次)
     batch: int = 0                  # source=generated:同一批运行生成的文件数
     conditional: bool = False       # 写它的命令在条件分支里(评审反例 false && cp:记了,但不当事实)
+    state_gap: bool = False         # 此前有未证实效应,两端同文也只能跨断点推定
 
 
 @dataclass
@@ -162,12 +163,13 @@ def _same(a: str, b: str) -> bool:
 class _State:
     """单文件的构建期状态(不出货)。"""
 
-    __slots__ = ("content", "interval_base", "pending")
+    __slots__ = ("content", "interval_base", "pending", "uncertain")
 
     def __init__(self) -> None:
         self.content: str | None = None      # 当前已知内容;None=未知
         self.interval_base: str | None = None  # 上一个已知状态(区间 diff 的基)
         self.pending: list[int] = []          # 未封口的 opaque 版本下标
+        self.uncertain = False               # 候选写只打断状态连续性,不制造正式修改版本
 
 
 def build_stories(events: list[Ev]) -> dict[str, FileStory]:
@@ -194,16 +196,18 @@ def build_stories(events: list[Ev]) -> dict[str, FileStory]:
 
     def write_known(st: FileStory, s: _State, e: Ev, content: str, source: str,
                     creation: bool = False) -> None:
-        if creation or (s.content is None and not st.versions):
+        if creation or (s.content is None and not st.versions and not s.uncertain):
             diff, kind = _udiff(None, content), "creation"
         elif s.content is not None:
             diff, kind = _udiff(s.content, content), "true"
         else:
             diff, kind = None, "unknown"      # 前态永失:覆盖前没被看过
-        add_version(st, e, e.agent, source, content, diff, kind)
+        ver = add_version(st, e, e.agent, source, content, diff, kind)
+        ver.state_gap = s.uncertain
         s.content = content
         s.interval_base = content
         s.pending = []                        # 未封口的到此永久失封(如实留白)
+        s.uncertain = False
 
     def demote_unseen(st: FileStory, s: _State) -> None:
         """Write 结果说 created:此前那些「首见即读、内容从未进上下文」的外部版本是探测出来的假前身,
@@ -220,6 +224,7 @@ def build_stories(events: list[Ev]) -> dict[str, FileStory]:
         s.content = None
         s.interval_base = None
         s.pending = []
+        s.uncertain = False
 
     def write_unknown(st: FileStory, s: _State, e: Ev, source: str) -> None:
         if s.content is not None:
@@ -230,8 +235,14 @@ def build_stories(events: list[Ev]) -> dict[str, FileStory]:
 
     for e in sorted(events, key=lambda x: (x.ts, x.seq)):
         st, s = story(e.path)
-        if e.kind == "wfull":
-            creation = False
+        if e.kind == "candidate":
+            if s.content is not None:
+                s.interval_base = s.content
+            s.content = None
+            s.pending = []                    # 后来的快照不能穿过候选写,封给更早的作者
+            s.uncertain = True
+        elif e.kind == "wfull":
+            creation = e.created
             if e.created and st.versions:
                 if all(v.source == "external" and v.content is None for v in st.versions):
                     demote_unseen(st, s)
@@ -270,6 +281,7 @@ def build_stories(events: list[Ev]) -> dict[str, FileStory]:
             s.content = ""
             s.interval_base = ""
             s.pending = []
+            s.uncertain = False
         elif e.kind == "edit":
             old, new = e.old or "", e.new or ""
             native = _udiff(old, new)
@@ -298,7 +310,19 @@ def build_stories(events: list[Ev]) -> dict[str, FileStory]:
             certain = True
             if e.content is not None and e.full:
                 snap = e.content
-                if s.content is not None:
+                if s.uncertain:
+                    if not (st.versions and st.versions[-1].content is not None
+                            and _same(st.versions[-1].content, snap)):
+                        st.breaks.append(Break(e.ts, e.seq, e.path, "uncertain-write",
+                                               "候选写之后观测重锚;不能确定哪次调用改动,也不证明发生过实录外修改"))
+                        ver = add_version(st, e, OUTBAND, "outband", snap,
+                                          _udiff(s.interval_base, snap), "interval")
+                        ver.state_gap = True
+                    self_read_version = len(st.versions)
+                    s.content = s.interval_base = snap
+                    s.pending = []
+                    s.uncertain = False
+                elif s.content is not None:
                     if _same(s.content, snap):
                         self_read_version = len(st.versions)
                     else:
@@ -491,6 +515,8 @@ def line_origins(story: FileStory) -> list[list[Origin]]:
     last_known_content: str | None = None
     last_known: list[Origin] = []
     for ver in story.versions:
+        if ver.state_gap:
+            prev_content = None
         if ver.content is None:
             per_version.append([])
             prev_content = None

@@ -1,0 +1,22 @@
+{
+  "date": "2026-09-08",
+  "baseline": "26e65b3",
+  "treatment": "implementation in this commit",
+  "root_sessions": ["9b3105a2-85ec-4889-9786-b3c220f06754", "ff019d8a-5172-4cdd-8ce3-77a21682c1b6"],
+  "before": {
+    "agents": 146, "stories": 3020, "actions": 13879, "build_seconds": 15.055,
+    "versions": 3543, "known_versions": 2230, "sealed_versions": 283,
+    "conditional_write_actions": 20, "conditional_read_actions": 0,
+    "generated_references": 13878, "valid_references": 13878, "ambiguous_locations": 0,
+    "coverage": {"SplashPage.ets": [815, 918], "EntryAbility.ets": [358, 406], "MemberCenterPage.ets": [372, 405]}
+  },
+  "after": {
+    "agents": 146, "stories": 3005, "actions": 13879, "build_seconds": 14.849,
+    "versions": 3335, "known_versions": 2071, "sealed_versions": 267,
+    "conditional_write_actions": 61, "conditional_read_actions": 1024, "scan_gap_actions": 0,
+    "generated_references": 13878, "valid_references": 13878, "ambiguous_locations": 0,
+    "coverage": {"SplashPage.ets": [819, 918], "EntryAbility.ets": [358, 406], "MemberCenterPage.ets": [373, 405]}
+  },
+  "tests": {"passed": 382, "skipped": 2, "new_contract_cases": 44},
+  "scope": "Mechanical coordinates and exact lexical record reachability, not factual attribution accuracy or diff completeness; single timing samples, no performance claim."
+}

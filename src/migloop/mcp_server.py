@@ -104,7 +104,10 @@ spec 时凭什么」用 search(q, agent=主会话, v=那一版) 按词切,不要
 现成件)。「错」的细分仍用这六类词:spec 写错 / 读了旧版 / 漏读(相对修复方的读取集)/ 转换错(读全了仍写错)/
 closer 或后续写者破坏 / 源码没读全。每条证据带 `path@v` 或 `agent v` 引用。
 凡是写「没有 / 零命中 / 从没读过 / 无人」,后面必须跟工具输出的「范围」行(哪些 agent、哪些文件、到哪一刻、内容未知几版);
-没有全池 until_ts 查询撑腰的,只能写成「X 在这个范围内没见过」。
+没有全池 until_ts 查询撑腰的,只能写成「X 在这个范围内未检索到」。
+出现「提及索引不完备」时,先 index(kind=scan) 查缺口,再 action(part=input/output, offset=…/find=…) 看原文。
+即使全池零命中也不证明没人见过:查询范围、未知内容、加密/缺失记录和扫描缺口都必须披露。
+条件/失败调用的路径是候选,不代表实际写过或读到过;候选写后的观测重锚不证明发生了实录外修改。
 边界:账本里只有**被读过**的安卓源码,从没人读过的文件不存在;标签是线索,盲写/脚本落盘的
 版本内容可能未知,如实说"无法确认"。
 """
@@ -148,7 +151,7 @@ def build_server(backend: Any | None = None) -> Any:
     @srv.tool()
     async def index(sid: str, kind: str | None = None, query: str | None = None,
                     limit: int = 0) -> str:
-        """账本目录:agent 与文件各一行。kind = agent | ets | spec | src | other(空=全部);query 子串过滤。
+        """账本目录:agent 与文件各一行。kind = agent | ets | spec | src | other | scan(扫描缺口);空=全部;query 子串过滤。
         不带 query 只给前 80 条(大会话有两百多个 agent,整张表就是三万字),带 query 给到 300。"""
         ledger, cwd = await _ctx(sid)
         return atoms_text.render_index(ledger, kind, query, root=cwd, limit=limit or (300 if query else 80))
@@ -213,12 +216,13 @@ def build_server(backend: Any | None = None) -> Any:
                                         since_ts=since_ts, until_ts=until_ts, root=cwd, kind=kind)
 
     @srv.tool()
-    async def action(sid: str, id: str, seq: int, max_chars: int = 20000, offset: int = 0, find: str = "") -> str:
+    async def action(sid: str, id: str, seq: int, max_chars: int = 20000, offset: int = 0, find: str = "",
+                     part: str | None = None) -> str:
         """展开 agent 某一次工具调用的完整原始输入与输出(agent 工具时间线里的 #n 就是 seq)。
         账本是实录的索引,任何摘要不够看时用它拿原文,信息不会丢。输出超过 max_chars 会截断并说明剩余多少:
-        offset= 从第几字继续,find= 直接跳到关键词前(长 think 里找决策句用它,别拿 search 撞)。"""
+        part=input/output 选择翻页侧;offset= 从第几字继续,find= 直接跳到关键词前(长 think/写入正文里找决策句用它)。"""
         ledger, _cwd = await _ctx(sid)
-        return atoms_text.render_action(ledger, id, seq, max_chars=max_chars, offset=offset, find=find)
+        return atoms_text.render_action(ledger, id, seq, max_chars=max_chars, offset=offset, find=find, part=part)
 
     return srv
 

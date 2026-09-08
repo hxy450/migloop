@@ -158,11 +158,11 @@ def run_stage_intervals(path: str, cwd: str) -> list[dict[str, Any]]:
 def _collect(fmt: str, roots: list[str], stage_intervals: list[dict[str, Any]] | None = None) -> Any:
     seq = [0]
     agents: dict[str, Any] = {}
-    for p in roots:
-        if fmt == "codex":
+    if fmt == "codex":
+        for p in roots:
             agents.update(atoms_collect.collect_codex(p, seq))
-        else:
-            agents.update(atoms_collect.collect_cc(p, seq, stage_intervals=stage_intervals))
+    else:
+        agents = atoms_collect.collect_cc_pool(roots, seq, stage_intervals=stage_intervals)
     ledger = atoms.build_ledger(agents)
     ledger.fix_after = atoms_collect.fix_boundary(stage_intervals or [])
     return ledger

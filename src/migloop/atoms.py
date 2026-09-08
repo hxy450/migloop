@@ -65,7 +65,7 @@ class Action:
     tuid: str | None = None
     stage: str | None = None   # 管线阶段:记录的归属戳(attributionSkill);子 agent 无戳时继承派发时阶段
     done_ts: str | None = None  # 结果返回时刻:读的内容这一刻才进上下文,喂的版本按它算(评审反例:写之后才返回的读)
-    blk: int = 0               # 同一条记录里第几个 tool_use(并行调用同行):引用里的 /块号,少了它两个调用同一个位置
+    blk: int = 0               # 原始 content 数组的块下标;混合 think/text/tool_use 也不碰撞
 
 
 @dataclass
@@ -122,6 +122,8 @@ class Ledger:
     by_loc: dict[tuple[str, int, int], int] = field(default_factory=dict)
     #: 撞了键的位置(理论上不该有):核验时报歧义,不能 first-wins
     loc_ambiguous: set[tuple[str, int, int]] = field(default_factory=set)
+    line_blocks: dict[tuple[str, int], set[int]] = field(default_factory=dict)
+    scan_gaps: list[dict[str, Any]] = field(default_factory=list)
     #: 转录标识 → 转录路径;旧格式短标识(8 位 / 带名字)→ 新标识,不唯一的记 None(报歧义,不猜)
     tag_paths: dict[str, str] = field(default_factory=dict)
     legacy_tags: dict[str, str | None] = field(default_factory=dict)
@@ -174,14 +176,14 @@ def _number(a: AgentRec) -> None:
 
 
 def event_id(ledger: Ledger, agent_id: str, seq: int) -> str | None:
-    """事件的稳定身份:会话 + 转录文件名 + tool_use_id(没有 id 的记录用转录行号)。
+    """事件的稳定身份:会话 + 转录文件名 + tool_use_id(没有 id 的记录用转录行号/原始块号)。
     动作号 #n 只是本次建账的句柄,解析器多认出一条读它就变;这个不变。"""
     a = resolve_agent(ledger, agent_id)
     act = next((x for x in a.actions if x.seq == seq), None) if a else None
     if a is None or act is None:
         return None
     stem = os.path.splitext(os.path.basename(act.src[0]))[0] if act.src else a.id
-    tail = act.tuid if act.tuid else (f"L{act.src[1] + 1}" if act.src else f"seq{act.seq}")
+    tail = act.tuid if act.tuid else (f"L{act.src[1] + 1}/{act.blk}" if act.src else f"seq{act.seq}")
     return f"{a.session}:{stem}:{tail}"
 
 
@@ -302,6 +304,14 @@ def build_ledger(agents: dict[str, AgentRec]) -> Ledger:
     _link_dispatches(agents)
     _fill_stages(agents)
     events = [ref.ev for a in agents.values() for act in a.actions for ref in act.files]
+    for a in agents.values():
+        for act in a.actions:
+            # 必须先进入重建引擎,不能 build_stories 后才补一条展示用虚线。
+            candidates = set(act.detail.get("conditional") or []) | set(act.detail.get("touched") or [])
+            for p in candidates:
+                events.append(Ev(act.ts, act.seq, "candidate", p, a.id, stage=act.stage))
+                if act.done_ts and act.done_ts != act.ts:
+                    events.append(Ev(act.done_ts, act.seq, "candidate", p, a.id, stage=act.stage))
     stories = build_stories(events)
     _sweep_phantoms(stories)
     index: dict[tuple[str, int], int] = {}
@@ -319,12 +329,18 @@ def build_ledger(agents: dict[str, AgentRec]) -> Ledger:
     locs: dict[int, str] = {}
     by_loc: dict[tuple[str, int, int], int] = {}
     loc_ambiguous: set[tuple[str, int, int]] = set()
+    line_blocks: dict[tuple[str, int], set[int]] = {}
+    for a in agents.values():
+        for act in a.actions:
+            if act.src is not None:
+                line_blocks.setdefault((transcript_tag(act.src[0]), act.src[1] + 1), set()).add(act.blk)
     for a in agents.values():
         for act in a.actions:
             if act.src is not None:
                 lines[act.seq] = act.src[1] + 1
                 tag = transcript_tag(act.src[0])
-                locs[act.seq] = f"{act.src[1] + 1}{'/' + str(act.blk) if act.blk else ''}·{tag}"
+                block_needed = act.blk or len(line_blocks[(tag, act.src[1] + 1)]) > 1
+                locs[act.seq] = f"{act.src[1] + 1}{'/' + str(act.blk) if block_needed else ''}·{tag}"
                 key = (tag, act.src[1] + 1, act.blk)
                 if key in by_loc and by_loc[key] != act.seq:
                     loc_ambiguous.add(key)                    # 撞键:核验时报歧义,不自动认第一个
@@ -348,6 +364,10 @@ def build_ledger(agents: dict[str, AgentRec]) -> Ledger:
                 st = stories.setdefault(p, FileStory(p))
                 st.touches.append(Touch(act.ts, act.seq, a.id, act.ver if act.ver is not None else act.at,
                                         "条件分支,是否执行未知(候选写)", act.stage))
+            for p in act.detail.get("conditional_reads") or []:
+                st = stories.setdefault(p, FileStory(p))
+                st.touches.append(Touch(act.ts, act.seq, a.id, act.at,
+                                        "条件分支,读取未获证实(不是已见输入)", act.stage))
             # 存在性守卫里探过的路径:文件当时可能不存在,只留指针
             for p in act.detail.get("probed") or []:
                 st = stories.setdefault(p, FileStory(p))
@@ -437,7 +457,14 @@ def build_ledger(agents: dict[str, AgentRec]) -> Ledger:
                 legacy[old] = None if (old in legacy and legacy[old] != tag) else tag
     return Ledger(stories, agents, feeds, t0, lines=lines, read_act=read_act, depth_max=dmax, depth_win=dwin,
                   mentions=mentions, mention_seq=mention_seq, write_cmds=_write_capable_cmds(agents),
-                  locs=locs, by_loc=by_loc, loc_ambiguous=loc_ambiguous, tag_paths=tag_paths, legacy_tags=legacy)
+                  locs=locs, by_loc=by_loc, loc_ambiguous=loc_ambiguous, line_blocks=line_blocks,
+                  tag_paths=tag_paths, legacy_tags=legacy,
+                  scan_gaps=[{"agent": a.id, "seq": act.seq,
+                              "chars": act.detail.get("mentions_scan_truncated", 0),
+                              "mentions": act.detail.get("mentions_truncated", 0),
+                              "sources": act.detail.get("mentions_scan_sources", [])}
+                             for a in agents.values() for act in a.actions
+                             if act.detail.get("mentions_scan_truncated") or act.detail.get("mentions_truncated")])
 
 
 REF_RE = re.compile(r"#(?:([\w-]+):)?(\d+)@L(\d+)(?:/(\d+))?(?:·([\w-]+))?")
@@ -459,9 +486,9 @@ def resolve_tag(ledger: Ledger, tag: str) -> tuple[str | None, bool]:
     return None, False
 
 
-def resolve_ref(ledger: Ledger, no: int, line: int, blk: int, tag: str | None) -> tuple[int | None, str]:
-    """一条引用 → (现在的动作号, 状态)。状态:ok / drifted(#n 漂了但位置对上)/ ambiguous / missing / untagged(没有标识,
-    只能按 #n 对,漂了就核不回去)。"""
+def resolve_ref(ledger: Ledger, no: int, line: int, blk: int | None, tag: str | None) -> tuple[int | None, str]:
+    """一条引用 → (现在的动作号, 状态)。ok / drifted(#n 漂了但位置唯一)/ ambiguous / missing / untagged。
+    无标识一律不算可核;多动作记录缺块号也不能借动作号猜。"""
     if line < 1:
         return None, "missing"
     if tag:
@@ -470,6 +497,11 @@ def resolve_ref(ledger: Ledger, no: int, line: int, blk: int, tag: str | None) -
             return None, "ambiguous"
         if t is None:
             return None, "missing"
+        if blk is None:
+            blocks = ledger.line_blocks.get((t, line), set())
+            if len(blocks) > 1:
+                return None, "ambiguous"       # 缺 /块号不是 #n 漂移,不能偷偷指向第一个调用
+            blk = next(iter(blocks), 0)
         key = (t, line, blk)
         if key in ledger.loc_ambiguous:
             return None, "ambiguous"
@@ -477,8 +509,6 @@ def resolve_ref(ledger: Ledger, no: int, line: int, blk: int, tag: str | None) -
         if hit is None:
             return None, "missing"
         return hit, ("ok" if hit == no else "drifted")
-    if ledger.lines.get(no) == line:
-        return no, "ok"
     return None, "untagged"
 
 
@@ -825,6 +855,7 @@ def file_atom(ledger: Ledger, hint: str, v: int | None = None,
             "by_ver": ver.by_ver, "seq": ver.act_seq, "via": ver.via, "source": ver.source,
             "gen_runs": list(ver.gen_runs), "batch": ver.batch,
             "diff_kind": ver.diff_kind, "sealed": ver.sealed, "conditional": ver.conditional,
+            "state_gap": ver.state_gap,
             "lines": len(ver.content.splitlines()) if ver.content else None,   # 末尾换行不算一行
             "has_diff": ver.diff is not None,
             "content_known": ver.content is not None,

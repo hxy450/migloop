@@ -5,7 +5,7 @@ import json
 import os
 from typing import Any
 
-from migloop import probe
+from migloop import atoms_text, probe
 
 from tests.test_atoms import MAIN_ID, _call, _ledger, _read_call, _rec
 
@@ -42,7 +42,7 @@ def test_probe_maps_calls_and_links_to_nodes(tmp_path: Any) -> None:
            {"tool": "search", "input": {"q": "x", "until_ts": "2026-01-01T01:00:00Z"}, "chars": 300}]
     report = ("文件: entry/A.ets\n"
               "环 1  fixer 写 A.ets@v2 (#9@L9)   判定: 传递\n"
-              f"环 2  conv-a(agent-c)v1 写 A.ets@v1,凭 spec/pages/A.md@v1 (#{conv_seq}@L{led.lines[conv_seq]})   判定: 错\n"
+              f"环 2  conv-a(agent-c)v1 写 A.ets@v1,凭 spec/pages/A.md@v1 ({atoms_text._core(conv_seq, led.locs[conv_seq])})   判定: 错\n"
               "环 3  spec/pages/A.md@v1 外部输入   判定: 缺\n"
               f"环 4  主会话·{MAIN_ID.split(':')[1]} v1 的派发词缺约束   判定: 错\n"      # 主会话不是 agent-… 形式的 id,也得认成坐标
               "故障进入点:\n"                                    # 真报告里常换行再分条,还会给几条缺陷各自的进入点
@@ -88,14 +88,15 @@ def test_probe_rejects_forged_line_numbers(tmp_path: Any) -> None:
                    toolUseResult={"agentId": "c"})]
     led = _ledger(tmp_path, main, {"agent-c": conv})
     conv_seq = next(a.seq for a in led.agents["agent-c"].actions if a.tool == "Write")
-    good = f"#{conv_seq}@L{led.lines[conv_seq]}"
+    good = atoms_text._core(conv_seq, led.locs[conv_seq])
+    forged = good.replace(f"@L{led.lines[conv_seq]}", "@L999999")
     report = ("文件: entry/A.ets\n"
               f"环 1  conv-a(agent-c)v1 写 A.ets@v1 ({good})   判定: 错\n"
-              f"环 2  conv-a(agent-c)v1 又写 (#{conv_seq}@L999999)   判定: 传递\n"
+              f"环 2  conv-a(agent-c)v1 又写 ({forged})   判定: 传递\n"
               "故障进入点: 环 1\n")
     p = probe.probe_payload(led, _run_dir(tmp_path, [], report))
     assert p["links"][0]["bad_refs"] == [] and any(n.get("action") == conv_seq for n in p["links"][0]["nodes"])
-    assert p["links"][1]["bad_refs"] == [f"#{conv_seq}@L999999"]
+    assert p["links"][1]["bad_refs"] == [forged]
     assert not any(n.get("action") == conv_seq for n in p["links"][1]["nodes"])
     assert p["bad_refs"] == 1
 

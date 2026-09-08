@@ -731,6 +731,7 @@ cases_tools6(标识在前的格式,其余不变)在跑,用来量引用格式这�
 
 ## 8. 文件索引
 
+- `docs/proposals/2026-09-08-evidence-contracts.md`：接手修复的证据契约与机械验收；条件读写、候选屏障、只读脚本历史、引用及扫描缺口。不是新一轮模型质量结论。
 - `docs/experiments/README.md`:实验产物说明。
 - `docs/experiments/2026-09-07-four-roots-after-optim/`:五步优化后四根验收 —— 新工具报告、实发提示词、metrics、盲评、
   各步在 0723 上的度量脚本(假 v1 / 幽灵路径 / 外部指针 / 覆盖对账 / 体量 / search 探针)。

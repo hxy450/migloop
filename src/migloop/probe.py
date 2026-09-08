@@ -111,7 +111,8 @@ def _link_nodes(ledger: atoms.Ledger, body: str) -> tuple[list[dict[str, Any]], 
             found.append((m.start(), {"kind": "agent", "aid": mid, "v": int(m.group(2))}))
     for m in _ACTION.finditer(body):
         tag = m.group(1) or m.group(5)
-        hit, status = atoms.resolve_ref(ledger, int(m.group(2)), int(m.group(3)), int(m.group(4) or 0), tag)
+        hit, status = atoms.resolve_ref(ledger, int(m.group(2)), int(m.group(3)),
+                                        int(m.group(4)) if m.group(4) is not None else None, tag)
         if hit is None:
             bad.append(m.group(0) + ("(歧义)" if status == "ambiguous" else ""))
             continue

@@ -2,6 +2,12 @@
 
 背景、目的与结论见 [../fixchain-research.md](../fixchain-research.md)。这里只说每个文件是什么。会话本体不在仓里,位置见那份文档 §3。
 
+## 2026-09-08-evidence-contracts/ —— 证据契约机械验收（非模型对照实验）
+
+- [audit-summary.json](2026-09-08-evidence-contracts/audit-summary.json)：`26e65b3` 与接手修复版在 0723 上的引用、记录可达性、候选与版本计数。
+- [audit_evidence.py](audit_evidence.py)：可指定根转录和冻结源码目录的只读复核脚本，无模型调用。
+- [实现与验收说明](../proposals/2026-09-08-evidence-contracts.md)：44 条新增契约用例、行为变更、候选增多的代价与未解决边界。
+
 ## 2026-09-04-diceroller-run-level/ —— run 级双盲(极简 prompt)
 
 - `prompts/prompt_run_common.md`:两组共用的任务段(原样);`prompt_run_tools.md` / `prompt_run_raw.md`:两组各自的「你手里有什么」;`run_tools.as-sent.md` / `run_raw.as-sent.md`:实际发给模型的拼好的全文。
