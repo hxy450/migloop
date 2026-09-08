@@ -101,14 +101,14 @@ def _link_nodes(ledger: atoms.Ledger, body: str) -> list[dict[str, Any]]:
 def probe_payload(ledger: atoms.Ledger, run_dir: str) -> dict[str, Any]:
     m, report = _load_run(run_dir)
     seq = (m.get("transcript") or {}).get("seq") or []
-    steps = []
+    steps: list[dict[str, Any]] = []
     for i, s in enumerate(seq, 1):
         inp = {k: v for k, v in (s.get("input") or {}).items() if k != "sid"}
         steps.append({"i": i, "tool": s.get("tool"), "args": inp, "chars": s.get("chars") or 0,
                       "node": _step_node(ledger, str(s.get("tool")), inp)})
     entry = _ENTRY.search(report)
     entry_no = int(entry.group(1)) if entry else None
-    links = []
+    links: list[dict[str, Any]] = []
     for ln in report.split("\n"):
         mm = _LINK.match(ln)
         if not mm:
@@ -120,8 +120,9 @@ def probe_payload(ledger: atoms.Ledger, run_dir: str) -> dict[str, Any]:
     # 节点 → 判定:只算它当主语的环(正文第一个坐标);同一节点被几环判过取最重(错 > 缺 > 传递)
     verdicts: dict[str, dict[str, Any]] = {}
     for lk in links:
-        subject: dict[str, Any] | None = lk["nodes"][0] if lk["nodes"] else None
-        verdict: str | None = lk["verdict"]
+        lk_nodes: list[dict[str, Any]] = list(lk["nodes"])
+        subject: dict[str, Any] | None = lk_nodes[0] if lk_nodes else None
+        verdict: str | None = str(lk["verdict"]) if lk["verdict"] else None
         if subject is None or verdict is None:
             continue
         key = str(subject.get("path") or subject.get("aid") or "")
