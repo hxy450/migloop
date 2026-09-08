@@ -42,9 +42,13 @@ GUIDE = """\
 file 原子末尾的「碰过它、方向不明的调用」与 sessions 末尾的「修复期被脚本碰过、方向不明的工程文件」:脚本里出现了
 这个路径但账本判不出是读是写(既读又写 / 数据表),不立版本、不猜方向,只给动作号 —— action(id, n) 展开原文自己判。
 被修的真文件可能只在这里露面(0723 修复真正改错值的 F012ViewModel.ets 就是修复方用 python heredoc 改的)。
-file 原子末尾还有「提到它的命令」:命令行 / heredoc 体 / 跑的脚本正文里出现这个路径的每一条命令,不论账本有没有解出读写
-(等于原始转录按文件名 grep 的结果),每条标明账本记到了什么(写@v / 读 / 碰过 / 没记到)。版本内容未知、实录外修改、
-脚本黑盒,先看这一节里「没记到」的那几条,按动作号 action 展开命令原文自己判。
+file 原子末尾还有「提到它的命令」:命令行 / heredoc 体 / 跑的脚本正文 / 工具输出里出现这个路径的每一条命令,不论账本有没有解出读写
+(等于原始转录按文件名 grep 的结果)。已入账的折成计数;没记到的按分档逐条列 —— 改动类(cp / sed -i / git checkout /
+脚本运行 / 重定向目标)、正文提到(heredoc、脚本正文)、输出里(git status、构建报错点名)、其他;只读检查(cat / grep / wc / ls)
+默认折叠,m_all=1 铺;一页 40 条,m_from 翻页。每条标它落在哪一版的窗口。版本行上「窗口内提及 N 条」指向这一节;
+「窗口内有写能力的命令 N 条(全池)」给的是 search(q='', kind=write, since_ts, until_ts) 的查法 —— 内容未知 / 实录外修改
+的版本,谁可能改的先按时间圈这些候选,再 action 打开判。agent 槽里解不出效应的命令直接带「可能碰了 X@v」;
+从一条命令进来只想看它之前的输入,用 agent(id, v, until=#n)。
 agent 工具给的每条动作/读取后面的 (#n) 是动作号;action(id, n) 返回那次工具调用的完整原始输入与输出
 (命令原文、grep 命中、cat 出来的全文、Read 到的内容)。摘要看不清时直接展开,不要猜。
 几万字的 think / 结果超过 max_chars 会截断并说明剩余多少:offset= 从第几字继续,find= 跳到关键词前
@@ -152,26 +156,29 @@ def build_server(backend: Any | None = None) -> Any:
     async def file(sid: str, path: str, v: int | None = None, content: bool = False,
                    diff: bool = False, start: int | None = None, n: int | None = None,
                    readers: bool = False, v_from: int | None = None, v_to: int | None = None,
-                   diff_chars: int | None = None) -> str:
-        """版本文件原子:≤v 的写者脊柱(写者 agent 版本/来路)、读了这一版的 agent、复原全文。
+                   diff_chars: int | None = None, m_from: int = 1, m_n: int = 40, m_all: bool = False) -> str:
+        """版本文件原子:≤v 的写者脊柱(写者 agent 版本/来路/证据标签)、读了这一版的 agent、复原全文。
         path 可给文件名、相对路径或绝对路径;v 空 = 最新版;content=True 给全文(start/n 裁行窗口)。
         三种口径:不带 diff = 索引;diff=True 带 v = 只看第 v 版的 diff;diff=True 不带 v = 每版完整 diff,一页 40 版,
-        v_from / v_to 翻页(创建版只给行数;diff_chars 只在你明确给时才截)。"""
+        v_from / v_to 翻页(创建版只给行数;diff_chars 只在你明确给时才截)。
+        末尾「提到它的命令」= 按文件名 grep 全部命令行 / heredoc / 脚本正文 / 工具输出:没记到读写的按分档逐条列
+        (改动类 / 正文提到 / 输出里 / 其他),只读检查折叠(m_all=True 铺),一页 m_n 条,m_from 翻页;每条标它落在哪一版的窗口。"""
         ledger, cwd = await _ctx(sid)
         return atoms_text.render_file(ledger, path, v, root=cwd, content=content, diff=diff,
                                       start=start, n=n, readers=readers, v_from=v_from, v_to=v_to,
-                                      diff_chars=diff_chars)
+                                      diff_chars=diff_chars, m_from=m_from, m_n=m_n, m_all=m_all)
 
     @srv.tool()
     async def agent(sid: str, id: str, v: int | None = None, since: int | None = None,
-                    reads: bool = True, seen: bool = False) -> str:
+                    reads: bool = True, seen: bool = False, until: int | None = None) -> str:
         """版本 agent 原子(索引):身份、派发者与派发词全文、收件箱一行一条、≤v 逐版的效应与输入
         (读按调用合行,绑文件版本,▲旧版/行段/命中行号/写前读等标)、它中途说的话一行一条、收尾输出。
         每条记录带 (#n@L行):action(id, n) 展开原文。id 可带或不带 agent- 前缀,名字唯一也认;
         v 空 = 整个生命周期;since 给了只看 (since, v] 这段版本 —— 主会话动辄几百次调用,查它必须带窗口。
-        seen=True 把命中读看见的原文行铺出来;reads=False 只给每版读的条数。"""
+        seen=True 把命中读看见的原文行铺出来;reads=False 只给每版读的条数。解不出效应的命令直接带「可能碰了 X@v」。
+        until=#n:槽截到那条命令为止,之后的输入不算这一版的依据(从一条命令进来只看它之前有什么)。"""
         ledger, cwd = await _ctx(sid)
-        return atoms_text.render_agent(ledger, id, v, root=cwd, since=since, reads=reads, seen=seen)
+        return atoms_text.render_agent(ledger, id, v, root=cwd, since=since, reads=reads, seen=seen, until=until)
 
     @srv.tool()
     async def blame(sid: str, path: str, v: int | None = None, start: int | None = None,
@@ -189,17 +196,20 @@ def build_server(backend: Any | None = None) -> Any:
         return atoms_text.render_diff(ledger, path, v, root=cwd)
 
     @srv.tool()
-    async def search(sid: str, q: str, agent: str | None = None, v: int | None = None,
+    async def search(sid: str, q: str = "", agent: str | None = None, v: int | None = None,
                      since: int | None = None, file: str | None = None, after: bool = False,
-                     since_ts: str | None = None, until_ts: str | None = None) -> str:
+                     since_ts: str | None = None, until_ts: str | None = None, kind: str | None = None) -> str:
         """带起点的按词查找。agent=(id 或名字)+ v / since:只看它喂养第 v 版及之前的记录(派发词、读到的内容、
         写入、命令与结果、自述、收件、注入技能),命中按种类分组、带 (#n@L行) 与下一跳;锚点之后的只计数(after=True 才列)。
         since_ts / until_ts:按时间区间查派发者(用文件时间线上两个版本的时刻)。file=(+ v):这个词首次出现在第几版、
         谁写的,哪些读者的读结果命中过。不带 agent / file 时必须带 until_ts:全池查那一刻之前所有 agent 的记录与
-        所有文件的已知内容,只用来核否定(「生成期没人见过 X」),结果自带范围行。每次输出第二行都是「范围」,零命中只能按它写。"""
+        所有文件的已知内容,只用来核否定(「生成期没人见过 X」),结果自带范围行。每次输出第二行都是「范围」,零命中只能按它写。
+        kind="write" + since_ts / until_ts:那段时间里全池有写能力的命令(file 里「实录外修改 / 内容未知」的版本行给了这个查法),
+        q 可空或做过滤;只按时间圈、不解析脚本,是否真改了要 action 打开自己判。
+        agent 模式下在 Bash 里命中、账本没记读写时,命中行带「可能碰到 X」。"""
         ledger, cwd = await _ctx(sid)
         return atoms_text.render_search(ledger, q, agent=agent, v=v, since=since, file=file, after=after,
-                                        since_ts=since_ts, until_ts=until_ts, root=cwd)
+                                        since_ts=since_ts, until_ts=until_ts, root=cwd, kind=kind)
 
     @srv.tool()
     async def action(sid: str, id: str, seq: int, max_chars: int = 20000, offset: int = 0, find: str = "") -> str:

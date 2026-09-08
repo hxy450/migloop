@@ -14,6 +14,7 @@
 
 from __future__ import annotations
 
+import bisect
 import difflib
 import json
 import os
@@ -97,6 +98,8 @@ class Mention:
     ctx: str
     ambiguous: bool = False     # 只给了文件名,池里同名文件不止一个
     stage: str | None = None
+    where: str = "in"           # in = 命令行;body = heredoc / 脚本正文;out = 工具输出
+    cls: str = "other"          # change / readonly / body / out / other:分档只决定默认折不折,不影响可达
 
 
 @dataclass
@@ -120,6 +123,10 @@ class Ledger:
     depth_win: dict[tuple[str, str, int], int] = field(default_factory=dict)
     #: 提到它的命令:路径 → 按时间排的 Mention。等于原始转录按文件名 grep 的结果,解析器放弃的也在
     mentions: dict[str, list[Mention]] = field(default_factory=dict)
+    #: 动作号 → 它提到的文件(反向索引:search 命中行、agent 槽里的「可能碰了」用)
+    mention_seq: dict[int, list[str]] = field(default_factory=dict)
+    #: 全池有写能力的命令 (ts, seq, agent),按时刻排:断点窗口里「谁可能改的」按它数,不解析脚本
+    write_cmds: list[tuple[str, int, str]] = field(default_factory=list)
 
 
 def resolve_agent(ledger: Ledger, hint: str) -> AgentRec | None:
@@ -386,8 +393,58 @@ def build_ledger(agents: dict[str, AgentRec]) -> Ledger:
         st.touches.sort(key=lambda t: (t.ts, t.seq))
     t0 = min((act.ts for a in agents.values() for act in a.actions if act.ts), default="")
     dmax, dwin = _upstream_depths(stories, agents)
+    mentions = _command_mentions(stories, agents)
+    mention_seq: dict[int, list[str]] = {}
+    for path, lst in mentions.items():
+        for m in lst:
+            mention_seq.setdefault(m.seq, []).append(path)
     return Ledger(stories, agents, feeds, t0, lines=lines, read_act=read_act, depth_max=dmax, depth_win=dwin,
-                  mentions=_command_mentions(stories, agents))
+                  mentions=mentions, mention_seq=mention_seq, write_cmds=_write_capable_cmds(agents))
+
+
+def _write_capable_cmds(agents: dict[str, AgentRec]) -> list[tuple[str, int, str]]:
+    """全池里可能写文件的命令:解出了写、分析器标了写能力、或压根没解出来的 Bash / PowerShell / exec,按时刻排。
+    「实录外修改」的窗口里谁可能改的,按它数,不解析脚本(评审:不追脚本黑盒,靠时间圈候选)。"""
+    rows: list[tuple[str, int, str]] = []
+    for a in agents.values():
+        for act in a.actions:
+            if act.tool not in ("Bash", "PowerShell", "exec"):
+                continue
+            if (act.detail.get("write_capable") or act.detail.get("unresolved")
+                    or any(ref.op != "read" for ref in act.files)):
+                rows.append((act.ts, act.seq, a.id))
+    rows.sort()
+    return rows
+
+
+def version_at(ledger: Ledger, path: str, ts: str) -> int:
+    """那一刻文件在第几版(时刻 ≤ ts 的最后一版;0 = 还没有版本)。"""
+    st = ledger.stories.get(path)
+    return _versions_at(st, ts) if st else 0
+
+
+def search_window_writes(ledger: Ledger, since_ts: str | None, until_ts: str | None,
+                         q: str = "", cap: int = 60) -> dict[str, Any]:
+    """时间窗口 (since_ts, until_ts] 里全池有写能力的命令,q 过滤命令文本。只按时间圈,不解析脚本。"""
+    by_seq = {act.seq: (a, act) for a in ledger.agents.values() for act in a.actions}
+    ql = (q or "").lower()
+    rows: list[dict[str, Any]] = []
+    n = 0
+    for ts, seq, aid in ledger.write_cmds:
+        if (since_ts and ts <= since_ts) or (until_ts and ts > until_ts):
+            continue
+        _a, act = by_seq[seq]
+        cmd = str(act.detail.get("cmd") or act.detail.get("args") or "")
+        if ql and ql not in cmd.lower():
+            continue
+        n += 1
+        if len(rows) >= cap:
+            continue
+        effects = ", ".join(f"写 {f.path.rsplit('/', 1)[-1]}@v{f.v}" for f in act.files if f.op != "read")
+        rows.append({"ts": ts, "t": rel_time(ts, ledger.t0), "seq": seq, "by": aid,
+                     "by_ver": act.ver if act.ver is not None else act.at, "cmd": cmd[:160],
+                     "effects": effects, "unresolved": act.detail.get("unresolved")})
+    return {"rows": rows, "n": n, "n_agents": len(ledger.agents)}
 
 
 def _command_mentions(stories: dict[str, FileStory], agents: dict[str, AgentRec]) -> dict[str, list[Mention]]:
@@ -411,10 +468,12 @@ def _command_mentions(stories: dict[str, FileStory], agents: dict[str, AgentRec]
                     stories[absp] = FileStory(absp)
                     by_base.setdefault(absp.rsplit("/", 1)[-1].lower(), []).append(absp)
                     cands = [absp]
+                where = str(item[3]) if len(item) > 3 else "in"
+                cls = str(item[4]) if len(item) > 4 else "other"
                 for p in cands:
                     out.setdefault(p, []).append(Mention(act.ts, act.seq, a.id, act.ver if act.ver is not None else act.at,
                                                          str(tok), str(ctx), ambiguous="/" not in low and len(cands) > 1,
-                                                         stage=act.stage))
+                                                         stage=act.stage, where=where, cls=cls))
     for lst in out.values():
         lst.sort(key=lambda m: (m.ts, m.seq))
     return out
@@ -693,10 +752,29 @@ def file_atom(ledger: Ledger, hint: str, v: int | None = None,
     touches = [{"by": t.by, "by_name": _agent_label(ledger.agents, t.by), "by_ver": t.by_ver,
                 "ts": t.ts, "t": rel_time(t.ts, ledger.t0), "seq": t.seq, "reason": t.reason}
                for t in st.touches]
+    vts = [ver.ts for ver in st.versions]
+
+    def _win(ts: str) -> int | None:
+        k = bisect.bisect_right(vts, ts)
+        return k + 1 if k < len(vts) else None          # 落在第 k+1 版的窗口;最后一版之后 = None
+
     mentions = [{"by": m.by, "by_name": _agent_label(ledger.agents, m.by), "by_ver": m.by_ver, "ts": m.ts,
                  "t": rel_time(m.ts, ledger.t0), "seq": m.seq, "token": m.token, "ctx": m.ctx,
-                 "ambiguous": m.ambiguous, "effect": mention_effect(ledger, path, m.seq)}
+                 "ambiguous": m.ambiguous, "effect": mention_effect(ledger, path, m.seq),
+                 "where": m.where, "cls": m.cls, "win": _win(m.ts)}
                 for m in ledger.mentions.get(path, [])]
+    # 每版的窗口 = 上一版时刻(不含)到这一版时刻(含):没记到的非只读提及数、全池有写能力的命令数(不含写它自己的那条)
+    wts = [t for t, _s, _a in ledger.write_cmds]
+    for row in out:
+        i = row["v"]
+        since, until = (vts[i - 2] if i >= 2 else ""), vts[i - 1]
+        row["win_since"] = since
+        wm = [m for m in mentions if m["win"] == i and m["effect"] is None]
+        row["win_mentions"] = sum(1 for m in wm if m["cls"] != "readonly")
+        row["win_change"] = sum(1 for m in wm if m["cls"] in ("change", "body", "out"))
+        lo = bisect.bisect_right(wts, since) if since else 0
+        hi = bisect.bisect_right(wts, until)
+        row["win_writes"] = sum(1 for _t, s, _a in ledger.write_cmds[lo:hi] if s != row["seq"])
     return {
         "path": path, "v": vers[-1].v if vers else 0, "n_versions": len(st.versions),
         "versions": out, "readers": readers, "touches": touches, "mentions": mentions, "t0": ledger.t0,
@@ -992,6 +1070,9 @@ def search_agent(ledger: Ledger, agent_id: str, q: str, v: int | None = None, si
                          "field": fld, "target": target,
                          "targets": rs if fld == "output" else ws,
                          "target_v": next((ref.v for ref in act.files if ref.path == target), None),
+                         "possible": ([p for p in ledger.mention_seq.get(act.seq, [])
+                                       if mention_effect(ledger, p, act.seq) is None]
+                                      if fld == "input" and not ws else []),
                          "after": not in_window, "snips": snips, "n": cnt})
     return {"agent": a.id, "label": _agent_label(ledger.agents, a.id) or a.id, "q": q, "v": anchor, "since": since,
             "since_ts": since_ts, "until_ts": until_ts, "hits": hits, "excluded_after": excluded}

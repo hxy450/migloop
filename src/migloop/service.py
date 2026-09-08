@@ -577,10 +577,12 @@ def atom_text(path: str, tool: str, args: dict[str, Any]) -> str:
                                       start=_opt_int(args, "start"), n=_opt_int(args, "n"),
                                       readers=_flag(args, "readers", "0"),
                                       v_from=_opt_int(args, "v_from"), v_to=_opt_int(args, "v_to"),
-                                      diff_chars=_opt_int(args, "diff_chars"))
+                                      diff_chars=_opt_int(args, "diff_chars"),
+                                      m_from=_opt_int(args, "m_from") or 1, m_n=_opt_int(args, "m_n") or 40,
+                                      m_all=_flag(args, "m_all", "0"))
     if tool == "agent" and args.get("id"):
         return atoms_text.render_agent(ledger, str(args["id"]), _opt_int(args, "v"), root=cwd,
-                                       since=_opt_int(args, "since"),
+                                       since=_opt_int(args, "since"), until=_opt_int(args, "until"),
                                        reads=_flag(args, "reads", "1"), seen=_flag(args, "seen", "0"))
     if tool == "blame" and args.get("path"):
         return atoms_text.render_blame(ledger, str(args["path"]), _opt_int(args, "v"),
@@ -588,13 +590,13 @@ def atom_text(path: str, tool: str, args: dict[str, Any]) -> str:
                                        changed=_flag(args, "changed", "0"))
     if tool == "diff" and args.get("path") and args.get("v") is not None:
         return atoms_text.render_diff(ledger, str(args["path"]), int(args["v"]), root=cwd)
-    if tool == "search" and args.get("q"):
-        return atoms_text.render_search(ledger, str(args["q"]), agent=args.get("agent") or args.get("id") or None,
+    if tool == "search" and (args.get("q") or args.get("kind")):
+        return atoms_text.render_search(ledger, str(args.get("q") or ""), agent=args.get("agent") or args.get("id") or None,
                                         v=_opt_int(args, "v"), since=_opt_int(args, "since"),
                                         file=args.get("file") or args.get("path") or None,
                                         after=_flag(args, "after", "0"),
                                         since_ts=args.get("since_ts") or None, until_ts=args.get("until_ts") or None,
-                                        root=cwd)
+                                        root=cwd, kind=args.get("kind") or None)
     if tool == "action" and args.get("id") and args.get("seq") is not None:
         return atoms_text.render_action(ledger, str(args["id"]), int(args["seq"]),
                                         max_chars=_opt_int(args, "max_chars") or 20000,

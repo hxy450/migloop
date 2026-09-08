@@ -178,20 +178,63 @@ _RUN_WORD = re.compile(r"[\w./\\~:-]+\.(?:py|js|mjs|sh)\b")
 
 
 _MENTION_CAP = 40
+_HEREDOC_BODY = re.compile(r"<<-?\s*['\"]?(\w+)['\"]?[^\n]*\n(.*?)\n[ \t]*\1[ \t]*(?:\n|$)", re.S)
+_SEG_SEP = re.compile(r"&&|\|\||[;|\n]")
+_CHANGE_HEADS = frozenset({"cp", "mv", "rm", "tee", "truncate", "install", "ln", "python", "python3", "python2", "node",
+                           "bash", "sh", "zsh", "chmod", "touch", "dd", "rsync", "unzip", "tar", "patch"})
+_READONLY_HEADS = frozenset({"cat", "head", "tail", "grep", "rg", "egrep", "fgrep", "wc", "ls", "stat", "test", "[", "[[",
+                             "diff", "find", "file", "less", "more", "md5sum", "sha1sum", "sha256sum", "echo", "printf",
+                             "tree", "du", "sort", "uniq", "cut", "tr", "awk", "jq", "realpath", "dirname", "basename"})
+_GIT_CHANGE = frozenset({"checkout", "restore", "stash", "apply", "mv", "rm", "reset", "clean", "revert", "merge",
+                         "rebase", "pull", "am", "cherry-pick"})
 
 
-def _path_mentions(cmd: str, scripts: dict[str, Any], cwd: object = None,
-                   ts: str | None = None) -> tuple[list[tuple[str, str, str | None]], int]:
-    """命令行 + heredoc 体 + 它跑的脚本正文里,长得像路径的词 → ([(词, 前后文, 解析出的绝对路径|None)], 截断数)。
-    不判读写,只记「提到」:原始转录按文件名 grep 能跳出来的命令,file() 末尾也得能列出来 —— 解析器放弃的、
-    当成无关的、写在 heredoc 正文里的都在。超过上限的不静默丢,记截断数。"""
+def _heredoc_spans(cmd: str) -> list[tuple[int, int]]:
+    return [(m.start(2), m.end(2)) for m in _HEREDOC_BODY.finditer(cmd)]
+
+
+def _mention_class(cmd: str, pos: int, tok_end: int) -> str:
+    """命令行里这个路径所在的那一段命令能对它做什么:change / readonly / other。按段头判,sed / perl 看 -i,git 看子命令,
+    重定向目标算改动。判不出的算 other,和 change 一样逐条列 —— 分档错误只影响默认折不折,不影响可达。"""
+    a = 0
+    for m in _SEG_SEP.finditer(cmd, 0, pos):
+        a = m.end()
+    m2 = _SEG_SEP.search(cmd, tok_end)
+    b = m2.start() if m2 else len(cmd)
+    seg = cmd[a:b]
+    if re.search(r">>?\s*['\"]?" + re.escape(cmd[pos:tok_end]), seg):
+        return "change"
+    words = [w for w in seg.split() if "=" not in w or w.startswith("-")]
+    words = [w for w in words if w not in ("sudo", "env", "time", "nohup", "nice")]
+    head = os.path.basename(words[0]) if words else ""
+    if head in ("sed", "perl"):
+        # -i / -i.bak / -pi / -pie / --in-place 都是就地改
+        return ("change" if any(w.startswith("-") and not w.startswith("--e") and "i" in w.split("=")[0]
+                                for w in words[1:]) else "readonly")
+    if head == "git":
+        return "change" if (len(words) > 1 and words[1] in _GIT_CHANGE) else "readonly"
+    if head in _CHANGE_HEADS:
+        return "change"
+    if head in _READONLY_HEADS:
+        return "readonly"
+    return "other"
+
+
+def _path_mentions(cmd: str, scripts: dict[str, Any], cwd: object = None, ts: str | None = None,
+                   where: str = "in") -> tuple[list[tuple[str, str, str | None, str, str]], int]:
+    """命令行 + heredoc 体 + 它跑的脚本正文(或工具输出,where="out")里,长得像路径的词
+    → ([(词, 前后文, 解析出的绝对路径|None, 出处 in/body/out, 分档 change/readonly/body/out/other)], 截断数)。
+    不判读写,只记「提到」:原始转录按文件名 grep 能跳出来的,这里一条不少;超过上限的不静默丢,记截断数。"""
     text = cmd or ""
-    for m in _RUN_WORD.finditer(text):
-        body = _script_body(scripts, os.path.basename(m.group(0).replace("\\", "/")), ts)
-        if body:
-            text += "\n" + body
+    cmd_len = len(text)
+    spans = _heredoc_spans(text) if where == "in" else []
+    if where == "in":
+        for m in _RUN_WORD.finditer(text):
+            body = _script_body(scripts, os.path.basename(m.group(0).replace("\\", "/")), ts)
+            if body:
+                text += "\n" + body
     base = _resolve(cwd, None) if isinstance(cwd, str) and cwd else None
-    out: list[tuple[str, str, str | None]] = []
+    out: list[tuple[str, str, str | None, str, str]] = []
     seen: set[str] = set()
     total = 0
     for m in _MENTION.finditer(text):
@@ -203,7 +246,13 @@ def _path_mentions(cmd: str, scripts: dict[str, Any], cwd: object = None,
         if len(out) >= _MENTION_CAP:
             continue
         ctx = " ".join(text[max(0, m.start() - 60):m.end() + 60].split())
-        out.append((tok, ctx[:150], _resolve(tok, base) if "/" in tok else None))
+        if where == "out":
+            src, cls = "out", "out"
+        elif m.start() >= cmd_len or any(s <= m.start() < e for s, e in spans):
+            src, cls = "body", "body"
+        else:
+            src, cls = "in", _mention_class(text, m.start(), m.end())
+        out.append((tok, ctx[:150], _resolve(tok, base) if "/" in tok else None, src, cls))
     return out, max(0, total - _MENTION_CAP)
 _PS_ASSIGN = re.compile(r"\$(\w+)\s*=\s*(['\"])([^'\"\n]+)\2")
 _PATHLINE = re.compile(r"^(.+?):(\d+)[:-]")
@@ -1360,10 +1409,22 @@ def _walk(path: str, agent_id: str, session: str, seq: list[int],
                         if partials:
                             detail["partials"] = partials
                         mentions, trunc = _path_mentions(cmd_text, scripts, ucwd, uts)
+                        if ok:
+                            # 输出里点名的文件(git status 的 modified、ls、构建报错、grep -rl):命令行里没有,输出里有
+                            om, otrunc = _path_mentions(_text_of(b.get("content"))[:200000], {}, ucwd, uts, where="out")
+                            head_cmd = " ".join(cmd_text.split())[:60]
+                            om = [(t, (head_cmd + " ⇒ " + c)[:150], ab, w, k) for t, c, ab, w, k in om]
+                            mentions, trunc = mentions + om, trunc + otrunc
                         if mentions:
                             detail["mentions"] = mentions
                         if trunc:
                             detail["mentions_truncated"] = trunc
+                    elif name in ("Grep", "Glob") and ok:
+                        om, otrunc = _path_mentions(_text_of(b.get("content"))[:200000], {}, ucwd, uts, where="out")
+                        if om:
+                            detail["mentions"] = om
+                        if otrunc:
+                            detail["mentions_truncated"] = otrunc
                     act = Action(uts, nxt(), name, _kind_of(name, ops), ok=ok, detail=detail,
                                  src=(path, use_line, line_no), tuid=tuid, stage=stage, done_ts=ts)
                     for op in ops:

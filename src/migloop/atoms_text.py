@@ -206,10 +206,14 @@ def _evidence_label(vv: dict[str, Any]) -> str:
     return str(src or "")
 
 
+_MENTION_CLS = {"change": "改动类", "body": "正文提到", "out": "输出里", "readonly": "只读检查", "other": "其他"}
+
+
 def render_file(ledger: atoms.Ledger, hint: str, v: int | None = None, root: str = "",
                 content: bool = False, diff: bool = False,
                 start: int | None = None, n: int | None = None, readers: bool = False,
-                v_from: int | None = None, v_to: int | None = None, diff_chars: int | None = None) -> str:
+                v_from: int | None = None, v_to: int | None = None, diff_chars: int | None = None,
+                m_from: int = 1, m_n: int = 40, m_all: bool = False) -> str:
     """默认只给写者脊柱与碰过:单根往上追看的是写者。读者是下游,归并阶段才用(指南漏条款波及了哪些页),
     默认一行计数,readers=True 展开;按词找读者用 search(file=)。"""
     fa = atoms.file_atom(ledger, hint, v, with_diff=diff, with_content=content)
@@ -257,6 +261,13 @@ def render_file(ledger: atoms.Ledger, hint: str, v: int | None = None, root: str
             extra.append(f"候选生成运行 {runs}(目录级线索,未证实{batch})")
         if vv.get("conditional"):
             extra.append("条件分支,是否执行未知")
+        if vv.get("win_mentions"):
+            extra.append(f"窗口内提及 {vv['win_mentions']} 条(改动类 {vv['win_change']}),见末尾提及节")
+        if vv.get("win_writes") and vv.get("win_since") and (not vv["content_known"] or vv.get("source") == "outband"
+                                                               or vv.get("sealed")):
+            # 内容未知 / 实录外修改 / 封口的版本:谁可能改的按时间圈,只给数和查法,不自动铺(一小时窗口几十条,一万字)
+            extra.append(f"窗口内有写能力的命令 {vv['win_writes']} 条(全池,不含写它自己的那条):"
+                         f"search(q='', kind=write, since_ts={vv['win_since']}, until_ts={vv['ts']})")
         if vv["sealed"]:
             extra.append("观测封口")
         if vv["lines"] is not None:
@@ -298,8 +309,9 @@ def render_file(ledger: atoms.Ledger, hint: str, v: int | None = None, root: str
             out.append(f"- {_who(ledger, t['by'], t['by_ver'])} | {t['ts'][5:16]} {t.get('t') or ''} | {t['reason']}"
                        f" | action{_ref(t['seq'], None, lines.get(t['seq']))}")
     if fa.get("mentions"):
-        # 原始转录按文件名 grep 会跳出来的命令,这里一条不少:解析器放弃的、当成无关的、写在 heredoc 正文里的都在。
-        # 「没记到」的命令是版本内容未知 / 实录外修改之前该先看的地方
+        # 原始转录按文件名 grep 会跳出来的命令,这里一条不少:解析器放弃的、当成无关的、写在 heredoc 正文里的、输出里点名的都在。
+        # 已入账的折成计数;没记到的按分档逐条列(改动类 / 正文提到 / 输出里 / 其他),只读检查默认折叠(m_all=1 铺);
+        # 一页 m_n 条,m_from 翻页 —— 底层一条不丢,没返回的不算看过
         ms = fa["mentions"]
         miss = [m for m in ms if m["effect"] is None]
         kinds: dict[str, int] = {}
@@ -308,16 +320,26 @@ def render_file(ledger: atoms.Ledger, hint: str, v: int | None = None, root: str
                 k = "写" if str(m["effect"]).startswith("写") else str(m["effect"])
                 kinds[k] = kinds.get(k, 0) + 1
         done = "、".join(f"{k} {n} 次" for k, n in kinds.items())
-        out.append(f"## 提到它的命令({len(ms)},其中 {len(miss)} 条账本没记到读写)—— 命令行 / heredoc 体 / 跑的脚本正文里"
-                   "出现这个路径;版本无法复原或实录外修改时先看这里,action 展开命令原文自己判")
+        listed = [m for m in miss if m_all or m.get("cls") != "readonly"]
+        folded = len(miss) - len(listed)
+        out.append(f"## 提到它的命令({len(ms)},其中 {len(miss)} 条账本没记到读写)—— 命令行 / heredoc 体 / 跑的脚本正文 / "
+                   "工具输出里出现这个路径;版本无法复原或实录外修改时先看这里,action 展开命令原文自己判")
         if done:
-            out.append(f"已入账的 {len(ms) - len(miss)} 条({done})脊柱与读者里已有,不再铺;下面只铺没记到的")
-        for m in miss[:40]:
-            amb = " · 只给了文件名,同名文件不止一个" if m.get("ambiguous") else ""
-            out.append(f"- {_who(ledger, m['by'], m['by_ver'])} | {m['ts'][5:16]} {m.get('t') or ''}{amb} | "
-                       f"…{m['ctx']}… | action{_ref(m['seq'], None, lines.get(m['seq']))}")
-        if len(miss) > 40:
-            out.append(f"…没记到的另有 {len(miss) - 40} 条;search(q=文件名) 找")
+            out.append(f"已入账的 {len(ms) - len(miss)} 条({done})脊柱与读者里已有,不再铺")
+        if folded:
+            out.append(f"只读检查 {folded} 条折叠(cat / grep / wc / ls …;m_all=1 铺)")
+        lo = max(m_from, 1)
+        page = listed[lo - 1:lo - 1 + max(m_n, 1)]
+        hi = lo - 1 + len(page)
+        if listed:
+            out.append(f"第 {lo}–{hi} 条 / 共 {len(listed)} 条"
+                       + (f";剩余 {len(listed) - hi}:file(path, m_from={hi + 1})" if hi < len(listed) else ""))
+        for m in page:
+            amb = " · 只给了文件名,同名不止一个" if m.get("ambiguous") else ""
+            win = f"v{m['win']} 窗口" if m.get("win") else "最新版之后"
+            out.append(f"- {win} | {_who(ledger, m['by'], m['by_ver'])} | {m['ts'][5:16]} {m.get('t') or ''} | "
+                       f"[{_MENTION_CLS.get(str(m.get('cls')), '其他')}]{amb} | …{m['ctx']}… | "
+                       f"action{_ref(m['seq'], None, lines.get(m['seq']))}")
     if content:
         if fa["content"] is None and fa.get("partial"):
             out.append("## 内容(部分,脚本字面量里的正文;行号不是文件行号)")
@@ -355,9 +377,20 @@ def _vtag(r: dict[str, Any]) -> str:
     return f"@v{r['v']}" if r.get("v") is not None else "(图片,不立版本)"
 
 
+def _possible_suffix(ledger: atoms.Ledger, a: dict[str, Any], root: str) -> str:
+    """解不出效应的命令直接带「可能碰了 A.ets@v3」(当时的版本按时刻就近),不用经 action 才看到。"""
+    if a.get("files"):
+        return ""
+    paths = [p for p in ledger.mention_seq.get(a["seq"], []) if atoms.mention_effect(ledger, p, a["seq"]) is None]
+    if not paths:
+        return ""
+    items = [f"{rel(p, root)}@v{atoms.version_at(ledger, p, a['ts'])}" for p in paths[:3]]
+    return " · 可能碰了 " + ", ".join(items) + (f" …共 {len(paths)}" if len(paths) > 3 else "")
+
+
 def render_agent(ledger: atoms.Ledger, agent_id: str, v: int | None = None,
                  root: str = "", full_text: bool = True, since: int | None = None,
-                 reads: bool = True, seen: bool = False) -> str:
+                 reads: bool = True, seen: bool = False, until: int | None = None) -> str:
     """默认是索引:头部、派发词全文、收件索引行、逐版效应、读记录按调用合行(安卓路径缩短、看见的行只留行号)、
     正文索引行、收尾。0723 复盘:agent 整段 1.27 万字里三分之二是读清单和看见的行,报告每根只引 6 个文件名和
     6 次「看见」;信息不删,只是不默认铺开 —— seen=True 铺原文,reads=False 只给每版读的条数。
@@ -366,6 +399,10 @@ def render_agent(ledger: atoms.Ledger, agent_id: str, v: int | None = None,
     ag = atoms.agent_atom(ledger, agent_id, v, since=since)
     if ag is None:
         return f"账本里没有该 agent: {agent_id}"
+    if until is not None:
+        # 从一条命令进来只想看它之前的输入:槽截到 #until,之后的囊余不算这一版的依据
+        for key in ("reads", "actions", "inbox"):
+            ag[key] = [r for r in ag[key] if r.get("seq") is None or r["seq"] <= until]
     anchor = ag["v"]
     big_note = ""
     if reads and since is None and ag["n_versions"] > 25:
@@ -375,7 +412,8 @@ def render_agent(ledger: atoms.Ledger, agent_id: str, v: int | None = None,
     lines = ledger.lines
     out = [f"# agent {ag['label']}  id={ag['id']}  v{anchor} / 共 {ag['n_versions']} 版"
            + (f"  窗口 v{since + 1}–v{anchor}(只给喂养这段版本的动作)" if since is not None else "")
-           + _hops(ledger, ("a", ag["id"], anchor))]
+           + _hops(ledger, ("a", ag["id"], anchor))
+           + (f"  截到 #{until} 为止(之后的输入不算这一版的依据)" if until is not None else "")]
     ident = [ag.get("kind") or "agent", f"会话 {ag['session']}"]
     if ag.get("model"):
         ident.append(ag["model"])
@@ -483,11 +521,12 @@ def render_agent(ledger: atoms.Ledger, agent_id: str, v: int | None = None,
                 out.append(f"  {_TEXT_KINDS[a['kind']]}: {_clip(d.get('skill') or d.get('text') or '', 120)} {ref}")
                 continue
             desc = d.get("cmd") or d.get("pattern") or d.get("skill") or d.get("url") or ""
+            poss = _possible_suffix(ledger, a, root)
             if d.get("unresolved"):
                 # 解析不了的读写不许静默:调查员据此知道该展开哪次 action 看原文
-                out.append(f"  ⚠ 未解析读写({d['unresolved']}) {a['tool']}: {_clip(desc, 120)} {ref}")
+                out.append(f"  ⚠ 未解析读写({d['unresolved']}) {a['tool']}: {_clip(desc, 120)} {ref}{poss}")
                 continue
-            out.append(f"  {a['tool']}" + ("" if a["ok"] else "(失败)") + (f": {desc}" if desc else "") + " " + ref)
+            out.append(f"  {a['tool']}" + ("" if a["ok"] else "(失败)") + (f": {desc}" if desc else "") + " " + ref + poss)
         inboxes = [a for a in slot["inp"] if a["kind"] == "inbox"]
         if inboxes:
             out.append(f"  收件 {len(inboxes)} 条(见上)")
@@ -827,11 +866,34 @@ def _render_pool_search(ledger: atoms.Ledger, q: str, until_ts: str, since_ts: s
     return "\n".join(out)
 
 
+def _render_window_writes(ledger: atoms.Ledger, q: str, since_ts: str | None, until_ts: str | None, root: str) -> str:
+    if not since_ts and not until_ts:
+        return "search(kind=write) 要带时间窗口:since_ts / until_ts(用文件时间线上两个版本的时刻)"
+    res = atoms.search_window_writes(ledger, since_ts, until_ts, q)
+    lines = ledger.lines
+    out = [f"# 窗口内有写能力的命令 {since_ts or '…'} ~ {until_ts or '…'}  {res['n']} 条" + (f",含「{q}」" if q else ""),
+           f"范围: 全池 {res['n_agents']} 个 agent 的 Bash / PowerShell / exec 里,分析器判为可能写文件的(解出了写、标了写能力、"
+           "或没解出来的);不解析脚本,只按时间圈 —— 这是「实录外修改 / 内容未知」之前该看的候选,是否真改了要 action 打开自己判"]
+    for r in res["rows"]:
+        eff = r["effects"] or (f"未解({r['unresolved']})" if r.get("unresolved") else "无")
+        out.append(f"- {_who(ledger, r['by'], r['by_ver'])} | {r['ts'][5:16]} {r['t']} | {r['cmd']} | 已解出: {eff}"
+                   f" | action{_ref(r['seq'], None, lines.get(r['seq']))}")
+    if res["n"] > len(res["rows"]):
+        out.append(f"…另有 {res['n'] - len(res['rows'])} 条;缩小时间窗口或加 q 过滤")
+    if not res["rows"]:
+        out.append("窗口内没有有写能力的命令(范围见上一行)")
+    return "\n".join(out)
+
+
 def render_search(ledger: atoms.Ledger, q: str, agent: str | None = None, v: int | None = None,
                   since: int | None = None, file: str | None = None, after: bool = False,
-                  since_ts: str | None = None, until_ts: str | None = None, root: str = "") -> str:
+                  since_ts: str | None = None, until_ts: str | None = None, root: str = "",
+                  kind: str | None = None) -> str:
     """带起点的按词查找。agent=:只看它喂养第 v 版及之前的记录(或 since_ts/until_ts 时间区间);
-    file=:只看它到第 v 版为止的内容和读者。没有起点不搜 —— 「提到过」不等于「上游」,每一跳都要有账本里的边。"""
+    file=:只看它到第 v 版为止的内容和读者。没有起点不搜 —— 「提到过」不等于「上游」,每一跳都要有账本里的边。
+    kind=write:时间窗口里全池有写能力的命令(断点窗口候选),q 可空。"""
+    if kind == "write":
+        return _render_window_writes(ledger, q, since_ts, until_ts, root)
     if not agent and not file:
         if not until_ts:
             return ("search 要么带起点(agent= 或 file=),要么全池但只允许带时间上限:search(q, until_ts=…)。"
@@ -857,6 +919,8 @@ def render_search(ledger: atoms.Ledger, q: str, agent: str | None = None, v: int
                     where = f" {rel(h['target'], root)}@v{h.get('target_v')}"
                 elif h.get("targets"):
                     where = " " + ", ".join(rel(p, root) for p in h["targets"][:3])
+                if h.get("possible"):
+                    where += " · 可能碰到 " + ", ".join(rel(p, root) for p in h["possible"][:3])
                 fed = "" if h["seq"] is None else (f" 效应 v{h['ver']}" if h["ver"] is not None else f" 喂 v{h['at']}")
                 late = " (锚点之后)" if h.get("after") else ""
                 ref = "" if h["seq"] is None else " " + _ref(h["seq"], h.get("t"), h.get("line"))
