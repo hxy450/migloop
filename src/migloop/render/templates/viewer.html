@@ -275,6 +275,8 @@
   table.data td { border-bottom: 1px solid var(--grid); padding: 4px 10px 4px 0; vertical-align: top; font-variant-numeric: tabular-nums; }
   table.data td.desc { color: var(--ink-2); max-width: 380px; }
   table.data tr:hover td { background: var(--wash); }
+  #modelbox tr.usage-total td { background: var(--wash); font-weight: 650; }
+  #modelbox .usage-note { margin-top: 8px; font-size: 11px; color: var(--ink-3); }
   .st { font-size: 11px; border-radius: 4px; padding: 0 6px; white-space: nowrap; }
   .st.done { color: var(--good); border: 1px solid var(--good); }
   .st.async { color: var(--ink-3); border: 1px solid var(--axis); }
@@ -625,6 +627,7 @@
   function fmtTok(n) {
     if (n == null) return "—";
     function trim(s) { return s.replace(/\.0+$|(\.\d*[1-9])0+$/, "$1"); }
+    if (n >= 1e9) return trim((n / 1e9).toFixed(2)) + "B";
     if (n >= 1e6) return trim((n / 1e6).toFixed(2)) + "M";
     if (n >= 1e3) return trim((n / 1e3).toFixed(1)) + "K";
     return String(n);
@@ -806,30 +809,42 @@
     if (!models.length) { box.style.display = "none"; return; }
     var users = {};
     (D.agents || []).forEach(function (a) { if (a.model) users[a.model] = (users[a.model] || 0) + 1; });
-    var cap = el("div", "rk", "模型用量(主线 + 子代理合并 · message.usage 末条口径)");
+    var cap = el("div", "rk", "模型用量(主线 + 子代理合并)");
     cap.style.cssText = "font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);margin-bottom:8px;font-family:var(--font-mono)";
     box.appendChild(cap);
     var tbl = el("table", "data");
-    tbl.style.minWidth = "640px";
-    tbl.innerHTML = "<thead><tr><th>模型</th><th>请求</th><th>未缓存输入</th><th>缓存读</th><th>缓存写</th><th>输出</th><th>使用方</th></tr></thead>";
+    tbl.style.minWidth = "760px";
+    tbl.innerHTML = "<thead><tr><th>模型</th><th>请求</th><th>总输入</th><th>未缓存输入</th><th>缓存读</th><th>缓存写</th><th>输出</th><th>使用方</th></tr></thead>";
     var tb = el("tbody");
+    // billing 已由各 adapter 归一化:inp 不含缓存;不能再叠加 provider 的原始 input_tokens。
+    var keys = ["req", "inp", "cread", "cw5", "cw1h", "out"];
+    var total = { req: 0, inp: 0, cread: 0, cw5: 0, cw1h: 0, out: 0 };
     models.forEach(function (m) {
-      var x = B[m];
-      var tr = el("tr");
-      tr.appendChild(el("td", "mono", m.replace("claude-", "")));
-      tr.appendChild(el("td", "mono", x.req.toLocaleString()));
-      tr.appendChild(el("td", "mono", fmtTok(x.inp)));
-      tr.appendChild(el("td", "mono", fmtTok(x.cread)));
-      tr.appendChild(el("td", "mono", fmtTok(x.cw5 + x.cw1h)));
-      tr.appendChild(el("td", "mono", fmtTok(x.out)));
+      keys.forEach(function (k) { total[k] += B[m][k] || 0; });
+    });
+    function usageRow(label, x, who, isTotal) {
+      var tr = el("tr", isTotal ? "usage-total" : null);
+      var inp = x.inp || 0, cread = x.cread || 0, cwrite = (x.cw5 || 0) + (x.cw1h || 0);
+      tr.appendChild(el("td", "mono", label));
+      tr.appendChild(el("td", "mono", (x.req || 0).toLocaleString()));
+      [inp + cread + cwrite, inp, cread, cwrite, x.out || 0].forEach(function (n) {
+        var cell = el("td", "mono", fmtTok(n));
+        cell.title = n.toLocaleString("en-US") + " tokens";
+        tr.appendChild(cell);
+      });
+      tr.appendChild(el("td", "desc", who));
+      tb.appendChild(tr);
+    }
+    usageRow("全部模型合计", total, "主线 + 子代理", true);
+    models.forEach(function (m) {
       var who = [];
       if (D.meta.model === m) who.push("主线");
       if (users[m]) who.push(users[m] + " 个子代理");
-      tr.appendChild(el("td", "desc", who.join(" + ") || "—"));
-      tb.appendChild(tr);
+      usageRow(m.replace("claude-", ""), B[m], who.join(" + ") || "—", false);
     });
     tbl.appendChild(tb);
     box.appendChild(tbl);
+    box.appendChild(el("div", "usage-note", "总输入 = 未缓存输入 + 缓存读 + 缓存写。按转录中已记录的请求用量累计，包含重复上下文，不是去重后的原文大小；悬停数字查看精确值。K / M / B = 千 / 百万 / 十亿。"));
 
     // ---- Output 构成:思考 / 正文 / 工具参数(代码) ----
     var sp = (D.totals || {}).output_split;

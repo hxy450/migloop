@@ -50,6 +50,18 @@ prompts / billing / lineage / workflows` trace。实现完成后在
 实时模式还需要该来源自己的增量 reducer，因此通过 `SUPPORTS_LIVE` 单独声明，不能把“能离线解析”
 误当成“能安全增量续读”。
 
+### 模型用量口径
+
+`billing` 按模型记录主线与子代理的请求用量。页面先显示「全部模型合计」，再保留分模型明细。
+总输入为 `inp + cread + cw5 + cw1h`：未缓存输入、缓存读取、两种 TTL 的缓存写入。
+其中 `inp` 必须是不含缓存的输入；例如 Codex 的原始 `input_tokens` 已包含缓存读取，adapter
+先扣除 `cached_input_tokens`，页面不可再直接叠加原始字段。输出直接合计归一化后的 `out`。
+
+这些数值按转录中已记录的请求累计，包含重复上下文，不是去重后的原文大小，也不代表缺失转录的用量。
+页面用 K / M / B 显示千 / 百万 / 十亿，悬停 token 数字可查看精确整数。
+`tests/test_model_usage.py` 用 Node.js 执行真实模板中的用量渲染代码，覆盖合计、缓存口径与空数据；
+未安装 Node.js 时这组测试会跳过。
+
 ---
 
 ## 运行
