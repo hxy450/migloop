@@ -518,8 +518,24 @@ def render_action(ledger: atoms.Ledger, agent_id: str, seq: int, max_chars: int 
         # think / say / 派发词:正文在输入侧,输出为空 —— offset / find 作用在这一侧
         in_piece, in_note = _window(inp_text, max_chars, offset, find)
         piece, note = "(空)", ""
-    out = [head, "## 输入" + (f"({in_note})" if in_note else ""), "```", in_piece, "```",
-           "## 输出" + (f"({note})" if note else ""), "```", piece, "```"]
+    out = [head]
+    links = atoms.action_links(ledger, agent_id, seq)
+    if links:
+        out.append(f"发自 {links['label']} (id={links['agent']}) v{links['ver']}"
+                   + ("(这次调用就是这一版的效应)" if links["is_effect"] else "(喂这一版)")
+                   + f" → agent({links['agent']}, v={links['ver']})")
+        if links["files"]:
+            out.append("## 账本记到的读写 → file(path, v)")
+            for f in links["files"]:
+                op = "读" if f["op"] == "read" else "删" if f["op"] == "delete" else "写"
+                out.append(f"- {op} {f['path']}@v{f['v']} → file({f['path']}, v={f['v']})")
+        if links["possible"]:
+            out.append("## 命令里提到、账本没记到读写的文件(可能碰到;「当时」按时刻就近)→ file(path, v)")
+            for p in links["possible"]:
+                amb = " · 只给了文件名,同名不止一个" if p["ambiguous"] else ""
+                out.append(f"- {p['path']} 当时@v{p['v']}{amb} | …{p['ctx']}… → file({p['path']}, v={max(p['v'], 1)})")
+    out += ["## 输入" + (f"({in_note})" if in_note else ""), "```", in_piece, "```",
+            "## 输出" + (f"({note})" if note else ""), "```", piece, "```"]
     tur = raw.get("tool_use_result")
     if isinstance(tur, dict) and isinstance(tur.get("file"), dict):
         f = tur["file"]

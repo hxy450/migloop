@@ -721,6 +721,30 @@ def _versions_at(st: FileStory, ts: str) -> int:
     return sum(1 for ver in st.versions if ver.ts <= ts)
 
 
+def action_links(ledger: Ledger, agent_id: str, seq: int) -> dict[str, Any]:
+    """一次调用两头的坐标:发自哪个 agent 的哪一版;账本记到它读写了哪些文件版本;命令里提到但没记到读写的文件
+    当时在第几版(按时刻就近)。action 是两个原子之间的枢纽,file 的虚线行和 agent 槽里的命令都经它跳到对面。"""
+    a = resolve_agent(ledger, agent_id)
+    act = next((x for x in a.actions if x.seq == seq), None) if a else None
+    if a is None or act is None:
+        return {}
+    ver = act.ver if act.ver is not None else act.at
+    files = [{"op": f.op, "path": f.path, "v": f.v} for f in act.files]
+    seen = {f.path for f in act.files}
+    possible = []
+    for path, lst in ledger.mentions.items():
+        if path in seen:
+            continue
+        for m in lst:
+            if m.seq == seq and mention_effect(ledger, path, seq) is None:
+                st = ledger.stories.get(path)
+                possible.append({"path": path, "v": _versions_at(st, act.ts) if st else 0,
+                                 "ambiguous": m.ambiguous, "ctx": m.ctx})
+                break
+    return {"agent": a.id, "label": agent_label(ledger, a.id), "ver": ver, "is_effect": act.ver is not None,
+            "files": files, "possible": possible}
+
+
 def agent_atom(ledger: Ledger, agent_id: str, v: int | None = None,
                since: int | None = None) -> dict[str, Any] | None:
     """版本 agent:≤ver 的全部动作(读绑文件版本、写产出版本)、派发指令、收件箱、

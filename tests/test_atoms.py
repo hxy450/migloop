@@ -2483,3 +2483,11 @@ def test_file_lists_every_command_mentioning_it(tmp_path: Any) -> None:
     assert f"action(#{bash[2].seq}@L" not in text.split("提到它的命令")[1]      # 已入账的(cat 是读)不再铺,只计数
     assert "已入账的 2 条(" in text and "读 1 次" in text                        # cat 是读;脚本那条记成碰过(方向不明)
     assert "2 条命令提到它但没入账" in atoms_text.render_index(led, "ets", None, root="/proj")
+    # action 是枢纽:file 的虚线行 → action 看到发自哪个 agent 哪一版(跳 agent);agent 槽里的命令 → action 看到
+    # 账本记到的文件版本和「提到但没记到」的文件当时的版本(跳 file)
+    git = atoms_text.render_action(led, MAIN_ID, bash[1].seq)
+    assert f"发自 主会话 (id={MAIN_ID}) v" in git and f"agent({MAIN_ID}, v=" in git
+    assert "命令里提到、账本没记到读写的文件" in git and "/proj/entry/A.ets 当时@v1" in git and "file(/proj/entry/A.ets, v=1)" in git
+    cat = atoms_text.render_action(led, MAIN_ID, bash[2].seq)
+    assert "账本记到的读写" in cat and "读 /proj/entry/A.ets@v1" in cat and "file(/proj/entry/A.ets, v=1)" in cat
+    assert "命令里提到、账本没记到读写的文件" not in cat                         # 记到了就不再列成「可能」
