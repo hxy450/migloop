@@ -95,3 +95,21 @@ def test_probe_rejects_forged_line_numbers(tmp_path: Any) -> None:
     assert p["links"][1]["bad_refs"] == [f"#{conv_seq}@L999999"]
     assert not any(n.get("action") == conv_seq for n in p["links"][1]["nodes"])
     assert p["bad_refs"] == 1
+
+
+def test_probe_resolves_drifted_action_numbers_by_location(tmp_path: Any) -> None:
+    """账本重建后 #n 漂了(解析器多认出几条记录),报告里的 (#n@L行·标识) 仍按位置对回现在的动作号,不算无效引用。"""
+    conv = [_rec("2026-01-01T00:00:00Z", "user", "转换 A"),
+            *_call("2026-01-01T00:00:20Z", "c2", "Write", {"file_path": "/proj/entry/A.ets", "content": "a\n"},
+                   "File created successfully at: /proj/entry/A.ets")]
+    main = [*_call("2026-01-01T00:00:00Z", "m1", "Agent", {"name": "conv-a", "prompt": "转换 A"}, "done",
+                   toolUseResult={"agentId": "c"})]
+    led = _ledger(tmp_path, main, {"agent-c": conv})
+    conv_seq = next(a.seq for a in led.agents["agent-c"].actions if a.tool == "Write")
+    loc = led.locs[conv_seq]                                    # "行·标识"
+    report = ("文件: entry/A.ets\n"
+              f"环 1  conv-a(agent-c)v1 写 A.ets@v1 (#{conv_seq + 100}@L{loc})   判定: 错\n"
+              "故障进入点: 环 1\n")
+    p = probe.probe_payload(led, _run_dir(tmp_path, [], report))
+    assert p["links"][0]["bad_refs"] == []
+    assert any(n.get("action") == conv_seq and n["aid"] == "agent-c" for n in p["links"][0]["nodes"])

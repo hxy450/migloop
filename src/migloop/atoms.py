@@ -115,6 +115,10 @@ class Ledger:
     fix_after: str | None = None
     #: 动作号 → 转录行号(1 起):报告里的 #n 旁边带 @L,不经工具也能回查
     lines: dict[int, int] = field(default_factory=dict)
+    #: 动作号 → "行号·转录标识"(渲染用):#n 是本次建账的句柄,账本重建后会漂;@L行·标识不漂,核验按它
+    locs: dict[int, str] = field(default_factory=dict)
+    #: (转录标识, 行号) → 动作号:报告里的引用反查,#n 漂了也能对回去
+    by_loc: dict[tuple[str, int], int] = field(default_factory=dict)
     #: (path, 读事件 seq) → 读它那次调用的动作号:文件原子的读者行带展开指针
     read_act: dict[tuple[str, int], int] = field(default_factory=dict)
     #: 上游最长链(建账时 DP 一遍算完):键 ("f", path, v) / ("a", agent, k),值 = 到池外为止最多经过几次
@@ -306,10 +310,15 @@ def build_ledger(agents: dict[str, AgentRec]) -> Ledger:
     act_seq: dict[tuple[str, int], int] = {}
     read_act: dict[tuple[str, int], int] = {}
     lines: dict[int, int] = {}
+    locs: dict[int, str] = {}
+    by_loc: dict[tuple[str, int], int] = {}
     for a in agents.values():
         for act in a.actions:
             if act.src is not None:
                 lines[act.seq] = act.src[1] + 1
+                tag = transcript_tag(act.src[0])
+                locs[act.seq] = f"{act.src[1] + 1}·{tag}"
+                by_loc.setdefault((tag, act.src[1] + 1), act.seq)
             for ref in act.files:
                 ref.v = index.get((ref.path, ref.ev.seq))
                 if ref.op == "read":
@@ -399,7 +408,14 @@ def build_ledger(agents: dict[str, AgentRec]) -> Ledger:
         for m in lst:
             mention_seq.setdefault(m.seq, []).append(path)
     return Ledger(stories, agents, feeds, t0, lines=lines, read_act=read_act, depth_max=dmax, depth_win=dwin,
-                  mentions=mentions, mention_seq=mention_seq, write_cmds=_write_capable_cmds(agents))
+                  mentions=mentions, mention_seq=mention_seq, write_cmds=_write_capable_cmds(agents),
+                  locs=locs, by_loc=by_loc)
+
+
+def transcript_tag(path: str) -> str:
+    """转录文件的短标识:主会话取会话号前 8 位,子代理取 agent- 后的前 8 位。引用 (#n@L行·标识) 里的那一截。"""
+    stem = os.path.splitext(os.path.basename(path))[0]
+    return stem[6:14] if stem.startswith("agent-") else stem[:8]
 
 
 def _write_capable_cmds(agents: dict[str, AgentRec]) -> list[tuple[str, int, str]]:
@@ -1065,7 +1081,7 @@ def search_agent(ledger: Ledger, agent_id: str, q: str, v: int | None = None, si
                 target = rs[0] if len(rs) == 1 else None
             elif fld == "input" and ws:
                 target = ws[0]
-            hits.append({"kind": act.kind, "tool": act.tool, "seq": act.seq, "line": ledger.lines.get(act.seq),
+            hits.append({"kind": act.kind, "tool": act.tool, "seq": act.seq, "line": ledger.locs.get(act.seq),
                          "at": act.at, "ver": act.ver, "ts": act.ts, "t": rel_time(act.ts, ledger.t0),
                          "field": fld, "target": target,
                          "targets": rs if fld == "output" else ws,
@@ -1096,7 +1112,7 @@ def search_file(ledger: Ledger, hint: str, q: str, v: int | None = None) -> dict
             if ql in ln.lower():
                 snips.append((0 if partial else i, _WS.sub(" ", ln).strip()[:160]))
         rows.append({"v": ver.v, "by": ver.by, "by_ver": ver.by_ver, "seq": ver.act_seq,
-                     "line": ledger.lines.get(ver.act_seq or -1), "t": rel_time(ver.ts, ledger.t0),
+                     "line": ledger.locs.get(ver.act_seq or -1), "t": rel_time(ver.ts, ledger.t0),
                      "snips": snips[:3], "n": len(snips), "partial": partial})
     readers = []
     for r in st.reads:
@@ -1106,7 +1122,7 @@ def search_file(ledger: Ledger, hint: str, q: str, v: int | None = None) -> dict
         if got:
             seq = ledger.read_act.get((path, r.seq))
             readers.append({"by": r.by, "at": ledger.feeds.get((path, r.seq)), "v": r.version,
-                            "seq": seq, "line": ledger.lines.get(seq or -1), "t": rel_time(r.ts, ledger.t0),
+                            "seq": seq, "line": ledger.locs.get(seq or -1), "t": rel_time(r.ts, ledger.t0),
                             "snips": got[:3], "n": len(got)})
     return {"path": path, "q": q, "v": len(vers), "n_versions": len(st.versions),
             "unknown": sum(1 for ver in vers if ver.content is None),
@@ -1131,7 +1147,7 @@ def search_pool(ledger: Ledger, q: str, until_ts: str, since_ts: str | None = No
                 ln, snip = next(((i, _WS.sub(" ", t).strip()[:160]) for i, t in enumerate(body.split("\n"), 1)
                                  if ql in t.lower()), (None, ""))
                 files.append({"path": path, "v": ver.v, "by": ver.by, "by_ver": ver.by_ver, "seq": ver.act_seq,
-                              "line": ledger.lines.get(ver.act_seq or -1), "t": rel_time(ver.ts, ledger.t0),
+                              "line": ledger.locs.get(ver.act_seq or -1), "t": rel_time(ver.ts, ledger.t0),
                               "ln": None if ver.content is None else ln, "snip": snip,
                               "n": sum(1 for t in body.split("\n") if ql in t.lower()),
                               "partial": ver.content is None})

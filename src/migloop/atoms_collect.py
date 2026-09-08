@@ -14,6 +14,7 @@ agent 身份:主线 = ``__main__:<sid8>``,子代理 = 其 transcript 文件 stem
 from __future__ import annotations
 
 import ast
+import bisect
 import glob
 import json
 import os
@@ -21,6 +22,7 @@ import posixpath
 import re
 import warnings
 from dataclasses import dataclass
+from functools import cache
 from typing import Any
 
 from migloop.atoms import Action, AgentRec, FileRef
@@ -128,6 +130,7 @@ _ALWAYS_OK = frozenset({"cd", "pushd", "popd", "mkdir", "export", "set", "echo",
                         "set-location", "push-location", "new-item"})
 
 
+@cache
 def _split_segments_ops(text: str) -> list[tuple[str, str]]:
     """同 _split_segments,但带上每段前面的分隔符(&& / || / 其他)—— 条件分支要靠它判。"""
     segs: list[tuple[str, str]] = []
@@ -189,20 +192,28 @@ _GIT_CHANGE = frozenset({"checkout", "restore", "stash", "apply", "mv", "rm", "r
                          "rebase", "pull", "am", "cherry-pick"})
 
 
+_REDIR_TARGET = re.compile(r">>?\s*['\"]?([^\s'\"|;&]+)")
+
+
 def _heredoc_spans(cmd: str) -> list[tuple[int, int]]:
     return [(m.start(2), m.end(2)) for m in _HEREDOC_BODY.finditer(cmd)]
 
 
-def _mention_class(cmd: str, pos: int, tok_end: int) -> str:
-    """命令行里这个路径所在的那一段命令能对它做什么:change / readonly / other。按段头判,sed / perl 看 -i,git 看子命令,
-    重定向目标算改动。判不出的算 other,和 change 一样逐条列 —— 分档错误只影响默认折不折,不影响可达。"""
+def _segment_bounds(cmd: str) -> list[tuple[int, int]]:
+    """按 && || ; | 换行切出的各段 (起, 止),一次算好;分档按词所在的段判(原来每个词从头扫一遍,长命令 O(n²))。"""
+    bounds: list[tuple[int, int]] = []
     a = 0
-    for m in _SEG_SEP.finditer(cmd, 0, pos):
+    for m in _SEG_SEP.finditer(cmd):
+        bounds.append((a, m.start()))
         a = m.end()
-    m2 = _SEG_SEP.search(cmd, tok_end)
-    b = m2.start() if m2 else len(cmd)
-    seg = cmd[a:b]
-    if re.search(r">>?\s*['\"]?" + re.escape(cmd[pos:tok_end]), seg):
+    bounds.append((a, len(cmd)))
+    return bounds
+
+
+def _mention_class(seg: str, tok: str) -> str:
+    """这一段命令能对这个路径做什么:change / readonly / other。按段头判,sed / perl 看 -i,git 看子命令,
+    重定向目标算改动。判不出的算 other,和 change 一样逐条列 —— 分档错误只影响默认折不折,不影响可达。"""
+    if tok in _REDIR_TARGET.findall(seg):
         return "change"
     words = [w for w in seg.split() if "=" not in w or w.startswith("-")]
     words = [w for w in words if w not in ("sudo", "env", "time", "nohup", "nice")]
@@ -228,6 +239,8 @@ def _path_mentions(cmd: str, scripts: dict[str, Any], cwd: object = None, ts: st
     text = cmd or ""
     cmd_len = len(text)
     spans = _heredoc_spans(text) if where == "in" else []
+    bounds = _segment_bounds(text) if where == "in" else []
+    starts = [b[0] for b in bounds]
     if where == "in":
         for m in _RUN_WORD.finditer(text):
             body = _script_body(scripts, os.path.basename(m.group(0).replace("\\", "/")), ts)
@@ -251,7 +264,9 @@ def _path_mentions(cmd: str, scripts: dict[str, Any], cwd: object = None, ts: st
         elif m.start() >= cmd_len or any(s <= m.start() < e for s, e in spans):
             src, cls = "body", "body"
         else:
-            src, cls = "in", _mention_class(text, m.start(), m.end())
+            i = bisect.bisect_right(starts, m.start()) - 1
+            seg = text[bounds[i][0]:bounds[i][1]] if i >= 0 else text[:cmd_len]
+            src, cls = "in", _mention_class(seg, m.group(0))
         out.append((tok, ctx[:150], _resolve(tok, base) if "/" in tok else None, src, cls))
     return out, max(0, total - _MENTION_CAP)
 _PS_ASSIGN = re.compile(r"\$(\w+)\s*=\s*(['\"])([^'\"\n]+)\2")
@@ -342,9 +357,10 @@ def _collapse_repeat(path: str) -> str:
 _BAD_PATH_CHARS = frozenset(" \t\n;|\"'<>=")
 
 
-def _resolve(p: object, base: str | None) -> str | None:
+@cache
+def _resolve_str(p: str, base: str | None) -> str | None:
     # 带空白/引号/分隔符的 token 是分词失衡的残渣,不是路径 —— 宁可漏
-    if not isinstance(p, str) or not p or any(c in _BAD_PATH_CHARS for c in p):
+    if not p or any(c in _BAD_PATH_CHARS for c in p):
         return None
     q = p.replace("\\", "/")
     if q.startswith("/") or (len(q) > 1 and q[1] == ":"):
@@ -352,6 +368,13 @@ def _resolve(p: object, base: str | None) -> str | None:
     if base is None:
         return None
     return _collapse_repeat(_norm_abs(base.rstrip("/") + "/" + q))
+
+
+def _resolve(p: object, base: str | None) -> str | None:
+    """路径解析按 (词, cwd) 记忆化:0723 一次建账调 8 万次,大半是重复的。"""
+    if not isinstance(p, str):
+        return None
+    return _resolve_str(p, base)
 
 
 # ═══════════════ 脚本字面量 ═══════════════
@@ -1411,7 +1434,7 @@ def _walk(path: str, agent_id: str, session: str, seq: list[int],
                         mentions, trunc = _path_mentions(cmd_text, scripts, ucwd, uts)
                         if ok:
                             # 输出里点名的文件(git status 的 modified、ls、构建报错、grep -rl):命令行里没有,输出里有
-                            om, otrunc = _path_mentions(_text_of(b.get("content"))[:200000], {}, ucwd, uts, where="out")
+                            om, otrunc = _path_mentions(_text_of(b.get("content"))[:20000], {}, ucwd, uts, where="out")
                             head_cmd = " ".join(cmd_text.split())[:60]
                             om = [(t, (head_cmd + " ⇒ " + c)[:150], ab, w, k) for t, c, ab, w, k in om]
                             mentions, trunc = mentions + om, trunc + otrunc
@@ -1420,7 +1443,7 @@ def _walk(path: str, agent_id: str, session: str, seq: list[int],
                         if trunc:
                             detail["mentions_truncated"] = trunc
                     elif name in ("Grep", "Glob") and ok:
-                        om, otrunc = _path_mentions(_text_of(b.get("content"))[:200000], {}, ucwd, uts, where="out")
+                        om, otrunc = _path_mentions(_text_of(b.get("content"))[:20000], {}, ucwd, uts, where="out")
                         if om:
                             detail["mentions"] = om
                         if otrunc:

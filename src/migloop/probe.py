@@ -21,7 +21,7 @@ _RING = re.compile(r"环\s*(\d+)")
 _ENTRY_ALSO = re.compile(r"进入点是\s*环\s*(\d+)")     # 几条缺陷各自进入时,报告会逐条说「…的进入点是环 N」
 _FILE_AT = re.compile(r"([\w./-]+\.[A-Za-z0-9]+)@v(\d+)")
 _AGENT_ID = re.compile(r"agent-[0-9a-f]+")        # 账本 id 是 16 位 hex,测试里的短 id 也认
-_ACTION = re.compile(r"#(\d+)@L(\d+)")
+_ACTION = re.compile(r"#(\d+)@L(\d+)(?:·([0-9a-f]+))?")
 _MAIN_AT = re.compile(r"主会话[·:]?\s*([0-9a-f]{6,})?\s*@?v(\d+)")   # 报告写主会话不用 agent- id:「主会话·9b3105a2 @v83」
 _RANK = {"错": 3, "缺": 2, "传递": 1}
 
@@ -109,8 +109,15 @@ def _link_nodes(ledger: atoms.Ledger, body: str) -> tuple[list[dict[str, Any]], 
         if mid:
             found.append((m.start(), {"kind": "agent", "aid": mid, "v": int(m.group(2))}))
     for m in _ACTION.finditer(body):
-        no, line = int(m.group(1)), int(m.group(2))
-        if ledger.lines.get(no) != line:
+        no, line, tag = int(m.group(1)), int(m.group(2)), m.group(3)
+        if tag:
+            # 账本重建后 #n 会漂,@L行·转录标识不漂:以位置为准,反查到现在的动作号
+            hit = ledger.by_loc.get((tag, line))
+            if hit is None:
+                bad.append(m.group(0))
+                continue
+            no = hit
+        elif ledger.lines.get(no) != line:
             bad.append(m.group(0))
             continue
         owner, ver = _seq_owner(ledger, no)

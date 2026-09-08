@@ -33,8 +33,9 @@ def _who(ledger: atoms.Ledger, by: str, ver: int | None) -> str:
     return atoms.agent_label(ledger, by) + (f" v{ver}" if ver is not None else "")
 
 
-def _ref(seq: Any, t: str | None, line: int | None = None) -> str:
-    """动作引用 (#n@L行 T+h:mm):动作号给 action 展开用,@L 是转录行号(报告不经工具也能回查),T+ 给跨 agent 对先后用。"""
+def _ref(seq: Any, t: str | None, line: int | str | None = None) -> str:
+    """动作引用 (#n@L行·转录标识 T+h:mm):#n 给 action 展开用,是本次建账的句柄,账本重建后会漂;@L行·标识是转录里的位置,
+    不漂,报告不经工具也能回查、核验按它;T+ 给跨 agent 对先后用。"""
     core = f"#{seq}@L{line}" if line else f"#{seq}"
     return f"({core} {t})" if t else f"({core})"
 
@@ -153,7 +154,7 @@ def _unknown_reason(vv: dict[str, Any]) -> str:
 
 
 def _collapse_spine(ledger: atoms.Ledger, rows: list[dict[str, Any]], anchor: int,
-                    lines: dict[int, int]) -> list[dict[str, Any]]:
+                    lines: dict[int, Any]) -> list[dict[str, Any]]:
     """同一写者、同一来路、内容已知与否一致的连续 ≥3 版折成一行;锚点版永远单列。折行 = {"_run": 文本}。"""
     if len(rows) <= 8:
         return rows
@@ -221,7 +222,7 @@ def render_file(ledger: atoms.Ledger, hint: str, v: int | None = None, root: str
         return f"账本里没有该文件: {hint}"
     anchor = fa["v"]
     vv_anchor = fa["versions"][anchor - 1] if fa["versions"] else None
-    lines = ledger.lines
+    lines = ledger.locs
     out = [f"# 文件 {rel(fa['path'], root)} @v{anchor}  (共 {fa['n_versions']} 版)"]
     out.append(f"完整路径: {fa['path']}")
     if vv_anchor is not None:
@@ -409,7 +410,7 @@ def render_agent(ledger: atoms.Ledger, agent_id: str, v: int | None = None,
         # pod730 一个 closer 52 版,整段 1.8 万字里读清单占大头:大 agent 不带窗口只给每版读的条数
         reads = False
         big_note = "(超过 25 版且没带 since 窗口:读只给条数;reads=1 全铺,或 agent(id, v, since=v-1) 看一版的窗口)"
-    lines = ledger.lines
+    lines = ledger.locs
     out = [f"# agent {ag['label']}  id={ag['id']}  v{anchor} / 共 {ag['n_versions']} 版"
            + (f"  窗口 v{since + 1}–v{anchor}(只给喂养这段版本的动作)" if since is not None else "")
            + _hops(ledger, ("a", ag["id"], anchor))
@@ -870,7 +871,7 @@ def _render_window_writes(ledger: atoms.Ledger, q: str, since_ts: str | None, un
     if not since_ts and not until_ts:
         return "search(kind=write) 要带时间窗口:since_ts / until_ts(用文件时间线上两个版本的时刻)"
     res = atoms.search_window_writes(ledger, since_ts, until_ts, q)
-    lines = ledger.lines
+    lines = ledger.locs
     out = [f"# 窗口内有写能力的命令 {since_ts or '…'} ~ {until_ts or '…'}  {res['n']} 条" + (f",含「{q}」" if q else ""),
            f"范围: 全池 {res['n_agents']} 个 agent 的 Bash / PowerShell / exec 里,分析器判为可能写文件的(解出了写、标了写能力、"
            "或没解出来的);不解析脚本,只按时间圈 —— 这是「实录外修改 / 内容未知」之前该看的候选,是否真改了要 action 打开自己判"]

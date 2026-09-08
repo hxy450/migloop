@@ -215,3 +215,15 @@ def test_ledger_cache_key_covers_subagent_transcripts(tmp_path: Any) -> None:
     with open(tmp_path / SID / "subagents" / "agent-s.jsonl", "a", encoding="utf-8") as fh:
         fh.write("\n" + '{"timestamp":"2026-01-01T00:02:00Z","type":"user","message":{"role":"user","content":"y"}}\n')
     assert service.pool_key([root]) != k1
+
+
+def test_refs_carry_transcript_tag_and_resolve_by_location(tmp_path: Any) -> None:
+    """(#n@L行·转录标识):#n 是本次建账的句柄,会漂;@L行·标识是转录里的位置,不漂。by_loc 按位置反查动作号。"""
+    main = [*_call(at("00:00:00"), "w1", "Write", {"file_path": A, "content": "a\n"})]
+    led = _ledger(tmp_path, main)
+    wr = next(a for a in led.agents[MAIN_ID].actions if a.tool == "Write")
+    tag = SID[:8]
+    assert led.locs[wr.seq] == f"{led.lines[wr.seq]}·{tag}" and led.by_loc[(tag, led.lines[wr.seq])] == wr.seq
+    text = atoms_text.render_file(led, "A.ets", None, root="/proj")
+    assert f"(#{wr.seq}@L{led.lines[wr.seq]}·{tag})" in text
+    assert atoms.transcript_tag("/x/agent-a68daf720e780b4c2.jsonl") == "a68daf72"

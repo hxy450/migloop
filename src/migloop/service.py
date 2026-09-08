@@ -351,7 +351,7 @@ def attach_fix_basis(chains: list[dict[str, Any]], ledger: Any) -> None:
                         wid, wseq, how = _doc_writer(ledger, p, ref.v, act.ts)
                         wagent = ledger.agents.get(wid) if wid else None
                         basis.append({"file": "/".join(p.rsplit("/", 2)[-2:]), "path": p, "v": ref.v, "seq": act.seq,
-                                      "line": ledger.lines.get(act.seq), "writer": wid,
+                                      "line": ledger.locs.get(act.seq), "writer": wid,
                                       "writer_name": atoms.agent_label(ledger, wid) if wid else None,
                                       "writer_seq": wseq, "writer_how": how,
                                       "evidence": _evidence_kinds(wagent, wseq) if (wagent and wseq) else {}})
