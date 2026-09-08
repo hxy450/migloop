@@ -66,3 +66,6 @@ def test_fixchain_template_has_probe_hooks() -> None:
     from migloop.service import load_asset
     html = load_asset("fixchain.html")
     assert 'id="probe"' in html and "U.probe" in html and "probeDecorate(d, node)" in html and "bootProbe()" in html
+    # 调查树:根开好后自动展开到每个查过的节点;没查过的兄弟折成桩;被归因的链整条标红(节点 + 边)
+    assert "probeExpand(" in html and "unstub(" in html and "isStub" in html
+    assert ".node.p-chain" in html and ".wire.chain" in html and "未查" in html
