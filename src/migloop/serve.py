@@ -8,6 +8,7 @@ hmigbot 同名路径上(fixchain.html / viewer.html 的默认相对地址就是�
     /api/insight1/atom/<sid>/<tool>          index | file | agent | blame | action(JSON)
     /api/insight1/atom/<sid>/text/<tool>     guide | sessions | index | file | agent | blame | diff | action(文本)
     /api/insight1/filediff/<sid>?file=&v=
+    /api/insight1/probe/<sid>?run=<目录>      调查覆盖:调查员的调用序列与报告环 → 树节点(JSON)
 """
 
 from __future__ import annotations
@@ -19,7 +20,7 @@ import threading
 import urllib.parse
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from typing import Any
+from typing import Any, ClassVar
 
 from . import service
 
@@ -29,11 +30,12 @@ _RE_FIXDATA = re.compile(r"^/api/insight1/fixchain-data/([^/]+)/?$")
 _RE_ATOM_TEXT = re.compile(r"^/api/insight1/atom/([^/]+)/text/([a-z]+)/?$")
 _RE_ATOM = re.compile(r"^/api/insight1/atom/([^/]+)/([a-z]+)/?$")
 _RE_FILEDIFF = re.compile(r"^/api/insight1/filediff/([^/]+)/?$")
+_RE_PROBE = re.compile(r"^/api/insight1/probe/([^/]+)/?$")
 
 
 class _Handler(BaseHTTPRequestHandler):
     default_sid: str = ""
-    roots: dict[str, str] = {}
+    roots: ClassVar[dict[str, str]] = {}
 
     def log_message(self, fmt: str, *args: Any) -> None:   # 安静;错误走 JSON 体
         pass
@@ -59,7 +61,7 @@ class _Handler(BaseHTTPRequestHandler):
     def _path_of(self, sid: str) -> str:
         return service.locate_session(urllib.parse.unquote(sid), self.roots)
 
-    def do_GET(self) -> None:  # noqa: N802 - stdlib 命名
+    def do_GET(self) -> None:
         url = urllib.parse.urlsplit(self.path)
         route = url.path
         args = {k: v[-1] for k, v in urllib.parse.parse_qs(url.query, keep_blank_values=True).items()}
@@ -93,6 +95,13 @@ class _Handler(BaseHTTPRequestHandler):
                     return
                 self._json(200, payload)
                 return
+            m = _RE_PROBE.match(route)
+            if m:
+                if not args.get("run"):
+                    self._json(400, {"error": "需要 run=<run 目录>"})
+                    return
+                self._json(200, service.probe_payload(self._path_of(m.group(1)), str(args["run"])))
+                return
             m = _RE_FILEDIFF.match(route)
             if m:
                 if not args.get("file") or args.get("v") is None:
@@ -109,7 +118,7 @@ class _Handler(BaseHTTPRequestHandler):
             self._json(404, {"error": str(err)})
         except ValueError as err:
             self._json(400, {"error": f"参数错误: {err}"})
-        except Exception as err:  # noqa: BLE001 - 服务不能因为一个请求崩
+        except Exception as err:  # 服务不能因为一个请求崩
             self._json(500, {"error": f"构建失败: {err}"})
 
 

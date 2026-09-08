@@ -489,6 +489,17 @@ def fixchain_light(path: str) -> dict[str, Any]:
     }
 
 
+def probe_payload(path: str, run_dir: str) -> dict[str, Any]:
+    """调查覆盖:一次调查员跑的调用序列与报告环落到这本账的节点上(见 probe.py)。run 目录相对 MIGLOOP_RUNS 或绝对。"""
+    from . import probe
+
+    base = os.environ.get("MIGLOOP_RUNS") or os.getcwd()
+    d = run_dir if os.path.isabs(run_dir) else os.path.join(base, run_dir)
+    if not os.path.isfile(os.path.join(d, "metrics.json")):
+        raise ValueError(f"run 目录里没有 metrics.json: {d}")
+    return probe.probe_payload(session_ledger(path), d)
+
+
 def fixchain_html(path: str) -> str:
     payload = fixchain_light(path)
     return load_asset("fixchain.html").replace("__FIXCHAIN_JSON__",

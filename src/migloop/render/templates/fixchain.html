@@ -179,6 +179,34 @@
 
   .empty { max-width: 620px; margin: 12vh auto 0; text-align: center; color: var(--ink-3); }
   .empty h2 { color: var(--ink-2); font-size: 17px; margin-bottom: 8px; }
+
+  /* 调查覆盖:模型的调查叠在同一棵树上 */
+  .node.p-dim { opacity: .42; }
+  .node.p-seen { box-shadow: inset 0 0 0 1.5px var(--c-spec); }
+  .node .badge.step { background: color-mix(in srgb, var(--c-spec) 14%, transparent); color: var(--c-spec); font-weight: 700; }
+  .node .badge.vd-err { background: color-mix(in srgb, var(--c-fix) 16%, transparent); color: var(--c-fix); font-weight: 700; }
+  .node .badge.vd-gap { background: rgba(184,134,11,.16); color: #9a6b00; font-weight: 700; }
+  .node .badge.vd-pass { background: color-mix(in srgb, var(--c-gen) 14%, transparent); color: var(--c-gen); font-weight: 700; }
+  .node.p-err { border-color: var(--c-fix) !important; background: color-mix(in srgb, var(--c-fix) 12%, var(--surface)) !important; color: var(--c-fix); }
+  .node.p-gap { border-color: #b8860b !important; background: rgba(184,134,11,.10) !important; }
+  .node.p-pass { border-color: var(--c-gen) !important; }
+  .node.p-entry { box-shadow: 0 0 0 3px color-mix(in srgb, var(--c-fix) 55%, transparent), 0 0 0 6px color-mix(in srgb, var(--c-fix) 18%, transparent); }
+  .probe { border-bottom: 1px solid var(--ring); padding: 8px 10px 10px; font-size: 12px; max-height: 46%; overflow-y: auto; }
+  .probe .ph { display: flex; align-items: center; gap: 6px; font-size: 10.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--c-fix); margin-bottom: 4px; }
+  .probe .ph .n { font-weight: 500; letter-spacing: 0; color: var(--ink-3); text-transform: none; }
+  .probe .ld { display: flex; gap: 4px; margin-bottom: 6px; }
+  .probe .ld input { flex: 1 1 auto; min-width: 0; font: 11.5px var(--mono); padding: 4px 8px; border: 1px solid var(--ring); border-radius: 6px; background: var(--wash); color: var(--ink); }
+  .probe .ld button { font-size: 11.5px; padding: 3px 9px; border: 1px solid var(--ring); border-radius: 6px; background: var(--surface); cursor: pointer; color: var(--ink-2); }
+  .probe .sum { color: var(--ink-2); margin-bottom: 6px; line-height: 1.5; }
+  .probe .lk, .probe .st { display: grid; grid-template-columns: 36px 1fr; gap: 6px; padding: 3px 6px; border-radius: 6px; cursor: pointer; border-left: 3px solid transparent; }
+  .probe .lk:hover, .probe .st:hover { background: var(--wash); }
+  .probe .lk .no, .probe .st .no { font-family: var(--mono); font-size: 10.5px; color: var(--ink-3); }
+  .probe .lk.err { border-left-color: var(--c-fix); } .probe .lk.gap { border-left-color: #b8860b; } .probe .lk.pass { border-left-color: var(--c-gen); }
+  .probe .lk.entry .no { color: var(--c-fix); font-weight: 700; }
+  .probe .lk .t, .probe .st .t { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--ink-2); }
+  .probe .st .t b { color: var(--ink); font-weight: 600; }
+  .probe .st.na { opacity: .55; cursor: default; }
+  .probe .sub { font-size: 10.5px; color: var(--ink-3); margin: 6px 0 2px; letter-spacing: .08em; text-transform: uppercase; }
 </style>
 
 <header>
@@ -191,6 +219,7 @@
   <aside class="rail panel" id="rail">
     <div class="railhead"><b>入口 · 选一个版本当根</b><button class="tog" id="railtog" title="收起/展开">◂</button></div>
     <div class="search"><input id="q" type="search" placeholder="搜文件名 / 路径 / agent / 会话…" autocomplete="off"></div>
+    <div class="probe" id="probe" hidden></div>
     <div class="railbody" id="railbody"><div class="rempty">账本装配中…</div></div>
   </aside>
   <div class="graph panel" id="graph">
@@ -243,6 +272,7 @@
     U.data = absUrl(U.data || ("/api/insight1/fixchain-data/" + SIDQ));
     U.atom = absUrl(U.atom || ("/api/insight1/atom/" + SIDQ));
     U.filediff = absUrl(U.filediff || ("/api/insight1/filediff/" + SIDQ));
+    U.probe = absUrl(U.probe || ("/api/insight1/probe/" + SIDQ));
     if (!("report" in U)) U.report = "/insight1/report/";     // null = 前序会话不给链接
     if (U.report) U.report = absUrl(U.report);
     function reportLink(s) {
@@ -786,6 +816,147 @@
       if (m.file) openRoot({ kind: "file", path: m.file, v: parseInt(m.v, 10) || null });
       else if (m.agent) openRoot({ kind: "agent", id: m.agent, v: parseInt(m.v, 10) || null });
     }
+    // ═══════════ 调查覆盖:把模型做的调查叠到这棵树上 ═══════════
+    // 树是给人做调查用的;probe 是一次调查员(模型)跑的轨迹:每次工具调用落到的节点 + 报告每环指到的节点与判定。
+    // 查过的节点打「查 #k」,判过的按 传递 / 错 / 缺 上色,故障进入点描边,没查过的变淡 —— 它查了什么、漏了什么、把问题定在哪,一眼可见。
+    var PROBE = null;
+    var probeEl = document.getElementById("probe");
+    var VD_CLS = { "错": "err", "缺": "gap", "传递": "pass" };
+    function probeKeyOf(node) { return node.kind === "file" ? node.path : node.kind === "agent" ? node.aid : null; }
+    function probeIndex(p) {
+      p.byKey = {};
+      (p.steps || []).forEach(function (s) {
+        var n = s.node;
+        if (!n) return;
+        var k = n.kind === "file" ? n.path : n.kind === "agent" ? n.aid : null;
+        if (!k) return;
+        (p.byKey[k] = p.byKey[k] || []).push(s);
+      });
+      p.mentions = {};
+      (p.links || []).forEach(function (lk) {
+        (lk.nodes || []).forEach(function (n) {
+          var k = n.path || n.aid;
+          if (!k) return;
+          var arr = p.mentions[k] = p.mentions[k] || [];
+          if (arr.indexOf(lk.no) < 0) arr.push(lk.no);
+        });
+      });
+    }
+    function probeMark(node) {
+      if (!PROBE || PROBE.error) return null;
+      var k = probeKeyOf(node);
+      return { steps: (k && PROBE.byKey[k]) || [], vd: (k && PROBE.verdicts && PROBE.verdicts[k]) || null, mentions: (k && PROBE.mentions[k]) || [] };
+    }
+    function probeDecorate(d, node) {
+      var pm = probeMark(node);
+      if (!pm) return;
+      var vd = pm.vd;
+      if (vd) {
+        d.classList.add("p-" + VD_CLS[vd.verdict]);
+        if (vd.entry) d.classList.add("p-entry");
+        d.appendChild(el("span", "badge vd-" + VD_CLS[vd.verdict], (vd.entry ? "进入点 " : "") + vd.verdict + " 环" + vd.links.join(",")));
+      } else if (pm.mentions.length) {
+        d.appendChild(el("span", "badge", "环" + pm.mentions.slice(0, 3).join(",") + " 提到"));
+      }
+      if (pm.steps.length) {
+        d.classList.add("p-seen");
+        d.appendChild(el("span", "badge step", "查 #" + pm.steps.slice(0, 3).map(function (s) { return s.i; }).join(",") + (pm.steps.length > 3 ? "…" : "")));
+      } else if (node.kind !== "leaf" && !vd) {
+        d.classList.add("p-dim");
+      }
+    }
+    function stepTarget(s) {
+      var n = s.node;
+      if (!n) return "";
+      if (n.kind === "file") return baseName(n.path || "?") + (n.v ? "@v" + n.v : "");
+      if (n.kind === "agent") return agentLabelOf(n.aid || "?") + (n.v ? " v" + n.v : "") + (n.action ? " #" + n.action : "");
+      if (n.kind === "pool") return "全池 " + (n.q || "");
+      if (n.kind === "chain") return "返修链";
+      return "";
+    }
+    function openProbeNode(n) {
+      if (!n) return;
+      if (n.kind === "file" && n.path) openRoot({ kind: "file", path: n.path, v: n.v || null });
+      else if (n.kind === "agent" && n.aid) openRoot({ kind: "agent", id: n.aid, v: n.v || null });
+    }
+    function renderProbe() {
+      probeEl.hidden = false;
+      probeEl.innerHTML = "";
+      var h = el("div", "ph", "调查覆盖");
+      if (PROBE && !PROBE.error) h.appendChild(el("span", "n", PROBE.run + " · $" + (PROBE.cost != null ? Number(PROBE.cost).toFixed(2) : "?") + " · " + (PROBE.steps || []).length + " 步"));
+      probeEl.appendChild(h);
+      var ld = el("div", "ld");
+      var inp = el("input");
+      inp.placeholder = "run 目录(…/rep1),相对 MIGLOOP_RUNS 或绝对";
+      inp.value = (PROBE && PROBE.runDir) || "";
+      var btn = el("button", null, "载入");
+      btn.addEventListener("click", function () { loadProbe(inp.value.trim()); });
+      inp.addEventListener("keydown", function (ev) { if (ev.key === "Enter") loadProbe(inp.value.trim()); });
+      ld.appendChild(inp);
+      ld.appendChild(btn);
+      probeEl.appendChild(ld);
+      if (!PROBE) { probeEl.appendChild(el("div", "sum", "载入一次调查员的跑:它查过的节点打「查 #k」,判过的按 传递 / 错 / 缺 上色,故障进入点描边,没查过的变淡。")); return; }
+      if (PROBE.error) { probeEl.appendChild(el("div", "sum", "载入失败:" + PROBE.error)); return; }
+      var sum = el("div", "sum", "");
+      sum.innerHTML = "<b>" + (PROBE.links || []).length + "</b> 环 · 进入点 <b>" + (PROBE.entry != null ? "环 " + PROBE.entry : "未标") + "</b> · 查过 <b>" + Object.keys(PROBE.byKey).length + "</b> 个节点";
+      probeEl.appendChild(sum);
+      probeEl.appendChild(el("div", "sub", "报告的环 · 点一下以它指的节点为根"));
+      (PROBE.links || []).forEach(function (lk) {
+        var row = el("div", "lk " + (VD_CLS[lk.verdict] || "") + (lk.entry ? " entry" : ""));
+        row.appendChild(el("span", "no", (lk.entry ? "★" : "") + "环" + lk.no));
+        var t = el("span", "t", (lk.verdict ? "[" + lk.verdict + "] " : "") + lk.text);
+        t.title = lk.text;
+        row.appendChild(t);
+        var first = (lk.nodes || [])[0];
+        if (first) row.addEventListener("click", function () { openProbeNode(first); });
+        probeEl.appendChild(row);
+      });
+      probeEl.appendChild(el("div", "sub", "调用步骤 · 点一下以它看的节点为根"));
+      (PROBE.steps || []).forEach(function (s) {
+        var n = s.node, can = !!(n && (n.path || n.aid));
+        var row = el("div", "st" + (can ? "" : " na"));
+        row.appendChild(el("span", "no", "#" + s.i));
+        var t = el("span", "t", "");
+        var tb = el("b", null, s.tool);
+        t.appendChild(tb);
+        t.appendChild(document.createTextNode(" " + stepTarget(s) + " · " + (Math.round((s.chars || 0) / 100) / 10) + "千字"));
+        t.title = JSON.stringify(s.args);
+        row.appendChild(t);
+        if (can) row.addEventListener("click", function () { openProbeNode(n); });
+        probeEl.appendChild(row);
+      });
+    }
+    function loadProbe(run) {
+      if (!run) return;
+      fetch(U.probe + "?run=" + encodeURIComponent(run), { credentials: "include" })
+        .then(function (r) { return r.json(); })
+        .then(function (p) {
+          if (p.error) { PROBE = { error: p.error, runDir: run }; renderProbe(); return; }
+          p.runDir = run;
+          probeIndex(p);
+          PROBE = p;
+          renderProbe();
+          var old = document.getElementById("probe-chip");
+          if (old) old.remove();
+          chip("调查 <b>" + p.run + "</b> · 进入点 环 " + (p.entry != null ? p.entry : "?"), "probe-chip");
+          var go = function () {
+            if (!dataReady) { setTimeout(go, 400); return; }
+            if (XT) renderTree(XT.root);
+            else if (p.root) openRoot({ kind: "file", path: p.root, v: null });
+          };
+          go();
+        })
+        .catch(function (e) { PROBE = { error: String(e), runDir: run }; renderProbe(); });
+    }
+    function bootProbe() {
+      renderProbe();
+      var q = {};
+      location.search.replace(/^\?/, "").split("&").forEach(function (kv) {
+        var i = kv.indexOf("=");
+        if (i > 0) q[kv.slice(0, i)] = decodeURIComponent(kv.slice(i + 1));
+      });
+      if (q.probe) loadProbe(q.probe);
+    }
     function nodeCls(node) {
       var c;
       if (node.kind === "agent") c = node.isDispatch ? "dispatch" : (isFixAt(node.aid, node.anchorVer) || node.isFixer) ? "fix" : "gen" + (node.sharp ? " sharp" : "");
@@ -907,6 +1078,7 @@
       d.style.left = node.x + "px"; d.style.top = node.y + "px"; d.style.width = NODE_W + "px";
       d.appendChild(document.createTextNode(node.label));
       (node.badges || []).forEach(function (b) { d.appendChild(el("span", "badge " + (b.cls || ""), b.t)); });
+      probeDecorate(d, node);
       if (node.kind !== "leaf" && !node.isRight) d.appendChild(el("span", "chev", node.expanded ? "▾" : (node.busy ? "…" : "▸")));
       d.title = (node.kind === "file" ? node.path : node.kind === "agent" ? node.aid : node.label)
               + ((node.badges || []).length ? "  [" + node.badges.map(function (b) { return b.t; }).join(" · ") + "]" : "")
@@ -1402,6 +1574,7 @@
     }, { passive: false });
     clearBtn.addEventListener("click", reset);
     window.addEventListener("hashchange", function () { if (!XT && dataReady) openFromHash(); });
+    bootProbe();
     renderEmptyCanvas();
     renderRail();
   })();
