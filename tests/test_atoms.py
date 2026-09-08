@@ -1320,8 +1320,11 @@ def test_out_dir_hint_marks_files_appearing_under_dir(tmp_path: Any) -> None:
             *_read_call("2026-01-01T00:05:00Z", "t2", "/proj/spec/out/a.md", "generated\n")]
     led = _ledger(tmp_path, main)
     st = led.stories["/proj/spec/out/a.md"]
-    assert st.versions[0].source == "generated" and st.versions[0].by == MAIN_ID      # 脚本跑出来的:写者是跑脚本的 agent
-    assert any("可能由此次运行生成" in t.reason and t.seq == led.agents[MAIN_ID].actions[0].seq for t in st.touches)
+    run_seq = led.agents[MAIN_ID].actions[0].seq
+    # 候选只导航不入账:作者仍是外部输入,候选运行号留在 gen_runs(评审反例:跑过脚本不证明文件是它生成的)
+    assert st.versions[0].source == "external" and st.versions[0].by == filestory.EXTERNAL
+    assert st.versions[0].gen_runs == (run_seq,)
+    assert any("可能由此次运行生成" in t.reason and t.seq == run_seq for t in st.touches)
 
 
 def test_single_cat_after_cd_binds_to_cd_target(tmp_path: Any) -> None:
@@ -1709,8 +1712,8 @@ def test_fix_basis_lists_docs_read_before_first_fix_write(tmp_path: Any) -> None
 
 def test_script_generated_files_get_the_run_as_writer(tmp_path: Any) -> None:
     """0723 的 102 份页面 spec、112 份 ui-snapshots 是主会话跑 gen_page_specs.py 一次生成的,账本却记「外部输入」,
-    归因到 spec 就断了。首版记成「批量生成」:写者 = 跑脚本的 agent(喂养它当时的版本),候选运行的动作号、同批文件数都带上;
-    真正池子外的文件(没人跑过任何脚本指向它)仍是外部输入。"""
+    归因到 spec 就断了。候选运行的动作号、同批文件数带在首版上让人判;但候选不升级成作者(评审反例:跑过脚本不证明
+    文件是它生成的),首版仍是外部输入。真正池子外的文件(没人跑过任何脚本指向它)连候选都没有。"""
     body = ("import os\nOUT = 'spec/baseline/ui'\nfor i in range(3):\n"
             "    open(os.path.join(OUT, f'page_{i}.md'), 'w').write('x')\n")
     main = [*_call("2026-01-01T00:00:00Z", "t1", "Bash", {"command": "cat > /tmp/s/gen.py <<'EOF'\n" + body + "EOF"}, ""),
@@ -1721,11 +1724,12 @@ def test_script_generated_files_get_the_run_as_writer(tmp_path: Any) -> None:
     led = _ledger(tmp_path, main)
     run = [a for a in led.agents[MAIN_ID].actions if a.tool == "Bash"][1]
     v1 = led.stories["/proj/spec/baseline/ui/page_1.md"].versions[0]
-    assert v1.source == "generated" and v1.by == MAIN_ID and v1.via == "script-run"
-    assert v1.gen_runs == (run.seq,) and v1.batch == 2 and v1.act_seq == run.seq
-    assert led.stories["/android/app/res/values/colors.xml"].versions[0].source == "external"
+    assert v1.source == "external" and v1.by == filestory.EXTERNAL and v1.act_seq is None
+    assert v1.gen_runs == (run.seq,) and v1.batch == 2
+    xml = led.stories["/android/app/res/values/colors.xml"].versions[0]
+    assert xml.source == "external" and xml.gen_runs == ()
     text = atoms_text.render_file(led, "page_1.md", root="/proj")
-    assert "批量生成" in text and "同批 2 个" in text and f"#{run.seq}@L" in text
+    assert "候选生成运行" in text and "同批 2 个" in text and f"#{run.seq}" in text and "未证实" in text
 
 
 def test_generated_writer_prefers_specific_earliest_run_not_project_root(tmp_path: Any) -> None:
@@ -1742,8 +1746,9 @@ def test_generated_writer_prefers_specific_earliest_run_not_project_root(tmp_pat
     led = _ledger(tmp_path, main)
     run = [a for a in led.agents[MAIN_ID].actions if a.tool == "Bash"][1]
     v1 = led.stories["/proj/spec/baseline/ui/page_1.md"].versions[0]
-    assert v1.source == "generated" and v1.act_seq == run.seq and v1.gen_runs == (run.seq,)
-    assert led.stories["/proj/entry/src/main/ets/X.ets"].versions[0].source == "external"   # 工程根不算线索
+    assert v1.source == "external" and v1.gen_runs == (run.seq,)          # 候选按前缀最长、时间最早,但不升级成作者
+    x = led.stories["/proj/entry/src/main/ets/X.ets"].versions[0]
+    assert x.source == "external" and x.gen_runs == ()                      # 工程根不算线索
 
 
 def test_fix_basis_looks_back_three_versions(tmp_path: Any) -> None:

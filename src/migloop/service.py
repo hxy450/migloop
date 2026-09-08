@@ -59,6 +59,16 @@ def _stat_key(paths: list[str]) -> list[Any]:
     return out
 
 
+def pool_key(roots: list[str]) -> list[Any]:
+    """账本缓存键要看整个池子:root 转录 + 各自的 subagents/*.jsonl —— 子代理独立追加时也要失效(评审指出)。"""
+    paths = list(roots)
+    for r in roots:
+        sub = os.path.splitext(r)[0] + "/subagents"
+        if os.path.isdir(sub):
+            paths += sorted(glob.glob(os.path.join(sub, "*.jsonl")))
+    return _stat_key(paths)
+
+
 def _put(cache: dict[str, Any], key: str, value: Any) -> None:
     if len(cache) >= _CACHE_MAX and key not in cache:
         cache.pop(next(iter(cache)))
@@ -167,7 +177,7 @@ def session_ledger(path: str) -> Any:
     cwd = str((data.get("meta") or {}).get("cwd") or "")
     roots = [*prior_roots(fmt, path, cwd), path]           # 时间正序:前序在前
     intervals = run_stage_intervals(path, cwd)
-    key = [*_stat_key(roots), tuple((iv["stage"], iv["start_ts"]) for iv in intervals)]
+    key = [*pool_key(roots), tuple((iv["stage"], iv["start_ts"]) for iv in intervals)]
     with _LOCK:
         hit = _LEDGER_CACHE.get(path)
         if hit is not None and hit[0] == key:

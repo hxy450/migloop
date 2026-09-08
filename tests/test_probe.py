@@ -42,7 +42,7 @@ def test_probe_maps_calls_and_links_to_nodes(tmp_path: Any) -> None:
            {"tool": "search", "input": {"q": "x", "until_ts": "2026-01-01T01:00:00Z"}, "chars": 300}]
     report = ("文件: entry/A.ets\n"
               "环 1  fixer 写 A.ets@v2 (#9@L9)   判定: 传递\n"
-              f"环 2  conv-a(agent-c)v1 写 A.ets@v1,凭 spec/pages/A.md@v1 (#{conv_seq}@L5)   判定: 错\n"
+              f"环 2  conv-a(agent-c)v1 写 A.ets@v1,凭 spec/pages/A.md@v1 (#{conv_seq}@L{led.lines[conv_seq]})   判定: 错\n"
               "环 3  spec/pages/A.md@v1 外部输入   判定: 缺\n"
               f"环 4  主会话·{MAIN_ID.split(':')[1]} v1 的派发词缺约束   判定: 错\n"      # 主会话不是 agent-… 形式的 id,也得认成坐标
               "故障进入点:\n"                                    # 真报告里常换行再分条,还会给几条缺陷各自的进入点
@@ -74,3 +74,24 @@ def test_fixchain_template_has_probe_hooks() -> None:
     assert ".node.p-chain" in html and ".wire.chain" in html and "未查" in html
     # 红只落在 键 + 版本 对上的节点;同 id 别的版本挂灰标说明环判的是哪一版
     assert "probeVerdictFor(" in html and "判的是 v" in html
+
+
+def test_probe_rejects_forged_line_numbers(tmp_path: Any) -> None:
+    """引用核验只证明「位置存在、原文匹配」:#n@L 的 L 与账本记的转录行号对不上,就不落节点,记进 bad_refs。"""
+    conv = [_rec("2026-01-01T00:00:00Z", "user", "转换 A"),
+            *_call("2026-01-01T00:00:20Z", "c2", "Write", {"file_path": "/proj/entry/A.ets", "content": "a\n"},
+                   "File created successfully at: /proj/entry/A.ets")]
+    main = [*_call("2026-01-01T00:00:00Z", "m1", "Agent", {"name": "conv-a", "prompt": "转换 A"}, "done",
+                   toolUseResult={"agentId": "c"})]
+    led = _ledger(tmp_path, main, {"agent-c": conv})
+    conv_seq = next(a.seq for a in led.agents["agent-c"].actions if a.tool == "Write")
+    good = f"#{conv_seq}@L{led.lines[conv_seq]}"
+    report = ("文件: entry/A.ets\n"
+              f"环 1  conv-a(agent-c)v1 写 A.ets@v1 ({good})   判定: 错\n"
+              f"环 2  conv-a(agent-c)v1 又写 (#{conv_seq}@L999999)   判定: 传递\n"
+              "故障进入点: 环 1\n")
+    p = probe.probe_payload(led, _run_dir(tmp_path, [], report))
+    assert p["links"][0]["bad_refs"] == [] and any(n.get("action") == conv_seq for n in p["links"][0]["nodes"])
+    assert p["links"][1]["bad_refs"] == [f"#{conv_seq}@L999999"]
+    assert not any(n.get("action") == conv_seq for n in p["links"][1]["nodes"])
+    assert p["bad_refs"] == 1

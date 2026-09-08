@@ -120,6 +120,8 @@ def render_index(ledger: atoms.Ledger, kind: str | None = None, query: str | Non
         for f in fs[:limit]:
             if f["has_writer"]:
                 tag = f"{f['n_versions']} 版"
+            elif not f["n_versions"] and not f["n_reads"] and not f.get("n_touches") and f.get("n_mentions"):
+                tag = "只被提到(命令里出现,无读写记录)"
             elif not f["n_versions"] and f.get("n_touches"):
                 tag = "只被脚本碰过(方向不明)"
             else:
@@ -181,6 +183,29 @@ def _collapse_spine(ledger: atoms.Ledger, rows: list[dict[str, Any]], anchor: in
 
 
 
+def _evidence_label(vv: dict[str, Any]) -> str:
+    """每一版凭什么:工具写/Edit 是「报告成功」(工具说成功,内容是请求的正文);heredoc / ast / cp / 黑盒是「推导」
+    (满足执行条件才有这个变换);快照、首见、实录外是「观测」。证据强弱按断言,不按来路一刀切。"""
+    src, via, known = vv.get("source"), vv.get("via"), bool(vv.get("content_known"))
+    if src == "full":
+        return "工具写·报告成功" if via == "tool" else ("推导·heredoc 全文" if via == "shell" else "推导·脚本字面量全文")
+    if src == "delta":
+        return "Edit·报告成功" if via == "tool" else "推导·ast 读改写"
+    if src == "derived":
+        return "推导·派生自已知源" if known and not vv.get("sealed") else "推导·派生源未知"
+    if src == "opaque":
+        return "推导·黑盒写"
+    if src == "outband":
+        return "观测·内容变了无写者"
+    if src == "external":
+        return "观测·首次读到" if known else "首见·内容未进上下文"
+    if src == "generated":
+        return "推导·脚本字面量含正文"
+    if src == "delete":
+        return "删除·报告成功"
+    return str(src or "")
+
+
 def render_file(ledger: atoms.Ledger, hint: str, v: int | None = None, root: str = "",
                 content: bool = False, diff: bool = False,
                 start: int | None = None, n: int | None = None, readers: bool = False,
@@ -219,16 +244,19 @@ def render_file(ledger: atoms.Ledger, hint: str, v: int | None = None, root: str
         if vv.get("_run"):
             out.append(vv["_run"])
             continue
-        extra = []
+        extra = [_evidence_label(vv)]
         if vv.get("source") == "generated":
             # 不是 agent 读源码写的,是脚本一次跑出来的:归因到这里就该问「这批是怎么生成的」而不是「谁写错了」
             runs = ", ".join(f"#{s}" for s in vv.get("gen_runs") or [])
             batch = f"同批 {vv.get('batch')} 个;" if vv.get("batch") else ""
             extra.append(f"批量生成(脚本跑出来的,{batch}候选运行 {runs})")
-        elif vv["via"] == "script":
-            extra.append("脚本落盘(字面量推断)")
-        elif vv["via"] == "shell":
-            extra.append("shell")
+        elif vv.get("source") == "external" and vv.get("gen_runs"):
+            # 候选只导航不入账:跑过可能输出到这个目录的脚本,作者仍是外部输入,候选运行号摆出来让人判
+            runs = ", ".join(f"#{s}" for s in vv["gen_runs"])
+            batch = f";同批 {vv.get('batch')} 个" if vv.get("batch") else ""
+            extra.append(f"候选生成运行 {runs}(目录级线索,未证实{batch})")
+        if vv.get("conditional"):
+            extra.append("条件分支,是否执行未知")
         if vv["sealed"]:
             extra.append("观测封口")
         if vv["lines"] is not None:
@@ -519,6 +547,9 @@ def render_action(ledger: atoms.Ledger, agent_id: str, seq: int, max_chars: int 
         in_piece, in_note = _window(inp_text, max_chars, offset, find)
         piece, note = "(空)", ""
     out = [head]
+    eid = atoms.event_id(ledger, agent_id, seq)
+    if eid:
+        out.append(f"事件 id {eid}(会话:转录:tool_use_id;解析升级也不变,#n 只是本次建账的句柄)")
     links = atoms.action_links(ledger, agent_id, seq)
     if links:
         out.append(f"发自 {links['label']} (id={links['agent']}) v{links['ver']}"

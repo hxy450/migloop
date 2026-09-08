@@ -63,6 +63,7 @@ class Action:
     src: tuple[str, int, int] | None = None
     tuid: str | None = None
     stage: str | None = None   # 管线阶段:记录的归属戳(attributionSkill);子 agent 无戳时继承派发时阶段
+    done_ts: str | None = None  # 结果返回时刻:读的内容这一刻才进上下文,喂的版本按它算(评审反例:写之后才返回的读)
 
 
 @dataclass
@@ -136,16 +137,35 @@ def resolve_agent(ledger: Ledger, hint: str) -> AgentRec | None:
 def _number(a: AgentRec) -> None:
     a.actions.sort(key=lambda x: (x.ts, x.seq))
     n = 0
+    effects: list[tuple[str, int]] = []
     for act in a.actions:
         if act.kind in EFFECTS and act.ok:
             n += 1
             act.ver = n
             act.at = n
+            effects.append((act.ts, act.seq))
         else:
             act.ver = None
             act.at = n + 1
+    # 输入喂的版本按完成时刻算:结果返回之前发生的效应不可能用到它
+    # (评审反例:00:00 发起 Read、00:10 Write、00:20 才返回 —— 那次读不是 v1 的输入)
+    for act in a.actions:
+        if act.ver is None and act.done_ts and act.done_ts > act.ts:
+            act.at = 1 + sum(1 for ts_, seq_ in effects if (ts_, seq_) < (act.done_ts, act.seq))
         for ref in act.files:
             ref.ev = replace(ref.ev, aver=act.ver)
+
+
+def event_id(ledger: Ledger, agent_id: str, seq: int) -> str | None:
+    """事件的稳定身份:会话 + 转录文件名 + tool_use_id(没有 id 的记录用转录行号)。
+    动作号 #n 只是本次建账的句柄,解析器多认出一条读它就变;这个不变。"""
+    a = resolve_agent(ledger, agent_id)
+    act = next((x for x in a.actions if x.seq == seq), None) if a else None
+    if a is None or act is None:
+        return None
+    stem = os.path.splitext(os.path.basename(act.src[0]))[0] if act.src else a.id
+    tail = act.tuid if act.tuid else (f"L{act.src[1] + 1}" if act.src else f"seq{act.seq}")
+    return f"{a.session}:{stem}:{tail}"
 
 
 def rel_time(ts: str | None, t0: str | None) -> str:
@@ -313,7 +333,7 @@ def build_ledger(agents: dict[str, AgentRec]) -> Ledger:
     runs_by_dir = {p: r for p, r in runs_by_dir.items()
                    if not ((cnt := sum(1 for path in stories if path.startswith(p))) >= 50 and cnt >= n_all * 0.25)}
     if runs_by_dir:
-        batches: dict[tuple[str, tuple[int, ...]], list[FileStory]] = {}
+        batches: dict[tuple[int, ...], list[FileStory]] = {}
         for path, st in stories.items():
             if not (st.versions and st.versions[0].source == "external"):
                 continue
@@ -329,16 +349,12 @@ def build_ledger(agents: dict[str, AgentRec]) -> Ledger:
             for _ts, aid, act in recent:
                 st.touches.append(Touch(act.ts, act.seq, aid, act.ver if act.ver is not None else act.at,
                                         "可能由此次运行生成(目录级线索)", act.stage))
-            # 脚本跑出来的文件不是「外部输入」:首版记成批量生成,写者是跑脚本的 agent(喂养它当时的版本)。
-            # 0723 的 102 份页面 spec 是 gen_page_specs.py 一次生成的而非 agent 读源码写的 —— 这件事要在账本上看得见
-            agents_of = {aid for _ts, aid, _act in recent}
-            if len(agents_of) == 1:
-                _ts, aid, act = recent[0]
-                v0 = st.versions[0]
-                v0.by, v0.by_ver, v0.source, v0.via = aid, act.at, "generated", "script-run"
-                v0.gen_runs = tuple(a.seq for _t, _a, a in recent)
-                v0.act_seq = act.seq
-                batches.setdefault((aid, v0.gen_runs), []).append(st)
+            # 候选只导航不入账:跑过一个可能输出到这个目录的脚本,不证明这个文件是它生成的
+            # (评审反例:--out-dir 跑完输出「nothing changed」,文件仍被记成它生成)。作者仍是外部输入,
+            # 候选运行号留在 gen_runs,file() 摆出来让人判;0723 那 102 份页面 spec 由此是「外部输入 + 候选运行」
+            v0 = st.versions[0]
+            v0.gen_runs = tuple(a.seq for _t, _a, a in recent)
+            batches.setdefault(v0.gen_runs, []).append(st)
         for sts in batches.values():
             for st in sts:
                 st.versions[0].batch = len(sts)
@@ -379,14 +395,22 @@ def _command_mentions(stories: dict[str, FileStory], agents: dict[str, AgentRec]
     by_base: dict[str, list[str]] = {}
     for path in stories:
         by_base.setdefault(path.rsplit("/", 1)[-1].lower(), []).append(path)
+    known_dirs = {p.rsplit("/", 1)[0] for p in stories if "/" in p}
     out: dict[str, list[Mention]] = {}
     for a in agents.values():
         for act in a.actions:
-            for tok, ctx in act.detail.get("mentions") or []:
-                low = str(tok).lower()
+            for item in act.detail.get("mentions") or []:
+                tok, ctx = str(item[0]), str(item[1])
+                absp = str(item[2]) if len(item) > 2 and item[2] else None
+                low = tok.lower()
                 cands = by_base.get(low.rsplit("/", 1)[-1], [])
                 if "/" in low:
                     cands = [p for p in cands if p.lower() == low or p.lower().endswith("/" + low)]
+                if not cands and absp and absp not in stories and absp.rsplit("/", 1)[0] in known_dirs:
+                    # 只被提到、从没读写过的文件也要有入口;只在目录已知时建,输出里的垃圾路径不进目录
+                    stories[absp] = FileStory(absp)
+                    by_base.setdefault(absp.rsplit("/", 1)[-1].lower(), []).append(absp)
+                    cands = [absp]
                 for p in cands:
                     out.setdefault(p, []).append(Mention(act.ts, act.seq, a.id, act.ver if act.ver is not None else act.at,
                                                          str(tok), str(ctx), ambiguous="/" not in low and len(cands) > 1,
@@ -648,7 +672,7 @@ def file_atom(ledger: Ledger, hint: str, v: int | None = None,
             "by_name": _agent_label(ledger.agents, ver.by),
             "by_ver": ver.by_ver, "seq": ver.act_seq, "via": ver.via, "source": ver.source,
             "gen_runs": list(ver.gen_runs), "batch": ver.batch,
-            "diff_kind": ver.diff_kind, "sealed": ver.sealed,
+            "diff_kind": ver.diff_kind, "sealed": ver.sealed, "conditional": ver.conditional,
             "lines": len(ver.content.splitlines()) if ver.content else None,   # 末尾换行不算一行
             "has_diff": ver.diff is not None,
             "content_known": ver.content is not None,
@@ -700,6 +724,7 @@ def ledger_index(ledger: Ledger) -> dict[str, Any]:
             "has_writer": any(ver.by not in (EXTERNAL, OUTBAND) for ver in st.versions),
             "n_unknown": sum(1 for ver in st.versions if ver.content is None),
             "n_reads": len(st.reads), "n_touches": len(st.touches),
+            "n_mentions": len(ledger.mentions.get(path, [])),
             "n_mentions_unrecorded": sum(1 for m in ledger.mentions.get(path, [])
                                          if mention_effect(ledger, path, m.seq) is None),
         })

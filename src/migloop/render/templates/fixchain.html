@@ -949,7 +949,8 @@
       (PROBE.links || []).forEach(function (lk) {
         var row = el("div", "lk " + (VD_CLS[lk.verdict] || "") + (lk.entry ? " entry" : ""));
         row.appendChild(el("span", "no", (lk.entry ? "★" : "") + "环" + lk.no));
-        var t = el("span", "t", (lk.verdict && lk.onTree === false && (lk.nodes || []).length ? "[主语不在树上] " : "")
+        var t = el("span", "t", (lk.bad_refs && lk.bad_refs.length ? "[引用无效 " + lk.bad_refs.join(",") + "] " : "")
+                                + (lk.verdict && lk.onTree === false && (lk.nodes || []).length ? "[主语不在树上] " : "")
                                 + (lk.verdict ? "[" + lk.verdict + "] " : "") + lk.text);
         t.title = lk.text;
         row.appendChild(t);

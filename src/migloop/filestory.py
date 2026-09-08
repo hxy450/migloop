@@ -78,6 +78,7 @@ class Ev:
     stage: str | None = None        # 管线阶段(记录归属戳):版本文件据此知道每版写在哪个阶段
     created: bool = False           # wfull: 工具结果说 File created —— 写之前文件不存在
     sources: tuple[str, ...] = ()   # wconcat: cat a b > f 的各段路径
+    conditional: bool = False       # 命令在 && / || 的条件分支里:前件成败未知,这一步是否执行了也未知
 
 
 @dataclass
@@ -98,6 +99,7 @@ class Version:
     partial: str | None = None      # 内容未知但脚本字面量里给了正文的一部分(渲染器写出的缺陷单)
     gen_runs: tuple[int, ...] = ()  # source=generated:候选的脚本运行动作号(首见之前最近几次)
     batch: int = 0                  # source=generated:同一批运行生成的文件数
+    conditional: bool = False       # 写它的命令在条件分支里(评审反例 false && cp:记了,但不当事实)
 
 
 @dataclass
@@ -186,7 +188,7 @@ def build_stories(events: list[Ev]) -> dict[str, FileStory]:
         v = Version(v=len(st.versions) + 1, ts=e.ts, seq=e.seq, by=by,
                     source=source, content=content, diff=diff, diff_kind=diff_kind,
                     by_ver=e.aver if own else None, via=e.via if own else "observe",
-                    stage=e.stage if own else None)
+                    stage=e.stage if own else None, conditional=e.conditional if own else False)
         st.versions.append(v)
         return v
 
@@ -278,13 +280,19 @@ def build_stories(events: list[Ev]) -> dict[str, FileStory]:
                 s.content = applied
                 s.interval_base = applied
             else:
-                if s.content is not None:
+                was_unknown = s.content is None
+                if not was_unknown:
                     st.breaks.append(Break(e.ts, e.seq, e.path, "edit-miss",
                                            f"old_string 不在已知内容中: {old[:60]!r}"))
                     s.interval_base = s.content
                 # 盲写:发生过、diff 原生可看,但之后状态未知
-                add_version(st, e, e.agent, "delta", None, native, "native")
+                v = add_version(st, e, e.agent, "delta", None, native, "native")
                 s.content = None
+                if was_unknown:
+                    # 状态本来就未知(前面有黑盒写):之后的快照要封在这一版上,不能越过它封到更早的未知写
+                    # (评审反例:不透明写 → Edit → Read,快照曾封到不透明写那一版,Edit 那版留白、读却绑它且 certain)。
+                    # 状态已知而 old 不在内容里的 edit-miss 不进 pending:那是实录外改过的证据,按断点 + 观测重锚
+                    s.pending.append(v.v - 1)
         elif e.kind == "read":
             self_read_version: int
             certain = True

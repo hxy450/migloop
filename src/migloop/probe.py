@@ -21,7 +21,7 @@ _RING = re.compile(r"环\s*(\d+)")
 _ENTRY_ALSO = re.compile(r"进入点是\s*环\s*(\d+)")     # 几条缺陷各自进入时,报告会逐条说「…的进入点是环 N」
 _FILE_AT = re.compile(r"([\w./-]+\.[A-Za-z0-9]+)@v(\d+)")
 _AGENT_ID = re.compile(r"agent-[0-9a-f]+")        # 账本 id 是 16 位 hex,测试里的短 id 也认
-_ACTION = re.compile(r"#(\d+)@L\d+")
+_ACTION = re.compile(r"#(\d+)@L(\d+)")
 _MAIN_AT = re.compile(r"主会话[·:]?\s*([0-9a-f]{6,})?\s*@?v(\d+)")   # 报告写主会话不用 agent- id:「主会话·9b3105a2 @v83」
 _RANK = {"错": 3, "缺": 2, "传递": 1}
 
@@ -85,8 +85,10 @@ def _step_node(ledger: atoms.Ledger, tool: str, inp: dict[str, Any]) -> dict[str
     return None
 
 
-def _link_nodes(ledger: atoms.Ledger, body: str) -> list[dict[str, Any]]:
-    """环正文里的坐标按出现位置排:第一个是这一环的主语(判定落在它身上),其余只是「提到」。"""
+def _link_nodes(ledger: atoms.Ledger, body: str) -> tuple[list[dict[str, Any]], list[str]]:
+    """环正文里的坐标按出现位置排:第一个是这一环的主语(判定落在它身上),其余只是「提到」。
+    #n@L 要能核回原文:L 与账本记的转录行号对不上的引用不落节点,记进 bad_refs(伪造行号校验失败)。"""
+    bad: list[str] = []
     found: list[tuple[int, dict[str, Any]]] = []
     for m in _FILE_AT.finditer(body):
         k = filestory.find_story_path(ledger.stories, m.group(1))
@@ -107,11 +109,15 @@ def _link_nodes(ledger: atoms.Ledger, body: str) -> list[dict[str, Any]]:
         if mid:
             found.append((m.start(), {"kind": "agent", "aid": mid, "v": int(m.group(2))}))
     for m in _ACTION.finditer(body):
-        owner, ver = _seq_owner(ledger, int(m.group(1)))
+        no, line = int(m.group(1)), int(m.group(2))
+        if ledger.lines.get(no) != line:
+            bad.append(m.group(0))
+            continue
+        owner, ver = _seq_owner(ledger, no)
         if owner:
-            found.append((m.start(), {"kind": "agent", "aid": owner, "v": ver, "action": int(m.group(1))}))
+            found.append((m.start(), {"kind": "agent", "aid": owner, "v": ver, "action": no}))
     found.sort(key=lambda x: x[0])
-    return [n for _pos, n in found]
+    return [n for _pos, n in found], bad
 
 
 def _entries(report: str) -> list[int]:
@@ -145,8 +151,9 @@ def probe_payload(ledger: atoms.Ledger, run_dir: str) -> dict[str, Any]:
             continue
         no, body = int(mm.group(1)), mm.group(2)
         vd = _VERDICT.search(body)
+        nodes, bad = _link_nodes(ledger, body)
         links.append({"no": no, "verdict": vd.group(1) if vd else None, "entry": no in entries,
-                      "text": body[:400], "nodes": _link_nodes(ledger, body)})
+                      "text": body[:400], "nodes": nodes, "bad_refs": bad})
     # 节点 → 判定:只算它当主语的环(正文第一个坐标),按「节点 + 版本」记,不按 id 连坐(主会话在树上到处出现,
     # 环 9 判的是它 v83 的派发词,v1 / v60 不该跟着红);同一节点同一版被几环判过取最重(错 > 缺 > 传递)
     verdicts: dict[str, list[dict[str, Any]]] = {}
@@ -175,4 +182,4 @@ def probe_payload(ledger: atoms.Ledger, run_dir: str) -> dict[str, Any]:
         root = filestory.find_story_path(ledger.stories, fm.group(1))
     return {"run": os.path.basename(os.path.dirname(os.path.abspath(run_dir))), "cost": m.get("cost_usd"), "turns": m.get("num_turns"),
             "root": root, "steps": steps, "links": links, "entry": entry_no, "entries": entries, "verdicts": verdicts,
-            "report": report}
+            "bad_refs": sum(len(lk["bad_refs"]) for lk in links), "report": report}
