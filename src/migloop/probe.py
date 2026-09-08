@@ -173,7 +173,8 @@ def probe_payload(ledger: atoms.Ledger, run_dir: str) -> dict[str, Any]:
         inp = {k: v for k, v in (s.get("input") or {}).items() if k != "sid"}
         steps.append({"i": i, "tool": s.get("tool"), "args": inp, "chars": s.get("chars") or 0,
                       "node": _step_node(ledger, str(s.get("tool")), inp),
-                      "ok": not s.get("is_error"), "scope": _step_scope(str(s.get("tool")), inp)})
+                      "ok": not s.get("is_error"), "scope": _step_scope(str(s.get("tool")), inp),
+                      "via": str(inp.get("via") or "")})
     entries = _entries(report)
     entry_no = entries[0] if entries else None
     links: list[dict[str, Any]] = []
@@ -403,6 +404,45 @@ def _ledger_relation(ledger: atoms.Ledger, a: dict[str, Any], b: dict[str, Any])
     return rel if st == "true" else None
 
 
+_VIA_RE = re.compile(r"^(file|agent):(\S+?)(?:@v(\d+))?(?=\s|$)")
+
+
+def _parse_via(ledger: atoms.Ledger, text: str) -> dict[str, Any]:
+    """模型声明的来处 → {text, tag, kind, key, v, ok}。tag = task / sessions / search(不是节点的来处);坐标解析失败 ok=False。"""
+    t = str(text or "").strip()
+    out: dict[str, Any] = {"text": t, "tag": None, "kind": None, "key": None, "v": None, "ok": False}
+    if not t:
+        return out
+    low = t.lower()
+    for tag in ("task", "sessions", "search"):
+        if low == tag or low.startswith((tag + ":", tag + " ")):
+            out["tag"] = tag
+            return out
+    m = _VIA_RE.match(t)
+    if not m:
+        return out
+    kind, hint, vs = m.group(1), m.group(2), m.group(3)
+    out["kind"] = kind
+    if kind == "file":
+        key = filestory.find_story_path(ledger.stories, hint)
+    else:
+        a = atoms.resolve_agent(ledger, hint)
+        if a is None and hint.startswith("__main__"):
+            a = verdict._main_agent(ledger, hint.split(":", 1)[-1])
+        key = a.id if a else None
+    if not key:
+        return out
+    out["key"] = key
+    v = int(vs) if vs is not None else None
+    if v is None and _n_versions(ledger, kind, key) == 1:
+        v = 1
+    if v is not None and not (1 <= v <= _n_versions(ledger, kind, key)):
+        return out
+    out["v"] = v
+    out["ok"] = True
+    return out
+
+
 def _trajectory(ledger: atoms.Ledger, run_dir: str, steps: list[dict[str, Any]], root: str | None,
                 structured: dict[str, Any] | None, verdicts: dict[str, list[dict[str, Any]]]) -> dict[str, Any] | None:
     texts = _transcript_results(run_dir)
@@ -452,6 +492,14 @@ def _trajectory(ledger: atoms.Ledger, run_dir: str, steps: list[dict[str, Any]],
             for r in rows:
                 if r.get("v") is not None:
                     add(str(r["kind"]), key, r["v"], "结论")
+    # 模型声明的来处:坐标能解析的也是它点名的节点,进集合(来源「来处」)
+    vias: dict[int, dict[str, Any]] = {}
+    for s in steps:
+        if s.get("via") and _step_landing(s) is not None and s.get("ok") is not False:
+            pv = _parse_via(ledger, str(s["via"]))
+            vias[int(s["i"])] = pv
+            if pv["ok"] and pv["v"] is not None:
+                add(str(pv["kind"]), str(pv["key"]), pv["v"], "来处")
     # 查过的落点;不带版本的索引 / 全程查询并进同键已有的版本节点
     for s in steps:
         land = _step_landing(s)
@@ -553,5 +601,40 @@ def _trajectory(ledger: atoms.Ledger, run_dir: str, steps: list[dict[str, Any]],
     present = {(n["kind"], n["key"], n["v"]) for n in order}
     for n in order:
         n["unseen"] = len([x for x in _upstream_neighbors(ledger, n["kind"], n["key"], n["v"]) if x not in present])
+    # 声明边:模型说的「我从 X 来查 Y」,逐条和账本边对照;不改结构,只是路线的记录
+    edge_pairs = {(e["from"], e["to"]) for e in edges}
+
+    def node_of(kind: str, key: str, v: int | None) -> dict[str, Any] | None:
+        exact = nodes.get(_traj_id(kind, key, v))
+        if exact is not None:
+            return exact
+        same = [n for n in nodes.values() if n["kind"] == kind and n["key"] == key]
+        return same[0] if same else None
+
+    declared: list[dict[str, Any]] = []
+    for s in steps:
+        i = int(s["i"])
+        dv = vias.get(i)
+        land = _step_landing(s)
+        if dv is None or land is None:
+            continue
+        to = node_of(*land)
+        row: dict[str, Any] = {"step": i, "text": dv["text"], "from": None, "to": to["id"] if to else None, "match": None}
+        if dv["tag"]:
+            row["match"] = "跳"                                  # 从 sessions / search / 任务跳过来,不是节点
+        elif not dv["ok"]:
+            row["match"] = "无法解析"
+        else:
+            fr = node_of(str(dv["kind"]), str(dv["key"]), dv["v"])
+            row["from"] = fr["id"] if fr else None
+            if fr is None or to is None:
+                row["match"] = "无法解析"
+            elif fr is to:
+                row["match"] = "同一节点"
+            elif (fr["id"], to["id"]) in edge_pairs or (to["id"], fr["id"]) in edge_pairs:
+                row["match"] = "重合"
+            else:
+                row["match"] = "不重合"
+        declared.append(row)
     ordered = sorted(order, key=lambda n: (0 if n is root_node else 1, n["depth"] if n["side"] == "up" else 10 ** 6, pos[n["id"]]))
-    return {"root": root_node["id"], "nodes": ordered, "edges": edges}
+    return {"root": root_node["id"], "nodes": ordered, "edges": edges, "declared": declared}

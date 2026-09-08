@@ -134,7 +134,8 @@ def test_unlinked_nodes_go_to_their_own_column(tmp_path: Any) -> None:
 def test_fixchain_template_builds_ledger_edge_tree() -> None:
     from migloop.service import load_asset
     html = load_asset("fixchain.html")
-    for needle in ("probeBuildTrajectory(", "PROBE.trajectory", "node.traj", "不在根的上下游", "前一版", "XT.extra", "出现于"):
+    for needle in ("probeBuildTrajectory(", "PROBE.trajectory", "node.traj", "不在根的上下游", "前一版", "XT.extra", "出现于",
+                   "XT.via", "wire via", "T.declared"):
         assert needle in html, needle
 
 
@@ -148,3 +149,31 @@ def test_sighting_rules() -> None:
     assert probe._sight("id=agent-c 的 v2", "agent", "agent-c", 1, None) == (True, False)
     assert probe._sight("主会话·abcdef12 v83 派发", "agent", "__main__:abcdef12", 83, None) == (True, True)
     assert verdict.SCHEMA == "migloop-verdict/1"
+
+
+def test_declared_via_edges_are_recorded_and_checked(tmp_path: Any) -> None:
+    """via = 模型每次查询自己声明的来处,harness 原样记录;probe 解析成声明边并逐条和账本边对照,不改结构。"""
+    led = _pool(tmp_path)
+    calls = [
+        ("sessions", {"file": "A.ets"}, "# 返修链(1)\n- entry/A.ets | 生成方 conv-a id=agent-c | 修复方 fixer id=agent-f\n"),
+        ("file", {"path": "A.ets", "via": "sessions"}, "# entry/A.ets 2 版\n- v1 agent-c v1\n- v2 agent-f v1\n"),
+        ("agent", {"id": "conv-a", "v": 1, "via": "file:entry/A.ets@v1 写者行"}, "# agent-c v1\n读 spec/pages/A.md@v1\n"),
+        ("file", {"path": "spec/pages/A.md", "v": 1, "via": "agent:conv-a@v1 读取行 spec/pages/A.md@v1"}, "# spec/pages/A.md@v1\n"),
+        ("agent", {"id": "fixer", "via": "file:entry/A.ets@v2 写者"}, "# agent-f\n读 entry/A.ets@v1\n"),
+        ("agent", {"id": MAIN_ID, "v": 1, "via": "file:spec/pages/A.md@v1 读者"}, "# 主会话 v1\n"),     # 主会话没读过 A.md:不重合
+        ("blame", {"path": "A.ets", "v": 2, "via": "凭感觉"}, "# blame\n"),
+    ]
+    p = probe.probe_payload(led, _run_dir(tmp_path, calls, _block(led), name="via"))
+    T = p["trajectory"]
+    d = {x["step"]: x for x in T["declared"]}
+    assert d[2]["match"] == "跳" and d[2]["from"] is None and d[2]["to"] is not None              # 从 sessions 跳过来,不是节点
+    assert (d[3]["from"], d[3]["to"], d[3]["match"]) == ("file:/proj/entry/A.ets@1", "agent:agent-c@1", "重合")   # 账本:conv-a v1 写 v1
+    assert (d[4]["from"], d[4]["to"], d[4]["match"]) == ("agent:agent-c@1", "file:/proj/spec/pages/A.md@1", "重合")
+    assert (d[5]["from"], d[5]["to"], d[5]["match"]) == ("file:/proj/entry/A.ets@2", "agent:agent-f@1", "重合")
+    assert (d[6]["from"], d[6]["to"], d[6]["match"]) == ("file:/proj/spec/pages/A.md@1", f"agent:{MAIN_ID}@1", "不重合")
+    assert d[7]["match"] == "无法解析" and d[7]["from"] is None
+    # 声明边不改结构:主会话 v1 仍按账本挂在 conv-a v1 下(派发),不是挂在 A.md 下
+    by = {n["id"]: n for n in T["nodes"]}
+    assert by[f"agent:{MAIN_ID}@1"]["parent"] == "agent:agent-c@1" and by[f"agent:{MAIN_ID}@1"]["edge"] == "派发"
+    # 步骤层原样带 via 文本
+    assert p["steps"][2]["via"] == "file:entry/A.ets@v1 写者行" and p["steps"][0]["via"] == ""

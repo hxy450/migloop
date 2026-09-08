@@ -215,6 +215,8 @@
   .node .badge.fixed, .probe .badge.fixed, .side .badge.fixed { background: rgba(212,160,23,.18); color: #8a6400; font-weight: 700; }
   .wire.cand { stroke: var(--c-fix); stroke-dasharray: 5 4; stroke-width: 1.8; }
   .wire.succ { stroke-dasharray: 2 4; }
+  .wire.via { stroke: #2b6cb0; stroke-dasharray: 6 3; stroke-width: 1.5; opacity: .8; }
+  .wire.via.differ { stroke: #c05621; }
   .wire.extra { opacity: .75; }
   .prow { border-left: 3px solid var(--ring); padding: 4px 8px; margin: 6px 0; border-radius: 0 6px 6px 0; background: var(--wash); }
   .prow.r-err, .prow.r-carry { border-left-color: var(--c-fix); } .prow.r-gap { border-left-color: #b8860b; } .prow.r-ok { border-left-color: var(--c-gen); }
@@ -1068,7 +1070,7 @@
       ld.appendChild(inp);
       ld.appendChild(btn);
       probeEl.appendChild(ld);
-      if (!PROBE) { probeEl.appendChild(el("div", "sum", "载入一次调查员的跑:树上只有它查过的和结论点名的节点(每个一次),边只画账本核得出来的写 / 读 / 派发 / 前一版,根是被修文件的最终版本;结论按缺陷 × 版本上色,进入点描边。")); return; }
+      if (!PROBE) { probeEl.appendChild(el("div", "sum", "载入一次调查员的跑:树上只有它查过的和结论点名的节点(每个一次),边只画账本核得出来的写 / 读 / 派发 / 前一版,根是被修文件的最终版本;模型每次查询声明的来处(via)画成蓝色虚线,和账本边不重合的橙色;结论按缺陷 × 版本上色,进入点描边。")); return; }
       if (PROBE.error) { probeEl.appendChild(el("div", "sum", "载入失败:" + PROBE.error)); return; }
       var sum = el("div", "sum", "");
       sum.innerHTML = "<b>" + (PROBE.links || []).length + "</b> 环 · 进入点 <b>" + (PROBE.entry != null ? "环 " + (PROBE.entries || [PROBE.entry]).join(" / ") : "未标") + "</b> · 查过 <b>" + Object.keys(PROBE.byKey).length + "</b> 个节点"
@@ -1123,7 +1125,7 @@
         var t = el("span", "t", "");
         var tb = el("b", null, s.tool);
         t.appendChild(tb);
-        t.appendChild(document.createTextNode(" " + stepTarget(s) + (s.scope ? " · " + s.scope : "") + (s.ok === false ? " · 失败" : "") + " · " + (Math.round((s.chars || 0) / 100) / 10) + "千字"));
+        t.appendChild(document.createTextNode(" " + stepTarget(s) + (s.scope ? " · " + s.scope : "") + (s.ok === false ? " · 失败" : "") + " · " + (Math.round((s.chars || 0) / 100) / 10) + "千字" + (s.via ? " · via " + s.via : "")));
         t.title = JSON.stringify(s.args);
         row.appendChild(t);
         if (can) row.addEventListener("click", function () { openProbeNode(n); });
@@ -1378,6 +1380,15 @@
       });
       T.nodes.forEach(function (n) {
         if (n.unseen > 0 && n.side === "up") addKid(byId[n.id], xtNode("leaf", { label: "+" + n.unseen + " 未查", isRoStub: true }));
+      });
+      // 声明边:模型每次查询说的「我从 X 来」,蓝色虚线;和账本边重合 ✓,不重合橙色 ✗;来处不是节点的只在徽标上标
+      XT.via = [];
+      (T.declared || []).forEach(function (d) {
+        var tn = d.to && byId[d.to];
+        if (!tn) return;
+        var mark = d.match === "重合" ? "✓" : d.match === "不重合" ? "✗" : d.match === "跳" ? "跳" : d.match === "同一节点" ? "=" : "?";
+        tn.badges.push({ cls: d.match === "不重合" ? "stale" : "via", t: "via #" + d.step + " " + mark + (d.match === "跳" ? " " + d.text.slice(0, 16) : "") });
+        if (d.from && byId[d.from] && d.match !== "同一节点") XT.via.push({ a: byId[d.from].tid, b: tn.tid, step: d.step, match: d.match });
       });
       if (root.kind === "file") setRootLabel(root.label, "F:" + root.path, "file=" + encodeURIComponent(root.path) + "&v=" + (root.anchorV || ""));
       else setRootLabel(root.label, "A:" + root.aid, "agent=" + encodeURIComponent(root.aid) + "&v=" + (root.anchorVer || ""));
@@ -1646,6 +1657,23 @@
         frag.appendChild(path);
         (wireByTid[tid] = wireByTid[tid] || []).push(path);
         (wireByTid[n.parent] = wireByTid[n.parent] || []).push(path);
+      });
+      (XT.via || []).forEach(function (e) {
+        var n = XT.byId[e.a], p = XT.byId[e.b];
+        if (!n || !p) return;
+        var a, b;
+        if (n.x < p.x) { a = n; b = p; } else { a = p; b = n; }
+        var x1 = a.x + NODE_W, y1 = a.y + NODE_H / 2 + 5, x2 = b.x, y2 = b.y + NODE_H / 2 + 5;
+        var mx = (x1 + x2) / 2;
+        var path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        path.setAttribute("d", "M" + x1 + "," + y1 + " C" + mx + "," + y1 + " " + mx + "," + y2 + " " + x2 + "," + y2);
+        path.setAttribute("class", "wire via" + (e.match === "重合" ? " agree" : " differ"));
+        var t = document.createElementNS("http://www.w3.org/2000/svg", "title");
+        t.textContent = "via #" + e.step + " · " + e.match;
+        path.appendChild(t);
+        frag.appendChild(path);
+        (wireByTid[e.a] = wireByTid[e.a] || []).push(path);
+        (wireByTid[e.b] = wireByTid[e.b] || []).push(path);
       });
       (XT.extra || []).forEach(function (e) {
         var n = XT.byId[e.a], p = XT.byId[e.b];

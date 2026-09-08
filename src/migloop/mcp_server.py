@@ -111,6 +111,12 @@ closer 或后续写者破坏 / 源码没读全。每条证据带 `path@v` 或 `a
 边界:账本里只有**被读过**的安卓源码,从没人读过的文件不存在;标签是线索,盲写/脚本落盘的
 版本内容可能未知,如实说"无法确认"。
 
+## 来处(via):每次查询都说你从哪来
+file / agent / action / blame / diff 每次调用都带 via=:你是从哪个节点、凭哪一行决定查它的,坐标照抄工具输出 ——
+`file:<路径>@vN` 或 `agent:<id>@vK`,后面可以跟 `#标识:n@L行` 或几个字(例:`agent:agent-a711c5d09fb676814@v4 读取行 P0001_MainActivity.md@v1`)。
+从 sessions / search 的命中跳过来的写 `sessions` / `search:<词>`;第一步写 `task`。页面把 via 画成你的路线,逐条和账本边对照;
+不填就没有那条路线边。via 是记录不是判断:你从哪来就写哪,不用猜账本里有没有这条边。
+
 ## 结构化结论(散文链写完后必须再附一段,页面靠它给树上节点着色、点节点看原因)
 另起一个 ```yaml 围栏块,严格按这个格式(未知键、词表外的词、缺版本号都载入失败):
 ```yaml
@@ -131,7 +137,7 @@ defects:
     edges:                                  # 可省;每条对应账本里的一条 写 / 读 / 派发 边;拿不准写 候选 或 省略
       - {from: agent:<id>@v<K>, to: file:<路径>@v<N>, relation: 写}
 ```
-角色的意思:正常 = 有依据地正确提供了输入(说它提供了什么);带病传递 = 保留了上游缺陷并传给下游(说保留了什么、
+角色的意思:正常 = 有依据地正确提供了输入(reason 一句话说它提供了什么就够,不展开;没查过的上游不用列);带病传递 = 保留了上游缺陷并传给下游(说保留了什么、
 怎么传的;不等于失职,失职要另有证据);进入·错 = 有好的输入没用或用错(说正确输入与错误实现的落差);
 进入·缺 = 输入里本来就没有;无法确认 = 内容未知或证据不够 —— 不为了把进入点推给下游而宣布上游正常。
 文件坐标用 file() / sessions 打印的路径,agent 坐标用 agent() / index 打印的 id(主会话是 __main__:<会话号前 8 位>);
@@ -187,7 +193,7 @@ def build_server(backend: Any | None = None) -> Any:
     async def file(sid: str, path: str, v: int | None = None, content: bool = False,
                    diff: bool = False, start: int | None = None, n: int | None = None,
                    readers: bool = False, v_from: int | None = None, v_to: int | None = None,
-                   diff_chars: int | None = None, m_from: int = 1, m_n: int = 40, m_all: bool = False) -> str:
+                   diff_chars: int | None = None, m_from: int = 1, m_n: int = 40, m_all: bool = False, via: str = "") -> str:
         """版本文件原子:≤v 的写者脊柱(写者 agent 版本/来路/证据标签)、读了这一版的 agent、复原全文。
         path 可给文件名、相对路径或绝对路径;v 空 = 最新版;content=True 给全文(start/n 裁行窗口)。
         三种口径:不带 diff = 索引;diff=True 带 v = 只看第 v 版的 diff;diff=True 不带 v = 每版完整 diff,一页 40 版,
@@ -201,7 +207,7 @@ def build_server(backend: Any | None = None) -> Any:
 
     @srv.tool()
     async def agent(sid: str, id: str, v: int | None = None, since: int | None = None,
-                    reads: bool = True, seen: bool = False, until: int | None = None) -> str:
+                    reads: bool = True, seen: bool = False, until: int | None = None, via: str = "") -> str:
         """版本 agent 原子(索引):身份、派发者与派发词全文、收件箱一行一条、≤v 逐版的效应与输入
         (读按调用合行,绑文件版本,▲旧版/行段/命中行号/写前读等标)、它中途说的话一行一条、收尾输出。
         每条记录带 (#n@L行):action(id, n) 展开原文。id 可带或不带 agent- 前缀,名字唯一也认;
@@ -213,7 +219,7 @@ def build_server(backend: Any | None = None) -> Any:
 
     @srv.tool()
     async def blame(sid: str, path: str, v: int | None = None, start: int | None = None,
-                    n: int | None = None, changed: bool = False) -> str:
+                    n: int | None = None, changed: bool = False, via: str = "") -> str:
         """逐行归属:文件@v 每一行是谁在哪一版写的(确定性逐行签名)。start/n 裁窗口,汇总按全文。
         changed=True 把 v 当修复版:只给它替换/删除掉的前一版那些行及其引入者(owner@since_v)和新增行数
         —— 定位被修行的来源用这个,不必整文件 blame。"""
@@ -221,7 +227,7 @@ def build_server(backend: Any | None = None) -> Any:
         return atoms_text.render_blame(ledger, path, v, start, n, root=cwd, changed=changed)
 
     @srv.tool()
-    async def diff(sid: str, path: str, v: int) -> str:
+    async def diff(sid: str, path: str, v: int, via: str = "") -> str:
         """某一版的 unified diff(相对前一已知版)。"""
         ledger, cwd = await _ctx(sid)
         return atoms_text.render_diff(ledger, path, v, root=cwd)
@@ -244,7 +250,7 @@ def build_server(backend: Any | None = None) -> Any:
 
     @srv.tool()
     async def action(sid: str, id: str, seq: int, max_chars: int = 20000, offset: int = 0, find: str = "",
-                     part: str | None = None) -> str:
+                     part: str | None = None, via: str = "") -> str:
         """展开 agent 某一次工具调用的完整原始输入与输出(agent 工具时间线里的 #n 就是 seq)。
         账本是实录的索引,任何摘要不够看时用它拿原文,信息不会丢。输出超过 max_chars 会截断并说明剩余多少:
         part=input/output 选择翻页侧;offset= 从第几字继续,find= 直接跳到关键词前(长 think/写入正文里找决策句用它)。"""
