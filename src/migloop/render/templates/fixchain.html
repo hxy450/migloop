@@ -197,6 +197,13 @@
   .wire.chain { stroke: var(--c-fix); stroke-width: 2.2; }
   /* 没查过的兄弟折成桩,点开可看 */
   .node.leaf.stub { border-style: dashed; border-color: var(--ring); color: var(--ink-3); cursor: pointer; }
+  /* 可能写者:词法层沾边的改动类命令,虚线;只读提及折成灰桩 */
+  .node.possible { border-style: dashed; opacity: .85; }
+  .node.possible .badge.via { background: color-mix(in srgb, var(--c-file) 14%, transparent); color: var(--c-file); }
+  .wire.dashed { stroke-dasharray: 5 4; }
+  .probe .dchips { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0 6px; }
+  .probe .dchips span { font-size: 11px; padding: 1px 8px; border: 1px solid var(--ring); border-radius: 999px; cursor: pointer; color: var(--ink-2); }
+  .probe .dchips span.on { border-color: var(--c-fix); color: var(--c-fix); font-weight: 700; }
   .node.leaf.stub:hover { border-color: var(--ink-3); }
   .node .badge.dup { color: var(--ink-3); }
   .probe { border-bottom: 1px solid var(--ring); padding: 8px 10px 10px; font-size: 12px; max-height: 46%; overflow-y: auto; }
@@ -685,10 +692,37 @@
             badges: badges
           }));
         });
+        possibleWriters(node, fa);
         node.expanded = true;
         node.busy = false;
         done();
       });
+    }
+    // 词法层沾边的命令:改动类 / 正文提到 / 输出里 且账本没记到读写的,按 (agent, 版本) 合成一个虚线「可能写」节点挂在上游;
+    // 只读检查折成一个灰桩(不展开)。不立版本、不进 blame —— 只导航,点它开 agent 抽屉
+    function possibleWriters(node, fa) {
+      var ms = (fa.mentions || []).filter(function (m) {
+        if (m.effect) return false;
+        if (node.anchorV && m.win && m.win > node.anchorV) return false;
+        return true;
+      });
+      var groups = {}, order = [], ro = 0;
+      ms.forEach(function (m) {
+        if (m.cls === "readonly") { ro++; return; }
+        var k = agentKey(m.by) + "@" + m.by_ver;
+        if (!groups[k]) { groups[k] = { by: m.by, name: m.by_name, ver: m.by_ver, cls: m.cls, ctx: m.ctx, n: 0 }; order.push(k); }
+        groups[k].n++;
+      });
+      var CLS = { change: "改动类", body: "正文提到", out: "输出里", other: "其他" };
+      order.forEach(function (k) {
+        var g = groups[k];
+        addKid(node, xtNode("agent", {
+          aid: g.by, anchorVer: g.ver, possible: true,
+          label: "⋯ 可能写 " + (g.name || agentLabelOf(g.by)) + (g.ver != null ? " v" + g.ver : ""),
+          badges: [{ cls: "via", t: CLS[g.cls] || g.cls }, { cls: "", t: String(g.ctx || "").slice(0, 40) }].concat(g.n > 1 ? [{ cls: "", t: "+" + (g.n - 1) }] : [])
+        }));
+      });
+      if (ro) addKid(node, xtNode("leaf", { label: "+" + ro + " 只读提及", isRoStub: true }));
     }
     // agent 原子 → ≤ver 的读取(file@v)+ 派发它的上游(父 agent@父版本)
     function expandAgent(node, done) {
@@ -731,7 +765,7 @@
       if (node.kind === "file") drawerFile(node);
       else if (node.kind === "agent") drawerAgent(node);
       if (node.kind === "leaf" && node.isStub) { unstub(node); renderTree(node.parent); return; }
-      if (node.busy || node.kind === "leaf" || node.isRight) { renderTree(tid); return; }
+      if (node.busy || node.kind === "leaf" || node.isRight || node.possible) { renderTree(tid); return; }
       if (node.expanded) { collapse(node); renderTree(tid); return; }
       node.busy = true;
       var done = function (err) {
@@ -857,10 +891,17 @@
     }
     // 判定按「节点 + 版本」落:文件精确到 @v,agent 精确到 v;写者分组节点代表它对这个文件从 verMin 到 anchorVer 的全部写入,
     // 环的版本落在这段里也算。同一 id 的其他版本不红,只挂「环 N 判的是 vX」的灰标 —— 主会话在很多派发边上出现,不能连坐。
+    // 按缺陷分组:PROBE.defect 选了一条缺陷时,只有那条缺陷的环(和没打标签的公共环)算判定;其余环的红先收起来
+    function probeDefect(no) {
+      if (!PROBE || !PROBE.defect) return true;
+      var lk = (PROBE.links || []).filter(function (l) { return l.no === no; })[0];
+      return !lk || !lk.defect || lk.defect === PROBE.defect;
+    }
     function probeVerdictFor(node, list) {
       var nv = node.kind === "file" ? node.anchorV : node.anchorVer;
       var hit = null, other = [];
       (list || []).forEach(function (x) {
+        if (PROBE && PROBE.defect && !(x.links || []).some(probeDefect)) return;
         var ok = x.v == null || nv == null || x.v === nv
               || (node.kind === "agent" && node.isWriter && node.verMin != null && x.v >= node.verMin && x.v <= nv);
         if (ok) { if (!hit || VD_RANK[x.verdict] > VD_RANK[hit.verdict]) hit = x; }
@@ -935,6 +976,19 @@
                         + (PROBE.links || []).filter(function (l) { return l.verdict && l.onTree; }).length + "/"
                         + (PROBE.links || []).filter(function (l) { return l.verdict; }).length + "</b> 环" : "");
       probeEl.appendChild(sum);
+      var dkeys = Object.keys(PROBE.defects || {});
+      if (dkeys.length) {
+        var chips = el("div", "dchips");
+        var all = el("span", PROBE.defect ? "" : "on", "全部");
+        all.addEventListener("click", function () { PROBE.defect = null; renderProbe(); if (XT) renderTree(XT.root); });
+        chips.appendChild(all);
+        dkeys.forEach(function (k) {
+          var c = el("span", PROBE.defect === k ? "on" : "", k + (PROBE.defects[k] ? " " + PROBE.defects[k] : ""));
+          c.addEventListener("click", function () { PROBE.defect = k; renderProbe(); if (XT) renderTree(XT.root); });
+          chips.appendChild(c);
+        });
+        probeEl.appendChild(chips);
+      }
       if (PROBE.unplaced && PROBE.unplaced.length) {
         probeEl.appendChild(el("div", "sub", "查过但不在这棵树上(" + PROBE.unplaced.length + ")· 点一下以它为根"));
         PROBE.unplaced.forEach(function (n) {
@@ -947,6 +1001,7 @@
       }
       probeEl.appendChild(el("div", "sub", "报告的环 · 点一下以它指的节点为根"));
       (PROBE.links || []).forEach(function (lk) {
+        if (PROBE.defect && lk.defect && lk.defect !== PROBE.defect) return;
         var row = el("div", "lk " + (VD_CLS[lk.verdict] || "") + (lk.entry ? " entry" : ""));
         row.appendChild(el("span", "no", (lk.entry ? "★" : "") + "环" + lk.no));
         var t = el("span", "t", (lk.bad_refs && lk.bad_refs.length ? "[引用无效 " + lk.bad_refs.join(",") + "] " : "")
@@ -1087,6 +1142,7 @@
       else c = "file" + (node.stale ? " stale" : "");
       if (node.isRoot) c += " root";
       if (node.isRight) c += " down";
+      if (node.possible) c += " possible";
       return c;
     }
 
@@ -1229,7 +1285,8 @@
         var mx = (x1 + x2) / 2;
         var path = document.createElementNS("http://www.w3.org/2000/svg", "path");
         path.setAttribute("d", "M" + x1 + "," + y1 + " C" + mx + "," + y1 + " " + mx + "," + y2 + " " + x2 + "," + y2);
-        path.setAttribute("class", "wire" + (PROBE && !PROBE.error && probeOnChain(n) && probeOnChain(p) ? " chain" : ""));
+        path.setAttribute("class", "wire" + (PROBE && !PROBE.error && probeOnChain(n) && probeOnChain(p) ? " chain" : "")
+                                     + (n.possible ? " dashed" : ""));
         frag.appendChild(path);
         (wireByTid[tid] = wireByTid[tid] || []).push(path);
         (wireByTid[n.parent] = wireByTid[n.parent] || []).push(path);

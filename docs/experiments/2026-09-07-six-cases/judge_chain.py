@@ -23,6 +23,8 @@ JUDGE_PROMPT = """你是迁移返修归因报告的评审。下面是关于**同
 2. 两份报告在哪些环指向同一个节点(同一个 agent 的同一次写、同一份 spec 的同一处)?在这些共同环上判定是否一致?
 3. 故障进入点是否同一环?若不同,哪份的进入点更站得住(理由要引报告里的证据)。
 4. 坐标可核性(1–5):每个断言是否指向具体、可回查的位置(文件 / 版本 / 记录号 / 行号 / 时间);泛泛而谈算低。
+   下面「引用核验(机械)」一节是脚本对两份报告里的坐标逐条核过的结果:位置无效的引用不计入可核性;但位置有效只证明
+   「那里有这条记录」,不证明记录支持该断言 —— 断言是否被原文支持仍由你按报告内容判。
 5. 内部一致性(1–5):有没有自相矛盾、结论超出证据、把范围有限的零命中说成全局否定。
 6. 事实冲突:两份在事实层面互相矛盾之处,逐条列(没有就空)。
 7. 哪份更可信(A / B / tie),一句话理由;哪份对「生成期该改什么流程」更有用(A / B / tie)。
@@ -31,6 +33,9 @@ JUDGE_PROMPT = """你是迁移返修归因报告的评审。下面是关于**同
 {"a_links": n, "b_links": n, "a_leaf": "...", "b_leaf": "...", "shared_links": n, "shared_verdict_agree": n,
  "same_entry": true|false, "entry_note": "...", "a_checkable": n, "b_checkable": n, "a_consistency": n, "b_consistency": n,
  "conflicts": ["..."], "preferred": "A"|"B"|"tie", "reason": "...", "more_actionable": "A"|"B"|"tie"}
+
+===== 引用核验(机械)=====
+{CITE}
 
 ===== 报告 A =====
 {A}
@@ -49,8 +54,8 @@ def load_result(label: str, chain: int) -> tuple[str, dict] | None:
     return str(r.get("result") or ""), m
 
 
-def judge_one(a: str, b: str) -> dict:
-    prompt = JUDGE_PROMPT.replace("{A}", a).replace("{B}", b)
+def judge_one(a: str, b: str, cite: str = "(未核验)") -> dict:
+    prompt = JUDGE_PROMPT.replace("{A}", a).replace("{B}", b).replace("{CITE}", cite)
     proc = subprocess.run([CLAUDE, "-p", "--model", "opus", "--max-turns", "2", "--output-format", "json"],
                           input=prompt, capture_output=True, text=True, encoding="utf-8", timeout=900)
     res = json.loads(proc.stdout)
@@ -66,9 +71,21 @@ def side(v: dict, key: str, treat_is_a: bool) -> tuple:
     return (a, b) if treat_is_a else (b, a)
 
 
+CITE_POOL = None
+
+
 def main() -> None:
-    treat, control = sys.argv[1], sys.argv[2]
-    chains = [int(x) for x in sys.argv[3:]] or sorted(
+    global CITE_POOL
+    args = sys.argv[1:]
+    if "--sid" in args:
+        i = args.index("--sid")
+        sid = args[i + 1]
+        del args[i:i + 2]
+        sys.path.insert(0, EXP)
+        import cite_check
+        CITE_POOL = cite_check.pool_for(sid)          # 账本 + 转录池:两份报告的坐标都按它核
+    treat, control = args[0], args[1]
+    chains = [int(x) for x in args[2:]] or sorted(
         int(os.path.basename(p)[5:7]) for p in glob.glob(os.path.join(EXP, "runs", treat, "chain*")))
     rng = random.Random(20260908)
     out = []
@@ -79,7 +96,13 @@ def main() -> None:
             continue
         treat_is_a = rng.random() < 0.5
         a, b = (t[0], c[0]) if treat_is_a else (c[0], t[0])
-        v = judge_one(a, b)
+        cite = "(未核验:没给 --sid)"
+        if CITE_POOL is not None:
+            import cite_check
+            ra, rb = cite_check.check_report(*CITE_POOL, a), cite_check.check_report(*CITE_POOL, b)
+            cite = cite_check.summary_line("报告 A", ra) + "\n" + cite_check.summary_line("报告 B", rb)
+        v = judge_one(a, b, cite)
+        v["_cite"] = cite
         pref = v.get("preferred")
         pref_method = ("treat" if (pref == "A") == treat_is_a else "control") if pref in ("A", "B") else "tie"
         act = v.get("more_actionable")

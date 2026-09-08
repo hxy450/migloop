@@ -1,9 +1,9 @@
 """引用核验(机械):两组报告里的坐标能不能核回原文。只证明「位置存在、原文匹配」,不证明结论成立。
 
-工具组坐标:#n@L行(账本动作号 + 转录行号,要求账本 lines[n] == L)、path@vN(账本里该文件版本数 ≥ N)。
+工具组坐标:#n@L行·转录标识(按 (标识, 行) 反查账本 by_loc;老格式 #n@L行 要求账本 lines[n] == L)、path@vN(该文件版本数 ≥ N)。
 原始组坐标:<转录文件>.jsonl:行号(池子里有这个文件且行数 ≥ 行号)、toolu_… id(在池子任一转录里出现)。
-用法: python cite_check.py <sid> <report.json 或 result.json>...   → 每份一行 JSON:{total, valid, invalid, samples}
-也可 import:check_report(ledger, pool_dir, text) -> dict。评委脚本把这一行拼进提示词。"""
+用法: python cite_check.py <sid> <result.json>...   → 每份一行 JSON:{total, valid, invalid, drifted, samples}
+也可 import:check_report(ledger, pool, text) -> dict;summary_line(tag, r) -> str。评委脚本把 summary_line 拼进提示词。"""
 from __future__ import annotations
 
 import glob
@@ -13,7 +13,7 @@ import re
 import sys
 from typing import Any
 
-_TOOL_REF = re.compile(r"#(\d+)@L(\d+)")
+_TOOL_REF = re.compile(r"#(\d+)@L(\d+)(?:·([0-9a-f]+))?")
 _FILE_AT = re.compile(r"([\w./-]+\.[A-Za-z0-9]+)@v(\d+)")
 _RAW_LINE = re.compile(r"([\w-]+\.jsonl):(\d+)")
 _TUID = re.compile(r"\btoolu_[A-Za-z0-9]{8,}\b")
@@ -60,11 +60,23 @@ class Pool:
 
 
 def check_report(ledger: Any, pool: Pool, text: str) -> dict[str, Any]:
-    total = valid = 0
+    total = valid = drifted = 0
     bad: list[str] = []
     for m in _TOOL_REF.finditer(text):
         total += 1
-        if ledger is not None and ledger.lines.get(int(m.group(1))) == int(m.group(2)):
+        no, line, tag = int(m.group(1)), int(m.group(2)), m.group(3)
+        if ledger is None:
+            bad.append(m.group(0))
+            continue
+        if tag:
+            hit = getattr(ledger, "by_loc", {}).get((tag, line))
+            if hit is not None:
+                valid += 1
+                if hit != no:
+                    drifted += 1                      # #n 漂了,位置对得上:仍可核
+            else:
+                bad.append(m.group(0))
+        elif ledger.lines.get(no) == line:
             valid += 1
         else:
             bad.append(m.group(0))
@@ -80,8 +92,8 @@ def check_report(ledger: Any, pool: Pool, text: str) -> dict[str, Any]:
     for m in _RAW_LINE.finditer(text):
         total += 1
         name = m.group(1)
-        hit = next((n for n in pool.files if n == name or n.startswith(name.rsplit(".", 1)[0])), None)
-        if hit and pool.lines(hit) >= int(m.group(2)):
+        hit_name = next((n for n in pool.files if n == name or n.startswith(name.rsplit(".", 1)[0])), None)
+        if hit_name and pool.lines(hit_name) >= int(m.group(2)):
             valid += 1
         else:
             bad.append(m.group(0))
@@ -91,26 +103,32 @@ def check_report(ledger: Any, pool: Pool, text: str) -> dict[str, Any]:
             valid += 1
         else:
             bad.append(tuid)
-    return {"total": total, "valid": valid, "invalid": len(bad), "samples": bad[:8]}
+    return {"total": total, "valid": valid, "invalid": len(bad), "drifted": drifted, "samples": bad[:8]}
 
 
 def summary_line(tag: str, r: dict[str, Any]) -> str:
     if not r["total"]:
         return f"{tag}:没有可机械核验的坐标"
-    s = f"{tag}:{r['total']} 条坐标,可核 {r['valid']},无效 {r['invalid']}"
+    s = f"{tag}:{r['total']} 条坐标,位置可核 {r['valid']},无效 {r['invalid']}"
+    if r.get("drifted"):
+        s += f"(其中 {r['drifted']} 条动作号漂了但位置对得上)"
     if r["samples"]:
-        s += "(无效例:" + ", ".join(r["samples"][:5]) + ")"
+        s += ";无效例:" + ", ".join(r["samples"][:5])
     return s
 
 
-def main() -> None:
+def pool_for(sid: str) -> tuple[Any, Pool]:
     from migloop import service
-    sid, files = sys.argv[1], sys.argv[2:]
     path = service.locate_session(sid)
     ledger = service.session_ledger(path)
     trace = service.extract_trace(path)
     cwd = str((trace.get("meta") or {}).get("cwd") or "")
-    pool = Pool([*service.prior_roots(service._fmt_of(trace), path, cwd), path])
+    return ledger, Pool([*service.prior_roots(service._fmt_of(trace), path, cwd), path])
+
+
+def main() -> None:
+    sid, files = sys.argv[1], sys.argv[2:]
+    ledger, pool = pool_for(sid)
     for f in files:
         with open(f, encoding="utf-8") as fh:
             data = json.load(fh)

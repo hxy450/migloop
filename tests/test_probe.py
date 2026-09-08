@@ -71,6 +71,9 @@ def test_fixchain_template_has_probe_hooks() -> None:
     assert 'id="probe"' in html and "U.probe" in html and "probeDecorate(d, node)" in html and "bootProbe()" in html
     # 调查树:根开好后自动展开到每个查过的节点;没查过的兄弟折成桩;被归因的链整条标红(节点 + 边)
     assert "probeExpand(" in html and "unstub(" in html and "isStub" in html
+    # 树上虚线:改动类可能写者挂上游、只读提及折灰桩;调查树按缺陷分组
+    assert ".node.possible" in html and "possibleWriters(" in html and "只读提及" in html
+    assert "probeDefect(" in html and "PROBE.defect" in html
     assert ".node.p-chain" in html and ".wire.chain" in html and "未查" in html
     # 红只落在 键 + 版本 对上的节点;同 id 别的版本挂灰标说明环判的是哪一版
     assert "probeVerdictFor(" in html and "判的是 v" in html
@@ -113,3 +116,22 @@ def test_probe_resolves_drifted_action_numbers_by_location(tmp_path: Any) -> Non
     p = probe.probe_payload(led, _run_dir(tmp_path, [], report))
     assert p["links"][0]["bad_refs"] == []
     assert any(n.get("action") == conv_seq and n["aid"] == "agent-c" for n in p["links"][0]["nodes"])
+
+
+def test_probe_groups_links_by_defect_tag(tmp_path: Any) -> None:
+    """一次修复含几条不相干的缺陷,报告环带【A 返回键】【B 进度条】标签:probe 按标签分组,面板可以只看一条链。"""
+    conv = [_rec("2026-01-01T00:00:00Z", "user", "转换 A"),
+            *_call("2026-01-01T00:00:20Z", "c2", "Write", {"file_path": "/proj/entry/A.ets", "content": "a\n"},
+                   "File created successfully at: /proj/entry/A.ets")]
+    main = [*_call("2026-01-01T00:00:00Z", "m1", "Agent", {"name": "conv-a", "prompt": "转换 A"}, "done",
+                   toolUseResult={"agentId": "c"})]
+    led = _ledger(tmp_path, main, {"agent-c": conv})
+    report = ("文件: entry/A.ets\n"
+              "环 1  【A 返回键】conv-a(agent-c)v1 写 A.ets@v1   判定: 错\n"
+              "环 2  【A 上游】spec/pages/A.md@v1 外部输入   判定: 缺\n"
+              "环 3  【B 进度条】conv-a(agent-c)v1 写 A.ets@v1   判定: 传递\n"
+              "环 4  单据层 fixer 写 A.ets@v2   判定: 传递\n"
+              "故障进入点: 环 1\n")
+    p = probe.probe_payload(led, _run_dir(tmp_path, [], report))
+    assert [lk["defect"] for lk in p["links"]] == ["A", "A", "B", None]
+    assert p["defects"] == {"A": "返回键", "B": "进度条"}

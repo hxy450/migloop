@@ -22,6 +22,7 @@ _ENTRY_ALSO = re.compile(r"进入点是\s*环\s*(\d+)")     # 几条缺陷各自
 _FILE_AT = re.compile(r"([\w./-]+\.[A-Za-z0-9]+)@v(\d+)")
 _AGENT_ID = re.compile(r"agent-[0-9a-f]+")        # 账本 id 是 16 位 hex,测试里的短 id 也认
 _ACTION = re.compile(r"#(\d+)@L(\d+)(?:·([0-9a-f]+))?")
+_DEFECT = re.compile(r"【([A-Za-z0-9])\s*([^】]*)】")     # 【A 返回键】【B 进度条】【C 上游】:字母是缺陷,后面是说明
 _MAIN_AT = re.compile(r"主会话[·:]?\s*([0-9a-f]{6,})?\s*@?v(\d+)")   # 报告写主会话不用 agent- id:「主会话·9b3105a2 @v83」
 _RANK = {"错": 3, "缺": 2, "传递": 1}
 
@@ -152,6 +153,7 @@ def probe_payload(ledger: atoms.Ledger, run_dir: str) -> dict[str, Any]:
     entries = _entries(report)
     entry_no = entries[0] if entries else None
     links: list[dict[str, Any]] = []
+    defects: dict[str, str] = {}
     for ln in report.split("\n"):
         mm = _LINK.match(ln)
         if not mm:
@@ -159,8 +161,14 @@ def probe_payload(ledger: atoms.Ledger, run_dir: str) -> dict[str, Any]:
         no, body = int(mm.group(1)), mm.group(2)
         vd = _VERDICT.search(body)
         nodes, bad = _link_nodes(ledger, body)
+        dm = _DEFECT.search(body)
+        defect = dm.group(1) if dm else None
+        if dm and defect not in defects and dm.group(2) and not any(w in dm.group(2) for w in ("上游", "池外", "入口")):
+            defects[defect] = dm.group(2).strip()
+        elif dm and defect not in defects:
+            defects[defect] = ""
         links.append({"no": no, "verdict": vd.group(1) if vd else None, "entry": no in entries,
-                      "text": body[:400], "nodes": nodes, "bad_refs": bad})
+                      "text": body[:400], "nodes": nodes, "bad_refs": bad, "defect": defect})
     # 节点 → 判定:只算它当主语的环(正文第一个坐标),按「节点 + 版本」记,不按 id 连坐(主会话在树上到处出现,
     # 环 9 判的是它 v83 的派发词,v1 / v60 不该跟着红);同一节点同一版被几环判过取最重(错 > 缺 > 传递)
     verdicts: dict[str, list[dict[str, Any]]] = {}
@@ -189,4 +197,4 @@ def probe_payload(ledger: atoms.Ledger, run_dir: str) -> dict[str, Any]:
         root = filestory.find_story_path(ledger.stories, fm.group(1))
     return {"run": os.path.basename(os.path.dirname(os.path.abspath(run_dir))), "cost": m.get("cost_usd"), "turns": m.get("num_turns"),
             "root": root, "steps": steps, "links": links, "entry": entry_no, "entries": entries, "verdicts": verdicts,
-            "bad_refs": sum(len(lk["bad_refs"]) for lk in links), "report": report}
+            "bad_refs": sum(len(lk["bad_refs"]) for lk in links), "defects": defects, "report": report}
