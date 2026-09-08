@@ -116,7 +116,7 @@ closer 或后续写者破坏 / 源码没读全。每条证据带 `path@v` 或 `a
 ```yaml
 schema: migloop-verdict/1
 ledger: <照抄 sessions 输出首行「账本身份:」后面那一串>
-root: file:<被修文件的账本路径>@v<修复前最后一版>
+root: file:<被修文件的账本路径>@v<最终版本(账本里最后一版)>
 defects:
   - id: A                                   # 一条缺陷一项;几条不相干的缺陷分开列,可共享节点
     title: <一句话说这条缺陷>

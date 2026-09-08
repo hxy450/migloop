@@ -214,6 +214,8 @@
   .node .badge.r-unk, .probe .badge.r-unk, .side .badge.r-unk { color: var(--ink-3); border: 1px dashed var(--ring); }
   .node .badge.fixed, .probe .badge.fixed, .side .badge.fixed { background: rgba(212,160,23,.18); color: #8a6400; font-weight: 700; }
   .wire.cand { stroke: var(--c-fix); stroke-dasharray: 5 4; stroke-width: 1.8; }
+  .wire.succ { stroke-dasharray: 2 4; }
+  .wire.extra { opacity: .75; }
   .prow { border-left: 3px solid var(--ring); padding: 4px 8px; margin: 6px 0; border-radius: 0 6px 6px 0; background: var(--wash); }
   .prow.r-err, .prow.r-carry { border-left-color: var(--c-fix); } .prow.r-gap { border-left-color: #b8860b; } .prow.r-ok { border-left-color: var(--c-gen); }
   .prow .phd { display: flex; gap: 6px; align-items: baseline; flex-wrap: wrap; margin-bottom: 3px; }
@@ -1017,10 +1019,11 @@
       } else if (pm.mentions.length) {
         d.appendChild(el("span", "badge", "环" + pm.mentions.slice(0, 3).join(",") + " 提到"));
       }
-      if (pm.steps.length) {
+      var stepsFor = node.traj ? (PROBE.steps || []).filter(function (s) { return (node.trajOpened || []).indexOf(s.i) >= 0; }) : pm.steps;
+      if (stepsFor.length) {
         d.classList.add("p-seen");
-        var stepB = el("span", "badge step", "查 #" + pm.steps.slice(0, 3).map(function (s) { return s.i; }).join(",") + (pm.steps.length > 3 ? "…" : ""));
-        stepB.title = pm.steps.map(function (s) { return "#" + s.i + " " + s.tool + " " + (s.scope || ""); }).join("\n");   // 蓝框只说明查过这个键,范围看这里
+        var stepB = el("span", "badge step", "查 #" + stepsFor.slice(0, 3).map(function (s) { return s.i; }).join(",") + (stepsFor.length > 3 ? "…" : ""));
+        stepB.title = stepsFor.map(function (s) { return "#" + s.i + " " + s.tool + " " + (s.scope || ""); }).join("\n");   // 蓝框只说明查过这个键,范围看这里
         d.appendChild(stepB);
       } else if (node.kind !== "leaf" && !vd && !pr.hit.length && !pr.fixed.length) {
         d.classList.add("p-dim");
@@ -1065,7 +1068,7 @@
       ld.appendChild(inp);
       ld.appendChild(btn);
       probeEl.appendChild(ld);
-      if (!PROBE) { probeEl.appendChild(el("div", "sum", "载入一次调查员的跑:树就是它走过的路(查过的 + 结论点名的节点,每个一次,挂在第一次看到它的那一步下),结论按缺陷 × 版本上色,进入点描边。")); return; }
+      if (!PROBE) { probeEl.appendChild(el("div", "sum", "载入一次调查员的跑:树上只有它查过的和结论点名的节点(每个一次),边只画账本核得出来的写 / 读 / 派发 / 前一版,根是被修文件的最终版本;结论按缺陷 × 版本上色,进入点描边。")); return; }
       if (PROBE.error) { probeEl.appendChild(el("div", "sum", "载入失败:" + PROBE.error)); return; }
       var sum = el("div", "sum", "");
       sum.innerHTML = "<b>" + (PROBE.links || []).length + "</b> 环 · 进入点 <b>" + (PROBE.entry != null ? "环 " + (PROBE.entries || [PROBE.entry]).join(" / ") : "未标") + "</b> · 查过 <b>" + Object.keys(PROBE.byKey).length + "</b> 个节点"
@@ -1325,42 +1328,57 @@
       });
       if (q.probe) loadProbe(q.probe);
     }
-    // ═══════════ 调查轨迹树:树 = 模型走过的路 ═══════════
-    // 节点只有 agent@版本 / file@版本 两种:模型真的查过的 + 结论块点名的,每个一次;挂在它第一次出现在返回文本里
-    // 的那一步的落点下(实录的「看到」边);sessions / 全池 search 带进来的挂根、虚线;从没出现过就被查的标「无来源」。
+    // ═══════════ 调查树:账本边 + 步号,零推断 ═══════════
+    // 节点只有 agent@版本 / file@版本 两种:模型真的查过的 + 结论块点名的,每个一次。结构只用账本核得出来的边
+    // (写 / 读 / 派发 / 同一文件的前一版);根 = 被修文件的最终版本,生成与修复都在它上游(左);路线只是节点上的步号,
+    // 「出现于 #j」是事实标注不画边;不在根的上下游锥里的(可能有账本边,比如读过链上某一版)单独一列,边照画,不挂人。
     // 「+N 未查」是账本里这个节点还有几个上游邻居没被查(只按精确版本数),不展开 —— 要看账本邻居,点节点开抽屉。
     function probeBuildTrajectory() {
       var T = PROBE && PROBE.trajectory;
       if (!T || !T.nodes || !T.nodes.length) return;
-      XT = { byId: {}, seq: 0, root: null, rights: [], rootKind: T.nodes[0].kind };
+      XT = { byId: {}, seq: 0, root: null, rights: [], rootKind: T.nodes[0].kind, extra: [], unlinkedDepth: null };
       var byId = {};
       T.nodes.forEach(function (n) {
         var node = n.kind === "file"
           ? xtNode("file", { path: n.key, anchorV: n.v, label: n.label })
           : xtNode("agent", { aid: n.key, anchorVer: n.v, label: n.label });
-        node.traj = true; node.expanded = true; node.children = []; node.edgeKind = n.edge_kind; node.trajSource = n.source;
+        node.traj = true; node.expanded = true; node.children = [];
+        node.trajOpened = n.opened || []; node.trajSide = n.side; node.edgeRel = n.edge;
         var b = [];
-        if (n.edge_kind === "seen") b.push({ cls: "", t: "#" + n.seen_step + " 看到" + (n.seen_exact ? "" : "·版本未标") });
-        else if (n.edge_kind === "search") b.push({ cls: "via", t: "#" + n.seen_step + " 命中" });
-        else if (n.edge_kind === "none") b.push({ cls: "stale", t: "无来源" });
-        else if (n.edge_kind === "task") b.push({ cls: "", t: "任务给的" });
+        if (n.edge) b.push({ cls: "", t: "账本·" + n.edge + (n.skipped ? "·跳过 " + n.skipped + " 版" : "") });
+        if (n.source === "任务") b.push({ cls: "", t: "任务给的" });
         if (n.source === "结论") b.push({ cls: "via", t: "命中未展开" });
+        if (n.source === "修复前") b.push({ cls: "stale", t: "修复前" });
         if (n.fixed) b.push({ cls: "", t: "修复后" });
-        if (n.seen_count > 1) b.push({ cls: "", t: "+" + (n.seen_count - 1) + " 次出现" });
-        if (n.ledger && n.ledger.status === "true") b.push({ cls: "", t: "账本·" + n.ledger.relation });
-        else if (n.ledger && n.ledger.status === "unknown") b.push({ cls: "via", t: "账本·候选" });
+        if (n.appears && n.appears.length) b.push({ cls: "", t: "出现于 #" + n.appears.slice(0, 4).join(",") + (n.appears.length > 4 ? "…" : "") });
         node.badges = b;
         byId[n.id] = node;
       });
+      var root = byId[T.root];
+      root.isRoot = true; root.depth = 0; XT.root = root.tid;
+      var maxD = 0;
+      T.nodes.forEach(function (n) {
+        if (n.id === T.root) return;
+        var node = byId[n.id];
+        if (n.side === "down") { addRight(root, node); return; }
+        addKid(byId[n.parent] || root, node);
+        if (n.side === "unlinked") node.unlinked = true;
+        else if (node.depth > maxD) maxD = node.depth;
+      });
       T.nodes.forEach(function (n) {
         var node = byId[n.id];
-        if (!n.parent || !byId[n.parent]) { node.isRoot = true; node.depth = 0; XT.root = node.tid; return; }
-        addKid(byId[n.parent], node);
+        if (node.unlinked) { node.depth = maxD + 1; XT.unlinkedDepth = maxD + 1; }
+      });
+      // 布局父子之外的账本边也画(同一节点几个上游、同一文件的前一版),不复制节点
+      var parentEdge = {};
+      T.nodes.forEach(function (n) { if (n.parent && n.side !== "unlinked") parentEdge[n.id + ">" + n.parent] = 1; });
+      (T.edges || []).forEach(function (e) {
+        if (parentEdge[e.from + ">" + e.to] || !byId[e.from] || !byId[e.to]) return;
+        XT.extra.push({ a: byId[e.from].tid, b: byId[e.to].tid, rel: e.relation });
       });
       T.nodes.forEach(function (n) {
-        if (n.unseen > 0) addKid(byId[n.id], xtNode("leaf", { label: "+" + n.unseen + " 未查", isRoStub: true }));
+        if (n.unseen > 0 && n.side === "up") addKid(byId[n.id], xtNode("leaf", { label: "+" + n.unseen + " 未查", isRoStub: true }));
       });
-      var root = XT.byId[XT.root];
       if (root.kind === "file") setRootLabel(root.label, "F:" + root.path, "file=" + encodeURIComponent(root.path) + "&v=" + (root.anchorV || ""));
       else setRootLabel(root.label, "A:" + root.aid, "agent=" + encodeURIComponent(root.aid) + "&v=" + (root.anchorVer || ""));
       selTid = root.tid;
@@ -1560,7 +1578,7 @@
       svg.setAttribute("width", totalW); svg.setAttribute("height", totalH);
       svg.style.width = totalW + "px"; svg.style.height = totalH + "px";
       for (var d = 0; d <= maxD; d++) {
-        var title = d === 0 ? (root.kind === "file" ? "ROOT · 文件" : "ROOT · agent") : "上游 " + d;
+        var title = d === 0 ? (root.kind === "file" ? "ROOT · 文件" : "ROOT · agent") : (XT.unlinkedDepth === d ? "查过 · 不在根的上下游" : "上游 " + d);
         var h = el("div", "colhead" + (d === 0 ? (root.kind === "file" ? " root" : " rootA") : ""), title);
         h.style.left = colX(d) + "px"; h.style.width = NODE_W + "px";
         canvas.appendChild(h);
@@ -1613,7 +1631,7 @@
       var frag = document.createDocumentFragment();
       Object.keys(XT.byId).forEach(function (tid) {
         var n = XT.byId[tid];
-        if (!n.parent) return;
+        if (!n.parent || n.unlinked) return;
         var p = XT.byId[n.parent];
         if (!p) return;
         var a, b;
@@ -1624,10 +1642,24 @@
         path.setAttribute("d", "M" + x1 + "," + y1 + " C" + mx + "," + y1 + " " + mx + "," + y2 + " " + x2 + "," + y2);
         var onChain = PROBE && !PROBE.error && probeOnChain(n) && probeOnChain(p);
         path.setAttribute("class", "wire" + (onChain ? (n.possible || p.possible ? " cand" : " chain") : "")
-                                     + (n.possible || (n.traj && n.edgeKind !== "seen") ? " dashed" : ""));
+                                     + (n.possible ? " dashed" : "") + (n.edgeRel === "前一版" ? " succ" : ""));
         frag.appendChild(path);
         (wireByTid[tid] = wireByTid[tid] || []).push(path);
         (wireByTid[n.parent] = wireByTid[n.parent] || []).push(path);
+      });
+      (XT.extra || []).forEach(function (e) {
+        var n = XT.byId[e.a], p = XT.byId[e.b];
+        if (!n || !p) return;
+        var a, b;
+        if (n.x < p.x) { a = n; b = p; } else { a = p; b = n; }
+        var x1 = a.x + NODE_W, y1 = a.y + NODE_H / 2, x2 = b.x, y2 = b.y + NODE_H / 2;
+        var mx = (x1 + x2) / 2;
+        var path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        path.setAttribute("d", "M" + x1 + "," + y1 + " C" + mx + "," + y1 + " " + mx + "," + y2 + " " + x2 + "," + y2);
+        path.setAttribute("class", "wire extra" + (e.rel === "前一版" ? " succ" : "") + (PROBE && !PROBE.error && probeOnChain(n) && probeOnChain(p) ? " chain" : ""));
+        frag.appendChild(path);
+        (wireByTid[e.a] = wireByTid[e.a] || []).push(path);
+        (wireByTid[e.b] = wireByTid[e.b] || []).push(path);
       });
       svg.appendChild(frag);
     }

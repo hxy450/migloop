@@ -260,9 +260,13 @@ def _structured(ledger: atoms.Ledger, run_dir: str, report: str) -> dict[str, An
     return verdict.build(ledger, lb["data"], lb["errors"], {"kind": lb["kind"], "raw": lb["raw"]})
 
 
-# ═══════════════ 调查轨迹树:树 = 模型走过的路 ═══════════════
-# 节点只有 agent@版本 / file@版本 两种,只收模型真的查过的和结论块点名的;每个节点一次,挂在它第一次出现在
-# 返回文本里的那一步的落点下。返回文本来自 harness 存的 transcript.jsonl,是实录,不是推断。
+# ═══════════════ 调查树:账本边 + 步号,零推断 ═══════════════
+# 节点只有 agent@版本 / file@版本 两种:模型真的查过的 + 结论块点名的,每个一次。
+# 结构只用账本里核得出来的关系:写(agent@vK → file@vN)、读(file@vN → agent@vK)、派发(agent → agent)、
+# 前一版(同一文件相邻两个在场版本,中间跳过的版本数标出来)。模型的路线只有一种诚实表示:节点上的步号。
+# 「出现于 #j」= 那一步的返回文本里含这个坐标,是事实;「模型因为它才走过去」不是事实,所以不画边。
+# 根 = 被修文件的最终版本,生成 / 修复的一切都在它上游(左);不在根的上下游锥里的节点单独一列(有账本边照画)。
+
 
 def _transcript_results(run_dir: str) -> list[str] | None:
     """transcript.jsonl 里按 tool_use 出现顺序的返回文本(与 metrics.transcript.seq 同序);没有转录 → None。"""
@@ -297,7 +301,7 @@ def _transcript_results(run_dir: str) -> list[str] | None:
 
 
 def _sight(text: str, kind: str, key: str, v: int | None, ledger: atoms.Ledger | None) -> tuple[bool, bool]:
-    """返回文本里有没有这个节点 → (看见了这个键, 版本也对上了)。文件按最长能匹配的路径后缀;agent 按 id / 尾段 / 主会话号 / 名字。"""
+    """返回文本里有没有这个节点 → (有这个键, 版本也对上了)。文件按最长能匹配的路径后缀;agent 按 id / 尾段 / 主会话号 / 名字。"""
     if kind == "file":
         parts = [x for x in key.replace("\\", "/").split("/") if x]
         for i in range(len(parts)):
@@ -344,6 +348,14 @@ def _traj_label(ledger: atoms.Ledger, kind: str, key: str, v: int | None) -> str
     return f"{name} v{v}" if v is not None else f"{name}(全程)"
 
 
+def _n_versions(ledger: atoms.Ledger, kind: str, key: str) -> int:
+    if kind == "file":
+        st = ledger.stories.get(key)
+        return len(st.versions) if st else 0
+    a = ledger.agents.get(key)
+    return sum(1 for act in a.actions if act.ver is not None) if a else 0
+
+
 def _upstream_neighbors(ledger: atoms.Ledger, kind: str, key: str, v: int | None) -> set[tuple[str, str, int | None]]:
     """账本里这个节点的上游邻居(精确版本才算):file@v → 写者@写者版本;agent@v → 喂养 ≤v 的确定读取 + 派发者。"""
     out: set[tuple[str, str, int | None]] = set()
@@ -371,6 +383,26 @@ def _upstream_neighbors(ledger: atoms.Ledger, kind: str, key: str, v: int | None
     return out
 
 
+def _ledger_relation(ledger: atoms.Ledger, a: dict[str, Any], b: dict[str, Any]) -> str | None:
+    """a → b 在账本里是不是一条 写 / 读 / 派发 边(只认核成 true 的;候选不算结构)。"""
+    if a["v"] is None or b["v"] is None:
+        return None
+    ra = verdict.resolve_node(ledger, f"{a['kind']}:{a['key']}@v{a['v']}")
+    rb = verdict.resolve_node(ledger, f"{b['kind']}:{b['key']}@v{b['v']}")
+    if not (ra["ok"] and rb["ok"]):
+        return None
+    if a["kind"] == "agent" and b["kind"] == "file":
+        rel = "写"
+    elif a["kind"] == "file" and b["kind"] == "agent":
+        rel = "读"
+    elif a["kind"] == "agent" and b["kind"] == "agent":
+        rel = "派发"
+    else:
+        return None
+    st, _rel, _note = verdict.check_edge(ledger, ra, rb, rel)
+    return rel if st == "true" else None
+
+
 def _trajectory(ledger: atoms.Ledger, run_dir: str, steps: list[dict[str, Any]], root: str | None,
                 structured: dict[str, Any] | None, verdicts: dict[str, list[dict[str, Any]]]) -> dict[str, Any] | None:
     texts = _transcript_results(run_dir)
@@ -378,37 +410,41 @@ def _trajectory(ledger: atoms.Ledger, run_dir: str, steps: list[dict[str, Any]],
         return None
     if len(texts) < len(steps):
         texts = texts + [""] * (len(steps) - len(texts))
-    # 根:被修文件的修复前版本(结论块 repair.before),没有就整个文件
-    root_v: int | None = None
-    if structured:
-        for d in structured.get("defects") or []:
-            b = (d.get("repair") or {}).get("before")
-            if b and b.get("ok") and b.get("kind") == "file" and b.get("key") == root:
-                root_v = int(b["v"])
-                break
     nodes: dict[str, dict[str, Any]] = {}
 
     def add(kind: str, key: str, v: int | None, source: str) -> dict[str, Any]:
+        if v is None and _n_versions(ledger, kind, key) == 1:
+            v = 1                                              # 只有一版的键,索引 / 全程查询就是那一版(事实,不是猜)
         nid = _traj_id(kind, key, v)
         n = nodes.get(nid)
         if n is None:
             n = nodes[nid] = {"id": nid, "kind": kind, "key": key, "v": v, "label": _traj_label(ledger, kind, key, v),
-                              "source": source, "opened": [], "seen_step": None, "seen_tool": None, "seen_exact": False,
-                              "seen_count": 0, "parent": None, "edge_kind": "none", "unseen": 0, "ledger": None,
-                              "fixed": False}
+                              "source": source, "fixed": False, "opened": [], "appears": [],
+                              "parent": None, "edge": None, "skipped": 0, "side": "up", "depth": 0,
+                              "unseen": 0}
         return n
 
-    if root_v is None:                                         # 没有修复锚点:结论点名的这个文件的最早一版当根
-        cands = [int(r["v"]) for r in ((structured or {}).get("roles") or {}).get(root, []) if r.get("v") is not None]
-        cands += [int(r["v"]) for r in verdicts.get(root, []) if r.get("v") is not None]
-        root_v = min(cands) if cands else None
-    root_node = add("file", root, root_v, "任务")
-    root_node["edge_kind"] = "task"
+    # 根 = 被修文件的最终版本:一切生成 / 修复都在它上游
+    st = ledger.stories.get(root)
+    root_node = add("file", root, len(st.versions) if st and st.versions else None, "任务")
     # 结论块点名的(精确版本)
     if structured and not structured.get("errors"):
         for key, rows in (structured.get("roles") or {}).items():
             for r in rows:
                 add(str(r["kind"]), key, r["v"], "结论")
+        for d in structured.get("defects") or []:
+            before = (d.get("repair") or {}).get("before")
+            if before and before.get("ok"):
+                add(str(before["kind"]), str(before["key"]), before["v"], "修复前")
+            for e in d.get("edges") or []:                      # 模型自己写的边,两端也是它点名的坐标
+                for end in (e.get("from"), e.get("to")):
+                    if end and end.get("ok"):
+                        add(str(end["kind"]), str(end["key"]), end["v"], "结论")
+            for nd in d.get("nodes") or []:
+                for ev in nd.get("evidence") or []:
+                    en = ev.get("node") if ev.get("type") == "node" else None
+                    if en and en.get("ok"):
+                        add(str(en["kind"]), str(en["key"]), en["v"], "结论")
         for f in structured.get("fixed") or []:
             add(str(f["kind"]), str(f["key"]), f["v"], "修复落点")["fixed"] = True
     elif verdicts:                                             # 旧散文报告:环的主语
@@ -416,20 +452,18 @@ def _trajectory(ledger: atoms.Ledger, run_dir: str, steps: list[dict[str, Any]],
             for r in rows:
                 if r.get("v") is not None:
                     add(str(r["kind"]), key, r["v"], "结论")
-    # 查过的落点;不带版本的索引查询并进同键已有的版本节点
+    # 查过的落点;不带版本的索引 / 全程查询并进同键已有的版本节点
     for s in steps:
         land = _step_landing(s)
         if land is None or s.get("ok") is False:
             continue
         kind, key, v = land
         same = [n for n in nodes.values() if n["kind"] == kind and n["key"] == key and n["v"] is not None]
-        if v is None and same:
+        if v is None and same and _n_versions(ledger, kind, key) != 1:
             for n in same:
                 n["opened"].append(s["i"])
             continue
-        n = add(kind, key, v, "查过")
-        n["opened"].append(s["i"])
-    # 同键的整段节点被后来出现的版本节点吸收(先查了 file(A) 再点名 A@v3 的顺序)
+        add(kind, key, v, "查过")["opened"].append(s["i"])
     for nid in list(nodes):
         n = nodes[nid]
         if n["v"] is None and n is not root_node:
@@ -441,98 +475,83 @@ def _trajectory(ledger: atoms.Ledger, run_dir: str, steps: list[dict[str, Any]],
     for n in nodes.values():
         n["opened"] = sorted(set(n["opened"]))
         if n["opened"] and n is not root_node:
-            n["source"] = "查过"                                   # 查过的就是查过的,结论点名只是附加信息(角色徽标另给)
+            n["source"] = "查过"
         elif n["source"] == "查过":
             n["source"] = "结论"
-    # 每一步返回文本里的动作引用 → 所属 agent@版本(精确视见)
-    ref_hits: list[set[tuple[str, int | None]]] = []
-    for text in texts:
-        hits: set[tuple[str, int | None]] = set()
-        for mm in _ACTION.finditer(text):
-            tag = mm.group(1) or mm.group(5)
-            hit, _status = atoms.resolve_ref(ledger, int(mm.group(2)), int(mm.group(3)),
-                                             int(mm.group(4)) if mm.group(4) is not None else None, tag)
-            if hit is not None:
-                owner, over = _seq_owner(ledger, hit)
-                if owner:
-                    hits.add((owner, over))
-        ref_hits.append(hits)
-    # 第一次看见:只算「第一次打开它之前」的步(打开它那一步的返回当然有它,不算);结论点名没查过的看全程
+    # 出现于哪些步的返回(事实标注,不画边):打开它这个键的步不算
     landing_by_step = {s["i"]: _step_landing(s) for s in steps}
-
-    def landing_node(i: int) -> dict[str, Any] | None:
-        land = landing_by_step.get(i)
-        if land is None:
-            return None
-        kind, key, v = land
-        exact = nodes.get(_traj_id(kind, key, v))
-        if exact is not None:
-            return exact
-        same = [n for n in nodes.values() if n["kind"] == kind and n["key"] == key]
-        return same[0] if same else None
-
     for n in nodes.values():
-        if n is root_node:
-            continue
-        limit = n["opened"][0] if n["opened"] else len(steps) + 1
-        first: int | None = None
         for s in steps:
             i = int(s["i"])
             land = landing_by_step.get(i)
             if land is not None and land[0] == n["kind"] and land[1] == n["key"]:
-                continue                                       # 打开它自己(任一版本)的那一步不算「看到」
-            seen, exact = _sight(texts[i - 1], n["kind"], n["key"], n["v"], ledger)
-            if n["kind"] == "agent" and not (seen and exact):
-                if (n["key"], n["v"]) in ref_hits[i - 1]:
-                    seen, exact = True, True
-                elif any(k == n["key"] for k, _v in ref_hits[i - 1]):
-                    seen = True
-            if not seen:
                 continue
-            n["seen_count"] += 1                                   # 出现次数全程计,打开之后再出现也算
-            if first is None and i < limit:                        # 进入边只认打开它之前的那一次
-                first = i
-                n["seen_step"] = i
-                n["seen_tool"] = str(s.get("tool") or "")
-                n["seen_exact"] = bool(exact)
-        if first is None:
-            n["parent"] = root_node["id"]
-            n["edge_kind"] = "none"
+            if _sight(texts[i - 1], n["kind"], n["key"], n["v"], ledger)[0]:
+                n["appears"].append(i)
+    # 账本边:写 / 读 / 派发(核成 true 的)+ 同一文件相邻在场版本的「前一版」
+    order = list(nodes.values())
+    edges: list[dict[str, Any]] = []
+    for a in order:
+        for b in order:
+            if a is b:
+                continue
+            rel = _ledger_relation(ledger, a, b)
+            if rel:
+                edges.append({"from": a["id"], "to": b["id"], "relation": rel, "skipped": 0})
+    by_file: dict[str, list[dict[str, Any]]] = {}
+    for n in order:
+        if n["kind"] == "file" and n["v"] is not None:
+            by_file.setdefault(n["key"], []).append(n)
+    for vs in by_file.values():
+        vs.sort(key=lambda x: int(x["v"]))
+        for lo, hi in zip(vs, vs[1:]):
+            edges.append({"from": lo["id"], "to": hi["id"], "relation": "前一版", "skipped": int(hi["v"]) - int(lo["v"]) - 1})
+    # 布局:从根沿账本边向上游 BFS 定层;每个节点只有一个布局父(层数最小的下游邻居,同层取先出现的),其余边照画
+    down_of: dict[str, list[dict[str, Any]]] = {}
+    up_of: dict[str, list[dict[str, Any]]] = {}
+    for e in edges:
+        down_of.setdefault(e["from"], []).append(e)          # from 的下游是 to
+        up_of.setdefault(e["to"], []).append(e)              # to 的上游是 from
+    depth: dict[str, int] = {root_node["id"]: 0}
+
+    def bfs(allow_succ: bool) -> None:
+        queue = sorted(depth, key=lambda k: depth[k])
+        while queue:
+            cur = queue.pop(0)
+            for e in up_of.get(cur, []):
+                if e["from"] not in depth and (allow_succ or e["relation"] != "前一版"):
+                    depth[e["from"]] = depth[cur] + 1
+                    queue.append(e["from"])
+
+    bfs(False)                                                 # 先沿 写 / 读 / 派发 走:agent → file → agent 交替
+    bfs(True)                                                  # 只靠「前一版」才够得着的(touch / 黑盒写断了读写链)再接上
+    pos = {n["id"]: i for i, n in enumerate(order)}
+    for n in order:
+        if n is root_node:
+            n["depth"] = 0
             continue
-        parent = landing_node(first)
-        if parent is None or parent is n:
-            n["parent"] = root_node["id"]
-            n["edge_kind"] = "search"                          # sessions / 全池 search 这类不落节点的步带进来的
+        if n["id"] in depth:
+            cands = [e for e in down_of.get(n["id"], []) if e["to"] in depth and depth[e["to"]] == depth[n["id"]] - 1]
+            cands.sort(key=lambda e: (e["relation"] == "前一版", pos[e["to"]]))
+            e = cands[0]
+            n["parent"], n["edge"], n["skipped"], n["side"], n["depth"] = e["to"], e["relation"], e["skipped"], "up", depth[n["id"]]
+            continue
+        # 根的下游(读了最终版的、之后的版本)放右边;不在根的上下游锥里的单独一列(它们可能仍有账本边,照画)
+        seen_down: set[str] = set()
+        stack = [root_node["id"]]
+        while stack:
+            cur = stack.pop()
+            for e in down_of.get(cur, []):
+                if e["to"] not in seen_down:
+                    seen_down.add(e["to"])
+                    stack.append(e["to"])
+        if n["id"] in seen_down:
+            e2 = next(e for e in up_of[n["id"]] if e["from"] == root_node["id"] or e["from"] in seen_down)
+            n["parent"], n["edge"], n["skipped"], n["side"] = e2["from"], e2["relation"], e2["skipped"], "down"
         else:
-            n["parent"] = parent["id"]
-            n["edge_kind"] = "seen"
-    # 账本关系(两端版本都精确才核)与没查过的邻居数
-    present = {(n["kind"], n["key"], n["v"]) for n in nodes.values()}
-    for n in nodes.values():
+            n["parent"], n["edge"], n["side"] = root_node["id"], None, "unlinked"
+    present = {(n["kind"], n["key"], n["v"]) for n in order}
+    for n in order:
         n["unseen"] = len([x for x in _upstream_neighbors(ledger, n["kind"], n["key"], n["v"]) if x not in present])
-        if n["parent"] is None:
-            continue
-        p = nodes[n["parent"]]
-        if n["v"] is None or p["v"] is None:
-            continue
-        a = verdict.resolve_node(ledger, f"{p['kind']}:{p['key']}@v{p['v']}")
-        b = verdict.resolve_node(ledger, f"{n['kind']}:{n['key']}@v{n['v']}")
-        st, rel, _note = verdict.check_edge(ledger, b, a, None)
-        if st != "true":
-            st, rel, _note = verdict.check_edge(ledger, a, b, None)
-        if st in ("true", "unknown"):
-            n["ledger"] = {"relation": rel, "status": st}
-    # 输出顺序:父在子前(按父链深度,再按第一次出现 / 打开的步)
-    def depth(n: dict[str, Any]) -> int:
-        d = 0
-        while n["parent"] is not None:
-            n = nodes[n["parent"]]
-            d += 1
-        return d
-
-    def order_key(n: dict[str, Any]) -> tuple[int, int]:
-        first = n["seen_step"] if n["seen_step"] is not None else (n["opened"][0] if n["opened"] else 10 ** 6)
-        return depth(n), first
-
-    ordered = sorted(nodes.values(), key=order_key)
-    return {"root": root_node["id"], "nodes": ordered}
+    ordered = sorted(order, key=lambda n: (0 if n is root_node else 1, n["depth"] if n["side"] == "up" else 10 ** 6, pos[n["id"]]))
+    return {"root": root_node["id"], "nodes": ordered, "edges": edges}

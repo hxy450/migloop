@@ -1,0 +1,225 @@
+{
+ "attempts": [
+  {
+   "found": true,
+   "kind": "yaml",
+   "raw": "schema: migloop-verdict/1\nledger: atoms-2026-09-08:80:9065b7a0906dadac\nroot: file:entry/src/main/ets/entryability/EntryAbility.ets@v10\ndefects:\n  - id: A\n    title: 生成期 EntryAbility 无 UI 测试桥(__test_mode__/__target_page__ → AppStorage),修复期由 UI-T Step3 按设计 §F 追加 consumeTestWant\n    repair:\n      before: file:entry/src/main/ets/entryability/EntryAbility.ets@v3\n      after: file:entry/src/main/ets/entryability/EntryAbility.ets@v6\n      evidence: [\"#a711c5d09fb676814:5025@L35\", \"#a711c5d09fb676814:5027@L37\", \"#a711c5d09fb676814:5029@L39\"]\n    entry: [agent:agent-a349784d2663f1f0a@v2]\n    boundary: 停在 .claude/skills/arkts-ui-verifier/references/test-case-template.md@v1 —— external 外部输入(技能定义 references,T+4:30 首次进池,上游 0/0 跳)\n    nodes:\n      - node: file:.claude/skills/arkts-ui-verifier/references/test-case-template.md@v1\n        role: 正常\n        reason: 技能定义 references(410 行,external·首次读到,上游 0/0 跳),§6.1/§6.2 给出 EntryAbility 桥与根页桥两种口径。池外叶子。\n        evidence: [\"file:.claude/skills/arkts-ui-verifier/references/test-case-template.md@v1\", \"#a70e555065a1dddd1:4966@L20\"]\n      - node: agent:agent-a70e555065a1dddd1@v1\n        role: 正常\n        reason: UI-T Step1 按派发词第 5 节「EntryAbility 桥需求」+ 模板写出 design §F,并实读 Index@v7 探测到 NavPathStack、EntryAbility@v3 现状,判定 Index 为 @ComponentV2 故桥收敛到 ability 侧。\n        evidence: [\"#a70e555065a1dddd1:4987@L36\", \"#a70e555065a1dddd1:4976@L28\"]\n      - node: file:spec/test/ui-test/design/P0001_MainActivity.md@v1\n        role: 正常\n        reason: 唯一版本,UI-T Step1 v1 所写(231 行),是修复方写第一笔前读的依据单。\n        evidence: [\"#a711c5d09fb676814:5002@L11\"]\n      - node: agent:agent-a349784d2663f1f0a@v2\n        role: 进入·缺\n        reason: 生成方写 EntryAbility@v2 时,派发词(沉浸式安全区契约 + F001 行为契约 + 占位规则)、Android 源 MainActivity.kt@v1、模板 v1 里都没有测试桥这回事;全池查「__target_page__」≤2026-09-03T16:08:03.524Z 零命中(范围:80 个 agent 全部记录 + 840 个文件已知内容,内容未知 52 版)。属输入晚出生,非转换错。\n        evidence: [\"#a349784d2663f1f0a:4062@L71\", \"#a349784d2663f1f0a:4016@L33\"]\n      - node: file:entry/src/main/ets/entryability/EntryAbility.ets@v2\n        role: 带病传递\n        reason: 沉浸式四件套已就位、82 行,但不含任何测试桥;这一状态被后续写者原样保留到修复期。\n        evidence: [\"#a349784d2663f1f0a:4062@L71\"]\n      - node: file:entry/src/main/ets/entryability/EntryAbility.ets@v3\n        role: 带病传递\n        reason: builder-base7 v1 的 interval·推导·黑盒写,行数仍 82、内容未引入桥;修复方 UI-T Step3 写前读的就是这一版。\n        evidence: [\"#a03bab42f073b7dcd:3453@L21\", \"#a711c5d09fb676814:5008@L17\"]\n      - node: agent:agent-a711c5d09fb676814@v4\n        role: 正常\n        reason: 修复方三次 Edit 只追加桥代码(常量 / onCreate+onNewWant 调用 / consumeTestWant),照 design §F 与模板 §6.1 做,未动既有沉浸式逻辑。\n        evidence: [\"#a711c5d09fb676814:5029@L39\", \"#a711c5d09fb676814:4998@L7\"]\n    edges:\n      - {from: agent:agent-a70e555065a1dddd1@v1, to: file:spec/test/ui-test/design/P0001_MainActivity.md@v1, relation: 写}\n      - {from: file:spec/test/ui-test/design/P0001_MainActivity.md@v1, to: agent:agent-a711c5d09fb676814@v4, relation: 读}\n      - {from: agent:agent-a349784d2663f1f0a@v2, to: file:entry/src/main/ets/entryability/EntryAbility.ets@v2, relation: 写}\n      - {from: agent:agent-a711c5d09fb676814@v4, to: file:entry/src/main/ets/entryability/EntryAbility.ets@v6, relation: 写}\n  - id: B\n    title: 全 app 无全局未捕获异常观察者;修复期 fix-errobserver 在 onCreate 注册 errorManager.on('error')\n    repair:\n      before: file:entry/src/main/ets/entryability/EntryAbility.ets@v7\n      after: file:entry/src/main/ets/entryability/EntryAbility.ets@v10\n      evidence: [\"#a27497cfed8c44856:715@L41\", \"#a27497cfed8c44856:717@L43\", \"#a27497cfed8c44856:719@L45\"]\n    entry: [agent:agent-a349784d2663f1f0a@v2]\n    boundary: 上游停在两处池外输入 —— EntryAbility.ets@v1(external 模板/脚手架默认值)与 ECAT 判别器缺陷单(以会话入口指令进池,账本里无写它的 agent)\n    nodes:\n      - node: file:entry/src/main/ets/entryability/EntryAbility.ets@v1\n        role: 进入·缺\n        reason: DevEco 模板/脚手架默认值(34 行,external·观测·首次读到),不含任何 crash 观察者;v8 唯一被替换的那一行(@kit.AbilityKit import)正是模板原行。池外叶子。\n        evidence: [\"file:entry/src/main/ets/entryability/EntryAbility.ets@v1\"]\n      - node: agent:agent-a349784d2663f1f0a@v2\n        role: 进入·缺\n        reason: 生成方的派发词只给沉浸式 + F001 行为契约,读的 Android 源无对应物;全池查「errorManager」≤2026-09-03T16:08:03.524Z 零命中(范围:80 个 agent 全部记录 + 840 个文件已知内容,内容未知 52 版)——生成期没有任何人见过这个能力。\n        evidence: [\"#a349784d2663f1f0a:4062@L71\", \"#a349784d2663f1f0a:4044@L57\"]\n      - node: file:entry/src/main/ets/entryability/EntryAbility.ets@v3\n        role: 带病传递\n        reason: builder-base7 编译轮黑盒写,内容不变;此后 v4–v6(测试桥)、v7 亦未触及异常观察者,缺陷一路传到 ECAT 轮。\n        evidence: [\"#a03bab42f073b7dcd:3453@L21\"]\n      - node: file:entry/src/main/ets/entryability/EntryAbility.ets@v7\n        role: 无法确认\n        reason: builder-verify-final v1 的 interval·推导·黑盒写,122 行与 v6 相同且无 diff,派发词只要求 touch 强制重编;账本判不出它是否真写入内容。\n        evidence: [\"#ac3b22afb4458cd07:5621@L15\", \"#81e0a463:3195@L3448\"]\n      - node: agent:__main__:2f01bcdc@v1\n        role: 正常\n        reason: ECAT 判别器缺陷单第 13 条以会话入口指令进池,点名本文件、给出 errorManager.on('error') 落点,并声明这是 HarmonyOS 框架约束、无 Android 对应物、不要查 Android 源码;更早一份同文见 #257fed22:1099@L3。池外输入,是发现点。\n        evidence: [\"#2f01bcdc:462@L3\", \"#257fed22:1099@L3\"]\n      - node: agent:__main__:2f01bcdc@v5\n        role: 正常\n        reason: 主会话把第 13 条拆成可执行处置并派发 fix-errobserver,派发前已确认工程无 AbilityStage、落点定在 onCreate;附带的 `@kit.ArkTS` import 建议标注为\"若 d.ts 不符则改路径并汇报\"。\n        evidence: [\"#2f01bcdc:509@L100\", \"#2f01bcdc:482@L49\"]\n      - node: agent:agent-a27497cfed8c44856@v3\n        role: 正常\n        reason: 三次 Edit 落地观察者,并用接口探测纠正派发词:@kit.ArkTS.d.ts grep 零命中、@kit.AbilityKit.d.ts 命中 46/95 行,故 errorManager 从 @kit.AbilityKit 导入;ErrorObserver 两个成员按本镜像 d.ts 实现。\n        evidence: [\"#a27497cfed8c44856:705@L31\", \"#a27497cfed8c44856:709@L35\", \"#a27497cfed8c44856:711@L37\"]\n    edges:\n      - {from: agent:__main__:2f01bcdc@v5, to: agent:agent-a27497cfed8c44856@v3, relation: 派发}\n      - {from: file:entry/src/main/ets/entryability/EntryAbility.ets@v7, to: agent:agent-a27497cfed8c44856@v3, relation: 读}\n      - {from: agent:agent-a27497cfed8c44856@v3, to: file:entry/src/main/ets/entryability/EntryAbility.ets@v10, relation: 写}\n",
+   "errors": []
+  }
+ ],
+ "repaired": false,
+ "repair": null,
+ "found": true,
+ "kind": "yaml",
+ "raw": "schema: migloop-verdict/1\nledger: atoms-2026-09-08:80:9065b7a0906dadac\nroot: file:entry/src/main/ets/entryability/EntryAbility.ets@v10\ndefects:\n  - id: A\n    title: 生成期 EntryAbility 无 UI 测试桥(__test_mode__/__target_page__ → AppStorage),修复期由 UI-T Step3 按设计 §F 追加 consumeTestWant\n    repair:\n      before: file:entry/src/main/ets/entryability/EntryAbility.ets@v3\n      after: file:entry/src/main/ets/entryability/EntryAbility.ets@v6\n      evidence: [\"#a711c5d09fb676814:5025@L35\", \"#a711c5d09fb676814:5027@L37\", \"#a711c5d09fb676814:5029@L39\"]\n    entry: [agent:agent-a349784d2663f1f0a@v2]\n    boundary: 停在 .claude/skills/arkts-ui-verifier/references/test-case-template.md@v1 —— external 外部输入(技能定义 references,T+4:30 首次进池,上游 0/0 跳)\n    nodes:\n      - node: file:.claude/skills/arkts-ui-verifier/references/test-case-template.md@v1\n        role: 正常\n        reason: 技能定义 references(410 行,external·首次读到,上游 0/0 跳),§6.1/§6.2 给出 EntryAbility 桥与根页桥两种口径。池外叶子。\n        evidence: [\"file:.claude/skills/arkts-ui-verifier/references/test-case-template.md@v1\", \"#a70e555065a1dddd1:4966@L20\"]\n      - node: agent:agent-a70e555065a1dddd1@v1\n        role: 正常\n        reason: UI-T Step1 按派发词第 5 节「EntryAbility 桥需求」+ 模板写出 design §F,并实读 Index@v7 探测到 NavPathStack、EntryAbility@v3 现状,判定 Index 为 @ComponentV2 故桥收敛到 ability 侧。\n        evidence: [\"#a70e555065a1dddd1:4987@L36\", \"#a70e555065a1dddd1:4976@L28\"]\n      - node: file:spec/test/ui-test/design/P0001_MainActivity.md@v1\n        role: 正常\n        reason: 唯一版本,UI-T Step1 v1 所写(231 行),是修复方写第一笔前读的依据单。\n        evidence: [\"#a711c5d09fb676814:5002@L11\"]\n      - node: agent:agent-a349784d2663f1f0a@v2\n        role: 进入·缺\n        reason: 生成方写 EntryAbility@v2 时,派发词(沉浸式安全区契约 + F001 行为契约 + 占位规则)、Android 源 MainActivity.kt@v1、模板 v1 里都没有测试桥这回事;全池查「__target_page__」≤2026-09-03T16:08:03.524Z 零命中(范围:80 个 agent 全部记录 + 840 个文件已知内容,内容未知 52 版)。属输入晚出生,非转换错。\n        evidence: [\"#a349784d2663f1f0a:4062@L71\", \"#a349784d2663f1f0a:4016@L33\"]\n      - node: file:entry/src/main/ets/entryability/EntryAbility.ets@v2\n        role: 带病传递\n        reason: 沉浸式四件套已就位、82 行,但不含任何测试桥;这一状态被后续写者原样保留到修复期。\n        evidence: [\"#a349784d2663f1f0a:4062@L71\"]\n      - node: file:entry/src/main/ets/entryability/EntryAbility.ets@v3\n        role: 带病传递\n        reason: builder-base7 v1 的 interval·推导·黑盒写,行数仍 82、内容未引入桥;修复方 UI-T Step3 写前读的就是这一版。\n        evidence: [\"#a03bab42f073b7dcd:3453@L21\", \"#a711c5d09fb676814:5008@L17\"]\n      - node: agent:agent-a711c5d09fb676814@v4\n        role: 正常\n        reason: 修复方三次 Edit 只追加桥代码(常量 / onCreate+onNewWant 调用 / consumeTestWant),照 design §F 与模板 §6.1 做,未动既有沉浸式逻辑。\n        evidence: [\"#a711c5d09fb676814:5029@L39\", \"#a711c5d09fb676814:4998@L7\"]\n    edges:\n      - {from: agent:agent-a70e555065a1dddd1@v1, to: file:spec/test/ui-test/design/P0001_MainActivity.md@v1, relation: 写}\n      - {from: file:spec/test/ui-test/design/P0001_MainActivity.md@v1, to: agent:agent-a711c5d09fb676814@v4, relation: 读}\n      - {from: agent:agent-a349784d2663f1f0a@v2, to: file:entry/src/main/ets/entryability/EntryAbility.ets@v2, relation: 写}\n      - {from: agent:agent-a711c5d09fb676814@v4, to: file:entry/src/main/ets/entryability/EntryAbility.ets@v6, relation: 写}\n  - id: B\n    title: 全 app 无全局未捕获异常观察者;修复期 fix-errobserver 在 onCreate 注册 errorManager.on('error')\n    repair:\n      before: file:entry/src/main/ets/entryability/EntryAbility.ets@v7\n      after: file:entry/src/main/ets/entryability/EntryAbility.ets@v10\n      evidence: [\"#a27497cfed8c44856:715@L41\", \"#a27497cfed8c44856:717@L43\", \"#a27497cfed8c44856:719@L45\"]\n    entry: [agent:agent-a349784d2663f1f0a@v2]\n    boundary: 上游停在两处池外输入 —— EntryAbility.ets@v1(external 模板/脚手架默认值)与 ECAT 判别器缺陷单(以会话入口指令进池,账本里无写它的 agent)\n    nodes:\n      - node: file:entry/src/main/ets/entryability/EntryAbility.ets@v1\n        role: 进入·缺\n        reason: DevEco 模板/脚手架默认值(34 行,external·观测·首次读到),不含任何 crash 观察者;v8 唯一被替换的那一行(@kit.AbilityKit import)正是模板原行。池外叶子。\n        evidence: [\"file:entry/src/main/ets/entryability/EntryAbility.ets@v1\"]\n      - node: agent:agent-a349784d2663f1f0a@v2\n        role: 进入·缺\n        reason: 生成方的派发词只给沉浸式 + F001 行为契约,读的 Android 源无对应物;全池查「errorManager」≤2026-09-03T16:08:03.524Z 零命中(范围:80 个 agent 全部记录 + 840 个文件已知内容,内容未知 52 版)——生成期没有任何人见过这个能力。\n        evidence: [\"#a349784d2663f1f0a:4062@L71\", \"#a349784d2663f1f0a:4044@L57\"]\n      - node: file:entry/src/main/ets/entryability/EntryAbility.ets@v3\n        role: 带病传递\n        reason: builder-base7 编译轮黑盒写,内容不变;此后 v4–v6(测试桥)、v7 亦未触及异常观察者,缺陷一路传到 ECAT 轮。\n        evidence: [\"#a03bab42f073b7dcd:3453@L21\"]\n      - node: file:entry/src/main/ets/entryability/EntryAbility.ets@v7\n        role: 无法确认\n        reason: builder-verify-final v1 的 interval·推导·黑盒写,122 行与 v6 相同且无 diff,派发词只要求 touch 强制重编;账本判不出它是否真写入内容。\n        evidence: [\"#ac3b22afb4458cd07:5621@L15\", \"#81e0a463:3195@L3448\"]\n      - node: agent:__main__:2f01bcdc@v1\n        role: 正常\n        reason: ECAT 判别器缺陷单第 13 条以会话入口指令进池,点名本文件、给出 errorManager.on('error') 落点,并声明这是 HarmonyOS 框架约束、无 Android 对应物、不要查 Android 源码;更早一份同文见 #257fed22:1099@L3。池外输入,是发现点。\n        evidence: [\"#2f01bcdc:462@L3\", \"#257fed22:1099@L3\"]\n      - node: agent:__main__:2f01bcdc@v5\n        role: 正常\n        reason: 主会话把第 13 条拆成可执行处置并派发 fix-errobserver,派发前已确认工程无 AbilityStage、落点定在 onCreate;附带的 `@kit.ArkTS` import 建议标注为\"若 d.ts 不符则改路径并汇报\"。\n        evidence: [\"#2f01bcdc:509@L100\", \"#2f01bcdc:482@L49\"]\n      - node: agent:agent-a27497cfed8c44856@v3\n        role: 正常\n        reason: 三次 Edit 落地观察者,并用接口探测纠正派发词:@kit.ArkTS.d.ts grep 零命中、@kit.AbilityKit.d.ts 命中 46/95 行,故 errorManager 从 @kit.AbilityKit 导入;ErrorObserver 两个成员按本镜像 d.ts 实现。\n        evidence: [\"#a27497cfed8c44856:705@L31\", \"#a27497cfed8c44856:709@L35\", \"#a27497cfed8c44856:711@L37\"]\n    edges:\n      - {from: agent:__main__:2f01bcdc@v5, to: agent:agent-a27497cfed8c44856@v3, relation: 派发}\n      - {from: file:entry/src/main/ets/entryability/EntryAbility.ets@v7, to: agent:agent-a27497cfed8c44856@v3, relation: 读}\n      - {from: agent:agent-a27497cfed8c44856@v3, to: file:entry/src/main/ets/entryability/EntryAbility.ets@v10, relation: 写}\n",
+ "data": {
+  "schema": "migloop-verdict/1",
+  "ledger": "atoms-2026-09-08:80:9065b7a0906dadac",
+  "root": "file:entry/src/main/ets/entryability/EntryAbility.ets@v10",
+  "defects": [
+   {
+    "id": "A",
+    "title": "生成期 EntryAbility 无 UI 测试桥(__test_mode__/__target_page__ → AppStorage),修复期由 UI-T Step3 按设计 §F 追加 consumeTestWant",
+    "repair": {
+     "before": "file:entry/src/main/ets/entryability/EntryAbility.ets@v3",
+     "after": "file:entry/src/main/ets/entryability/EntryAbility.ets@v6",
+     "evidence": [
+      "#a711c5d09fb676814:5025@L35",
+      "#a711c5d09fb676814:5027@L37",
+      "#a711c5d09fb676814:5029@L39"
+     ]
+    },
+    "entry": [
+     "agent:agent-a349784d2663f1f0a@v2"
+    ],
+    "boundary": "停在 .claude/skills/arkts-ui-verifier/references/test-case-template.md@v1 —— external 外部输入(技能定义 references,T+4:30 首次进池,上游 0/0 跳)",
+    "nodes": [
+     {
+      "node": "file:.claude/skills/arkts-ui-verifier/references/test-case-template.md@v1",
+      "role": "正常",
+      "reason": "技能定义 references(410 行,external·首次读到,上游 0/0 跳),§6.1/§6.2 给出 EntryAbility 桥与根页桥两种口径。池外叶子。",
+      "evidence": [
+       "file:.claude/skills/arkts-ui-verifier/references/test-case-template.md@v1",
+       "#a70e555065a1dddd1:4966@L20"
+      ]
+     },
+     {
+      "node": "agent:agent-a70e555065a1dddd1@v1",
+      "role": "正常",
+      "reason": "UI-T Step1 按派发词第 5 节「EntryAbility 桥需求」+ 模板写出 design §F,并实读 Index@v7 探测到 NavPathStack、EntryAbility@v3 现状,判定 Index 为 @ComponentV2 故桥收敛到 ability 侧。",
+      "evidence": [
+       "#a70e555065a1dddd1:4987@L36",
+       "#a70e555065a1dddd1:4976@L28"
+      ]
+     },
+     {
+      "node": "file:spec/test/ui-test/design/P0001_MainActivity.md@v1",
+      "role": "正常",
+      "reason": "唯一版本,UI-T Step1 v1 所写(231 行),是修复方写第一笔前读的依据单。",
+      "evidence": [
+       "#a711c5d09fb676814:5002@L11"
+      ]
+     },
+     {
+      "node": "agent:agent-a349784d2663f1f0a@v2",
+      "role": "进入·缺",
+      "reason": "生成方写 EntryAbility@v2 时,派发词(沉浸式安全区契约 + F001 行为契约 + 占位规则)、Android 源 MainActivity.kt@v1、模板 v1 里都没有测试桥这回事;全池查「__target_page__」≤2026-09-03T16:08:03.524Z 零命中(范围:80 个 agent 全部记录 + 840 个文件已知内容,内容未知 52 版)。属输入晚出生,非转换错。",
+      "evidence": [
+       "#a349784d2663f1f0a:4062@L71",
+       "#a349784d2663f1f0a:4016@L33"
+      ]
+     },
+     {
+      "node": "file:entry/src/main/ets/entryability/EntryAbility.ets@v2",
+      "role": "带病传递",
+      "reason": "沉浸式四件套已就位、82 行,但不含任何测试桥;这一状态被后续写者原样保留到修复期。",
+      "evidence": [
+       "#a349784d2663f1f0a:4062@L71"
+      ]
+     },
+     {
+      "node": "file:entry/src/main/ets/entryability/EntryAbility.ets@v3",
+      "role": "带病传递",
+      "reason": "builder-base7 v1 的 interval·推导·黑盒写,行数仍 82、内容未引入桥;修复方 UI-T Step3 写前读的就是这一版。",
+      "evidence": [
+       "#a03bab42f073b7dcd:3453@L21",
+       "#a711c5d09fb676814:5008@L17"
+      ]
+     },
+     {
+      "node": "agent:agent-a711c5d09fb676814@v4",
+      "role": "正常",
+      "reason": "修复方三次 Edit 只追加桥代码(常量 / onCreate+onNewWant 调用 / consumeTestWant),照 design §F 与模板 §6.1 做,未动既有沉浸式逻辑。",
+      "evidence": [
+       "#a711c5d09fb676814:5029@L39",
+       "#a711c5d09fb676814:4998@L7"
+      ]
+     }
+    ],
+    "edges": [
+     {
+      "from": "agent:agent-a70e555065a1dddd1@v1",
+      "to": "file:spec/test/ui-test/design/P0001_MainActivity.md@v1",
+      "relation": "写"
+     },
+     {
+      "from": "file:spec/test/ui-test/design/P0001_MainActivity.md@v1",
+      "to": "agent:agent-a711c5d09fb676814@v4",
+      "relation": "读"
+     },
+     {
+      "from": "agent:agent-a349784d2663f1f0a@v2",
+      "to": "file:entry/src/main/ets/entryability/EntryAbility.ets@v2",
+      "relation": "写"
+     },
+     {
+      "from": "agent:agent-a711c5d09fb676814@v4",
+      "to": "file:entry/src/main/ets/entryability/EntryAbility.ets@v6",
+      "relation": "写"
+     }
+    ]
+   },
+   {
+    "id": "B",
+    "title": "全 app 无全局未捕获异常观察者;修复期 fix-errobserver 在 onCreate 注册 errorManager.on('error')",
+    "repair": {
+     "before": "file:entry/src/main/ets/entryability/EntryAbility.ets@v7",
+     "after": "file:entry/src/main/ets/entryability/EntryAbility.ets@v10",
+     "evidence": [
+      "#a27497cfed8c44856:715@L41",
+      "#a27497cfed8c44856:717@L43",
+      "#a27497cfed8c44856:719@L45"
+     ]
+    },
+    "entry": [
+     "agent:agent-a349784d2663f1f0a@v2"
+    ],
+    "boundary": "上游停在两处池外输入 —— EntryAbility.ets@v1(external 模板/脚手架默认值)与 ECAT 判别器缺陷单(以会话入口指令进池,账本里无写它的 agent)",
+    "nodes": [
+     {
+      "node": "file:entry/src/main/ets/entryability/EntryAbility.ets@v1",
+      "role": "进入·缺",
+      "reason": "DevEco 模板/脚手架默认值(34 行,external·观测·首次读到),不含任何 crash 观察者;v8 唯一被替换的那一行(@kit.AbilityKit import)正是模板原行。池外叶子。",
+      "evidence": [
+       "file:entry/src/main/ets/entryability/EntryAbility.ets@v1"
+      ]
+     },
+     {
+      "node": "agent:agent-a349784d2663f1f0a@v2",
+      "role": "进入·缺",
+      "reason": "生成方的派发词只给沉浸式 + F001 行为契约,读的 Android 源无对应物;全池查「errorManager」≤2026-09-03T16:08:03.524Z 零命中(范围:80 个 agent 全部记录 + 840 个文件已知内容,内容未知 52 版)——生成期没有任何人见过这个能力。",
+      "evidence": [
+       "#a349784d2663f1f0a:4062@L71",
+       "#a349784d2663f1f0a:4044@L57"
+      ]
+     },
+     {
+      "node": "file:entry/src/main/ets/entryability/EntryAbility.ets@v3",
+      "role": "带病传递",
+      "reason": "builder-base7 编译轮黑盒写,内容不变;此后 v4–v6(测试桥)、v7 亦未触及异常观察者,缺陷一路传到 ECAT 轮。",
+      "evidence": [
+       "#a03bab42f073b7dcd:3453@L21"
+      ]
+     },
+     {
+      "node": "file:entry/src/main/ets/entryability/EntryAbility.ets@v7",
+      "role": "无法确认",
+      "reason": "builder-verify-final v1 的 interval·推导·黑盒写,122 行与 v6 相同且无 diff,派发词只要求 touch 强制重编;账本判不出它是否真写入内容。",
+      "evidence": [
+       "#ac3b22afb4458cd07:5621@L15",
+       "#81e0a463:3195@L3448"
+      ]
+     },
+     {
+      "node": "agent:__main__:2f01bcdc@v1",
+      "role": "正常",
+      "reason": "ECAT 判别器缺陷单第 13 条以会话入口指令进池,点名本文件、给出 errorManager.on('error') 落点,并声明这是 HarmonyOS 框架约束、无 Android 对应物、不要查 Android 源码;更早一份同文见",
+      "evidence": [
+       "#2f01bcdc:462@L3",
+       "#257fed22:1099@L3"
+      ]
+     },
+     {
+      "node": "agent:__main__:2f01bcdc@v5",
+      "role": "正常",
+      "reason": "主会话把第 13 条拆成可执行处置并派发 fix-errobserver,派发前已确认工程无 AbilityStage、落点定在 onCreate;附带的 `@kit.ArkTS` import 建议标注为\"若 d.ts 不符则改路径并汇报\"。",
+      "evidence": [
+       "#2f01bcdc:509@L100",
+       "#2f01bcdc:482@L49"
+      ]
+     },
+     {
+      "node": "agent:agent-a27497cfed8c44856@v3",
+      "role": "正常",
+      "reason": "三次 Edit 落地观察者,并用接口探测纠正派发词:@kit.ArkTS.d.ts grep 零命中、@kit.AbilityKit.d.ts 命中 46/95 行,故 errorManager 从 @kit.AbilityKit 导入;ErrorObserver 两个成员按本镜像 d.ts 实现。",
+      "evidence": [
+       "#a27497cfed8c44856:705@L31",
+       "#a27497cfed8c44856:709@L35",
+       "#a27497cfed8c44856:711@L37"
+      ]
+     }
+    ],
+    "edges": [
+     {
+      "from": "agent:__main__:2f01bcdc@v5",
+      "to": "agent:agent-a27497cfed8c44856@v3",
+      "relation": "派发"
+     },
+     {
+      "from": "file:entry/src/main/ets/entryability/EntryAbility.ets@v7",
+      "to": "agent:agent-a27497cfed8c44856@v3",
+      "relation": "读"
+     },
+     {
+      "from": "agent:agent-a27497cfed8c44856@v3",
+      "to": "file:entry/src/main/ets/entryability/EntryAbility.ets@v10",
+      "relation": "写"
+     }
+    ]
+   }
+  ]
+ },
+ "errors": [],
+ "harness_identity": "atoms-2026-09-08:80:9065b7a0906dadac",
+ "schema": "migloop-verdict/1"
+}

@@ -56,11 +56,13 @@ B 下进入错是两条记录;页面切换缺陷时按记录过滤,不先合并�
 - 服务端 `probe.probe_payload`:先读 `verdict.json`(以当前 schema 再校验一遍),没有就从 `result.json` 正文抽块;
   没块 = `legacy: true`(旧散文报告仍按环正则解析,面板标 legacy,没有新式核验)。
 - 页面入口不变:`/api/insight1/fixchain/<sid>?probe=<run 目录相对 MIGLOOP_RUNS>`,或面板里输入目录点「载入」。
-- 树 = 模型走过的路(`probe._trajectory` → 页面 `probeBuildTrajectory`),不再是账本的上游树。节点只有 agent@版本 / file@版本
-  两种:模型真的用 file / agent / action / blame / diff 落到的 + 结论块点名的,每个出现一次。父节点 = 模型第一次在返回文本里
-  看到它的那一步的落点 —— 返回文本来自 harness 存的 transcript.jsonl,是实录;`sessions` / 全池 `search` 这类不落节点的步带进来的
-  挂根、画虚线并标「#j sessions 命中」;打开它之前从没出现过的标「无来源」;结论点名但没查的标「命中未展开」;
-  出现不止一次的标「+N 次出现」;两端版本都精确时按账本核一次关系(账本·写 / 读 / 派发 / 候选)。
+- 树 = 账本边 + 步号,零推断(`probe._trajectory` → 页面 `probeBuildTrajectory`)。节点只有 agent@版本 / file@版本 两种:
+  模型真的用 file / agent / action / blame / diff 落到的 + 结论块点名的(角色节点、repair 前后、edges 两端、证据里的坐标),
+  每个出现一次。结构只用账本核成 true 的关系:写(agent@vK → file@vN)、读(file@vN → agent@vK)、派发(agent → agent)、
+  前一版(同一文件相邻两个在场版本,标跳过几版);根 = 被修文件的最终版本(账本最后一版),生成与修复都在它上游(左)。
+  一个节点只有一个布局父(层数最小的下游邻居,写 / 读 / 派发 优先于前一版),其余账本边照画不复制节点。
+  模型的路线只有节点上的步号「查 #k」(按精确版本);「出现于 #j」= 那一步返回文本里含这个坐标,是事实标注,不画边 ——
+  第一版曾按「第一次出现的那一步」挂父节点,那是推断,已撤。和链上任何节点都没有账本边的单独一列「查过 · 无账本直连」。
   「+N 未查」= 账本里这个节点还有几个上游邻居没被查,不展开;词法候选(⋯ 可能写)不画。没有 transcript.jsonl 的老 run 退回账本树。
 - 角色着色(进入·错 深红 + 描边;进入·缺 黄;带病传递 红;正常 绿;无法确认 灰虚线;修复落点 金框),
   节点上每条缺陷一个徽标(`A 进入·错` / `B 正常`),别的版本只挂灰标「A 判的是 v3」;两端都红的账本边画红线,
@@ -113,6 +115,21 @@ probe 集合只按键不按版本留节点(结论有 `主会话·81e0a463@v90`,�
 (文件 9、agent 10)各出现一次:根 `EntryAbility.ets@v3`;`conv-page-0001 v2` 下挂 `MainActivity.kt@v1` / `SKILL.md@v1`(#14 看到);
 `P0001_MainActivity.md` 下挂 `UI-T Step1 v1`(#16 看到);其余节点都是 #3 sessions 那一步带进来的(返修链摘要把修复方、主会话、文件版本
 一次列全),挂根、虚线。`tests/test_trajectory.py` 4 条;全仓 399 passed。
+
+用户再问:「你是不是在 invent heuristic?我们到底有没有记录模型的路线?」—— 没有。记录只有调用序列(每步落在哪个 agent@版本 / file@版本)
+和每步返回文本;「模型因为第 j 步看到才走过去」转录里没有,「第一次出现」规则是推断。于是树改成账本边 + 步号(上面第 3 节的现口径),
+根改成被修文件的最终版本 `EntryAbility.ets@v10`。同一跑 21 个节点(文件 11、agent 10)、26 条账本边、4 个无直连(截图 11):
+`v10 ←写 fix-errobserver v3 ←派发 主会话·2f01bcdc v5`;`fix-errobserver v3 ←读 v7 ←前一版 v6 ←写 UI-T Step3 v4 ←{派发 主会话·81e0a463 v90,
+读 test-case-template.md@v1, 读 P0001_MainActivity.md@v1 ←写 UI-T Step1 v1}`;`v6 ←前一版(跳过 2) v3 ←前一版 v2 ←写 conv-page-0001 v2 ←读 SKILL.md@v1`;
+`MainActivity.kt@v1` 挂在主会话 v90 下(读),到 conv-page-0001 v2 的读边照画。无直连:主会话·257fed22 v6、2f01bcdc v4 / v1、593d4e86 v23。
+
+按用户要求把 GUIDE 的 `root` 改成「被修文件的最终版本」后重跑一次(`dice_yaml2/`,截图 12):21 轮 / 20 次调用 / 88,595 字工具返回 /
+$1.70 / 5.6 min;结论块第一次就过校验,`root: …EntryAbility.ets@v10`,账本身份一致;2 条缺陷、14 个节点全部有效、显式边全部核成 true
+(面板:已证实 11 / 候选 1 / 未证实 4,后两类都是相邻项自动核出来的)。这一跑模型把中间版本列成了角色:A 下 `EntryAbility.ets@v2 / v3` 带病传递,
+B 下 `v1`(模板)进入·缺、`v3` 带病传递、`v7` 无法确认;进入点仍是 `conv-page-0001 v2`。树:15 个节点(文件 9、agent 6)、20 条账本边、
+1 个不在根上下游锥里的节点(`主会话·2f01bcdc v1`,它读过 v7,那条读边照画):
+`v10 ←写 fix-errobserver v3 ←{派发 主会话·2f01bcdc v5, 读 v7 ←前一版 v6 ←写 UI-T Step3 v4 ←{读 test-case-template.md@v1, 读 P0001_MainActivity.md@v1 ←写 UI-T Step1 v1,
+读 v3 ←前一版 v2 ←{写 conv-page-0001 v2, 前一版 v1}}}`,`v6 ←前一版 v4` 另挂一支。控制台无报错。
 
 模型这一跑的观察(不是机检结论):散文里 12 环,结构化块里没有一个「带病传递」节点 —— 它把中间的文件版本(v3 / v7)只放在 repair.before,
 没有当传播节点列出;`notes` 里如实写了 v3 / v7 两版是 touch 强制重编、内容改动无法确认,以及 273 条提及只看了 48 条。
