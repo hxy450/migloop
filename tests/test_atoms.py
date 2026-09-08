@@ -509,7 +509,7 @@ def test_render_agent_marks_action_seq_and_seen_lines(tmp_path: Any) -> None:
                  {"command": "cd /proj && grep -n appName spec/r.md"}, "615:- App 显示名 appName\n")
     led = _ledger(tmp_path, main)
     txt = atoms_text.render_agent(led, MAIN_ID, None, root="/proj")
-    assert "#1" in txt and "行号 615" in txt and "App 显示名" not in txt      # 默认只留行号
+    assert ":1@L" in txt and "行号 615" in txt and "App 显示名" not in txt      # 默认只留行号
     assert "App 显示名" in atoms_text.render_agent(led, MAIN_ID, None, root="/proj", seen=True)
     seq = atoms.agent_atom(led, MAIN_ID, None)["actions"][0]["seq"]  # type: ignore[index]
     raw = atoms_text.render_action(led, MAIN_ID, seq)
@@ -1186,7 +1186,7 @@ def test_script_touch_shows_on_file_atom_and_index(tmp_path: Any) -> None:
     assert fa["versions"][0]["seq"] == write_act.seq                                 # 写 v1 那次调用的动作号
     assert [(t["by"], t["seq"], t["reason"]) for t in fa["touches"]] == [(MAIN_ID, bash.seq, bash.detail["unresolved"])]
     text = atoms_text.render_file(led, "F.ets", None, root="/proj")
-    assert f"(#{write_act.seq}@L" in text and "碰过它、方向不明" in text and f"action(#{bash.seq}@L" in text
+    assert f":{write_act.seq}@L" in text and "碰过它、方向不明" in text and f"action(#{{}}".replace("{}", "") and f":{bash.seq}@L" in text
     new = atoms.file_atom(led, "New.ets", None)
     assert new is not None and new["n_versions"] == 0 and len(new["touches"]) == 1
     assert "只被脚本碰过(方向不明)" in atoms_text.render_index(led, "ets", None, root="/proj")
@@ -1598,7 +1598,7 @@ def test_render_agent_result_is_an_index_line(tmp_path: Any) -> None:
     txt = atoms_text.render_agent(led, MAIN_ID, root="/proj")
     tail = txt.split("## 收尾输出", 1)[1]
     say = [a for a in led.agents[MAIN_ID].actions if a.kind == "say"][-1]
-    assert f"#{say.seq}@L" in tail and "action" in tail and len(tail) < len(long)
+    assert f":{say.seq}@L" in tail and "action" in tail and len(tail) < len(long)
     assert long in str(atoms.action_raw(led, MAIN_ID, say.seq)["input"])
 
 
@@ -2486,9 +2486,9 @@ def test_file_lists_every_command_mentioning_it(tmp_path: Any) -> None:
     assert "still uses old API" in next(m for m in fa["mentions"] if m["seq"] == bash[0].seq)["ctx"]
     text = atoms_text.render_file(led, "A.ets", None, root="/proj")
     assert "提到它的命令(5,其中 3 条账本没记到读写)" in text
-    assert f"action(#{bash[0].seq}@L" in text.split("提到它的命令")[1]              # heredoc 正文提到:默认列
-    assert f"action(#{bash[1].seq}@L" not in text.split("提到它的命令")[1]          # git log 是只读检查:默认折叠
-    assert f"action(#{bash[1].seq}@L" in atoms_text.render_file(led, "A.ets", None, root="/proj", m_all=True)
+    assert f":{bash[0].seq}@L" in text.split("提到它的命令")[1]              # heredoc 正文提到:默认列
+    assert f":{bash[1].seq}@L" not in text.split("提到它的命令")[1]          # git log 是只读检查:默认折叠
+    assert f":{bash[1].seq}@L" in atoms_text.render_file(led, "A.ets", None, root="/proj", m_all=True)
     assert f"action(#{bash[2].seq}@L" not in text.split("提到它的命令")[1]      # 已入账的(cat 是读)不再铺,只计数
     assert "已入账的 2 条(" in text and "读 1 次" in text                        # cat 是读;脚本那条记成碰过(方向不明)
     assert "3 条命令提到它但没入账" in atoms_text.render_index(led, "ets", None, root="/proj")

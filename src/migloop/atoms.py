@@ -65,6 +65,7 @@ class Action:
     tuid: str | None = None
     stage: str | None = None   # 管线阶段:记录的归属戳(attributionSkill);子 agent 无戳时继承派发时阶段
     done_ts: str | None = None  # 结果返回时刻:读的内容这一刻才进上下文,喂的版本按它算(评审反例:写之后才返回的读)
+    blk: int = 0               # 同一条记录里第几个 tool_use(并行调用同行):引用里的 /块号,少了它两个调用同一个位置
 
 
 @dataclass
@@ -117,8 +118,13 @@ class Ledger:
     lines: dict[int, int] = field(default_factory=dict)
     #: 动作号 → "行号·转录标识"(渲染用):#n 是本次建账的句柄,账本重建后会漂;@L行·标识不漂,核验按它
     locs: dict[int, str] = field(default_factory=dict)
-    #: (转录标识, 行号) → 动作号:报告里的引用反查,#n 漂了也能对回去
-    by_loc: dict[tuple[str, int], int] = field(default_factory=dict)
+    #: (转录标识, 行号, 块号) → 动作号:报告里的引用反查,#n 漂了也能对回去
+    by_loc: dict[tuple[str, int, int], int] = field(default_factory=dict)
+    #: 撞了键的位置(理论上不该有):核验时报歧义,不能 first-wins
+    loc_ambiguous: set[tuple[str, int, int]] = field(default_factory=set)
+    #: 转录标识 → 转录路径;旧格式短标识(8 位 / 带名字)→ 新标识,不唯一的记 None(报歧义,不猜)
+    tag_paths: dict[str, str] = field(default_factory=dict)
+    legacy_tags: dict[str, str | None] = field(default_factory=dict)
     #: (path, 读事件 seq) → 读它那次调用的动作号:文件原子的读者行带展开指针
     read_act: dict[tuple[str, int], int] = field(default_factory=dict)
     #: 上游最长链(建账时 DP 一遍算完):键 ("f", path, v) / ("a", agent, k),值 = 到池外为止最多经过几次
@@ -311,14 +317,19 @@ def build_ledger(agents: dict[str, AgentRec]) -> Ledger:
     read_act: dict[tuple[str, int], int] = {}
     lines: dict[int, int] = {}
     locs: dict[int, str] = {}
-    by_loc: dict[tuple[str, int], int] = {}
+    by_loc: dict[tuple[str, int, int], int] = {}
+    loc_ambiguous: set[tuple[str, int, int]] = set()
     for a in agents.values():
         for act in a.actions:
             if act.src is not None:
                 lines[act.seq] = act.src[1] + 1
                 tag = transcript_tag(act.src[0])
-                locs[act.seq] = f"{act.src[1] + 1}·{tag}"
-                by_loc.setdefault((tag, act.src[1] + 1), act.seq)
+                locs[act.seq] = f"{act.src[1] + 1}{'/' + str(act.blk) if act.blk else ''}·{tag}"
+                key = (tag, act.src[1] + 1, act.blk)
+                if key in by_loc and by_loc[key] != act.seq:
+                    loc_ambiguous.add(key)                    # 撞键:核验时报歧义,不自动认第一个
+                else:
+                    by_loc[key] = act.seq
             for ref in act.files:
                 ref.v = index.get((ref.path, ref.ev.seq))
                 if ref.op == "read":
@@ -332,6 +343,11 @@ def build_ledger(agents: dict[str, AgentRec]) -> Ledger:
                 st = stories.setdefault(p, FileStory(p))
                 st.touches.append(Touch(act.ts, act.seq, a.id, act.ver if act.ver is not None else act.at,
                                         str(act.detail.get("unresolved") or "方向不明"), act.stage))
+            # 条件分支里的效应:不进正式状态(评审反例:false && 写 A,文件没变,账本却多出一版和一次「实录外修改」),记候选
+            for p in act.detail.get("conditional") or []:
+                st = stories.setdefault(p, FileStory(p))
+                st.touches.append(Touch(act.ts, act.seq, a.id, act.ver if act.ver is not None else act.at,
+                                        "条件分支,是否执行未知(候选写)", act.stage))
             # 存在性守卫里探过的路径:文件当时可能不存在,只留指针
             for p in act.detail.get("probed") or []:
                 st = stories.setdefault(p, FileStory(p))
@@ -407,15 +423,75 @@ def build_ledger(agents: dict[str, AgentRec]) -> Ledger:
     for path, lst in mentions.items():
         for m in lst:
             mention_seq.setdefault(m.seq, []).append(path)
+    tag_paths: dict[str, str] = {}
+    legacy: dict[str, str | None] = {}
+    for a in agents.values():
+        for act in a.actions:
+            if act.src is None:
+                continue
+            tag = transcript_tag(act.src[0])
+            tag_paths[tag] = act.src[0]
+            stem = os.path.splitext(os.path.basename(act.src[0]))[0]
+            old = stem[6:14] if stem.startswith("agent-") else stem[:8]
+            if old != tag:
+                legacy[old] = None if (old in legacy and legacy[old] != tag) else tag
     return Ledger(stories, agents, feeds, t0, lines=lines, read_act=read_act, depth_max=dmax, depth_win=dwin,
                   mentions=mentions, mention_seq=mention_seq, write_cmds=_write_capable_cmds(agents),
-                  locs=locs, by_loc=by_loc)
+                  locs=locs, by_loc=by_loc, loc_ambiguous=loc_ambiguous, tag_paths=tag_paths, legacy_tags=legacy)
+
+
+REF_RE = re.compile(r"#(?:([\w-]+):)?(\d+)@L(\d+)(?:/(\d+))?(?:·([\w-]+))?")
+
+
+def resolve_tag(ledger: Ledger, tag: str) -> tuple[str | None, bool]:
+    """报告里的转录标识 → 账本里的标识。精确 → 旧格式迁移(唯一才认)→ 前缀(≥4 位且唯一)。(None, True) = 歧义。"""
+    if tag in ledger.tag_paths:
+        return tag, False
+    if tag in ledger.legacy_tags:
+        t = ledger.legacy_tags[tag]
+        return (t, False) if t else (None, True)
+    if len(tag) >= 4:
+        cands = [t for t in ledger.tag_paths if t.startswith(tag)]
+        if len(cands) == 1:
+            return cands[0], False
+        if cands:
+            return None, True
+    return None, False
+
+
+def resolve_ref(ledger: Ledger, no: int, line: int, blk: int, tag: str | None) -> tuple[int | None, str]:
+    """一条引用 → (现在的动作号, 状态)。状态:ok / drifted(#n 漂了但位置对上)/ ambiguous / missing / untagged(没有标识,
+    只能按 #n 对,漂了就核不回去)。"""
+    if line < 1:
+        return None, "missing"
+    if tag:
+        t, amb = resolve_tag(ledger, tag)
+        if amb:
+            return None, "ambiguous"
+        if t is None:
+            return None, "missing"
+        key = (t, line, blk)
+        if key in ledger.loc_ambiguous:
+            return None, "ambiguous"
+        hit = ledger.by_loc.get(key)
+        if hit is None:
+            return None, "missing"
+        return hit, ("ok" if hit == no else "drifted")
+    if ledger.lines.get(no) == line:
+        return no, "ok"
+    return None, "untagged"
 
 
 def transcript_tag(path: str) -> str:
-    """转录文件的短标识:主会话取会话号前 8 位,子代理取 agent- 后的前 8 位。引用 (#n@L行·标识) 里的那一截。"""
+    """转录文件的标识:主会话取会话号前 8 位;子代理取文件名末尾那一整段 hex(agent-aconv-apploaddlg-8ea392b08bb155da →
+    8ea392b08bb155da)—— 截 8 位会撞(0723 有 17 个短标识各对两个文件)、带名字的会有非 hex 字符。引用 (#n@L行·标识) 里的那一截。"""
     stem = os.path.splitext(os.path.basename(path))[0]
-    return stem[6:14] if stem.startswith("agent-") else stem[:8]
+    if stem.startswith("agent-"):
+        m = re.search(r"([0-9a-f]+)$", stem)
+        if m and len(m.group(1)) >= 4:
+            return m.group(1)
+        return re.sub(r"[^\w-]", "", stem[6:]) or stem
+    return stem[:8]
 
 
 def _write_capable_cmds(agents: dict[str, AgentRec]) -> list[tuple[str, int, str]]:
@@ -426,8 +502,9 @@ def _write_capable_cmds(agents: dict[str, AgentRec]) -> list[tuple[str, int, str
         for act in a.actions:
             if act.tool not in ("Bash", "PowerShell", "exec"):
                 continue
-            if (act.detail.get("write_capable") or act.detail.get("unresolved")
-                    or any(ref.op != "read" for ref in act.files)):
+            if (act.detail.get("write_capable") or act.detail.get("unresolved") or act.detail.get("conditional")
+                    or any(ref.op != "read" for ref in act.files)
+                    or any(len(m) > 4 and m[4] == "change" for m in act.detail.get("mentions") or [])):
                 rows.append((act.ts, act.seq, a.id))
     rows.sort()
     return rows
@@ -947,19 +1024,25 @@ def agent_atom(ledger: Ledger, agent_id: str, v: int | None = None,
 
 # ═══════════════ 带起点的 search ═══════════════
 
-_TRANSCRIPT_CACHE: dict[str, list[str]] = {}
+_TRANSCRIPT_CACHE: dict[str, tuple[tuple[int, int], list[str]]] = {}
 
 
 def _transcript_lines(path: str) -> list[str]:
-    """整份转录按行缓存(最多 4 份):search 先用子串在原始行上粗筛,命中的才解析 JSON。"""
-    lines = _TRANSCRIPT_CACHE.get(path)
-    if lines is None:
+    """整份转录按行缓存(最多 4 份),键带 (mtime, size):转录追加后重建账本,search 不能还读旧行(评审反例)。"""
+    try:
+        stt = os.stat(path)
+        sig = (stt.st_mtime_ns, stt.st_size)
+    except OSError:
+        sig = (0, 0)
+    hit = _TRANSCRIPT_CACHE.get(path)
+    if hit is None or hit[0] != sig:
         with open(path, encoding="utf-8", errors="ignore") as fh:
             lines = fh.read().split("\n")
-        if len(_TRANSCRIPT_CACHE) >= 4:
+        if len(_TRANSCRIPT_CACHE) >= 4 and path not in _TRANSCRIPT_CACHE:
             _TRANSCRIPT_CACHE.pop(next(iter(_TRANSCRIPT_CACHE)))
-        _TRANSCRIPT_CACHE[path] = lines
-    return lines
+        _TRANSCRIPT_CACHE[path] = (sig, lines)
+        return lines
+    return hit[1]
 
 
 def _record_texts(rec: dict[str, Any], act: Action) -> dict[str, str]:
@@ -1043,7 +1126,8 @@ def search_agent(ledger: Ledger, agent_id: str, q: str, v: int | None = None, si
                 continue
             in_window = True
         else:
-            in_window = (since is None or k > since) and k <= anchor
+            # 不带 v = 整个生命周期,锚点之后的也算(评审反例:最后一个效应之后说的话搜不到)
+            in_window = (since is None or k > since) and (v is None or k <= anchor)
         path, ui, ri = act.src
         lines = _transcript_lines(path)
         idxs = [ui] + ([ri] if ri is not None and ri != ui else [])

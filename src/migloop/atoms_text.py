@@ -33,10 +33,18 @@ def _who(ledger: atoms.Ledger, by: str, ver: int | None) -> str:
     return atoms.agent_label(ledger, by) + (f" v{ver}" if ver is not None else "")
 
 
+def _core(seq: Any, loc: int | str | None) -> str:
+    """引用主体 #转录标识:n@L行[/块]:标识在前,是坐标的一部分,截不掉(放后缀时模型抄的时候丢了七成)。
+    #n 给 action 展开用,是本次建账的句柄,账本重建后会漂;标识 + 行 + 块是转录里的位置,不漂,核验按它。"""
+    if isinstance(loc, str) and "·" in loc:
+        pos, tag = loc.split("·", 1)
+        return f"#{tag}:{seq}@L{pos}"
+    return f"#{seq}@L{loc}" if loc else f"#{seq}"
+
+
 def _ref(seq: Any, t: str | None, line: int | str | None = None) -> str:
-    """动作引用 (#n@L行·转录标识 T+h:mm):#n 给 action 展开用,是本次建账的句柄,账本重建后会漂;@L行·标识是转录里的位置,
-    不漂,报告不经工具也能回查、核验按它;T+ 给跨 agent 对先后用。"""
-    core = f"#{seq}@L{line}" if line else f"#{seq}"
+    """动作引用 (#转录标识:n@L行 T+h:mm);T+ 给跨 agent 对先后用。"""
+    core = _core(seq, line)
     return f"({core} {t})" if t else f"({core})"
 
 
@@ -173,7 +181,7 @@ def _collapse_spine(ledger: atoms.Ledger, rows: list[dict[str, Any]], anchor: in
             ln = (f" · {a['lines']}→{b['lines']} 行" if a.get("lines") is not None and b.get("lines") is not None else "")
             ptr = ""
             if a.get("seq") is not None and b.get("seq") is not None:
-                ptr = f" (#{a['seq']}@L{lines.get(a['seq'], '?')} … #{b['seq']}@L{lines.get(b['seq'], '?')})"
+                ptr = f" ({_core(a['seq'], lines.get(a['seq']))} … {_core(b['seq'], lines.get(b['seq']))})"
             who = f"{atoms.agent_label(ledger, a['by']) or a['by']} {bv}".strip()
             out.append({"_run": f"- v{a['v']}–v{b['v']} ← {who} | {a['ts'][5:16]}–{b['ts'][11:16]} | {a['diff_kind']} ×{j - i + 1}"
                                 f"({j - i + 1} 版){ln}{'' if a['content_known'] else ' · 内容未知'}{ptr}"})

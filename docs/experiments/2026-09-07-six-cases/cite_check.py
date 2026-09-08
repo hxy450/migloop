@@ -13,10 +13,11 @@ import re
 import sys
 from typing import Any
 
-_TOOL_REF = re.compile(r"#(\d+)@L(\d+)(?:·([0-9a-f]+))?")
+_TOOL_REF = re.compile(r"#(?:([\w-]+):)?(\d+)@L(\d+)(?:/(\d+))?(?:·([\w-]+))?")
 _FILE_AT = re.compile(r"([\w./-]+\.[A-Za-z0-9]+)@v(\d+)")
 _RAW_LINE = re.compile(r"([\w-]+\.jsonl):(\d+)")
 _TUID = re.compile(r"\btoolu_[A-Za-z0-9]{8,}\b")
+_TUID_DEF = re.compile(r'"id":\s*"(toolu_[A-Za-z0-9]{8,})"')      # 只认 tool_use 块里定义的 id,正文里提到的不算
 
 
 def _line_count(path: str) -> int:
@@ -52,7 +53,7 @@ class Pool:
                 try:
                     with open(p, encoding="utf-8", errors="ignore") as fh:
                         for line in fh:
-                            ids.update(_TUID.findall(line))
+                            ids.update(_TUID_DEF.findall(line))
                 except OSError:
                     continue
             self._ids = ids
@@ -62,30 +63,29 @@ class Pool:
 def check_report(ledger: Any, pool: Pool, text: str) -> dict[str, Any]:
     total = valid = drifted = 0
     bad: list[str] = []
+    untagged = 0
     for m in _TOOL_REF.finditer(text):
         total += 1
-        no, line, tag = int(m.group(1)), int(m.group(2)), m.group(3)
         if ledger is None:
             bad.append(m.group(0))
             continue
-        if tag:
-            hit = getattr(ledger, "by_loc", {}).get((tag, line))
-            if hit is not None:
-                valid += 1
-                if hit != no:
-                    drifted += 1                      # #n 漂了,位置对得上:仍可核
-            else:
-                bad.append(m.group(0))
-        elif ledger.lines.get(no) == line:
+        from migloop import atoms
+        tag = m.group(1) or m.group(5)
+        hit, status = atoms.resolve_ref(ledger, int(m.group(2)), int(m.group(3)), int(m.group(4) or 0), tag)
+        if hit is not None:
             valid += 1
+            if status == "drifted":
+                drifted += 1                          # #n 漂了,位置对得上:仍可核
         else:
-            bad.append(m.group(0))
+            if status == "untagged":
+                untagged += 1
+            bad.append(m.group(0) + ("(歧义)" if status == "ambiguous" else "(无标识)" if status == "untagged" else ""))
     if ledger is not None:
         from migloop import filestory
         for m in _FILE_AT.finditer(text):
             k = filestory.find_story_path(ledger.stories, m.group(1))
             total += 1
-            if k and len(ledger.stories[k].versions) >= int(m.group(2)):
+            if k and 1 <= int(m.group(2)) <= len(ledger.stories[k].versions):
                 valid += 1
             else:
                 bad.append(m.group(0))
@@ -93,7 +93,7 @@ def check_report(ledger: Any, pool: Pool, text: str) -> dict[str, Any]:
         total += 1
         name = m.group(1)
         hit_name = next((n for n in pool.files if n == name or n.startswith(name.rsplit(".", 1)[0])), None)
-        if hit_name and pool.lines(hit_name) >= int(m.group(2)):
+        if hit_name and 1 <= int(m.group(2)) <= pool.lines(hit_name):
             valid += 1
         else:
             bad.append(m.group(0))
@@ -103,7 +103,7 @@ def check_report(ledger: Any, pool: Pool, text: str) -> dict[str, Any]:
             valid += 1
         else:
             bad.append(tuid)
-    return {"total": total, "valid": valid, "invalid": len(bad), "drifted": drifted, "samples": bad[:8]}
+    return {"total": total, "valid": valid, "invalid": len(bad), "drifted": drifted, "untagged": untagged, "samples": bad[:8]}
 
 
 def summary_line(tag: str, r: dict[str, Any]) -> str:
@@ -112,6 +112,8 @@ def summary_line(tag: str, r: dict[str, Any]) -> str:
     s = f"{tag}:{r['total']} 条坐标,位置可核 {r['valid']},无效 {r['invalid']}"
     if r.get("drifted"):
         s += f"(其中 {r['drifted']} 条动作号漂了但位置对得上)"
+    if r.get("untagged"):
+        s += f"(无效里 {r['untagged']} 条没带转录标识,核不回去)"
     if r["samples"]:
         s += ";无效例:" + ", ".join(r["samples"][:5])
     return s

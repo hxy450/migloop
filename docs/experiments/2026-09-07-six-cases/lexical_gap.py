@@ -36,11 +36,16 @@ def main() -> None:
         seqs.update(s for (pp, _rs), s in ledger.read_act.items() if pp == p)
         seqs.update(t.seq for t in st.touches)
         seqs.update(m.seq for m in ledger.mentions.get(p, []))
+        # 按动作自己的 tool_use 行与 tool_result 行精确配对(Action.src),不用邻行冒充(评审反例:没入口的
+        # file-history-snapshot 紧挨着 Write 就被算成覆盖)
+        by_seq = {a.seq: a for ag in ledger.agents.values() for a in ag.actions}
         for s in seqs:
-            loc = ledger.locs.get(s)
-            if loc:
-                line, tag = loc.split("·", 1)
-                covered.add((tag, int(line)))
+            a = by_seq.get(s)
+            if a is not None and a.src:
+                tag = atoms.transcript_tag(a.src[0])
+                covered.add((tag, a.src[1] + 1))
+                if a.src[2] is not None:
+                    covered.add((tag, a.src[2] + 1))
         # 转录里提到它的行
         hit_lines: list[tuple[str, int, str]] = []
         for f in files:
@@ -57,10 +62,7 @@ def main() -> None:
                         blocks = m.get("content") if isinstance(m, dict) else None
                         kinds = Counter((str(b.get("type") or "text") if isinstance(b, dict) else "text") for b in (blocks if isinstance(blocks, list) else [{}]))
                         hit_lines.append((tag, i, f"{role}:{'/'.join(sorted(kinds))}"))
-        missing = [(t, i, k) for t, i, k in hit_lines if (t, i) not in covered]
-        # 同一次调用的 tool_use 行和 tool_result 行是两行:账本指针指其一(use 行),另一行算覆盖
-        adj = {(t, i) for t, i in covered} | {(t, i + 1) for t, i in covered} | {(t, i - 1) for t, i in covered}
-        missing2 = [(t, i, k) for t, i, k in hit_lines if (t, i) not in adj]
+        missing2 = [(t, i, k) for t, i, k in hit_lines if (t, i) not in covered]
         kinds = Counter(k for _t, _i, k in missing2)
         print(f"== {base}: 转录里提到它 {len(hit_lines)} 行;账本入口覆盖 {len(hit_lines) - len(missing2)};差集 {len(missing2)}")
         print("   差集按记录种类:", dict(kinds.most_common(8)))

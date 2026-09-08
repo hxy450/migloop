@@ -132,16 +132,20 @@ def test_failed_command_keeps_pointer_and_candidate(tmp_path: Any) -> None:
 
 
 def test_conditional_branch_write_is_flagged_not_asserted(tmp_path: Any) -> None:
-    """`false && cp b A; true` 实际没执行 cp。&& / || 之后的操作标「条件分支,是否执行未知」;
-    cd / mkdir / echo 这种几乎不失败的前件不算条件。"""
+    """`false && cp b A; true` 实际没执行 cp。&& / || 之后的效应不进正式状态:不立版本,记「条件分支,是否执行未知(候选写)」,
+    之后读回原内容不是实录外修改(第二轮评审反例);cd / mkdir / echo 这种几乎不失败的前件不算条件。"""
     main = [
         *_call(at("00:00:00"), "t1", "Write", {"file_path": A, "content": "a\n"}),
         *_call(at("00:00:10"), "t2", "Bash", {"command": f"false && cp /tmp/b.ets {A}; true"}, out=""),
+        *_read_call(at("00:00:20"), "t3", A, "a\n"),
     ]
     led = _ledger(tmp_path, main)
     st = led.stories[A]
-    assert len(st.versions) == 2 and st.versions[1].conditional
+    cp = next(a for a in led.agents[MAIN_ID].actions if a.tool == "Bash")
+    assert len(st.versions) == 1 and not st.breaks
+    assert [(t.seq, t.reason) for t in st.touches] == [(cp.seq, "条件分支,是否执行未知(候选写)")]
     assert "条件分支" in atoms_text.render_file(led, "A.ets", None, root="/proj")
+    assert any(r["seq"] == cp.seq for r in atoms.search_window_writes(led, None, at("00:01:00"))["rows"])
     main2 = [
         *_call(at("00:00:00"), "t1", "Write", {"file_path": A, "content": "a\n"}),
         *_call(at("00:00:10"), "t2", "Bash", {"command": "cd /proj && cp /tmp/b.ets entry/A.ets"}, out=""),
@@ -163,7 +167,7 @@ def test_lexical_layer_discloses_truncation_mention_only_files_and_unfinished_ca
     led = _ledger(tmp_path, recs)
     acts = led.agents[MAIN_ID].actions
     ls = next(a for a in acts if str(a.detail.get("cmd", "")).startswith("ls "))
-    assert len(ls.detail["mentions"]) == 40 and ls.detail["mentions_truncated"] == 5
+    assert len(ls.detail["mentions"]) == 45 and not ls.detail.get("mentions_truncated")   # 收集上限 2000,展示层再分页
     # 只被提到、从没读写过的文件也有入口(目录已知才建,免得输出里的垃圾路径灌进目录)
     assert "/proj/entry/Never.ets" in led.stories and not led.stories["/proj/entry/Never.ets"].versions
     idx = atoms_text.render_index(led, "ets", None, root="/proj")
@@ -223,7 +227,8 @@ def test_refs_carry_transcript_tag_and_resolve_by_location(tmp_path: Any) -> Non
     led = _ledger(tmp_path, main)
     wr = next(a for a in led.agents[MAIN_ID].actions if a.tool == "Write")
     tag = SID[:8]
-    assert led.locs[wr.seq] == f"{led.lines[wr.seq]}·{tag}" and led.by_loc[(tag, led.lines[wr.seq])] == wr.seq
+    assert led.locs[wr.seq] == f"{led.lines[wr.seq]}·{tag}" and led.by_loc[(tag, led.lines[wr.seq], 0)] == wr.seq
     text = atoms_text.render_file(led, "A.ets", None, root="/proj")
-    assert f"(#{wr.seq}@L{led.lines[wr.seq]}·{tag})" in text
-    assert atoms.transcript_tag("/x/agent-a68daf720e780b4c2.jsonl") == "a68daf72"
+    assert f"(#{tag}:{wr.seq}@L{led.lines[wr.seq]})" in text                 # 标识在前,截不掉
+    assert atoms.transcript_tag("/x/agent-a68daf720e780b4c2.jsonl") == "a68daf720e780b4c2"
+    assert atoms.transcript_tag("/x/agent-aconv-apploaddlg-8ea392b08bb155da.jsonl") == "8ea392b08bb155da"

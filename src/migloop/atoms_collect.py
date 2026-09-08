@@ -93,13 +93,23 @@ _SCRIPT_EXT_HINT = re.compile(r"\.(?:py|js|mjs|sh)\b")
 
 class ScriptTable(dict[str, list[tuple[str, str]]]):
     """脚本正文表:名字 / 路径 → [(写入时刻, 正文)]。按运行时刻取当时存在的版本 —— 不拿后来才写的正文解释早先的运行
-    (评审反例:子代理 00:10 跑 fix.py,主会话 00:40 才写出来,曾被拿来解释)。"""
+    (评审反例:子代理 00:10 跑 fix.py,主会话 00:40 才写出来,曾被拿来解释)。paths 记同名脚本的各个完整路径:
+    运行时先按完整路径查,basename 只在唯一时兜底(评审反例:/tmp/one/fix.py 与 /tmp/two/fix.py 串用)。"""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.paths: dict[str, set[str]] = {}
 
     def put(self, key: str, ts: str, content: str) -> None:
         rows = self.setdefault(key, [])
         if (ts, content) not in rows:
             rows.append((ts, content))
             rows.sort()
+        if "/" in key:
+            self.paths.setdefault(os.path.basename(key), set()).add(key)
+
+    def paths_for(self, base: str) -> list[str]:
+        return sorted(self.paths.get(base, ()))
 
     def body(self, key: str, ts: str | None = None) -> str | None:
         rows = self.get(key) or []
@@ -118,6 +128,22 @@ def _script_body(scripts: dict[str, Any], key: str, ts: str | None = None) -> st
     return str(v) if isinstance(v, str) else None
 
 
+def _script_lookup(scripts: dict[str, Any], run: str, base: str | None, ts: str | None) -> str | None:
+    """跑的脚本正文:先按解析出的完整路径,查不到才按 basename,且只在同名脚本唯一时认(两个都不行 = 正文未知)。"""
+    full = _resolve(run, base)
+    body = _script_body(scripts, full, ts) if full else None
+    if body is not None:
+        return body
+    name = os.path.basename(run.replace("\\", "/"))
+    if isinstance(scripts, ScriptTable):
+        cands = [p for p in scripts.paths_for(name) if p != full]
+        if len(cands) == 1:
+            return scripts.body(cands[0], ts)
+        if cands:
+            return None                                    # 同名不止一个,不猜
+    return _script_body(scripts, name, ts)
+
+
 def _script_put(scripts: dict[str, Any], key: str, ts: str | None, content: str) -> None:
     if isinstance(scripts, ScriptTable):
         scripts.put(key, ts or "", content)
@@ -126,7 +152,7 @@ def _script_put(scripts: dict[str, Any], key: str, ts: str | None, content: str)
 
 
 #: && 之后不算条件分支的前件:几乎不会失败,失败了后件也不会被当成"没执行"来解释
-_ALWAYS_OK = frozenset({"cd", "pushd", "popd", "mkdir", "export", "set", "echo", "true", "source", ".",
+_ALWAYS_OK = frozenset({"cd", "pushd", "popd", "mkdir", "export", "set", "echo", "true", "source", ".", "touch",
                         "set-location", "push-location", "new-item"})
 
 
@@ -180,7 +206,8 @@ _MENTION = re.compile(r"[\w./\\~:-]*\w\.[A-Za-z][A-Za-z0-9]{0,5}(?![\w.])")
 _RUN_WORD = re.compile(r"[\w./\\~:-]+\.(?:py|js|mjs|sh)\b")
 
 
-_MENTION_CAP = 40
+_MENTION_CAP = 2000          # 收集层上限(展示层另行分页);超出记 mentions_truncated
+_SCAN_LIMIT = 2_000_000      # 每段文本的扫描预算(字符);超出记 mentions_scan_truncated,查询端能看到没扫的区域
 _HEREDOC_BODY = re.compile(r"<<-?\s*['\"]?(\w+)['\"]?[^\n]*\n(.*?)\n[ \t]*\1[ \t]*(?:\n|$)", re.S)
 _SEG_SEP = re.compile(r"&&|\|\||[;|\n]")
 _CHANGE_HEADS = frozenset({"cp", "mv", "rm", "tee", "truncate", "install", "ln", "python", "python3", "python2", "node",
@@ -223,7 +250,12 @@ def _mention_class(seg: str, tok: str) -> str:
         return ("change" if any(w.startswith("-") and not w.startswith("--e") and "i" in w.split("=")[0]
                                 for w in words[1:]) else "readonly")
     if head == "git":
-        return "change" if (len(words) > 1 and words[1] in _GIT_CHANGE) else "readonly"
+        rest, i = words[1:], 0
+        while i < len(rest) and rest[i].startswith("-"):
+            i += 2 if rest[i] in ("-C", "-c", "--git-dir", "--work-tree") else 1     # git -C /proj restore …
+        return "change" if (i < len(rest) and rest[i] in _GIT_CHANGE) else "readonly"
+    if head == "find":
+        return "change" if any(w in ("-delete", "-exec", "-execdir", "-ok", "-okdir") for w in words) else "readonly"
     if head in _CHANGE_HEADS:
         return "change"
     if head in _READONLY_HEADS:
@@ -241,12 +273,12 @@ def _path_mentions(cmd: str, scripts: dict[str, Any], cwd: object = None, ts: st
     spans = _heredoc_spans(text) if where == "in" else []
     bounds = _segment_bounds(text) if where == "in" else []
     starts = [b[0] for b in bounds]
+    base = _resolve(cwd, None) if isinstance(cwd, str) and cwd else None
     if where == "in":
         for m in _RUN_WORD.finditer(text):
-            body = _script_body(scripts, os.path.basename(m.group(0).replace("\\", "/")), ts)
+            body = _script_lookup(scripts, m.group(0), base, ts)
             if body:
                 text += "\n" + body
-    base = _resolve(cwd, None) if isinstance(cwd, str) and cwd else None
     out: list[tuple[str, str, str | None, str, str]] = []
     seen: set[str] = set()
     total = 0
@@ -977,8 +1009,7 @@ def _shell_analyze(cmd: str, cwd: object, scripts: dict[str, Any],
             run = next((w for w in args if _SCRIPT_RUN.search(w) and not w.startswith("-")), None)
             if run:
                 ran_script = True
-                body = (_script_body(scripts, os.path.basename(run), ts)
-                        or _script_body(scripts, _resolve(run, base) or "", ts))
+                body = _script_lookup(scripts, run, base, ts)
                 if body is None:
                     capable = True                # 会话外脚本 / 运行时尚未写出:目标不可知
                     unknown_scripts.append(run)
@@ -1234,6 +1265,12 @@ def _file_ops(name: str, inp: dict[str, Any], out: str, tur: Any, cwd: object,
     elif name in ("Bash", "PowerShell"):
         cmd = str(inp.get("command") or "")
         ops, capable, undetermined, touched, hints = _shell_analyze(cmd, cwd, scripts, out, ts=ts)
+        cond_ops = [o for o in ops if o.conditional and o.op != "read"]      # 读的证据是它的输出,不受条件分支影响
+        if cond_ops:
+            # 条件分支里的效应不进正式状态:只记候选路径(build_ledger 挂成「条件分支,是否执行未知(候选写)」),
+            # 评审反例:false && 写 A,文件没变,账本却多出一版 b 和一次「实录外修改」
+            detail["conditional"] = sorted({o.path for o in cond_ops})
+            ops = [o for o in ops if not (o.conditional and o.op != "read")]
         if capable:
             detail["write_capable"] = True
         if not ops:
@@ -1350,7 +1387,7 @@ def fix_boundary(intervals: list[dict[str, Any]]) -> str | None:
 def _walk(path: str, agent_id: str, session: str, seq: list[int],
           scripts: dict[str, Any], stage_intervals: list[dict[str, Any]] | None = None) -> AgentRec:
     rec = AgentRec(id=agent_id, session=session)
-    pend: dict[str, tuple[str, str, Any, Any, int, str | None]] = {}   # id -> (ts, name, inp, cwd, 行号, 阶段)
+    pend: dict[str, tuple[str, str, Any, Any, int, str | None, int]] = {}   # id -> (ts, name, inp, cwd, 行号, 阶段, 块号)
 
     def nxt() -> int:
         seq[0] += 1
@@ -1395,6 +1432,7 @@ def _walk(path: str, agent_id: str, session: str, seq: list[int],
             said: list[str] = []
             thought: list[str] = []
             utexts: list[str] = []
+            use_blk = 0
             for b in blocks:
                 if not isinstance(b, dict):
                     continue
@@ -1408,10 +1446,11 @@ def _walk(path: str, agent_id: str, session: str, seq: list[int],
                     thought.append(str(b["thinking"]).strip())
                 elif b.get("type") == "tool_use":
                     pend[str(b.get("id"))] = (ts, str(b.get("name")), b.get("input") or {}, cwd, line_no,
-                                               stage_now(ts))
+                                               stage_now(ts), use_blk)
+                    use_blk += 1
                 elif b.get("type") == "tool_result" and str(b.get("tool_use_id")) in pend:
                     tuid = str(b.get("tool_use_id"))
-                    uts, name, inp, ucwd, use_line, stage = pend.pop(tuid)
+                    uts, name, inp, ucwd, use_line, stage, blk = pend.pop(tuid)
                     ok = not b.get("is_error", False)
                     ops: list[FileOp] = []
                     detail: dict[str, Any] = _basic_detail(name, inp)
@@ -1436,7 +1475,10 @@ def _walk(path: str, agent_id: str, session: str, seq: list[int],
                         mentions, trunc = _path_mentions(cmd_text, scripts, ucwd, uts)
                         if ok:
                             # 输出里点名的文件(git status 的 modified、ls、构建报错、grep -rl):命令行里没有,输出里有
-                            om, otrunc = _path_mentions(_text_of(b.get("content"))[:20000], {}, ucwd, uts, where="out")
+                            out_full = _text_of(b.get("content"))
+                            if len(out_full) > _SCAN_LIMIT:
+                                detail["mentions_scan_truncated"] = len(out_full) - _SCAN_LIMIT
+                            om, otrunc = _path_mentions(out_full[:_SCAN_LIMIT], {}, ucwd, uts, where="out")
                             head_cmd = " ".join(cmd_text.split())[:60]
                             om = [(t, (head_cmd + " ⇒ " + c)[:150], ab, w, k) for t, c, ab, w, k in om]
                             mentions, trunc = mentions + om, trunc + otrunc
@@ -1445,7 +1487,10 @@ def _walk(path: str, agent_id: str, session: str, seq: list[int],
                         if trunc:
                             detail["mentions_truncated"] = trunc
                     elif name in ("Grep", "Glob") and ok:
-                        om, otrunc = _path_mentions(_text_of(b.get("content"))[:20000], {}, ucwd, uts, where="out")
+                        out_full = _text_of(b.get("content"))
+                        if len(out_full) > _SCAN_LIMIT:
+                            detail["mentions_scan_truncated"] = len(out_full) - _SCAN_LIMIT
+                        om, otrunc = _path_mentions(out_full[:_SCAN_LIMIT], {}, ucwd, uts, where="out")
                         if om:
                             detail["mentions"] = om
                         if otrunc:
@@ -1458,7 +1503,7 @@ def _walk(path: str, agent_id: str, session: str, seq: list[int],
                         if im[1]:
                             detail["mentions_truncated"] = im[1]
                     act = Action(uts, nxt(), name, _kind_of(name, ops), ok=ok, detail=detail,
-                                 src=(path, use_line, line_no), tuid=tuid, stage=stage, done_ts=ts)
+                                 src=(path, use_line, line_no), tuid=tuid, stage=stage, done_ts=ts, blk=blk)
                     for op in ops:
                         # 写在调用时刻发生,读的内容在结果时刻进上下文
                         ev = _to_ev(op, agent_id, ts if op.op == "read" else uts, nxt(), stage)
@@ -1477,7 +1522,7 @@ def _walk(path: str, agent_id: str, session: str, seq: list[int],
                     text = re.sub(r"\s*</teammate-message>\s*$", "", text)
                     ib_detail: dict[str, Any] = {"from": tm.group(1) if tm else "dispatcher",
                                                  "summary": tm.group(2) if tm else None, "text": text}
-                    ib_m, ib_t = _path_mentions(text[:20000], {}, cwd, ts, where="text", cls="text")
+                    ib_m, ib_t = _path_mentions(text[:_SCAN_LIMIT], {}, cwd, ts, where="text", cls="text")
                     if ib_m:
                         ib_detail["mentions"] = ib_m
                     if ib_t:
@@ -1500,14 +1545,14 @@ def _walk(path: str, agent_id: str, session: str, seq: list[int],
                 if texts:
                     full = "\n".join(texts)
                     st_detail: dict[str, Any] = {"text": _head(full)}
-                    st_m, st_t = _path_mentions(full[:20000], {}, cwd, ts, where="text", cls="text")
+                    st_m, st_t = _path_mentions(full[:_SCAN_LIMIT], {}, cwd, ts, where="text", cls="text")
                     if st_m:
                         st_detail["mentions"] = st_m
                     if st_t:
                         st_detail["mentions_truncated"] = st_t
                     rec.actions.append(Action(ts, nxt(), kind, kind, detail=st_detail,
                                               src=(path, line_no, line_no), stage=stage_now(ts)))
-    for tuid, (uts, name, inp, ucwd, use_line, stage) in pend.items():
+    for tuid, (uts, name, inp, ucwd, use_line, stage, blk) in pend.items():
         # 没等到结果的调用可能已经产生副作用:指针、tool_use_id、提及都保留,标 unfinished
         detail = _basic_detail(name, inp if isinstance(inp, dict) else {})
         detail["unfinished"] = True
@@ -1518,7 +1563,7 @@ def _walk(path: str, agent_id: str, session: str, seq: list[int],
             if trunc:
                 detail["mentions_truncated"] = trunc
         rec.actions.append(Action(uts, nxt(), name, "other", ok=None, detail=detail,
-                                  src=(path, use_line, use_line), tuid=tuid, stage=stage))
+                                  src=(path, use_line, use_line), tuid=tuid, stage=stage, blk=blk))
     rec.result = last_text
     return rec
 
@@ -1546,30 +1591,36 @@ def _input_text_mentions(name: str, inp: dict[str, Any], cwd: object, ts: str) -
     """非命令类调用的输入里提到的路径:派发词(Agent / Task 的 prompt)→ dispatch;发消息 → message;
     Write / Edit / MultiEdit 的正文 → content(写别的文件时清单里列了它)。Read / Grep / Glob 的路径参数已是读,不重复。"""
     if name in ("Agent", "Task"):
-        return _path_mentions(str(inp.get("prompt") or "")[:20000], {}, cwd, ts, where="dispatch", cls="dispatch")
+        return _path_mentions(str(inp.get("prompt") or "")[:_SCAN_LIMIT], {}, cwd, ts, where="dispatch", cls="dispatch")
     if name == "SendMessage":
-        return _path_mentions(str(inp.get("message") or inp.get("content") or "")[:20000], {}, cwd, ts,
+        return _path_mentions(str(inp.get("message") or inp.get("content") or "")[:_SCAN_LIMIT], {}, cwd, ts,
                               where="message", cls="message")
     if name == "Write":
-        return _path_mentions(str(inp.get("content") or "")[:20000], {}, cwd, ts, where="content", cls="content")
+        return _path_mentions(str(inp.get("content") or "")[:_SCAN_LIMIT], {}, cwd, ts, where="content", cls="content")
     if name in ("Edit", "MultiEdit"):
         edits = inp.get("edits") if name == "MultiEdit" else [inp]
         body = "\n".join(str(e.get("new_string") or "") + "\n" + str(e.get("old_string") or "")
                          for e in (edits or []) if isinstance(e, dict))
-        return _path_mentions(body[:20000], {}, cwd, ts, where="content", cls="content")
+        return _path_mentions(body[:_SCAN_LIMIT], {}, cwd, ts, where="content", cls="content")
     return [], 0
 
 
 def _prescan_scripts(paths: list[str]) -> ScriptTable:
-    """全池扫一遍脚本文件(.py/.sh/.js)的每次写入及其时刻(Write 工具与 heredoc 落盘),供运行按时刻取正文。
-    行级预筛(没有 Write / heredoc 标记、连脚本扩展名都没有的行不解 JSON),代价远小于走一遍转录。"""
-    table = ScriptTable()
+    """全池扫一遍脚本文件(.py/.sh/.js)的写入 / 编辑 / heredoc 落盘,按 tool_result 成败入表(失败的写不算正文),
+    收齐后按时刻回放建表 —— 谁先走谁后走都不影响「跑的时候脚本长什么样」。行级预筛降低解 JSON 的量。
+    评审反例:Write fix.py 报 Permission denied 仍被当正文;子代理 Edit 过的脚本主线运行时用旧正文。"""
+    events: list[tuple[str, int, str, dict[str, Any], Any]] = []     # (ts, 序, 工具, 输入, cwd)
+    order = 0
     for p in paths:
         if not os.path.isfile(p):
             continue
+        pending: dict[str, tuple[str, str, dict[str, Any], Any]] = {}
         with open(p, encoding="utf-8", errors="ignore") as fh:
             for line in fh:
-                if ('"Write"' not in line and "<<" not in line) or not _SCRIPT_EXT_HINT.search(line):
+                if '"tool_result"' in line:
+                    if not pending or not any(t in line for t in pending):
+                        continue
+                elif not (('"Write"' in line or '"Edit"' in line or "<<" in line) and _SCRIPT_EXT_HINT.search(line)):
                     continue
                 try:
                     r = json.loads(line)
@@ -1581,18 +1632,25 @@ def _prescan_scripts(paths: list[str]) -> ScriptTable:
                     continue
                 ts = str(r.get("timestamp") or "")
                 for b in blocks:
-                    if not isinstance(b, dict) or b.get("type") != "tool_use":
+                    if not isinstance(b, dict):
                         continue
-                    name, inp = str(b.get("name")), b.get("input")
-                    if not isinstance(inp, dict):
-                        continue
-                    if name == "Write":
-                        sp = _resolve(inp.get("file_path"), _resolve(r.get("cwd"), None))
-                        if sp and _SCRIPT_RUN.search(sp):
-                            table.put(os.path.basename(sp), ts, str(inp.get("content") or ""))
-                            table.put(sp, ts, str(inp.get("content") or ""))
-                    elif name in ("Bash", "PowerShell") and "<<" in str(inp.get("command") or ""):
-                        _file_ops(name, inp, "", None, r.get("cwd"), table, ts=ts)   # 副作用:heredoc 落盘的脚本进表
+                    if b.get("type") == "tool_use":
+                        name, inp = str(b.get("name")), b.get("input")
+                        if not isinstance(inp, dict):
+                            continue
+                        target = str(inp.get("file_path") or "")
+                        cmd = str(inp.get("command") or "")
+                        if ((name in ("Write", "Edit", "MultiEdit") and _SCRIPT_RUN.search(target))
+                                or (name in ("Bash", "PowerShell") and "<<" in cmd and _SCRIPT_EXT_HINT.search(cmd))):
+                            pending[str(b.get("id"))] = (ts, name, inp, r.get("cwd"))
+                    elif b.get("type") == "tool_result" and str(b.get("tool_use_id")) in pending:
+                        ev = pending.pop(str(b.get("tool_use_id")))
+                        if not b.get("is_error", False):
+                            order += 1
+                            events.append((ev[0], order, ev[1], ev[2], ev[3]))
+    table = ScriptTable()
+    for ts, _o, name, inp, cwd in sorted(events, key=lambda e: (e[0], e[1])):
+        _file_ops(name, inp, "", None, cwd, table, ts=ts)     # 副作用:Write 入表、Edit 同步、heredoc 落盘入表
     return table
 
 

@@ -116,6 +116,12 @@ def test_probe_resolves_drifted_action_numbers_by_location(tmp_path: Any) -> Non
     p = probe.probe_payload(led, _run_dir(tmp_path, [], report))
     assert p["links"][0]["bad_refs"] == []
     assert any(n.get("action") == conv_seq and n["aid"] == "agent-c" for n in p["links"][0]["nodes"])
+    # 标识在前的新格式、旧的 8 位短标识(唯一时迁移)都认;没标识且 #n 漂了的核不回去
+    line = led.lines[conv_seq]
+    nodes, bad = probe._link_nodes(led, f"#c:{conv_seq + 100}@L{line}")
+    assert not bad and any(n.get("action") == conv_seq for n in nodes)
+    nodes, bad = probe._link_nodes(led, f"#{conv_seq + 100}@L{line}")
+    assert bad == [f"#{conv_seq + 100}@L{line}"] and not nodes
 
 
 def test_probe_groups_links_by_defect_tag(tmp_path: Any) -> None:
