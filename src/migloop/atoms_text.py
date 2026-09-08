@@ -731,8 +731,11 @@ def render_diff(ledger: atoms.Ledger, hint: str, v: int, root: str = "") -> str:
     return head + "\n```diff\n" + _clip(vv["diff"], 20000) + "\n```"
 
 
-def render_chains(payload: dict[str, Any], root: str = "", file: str | None = None) -> str:
-    """file 给了只回目标文件那条链(文件名 / 相对路径 / 绝对路径都行):调查一条链不必把全部链读一遍。"""
+def render_chains(payload: dict[str, Any], root: str = "", file: str | None = None,
+                  identity: str | None = None) -> str:
+    """file 给了只回目标文件那条链(文件名 / 相对路径 / 绝对路径都行):调查一条链不必把全部链读一遍。
+    identity 给了写在首行:结论块的 ledger 字段照抄它。"""
+    head = [f"账本身份: {identity}"] if identity else []
     chains = payload.get("chains") or []
     touched = payload.get("touched") or []
     total = len(chains)
@@ -742,12 +745,13 @@ def render_chains(payload: dict[str, Any], root: str = "", file: str | None = No
         # 「碰过」附录也只列这个文件:0723 上全列是 54 个文件 6.5K 字,每根调查从第二次调用起就一直背着
         touched = [t for t in touched if _same_file(t["path"], want)]
         if not chains and not touched:
-            return f"# 返修链(0/{total},只看 {want})\n没有匹配的链;不带 file 看全部,或先用 index 确认路径。"
-        out = [f"# 返修链({len(chains)}/{total},只看 {want})"]
+            return "\n".join([*head, f"# 返修链(0/{total},只看 {want})",
+                              "没有匹配的链;不带 file 看全部,或先用 index 确认路径。"])
+        out = [*head, f"# 返修链({len(chains)}/{total},只看 {want})"]
         if not chains:
             out.append("没有匹配的链(下面只有脚本碰过的记录);不带 file 看全部,或先用 index 确认路径。")
     else:
-        out = [f"# 返修链({total})"]
+        out = [*head, f"# 返修链({total})"]
     cross = payload.get("cross") or {}
     if cross.get("priors"):
         out.append(f"前序会话: {', '.join(cross['priors'])} · 跨会话链 {cross.get('n_cross', 0)}")

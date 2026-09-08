@@ -1,0 +1,222 @@
+{
+ "attempts": [
+  {
+   "found": true,
+   "kind": "yaml",
+   "raw": "schema: migloop-verdict/1\nledger: atoms-2026-09-08:80:9065b7a0906dadac\nroot: file:entry/src/main/ets/entryability/EntryAbility.ets@v3\ndefects:\n  - id: A\n    title: 生成期 EntryAbility 没有 UI 测试桥(__test_mode__/__target_page__ → AppStorage),修复轮才由 UI-T Step3 追加 consumeTestWant\n    repair:\n      before: file:entry/src/main/ets/entryability/EntryAbility.ets@v3\n      after: file:entry/src/main/ets/entryability/EntryAbility.ets@v6\n      evidence: [\"#a711c5d09fb676814:5025@L35\", \"#a711c5d09fb676814:5027@L37\", \"#a711c5d09fb676814:5029@L39\"]\n    entry: [agent:agent-a349784d2663f1f0a@v2]\n    boundary: 池外输入(安卓源 MainActivity.kt@v1 + baseline spec)与技能定义(arkts-ui-verifier 参考模板 external 上游 0/0 跳、arkts-immersive-safearea/SKILL.md@v1)\n    nodes:\n      - node: agent:agent-a711c5d09fb676814@v4\n        role: 正常\n        reason: 修复方按设计单 §F 与模板 §6.1 在 EntryAbility 侧追加桥,写前读 v3 只做增量、不动沉浸式逻辑。\n        evidence: [\"#a711c5d09fb676814:5002@L11\", \"#a711c5d09fb676814:4998@L7\", \"#a711c5d09fb676814:5008@L17\", \"#a711c5d09fb676814:5025@L35\"]\n      - node: agent:__main__:81e0a463@v90\n        role: 正常\n        reason: 派发词明确要求 onCreate/onNewWant 注入两个测试参数,并指定按 design §F 而非模板 §6.2 的 V1 装饰器写法。\n        evidence: [\"#81e0a463:3153@L3357\"]\n      - node: agent:agent-a70e555065a1dddd1@v1\n        role: 正常\n        reason: Step1 读模板与 EntryAbility.ets@v3 后把「EntryAbility 桥需求」写进设计单 §F,需求由其派发词 §5 给定。\n        evidence: [\"#a70e555065a1dddd1:4987@L36\", \"#81e0a463:3143@L3327\", \"#a70e555065a1dddd1:4966@L20\", \"#a70e555065a1dddd1:4976@L28\", \"file:spec/test/ui-test/design/P0001_MainActivity.md@v1\"]\n      - node: file:.claude/skills/arkts-ui-verifier/references/test-case-template.md@v1\n        role: 正常\n        reason: 桥机制(§6.1 want→AppStorage、§6.2 宿主特判)的原始出处;external、上游 0/0 跳,T+4:30 才首次被读 —— 技能定义边界。\n        evidence: [\"file:.claude/skills/arkts-ui-verifier/references/test-case-template.md@v1\", \"#a70e555065a1dddd1:4966@L20\"]\n      - node: agent:agent-a349784d2663f1f0a@v2\n        role: 进入·缺\n        reason: 生成方只被派了沉浸式 Layer 1 与 F001 行为契约,输入里没有任何测试桥要求;全池 search「__test_mode__」≤2026-09-03T15:51:35.645Z 零命中(范围:那一刻之前 80 个 agent 全部记录 + 840 个文件已知内容,内容未知 48 版)。\n        evidence: [\"#a349784d2663f1f0a:4062@L71\", \"#81e0a463:2157@L1124\"]\n      - node: file:/Users/fengyi/Workspace/fuxi-ailabs/a2h_multiagents/Android-Beginner-Projects/DiceRoller/app/src/main/java/com/example/diceroller/MainActivity.kt@v1\n        role: 正常\n        reason: 池外叶子,忠实提供了 Dice(6).roll() 与 6 面查表等业务事实;鸿蒙侧测试桥不是它能提供的输入。\n        evidence: [\"#a349784d2663f1f0a:4016@L33\"]\n      - node: file:.claude/skills/arkts-immersive-safearea/SKILL.md@v1\n        role: 正常\n        reason: 生成方被契约强制先读的唯一技能,只覆盖沉浸式四层,不含测试基建 —— 技能定义边界,停。\n        evidence: [\"#a349784d2663f1f0a:4044@L57\"]\n    edges:\n      - {from: agent:agent-a70e555065a1dddd1@v1, to: file:spec/test/ui-test/design/P0001_MainActivity.md@v1, relation: 写}\n      - {from: agent:__main__:81e0a463@v90, to: agent:agent-a711c5d09fb676814@v4, relation: 派发}\n      - {from: file:spec/test/ui-test/design/P0001_MainActivity.md@v1, to: agent:agent-a711c5d09fb676814@v4, relation: 读}\n      - {from: agent:agent-a711c5d09fb676814@v4, to: file:entry/src/main/ets/entryability/EntryAbility.ets@v6, relation: 写}\n      - {from: agent:agent-a349784d2663f1f0a@v2, to: file:entry/src/main/ets/entryability/EntryAbility.ets@v2, relation: 写}\n  - id: B\n    title: 全 app 无全局未捕获异常观察者,ECAT iteration 0 才由 fix-errobserver 在 onCreate 注册 errorManager.on('error')\n    repair:\n      before: file:entry/src/main/ets/entryability/EntryAbility.ets@v7\n      after: file:entry/src/main/ets/entryability/EntryAbility.ets@v10\n      evidence: [\"#a27497cfed8c44856:715@L41\", \"#a27497cfed8c44856:717@L43\", \"#a27497cfed8c44856:719@L45\"]\n    entry: [agent:agent-a349784d2663f1f0a@v2]\n    boundary: 技能定义缺口(注入的 17 份技能无 crash-observability 一课)+ 判别器本体在池外(ECAT 工作单以指令形式喂入,#2f01bcdc:462@L3)\n    nodes:\n      - node: agent:agent-a27497cfed8c44856@v3\n        role: 正常\n        reason: 按 work list 在 onCreate 注册观察者;靠 SDK d.ts 探测把派发词建议的 @kit.ArkTS 纠正为 @kit.AbilityKit,并按 ErrorObserver.d.ts 实现两个成员。\n        evidence: [\"#a27497cfed8c44856:703@L29\", \"#a27497cfed8c44856:705@L31\", \"#a27497cfed8c44856:709@L35\", \"#a27497cfed8c44856:711@L37\", \"#a27497cfed8c44856:719@L45\"]\n      - node: agent:__main__:2f01bcdc@v5\n        role: 正常\n        reason: 把 item 13 拆成单文件工作单派给 fix-errobserver,并原样传下\"HarmonyOS 框架约束、无 Android 对应物、不要参考安卓源\"的口径。\n        evidence: [\"#2f01bcdc:509@L100\", \"#2f01bcdc:462@L3\"]\n      - node: agent:__main__:257fed22@v6\n        role: 正常\n        reason: 判别侧同一时段收到同一条 item(#257fed22:1099@L3),并自行判定它需要新开一门 crash-observability 技能 —— 说明这条能力在技能库里本来就没有。\n        evidence: [\"#257fed22:1099@L3\", \"#257fed22:1128@L96\", \"#257fed22:1133@L110\"]\n      - node: agent:agent-a349784d2663f1f0a@v2\n        role: 进入·缺\n        reason: 生成期全池 search「errorManager」≤2026-09-03T15:51:35.645Z 零命中(范围:那一刻之前 80 个 agent 全部记录 + 840 个文件已知内容,内容未知 48 版),生成方的派发词、spec 与注入技能里都没有全局异常观察者这一项。\n        evidence: [\"#a349784d2663f1f0a:4062@L71\", \"#a349784d2663f1f0a:4044@L57\"]\n      - node: file:entry/src/main/ets/entryability/EntryAbility.ets@v1\n        role: 正常\n        reason: 池外脚手架模板;v8 唯一被替换的行就是它的 @kit.AbilityKit import(blame v8 changed → __external__@v1),模板默认值本身不含观察者,叶子。\n        evidence: [\"file:entry/src/main/ets/entryability/EntryAbility.ets@v1\", \"#a27497cfed8c44856:715@L41\"]\n    edges:\n      - {from: agent:__main__:2f01bcdc@v5, to: agent:agent-a27497cfed8c44856@v3, relation: 派发}\n      - {from: file:entry/src/main/ets/entryability/EntryAbility.ets@v7, to: agent:agent-a27497cfed8c44856@v3, relation: 读}\n      - {from: agent:agent-a27497cfed8c44856@v3, to: file:entry/src/main/ets/entryability/EntryAbility.ets@v10, relation: 写}\nnotes: |\n  v3 与 v7 两版行数与前一版相同、账本 diff 为空,判为 touch 强制重编(主会话 v94 派发词 #81e0a463:3195@L3448 明确要求 touch;主会话·593d4e86 v23 的\"候选写\" #593d4e86:1424@L465 展开后确认是 touch + build);两版都带「推导·黑盒写·观测封口」,是否存在实录外内容改动无法确认。\n  该文件 273 条提及中 259 条账本没记读写,本次只看了前 40 条 + 8 条,余下未逐条展开;针对 EntryAbility 的运行期观测/截图证据在本次查询范围内未检索到。\n",
+   "errors": []
+  }
+ ],
+ "repaired": false,
+ "repair": null,
+ "found": true,
+ "kind": "yaml",
+ "raw": "schema: migloop-verdict/1\nledger: atoms-2026-09-08:80:9065b7a0906dadac\nroot: file:entry/src/main/ets/entryability/EntryAbility.ets@v3\ndefects:\n  - id: A\n    title: 生成期 EntryAbility 没有 UI 测试桥(__test_mode__/__target_page__ → AppStorage),修复轮才由 UI-T Step3 追加 consumeTestWant\n    repair:\n      before: file:entry/src/main/ets/entryability/EntryAbility.ets@v3\n      after: file:entry/src/main/ets/entryability/EntryAbility.ets@v6\n      evidence: [\"#a711c5d09fb676814:5025@L35\", \"#a711c5d09fb676814:5027@L37\", \"#a711c5d09fb676814:5029@L39\"]\n    entry: [agent:agent-a349784d2663f1f0a@v2]\n    boundary: 池外输入(安卓源 MainActivity.kt@v1 + baseline spec)与技能定义(arkts-ui-verifier 参考模板 external 上游 0/0 跳、arkts-immersive-safearea/SKILL.md@v1)\n    nodes:\n      - node: agent:agent-a711c5d09fb676814@v4\n        role: 正常\n        reason: 修复方按设计单 §F 与模板 §6.1 在 EntryAbility 侧追加桥,写前读 v3 只做增量、不动沉浸式逻辑。\n        evidence: [\"#a711c5d09fb676814:5002@L11\", \"#a711c5d09fb676814:4998@L7\", \"#a711c5d09fb676814:5008@L17\", \"#a711c5d09fb676814:5025@L35\"]\n      - node: agent:__main__:81e0a463@v90\n        role: 正常\n        reason: 派发词明确要求 onCreate/onNewWant 注入两个测试参数,并指定按 design §F 而非模板 §6.2 的 V1 装饰器写法。\n        evidence: [\"#81e0a463:3153@L3357\"]\n      - node: agent:agent-a70e555065a1dddd1@v1\n        role: 正常\n        reason: Step1 读模板与 EntryAbility.ets@v3 后把「EntryAbility 桥需求」写进设计单 §F,需求由其派发词 §5 给定。\n        evidence: [\"#a70e555065a1dddd1:4987@L36\", \"#81e0a463:3143@L3327\", \"#a70e555065a1dddd1:4966@L20\", \"#a70e555065a1dddd1:4976@L28\", \"file:spec/test/ui-test/design/P0001_MainActivity.md@v1\"]\n      - node: file:.claude/skills/arkts-ui-verifier/references/test-case-template.md@v1\n        role: 正常\n        reason: 桥机制(§6.1 want→AppStorage、§6.2 宿主特判)的原始出处;external、上游 0/0 跳,T+4:30 才首次被读 —— 技能定义边界。\n        evidence: [\"file:.claude/skills/arkts-ui-verifier/references/test-case-template.md@v1\", \"#a70e555065a1dddd1:4966@L20\"]\n      - node: agent:agent-a349784d2663f1f0a@v2\n        role: 进入·缺\n        reason: 生成方只被派了沉浸式 Layer 1 与 F001 行为契约,输入里没有任何测试桥要求;全池 search「__test_mode__」≤2026-09-03T15:51:35.645Z 零命中(范围:那一刻之前 80 个 agent 全部记录 + 840 个文件已知内容,内容未知 48 版)。\n        evidence: [\"#a349784d2663f1f0a:4062@L71\", \"#81e0a463:2157@L1124\"]\n      - node: file:/Users/fengyi/Workspace/fuxi-ailabs/a2h_multiagents/Android-Beginner-Projects/DiceRoller/app/src/main/java/com/example/diceroller/MainActivity.kt@v1\n        role: 正常\n        reason: 池外叶子,忠实提供了 Dice(6).roll() 与 6 面查表等业务事实;鸿蒙侧测试桥不是它能提供的输入。\n        evidence: [\"#a349784d2663f1f0a:4016@L33\"]\n      - node: file:.claude/skills/arkts-immersive-safearea/SKILL.md@v1\n        role: 正常\n        reason: 生成方被契约强制先读的唯一技能,只覆盖沉浸式四层,不含测试基建 —— 技能定义边界,停。\n        evidence: [\"#a349784d2663f1f0a:4044@L57\"]\n    edges:\n      - {from: agent:agent-a70e555065a1dddd1@v1, to: file:spec/test/ui-test/design/P0001_MainActivity.md@v1, relation: 写}\n      - {from: agent:__main__:81e0a463@v90, to: agent:agent-a711c5d09fb676814@v4, relation: 派发}\n      - {from: file:spec/test/ui-test/design/P0001_MainActivity.md@v1, to: agent:agent-a711c5d09fb676814@v4, relation: 读}\n      - {from: agent:agent-a711c5d09fb676814@v4, to: file:entry/src/main/ets/entryability/EntryAbility.ets@v6, relation: 写}\n      - {from: agent:agent-a349784d2663f1f0a@v2, to: file:entry/src/main/ets/entryability/EntryAbility.ets@v2, relation: 写}\n  - id: B\n    title: 全 app 无全局未捕获异常观察者,ECAT iteration 0 才由 fix-errobserver 在 onCreate 注册 errorManager.on('error')\n    repair:\n      before: file:entry/src/main/ets/entryability/EntryAbility.ets@v7\n      after: file:entry/src/main/ets/entryability/EntryAbility.ets@v10\n      evidence: [\"#a27497cfed8c44856:715@L41\", \"#a27497cfed8c44856:717@L43\", \"#a27497cfed8c44856:719@L45\"]\n    entry: [agent:agent-a349784d2663f1f0a@v2]\n    boundary: 技能定义缺口(注入的 17 份技能无 crash-observability 一课)+ 判别器本体在池外(ECAT 工作单以指令形式喂入,#2f01bcdc:462@L3)\n    nodes:\n      - node: agent:agent-a27497cfed8c44856@v3\n        role: 正常\n        reason: 按 work list 在 onCreate 注册观察者;靠 SDK d.ts 探测把派发词建议的 @kit.ArkTS 纠正为 @kit.AbilityKit,并按 ErrorObserver.d.ts 实现两个成员。\n        evidence: [\"#a27497cfed8c44856:703@L29\", \"#a27497cfed8c44856:705@L31\", \"#a27497cfed8c44856:709@L35\", \"#a27497cfed8c44856:711@L37\", \"#a27497cfed8c44856:719@L45\"]\n      - node: agent:__main__:2f01bcdc@v5\n        role: 正常\n        reason: 把 item 13 拆成单文件工作单派给 fix-errobserver,并原样传下\"HarmonyOS 框架约束、无 Android 对应物、不要参考安卓源\"的口径。\n        evidence: [\"#2f01bcdc:509@L100\", \"#2f01bcdc:462@L3\"]\n      - node: agent:__main__:257fed22@v6\n        role: 正常\n        reason: 判别侧同一时段收到同一条 item(#257fed22:1099@L3),并自行判定它需要新开一门 crash-observability 技能 —— 说明这条能力在技能库里本来就没有。\n        evidence: [\"#257fed22:1099@L3\", \"#257fed22:1128@L96\", \"#257fed22:1133@L110\"]\n      - node: agent:agent-a349784d2663f1f0a@v2\n        role: 进入·缺\n        reason: 生成期全池 search「errorManager」≤2026-09-03T15:51:35.645Z 零命中(范围:那一刻之前 80 个 agent 全部记录 + 840 个文件已知内容,内容未知 48 版),生成方的派发词、spec 与注入技能里都没有全局异常观察者这一项。\n        evidence: [\"#a349784d2663f1f0a:4062@L71\", \"#a349784d2663f1f0a:4044@L57\"]\n      - node: file:entry/src/main/ets/entryability/EntryAbility.ets@v1\n        role: 正常\n        reason: 池外脚手架模板;v8 唯一被替换的行就是它的 @kit.AbilityKit import(blame v8 changed → __external__@v1),模板默认值本身不含观察者,叶子。\n        evidence: [\"file:entry/src/main/ets/entryability/EntryAbility.ets@v1\", \"#a27497cfed8c44856:715@L41\"]\n    edges:\n      - {from: agent:__main__:2f01bcdc@v5, to: agent:agent-a27497cfed8c44856@v3, relation: 派发}\n      - {from: file:entry/src/main/ets/entryability/EntryAbility.ets@v7, to: agent:agent-a27497cfed8c44856@v3, relation: 读}\n      - {from: agent:agent-a27497cfed8c44856@v3, to: file:entry/src/main/ets/entryability/EntryAbility.ets@v10, relation: 写}\nnotes: |\n  v3 与 v7 两版行数与前一版相同、账本 diff 为空,判为 touch 强制重编(主会话 v94 派发词 #81e0a463:3195@L3448 明确要求 touch;主会话·593d4e86 v23 的\"候选写\" #593d4e86:1424@L465 展开后确认是 touch + build);两版都带「推导·黑盒写·观测封口」,是否存在实录外内容改动无法确认。\n  该文件 273 条提及中 259 条账本没记读写,本次只看了前 40 条 + 8 条,余下未逐条展开;针对 EntryAbility 的运行期观测/截图证据在本次查询范围内未检索到。\n",
+ "data": {
+  "schema": "migloop-verdict/1",
+  "ledger": "atoms-2026-09-08:80:9065b7a0906dadac",
+  "root": "file:entry/src/main/ets/entryability/EntryAbility.ets@v3",
+  "defects": [
+   {
+    "id": "A",
+    "title": "生成期 EntryAbility 没有 UI 测试桥(__test_mode__/__target_page__ → AppStorage),修复轮才由 UI-T Step3 追加 consumeTestWant",
+    "repair": {
+     "before": "file:entry/src/main/ets/entryability/EntryAbility.ets@v3",
+     "after": "file:entry/src/main/ets/entryability/EntryAbility.ets@v6",
+     "evidence": [
+      "#a711c5d09fb676814:5025@L35",
+      "#a711c5d09fb676814:5027@L37",
+      "#a711c5d09fb676814:5029@L39"
+     ]
+    },
+    "entry": [
+     "agent:agent-a349784d2663f1f0a@v2"
+    ],
+    "boundary": "池外输入(安卓源 MainActivity.kt@v1 + baseline spec)与技能定义(arkts-ui-verifier 参考模板 external 上游 0/0 跳、arkts-immersive-safearea/SKILL.md@v1)",
+    "nodes": [
+     {
+      "node": "agent:agent-a711c5d09fb676814@v4",
+      "role": "正常",
+      "reason": "修复方按设计单 §F 与模板 §6.1 在 EntryAbility 侧追加桥,写前读 v3 只做增量、不动沉浸式逻辑。",
+      "evidence": [
+       "#a711c5d09fb676814:5002@L11",
+       "#a711c5d09fb676814:4998@L7",
+       "#a711c5d09fb676814:5008@L17",
+       "#a711c5d09fb676814:5025@L35"
+      ]
+     },
+     {
+      "node": "agent:__main__:81e0a463@v90",
+      "role": "正常",
+      "reason": "派发词明确要求 onCreate/onNewWant 注入两个测试参数,并指定按 design §F 而非模板 §6.2 的 V1 装饰器写法。",
+      "evidence": [
+       "#81e0a463:3153@L3357"
+      ]
+     },
+     {
+      "node": "agent:agent-a70e555065a1dddd1@v1",
+      "role": "正常",
+      "reason": "Step1 读模板与 EntryAbility.ets@v3 后把「EntryAbility 桥需求」写进设计单 §F,需求由其派发词 §5 给定。",
+      "evidence": [
+       "#a70e555065a1dddd1:4987@L36",
+       "#81e0a463:3143@L3327",
+       "#a70e555065a1dddd1:4966@L20",
+       "#a70e555065a1dddd1:4976@L28",
+       "file:spec/test/ui-test/design/P0001_MainActivity.md@v1"
+      ]
+     },
+     {
+      "node": "file:.claude/skills/arkts-ui-verifier/references/test-case-template.md@v1",
+      "role": "正常",
+      "reason": "桥机制(§6.1 want→AppStorage、§6.2 宿主特判)的原始出处;external、上游 0/0 跳,T+4:30 才首次被读 —— 技能定义边界。",
+      "evidence": [
+       "file:.claude/skills/arkts-ui-verifier/references/test-case-template.md@v1",
+       "#a70e555065a1dddd1:4966@L20"
+      ]
+     },
+     {
+      "node": "agent:agent-a349784d2663f1f0a@v2",
+      "role": "进入·缺",
+      "reason": "生成方只被派了沉浸式 Layer 1 与 F001 行为契约,输入里没有任何测试桥要求;全池 search「__test_mode__」≤2026-09-03T15:51:35.645Z 零命中(范围:那一刻之前 80 个 agent 全部记录 + 840 个文件已知内容,内容未知 48 版)。",
+      "evidence": [
+       "#a349784d2663f1f0a:4062@L71",
+       "#81e0a463:2157@L1124"
+      ]
+     },
+     {
+      "node": "file:/Users/fengyi/Workspace/fuxi-ailabs/a2h_multiagents/Android-Beginner-Projects/DiceRoller/app/src/main/java/com/example/diceroller/MainActivity.kt@v1",
+      "role": "正常",
+      "reason": "池外叶子,忠实提供了 Dice(6).roll() 与 6 面查表等业务事实;鸿蒙侧测试桥不是它能提供的输入。",
+      "evidence": [
+       "#a349784d2663f1f0a:4016@L33"
+      ]
+     },
+     {
+      "node": "file:.claude/skills/arkts-immersive-safearea/SKILL.md@v1",
+      "role": "正常",
+      "reason": "生成方被契约强制先读的唯一技能,只覆盖沉浸式四层,不含测试基建 —— 技能定义边界,停。",
+      "evidence": [
+       "#a349784d2663f1f0a:4044@L57"
+      ]
+     }
+    ],
+    "edges": [
+     {
+      "from": "agent:agent-a70e555065a1dddd1@v1",
+      "to": "file:spec/test/ui-test/design/P0001_MainActivity.md@v1",
+      "relation": "写"
+     },
+     {
+      "from": "agent:__main__:81e0a463@v90",
+      "to": "agent:agent-a711c5d09fb676814@v4",
+      "relation": "派发"
+     },
+     {
+      "from": "file:spec/test/ui-test/design/P0001_MainActivity.md@v1",
+      "to": "agent:agent-a711c5d09fb676814@v4",
+      "relation": "读"
+     },
+     {
+      "from": "agent:agent-a711c5d09fb676814@v4",
+      "to": "file:entry/src/main/ets/entryability/EntryAbility.ets@v6",
+      "relation": "写"
+     },
+     {
+      "from": "agent:agent-a349784d2663f1f0a@v2",
+      "to": "file:entry/src/main/ets/entryability/EntryAbility.ets@v2",
+      "relation": "写"
+     }
+    ]
+   },
+   {
+    "id": "B",
+    "title": "全 app 无全局未捕获异常观察者,ECAT iteration 0 才由 fix-errobserver 在 onCreate 注册 errorManager.on('error')",
+    "repair": {
+     "before": "file:entry/src/main/ets/entryability/EntryAbility.ets@v7",
+     "after": "file:entry/src/main/ets/entryability/EntryAbility.ets@v10",
+     "evidence": [
+      "#a27497cfed8c44856:715@L41",
+      "#a27497cfed8c44856:717@L43",
+      "#a27497cfed8c44856:719@L45"
+     ]
+    },
+    "entry": [
+     "agent:agent-a349784d2663f1f0a@v2"
+    ],
+    "boundary": "技能定义缺口(注入的 17 份技能无 crash-observability 一课)+ 判别器本体在池外(ECAT 工作单以指令形式喂入,#2f01bcdc:462@L3)",
+    "nodes": [
+     {
+      "node": "agent:agent-a27497cfed8c44856@v3",
+      "role": "正常",
+      "reason": "按 work list 在 onCreate 注册观察者;靠 SDK d.ts 探测把派发词建议的 @kit.ArkTS 纠正为 @kit.AbilityKit,并按 ErrorObserver.d.ts 实现两个成员。",
+      "evidence": [
+       "#a27497cfed8c44856:703@L29",
+       "#a27497cfed8c44856:705@L31",
+       "#a27497cfed8c44856:709@L35",
+       "#a27497cfed8c44856:711@L37",
+       "#a27497cfed8c44856:719@L45"
+      ]
+     },
+     {
+      "node": "agent:__main__:2f01bcdc@v5",
+      "role": "正常",
+      "reason": "把 item 13 拆成单文件工作单派给 fix-errobserver,并原样传下\"HarmonyOS 框架约束、无 Android 对应物、不要参考安卓源\"的口径。",
+      "evidence": [
+       "#2f01bcdc:509@L100",
+       "#2f01bcdc:462@L3"
+      ]
+     },
+     {
+      "node": "agent:__main__:257fed22@v6",
+      "role": "正常",
+      "reason": "判别侧同一时段收到同一条 item(#257fed22:1099@L3),并自行判定它需要新开一门 crash-observability 技能 —— 说明这条能力在技能库里本来就没有。",
+      "evidence": [
+       "#257fed22:1099@L3",
+       "#257fed22:1128@L96",
+       "#257fed22:1133@L110"
+      ]
+     },
+     {
+      "node": "agent:agent-a349784d2663f1f0a@v2",
+      "role": "进入·缺",
+      "reason": "生成期全池 search「errorManager」≤2026-09-03T15:51:35.645Z 零命中(范围:那一刻之前 80 个 agent 全部记录 + 840 个文件已知内容,内容未知 48 版),生成方的派发词、spec 与注入技能里都没有全局异常观察者这一项。",
+      "evidence": [
+       "#a349784d2663f1f0a:4062@L71",
+       "#a349784d2663f1f0a:4044@L57"
+      ]
+     },
+     {
+      "node": "file:entry/src/main/ets/entryability/EntryAbility.ets@v1",
+      "role": "正常",
+      "reason": "池外脚手架模板;v8 唯一被替换的行就是它的 @kit.AbilityKit import(blame v8 changed → __external__@v1),模板默认值本身不含观察者,叶子。",
+      "evidence": [
+       "file:entry/src/main/ets/entryability/EntryAbility.ets@v1",
+       "#a27497cfed8c44856:715@L41"
+      ]
+     }
+    ],
+    "edges": [
+     {
+      "from": "agent:__main__:2f01bcdc@v5",
+      "to": "agent:agent-a27497cfed8c44856@v3",
+      "relation": "派发"
+     },
+     {
+      "from": "file:entry/src/main/ets/entryability/EntryAbility.ets@v7",
+      "to": "agent:agent-a27497cfed8c44856@v3",
+      "relation": "读"
+     },
+     {
+      "from": "agent:agent-a27497cfed8c44856@v3",
+      "to": "file:entry/src/main/ets/entryability/EntryAbility.ets@v10",
+      "relation": "写"
+     }
+    ]
+   }
+  ],
+  "notes": "v3 与 v7 两版行数与前一版相同、账本 diff 为空,判为 touch 强制重编(主会话 v94 派发词 #81e0a463:3195@L3448 明确要求 touch;主会话·593d4e86 v23 的\"候选写\" #593d4e86:1424@L465 展开后确认是 touch + build);两版都带「推导·黑盒写·观测封口」,是否存在实录外内容改动无法确认。\n该文件 273 条提及中 259 条账本没记读写,本次只看了前 40 条 + 8 条,余下未逐条展开;针对 EntryAbility 的运行期观测/截图证据在本次查询范围内未检索到。\n"
+ },
+ "errors": [],
+ "harness_identity": "atoms-2026-09-08:80:9065b7a0906dadac",
+ "schema": "migloop-verdict/1"
+}

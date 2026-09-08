@@ -1,0 +1,317 @@
+{
+ "label": "dice_yaml",
+ "chain": 2,
+ "file": "EntryAbility.ets",
+ "rep": 1,
+ "model": "opus",
+ "session_id": "d3d3fb2e-a27e-4018-9cec-c9888ee0215f",
+ "is_error": false,
+ "num_turns": 22,
+ "duration_ms": 455377,
+ "duration_api_ms": 447743,
+ "wall_s": 457.6,
+ "cost_usd": 2.2556819999999997,
+ "usage": {
+  "input_tokens": 32,
+  "cache_creation_input_tokens": 99606,
+  "cache_read_input_tokens": 1004054,
+  "output_tokens": 30224,
+  "output_tokens_details": {
+   "thinking_tokens": 21243
+  },
+  "server_tool_use": {
+   "web_search_requests": 0,
+   "web_fetch_requests": 0
+  },
+  "service_tier": "standard",
+  "cache_creation": {
+   "ephemeral_1h_input_tokens": 99606,
+   "ephemeral_5m_input_tokens": 0
+  },
+  "inference_geo": "not_available",
+  "iterations": [
+   {
+    "input_tokens": 2,
+    "output_tokens": 13009,
+    "cache_read_input_tokens": 110333,
+    "cache_creation_input_tokens": 4588,
+    "cache_creation": {
+     "ephemeral_5m_input_tokens": 0,
+     "ephemeral_1h_input_tokens": 4588
+    },
+    "type": "message"
+   }
+  ],
+  "speed": "standard"
+ },
+ "result_chars": 9788,
+ "verdict": "",
+ "at": "2026-09-08T10:42:10",
+ "verdict_ok": true,
+ "verdict_errors": [],
+ "repair": null,
+ "cost_usd_total": 2.2556819999999997,
+ "harness_identity": "atoms-2026-09-08:80:9065b7a0906dadac",
+ "transcript": {
+  "usage": {
+   "input": 32,
+   "cache_create": 99606,
+   "cache_read": 1004054,
+   "output": 30224
+  },
+  "turns": 16,
+  "tool_calls": 21,
+  "per_tool": {
+   "ToolSearch": {
+    "n": 1,
+    "chars": 0
+   },
+   "guide": {
+    "n": 1,
+    "chars": 6345
+   },
+   "sessions": {
+    "n": 1,
+    "chars": 1732
+   },
+   "file": {
+    "n": 5,
+    "chars": 48808
+   },
+   "agent": {
+    "n": 5,
+    "chars": 35669
+   },
+   "search": {
+    "n": 5,
+    "chars": 4787
+   },
+   "action": {
+    "n": 2,
+    "chars": 8478
+   },
+   "blame": {
+    "n": 1,
+    "chars": 330
+   }
+  },
+  "tool_chars": 106149,
+  "seq": [
+   {
+    "tool": "ToolSearch",
+    "input": {
+     "query": "select:mcp__migloop__guide,mcp__migloop__sessions,mcp__migloop__index,mcp__migloop__file,mcp__migloop__agent,mcp__migloop__search,mcp__migloop__blame,mcp__migloop__diff,mcp__migloop__action",
+     "max_results": 10
+    },
+    "chars": 0,
+    "ts": "2026-09-08T14:34:36.238Z",
+    "is_error": false
+   },
+   {
+    "tool": "guide",
+    "input": {},
+    "chars": 6345,
+    "ts": "2026-09-08T14:34:38.342Z",
+    "is_error": false
+   },
+   {
+    "tool": "sessions",
+    "input": {
+     "file": "EntryAbility.ets"
+    },
+    "chars": 1732,
+    "ts": "2026-09-08T14:34:41.111Z",
+    "is_error": false
+   },
+   {
+    "tool": "file",
+    "input": {
+     "path": "entry/src/main/ets/entryability/EntryAbility.ets"
+    },
+    "chars": 12507,
+    "ts": "2026-09-08T14:34:51.408Z",
+    "is_error": false
+   },
+   {
+    "tool": "file",
+    "input": {
+     "path": "entry/src/main/ets/entryability/EntryAbility.ets",
+     "diff": true,
+     "v_from": 2,
+     "v_to": 7
+    },
+    "chars": 17890,
+    "ts": "2026-09-08T14:34:59.439Z",
+    "is_error": false
+   },
+   {
+    "tool": "file",
+    "input": {
+     "path": "entry/src/main/ets/entryability/EntryAbility.ets",
+     "diff": true,
+     "v_from": 8,
+     "v_to": 10
+    },
+    "chars": 12934,
+    "ts": "2026-09-08T14:35:12.855Z",
+    "is_error": false
+   },
+   {
+    "tool": "agent",
+    "input": {
+     "id": "a27497cfed8c44856"
+    },
+    "chars": 7486,
+    "ts": "2026-09-08T14:35:26.884Z",
+    "is_error": false
+   },
+   {
+    "tool": "agent",
+    "input": {
+     "id": "a711c5d09fb676814",
+     "v": 4
+    },
+    "chars": 7327,
+    "ts": "2026-09-08T14:35:27.464Z",
+    "is_error": false
+   },
+   {
+    "tool": "agent",
+    "input": {
+     "id": "__main__:2f01bcdc",
+     "v": 5,
+     "since": 4
+    },
+    "chars": 420,
+    "ts": "2026-09-08T14:36:04.156Z",
+    "is_error": false
+   },
+   {
+    "tool": "search",
+    "input": {
+     "q": "errorManager",
+     "until_ts": "2026-09-03T15:51:35.645Z"
+    },
+    "chars": 211,
+    "ts": "2026-09-08T14:36:04.487Z",
+    "is_error": false
+   },
+   {
+    "tool": "search",
+    "input": {
+     "q": "未捕获异常",
+     "agent": "__main__:2f01bcdc",
+     "v": 5
+    },
+    "chars": 759,
+    "ts": "2026-09-08T14:36:11.973Z",
+    "is_error": false
+   },
+   {
+    "tool": "search",
+    "input": {
+     "q": "errorManager",
+     "agent": "__main__:2f01bcdc",
+     "v": 4
+    },
+    "chars": 2361,
+    "ts": "2026-09-08T14:36:29.462Z",
+    "is_error": false
+   },
+   {
+    "tool": "search",
+    "input": {
+     "q": "__test_mode__",
+     "until_ts": "2026-09-03T15:51:35.645Z"
+    },
+    "chars": 212,
+    "ts": "2026-09-08T14:37:11.687Z",
+    "is_error": false
+   },
+   {
+    "tool": "agent",
+    "input": {
+     "id": "a349784d2663f1f0a",
+     "v": 2
+    },
+    "chars": 11345,
+    "ts": "2026-09-08T14:37:11.832Z",
+    "is_error": false
+   },
+   {
+    "tool": "action",
+    "input": {
+     "id": "__main__:2f01bcdc",
+     "seq": 462,
+     "part": "input",
+     "max_chars": 2500
+    },
+    "chars": 7656,
+    "ts": "2026-09-08T14:37:34.296Z",
+    "is_error": false
+   },
+   {
+    "tool": "file",
+    "input": {
+     "path": "spec/test/ui-test/design/P0001_MainActivity.md"
+    },
+    "chars": 2930,
+    "ts": "2026-09-08T14:37:34.806Z",
+    "is_error": false
+   },
+   {
+    "tool": "file",
+    "input": {
+     "path": ".claude/skills/arkts-ui-verifier/references/test-case-template.md"
+    },
+    "chars": 2547,
+    "ts": "2026-09-08T14:37:56.811Z",
+    "is_error": false
+   },
+   {
+    "tool": "blame",
+    "input": {
+     "path": "entry/src/main/ets/entryability/EntryAbility.ets",
+     "v": 8,
+     "changed": true
+    },
+    "chars": 330,
+    "ts": "2026-09-08T14:37:57.341Z",
+    "is_error": false
+   },
+   {
+    "tool": "search",
+    "input": {
+     "q": "uncaught",
+     "agent": "__main__:257fed22"
+    },
+    "chars": 1244,
+    "ts": "2026-09-08T14:38:18.025Z",
+    "is_error": false
+   },
+   {
+    "tool": "agent",
+    "input": {
+     "id": "a70e555065a1dddd1",
+     "v": 1,
+     "reads": true
+    },
+    "chars": 9091,
+    "ts": "2026-09-08T14:38:18.293Z",
+    "is_error": false
+   },
+   {
+    "tool": "action",
+    "input": {
+     "id": "__main__:593d4e86",
+     "seq": 1424,
+     "part": "input",
+     "max_chars": 1500
+    },
+    "chars": 822,
+    "ts": "2026-09-08T14:39:23.751Z",
+    "is_error": false
+   }
+  ]
+ }
+}

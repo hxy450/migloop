@@ -201,6 +201,36 @@
   .node.possible { border-style: dashed; opacity: .85; }
   .node.possible .badge.via { background: color-mix(in srgb, var(--c-file) 14%, transparent); color: var(--c-file); }
   .wire.dashed { stroke-dasharray: 5 4; }
+  /* 结构化结论:角色着色(按缺陷 × 版本)、修复落点金框、候选边 */
+  .node.p-carry { border-color: var(--c-fix) !important; background: color-mix(in srgb, var(--c-fix) 9%, var(--surface)) !important; color: var(--c-fix); }
+  .node.p-ok { border-color: var(--c-gen) !important; background: color-mix(in srgb, var(--c-gen) 8%, var(--surface)) !important; }
+  .node.p-unk { border-style: dashed !important; color: var(--ink-3); }
+  .node.p-fixed { box-shadow: 0 0 0 3px #d4a017, 0 0 0 6px rgba(212,160,23,.22); }
+  .node.p-fixed.p-seen { box-shadow: 0 0 0 3px #d4a017, 0 0 0 6px rgba(212,160,23,.22), inset 0 0 0 1.5px var(--c-spec); }
+  .node .badge.r-err, .probe .badge.r-err, .side .badge.r-err { background: color-mix(in srgb, var(--c-fix) 16%, transparent); color: var(--c-fix); font-weight: 700; }
+  .node .badge.r-gap, .probe .badge.r-gap, .side .badge.r-gap { background: rgba(184,134,11,.16); color: #9a6b00; font-weight: 700; }
+  .node .badge.r-carry, .probe .badge.r-carry, .side .badge.r-carry { background: color-mix(in srgb, var(--c-fix) 9%, transparent); color: var(--c-fix); font-weight: 600; }
+  .node .badge.r-ok, .probe .badge.r-ok, .side .badge.r-ok { background: color-mix(in srgb, var(--c-gen) 14%, transparent); color: var(--c-gen); font-weight: 700; }
+  .node .badge.r-unk, .probe .badge.r-unk, .side .badge.r-unk { color: var(--ink-3); border: 1px dashed var(--ring); }
+  .node .badge.fixed, .probe .badge.fixed, .side .badge.fixed { background: rgba(212,160,23,.18); color: #8a6400; font-weight: 700; }
+  .wire.cand { stroke: var(--c-fix); stroke-dasharray: 5 4; stroke-width: 1.8; }
+  .prow { border-left: 3px solid var(--ring); padding: 4px 8px; margin: 6px 0; border-radius: 0 6px 6px 0; background: var(--wash); }
+  .prow.r-err, .prow.r-carry { border-left-color: var(--c-fix); } .prow.r-gap { border-left-color: #b8860b; } .prow.r-ok { border-left-color: var(--c-gen); }
+  .prow .phd { display: flex; gap: 6px; align-items: baseline; flex-wrap: wrap; margin-bottom: 3px; }
+  .prow .pttl { color: var(--ink-2); font-size: 11.5px; }
+  .prow .preason { white-space: pre-wrap; line-height: 1.45; }
+  .prow .pchk, .pnote { color: var(--ink-3); font-size: 11px; margin-top: 3px; }
+  .verow { display: flex; gap: 6px; align-items: baseline; flex-wrap: wrap; font-size: 11.5px; padding: 1px 0; }
+  .verow .vst { font-weight: 700; } .verow.ok .vst { color: var(--c-gen); } .verow.bad .vst { color: var(--c-fix); }
+  .verow .vdiag { color: var(--ink-3); } .verow pre { flex-basis: 100%; }
+  .probe .warn { color: #9a6b00; font-size: 11.5px; padding: 3px 6px; border-left: 3px solid #d4a017; margin: 4px 0; }
+  .probe .bad { color: var(--c-fix); font-size: 11.5px; padding: 3px 6px; border-left: 3px solid var(--c-fix); margin: 4px 0; white-space: pre-wrap; }
+  .probe .pn { display: grid; grid-template-columns: 22px 1fr; gap: 6px; padding: 2px 6px; border-radius: 6px; cursor: pointer; font-size: 11.5px; border-left: 3px solid transparent; }
+  .probe .pn:hover { background: var(--wash); } .probe .pn.na { cursor: default; opacity: .7; }
+  .probe .pn.r-err, .probe .pn.r-carry { border-left-color: var(--c-fix); } .probe .pn.r-gap { border-left-color: #b8860b; } .probe .pn.r-ok { border-left-color: var(--c-gen); }
+  .probe .pn .t { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--ink-2); }
+  .probe .pe { font-size: 11px; color: var(--ink-3); padding: 1px 6px 1px 28px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .probe .pe.t { color: var(--c-fix); } .probe .pe.u { color: #9a6b00; }
   .probe .dchips { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0 6px; }
   .probe .dchips span { font-size: 11px; padding: 1px 8px; border: 1px solid var(--ring); border-radius: 999px; cursor: pointer; color: var(--ink-2); }
   .probe .dchips span.on { border-color: var(--c-fix); color: var(--c-fix); font-weight: 700; }
@@ -762,8 +792,7 @@
       var node = XT.byId[tid];
       if (!node) return;
       selTid = tid;
-      if (node.kind === "file") drawerFile(node);
-      else if (node.kind === "agent") drawerAgent(node);
+      drawerFor(node);
       if (node.kind === "leaf" && node.isStub) { unstub(node); renderTree(node.parent); return; }
       if (node.busy || node.kind === "leaf" || node.isRight || node.possible) { renderTree(tid); return; }
       if (node.expanded) { collapse(node); renderTree(tid); return; }
@@ -776,6 +805,14 @@
       else expandAgent(node, done);
     }
     // ---- 根:任何 文件@v / agent@ver ----
+    // 抽屉:文件 / agent 各自的正文之前先插「调查结论」块(点树上节点、以节点为根都走这里)
+    function drawerFor(node) {
+      if (node.kind === "file") drawerFile(node);
+      else if (node.kind === "agent") drawerAgent(node);
+      else return;
+      var rs = probeReason(node);
+      if (rs) side.insertBefore(rs, side.querySelector(".body"));
+    }
     function openRoot(spec) {
       if (spec.kind === "file") openFileRoot(spec.path, spec.v || null);
       else openAgentRoot(spec.id, spec.v || null);
@@ -823,7 +860,7 @@
           });
         }
         expandFile(root, function () { renderTree(root.tid); probeExpand(); });
-        drawerFile(root);
+        drawerFor(root);
       });
     }
     function openAgentRoot(id, v) {
@@ -851,7 +888,7 @@
           addRight(root, xtNode("file", { path: w.path, anchorV: w.v, label: baseName(w.path) + "@v" + w.v, badges: b }));
         });
         expandAgent(root, function () { renderTree(root.tid); probeExpand(); });
-        drawerAgent(root);
+        drawerFor(root);
       });
     }
     function openFromHash() {
@@ -869,16 +906,26 @@
     var probeEl = document.getElementById("probe");
     var VD_CLS = { "错": "err", "缺": "gap", "传递": "pass" };
     var VD_RANK = { "错": 3, "缺": 2, "传递": 1 };
+    // 结构化结论的角色:着色类与轻重;红 = 模型主张该节点与这条缺陷有关,不等于机检认证
+    var ROLE_CLS = { "进入·错": "err", "进入·缺": "gap", "带病传递": "carry", "正常": "ok", "无法确认": "unk" };
+    var ROLE_RANK = { "进入·错": 4, "进入·缺": 3, "带病传递": 2, "无法确认": 1, "正常": 0 };
+    var ROLE_RED = { "进入·错": 1, "进入·缺": 1, "带病传递": 1 };
     function probeKeyOf(node) { return node.kind === "file" ? node.path : node.kind === "agent" ? node.aid : null; }
     function probeIndex(p) {
       p.byKey = {};
       (p.steps || []).forEach(function (s) {
         var n = s.node;
-        if (!n) return;
+        if (!n || s.ok === false) return;          // 失败的调用不算查过
         var k = n.kind === "file" ? n.path : n.kind === "agent" ? n.aid : null;
         if (!k) return;
         (p.byKey[k] = p.byKey[k] || []).push(s);
       });
+      // 结构化结论:键 → [{defect, kind, v, role, reason, evidence…}];修复落点另存,不进角色
+      p.roleIdx = p.roles || {};
+      p.fixIdx = {};
+      (p.fixed || []).forEach(function (f) { (p.fixIdx[f.key] = p.fixIdx[f.key] || []).push(f); });
+      p.structuredOK = !!(p.structured && !(p.structured.errors || []).length);
+      p.defectTitles = p.defects || {};
       p.mentions = {};
       (p.links || []).forEach(function (lk) {
         (lk.nodes || []).forEach(function (n) {
@@ -909,6 +956,27 @@
       });
       return { vd: hit, other: other };
     }
+    // 角色按 (缺陷, 键, 版本) 落:文件精确到 @v,agent 精确到 v(写者分组节点覆盖 verMin..anchorVer);
+    // 选了缺陷只看那条缺陷的角色 —— 同一节点在 A 下正常、B 下进入错,切换不串色
+    function probeRolesFor(node) {
+      var k = probeKeyOf(node);
+      if (!k || !PROBE || PROBE.error) return { hit: [], other: [], fixed: [] };
+      var nv = node.kind === "file" ? node.anchorV : node.anchorVer;
+      var hit = [], other = [];
+      (PROBE.roleIdx[k] || []).forEach(function (r) {
+        if (PROBE.defect && r.defect !== PROBE.defect) return;
+        var ok = nv == null || r.v === nv
+              || (node.kind === "agent" && node.isWriter && node.verMin != null && r.v >= node.verMin && r.v <= nv);
+        (ok ? hit : other).push(r);
+      });
+      var fixed = (PROBE.fixIdx[k] || []).filter(function (f) { return (!PROBE.defect || f.defect === PROBE.defect) && (nv == null || f.v === nv); });
+      return { hit: hit, other: other, fixed: fixed };
+    }
+    function worstRole(rows) {
+      var w = null;
+      rows.forEach(function (r) { if (!w || ROLE_RANK[r.role] > ROLE_RANK[w.role]) w = r; });
+      return w;
+    }
     function probeMark(node) {
       if (!PROBE || PROBE.error) return null;
       var k = probeKeyOf(node);
@@ -918,8 +986,27 @@
     function probeDecorate(d, node) {
       var pm = probeMark(node);
       if (!pm) return;
-      var vd = pm.vd;
-      if (vd) {
+      var pr = probeRolesFor(node);
+      if (pr.hit.length) {
+        var w = worstRole(pr.hit);
+        d.classList.add("p-role");
+        d.classList.add("p-" + ROLE_CLS[w.role]);
+        if (ROLE_RED[w.role]) d.classList.add("p-chain");
+        if (pr.hit.some(function (r) { return r.entry; })) d.classList.add("p-entry");
+        pr.hit.forEach(function (r) {
+          d.appendChild(el("span", "badge r-" + ROLE_CLS[r.role], (r.entry ? "★ " : "") + r.defect + " " + r.role + (r.evidence_bad ? " ⚠" + r.evidence_bad : "")));
+        });
+      } else if (pr.other.length) {
+        d.appendChild(el("span", "badge dup", pr.other[0].defect + " 判的是 v" + pr.other[0].v));
+      }
+      if (pr.fixed.length) {
+        d.classList.add("p-fixed");
+        d.appendChild(el("span", "badge fixed", "修复落点 " + pr.fixed.map(function (f) { return f.defect; }).join(",")));
+      }
+      var vd = PROBE.legacy ? pm.vd : null;      // 旧散文报告才按环判定上色;新式结论只认结构化角色
+      if (pr.hit.length || pr.fixed.length) {
+        // 结构化角色已经上色;下面只补「查过」标记
+      } else if (vd) {
         d.classList.add("p-chain");
         d.classList.add("p-" + VD_CLS[vd.verdict]);
         if (vd.entry) d.classList.add("p-entry");
@@ -931,13 +1018,22 @@
       }
       if (pm.steps.length) {
         d.classList.add("p-seen");
-        d.appendChild(el("span", "badge step", "查 #" + pm.steps.slice(0, 3).map(function (s) { return s.i; }).join(",") + (pm.steps.length > 3 ? "…" : "")));
-      } else if (node.kind !== "leaf" && !vd) {
+        var stepB = el("span", "badge step", "查 #" + pm.steps.slice(0, 3).map(function (s) { return s.i; }).join(",") + (pm.steps.length > 3 ? "…" : ""));
+        stepB.title = pm.steps.map(function (s) { return "#" + s.i + " " + s.tool + " " + (s.scope || ""); }).join("\n");   // 蓝框只说明查过这个键,范围看这里
+        d.appendChild(stepB);
+      } else if (node.kind !== "leaf" && !vd && !pr.hit.length && !pr.fixed.length) {
         d.classList.add("p-dim");
       }
       if (node.probeDup) d.appendChild(el("span", "badge dup", "↑ 已在上方展开"));
     }
-    function probeOnChain(node) { var pm = probeMark(node); return !!(pm && pm.vd); }
+    function probeOnChain(node) {
+      if (!PROBE || PROBE.error) return false;
+      var pr = probeRolesFor(node);
+      if (pr.hit.length) { var w = worstRole(pr.hit); return !!ROLE_RED[w.role]; }
+      if (!PROBE.legacy) return false;
+      var pm = probeMark(node);
+      return !!(pm && pm.vd);
+    }
     function stepTarget(s) {
       var n = s.node;
       if (!n) return "";
@@ -976,6 +1072,7 @@
                         + (PROBE.links || []).filter(function (l) { return l.verdict && l.onTree; }).length + "/"
                         + (PROBE.links || []).filter(function (l) { return l.verdict; }).length + "</b> 环" : "");
       probeEl.appendChild(sum);
+      if (PROBE.structured || PROBE.legacy) renderStructuredHead(probeEl);
       var dkeys = Object.keys(PROBE.defects || {});
       if (dkeys.length) {
         var chips = el("div", "dchips");
@@ -989,6 +1086,7 @@
         });
         probeEl.appendChild(chips);
       }
+      if (PROBE.structured) renderStructured(probeEl);
       if (PROBE.unplaced && PROBE.unplaced.length) {
         probeEl.appendChild(el("div", "sub", "查过但不在这棵树上(" + PROBE.unplaced.length + ")· 点一下以它为根"));
         PROBE.unplaced.forEach(function (n) {
@@ -1017,15 +1115,174 @@
       (PROBE.steps || []).forEach(function (s) {
         var n = s.node, can = !!(n && (n.path || n.aid));
         var row = el("div", "st" + (can ? "" : " na"));
-        row.appendChild(el("span", "no", "#" + s.i));
+        row.appendChild(el("span", "no", (s.ok === false ? "✗" : "#") + s.i));
         var t = el("span", "t", "");
         var tb = el("b", null, s.tool);
         t.appendChild(tb);
-        t.appendChild(document.createTextNode(" " + stepTarget(s) + " · " + (Math.round((s.chars || 0) / 100) / 10) + "千字"));
+        t.appendChild(document.createTextNode(" " + stepTarget(s) + (s.scope ? " · " + s.scope : "") + (s.ok === false ? " · 失败" : "") + " · " + (Math.round((s.chars || 0) / 100) / 10) + "千字"));
         t.title = JSON.stringify(s.args);
         row.appendChild(t);
         if (can) row.addEventListener("click", function () { openProbeNode(n); });
         probeEl.appendChild(row);
+      });
+    }
+    // 原文加载:同一份逻辑给动作行和证据行用
+    function loadActionInto(pre, aid, seq) {
+      fetch(API + "/action?id=" + encodeURIComponent(aid) + "&seq=" + seq, { credentials: "include" })
+        .then(function (x) { return x.json(); })
+        .then(function (j) {
+          if (!j || j.error) { pre.textContent = "(" + ((j || {}).error || "失败") + ")"; return; }
+          var inp = typeof j.input === "string" ? j.input : JSON.stringify(j.input, null, 1);
+          var out = j.output || "(空)";
+          pre.textContent = "";
+          function seg(label, text, cap) {
+            pre.appendChild(el("span", "dl-ctx", label + "\n"));
+            var t = document.createTextNode(text.length > cap ? text.slice(0, cap) + "…" : text);
+            pre.appendChild(t);
+            if (text.length > cap) {
+              var m = el("span", "more", " 展开全部(" + text.length + " 字)");
+              m.addEventListener("click", function (e2) { e2.stopPropagation(); t.textContent = text; m.remove(); });
+              pre.appendChild(m);
+            }
+            pre.appendChild(document.createTextNode("\n"));
+          }
+          seg("── 输入 ──", inp, 1500);
+          seg("── 输出 ──", out, 3000);
+        })
+        .catch(function (e) { pre.textContent = "加载失败: " + e; });
+    }
+    var EV_DIAG = { missing: "位置不存在", untagged: "无转录标识,核不回去", ambiguous: "歧义(多动作同行缺块号)", invalid: "节点无效", unparsed: "不是坐标", drifted: "#n 漂了,按位置对回" };
+    function evidenceRow(e) {
+      var good = e.status === "ok" || e.status === "drifted";
+      var row = el("div", "verow " + (good ? "ok" : "bad"));
+      row.appendChild(el("span", "vst", e.status === "ok" ? "✓" : e.status === "drifted" ? "≈" : "✗"));
+      row.appendChild(el("span", "mono", e.ref));
+      if (e.type === "action" && e.seq != null && e.aid) {
+        row.appendChild(el("span", "vdiag", agentLabelOf(e.aid) + (e.v != null ? " v" + e.v : "") + " #" + e.seq));
+        var lk = el("span", "more", " 原文"), pre = null;
+        lk.addEventListener("click", function (ev) {
+          ev.stopPropagation();
+          if (pre) { pre.remove(); pre = null; lk.textContent = " 原文"; return; }
+          pre = el("pre", "diffblock", "加载原文…");
+          row.appendChild(pre);
+          lk.textContent = " 收起";
+          loadActionInto(pre, e.aid, e.seq);
+        });
+        row.appendChild(lk);
+        row.appendChild(lnk(" 到 agent", "", function () { openRoot({ kind: "agent", id: e.aid, v: e.v || null }); }));
+      } else if (e.type === "node" && e.node && e.node.ok) {
+        row.appendChild(lnk(" 打开", "", function () {
+          openProbeNode(e.node.kind === "file" ? { kind: "file", path: e.node.key, v: e.node.v } : { kind: "agent", aid: e.node.key, v: e.node.v });
+        }));
+      }
+      if (!good) row.appendChild(el("span", "vdiag", EV_DIAG[e.status] || e.status + (e.node && e.node.diag ? ":" + e.node.diag : "")));
+      else if (e.status === "drifted") row.appendChild(el("span", "vdiag", EV_DIAG.drifted));
+      return row;
+    }
+    // 抽屉顶部的结论块:这个节点(键 + 版本)在每条缺陷下的角色、原因、证据、核验状态;别的版本的判定只做提示
+    function probeReason(node) {
+      var pr = probeRolesFor(node);
+      if (!pr.hit.length && !pr.fixed.length && !pr.other.length) return null;
+      var wrap = el("div", "body vbody");
+      var s = sec("调查结论" + (PROBE.structured && PROBE.structured.identity && PROBE.structured.identity.match === false ? "(账本身份不匹配,坐标可能已漂)" : ""));
+      pr.fixed.forEach(function (f) {
+        var b = el("div", "prow");
+        b.appendChild(el("span", "badge fixed", "修复落点 · 缺陷 " + f.defect));
+        b.appendChild(el("div", "preason", (PROBE.defectTitles[f.defect] || "") + " —— 修复后的版本;是否还有问题另标,不按带病着色"));
+        s.appendChild(b);
+      });
+      pr.hit.forEach(function (r) {
+        var box = el("div", "prow r-" + ROLE_CLS[r.role]);
+        var hd = el("div", "phd");
+        hd.appendChild(el("span", "badge r-" + ROLE_CLS[r.role], r.defect + " · " + r.role + (r.entry ? " · 进入点" : "")));
+        hd.appendChild(el("span", "pttl", PROBE.defectTitles[r.defect] || ""));
+        box.appendChild(hd);
+        box.appendChild(el("div", "preason", r.reason || "(没写原因)"));
+        if (r.boundary) box.appendChild(kv("边界", r.boundary));
+        (r.evidence || []).forEach(function (e) { box.appendChild(evidenceRow(e)); });
+        var chk = "核验:" + (r.checked === "not_checked" ? "未机检(引用 ✓ 只证明位置可核,不证明原文支持这段原因)" : r.checked)
+                + (r.evidence_bad ? " · 无效引用 " + r.evidence_bad + " 条" : "");
+        box.appendChild(el("div", "pchk", chk));
+        (r.checks || []).forEach(function (c) { box.appendChild(kv(c.result, c.claim)); });
+        s.appendChild(box);
+      });
+      pr.other.forEach(function (r) {
+        s.appendChild(el("div", "pnote", "缺陷 " + r.defect + " 判的是 v" + r.v + "(" + r.role + "),不是这一版;这一版不连坐"));
+      });
+      wrap.appendChild(s);
+      return wrap;
+    }
+    function nodeSpecOf(n) {
+      if (!n || !n.ok) return null;
+      return n.kind === "file" ? { kind: "file", path: n.key, v: n.v } : { kind: "agent", aid: n.key, v: n.v };
+    }
+    // 面板:结构化结论 —— 身份 / 错误 / 每条缺陷的进入点、修复锚点、节点(角色着色,无效的标诊断)、边(核验状态)
+    function renderStructuredHead(host) {
+      var s = PROBE.structured;
+      if (!s) { host.appendChild(el("div", "warn", "legacy:旧式散文报告,按环正则解析,没有新式核验")); return; }
+      var nodes = 0, bad = 0, edges = { "true": 0, "unknown": 0, "false": 0 };
+      (s.defects || []).forEach(function (d) {
+        (d.nodes || []).forEach(function (n) { nodes++; if (!n.ok) bad++; });
+        (d.edges || []).forEach(function (e) { if (e.status in edges) edges[e.status]++; });
+      });
+      var line = el("div", "sum", "");
+      line.innerHTML = "结构化结论 · 缺陷 <b>" + (s.defects || []).length + "</b> · 节点 <b>" + nodes + "</b>" + (bad ? "(无效 " + bad + ")" : "")
+                     + " · 边 已证实 <b>" + edges["true"] + "</b> / 候选 " + edges.unknown + " / 未证实 " + edges["false"]
+                     + (PROBE.rolesOnTree != null ? " · 结论节点在树上 <b>" + PROBE.rolesOnTree + "/" + PROBE.rolesTotal + "</b>" : "");
+      host.appendChild(line);
+    }
+    function renderStructured(host) {
+      var s = PROBE.structured;
+      if (!s) { host.appendChild(el("div", "warn", "legacy:旧式散文报告,按环正则解析,没有新式核验")); return; }
+      var idn = s.identity || {};
+      if (idn.match === false) host.appendChild(el("div", "warn", "⚠ 账本身份不匹配:结论是对 " + (idn.claimed || "?") + " 说的,现在是 " + (idn.current || "?") + ";vN / #n 可能已漂,只有按位置对回的引用可信"));
+      else if (idn.match == null) host.appendChild(el("div", "warn", "账本身份未记录(旧 harness 产物),无法确认坐标是否对本账说的"));
+      if (s.repaired) host.appendChild(el("div", "sub", "结论块经过一次 schema 修复重试"));
+      if ((s.errors || []).length) {
+        host.appendChild(el("div", "bad", "结论块载入失败,主张未上树:\n" + s.errors.slice(0, 8).join("\n") + (s.errors.length > 8 ? "\n…" : "")));
+        if (s.raw) {
+          var rawLk = el("span", "more", "看原始块");
+          var rawPre = null;
+          rawLk.addEventListener("click", function () { if (rawPre) { rawPre.remove(); rawPre = null; return; } rawPre = el("pre", "diffblock", s.raw); host.appendChild(rawPre); });
+          host.appendChild(rawLk);
+        }
+        return;
+      }
+      (s.defects || []).forEach(function (d) {
+        if (PROBE.defect && d.id !== PROBE.defect) return;
+        host.appendChild(el("div", "sub", "缺陷 " + d.id + " · " + d.title));
+        var rep = d.repair || {};
+        [["修复前", rep.before], ["修复后", rep.after]].forEach(function (pair) {
+          var n = pair[1];
+          if (!n) return;
+          var row = el("div", "pn" + (n.ok ? "" : " na"));
+          row.appendChild(el("span", "no", pair[0] === "修复后" ? "★" : "·"));
+          row.appendChild(el("span", "t", pair[0] + " " + n.label + (n.ok ? "" : " [无效: " + n.diag + "]")));
+          if (n.ok) row.addEventListener("click", function () { openProbeNode(nodeSpecOf(n)); });
+          host.appendChild(row);
+        });
+        (rep.evidence || []).forEach(function (e) { host.appendChild(el("div", "pe" + (e.status === "ok" || e.status === "drifted" ? "" : " t"), "修复证据 " + e.ref + (e.status === "ok" ? "" : " [" + (EV_DIAG[e.status] || e.status) + "]"))); });
+        (d.entry || []).forEach(function (n) {
+          host.appendChild(el("div", "pe" + (n.ok ? "" : " t"), "进入点 " + n.label + (n.ok ? "" : " [无效: " + n.diag + "]")));
+        });
+        if (d.boundary) host.appendChild(el("div", "pe", "边界 " + d.boundary));
+        (d.nodes || []).forEach(function (n) {
+          var row = el("div", "pn " + (n.ok ? "r-" + ROLE_CLS[n.role] : "na"));
+          row.appendChild(el("span", "no", n.entry ? "★" : "·"));
+          var t = el("span", "t", "");
+          t.appendChild(el("span", "badge r-" + ROLE_CLS[n.role], n.role));
+          t.appendChild(document.createTextNode(" " + n.label + (n.ok ? "" : " [无效: " + n.diag + "]") + (n.evidence_bad ? " ⚠引用 " + n.evidence_bad : "") + " — " + (n.reason || "")));
+          t.title = n.spec + "\n" + (n.reason || "");
+          row.appendChild(t);
+          if (n.ok) row.addEventListener("click", function () { openProbeNode(nodeSpecOf(n)); });
+          host.appendChild(row);
+        });
+        (d.edges || []).forEach(function (e) {
+          var mark = e.status === "true" ? "✓" : e.status === "unknown" ? "?" : e.status === "false" ? "✗" : "–";
+          var cls = e.status === "true" ? "" : e.status === "unknown" ? " u" : " t";
+          host.appendChild(el("div", "pe" + cls, mark + " " + e.from.label + " → " + e.to.label + " · " + (e.relation || "?")
+                                              + (e.implicit ? "(相邻项,自动核)" : "") + " · " + (e.note || "")));
+        });
       });
     }
     function loadProbe(run) {
@@ -1040,7 +1297,14 @@
           renderProbe();
           var old = document.getElementById("probe-chip");
           if (old) old.remove();
-          chip("调查 <b>" + p.run + "</b> · " + (p.entry != null ? "进入点 环 " + (p.entries || [p.entry]).join(" / ") : "进入点未标"), "probe-chip");
+          var entryTxt;
+          if (p.structured && !(p.structured.errors || []).length) {
+            var ents = [];
+            (p.structured.defects || []).forEach(function (d) { (d.entry || []).forEach(function (n) { ents.push(d.id + ":" + n.label + (n.ok ? "" : "(无效)")); }); });
+            entryTxt = ents.length ? "进入点 " + ents.join(" / ") : "进入点未标";
+          } else if (p.structured) entryTxt = "结论块载入失败";
+          else entryTxt = (p.entry != null ? "进入点 环 " + (p.entries || [p.entry]).join(" / ") : "进入点未标") + " · legacy";
+          chip("调查 <b>" + p.run + "</b> · " + entryTxt, "probe-chip");
           var go = function () {
             if (!dataReady) { setTimeout(go, 400); return; }
             if (XT) probeExpand();
@@ -1066,7 +1330,8 @@
     var PROBE_DEPTH = 10;
     function probeHas(node) {
       var k = probeKeyOf(node);
-      return !!(k && PROBE && !PROBE.error && (PROBE.byKey[k] || (PROBE.verdicts && PROBE.verdicts[k]) || (PROBE.mentions && PROBE.mentions[k])));
+      return !!(k && PROBE && !PROBE.error && (PROBE.byKey[k] || (PROBE.verdicts && PROBE.verdicts[k]) || (PROBE.mentions && PROBE.mentions[k])
+                                             || (PROBE.roleIdx && PROBE.roleIdx[k]) || (PROBE.fixIdx && PROBE.fixIdx[k])));
     }
     function unstub(stub) {
       var p = XT.byId[stub.parent];
@@ -1117,6 +1382,17 @@
           if (pm && pm.vd) pm.vd.links.forEach(function (no) { onTree[no] = 1; });
         });
         (PROBE.links || []).forEach(function (lk) { lk.onTree = !!onTree[lk.no]; });
+        // 结构化结论:每条 (缺陷, 键, 版本) 是否真落在树上(精确到版本)
+        var seenRole = {};
+        Object.keys(XT.byId).forEach(function (t) {
+          var nd = XT.byId[t];
+          var saved = PROBE.defect; PROBE.defect = null;
+          probeRolesFor(nd).hit.forEach(function (r) { seenRole[r.defect + "|" + r.key + "|" + r.v] = 1; });
+          PROBE.defect = saved;
+        });
+        var tot = 0, on = 0;
+        Object.keys(PROBE.roleIdx || {}).forEach(function (k) { (PROBE.roleIdx[k] || []).forEach(function (r) { tot++; if (seenRole[r.defect + "|" + r.key + "|" + r.v]) on++; }); });
+        PROBE.rolesTotal = tot; PROBE.rolesOnTree = on;
         PROBE.unplaced = keys.filter(function (k) { return !placed[k]; }).map(function (k) { return PROBE.byKey[k][0].node; });
         probeExpanding = false;
         autoFit = true;
@@ -1285,7 +1561,8 @@
         var mx = (x1 + x2) / 2;
         var path = document.createElementNS("http://www.w3.org/2000/svg", "path");
         path.setAttribute("d", "M" + x1 + "," + y1 + " C" + mx + "," + y1 + " " + mx + "," + y2 + " " + x2 + "," + y2);
-        path.setAttribute("class", "wire" + (PROBE && !PROBE.error && probeOnChain(n) && probeOnChain(p) ? " chain" : "")
+        var onChain = PROBE && !PROBE.error && probeOnChain(n) && probeOnChain(p);
+        path.setAttribute("class", "wire" + (onChain ? (n.possible || p.possible ? " cand" : " chain") : "")
                                      + (n.possible ? " dashed" : ""));
         frag.appendChild(path);
         (wireByTid[tid] = wireByTid[tid] || []).push(path);
@@ -1573,28 +1850,7 @@
           pre = el("pre", "diffblock", "加载原文…");
           r.appendChild(pre);
           lk.textContent = " 收起";
-          fetch(API + "/action?id=" + encodeURIComponent(curAgentId) + "&seq=" + a.seq, { credentials: "include" })
-            .then(function (x) { return x.json(); })
-            .then(function (j) {
-              if (!j || j.error) { pre.textContent = "(" + ((j || {}).error || "失败") + ")"; return; }
-              var inp = typeof j.input === "string" ? j.input : JSON.stringify(j.input, null, 1);
-              var out = j.output || "(空)";
-              pre.textContent = "";
-              function seg(label, text, cap) {
-                pre.appendChild(el("span", "dl-ctx", label + "\n"));
-                var t = document.createTextNode(text.length > cap ? text.slice(0, cap) + "…" : text);
-                pre.appendChild(t);
-                if (text.length > cap) {
-                  var m = el("span", "more", " 展开全部(" + text.length + " 字)");
-                  m.addEventListener("click", function (e2) { e2.stopPropagation(); t.textContent = text; m.remove(); });
-                  pre.appendChild(m);
-                }
-                pre.appendChild(document.createTextNode("\n"));
-              }
-              seg("── 输入 ──", inp, 1500);
-              seg("── 输出 ──", out, 3000);
-            })
-            .catch(function (e) { pre.textContent = "加载失败: " + e; });
+          loadActionInto(pre, curAgentId, a.seq);
         });
         r.appendChild(lk);
       }

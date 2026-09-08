@@ -565,7 +565,8 @@ def atom_text(path: str, tool: str, args: dict[str, Any]) -> str:
         return mcp_server.GUIDE
     cwd = session_cwd(path)
     if tool == "sessions":
-        return atoms_text.render_chains(fixchain_payload(path), root=cwd, file=args.get("path") or None)
+        return atoms_text.render_chains(fixchain_payload(path), root=cwd, file=args.get("path") or args.get("file") or None,
+                                        identity=atoms.ledger_identity(session_ledger(path)))
     ledger = session_ledger(path)
     if tool == "index":
         return atoms_text.render_index(ledger, args.get("kind") or None, args.get("query") or None,

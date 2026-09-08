@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from migloop import atoms_text
+from migloop import atoms, atoms_text
 
 GUIDE = """\
 # MigLoop 两原子归因指南
@@ -110,6 +110,32 @@ closer 或后续写者破坏 / 源码没读全。每条证据带 `path@v` 或 `a
 条件/失败调用的路径是候选,不代表实际写过或读到过;候选写后的观测重锚不证明发生了实录外修改。
 边界:账本里只有**被读过**的安卓源码,从没人读过的文件不存在;标签是线索,盲写/脚本落盘的
 版本内容可能未知,如实说"无法确认"。
+
+## 结构化结论(散文链写完后必须再附一段,页面靠它给树上节点着色、点节点看原因)
+另起一个 ```yaml 围栏块,严格按这个格式(未知键、词表外的词、缺版本号都载入失败):
+```yaml
+schema: migloop-verdict/1
+ledger: <照抄 sessions 输出首行「账本身份:」后面那一串>
+root: file:<被修文件的账本路径>@v<修复前最后一版>
+defects:
+  - id: A                                   # 一条缺陷一项;几条不相干的缺陷分开列,可共享节点
+    title: <一句话说这条缺陷>
+    repair: {before: file:<路径>@v<修复前版本>, after: file:<路径>@v<修复后版本>, evidence: ["#标识:n@L行"]}
+    entry: [agent:<账本 id>@v<K>]           # 故障进入点;可以不止一个,查不出就留空列表
+    boundary: <停在哪、为什么:池外输入 / 批量生成 / 停止追溯;不停可省>
+    nodes:                                  # 展示顺序;相邻两项不代表因果
+      - node: file:<账本路径>@v<N>            # 或 agent:<账本 id>@v<K>;坐标照抄工具输出,版本必填
+        role: 正常                            # 正常 / 带病传递 / 进入·错 / 进入·缺 / 无法确认
+        reason: <一到三句>
+        evidence: ["#标识:n@L行", "file:<路径>@v<N>"]
+    edges:                                  # 可省;每条对应账本里的一条 写 / 读 / 派发 边;拿不准写 候选 或 省略
+      - {from: agent:<id>@v<K>, to: file:<路径>@v<N>, relation: 写}
+```
+角色的意思:正常 = 有依据地正确提供了输入(说它提供了什么);带病传递 = 保留了上游缺陷并传给下游(说保留了什么、
+怎么传的;不等于失职,失职要另有证据);进入·错 = 有好的输入没用或用错(说正确输入与错误实现的落差);
+进入·缺 = 输入里本来就没有;无法确认 = 内容未知或证据不够 —— 不为了把进入点推给下游而宣布上游正常。
+文件坐标用 file() / sessions 打印的路径,agent 坐标用 agent() / index 打印的 id(主会话是 __main__:<会话号前 8 位>);
+修复后的版本只放 repair.after,不进 nodes 标带病;修复后是否仍有问题另起一条缺陷或写在 notes。
 """
 
 
@@ -146,7 +172,8 @@ def build_server(backend: Any | None = None) -> Any:
         rt = _be()
         payload = await rt.get_fixchain(sid)
         cwd = await rt.get_session_cwd(sid)
-        return atoms_text.render_chains(payload, root=cwd, file=file)
+        ledger = await rt.get_ledger(sid)
+        return atoms_text.render_chains(payload, root=cwd, file=file, identity=atoms.ledger_identity(ledger))
 
     @srv.tool()
     async def index(sid: str, kind: str | None = None, query: str | None = None,

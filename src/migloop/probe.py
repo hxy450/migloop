@@ -12,7 +12,7 @@ import os
 import re
 from typing import Any
 
-from . import atoms, filestory
+from . import atoms, filestory, verdict
 
 _VERDICT = re.compile(r"判定[::]\s*(传递|错|缺)")
 _LINK = re.compile(r"^环\s*(\d+)[A-Za-z\']?\s*(.*)$")
@@ -25,6 +25,33 @@ _ACTION = atoms.REF_RE
 _DEFECT = re.compile(r"【([A-Za-z0-9])\s*([^】]*)】")     # 【A 返回键】【B 进度条】【C 上游】:字母是缺陷,后面是说明
 _MAIN_AT = re.compile(r"主会话[·:]?\s*([0-9a-f]{6,})?\s*@?v(\d+)")   # 报告写主会话不用 agent- id:「主会话·9b3105a2 @v83」
 _RANK = {"错": 3, "缺": 2, "传递": 1}
+
+
+def _step_scope(tool: str, inp: dict[str, Any]) -> str:
+    """这一步看到了什么范围:索引 / 正文 vN / 差分 / 搜索窗口 / 原文 —— 蓝框只说明查过这个键,范围在这里。"""
+    v = inp.get("v")
+    vs = f" v{v}" if v is not None else ""
+    if tool == "file":
+        if inp.get("diff"):
+            return "差分" + vs
+        if inp.get("content"):
+            rng = f" {inp['start']}-{int(inp['start']) + int(inp.get('n') or 0)}行" if inp.get("start") else ""
+            return f"正文{vs}{rng}"
+        return "索引" + vs
+    if tool == "diff":
+        return "差分" + vs
+    if tool == "blame":
+        return "归属" + vs + ("(只看改动行)" if inp.get("changed") else "")
+    if tool == "agent":
+        win = f"v{inp['since']}→{v}" if inp.get("since") is not None and v is not None else (vs.strip() or "全程")
+        return win + (" 到 " + str(inp["until"]) if inp.get("until") else "") + (" 不含读取" if inp.get("reads") is False else "")
+    if tool == "search":
+        return "搜索窗口" + vs
+    if tool == "action":
+        return f"原文 #{inp.get('seq')}" + (f" {inp['part']}" if inp.get("part") else "")
+    if tool == "sessions":
+        return "返修链"
+    return "索引查询"
 
 
 def _load_run(run_dir: str) -> tuple[dict[str, Any], str]:
@@ -145,7 +172,8 @@ def probe_payload(ledger: atoms.Ledger, run_dir: str) -> dict[str, Any]:
     for i, s in enumerate(seq, 1):
         inp = {k: v for k, v in (s.get("input") or {}).items() if k != "sid"}
         steps.append({"i": i, "tool": s.get("tool"), "args": inp, "chars": s.get("chars") or 0,
-                      "node": _step_node(ledger, str(s.get("tool")), inp)})
+                      "node": _step_node(ledger, str(s.get("tool")), inp),
+                      "ok": not s.get("is_error"), "scope": _step_scope(str(s.get("tool")), inp)})
     entries = _entries(report)
     entry_no = entries[0] if entries else None
     links: list[dict[str, Any]] = []
@@ -193,6 +221,39 @@ def probe_payload(ledger: atoms.Ledger, run_dir: str) -> dict[str, Any]:
     fm = re.search(r"文件[::]\s*([^\s(（]+)", report)
     if not root and fm:
         root = filestory.find_story_path(ledger.stories, fm.group(1))
+    structured = _structured(ledger, run_dir, report)
+    if structured is not None:
+        if structured["defects"]:
+            defects = {d["id"]: d["title"] for d in structured["defects"]}
+        sr = structured.get("root")
+        if sr and sr.get("ok") and sr.get("kind") == "file":
+            root = sr["key"]
     return {"run": os.path.basename(os.path.dirname(os.path.abspath(run_dir))), "cost": m.get("cost_usd"), "turns": m.get("num_turns"),
             "root": root, "steps": steps, "links": links, "entry": entry_no, "entries": entries, "verdicts": verdicts,
-            "bad_refs": sum(len(lk["bad_refs"]) for lk in links), "defects": defects, "report": report}
+            "bad_refs": sum(len(lk["bad_refs"]) for lk in links), "defects": defects, "report": report,
+            "legacy": structured is None, "structured": structured,
+            "roles": (structured or {}).get("roles") or {}, "fixed": (structured or {}).get("fixed") or []}
+
+
+def _structured(ledger: atoms.Ledger, run_dir: str, report: str) -> dict[str, Any] | None:
+    """harness 落的 verdict.json(带 harness 算的账本身份、修复重试记录)优先;没有就从报告正文里抽结论块。
+    没有结论块 → None(legacy 散文);有块但校验失败 → 只带原文与错误,主张不猜。"""
+    vp = os.path.join(run_dir, "verdict.json")
+    if os.path.isfile(vp):
+        with open(vp, encoding="utf-8") as fh:
+            vj = json.load(fh)
+        data = vj.get("data")
+        errors = list(vj.get("errors") or [])
+        if data is not None:
+            errors = verdict.validate(data)                      # 以当前 schema 再核一遍,不信 harness 的旧结论
+            if errors:
+                data = None
+        if data is None and not vj.get("raw") and not vj.get("found", True):
+            return None
+        meta = {"kind": vj.get("kind"), "raw": vj.get("raw"), "repaired": vj.get("repaired"),
+                "harness_identity": vj.get("harness_identity")}
+        return verdict.build(ledger, data, errors, meta)
+    lb = verdict.load_block(report)
+    if not lb["found"]:
+        return None
+    return verdict.build(ledger, lb["data"], lb["errors"], {"kind": lb["kind"], "raw": lb["raw"]})

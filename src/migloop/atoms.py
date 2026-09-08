@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import bisect
 import difflib
+import hashlib
 import json
 import os
 import re
@@ -139,6 +140,24 @@ class Ledger:
     mention_seq: dict[int, list[str]] = field(default_factory=dict)
     #: 全池有写能力的命令 (ts, seq, agent),按时刻排:断点窗口里「谁可能改的」按它数,不解析脚本
     write_cmds: list[tuple[str, int, str]] = field(default_factory=list)
+
+
+LEDGER_CODE_VERSION = "atoms-2026-09-08"
+
+
+def ledger_identity(ledger: Ledger) -> str:
+    """账本身份 = 工具代码版本 + 原始数据池清单摘要(每份转录的标识、文件名、大小、修改时刻)。
+    结论块里的 vN / #n 都是对这一本账说的:身份不一致时页面告警,不把旧坐标当现在的节点。"""
+    h = hashlib.sha1()
+    for tag, path in sorted(ledger.tag_paths.items()):
+        try:
+            st = os.stat(path)
+            sig = f"{tag}:{os.path.basename(path)}:{st.st_size}:{st.st_mtime_ns}"
+        except OSError:
+            sig = f"{tag}:{os.path.basename(path)}:missing"
+        h.update(sig.encode("utf-8"))
+        h.update(b"\n")
+    return f"{LEDGER_CODE_VERSION}:{len(ledger.tag_paths)}:{h.hexdigest()[:16]}"
 
 
 def resolve_agent(ledger: Ledger, hint: str) -> AgentRec | None:
