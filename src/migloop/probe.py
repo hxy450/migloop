@@ -16,7 +16,9 @@ from . import atoms, filestory
 
 _VERDICT = re.compile(r"判定[::]\s*(传递|错|缺)")
 _LINK = re.compile(r"^环\s*(\d+)[A-Za-z\']?\s*(.*)$")
-_ENTRY = re.compile(r"故障进入点[::][^\n]*?环\s*(\d+)")
+_ENTRY = re.compile(r"故障进入点[::]")
+_RING = re.compile(r"环\s*(\d+)")
+_ENTRY_ALSO = re.compile(r"进入点是\s*环\s*(\d+)")     # 几条缺陷各自进入时,报告会逐条说「…的进入点是环 N」
 _FILE_AT = re.compile(r"([\w./-]+\.[A-Za-z0-9]+)@v(\d+)")
 _AGENT_ID = re.compile(r"agent-[0-9a-f]+")        # 账本 id 是 16 位 hex,测试里的短 id 也认
 _ACTION = re.compile(r"#(\d+)@L\d+")
@@ -98,6 +100,20 @@ def _link_nodes(ledger: atoms.Ledger, body: str) -> list[dict[str, Any]]:
     return [n for _pos, n in found]
 
 
+def _entries(report: str) -> list[int]:
+    """故障进入点:「故障进入点:」之后(可跨行)第一个环号是主进入点;正文里「进入点是环 N」再补几个。"""
+    nos: list[int] = []
+    m = _ENTRY.search(report)
+    if m:
+        r = _RING.search(report[m.end():m.end() + 400])
+        if r:
+            nos.append(int(r.group(1)))
+    for a in _ENTRY_ALSO.finditer(report):
+        if int(a.group(1)) not in nos:
+            nos.append(int(a.group(1)))
+    return nos
+
+
 def probe_payload(ledger: atoms.Ledger, run_dir: str) -> dict[str, Any]:
     m, report = _load_run(run_dir)
     seq = (m.get("transcript") or {}).get("seq") or []
@@ -106,8 +122,8 @@ def probe_payload(ledger: atoms.Ledger, run_dir: str) -> dict[str, Any]:
         inp = {k: v for k, v in (s.get("input") or {}).items() if k != "sid"}
         steps.append({"i": i, "tool": s.get("tool"), "args": inp, "chars": s.get("chars") or 0,
                       "node": _step_node(ledger, str(s.get("tool")), inp)})
-    entry = _ENTRY.search(report)
-    entry_no = int(entry.group(1)) if entry else None
+    entries = _entries(report)
+    entry_no = entries[0] if entries else None
     links: list[dict[str, Any]] = []
     for ln in report.split("\n"):
         mm = _LINK.match(ln)
@@ -115,7 +131,7 @@ def probe_payload(ledger: atoms.Ledger, run_dir: str) -> dict[str, Any]:
             continue
         no, body = int(mm.group(1)), mm.group(2)
         vd = _VERDICT.search(body)
-        links.append({"no": no, "verdict": vd.group(1) if vd else None, "entry": no == entry_no,
+        links.append({"no": no, "verdict": vd.group(1) if vd else None, "entry": no in entries,
                       "text": body[:400], "nodes": _link_nodes(ledger, body)})
     # 节点 → 判定:只算它当主语的环(正文第一个坐标);同一节点被几环判过取最重(错 > 缺 > 传递)
     verdicts: dict[str, dict[str, Any]] = {}
@@ -139,4 +155,5 @@ def probe_payload(ledger: atoms.Ledger, run_dir: str) -> dict[str, Any]:
     if not root and fm:
         root = filestory.find_story_path(ledger.stories, fm.group(1))
     return {"run": os.path.basename(os.path.dirname(os.path.abspath(run_dir))), "cost": m.get("cost_usd"), "turns": m.get("num_turns"),
-            "root": root, "steps": steps, "links": links, "entry": entry_no, "verdicts": verdicts, "report": report}
+            "root": root, "steps": steps, "links": links, "entry": entry_no, "entries": entries, "verdicts": verdicts,
+            "report": report}

@@ -44,18 +44,21 @@ def test_probe_maps_calls_and_links_to_nodes(tmp_path: Any) -> None:
               "环 1  fixer 写 A.ets@v2 (#9@L9)   判定: 传递\n"
               f"环 2  conv-a(agent-c)v1 写 A.ets@v1,凭 spec/pages/A.md@v1 (#{conv_seq}@L5)   判定: 错\n"
               "环 3  spec/pages/A.md@v1 外部输入   判定: 缺\n"
-              "故障进入点: 环 2,因为 …\n")
+              "故障进入点:\n"                                    # 真报告里常换行再分条,还会给几条缺陷各自的进入点
+              "- 两条缺陷各自进入。按时间最早是环 2(派发词缺约束);\n"
+              "- 另一条的进入点是环 3\n")
     p = probe.probe_payload(led, _run_dir(tmp_path, seq, report))
     kinds = [s["node"]["kind"] if s["node"] else None for s in p["steps"]]
     assert kinds == [None, "chain", "file", "agent", "agent", "pool"]
     assert p["steps"][2]["node"] == {"kind": "file", "path": "/proj/entry/A.ets", "v": 2}
     assert p["steps"][3]["node"]["aid"] == "agent-c" and p["steps"][4]["node"]["aid"] == "agent-c"
-    assert p["root"] == "/proj/entry/A.ets" and p["entry"] == 2
-    assert [lk["verdict"] for lk in p["links"]] == ["传递", "错", "缺"] and p["links"][1]["entry"]
+    assert p["root"] == "/proj/entry/A.ets" and p["entry"] == 2 and p["entries"] == [2, 3]
+    assert [lk["verdict"] for lk in p["links"]] == ["传递", "错", "缺"]
+    assert [lk["entry"] for lk in p["links"]] == [False, True, True]
     # 判定只落在每环的主语(正文第一个坐标):环 1 主语是 A.ets@v2 → 传递;环 2 主语是 agent-c → 错;环 3 主语是 A.md → 缺
     assert p["verdicts"]["/proj/entry/A.ets"]["verdict"] == "传递"
     assert p["verdicts"]["agent-c"]["verdict"] == "错" and p["verdicts"]["agent-c"]["entry"]
-    assert p["verdicts"]["/proj/spec/pages/A.md"]["verdict"] == "缺"
+    assert p["verdicts"]["/proj/spec/pages/A.md"]["verdict"] == "缺" and p["verdicts"]["/proj/spec/pages/A.md"]["entry"]
     assert [n["kind"] for n in p["links"][1]["nodes"]] == ["agent", "file", "file", "agent"]   # 主语在前,其余是提到
 
 

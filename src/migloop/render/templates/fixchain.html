@@ -898,7 +898,7 @@
       if (!PROBE) { probeEl.appendChild(el("div", "sum", "载入一次调查员的跑:它查过的节点打「查 #k」,判过的按 传递 / 错 / 缺 上色,故障进入点描边,没查过的变淡。")); return; }
       if (PROBE.error) { probeEl.appendChild(el("div", "sum", "载入失败:" + PROBE.error)); return; }
       var sum = el("div", "sum", "");
-      sum.innerHTML = "<b>" + (PROBE.links || []).length + "</b> 环 · 进入点 <b>" + (PROBE.entry != null ? "环 " + PROBE.entry : "未标") + "</b> · 查过 <b>" + Object.keys(PROBE.byKey).length + "</b> 个节点";
+      sum.innerHTML = "<b>" + (PROBE.links || []).length + "</b> 环 · 进入点 <b>" + (PROBE.entry != null ? "环 " + (PROBE.entries || [PROBE.entry]).join(" / ") : "未标") + "</b> · 查过 <b>" + Object.keys(PROBE.byKey).length + "</b> 个节点";
       probeEl.appendChild(sum);
       probeEl.appendChild(el("div", "sub", "报告的环 · 点一下以它指的节点为根"));
       (PROBE.links || []).forEach(function (lk) {
@@ -938,7 +938,7 @@
           renderProbe();
           var old = document.getElementById("probe-chip");
           if (old) old.remove();
-          chip("调查 <b>" + p.run + "</b> · 进入点 环 " + (p.entry != null ? p.entry : "?"), "probe-chip");
+          chip("调查 <b>" + p.run + "</b> · " + (p.entry != null ? "进入点 环 " + (p.entries || [p.entry]).join(" / ") : "进入点未标"), "probe-chip");
           var go = function () {
             if (!dataReady) { setTimeout(go, 400); return; }
             if (XT) renderTree(XT.root);
