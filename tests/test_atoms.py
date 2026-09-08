@@ -2453,3 +2453,31 @@ def test_file_diff_log_gives_full_udiff_per_version(tmp_path: Any) -> None:
     assert "整篇 4 行" in text                                                   # 创建版仍只给行数
     bounded = atoms_text.render_file(led, "A.ets", None, root="/proj", diff=True, diff_chars=200)
     assert bounded.split("- v2 ←", 1)[1].count("+x") < 400 and "截" in bounded    # 调用方明确要截才截
+
+
+def test_file_lists_every_command_mentioning_it(tmp_path: Any) -> None:
+    """原始转录按文件名 grep,脚本正文里含这个路径的命令直接跳出来;file() 末尾也要一条不少:命令行、heredoc 体、
+    跑的脚本正文里提到这个路径的命令都列出来,标明账本对这条命令记到了什么(写@v / 读 / 碰过 / 没记到)。
+    模型站在一条脚本前不知道往哪一版走、站在「内容未知」前不知道去看哪条命令,两个断点都由这一节接上。"""
+    note = "cat > /proj/notes.md <<'EOF'\nTODO: entry/A.ets still uses old API\nEOF"
+    fix = "p='entry/A.ets'\nimport re\ns=open(p).read()\nopen(p,'w').write(re.sub('a+','b',s))\n"
+    main = [
+        *_call("2026-01-01T00:00:00Z", "t0", "Write", {"file_path": "/proj/entry/A.ets", "content": "a\n"}),
+        *_call("2026-01-01T00:00:10Z", "t1", "Bash", {"command": note}),
+        *_call("2026-01-01T00:00:20Z", "t2", "Bash", {"command": "cd /proj && git log --oneline -- entry/A.ets"}, out="abc fix"),
+        *_call("2026-01-01T00:00:30Z", "t3", "Bash", {"command": "cat /proj/entry/A.ets"}, out="a"),
+        *_call("2026-01-01T00:00:40Z", "t4", "Write", {"file_path": "/tmp/fix.py", "content": fix}),
+        *_call("2026-01-01T00:00:50Z", "t5", "Bash", {"command": "cd /proj && python3 /tmp/fix.py"}),
+    ]
+    led = _ledger(tmp_path, main)
+    bash = [a for a in led.agents[MAIN_ID].actions if a.tool == "Bash"]
+    fa = atoms.file_atom(led, "A.ets", None)
+    got = [(m["seq"], m["effect"]) for m in fa["mentions"]]
+    assert [s for s, _ in got] == [b.seq for b in bash]                        # 四条命令一条不少,按时间排
+    assert got[0][1] is None and got[1][1] is None                             # heredoc 正文里提到、git log:账本没记到读写
+    assert got[2][1] == "读"                                                   # cat 是读,记到了
+    assert got[3][1] is not None                                               # 跑的脚本正文里提到:re.sub 盲写,记到了
+    assert "still uses old API" in fa["mentions"][0]["ctx"]
+    text = atoms_text.render_file(led, "A.ets", None, root="/proj")
+    assert "提到它的命令(4,其中 2 条账本没记到读写)" in text and f"action(#{bash[1].seq}@L" in text and "没记到" in text
+    assert "2 条命令提到它但没入账" in atoms_text.render_index(led, "ets", None, root="/proj")

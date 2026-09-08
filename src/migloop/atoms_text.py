@@ -127,6 +127,8 @@ def render_index(ledger: atoms.Ledger, kind: str | None = None, query: str | Non
             touch = f" · 碰过 {f['n_touches']}" if f.get("n_touches") else ""
             if f.get("n_unknown"):
                 touch += f" · {f['n_unknown']} 版内容未知(按词查文件查不到这些版)"
+            if f.get("n_mentions_unrecorded"):
+                touch += f" · {f['n_mentions_unrecorded']} 条命令提到它但没入账(file 末尾列)"
             hops = _hops(ledger, ("f", f["path"], f["n_versions"])) if f["n_versions"] else ""
             out.append(f"- {rel(f['path'], root)} | {f['kind']} | {tag} · 读 {f['n_reads']}{touch}{hops}")
         if len(fs) > limit:
@@ -267,6 +269,19 @@ def render_file(ledger: atoms.Ledger, hint: str, v: int | None = None, root: str
         for t in fa["touches"]:
             out.append(f"- {_who(ledger, t['by'], t['by_ver'])} | {t['ts'][5:16]} {t.get('t') or ''} | {t['reason']}"
                        f" | action{_ref(t['seq'], None, lines.get(t['seq']))}")
+    if fa.get("mentions"):
+        # 原始转录按文件名 grep 会跳出来的命令,这里一条不少:解析器放弃的、当成无关的、写在 heredoc 正文里的都在。
+        # 「没记到」的命令是版本内容未知 / 实录外修改之前该先看的地方
+        ms = fa["mentions"]
+        miss = sum(1 for m in ms if m["effect"] is None)
+        out.append(f"## 提到它的命令({len(ms)},其中 {miss} 条账本没记到读写)—— 命令行 / heredoc 体 / 跑的脚本正文里"
+                   "出现这个路径;版本无法复原或实录外修改时先看这里,action 展开命令原文自己判")
+        for m in ms[:30]:
+            amb = " · 只给了文件名,同名文件不止一个" if m.get("ambiguous") else ""
+            out.append(f"- {_who(ledger, m['by'], m['by_ver'])} | {m['ts'][5:16]} {m.get('t') or ''} | "
+                       f"账本: {m['effect'] or '没记到'}{amb} | …{m['ctx']}… | action{_ref(m['seq'], None, lines.get(m['seq']))}")
+        if len(ms) > 30:
+            out.append(f"…另有 {len(ms) - 30} 条;search(q=文件名) 找")
     if content:
         if fa["content"] is None and fa.get("partial"):
             out.append("## 内容(部分,脚本字面量里的正文;行号不是文件行号)")

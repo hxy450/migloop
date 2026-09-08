@@ -86,6 +86,19 @@ class AgentRec:
 
 
 @dataclass
+class Mention:
+    """一条命令提到了这个路径(命令行 / heredoc 体 / 跑的脚本正文里出现),不论账本有没有解出读写。"""
+    ts: str
+    seq: int
+    by: str
+    by_ver: int
+    token: str
+    ctx: str
+    ambiguous: bool = False     # 只给了文件名,池里同名文件不止一个
+    stage: str | None = None
+
+
+@dataclass
 class Ledger:
     stories: dict[str, FileStory]
     agents: dict[str, AgentRec]
@@ -104,6 +117,8 @@ class Ledger:
     #: agent↔文件转换(派发也算一跳)。depth_max 按累计读(写之前读过的一切都是前驱,诚实上界),depth_win 只按窗口读
     depth_max: dict[tuple[str, str, int], int] = field(default_factory=dict)
     depth_win: dict[tuple[str, str, int], int] = field(default_factory=dict)
+    #: 提到它的命令:路径 → 按时间排的 Mention。等于原始转录按文件名 grep 的结果,解析器放弃的也在
+    mentions: dict[str, list[Mention]] = field(default_factory=dict)
 
 
 def resolve_agent(ledger: Ledger, hint: str) -> AgentRec | None:
@@ -355,7 +370,46 @@ def build_ledger(agents: dict[str, AgentRec]) -> Ledger:
         st.touches.sort(key=lambda t: (t.ts, t.seq))
     t0 = min((act.ts for a in agents.values() for act in a.actions if act.ts), default="")
     dmax, dwin = _upstream_depths(stories, agents)
-    return Ledger(stories, agents, feeds, t0, lines=lines, read_act=read_act, depth_max=dmax, depth_win=dwin)
+    return Ledger(stories, agents, feeds, t0, lines=lines, read_act=read_act, depth_max=dmax, depth_win=dwin,
+                  mentions=_command_mentions(stories, agents))
+
+
+def _command_mentions(stories: dict[str, FileStory], agents: dict[str, AgentRec]) -> dict[str, list[Mention]]:
+    """每条命令里长得像路径的词对到账本里的文件:带目录的按后缀对,只有文件名的对所有同名文件(标 ambiguous)。"""
+    by_base: dict[str, list[str]] = {}
+    for path in stories:
+        by_base.setdefault(path.rsplit("/", 1)[-1].lower(), []).append(path)
+    out: dict[str, list[Mention]] = {}
+    for a in agents.values():
+        for act in a.actions:
+            for tok, ctx in act.detail.get("mentions") or []:
+                low = str(tok).lower()
+                cands = by_base.get(low.rsplit("/", 1)[-1], [])
+                if "/" in low:
+                    cands = [p for p in cands if p.lower() == low or p.lower().endswith("/" + low)]
+                for p in cands:
+                    out.setdefault(p, []).append(Mention(act.ts, act.seq, a.id, act.ver if act.ver is not None else act.at,
+                                                         str(tok), str(ctx), ambiguous="/" not in low and len(cands) > 1,
+                                                         stage=act.stage))
+    for lst in out.values():
+        lst.sort(key=lambda m: (m.ts, m.seq))
+    return out
+
+
+def mention_effect(ledger: Ledger, path: str, seq: int) -> str | None:
+    """这条命令对这个文件,账本记到了什么:写@vN / 读 / 碰过(方向不明) / None = 没记到。"""
+    st = ledger.stories.get(path)
+    if st is None:
+        return None
+    for ver in st.versions:
+        if ver.act_seq == seq:
+            return f"写@v{ver.v}"
+    for r in st.reads:
+        if ledger.read_act.get((path, r.seq)) == seq:
+            return "读"
+    if any(t.seq == seq for t in st.touches):
+        return "碰过(方向不明)"
+    return None
 
 
 _LEAF_SOURCES = frozenset({"external", "generated", "outband"})
@@ -615,9 +669,13 @@ def file_atom(ledger: Ledger, hint: str, v: int | None = None,
     touches = [{"by": t.by, "by_name": _agent_label(ledger.agents, t.by), "by_ver": t.by_ver,
                 "ts": t.ts, "t": rel_time(t.ts, ledger.t0), "seq": t.seq, "reason": t.reason}
                for t in st.touches]
+    mentions = [{"by": m.by, "by_name": _agent_label(ledger.agents, m.by), "by_ver": m.by_ver, "ts": m.ts,
+                 "t": rel_time(m.ts, ledger.t0), "seq": m.seq, "token": m.token, "ctx": m.ctx,
+                 "ambiguous": m.ambiguous, "effect": mention_effect(ledger, path, m.seq)}
+                for m in ledger.mentions.get(path, [])]
     return {
         "path": path, "v": vers[-1].v if vers else 0, "n_versions": len(st.versions),
-        "versions": out, "readers": readers, "touches": touches, "t0": ledger.t0,
+        "versions": out, "readers": readers, "touches": touches, "mentions": mentions, "t0": ledger.t0,
         "content": content if with_content else None, "content_known": content is not None,
         "partial": partial if with_content else None, "partial_known": partial is not None,
         "breaks": [{"ts": b.ts, "kind": b.kind, "detail": b.detail} for b in st.breaks],
@@ -642,6 +700,8 @@ def ledger_index(ledger: Ledger) -> dict[str, Any]:
             "has_writer": any(ver.by not in (EXTERNAL, OUTBAND) for ver in st.versions),
             "n_unknown": sum(1 for ver in st.versions if ver.content is None),
             "n_reads": len(st.reads), "n_touches": len(st.touches),
+            "n_mentions_unrecorded": sum(1 for m in ledger.mentions.get(path, [])
+                                         if mention_effect(ledger, path, m.seq) is None),
         })
     agents = []
     for a in ledger.agents.values():

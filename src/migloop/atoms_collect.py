@@ -86,6 +86,31 @@ def _classify_user_text(raw: str, cwd: object) -> tuple[str | None, dict[str, An
         return "interrupt", {"text": _head(s)}, None
     return "instruction", {"text": _head(s)}, None
 _SCRIPT_RUN = re.compile(r"\.(?:py|js|mjs|sh)$")
+_MENTION = re.compile(r"[\w./\\~:-]*\w\.[A-Za-z][A-Za-z0-9]{0,5}(?![\w.])")
+_RUN_WORD = re.compile(r"[\w./\\~:-]+\.(?:py|js|mjs|sh)\b")
+
+
+def _path_mentions(cmd: str, scripts: dict[str, str]) -> list[tuple[str, str]]:
+    """命令行 + heredoc 体 + 它跑的脚本正文里,长得像路径的词 → [(词, 前后文)]。不判读写,只记「提到」:
+    原始转录按文件名 grep 能跳出来的命令,file() 末尾也得能列出来 —— 解析器放弃的、当成无关的、写在 heredoc
+    正文里的都在,不然模型站在一条脚本前不知道该往哪一版走。对不对得上账本里的文件,建账时按文件名再对。"""
+    text = cmd or ""
+    for m in _RUN_WORD.finditer(text):
+        body = scripts.get(os.path.basename(m.group(0).replace("\\", "/")))
+        if body:
+            text += "\n" + body
+    out: list[tuple[str, str]] = []
+    seen: set[str] = set()
+    for m in _MENTION.finditer(text):
+        tok = m.group(0).replace("\\", "/").lstrip("./")
+        if not tok or ("/" not in tok and len(tok) < 4) or tok in seen:
+            continue
+        seen.add(tok)
+        ctx = " ".join(text[max(0, m.start() - 60):m.end() + 60].split())
+        out.append((tok, ctx[:150]))
+        if len(out) >= 40:
+            break
+    return out
 _PS_ASSIGN = re.compile(r"\$(\w+)\s*=\s*(['\"])([^'\"\n]+)\2")
 _PATHLINE = re.compile(r"^(.+?):(\d+)[:-]")
 _LINEONLY = re.compile(r"^(\d+)[:-]")
@@ -1198,6 +1223,9 @@ def _walk(path: str, agent_id: str, session: str, seq: list[int],
                                     for pw in _py_partial_writes(body)]
                         if partials:
                             detail["partials"] = partials
+                        mentions = _path_mentions(str(inp.get("command") or ""), scripts)
+                        if mentions:
+                            detail["mentions"] = mentions
                     act = Action(uts, nxt(), name, _kind_of(name, ops), ok=ok, detail=detail,
                                  src=(path, use_line, line_no), tuid=tuid, stage=stage)
                     for op in ops:
@@ -1435,6 +1463,10 @@ def _walk_codex(path: str, agent_id: str, session: str, seq: list[int], scripts:
                 if name == "exec":
                     full_ops, detail, ok = _codex_exec_ops(raw_arg, out_text, ucwd, scripts)
                     kind = _kind_of("exec", full_ops)
+                    mentions = _path_mentions(raw_arg if isinstance(raw_arg, str)
+                                              else json.dumps(raw_arg, ensure_ascii=False), scripts)
+                    if mentions:
+                        detail["mentions"] = mentions
                     ops = full_ops if ok else []
                 elif name == "spawn_agent":
                     args = _json_args(raw_arg)
