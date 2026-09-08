@@ -91,9 +91,9 @@ def _link_nodes(ledger: atoms.Ledger, body: str) -> list[dict[str, Any]]:
         if a:
             found.append((m.start(), {"kind": "agent", "aid": a.id, "v": int(vm.group(1)) if vm else None}))
     for m in _ACTION.finditer(body):
-        aid, ver = _seq_owner(ledger, int(m.group(1)))
-        if aid:
-            found.append((m.start(), {"kind": "agent", "aid": aid, "v": ver, "action": int(m.group(1))}))
+        owner, ver = _seq_owner(ledger, int(m.group(1)))
+        if owner:
+            found.append((m.start(), {"kind": "agent", "aid": owner, "v": ver, "action": int(m.group(1))}))
     found.sort(key=lambda x: x[0])
     return [n for _pos, n in found]
 
