@@ -2477,20 +2477,21 @@ def test_file_lists_every_command_mentioning_it(tmp_path: Any) -> None:
     led = _ledger(tmp_path, main)
     bash = [a for a in led.agents[MAIN_ID].actions if a.tool == "Bash"]
     fa = atoms.file_atom(led, "A.ets", None)
-    got = [(m["seq"], m["effect"]) for m in fa["mentions"]]
-    assert [s for s, _ in got] == [b.seq for b in bash]                        # 四条命令一条不少,按时间排
-    assert got[0][1] is None and got[1][1] is None                             # heredoc 正文里提到、git log:账本没记到读写
-    assert got[2][1] == "读"                                                   # cat 是读,记到了
-    assert got[3][1] is not None                                               # 跑的脚本正文里提到:re.sub 盲写,记到了
-    assert "still uses old API" in fa["mentions"][0]["ctx"]
+    eff = {m["seq"]: m["effect"] for m in fa["mentions"]}
+    assert [b.seq for b in bash if b.seq in eff] == [b.seq for b in bash]      # 四条命令一条不少,按时间排
+    assert eff[bash[0].seq] is None and eff[bash[1].seq] is None               # heredoc 正文里提到、git log:账本没记到读写
+    assert eff[bash[2].seq] == "读"                                            # cat 是读,记到了
+    assert eff[bash[3].seq] is not None                                        # 跑的脚本正文里提到:re.sub 盲写,记到了
+    assert any(m["cls"] == "content" for m in fa["mentions"])                  # 写 fix.py 的正文里也提到它:写入内容
+    assert "still uses old API" in next(m for m in fa["mentions"] if m["seq"] == bash[0].seq)["ctx"]
     text = atoms_text.render_file(led, "A.ets", None, root="/proj")
-    assert "提到它的命令(4,其中 2 条账本没记到读写)" in text
+    assert "提到它的命令(5,其中 3 条账本没记到读写)" in text
     assert f"action(#{bash[0].seq}@L" in text.split("提到它的命令")[1]              # heredoc 正文提到:默认列
     assert f"action(#{bash[1].seq}@L" not in text.split("提到它的命令")[1]          # git log 是只读检查:默认折叠
     assert f"action(#{bash[1].seq}@L" in atoms_text.render_file(led, "A.ets", None, root="/proj", m_all=True)
     assert f"action(#{bash[2].seq}@L" not in text.split("提到它的命令")[1]      # 已入账的(cat 是读)不再铺,只计数
     assert "已入账的 2 条(" in text and "读 1 次" in text                        # cat 是读;脚本那条记成碰过(方向不明)
-    assert "2 条命令提到它但没入账" in atoms_text.render_index(led, "ets", None, root="/proj")
+    assert "3 条命令提到它但没入账" in atoms_text.render_index(led, "ets", None, root="/proj")
     # action 是枢纽:file 的虚线行 → action 看到发自哪个 agent 哪一版(跳 agent);agent 槽里的命令 → action 看到
     # 账本记到的文件版本和「提到但没记到」的文件当时的版本(跳 file)
     git = atoms_text.render_action(led, MAIN_ID, bash[1].seq)

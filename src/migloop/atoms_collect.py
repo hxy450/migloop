@@ -232,7 +232,7 @@ def _mention_class(seg: str, tok: str) -> str:
 
 
 def _path_mentions(cmd: str, scripts: dict[str, Any], cwd: object = None, ts: str | None = None,
-                   where: str = "in") -> tuple[list[tuple[str, str, str | None, str, str]], int]:
+                   where: str = "in", cls: str | None = None) -> tuple[list[tuple[str, str, str | None, str, str]], int]:
     """命令行 + heredoc 体 + 它跑的脚本正文(或工具输出,where="out")里,长得像路径的词
     → ([(词, 前后文, 解析出的绝对路径|None, 出处 in/body/out, 分档 change/readonly/body/out/other)], 截断数)。
     不判读写,只记「提到」:原始转录按文件名 grep 能跳出来的,这里一条不少;超过上限的不静默丢,记截断数。"""
@@ -259,15 +259,17 @@ def _path_mentions(cmd: str, scripts: dict[str, Any], cwd: object = None, ts: st
         if len(out) >= _MENTION_CAP:
             continue
         ctx = " ".join(text[max(0, m.start() - 60):m.end() + 60].split())
-        if where == "out":
-            src, cls = "out", "out"
+        if cls is not None:
+            src, kind = where, cls                 # 派发词 / 写入内容 / 正文 / 消息:整段一个种类
+        elif where == "out":
+            src, kind = "out", "out"
         elif m.start() >= cmd_len or any(s <= m.start() < e for s, e in spans):
-            src, cls = "body", "body"
+            src, kind = "body", "body"
         else:
             i = bisect.bisect_right(starts, m.start()) - 1
             seg = text[bounds[i][0]:bounds[i][1]] if i >= 0 else text[:cmd_len]
-            src, cls = "in", _mention_class(seg, m.group(0))
-        out.append((tok, ctx[:150], _resolve(tok, base) if "/" in tok else None, src, cls))
+            src, kind = "in", _mention_class(seg, m.group(0))
+        out.append((tok, ctx[:150], _resolve(tok, base) if "/" in tok else None, src, kind))
     return out, max(0, total - _MENTION_CAP)
 _PS_ASSIGN = re.compile(r"\$(\w+)\s*=\s*(['\"])([^'\"\n]+)\2")
 _PATHLINE = re.compile(r"^(.+?):(\d+)[:-]")
@@ -1448,6 +1450,13 @@ def _walk(path: str, agent_id: str, session: str, seq: list[int],
                             detail["mentions"] = om
                         if otrunc:
                             detail["mentions_truncated"] = otrunc
+                    else:
+                        # 派发词点名了谁、发消息说了谁、写别的文件时清单里列了谁:也是「转录里提到它」的行,词法层要有入口
+                        im = _input_text_mentions(name, inp, ucwd, uts)
+                        if im[0]:
+                            detail["mentions"] = im[0]
+                        if im[1]:
+                            detail["mentions_truncated"] = im[1]
                     act = Action(uts, nxt(), name, _kind_of(name, ops), ok=ok, detail=detail,
                                  src=(path, use_line, line_no), tuid=tuid, stage=stage, done_ts=ts)
                     for op in ops:
@@ -1466,10 +1475,15 @@ def _walk(path: str, agent_id: str, session: str, seq: list[int],
                     # teammate-message 是收件;子代理没包装的首条文本就是派发词本身
                     text = raw[tm.end():] if tm else raw
                     text = re.sub(r"\s*</teammate-message>\s*$", "", text)
-                    rec.actions.append(Action(ts, nxt(), "inbox", "inbox", detail={
-                        "from": tm.group(1) if tm else "dispatcher",
-                        "summary": tm.group(2) if tm else None, "text": text},
-                        src=(path, line_no, line_no), stage=stage_now(ts)))
+                    ib_detail: dict[str, Any] = {"from": tm.group(1) if tm else "dispatcher",
+                                                 "summary": tm.group(2) if tm else None, "text": text}
+                    ib_m, ib_t = _path_mentions(text[:20000], {}, cwd, ts, where="text", cls="text")
+                    if ib_m:
+                        ib_detail["mentions"] = ib_m
+                    if ib_t:
+                        ib_detail["mentions_truncated"] = ib_t
+                    rec.actions.append(Action(ts, nxt(), "inbox", "inbox", detail=ib_detail,
+                                              src=(path, line_no, line_no), stage=stage_now(ts)))
                     if rec.prompt is None and is_sub:
                         rec.prompt = text
                 else:
@@ -1484,7 +1498,14 @@ def _walk(path: str, agent_id: str, session: str, seq: list[int],
             # agent 自己说的话 / 想的话:一条记录一条索引,喂养下一版;全文按指针展开
             for kind, texts in (("say", said), ("think", thought)):
                 if texts:
-                    rec.actions.append(Action(ts, nxt(), kind, kind, detail={"text": _head("\n".join(texts))},
+                    full = "\n".join(texts)
+                    st_detail: dict[str, Any] = {"text": _head(full)}
+                    st_m, st_t = _path_mentions(full[:20000], {}, cwd, ts, where="text", cls="text")
+                    if st_m:
+                        st_detail["mentions"] = st_m
+                    if st_t:
+                        st_detail["mentions_truncated"] = st_t
+                    rec.actions.append(Action(ts, nxt(), kind, kind, detail=st_detail,
                                               src=(path, line_no, line_no), stage=stage_now(ts)))
     for tuid, (uts, name, inp, ucwd, use_line, stage) in pend.items():
         # 没等到结果的调用可能已经产生副作用:指针、tool_use_id、提及都保留,标 unfinished
@@ -1519,6 +1540,24 @@ def collect_cc(main_jsonl: str, seq: list[int],
         # run 级区间是 stage 粒度 —— 直接按时间落会把 execute 期间派的 visual-verify 子代理误成 execute)
         agents[stem] = _walk(fn, stem, sid8, seq, scripts)
     return agents
+
+
+def _input_text_mentions(name: str, inp: dict[str, Any], cwd: object, ts: str) -> tuple[list[tuple[str, str, str | None, str, str]], int]:
+    """非命令类调用的输入里提到的路径:派发词(Agent / Task 的 prompt)→ dispatch;发消息 → message;
+    Write / Edit / MultiEdit 的正文 → content(写别的文件时清单里列了它)。Read / Grep / Glob 的路径参数已是读,不重复。"""
+    if name in ("Agent", "Task"):
+        return _path_mentions(str(inp.get("prompt") or "")[:20000], {}, cwd, ts, where="dispatch", cls="dispatch")
+    if name == "SendMessage":
+        return _path_mentions(str(inp.get("message") or inp.get("content") or "")[:20000], {}, cwd, ts,
+                              where="message", cls="message")
+    if name == "Write":
+        return _path_mentions(str(inp.get("content") or "")[:20000], {}, cwd, ts, where="content", cls="content")
+    if name in ("Edit", "MultiEdit"):
+        edits = inp.get("edits") if name == "MultiEdit" else [inp]
+        body = "\n".join(str(e.get("new_string") or "") + "\n" + str(e.get("old_string") or "")
+                         for e in (edits or []) if isinstance(e, dict))
+        return _path_mentions(body[:20000], {}, cwd, ts, where="content", cls="content")
+    return [], 0
 
 
 def _prescan_scripts(paths: list[str]) -> ScriptTable:

@@ -162,11 +162,13 @@ def probe_payload(ledger: atoms.Ledger, run_dir: str) -> dict[str, Any]:
         vd = _VERDICT.search(body)
         nodes, bad = _link_nodes(ledger, body)
         dm = _DEFECT.search(body)
-        defect = dm.group(1) if dm else None
-        if dm and defect not in defects and dm.group(2) and not any(w in dm.group(2) for w in ("上游", "池外", "入口")):
-            defects[defect] = dm.group(2).strip()
-        elif dm and defect not in defects:
-            defects[defect] = ""
+        defect: str | None = None
+        if dm:
+            defect = str(dm.group(1))
+            desc = str(dm.group(2) or "").strip()
+            generic = any(w in desc for w in ("上游", "池外", "入口"))
+            if defect not in defects or (not defects[defect] and not generic):
+                defects[defect] = "" if generic else desc
         links.append({"no": no, "verdict": vd.group(1) if vd else None, "entry": no in entries,
                       "text": body[:400], "nodes": nodes, "bad_refs": bad, "defect": defect})
     # 节点 → 判定:只算它当主语的环(正文第一个坐标),按「节点 + 版本」记,不按 id 连坐(主会话在树上到处出现,

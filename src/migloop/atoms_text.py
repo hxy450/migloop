@@ -207,7 +207,10 @@ def _evidence_label(vv: dict[str, Any]) -> str:
     return str(src or "")
 
 
-_MENTION_CLS = {"change": "改动类", "body": "正文提到", "out": "输出里", "readonly": "只读检查", "other": "其他"}
+_MENTION_CLS = {"change": "改动类", "body": "正文提到", "out": "输出里", "readonly": "只读检查", "other": "其他",
+                "dispatch": "派发词", "message": "消息", "content": "写入内容", "text": "正文"}
+#: 默认折叠的分档:只读检查(噪声)、别的文件写入内容里的清单、说/想/收件正文(量大;search 按词能找)
+_MENTION_FOLD = ("readonly", "content", "text")
 
 
 def render_file(ledger: atoms.Ledger, hint: str, v: int | None = None, root: str = "",
@@ -321,14 +324,20 @@ def render_file(ledger: atoms.Ledger, hint: str, v: int | None = None, root: str
                 k = "写" if str(m["effect"]).startswith("写") else str(m["effect"])
                 kinds[k] = kinds.get(k, 0) + 1
         done = "、".join(f"{k} {n} 次" for k, n in kinds.items())
-        listed = [m for m in miss if m_all or m.get("cls") != "readonly"]
+        listed = [m for m in miss if m_all or m.get("cls") not in _MENTION_FOLD]
         folded = len(miss) - len(listed)
+        fold_by: dict[str, int] = {}
+        for m in miss:
+            if m.get("cls") in _MENTION_FOLD:
+                k = _MENTION_CLS.get(str(m.get("cls")), "其他")
+                fold_by[k] = fold_by.get(k, 0) + 1
         out.append(f"## 提到它的命令({len(ms)},其中 {len(miss)} 条账本没记到读写)—— 命令行 / heredoc 体 / 跑的脚本正文 / "
                    "工具输出里出现这个路径;版本无法复原或实录外修改时先看这里,action 展开命令原文自己判")
         if done:
             out.append(f"已入账的 {len(ms) - len(miss)} 条({done})脊柱与读者里已有,不再铺")
         if folded:
-            out.append(f"只读检查 {folded} 条折叠(cat / grep / wc / ls …;m_all=1 铺)")
+            out.append("折叠 " + "、".join(f"{k} {n} 条" for k, n in fold_by.items())
+                       + "(只读检查 = cat / grep / wc / ls;写入内容 = 别的文件正文里列了它;正文 = 说 / 想 / 收件;m_all=1 铺)")
         lo = max(m_from, 1)
         page = listed[lo - 1:lo - 1 + max(m_n, 1)]
         hi = lo - 1 + len(page)

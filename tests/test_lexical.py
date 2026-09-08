@@ -7,7 +7,7 @@ from typing import Any
 
 from migloop import atoms, atoms_text
 
-from tests.test_atoms import MAIN_ID, _call, _ledger, _read_call
+from tests.test_atoms import MAIN_ID, _call, _ledger, _read_call, _rec
 
 A = "/proj/entry/A.ets"
 
@@ -44,7 +44,7 @@ def test_mentions_classified_readonly_folded_by_default(tmp_path: Any) -> None:
     text = atoms_text.render_file(led, "A.ets", None, root="/proj")
     sec = text.split("提到它的命令")[1]
     assert "perl -pi" in sec and "see entry/A.ets" in sec and "wc -l" not in sec
-    assert "只读检查 1 条折叠" in sec and "[改动类]" in sec and "[正文提到]" in sec
+    assert "只读检查 1 条" in sec and "[改动类]" in sec and "[正文提到]" in sec
     full = atoms_text.render_file(led, "A.ets", None, root="/proj", m_all=True)
     assert "wc -l" in full.split("提到它的命令")[1]
 
@@ -87,6 +87,24 @@ def test_search_hits_show_possible_files(tmp_path: Any) -> None:
     led = _base(tmp_path, [*_call(at("00:02:00"), "t1", "Bash", {"command": "cd /proj && perl -pi -e 's/x/y/' entry/A.ets"}, out="")])
     text = atoms_text.render_search(led, "perl", agent=MAIN_ID, root="/proj", after=True)
     assert "可能碰到 entry/A.ets" in text
+
+
+def test_mentions_cover_dispatch_words_and_written_content(tmp_path: Any) -> None:
+    """完备性差集(评审 K):转录里提到这个文件的行,账本得有入口。派发词点名(谁被告知了它)默认列;
+    别的文件的写入内容里提到它(spec 清单)折叠成计数;说 / 想 / 收件里提到的也折叠但能 m_all=1 铺。"""
+    led = _base(tmp_path, [
+        *_call(at("00:01:00"), "m1", "Write", {"file_path": "/proj/spec/list.md", "content": "- entry/A.ets 待修\n"}),
+        *_call(at("00:02:00"), "m2", "Agent", {"name": "fixer", "prompt": "请修 entry/A.ets 的返回键"}, "done",
+               toolUseResult={"agentId": "s"}),
+        _rec(at("00:03:00"), "assistant", [{"type": "text", "text": "先看 entry/A.ets 再说"}]),
+    ])
+    cls = sorted(m.cls for m in led.mentions[A])
+    assert cls == ["content", "dispatch", "text"]
+    text = atoms_text.render_file(led, "A.ets", None, root="/proj")
+    sec = text.split("提到它的命令")[1]
+    assert "[派发词]" in sec and "请修 entry/A.ets" in sec
+    assert "写入内容 1 条" in sec and "正文 1 条" in sec and "待修" not in sec
+    assert "待修" in atoms_text.render_file(led, "A.ets", None, root="/proj", m_all=True)
 
 
 def test_agent_slot_shows_possible_touch_and_until_cut(tmp_path: Any) -> None:
