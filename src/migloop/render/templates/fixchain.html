@@ -761,6 +761,7 @@
       root.busy = true;
       selTid = root.tid;
       autoFit = true;
+      autoFloor = MIN_AUTO;
       atomFile(path, function (fa) {
         var anchor = v || (fa ? fa.v : null);
         if (!v && fa) root.label = baseName(path) + "@v" + fa.v;
@@ -797,6 +798,7 @@
       root.busy = true;
       selTid = root.tid;
       autoFit = true;
+      autoFloor = MIN_AUTO;
       atomAgent(id, function (ag) {
         var anchor = v || (ag ? ag.n_versions : null);
         var name = ag ? (ag.label || agentLabelOf(id)) : agentLabelOf(id);
@@ -1032,8 +1034,9 @@
         PROBE.placed = keys.filter(function (k) { return placed[k]; }).length;
         PROBE.unplaced = keys.filter(function (k) { return !placed[k]; }).map(function (k) { return PROBE.byKey[k][0].node; });
         probeExpanding = false;
+        autoFit = true;
+        autoFloor = null;     // 调查树一次长出五六列,整棵放进视口,不用自动适应的下限
         renderTree(XT.root);
-        fitView();            // 调查树一次长出五六列,整棵放进视口,不用自动适应的下限
         renderProbe();
       }
       function step() {
@@ -1106,6 +1109,7 @@
     }
     // 自动适应有下限:树长大后不再一味缩小,到 MIN_AUTO 停住、靶点滚进视野;"适应"按钮不受下限约束
     var MIN_AUTO = 0.62;
+    var autoFloor = MIN_AUTO;      // 调查树长完后置 null:整棵进视口,之后的重绘也不缩回下限;换根恢复
     function fitView(floor) {
       var gw = graphEl.clientWidth - 8, gh = graphEl.clientHeight - canvasTop() - 8;
       var k = Math.min(gw / (layoutSize.w || 1), gh / (layoutSize.h || 1), 1);
@@ -1151,7 +1155,7 @@
         addTreeNode(n);
       });
       drawEdges();
-      if (autoFit) fitView(MIN_AUTO);
+      if (autoFit) fitView(autoFloor);
       else applyZoom(zoom);
       if (focusTid && nodeEls[focusTid]) {
         var n0 = XT.byId[focusTid];
@@ -1205,7 +1209,7 @@
     function hiliteEdges(tid, on) {
       (wireByTid[tid] || []).forEach(function (p) { p.classList.toggle("on", on); });
     }
-    window.addEventListener("resize", function () { if (XT && autoFit) fitView(MIN_AUTO); });
+    window.addEventListener("resize", function () { if (XT && autoFit) fitView(autoFloor); });
 
     var clearBtn = document.getElementById("clear");
     var side = document.getElementById("side");
