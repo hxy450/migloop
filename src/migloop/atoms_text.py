@@ -273,15 +273,23 @@ def render_file(ledger: atoms.Ledger, hint: str, v: int | None = None, root: str
         # 原始转录按文件名 grep 会跳出来的命令,这里一条不少:解析器放弃的、当成无关的、写在 heredoc 正文里的都在。
         # 「没记到」的命令是版本内容未知 / 实录外修改之前该先看的地方
         ms = fa["mentions"]
-        miss = sum(1 for m in ms if m["effect"] is None)
-        out.append(f"## 提到它的命令({len(ms)},其中 {miss} 条账本没记到读写)—— 命令行 / heredoc 体 / 跑的脚本正文里"
+        miss = [m for m in ms if m["effect"] is None]
+        kinds: dict[str, int] = {}
+        for m in ms:
+            if m["effect"]:
+                k = "写" if str(m["effect"]).startswith("写") else str(m["effect"])
+                kinds[k] = kinds.get(k, 0) + 1
+        done = "、".join(f"{k} {n} 次" for k, n in kinds.items())
+        out.append(f"## 提到它的命令({len(ms)},其中 {len(miss)} 条账本没记到读写)—— 命令行 / heredoc 体 / 跑的脚本正文里"
                    "出现这个路径;版本无法复原或实录外修改时先看这里,action 展开命令原文自己判")
-        for m in ms[:30]:
+        if done:
+            out.append(f"已入账的 {len(ms) - len(miss)} 条({done})脊柱与读者里已有,不再铺;下面只铺没记到的")
+        for m in miss[:40]:
             amb = " · 只给了文件名,同名文件不止一个" if m.get("ambiguous") else ""
-            out.append(f"- {_who(ledger, m['by'], m['by_ver'])} | {m['ts'][5:16]} {m.get('t') or ''} | "
-                       f"账本: {m['effect'] or '没记到'}{amb} | …{m['ctx']}… | action{_ref(m['seq'], None, lines.get(m['seq']))}")
-        if len(ms) > 30:
-            out.append(f"…另有 {len(ms) - 30} 条;search(q=文件名) 找")
+            out.append(f"- {_who(ledger, m['by'], m['by_ver'])} | {m['ts'][5:16]} {m.get('t') or ''}{amb} | "
+                       f"…{m['ctx']}… | action{_ref(m['seq'], None, lines.get(m['seq']))}")
+        if len(miss) > 40:
+            out.append(f"…没记到的另有 {len(miss) - 40} 条;search(q=文件名) 找")
     if content:
         if fa["content"] is None and fa.get("partial"):
             out.append("## 内容(部分,脚本字面量里的正文;行号不是文件行号)")

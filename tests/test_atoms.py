@@ -2479,5 +2479,7 @@ def test_file_lists_every_command_mentioning_it(tmp_path: Any) -> None:
     assert got[3][1] is not None                                               # 跑的脚本正文里提到:re.sub 盲写,记到了
     assert "still uses old API" in fa["mentions"][0]["ctx"]
     text = atoms_text.render_file(led, "A.ets", None, root="/proj")
-    assert "提到它的命令(4,其中 2 条账本没记到读写)" in text and f"action(#{bash[1].seq}@L" in text and "没记到" in text
+    assert "提到它的命令(4,其中 2 条账本没记到读写)" in text and f"action(#{bash[1].seq}@L" in text
+    assert f"action(#{bash[2].seq}@L" not in text.split("提到它的命令")[1]      # 已入账的(cat 是读)不再铺,只计数
+    assert "已入账的 2 条(" in text and "读 1 次" in text                        # cat 是读;脚本那条记成碰过(方向不明)
     assert "2 条命令提到它但没入账" in atoms_text.render_index(led, "ets", None, root="/proj")
