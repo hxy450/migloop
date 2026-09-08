@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
+from functools import lru_cache
 
 
 @dataclass
@@ -102,8 +103,10 @@ def _strip_heredocs(text: str) -> tuple[str, list[str]]:
     return "".join(out), bodies
 
 
+@lru_cache(maxsize=16384)
 def _split_segments(text: str) -> list[str]:
-    """引号感知地按 && || ; | & 换行切段;未引号的 #… 注释与 (){} 分组符当分隔。"""
+    """引号感知地按 && || ; | & 换行切段;未引号的 #… 注释与 (){} 分组符当分隔。
+    记忆化:同一条命令会被几个分析器各切一遍,结果只读共享。"""
     segs: list[str] = []
     buf: list[str] = []
     quote = ""
@@ -139,6 +142,7 @@ def _split_segments(text: str) -> list[str]:
     return segs
 
 
+@lru_cache(maxsize=32768)
 def _tokenize(seg: str) -> list[tuple[str, bool, str]]:
     """→ [(值, 是否被引号包裹, 操作符)]:操作符 ∈ {'>','>>','<','<<','2>','&>',''}。"""
     toks: list[tuple[str, bool, str]] = []
@@ -302,7 +306,9 @@ def _classify(seg: str, io: ShellIO) -> None:
     # 未知命令(python xxx.py / $VAR 等):实参语义不可知,只有上面的通用重定向作数
 
 
+@lru_cache(maxsize=16384)
 def parse_shell(command: str) -> ShellIO:
+    """记忆化:同一段命令在 _shell_analyze / 单文件 cat / stdout 反证里各解析一遍;ShellIO 调用方只读。"""
     io = ShellIO()
     text = (command or "").replace("\\\n", " ")      # 续行拼回一行再分段
     text, bodies = _strip_heredocs(text)
