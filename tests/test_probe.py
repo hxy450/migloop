@@ -7,7 +7,7 @@ from typing import Any
 
 from migloop import probe
 
-from tests.test_atoms import _call, _ledger, _read_call, _rec
+from tests.test_atoms import MAIN_ID, _call, _ledger, _read_call, _rec
 
 
 def _run_dir(tmp_path: Any, seq: list[dict[str, Any]], report: str) -> str:
@@ -44,6 +44,7 @@ def test_probe_maps_calls_and_links_to_nodes(tmp_path: Any) -> None:
               "环 1  fixer 写 A.ets@v2 (#9@L9)   判定: 传递\n"
               f"环 2  conv-a(agent-c)v1 写 A.ets@v1,凭 spec/pages/A.md@v1 (#{conv_seq}@L5)   判定: 错\n"
               "环 3  spec/pages/A.md@v1 外部输入   判定: 缺\n"
+              f"环 4  主会话·{MAIN_ID.split(':')[1]} v1 的派发词缺约束   判定: 错\n"      # 主会话不是 agent-… 形式的 id,也得认成坐标
               "故障进入点:\n"                                    # 真报告里常换行再分条,还会给几条缺陷各自的进入点
               "- 两条缺陷各自进入。按时间最早是环 2(派发词缺约束);\n"
               "- 另一条的进入点是环 3\n")
@@ -53,12 +54,14 @@ def test_probe_maps_calls_and_links_to_nodes(tmp_path: Any) -> None:
     assert p["steps"][2]["node"] == {"kind": "file", "path": "/proj/entry/A.ets", "v": 2}
     assert p["steps"][3]["node"]["aid"] == "agent-c" and p["steps"][4]["node"]["aid"] == "agent-c"
     assert p["root"] == "/proj/entry/A.ets" and p["entry"] == 2 and p["entries"] == [2, 3]
-    assert [lk["verdict"] for lk in p["links"]] == ["传递", "错", "缺"]
-    assert [lk["entry"] for lk in p["links"]] == [False, True, True]
-    # 判定只落在每环的主语(正文第一个坐标):环 1 主语是 A.ets@v2 → 传递;环 2 主语是 agent-c → 错;环 3 主语是 A.md → 缺
-    assert p["verdicts"]["/proj/entry/A.ets"]["verdict"] == "传递"
-    assert p["verdicts"]["agent-c"]["verdict"] == "错" and p["verdicts"]["agent-c"]["entry"]
-    assert p["verdicts"]["/proj/spec/pages/A.md"]["verdict"] == "缺" and p["verdicts"]["/proj/spec/pages/A.md"]["entry"]
+    assert [lk["verdict"] for lk in p["links"]] == ["传递", "错", "缺", "错"]
+    assert [lk["entry"] for lk in p["links"]] == [False, True, True, False]
+    assert p["links"][3]["nodes"][0] == {"kind": "agent", "aid": MAIN_ID, "v": 1}
+    # 判定只落在每环的主语(正文第一个坐标),并且按「节点 + 版本」记,同一 id 的别的版本不连坐
+    assert p["verdicts"]["/proj/entry/A.ets"] == [{"kind": "file", "v": 2, "verdict": "传递", "links": [1], "entry": False}]
+    assert p["verdicts"]["agent-c"] == [{"kind": "agent", "v": 1, "verdict": "错", "links": [2], "entry": True}]
+    assert p["verdicts"]["/proj/spec/pages/A.md"][0]["verdict"] == "缺" and p["verdicts"]["/proj/spec/pages/A.md"][0]["entry"]
+    assert p["verdicts"][MAIN_ID] == [{"kind": "agent", "v": 1, "verdict": "错", "links": [4], "entry": False}]
     assert [n["kind"] for n in p["links"][1]["nodes"]] == ["agent", "file", "file", "agent"]   # 主语在前,其余是提到
 
 
@@ -69,3 +72,5 @@ def test_fixchain_template_has_probe_hooks() -> None:
     # 调查树:根开好后自动展开到每个查过的节点;没查过的兄弟折成桩;被归因的链整条标红(节点 + 边)
     assert "probeExpand(" in html and "unstub(" in html and "isStub" in html
     assert ".node.p-chain" in html and ".wire.chain" in html and "未查" in html
+    # 红只落在 键 + 版本 对上的节点;同 id 别的版本挂灰标说明环判的是哪一版
+    assert "probeVerdictFor(" in html and "判的是 v" in html

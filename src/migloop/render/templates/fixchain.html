@@ -663,6 +663,7 @@
           if (!g) { g = byA[vv.by] = { by: vv.by, name: vv.by_name, vs: [], ver: null, vias: {} }; groups.push(g); }
           g.vs.push(vv.v);
           if (vv.by_ver != null && (g.ver == null || vv.by_ver > g.ver)) g.ver = vv.by_ver;
+          if (vv.by_ver != null && (g.verMin == null || vv.by_ver < g.verMin)) g.verMin = vv.by_ver;
           g.vias[vv.via] = 1;
         });
         var ch = node.isRoot ? chainByFile[node.path] : null;
@@ -679,7 +680,7 @@
           if (g.vias.script) badges.push({ cls: "via", t: "脚本落盘" });
           else if (g.vias.shell) badges.push({ cls: "via", t: "shell" });
           addKid(node, xtNode("agent", {
-            aid: g.by, anchorVer: g.ver, sharp: !!sharp[agentKey(g.by)],
+            aid: g.by, anchorVer: g.ver, verMin: g.verMin, isWriter: true, sharp: !!sharp[agentKey(g.by)],
             label: (sharp[agentKey(g.by)] ? "★ " : "") + (g.name || agentLabelOf(g.by)) + (g.ver != null ? " v" + g.ver : ""),
             badges: badges
           }));
@@ -833,6 +834,7 @@
     var PROBE = null;
     var probeEl = document.getElementById("probe");
     var VD_CLS = { "错": "err", "缺": "gap", "传递": "pass" };
+    var VD_RANK = { "错": 3, "缺": 2, "传递": 1 };
     function probeKeyOf(node) { return node.kind === "file" ? node.path : node.kind === "agent" ? node.aid : null; }
     function probeIndex(p) {
       p.byKey = {};
@@ -853,10 +855,24 @@
         });
       });
     }
+    // 判定按「节点 + 版本」落:文件精确到 @v,agent 精确到 v;写者分组节点代表它对这个文件从 verMin 到 anchorVer 的全部写入,
+    // 环的版本落在这段里也算。同一 id 的其他版本不红,只挂「环 N 判的是 vX」的灰标 —— 主会话在很多派发边上出现,不能连坐。
+    function probeVerdictFor(node, list) {
+      var nv = node.kind === "file" ? node.anchorV : node.anchorVer;
+      var hit = null, other = [];
+      (list || []).forEach(function (x) {
+        var ok = x.v == null || nv == null || x.v === nv
+              || (node.kind === "agent" && node.isWriter && node.verMin != null && x.v >= node.verMin && x.v <= nv);
+        if (ok) { if (!hit || VD_RANK[x.verdict] > VD_RANK[hit.verdict]) hit = x; }
+        else other.push(x);
+      });
+      return { vd: hit, other: other };
+    }
     function probeMark(node) {
       if (!PROBE || PROBE.error) return null;
       var k = probeKeyOf(node);
-      return { steps: (k && PROBE.byKey[k]) || [], vd: (k && PROBE.verdicts && PROBE.verdicts[k]) || null, mentions: (k && PROBE.mentions[k]) || [] };
+      var pv = probeVerdictFor(node, k && PROBE.verdicts ? PROBE.verdicts[k] : null);
+      return { steps: (k && PROBE.byKey[k]) || [], vd: pv.vd, other: pv.other, mentions: (k && PROBE.mentions[k]) || [] };
     }
     function probeDecorate(d, node) {
       var pm = probeMark(node);
@@ -867,6 +883,8 @@
         d.classList.add("p-" + VD_CLS[vd.verdict]);
         if (vd.entry) d.classList.add("p-entry");
         d.appendChild(el("span", "badge vd-" + VD_CLS[vd.verdict], (vd.entry ? "进入点 " : "") + vd.verdict + " 环" + vd.links.join(",")));
+      } else if (pm.other.length) {
+        d.appendChild(el("span", "badge dup", "环" + pm.other[0].links.join(",") + " 判的是 v" + pm.other[0].v));
       } else if (pm.mentions.length) {
         d.appendChild(el("span", "badge", "环" + pm.mentions.slice(0, 3).join(",") + " 提到"));
       }
@@ -913,7 +931,9 @@
       if (PROBE.error) { probeEl.appendChild(el("div", "sum", "载入失败:" + PROBE.error)); return; }
       var sum = el("div", "sum", "");
       sum.innerHTML = "<b>" + (PROBE.links || []).length + "</b> 环 · 进入点 <b>" + (PROBE.entry != null ? "环 " + (PROBE.entries || [PROBE.entry]).join(" / ") : "未标") + "</b> · 查过 <b>" + Object.keys(PROBE.byKey).length + "</b> 个节点"
-                    + (PROBE.placed != null ? " · 树上 <b>" + PROBE.placed + "</b>" : "");
+                    + (PROBE.placed != null ? " · 树上 <b>" + PROBE.placed + "</b> · 判定落到树上 <b>"
+                        + (PROBE.links || []).filter(function (l) { return l.verdict && l.onTree; }).length + "/"
+                        + (PROBE.links || []).filter(function (l) { return l.verdict; }).length + "</b> 环" : "");
       probeEl.appendChild(sum);
       if (PROBE.unplaced && PROBE.unplaced.length) {
         probeEl.appendChild(el("div", "sub", "查过但不在这棵树上(" + PROBE.unplaced.length + ")· 点一下以它为根"));
@@ -929,7 +949,8 @@
       (PROBE.links || []).forEach(function (lk) {
         var row = el("div", "lk " + (VD_CLS[lk.verdict] || "") + (lk.entry ? " entry" : ""));
         row.appendChild(el("span", "no", (lk.entry ? "★" : "") + "环" + lk.no));
-        var t = el("span", "t", (lk.verdict ? "[" + lk.verdict + "] " : "") + lk.text);
+        var t = el("span", "t", (lk.verdict && lk.onTree === false && (lk.nodes || []).length ? "[主语不在树上] " : "")
+                                + (lk.verdict ? "[" + lk.verdict + "] " : "") + lk.text);
         t.title = lk.text;
         row.appendChild(t);
         var first = (lk.nodes || [])[0];
@@ -1004,7 +1025,7 @@
       probeExpanding = true;
       var expandedKeys = {};
       var rootN = XT.byId[XT.root];
-      expandedKeys[probeKeyOf(rootN)] = 1;
+      expandedKeys[probeKeyOf(rootN) + (rootN.kind === "agent" ? "@" + rootN.anchorVer : "")] = 1;
       var queue = [];
       function fold(node) {
         var keep = [], rest = [];
@@ -1021,7 +1042,8 @@
         }
         keep.forEach(function (kid) {
           if (kid.kind === "leaf") return;
-          var k = probeKeyOf(kid);
+          // 文件按键去重(早先版本的子树是同一个故事);agent 按 键 + 版本(主会话 v1 / v83 派发的是不同的人)
+          var k = probeKeyOf(kid) + (kid.kind === "agent" ? "@" + kid.anchorVer : "");
           if (expandedKeys[k]) { kid.probeDup = true; return; }
           expandedKeys[k] = 1;
           if (kid.depth < PROBE_DEPTH) queue.push(kid);
@@ -1032,6 +1054,13 @@
         Object.keys(XT.byId).forEach(function (t) { var k = probeKeyOf(XT.byId[t]); if (k) placed[k] = 1; });
         var keys = Object.keys(PROBE.byKey);
         PROBE.placed = keys.filter(function (k) { return placed[k]; }).length;
+        // 每一环的主语(键 + 版本)是否真落在树上:没落上的在面板里标出来;红只在对上的节点
+        var onTree = {};
+        Object.keys(XT.byId).forEach(function (t) {
+          var pm = probeMark(XT.byId[t]);
+          if (pm && pm.vd) pm.vd.links.forEach(function (no) { onTree[no] = 1; });
+        });
+        (PROBE.links || []).forEach(function (lk) { lk.onTree = !!onTree[lk.no]; });
         PROBE.unplaced = keys.filter(function (k) { return !placed[k]; }).map(function (k) { return PROBE.byKey[k][0].node; });
         probeExpanding = false;
         autoFit = true;

@@ -22,6 +22,7 @@ _ENTRY_ALSO = re.compile(r"进入点是\s*环\s*(\d+)")     # 几条缺陷各自
 _FILE_AT = re.compile(r"([\w./-]+\.[A-Za-z0-9]+)@v(\d+)")
 _AGENT_ID = re.compile(r"agent-[0-9a-f]+")        # 账本 id 是 16 位 hex,测试里的短 id 也认
 _ACTION = re.compile(r"#(\d+)@L\d+")
+_MAIN_AT = re.compile(r"主会话[·:]?\s*([0-9a-f]{6,})?\s*@?v(\d+)")   # 报告写主会话不用 agent- id:「主会话·9b3105a2 @v83」
 _RANK = {"错": 3, "缺": 2, "传递": 1}
 
 
@@ -42,6 +43,15 @@ def _seq_owner(ledger: atoms.Ledger, seq_no: int, aid: str | None = None) -> tup
             if act.seq == seq_no:
                 return a.id, act.ver if act.ver is not None else act.at
     return None, None
+
+
+def _main_id(ledger: atoms.Ledger, sid: str | None) -> str | None:
+    """「主会话·9b3105a2」→ 账本 id __main__:<sid8>;不带会话号只在池子里只有一个主会话时认。"""
+    mains = [k for k in ledger.agents if k.startswith("__main__")]
+    if sid:
+        hit = [k for k in mains if k.split(":", 1)[-1].startswith(sid) or sid.startswith(k.split(":", 1)[-1])]
+        return hit[0] if len(hit) == 1 else None
+    return mains[0] if len(mains) == 1 else None
 
 
 def _int(x: Any) -> int | None:
@@ -92,6 +102,10 @@ def _link_nodes(ledger: atoms.Ledger, body: str) -> list[dict[str, Any]]:
         vm = re.search(re.escape(aid) + r"\)?\s*v(\d+)", body)
         if a:
             found.append((m.start(), {"kind": "agent", "aid": a.id, "v": int(vm.group(1)) if vm else None}))
+    for m in _MAIN_AT.finditer(body):
+        mid = _main_id(ledger, m.group(1))
+        if mid:
+            found.append((m.start(), {"kind": "agent", "aid": mid, "v": int(m.group(2))}))
     for m in _ACTION.finditer(body):
         owner, ver = _seq_owner(ledger, int(m.group(1)))
         if owner:
@@ -133,8 +147,9 @@ def probe_payload(ledger: atoms.Ledger, run_dir: str) -> dict[str, Any]:
         vd = _VERDICT.search(body)
         links.append({"no": no, "verdict": vd.group(1) if vd else None, "entry": no in entries,
                       "text": body[:400], "nodes": _link_nodes(ledger, body)})
-    # 节点 → 判定:只算它当主语的环(正文第一个坐标);同一节点被几环判过取最重(错 > 缺 > 传递)
-    verdicts: dict[str, dict[str, Any]] = {}
+    # 节点 → 判定:只算它当主语的环(正文第一个坐标),按「节点 + 版本」记,不按 id 连坐(主会话在树上到处出现,
+    # 环 9 判的是它 v83 的派发词,v1 / v60 不该跟着红);同一节点同一版被几环判过取最重(错 > 缺 > 传递)
+    verdicts: dict[str, list[dict[str, Any]]] = {}
     for lk in links:
         lk_nodes: list[dict[str, Any]] = list(lk["nodes"])
         subject: dict[str, Any] | None = lk_nodes[0] if lk_nodes else None
@@ -144,12 +159,16 @@ def probe_payload(ledger: atoms.Ledger, run_dir: str) -> dict[str, Any]:
         key = str(subject.get("path") or subject.get("aid") or "")
         if not key:
             continue
-        cur = verdicts.get(key)
-        if cur is None or _RANK[verdict] > _RANK[str(cur["verdict"])]:
-            verdicts[key] = {"kind": subject["kind"], "verdict": verdict, "links": [lk["no"]], "entry": bool(lk["entry"]), "v": subject.get("v")}
-        elif lk["no"] not in cur["links"]:
+        bucket = verdicts.setdefault(key, [])
+        cur = next((x for x in bucket if x["v"] == subject.get("v")), None)
+        if cur is None:
+            bucket.append({"kind": subject["kind"], "v": subject.get("v"), "verdict": verdict, "links": [lk["no"]], "entry": bool(lk["entry"])})
+            continue
+        if _RANK[verdict] > _RANK[str(cur["verdict"])]:
+            cur["verdict"] = verdict
+        if lk["no"] not in cur["links"]:
             cur["links"].append(lk["no"])
-            cur["entry"] = bool(cur["entry"] or lk["entry"])
+        cur["entry"] = bool(cur["entry"] or lk["entry"])
     root = next((s["node"].get("path") for s in steps if s["node"] and s["node"].get("kind") == "chain" and s["node"].get("path")), None)
     fm = re.search(r"文件[::]\s*([^\s(（]+)", report)
     if not root and fm:
