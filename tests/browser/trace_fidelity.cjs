@@ -433,6 +433,10 @@ async function main(){
     await evaluate("document.querySelector('#observation-scope').open=true");
     await check('opening the fixed scope never changes recorded investigation',"JSON.stringify(__mig.probe().trajectory)===window.originalTrajectory && document.querySelectorAll('.wire').length===0");
     await evaluate("document.querySelector('#observation-scope').open=false");
+    await check('exact node versions have separate nonshrinking label spans',"[...document.querySelectorAll('#canvas .node')].filter(n=>n.querySelector('.node-version')).length>=3 && [...document.querySelectorAll('.node-version')].every(n=>getComputedStyle(n).flexShrink==='0')");
+    await evaluate("window.labelProbe=[...document.querySelectorAll('#canvas .node-caption')].find(n=>n.querySelector('.node-version').textContent==='@v3'); window.originalLabel=window.labelProbe.querySelector('.node-name').textContent; window.labelProbe.querySelector('.node-name').textContent='VeryLongMemberCenterPageNameForVersionVisibility.ets'");
+    await check('long names can truncate but the exact version remains inside its node',"(()=>{const v=window.labelProbe.querySelector('.node-version').getBoundingClientRect(),n=window.labelProbe.closest('.node').getBoundingClientRect();return v.left>=n.left && v.right<=n.right && v.width>0 && JSON.stringify(__mig.probe().trajectory)===window.originalTrajectory})()");
+    await evaluate("window.labelProbe.querySelector('.node-name').textContent=window.originalLabel");
     await check('one entity per exact version',"Object.values(__mig.xt().byId).filter(n=>n.traj).length === 4");
     await check('unqueried conclusion version has no checked badge',"[...document.querySelectorAll('#canvas .node')].some(n=>n.textContent.startsWith('A.ets@v1') && n.textContent.includes('未查询') && !n.querySelector('.badge.step'))");
     await check('rejected visit overrides successful transport status',"[...document.querySelectorAll('#probe .st')].some(n=>n.textContent.startsWith('✗7') && n.textContent.includes('被拒 · 未打开'))");

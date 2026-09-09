@@ -93,6 +93,9 @@
   .node:hover { box-shadow: 0 2px 10px rgba(16,24,40,.14); transform: translateY(-1px); z-index: 3; }
   .node.sel { box-shadow: 0 0 0 2.5px color-mix(in srgb, var(--c-spec) 45%, transparent); }
   .node .chev { position: absolute; right: 8px; top: 0; color: var(--ink-3); font-size: 10px; }
+  .node-caption { display: inline-flex; max-width: 100%; vertical-align: top; }
+  .node-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .node-version { flex: 0 0 auto; }
   .node .badge { display: inline-block; font-size: 9.5px; line-height: 14px; padding: 0 5px; margin-left: 5px; border-radius: 4px;
                  background: var(--wash-2); color: var(--ink-3); vertical-align: 1px; font-family: var(--sans); }
   .node .badge.stale { background: color-mix(in srgb, var(--c-fix) 12%, transparent); color: var(--c-fix); font-weight: 700; }
@@ -2626,11 +2629,19 @@
       var d = el("div", "node " + nodeCls(node) + (node.tid === selTid ? " sel" : ""));
       d.dataset.tid = node.tid;
       d.style.left = node.x + "px"; d.style.top = node.y + "px"; d.style.width = NODE_W + "px";
-      d.appendChild(document.createTextNode(node.label));
+      var version = node.kind === "file" ? node.anchorV : node.kind === "agent" ? node.anchorVer : null;
+      var suffix = node.kind === "file" ? "@v" + version : " v" + version;
+      if (version != null && String(node.label).endsWith(suffix)) {
+        var caption = el("span", "node-caption");
+        caption.appendChild(el("span", "node-name", String(node.label).slice(0, -suffix.length)));
+        caption.appendChild(el("span", "node-version", suffix));
+        d.appendChild(caption);
+      } else d.appendChild(document.createTextNode(node.label));
       (node.badges || []).forEach(function (b) { var badge = el("span", "badge " + (b.cls || ""), b.t); if (b.title) badge.title = b.title; d.appendChild(badge); });
       probeDecorate(d, node);
       if (node.kind !== "leaf" && !node.isRight) d.appendChild(el("span", "chev", node.expanded ? "▾" : (node.busy ? "…" : "▸")));
       d.title = (node.kind === "file" ? node.path : node.kind === "agent" ? node.aid : node.label)
+              + (version != null ? " @v" + version : "")
               + ((node.badges || []).length ? "  [" + node.badges.map(function (b) { return b.t; }).join(" · ") + "]" : "")
               + (node.isRight ? "  (下游节点:抽屉里可「以此为根」)" : "");
       d.addEventListener("click", function (ev) { ev.stopPropagation(); onNode(node.tid); });
