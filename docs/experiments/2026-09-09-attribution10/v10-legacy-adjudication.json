@@ -1,0 +1,3468 @@
+{
+  "schema": "migloop-v10-legacy-adjudication/1",
+  "status": "complete_for_all_six_v10_legacy_runs_sealed",
+  "review_date": "2026-09-09",
+  "source_code_id": "80c099e",
+  "scope": "Only completed formal-v10 legacy runs against unchanged reference-v1 and raw pool. V9 unchanged. No model calls or production/frozen/reference/run writes; futureentry_effect_alignment not used as scoring rule.",
+  "rubric": {
+    "file": "core-rubric-reconciliation.md",
+    "protocol_file": "protocol.md",
+    "protocol_sha256": "19df0bb2ef9dacc62d2b8c1d911cdaf03aa6ec7941889eb78bd135c8403f7afb",
+    "reference": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/reference-v1/legacy-reference.json",
+    "reference_sha256": "2c015536094fff1e42bb3b6b5cc2dce743c0f2a0f6924254027f7f8a5faac927",
+    "facts_are_not_accuracy": true,
+    "check_not_truth": true,
+    "core_not_full_annotation": true
+  },
+  "runs": [
+    {
+      "case": "member-center",
+      "variant": "formal-v10",
+      "arm": "tools",
+      "rep": 1,
+      "run": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v10/member-center/runs/tools/rep1",
+      "source_code_id": "80c099e",
+      "source_digest": "b47380bd789929d3181eae024e4dee12709d8878615ebe7bd85e0271a37a35ed",
+      "pool_digest": "a78b1373045f7558d6da3b76123e30d032635a2a0b4cdd665e7f80c0bdf8b337",
+      "common_task_sha256": "e60ad7491cd5991a948f8c7128432feca230a59bee208640ca5b90a44d68dec1",
+      "model": [
+        "gpt-5.5"
+      ],
+      "effort": "medium",
+      "questions": [
+        {
+          "id": "S3",
+          "core": "pass",
+          "basis": "三处AppLoad透明、Pay/Renew深色，明确已有H5透明且不在新增三处；执行与文件复原/设备验证区分正确。",
+          "mandatory_gaps": [],
+          "minor_omissions": [],
+          "facts": [
+            {
+              "id": "S3.f1",
+              "status": "supported",
+              "report_claim": "206 AppLoad、704 PayAgreement、728 RenewRule，761H5不在新增之中。",
+              "raw_evidence": [
+                "fixer L42/L43,L74/L75,L80/L81"
+              ]
+            },
+            {
+              "id": "S3.f2",
+              "status": "supported",
+              "report_claim": "已设mask跳过，AppLoadTransparent，其余Palette.DIALOG_MASK；脚本执行后Pay片段直接读回。",
+              "raw_evidence": [
+                "fixer L103/L104,L106/L107"
+              ]
+            },
+            {
+              "id": "S3.f3",
+              "status": "supported",
+              "report_claim": "3sites是1透明+2深色，H5原有786行Color.Transparent。",
+              "raw_evidence": [
+                "fixer L74/L75; Slice8 L264原有H5"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "S4",
+          "core": "partial",
+          "basis": "两轮Span修复、tail private来源、编译报错及去private两Edit成立；仍未追Slice8写前实际Kotlin输入→坏整写。成功构建仅按已开历史报告说明，未声称没有构建。",
+          "mandatory_gaps": [
+            "Slice8 L21/L24源码读取→L264/L265错误整写未调查。"
+          ],
+          "minor_omissions": [
+            "最后成功构建的原生L36/L37,L39/L40未展开，报告明确仅按say/通知主张引用；有该后置结果不等于已直核原生日志。"
+          ],
+          "facts": [
+            {
+              "id": "S4.f1",
+              "status": "partial",
+              "report_claim": "只从fixer L516读回原价格整串30，再引用后期Kotlin L523。",
+              "raw_evidence": [
+                "Slice8 L21/L24→L264/L265"
+              ],
+              "gap": "本次search结果L122已给Slice8 Read L21入口，仍没有开该agent或对应action，也未开坏整写。"
+            },
+            {
+              "id": "S4.f2",
+              "status": "supported",
+              "report_claim": "v11/v12为ForEach splitPriceRuns，L592tail改为固定两个Span。",
+              "raw_evidence": [
+                "fixer L528/L529,L592/L593"
+              ]
+            },
+            {
+              "id": "S4.f3",
+              "status": "supported",
+              "report_claim": "tail新增private helpers被兄弟组件调用，builder报错、两Edit去private；历史say/通知报告最终PASS，但本次未展开原生成功日志。",
+              "raw_evidence": [
+                "fixer L592/L593; builder L23/L24,L32/L33,L34/L35,L36/L37,L39/L40,L54; rootff L1758"
+              ],
+              "boundary": "按已锁口径，不因正确标识消息来源而把真实后置构建判假；没有给本次原生日志复核的信用。"
+            }
+          ]
+        }
+      ],
+      "extra_false_claims": [
+        {
+          "code": "android_branch_condition_misstatement",
+          "question": "S4",
+          "severity": "factual_detail",
+          "material": false,
+          "report_location": "S4.event_claims[S4_E4].reason",
+          "report_quote": "非 selected/非滚动分支把 model.showNowPrice 赋给 tvProductPrice",
+          "raw_file": "9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aslice8-pay-80bbb1f44b77da0f.jsonl",
+          "raw_line": 24,
+          "source_lines": [
+            262,
+            269,
+            274,
+            277
+          ],
+          "raw_sha256": "8888a1acd0b4f96f15e3e363f8eeeac0dcc9de621538c0b3ec55aaa1f676a06a",
+          "actual": "外层是否滚动取决于auditingStatus==0 && model.isCt() && limitProductBean.productId匹配 && first && !fullAnimation；model.selected只决定滚动分支的文字颜色。",
+          "model_received": "action L523只返回源码265-295行，缺262的外层if，保留269内层selected。",
+          "judgment": "将非selected与非滚动并列混同是错误条件标签，应改正；其核心数字段/非动画Span叙述仍正确，不新加oracle分母或用这一个标签替代已有S4 mandatory判据。"
+        }
+      ],
+      "annotation_requires_correction": true,
+      "annotation_reason": "需补Slice8近因链并纠正分支标签；尾后private事件没有假绑v40。",
+      "event_review": {
+        "count": 12,
+        "mask_events": 5,
+        "price_events": 7,
+        "red_tail": {
+          "id": "S4_E5",
+          "ref": "#a68daf720e780b4c2:15731@L592",
+          "native_id": "toolu_01BrL9dsi5PB64tZiKVRfWoa",
+          "result_line": 593,
+          "effect_version": null,
+          "role": "进入·错",
+          "support": "脚本明确先write，再ok+价格读回；新增privatepriceDigits/Suffix且调用来自ProductItemCard，后置编译器直接报这两个访问。",
+          "boundary": "builder部分Read被就近绑定v14不证明v14快照；本稿以原始事件正文/实际错误为证，没有借该绑定给v14造private版本。"
+        }
+      },
+      "query_review": {
+        "tool_calls": 56,
+        "action_calls": 26,
+        "agent_calls": 2,
+        "successful_agent_calls": 1,
+        "successful_agent": "builder@v3,summary_chars=200",
+        "blame_calls": 0,
+        "search_calls": 14,
+        "until_ts_searches": 10,
+        "source_delivery_not_followed": {
+          "result_line": 122,
+          "query": "AbsoluteSizeSpan",
+          "hit": "#80bbb1f44b77da0f:13499@L21",
+          "meaning": "Slice8真实Kotlin Read入口已返回，不证明已经展开正文/完成归因。"
+        },
+        "build_gap": {
+          "query": "COMPILE RESULT:PASS",
+          "scope": "builder<=v3,after=true",
+          "result_line": 250,
+          "result": "0字面命中",
+          "raw_available": "builder L36/L37=EXIT=0/BUILD SUCCESSFUL；L39/L40=CompileArkTS/PackageHap/SignHap",
+          "assessment": "不得将字符串缺失推出整个池未构建；本稿没有作该强断言，但未继续别的词/原始动作。"
+        },
+        "repeated_expansion": "3次成功file@v16不同窗口均返回同类未知内容/脊柱约18k字；不是新的完整快照证据。"
+      },
+      "metrics": {
+        "input_total": 1716600,
+        "cached_included_in_input": 1562112,
+        "output": 18171,
+        "total_input_plus_output": 1734771,
+        "wall_s": 402.4389009999577,
+        "end_to_end_wall_s": 416.0596371999709,
+        "tool_calls": 56,
+        "tool_chars": 285307,
+        "rejected_calls": 2,
+        "repeated_calls": 0,
+        "raw_two_rep_mean_total": 2691060,
+        "observed_saving_vs_raw_two_rep_mean_pct": 35.53577400726851
+      },
+      "mechanical": {
+        "final_check": {
+          "status": "matched",
+          "semantic_checked": false,
+          "checks": [
+            {
+              "step": 55,
+              "call_id": "call_1bIgESck8DvHhfWzFFDDUska",
+              "verified": true,
+              "status": "needs_review",
+              "counts": {
+                "errors": 0,
+                "warnings": 11,
+                "total": 11
+              },
+              "draft_sha256": "ece7b0d72fa731718b46af8c1ed49f547a2c10dcfefed9104ea624039525aa3a",
+              "document_sha256": "3459306a36842de7ce3cd6c3ef18db44eb545880f451df7f6566d09d1288f8d8",
+              "issues": [
+                {
+                  "code": "event_entry_role_conflict",
+                  "severity": "warning",
+                  "where": "defect:S3.event_claims[0]",
+                  "node": null,
+                  "detail": "事件进入点与角色声明不一致；不自动改变角色或节点"
+                },
+                {
+                  "code": "event_entry_role_conflict",
+                  "severity": "warning",
+                  "where": "defect:S3.event_claims[1]",
+                  "node": null,
+                  "detail": "事件进入点与角色声明不一致；不自动改变角色或节点"
+                },
+                {
+                  "code": "event_entry_role_conflict",
+                  "severity": "warning",
+                  "where": "defect:S3.event_claims[2]",
+                  "node": null,
+                  "detail": "事件进入点与角色声明不一致；不自动改变角色或节点"
+                },
+                {
+                  "code": "event_entry_role_conflict",
+                  "severity": "warning",
+                  "where": "defect:S3.event_claims[3]",
+                  "node": null,
+                  "detail": "事件进入点与角色声明不一致；不自动改变角色或节点"
+                },
+                {
+                  "code": "event_entry_role_conflict",
+                  "severity": "warning",
+                  "where": "defect:S3.event_claims[4]",
+                  "node": null,
+                  "detail": "事件进入点与角色声明不一致；不自动改变角色或节点"
+                },
+                {
+                  "code": "event_entry_role_conflict",
+                  "severity": "warning",
+                  "where": "defect:S4.event_claims[0]",
+                  "node": null,
+                  "detail": "事件进入点与角色声明不一致；不自动改变角色或节点"
+                },
+                {
+                  "code": "event_entry_role_conflict",
+                  "severity": "warning",
+                  "where": "defect:S4.event_claims[1]",
+                  "node": null,
+                  "detail": "事件进入点与角色声明不一致；不自动改变角色或节点"
+                },
+                {
+                  "code": "event_entry_role_conflict",
+                  "severity": "warning",
+                  "where": "defect:S4.event_claims[2]",
+                  "node": null,
+                  "detail": "事件进入点与角色声明不一致；不自动改变角色或节点"
+                },
+                {
+                  "code": "event_entry_role_conflict",
+                  "severity": "warning",
+                  "where": "defect:S4.event_claims[3]",
+                  "node": null,
+                  "detail": "事件进入点与角色声明不一致；不自动改变角色或节点"
+                },
+                {
+                  "code": "event_entry_role_conflict",
+                  "severity": "warning",
+                  "where": "defect:S4.event_claims[5]",
+                  "node": null,
+                  "detail": "事件进入点与角色声明不一致；不自动改变角色或节点"
+                },
+                {
+                  "code": "event_entry_role_conflict",
+                  "severity": "warning",
+                  "where": "defect:S4.event_claims[6]",
+                  "node": null,
+                  "detail": "事件进入点与角色声明不一致；不自动改变角色或节点"
+                }
+              ],
+              "omitted_issues": 0,
+              "coverage": {
+                "checked": true,
+                "target": "entry/src/main/ets/pages/MemberCenterPage.ets",
+                "counts": {
+                  "expected": 38,
+                  "provided": 13,
+                  "accounted": 38,
+                  "expected_versions": 7,
+                  "expected_candidates": 31,
+                  "missing_versions": 0,
+                  "missing_candidates": 0,
+                  "missing": 0,
+                  "unresolved": 0,
+                  "not_repair": 0,
+                  "deferred": 3,
+                  "unconfirmed": 3,
+                  "advisories": 0,
+                  "advisory_rows": 0,
+                  "reviewed": 13,
+                  "not_investigated": 25
+                },
+                "accounted": true,
+                "semantic_checked": false,
+                "mode": "manifest_complement",
+                "manifest_identity_valid": true,
+                "declarations_complete": false
+              }
+            },
+            {
+              "step": 56,
+              "call_id": "call_xkRvLBC2IvSr21byeZVSm6f7",
+              "verified": true,
+              "status": "mechanical_clear",
+              "counts": {
+                "errors": 0,
+                "warnings": 0,
+                "total": 0
+              },
+              "draft_sha256": "0846accd6c9adc17afedad291c56a003729c021d25d4916b710555e67f0bde5d",
+              "document_sha256": "1d9a0125f9a195fc1455624a76a8bb7b908747c70691d1d086b46e492a71b68c",
+              "issues": [],
+              "omitted_issues": 0,
+              "coverage": {
+                "checked": true,
+                "target": "entry/src/main/ets/pages/MemberCenterPage.ets",
+                "counts": {
+                  "expected": 38,
+                  "provided": 13,
+                  "accounted": 38,
+                  "expected_versions": 7,
+                  "expected_candidates": 31,
+                  "missing_versions": 0,
+                  "missing_candidates": 0,
+                  "missing": 0,
+                  "unresolved": 0,
+                  "not_repair": 0,
+                  "deferred": 3,
+                  "unconfirmed": 3,
+                  "advisories": 0,
+                  "advisory_rows": 0,
+                  "reviewed": 13,
+                  "not_investigated": 25
+                },
+                "accounted": true,
+                "semantic_checked": false,
+                "mode": "manifest_complement",
+                "manifest_identity_valid": true,
+                "declarations_complete": false
+              }
+            }
+          ],
+          "check_calls": 2,
+          "draft_chars": 23766,
+          "returned_chars": 3693,
+          "final_document_sha256": "1d9a0125f9a195fc1455624a76a8bb7b908747c70691d1d086b46e492a71b68c",
+          "matched_check": 56
+        },
+        "coverage_counts": {
+          "expected": 38,
+          "provided": 13,
+          "accounted": 38,
+          "expected_versions": 7,
+          "expected_candidates": 31,
+          "missing_versions": 0,
+          "missing_candidates": 0,
+          "missing": 0,
+          "unresolved": 0,
+          "not_repair": 0,
+          "deferred": 3,
+          "unconfirmed": 3,
+          "advisories": 0,
+          "advisory_rows": 0,
+          "reviewed": 13,
+          "not_investigated": 25
+        },
+        "declarations_complete": false,
+        "trace_identity_bound": true,
+        "raw_equals_last_draft": true,
+        "yaml_equals_raw_trim": true,
+        "yaml_sha256": "0846accd6c9adc17afedad291c56a003729c021d25d4916b710555e67f0bde5d",
+        "document_sha256": "1d9a0125f9a195fc1455624a76a8bb7b908747c70691d1d086b46e492a71b68c",
+        "submission_status": "accepted",
+        "locator_count": 21,
+        "locator_checks": [
+          {
+            "ref": "#a64594a2e464bd6af:15289@L310",
+            "file_matches": 1,
+            "line": 310,
+            "ok": true,
+            "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a64594a2e464bd6af.jsonl",
+            "timestamp": "2026-07-26T19:18:30.074Z",
+            "source_role": "assistant",
+            "record_sha256": "c1dc6806d9fc8088e81d5af62300a78e787e5e6021ec11744c508bb29c20380e",
+            "native_ids": [
+              "toolu_01PC1ToMEmhiF5cApXdPzqCw"
+            ]
+          },
+          {
+            "ref": "#a68daf720e780b4c2:15354@L18",
+            "file_matches": 1,
+            "line": 18,
+            "ok": true,
+            "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+            "timestamp": "2026-07-26T20:33:40.585Z",
+            "source_role": "assistant",
+            "record_sha256": "76f94eb829c51cc0c5680ccc0f117c589bb15b23c32435293a24f9ad5d4890cf",
+            "native_ids": [
+              "toolu_014cEoHg7bJPz1R6363BQFB5"
+            ]
+          },
+          {
+            "ref": "#a68daf720e780b4c2:15361@L28",
+            "file_matches": 1,
+            "line": 28,
+            "ok": true,
+            "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+            "timestamp": "2026-07-26T20:33:52.399Z",
+            "source_role": "assistant",
+            "record_sha256": "0b58129d2362096b2baaa505cd5c9d4f82f8465f9da6b52dcc958ac9f07e13e3",
+            "native_ids": [
+              "toolu_01B8RaNhNXNsZ6LPHxobH1KV"
+            ]
+          },
+          {
+            "ref": "#a68daf720e780b4c2:15371@L42",
+            "file_matches": 1,
+            "line": 42,
+            "ok": true,
+            "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+            "timestamp": "2026-07-26T20:34:15.052Z",
+            "source_role": "assistant",
+            "record_sha256": "e3b1aa7e4c15bf623a94d65653390076e68df7a81553d0f592ec5534a7341423",
+            "native_ids": [
+              "toolu_01JKCtmH5cVhRuivGMjbvQQi"
+            ]
+          },
+          {
+            "ref": "#a68daf720e780b4c2:15395@L74",
+            "file_matches": 1,
+            "line": 74,
+            "ok": true,
+            "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+            "timestamp": "2026-07-26T20:35:47.493Z",
+            "source_role": "assistant",
+            "record_sha256": "7c9e42179203997eb9ee51265bcf31633911b1040baad87bf220f177ad3f3255",
+            "native_ids": [
+              "toolu_01WYkvw5vN1kASRqmt5EkUbM"
+            ]
+          },
+          {
+            "ref": "#a68daf720e780b4c2:15397@L80",
+            "file_matches": 1,
+            "line": 80,
+            "ok": true,
+            "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+            "timestamp": "2026-07-26T20:36:15.076Z",
+            "source_role": "assistant",
+            "record_sha256": "7c126ee113537ab79cb559e72cae3ce3ecd4d02cd20f81ad3ebeac8af9d46fb5",
+            "native_ids": [
+              "toolu_011svikWwqqHYsLcQxAET1dW"
+            ]
+          },
+          {
+            "ref": "#a68daf720e780b4c2:15406@L103",
+            "file_matches": 1,
+            "line": 103,
+            "ok": true,
+            "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+            "timestamp": "2026-07-26T20:41:07.872Z",
+            "source_role": "assistant",
+            "record_sha256": "d3662b808223939b528589cd614033c8b5bffcb83d2cf78c3b5b97c0d395b4ba",
+            "native_ids": [
+              "toolu_01T6WkXMhD7rUsHaSaMPuhgx"
+            ]
+          },
+          {
+            "ref": "#a68daf720e780b4c2:15407@L106",
+            "file_matches": 1,
+            "line": 106,
+            "ok": true,
+            "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+            "timestamp": "2026-07-26T20:41:17.462Z",
+            "source_role": "assistant",
+            "record_sha256": "cb92907b23f9a26e874433f6e41be0ab102c854f2909d65e7ac823bb2a52319e",
+            "native_ids": [
+              "toolu_019xb74vC9BgRv4xeSea6NmF"
+            ]
+          },
+          {
+            "ref": "#a68daf720e780b4c2:15624@L436",
+            "file_matches": 1,
+            "line": 436,
+            "ok": true,
+            "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+            "timestamp": "2026-07-26T21:16:18.424Z",
+            "source_role": "assistant",
+            "record_sha256": "08c8269ea6c0c98e9208143b83d37b9d3c103745822f2b86657b6f726df914bc",
+            "native_ids": [
+              "toolu_01JFX7XbxsbxexCTxvvuGvUy"
+            ]
+          },
+          {
+            "ref": "#a68daf720e780b4c2:15677@L516",
+            "file_matches": 1,
+            "line": 516,
+            "ok": true,
+            "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+            "timestamp": "2026-07-26T21:22:55.328Z",
+            "source_role": "assistant",
+            "record_sha256": "0842419d54cf337120262ca5ad80a280bc1c0f2b449a17186b855661edfb7ca6",
+            "native_ids": [
+              "toolu_019PTiyxoeX5Vc9KMJFu2jhw"
+            ]
+          },
+          {
+            "ref": "#a68daf720e780b4c2:15680@L523",
+            "file_matches": 1,
+            "line": 523,
+            "ok": true,
+            "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+            "timestamp": "2026-07-26T21:23:32.334Z",
+            "source_role": "assistant",
+            "record_sha256": "e46907395da4194bc57e06c99a44eb56e1238d961c03e069ea78bfd714846b50",
+            "native_ids": [
+              "toolu_01XBPsevwzempBkQ2sBNTsvW"
+            ]
+          },
+          {
+            "ref": "#a68daf720e780b4c2:15681@L526",
+            "file_matches": 1,
+            "line": 526,
+            "ok": true,
+            "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+            "timestamp": "2026-07-26T21:23:48.943Z",
+            "source_role": "assistant",
+            "record_sha256": "bd088e069c147c83094ed38f227fcd610cb50ea4d719aecfdda17eefe4f613e4",
+            "native_ids": [
+              "toolu_018iigK7PXctAwha3ACowNZP"
+            ]
+          },
+          {
+            "ref": "#a68daf720e780b4c2:15682@L528",
+            "file_matches": 1,
+            "line": 528,
+            "ok": true,
+            "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+            "timestamp": "2026-07-26T21:24:15.832Z",
+            "source_role": "assistant",
+            "record_sha256": "16690e1e9641c1ddf9dee4ca7979c4f3521bb478bc2799bdd0db2ab28f2ff6dc",
+            "native_ids": [
+              "toolu_016bvcNnvDn4tHXcYJY7CzLh"
+            ]
+          },
+          {
+            "ref": "#a68daf720e780b4c2:15688@L532",
+            "file_matches": 1,
+            "line": 532,
+            "ok": true,
+            "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+            "timestamp": "2026-07-26T21:24:34.699Z",
+            "source_role": "assistant",
+            "record_sha256": "b86a3542d46366852c44819b58328f993df377b0d2066003db6d28b60c485d86",
+            "native_ids": [
+              "toolu_012iDuZirwvtQcB6kboc6BwR"
+            ]
+          },
+          {
+            "ref": "#a68daf720e780b4c2:15731@L592",
+            "file_matches": 1,
+            "line": 592,
+            "ok": true,
+            "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+            "timestamp": "2026-07-26T21:30:17.239Z",
+            "source_role": "assistant",
+            "record_sha256": "247880efbf4a79665a1ed0968a3cfa8e7269a991e34aecc0715dedad965642d7",
+            "native_ids": [
+              "toolu_01BrL9dsi5PB64tZiKVRfWoa"
+            ]
+          },
+          {
+            "ref": "#af0e3d2ae54dbf769:17286@L23",
+            "file_matches": 1,
+            "line": 23,
+            "ok": true,
+            "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-af0e3d2ae54dbf769.jsonl",
+            "timestamp": "2026-07-26T21:45:43.448Z",
+            "source_role": "assistant",
+            "record_sha256": "dd5a088044c503af6f19786c8b1c4eb3abbcdfe58c4207eed096bbd08b436a4f",
+            "native_ids": [
+              "toolu_01SSSyTUpqQtQF1SjZy36FTe"
+            ]
+          },
+          {
+            "ref": "#af0e3d2ae54dbf769:17289@L28",
+            "file_matches": 1,
+            "line": 28,
+            "ok": true,
+            "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-af0e3d2ae54dbf769.jsonl",
+            "timestamp": "2026-07-26T21:45:55.385Z",
+            "source_role": "assistant",
+            "record_sha256": "3f0a2a3ff129ca9071aeb31a13d33a5cd70f1cd616c20638a70d10bc862f7529",
+            "native_ids": [
+              "toolu_01B3ksjHD3ZYEfadAEE1SRA1"
+            ]
+          },
+          {
+            "ref": "#af0e3d2ae54dbf769:17292@L32",
+            "file_matches": 1,
+            "line": 32,
+            "ok": true,
+            "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-af0e3d2ae54dbf769.jsonl",
+            "timestamp": "2026-07-26T21:46:11.820Z",
+            "source_role": "assistant",
+            "record_sha256": "94fd77263f2be9dbaff0629cf3399face77ec8c84e9fcba8f0f72a15877eca77",
+            "native_ids": [
+              "toolu_01W4Yg3nfX75u3Yxsk1X4wat"
+            ]
+          },
+          {
+            "ref": "#af0e3d2ae54dbf769:17294@L34",
+            "file_matches": 1,
+            "line": 34,
+            "ok": true,
+            "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-af0e3d2ae54dbf769.jsonl",
+            "timestamp": "2026-07-26T21:46:12.739Z",
+            "source_role": "assistant",
+            "record_sha256": "5dc57be6408fb9395737e8d66e0b239071524e71e5d8329f421483170690c200",
+            "native_ids": [
+              "toolu_01YcRVJymkRf9wtm51Pr5qt8"
+            ]
+          },
+          {
+            "ref": "#af0e3d2ae54dbf769:17303@L54",
+            "file_matches": 1,
+            "line": 54,
+            "ok": true,
+            "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-af0e3d2ae54dbf769.jsonl",
+            "timestamp": "2026-07-26T21:47:53.546Z",
+            "source_role": "assistant",
+            "record_sha256": "a40cf110905d0bd8bcff42abcfb91f2e260178c0e91c8f976d0e7cbffbf7bf09",
+            "native_ids": []
+          },
+          {
+            "ref": "#ff019d8a:14849@L1758",
+            "file_matches": 1,
+            "line": 1758,
+            "ok": true,
+            "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6.jsonl",
+            "timestamp": "2026-07-26T21:47:56.477Z",
+            "source_role": "user",
+            "record_sha256": "1531de9e79dbdda431d662b6e1286a3a2307320ad4cd4dfa10f52ed9b76f8d71",
+            "native_ids": []
+          }
+        ],
+        "check_revision": "两draft仅删除S3/S4 entry_events列表；红tailrole/basis/证据未删除，没有新证据查询。11个角色冲突warning归零不是语义认证。"
+      },
+      "fact_detail_counts": {
+        "supported": 5,
+        "partial": 1,
+        "omitted": 0,
+        "contradicted": 0
+      }
+    },
+    {
+      "case": "dice-entry",
+      "variant": "formal-v10",
+      "arm": "tools",
+      "rep": 1,
+      "run": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v10/dice-entry/runs/tools/rep1",
+      "source_code_id": "80c099e",
+      "source_digest": "b47380bd789929d3181eae024e4dee12709d8878615ebe7bd85e0271a37a35ed",
+      "pool_digest": "653db4192d47366e8ca099e59ef2679e929056f18320d081768539b2f5b7443e",
+      "common_task_sha256": "9060a6c160d2a1ac2b893b9f19d12e66a16e6ce1b7d301eacae0abfb9f55eec4",
+      "model": [
+        "gpt-5.5"
+      ],
+      "effort": "medium",
+      "ledger": "atoms-2026-09-09-file-evidence5:80:c0cc62829271122172d2fc77",
+      "questions": [
+        {
+          "id": "D1",
+          "core": "partial",
+          "basis": "后置bridge设计/模板/派发、三Edit和回放边界正确；没有展开generator实际页面/F001/派发输入，主要用v1关键词窗口+filev2描述Layer1关注，回到原raw同尺度的mandatory缺口。",
+          "mandatory_gaps": [
+            "生成方当时实际页面/F001/沉浸式输入未完整调查和说明。"
+          ],
+          "minor_omissions": [
+            "回放10/10据历史summary，未直接开L260/L267原生回执；AppStorage未知正确。"
+          ],
+          "facts": [
+            {
+              "id": "D1.f1",
+              "status": "partial",
+              "report_claim": "初始输出v2无桥，相关记录关注Layer1；没有展开页面/F001输入和生成派发。",
+              "raw_evidence": [
+                "generator L1,L51-L58,L71/L72"
+              ],
+              "gap": "实际只有search(agentv1,q=EntryAbility)碎片及filev2，未开generator。"
+            },
+            {
+              "id": "D1.f2",
+              "status": "supported",
+              "report_claim": "Step3设计§F/模板要求Want→AppStorage，并三次正式Edit加入。",
+              "raw_evidence": [
+                "bridge L7/L8,L11/L12,L35-L40"
+              ]
+            },
+            {
+              "id": "D1.f3",
+              "status": "supported",
+              "report_claim": "后置测试桥要求不自动等于Stage1遗漏，零命中只作检索边界。",
+              "raw_evidence": [
+                "generator与bridge不同原始阶段"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "D2",
+          "core": "pass",
+          "basis": "ECAT主会话直接派发、SDK原文、三Edit及后置v8读回和成功原生build支持主要链；未声明callback实际触发。",
+          "mandatory_gaps": [],
+          "minor_omissions": [
+            "没有展开observer修前Entry Read；实际SDK与修改证据足够支撑核心要求/实现链，细项仍partial。",
+            "未报告may-throw WARN，未声称0WARN。"
+          ],
+          "facts": [
+            {
+              "id": "D2.f1",
+              "status": "supported",
+              "report_claim": "root2f@v5派发Worklist明确观察者要求/Entry落点。",
+              "raw_evidence": [
+                "root2f L100; observer L1"
+              ]
+            },
+            {
+              "id": "D2.f2",
+              "status": "partial",
+              "report_claim": "SDK接口依据与三次修改成立，未调查observer修前入口Read这一半项。",
+              "raw_evidence": [
+                "observer L23/L24,L29/L30,L35-L38,L41-L46"
+              ],
+              "gap": "observer agent导航全失败但直接SDK和patch已开；不假装看过该agent全部输入。"
+            },
+            {
+              "id": "D2.f3",
+              "status": "partial",
+              "report_claim": "gatebuild实际读v8、CompileArkTS/PackageHap/BUILD SUCCESSFUL；WARN未交代。",
+              "raw_evidence": [
+                "builder L33/L34,L43/L44,L47/L48,L51/L52"
+              ]
+            }
+          ]
+        }
+      ],
+      "extra_false_claims": [],
+      "annotation_requires_correction": true,
+      "annotation_reason": "D1 mandatory输入未核；普通generatorv1节点reason明确所引filev2是后续形成，不将它强判成v1效应或红进入点。",
+      "event_review": {
+        "count": 6,
+        "bridge": 3,
+        "observer": 3,
+        "semantic_boundary": "设计/模板真实Read；10/10是summary Write正文+原生aa start旁证，不是直接L260回执；0effectbuilderRead/日志独立事件，不造agent版本。"
+      },
+      "query_review": {
+        "agent_calls": 8,
+        "successful_agent_calls": 2,
+        "agents_opened": [
+          "bridge@v4",
+          "root2f@v5"
+        ],
+        "generator_agent_opened": false,
+        "observer_agent_opened": false,
+        "action_calls": 14,
+        "search_calls": 10,
+        "until_ts_searches": 5,
+        "rejected_calls": 7,
+        "repeated_calls": 1,
+        "detail": "反复via人名/未opened节点导致observer未开；其SDK/patch由action核。generator只有v1search和成功filev2。",
+        "node_boundary": {
+          "node": "agent:agent-a349784d2663f1f0a@v1",
+          "evidence": "#a349784d2663f1f0a:2061@L71",
+          "actual_owner_version": 2,
+          "report_quote": "在后续形成的 EntryAbility@v2",
+          "judgment": "search结果L243已标锚点之后，fileL254写者v2；报告明确后续，不自动视为v1内写或因果红边。"
+        }
+      },
+      "memory_review": {
+        "status": "no_memory_exclusion_claim",
+        "judgment": "没有新增memory修复后错误排除，也没有追早期feedback，不能算已完整证明其来源。"
+      },
+      "dice_addendum": {
+        "reported": true,
+        "ten_of_ten_source": "593d L291 fullsummary input实际打开",
+        "native_start_source": "593d L168 output实际打开",
+        "native_result_260_opened": false,
+        "appstorage_not_proved": true,
+        "observer_postrepair_runtime_not_proved": true
+      },
+      "identity_review": {
+        "actual_ledger": "atoms-2026-09-09-file-evidence5:80:c0cc62829271122172d2fc77",
+        "previous_v9_ledger": "atoms-2026-09-09-file-evidence5:80:2761a17e6de3fc094049a3c2",
+        "current_root": "formal-v1/dice-entry/pool/49d451b1-f479-4c4e-bb39-9fa0dd06aeb0.jsonl",
+        "assessment": "本轮global seq及ledger实际不同，但pool/task digest相同、tracebound、来源tag/原行/原ID可核；不沿用旧seq重绑、不无证据推断伪造，未在此语义任务追查identity差异机制。"
+      },
+      "metrics": {
+        "input_total": 1438560,
+        "cached_included_in_input": 1315328,
+        "output": 13687,
+        "total_input_plus_output": 1452247,
+        "wall_s": 304.88168540003244,
+        "end_to_end_wall_s": 308.6406719000079,
+        "tool_calls": 45,
+        "tool_chars": 222176,
+        "rejected_calls": 7,
+        "repeated_calls": 1,
+        "raw_two_rep_mean_total": 1413930.5,
+        "observed_saving_vs_raw_two_rep_mean_pct": -2.709928104669923
+      },
+      "mechanical": {
+        "final_check": {
+          "status": "matched",
+          "semantic_checked": false,
+          "checks": [
+            {
+              "step": 44,
+              "call_id": "call_rPgdpISrpPZWeHIAujgh0z7M",
+              "verified": true,
+              "status": "needs_review",
+              "counts": {
+                "errors": 3,
+                "warnings": 0,
+                "total": 3
+              },
+              "draft_sha256": "8fb165f42fb50895702b14ddfb32fa849f6302a617b0b6015a9372d9f8333e31",
+              "document_sha256": "c0987f35c1002b32a61532c7d4585163edbf205bd2c6ce8c7484201ed68a9876",
+              "issues": [
+                {
+                  "code": "invalid_reference",
+                  "severity": "error",
+                  "where": "defect:D1.nodes[0].evidence[1]",
+                  "node": null,
+                  "detail": "search:28aa09bfef9c6e3039bbfaf1: unparsed;引用位置可核不代表原文支持断言"
+                },
+                {
+                  "code": "invalid_reference",
+                  "severity": "error",
+                  "where": "defect:D1.nodes[0].evidence[2]",
+                  "node": null,
+                  "detail": "search:815299de1cf826565e4a6221: unparsed;引用位置可核不代表原文支持断言"
+                },
+                {
+                  "code": "invalid_reference",
+                  "severity": "error",
+                  "where": "defect:D1.nodes[0].evidence[3]",
+                  "node": null,
+                  "detail": "search:7b7a99199eb3a6246eedfa57:14: unparsed;引用位置可核不代表原文支持断言"
+                }
+              ],
+              "omitted_issues": 0,
+              "coverage": {
+                "checked": true,
+                "target": "entry/src/main/ets/entryability/EntryAbility.ets",
+                "counts": {
+                  "expected": 7,
+                  "provided": 6,
+                  "accounted": 7,
+                  "expected_versions": 6,
+                  "expected_candidates": 1,
+                  "missing_versions": 0,
+                  "missing_candidates": 0,
+                  "missing": 0,
+                  "unresolved": 0,
+                  "not_repair": 0,
+                  "deferred": 0,
+                  "unconfirmed": 0,
+                  "advisories": 0,
+                  "advisory_rows": 0,
+                  "reviewed": 6,
+                  "not_investigated": 1
+                },
+                "accounted": true,
+                "semantic_checked": false,
+                "mode": "manifest_complement",
+                "manifest_identity_valid": true,
+                "declarations_complete": false
+              }
+            },
+            {
+              "step": 45,
+              "call_id": "call_kmBYcUwu9eqMC9GsqnYfENXd",
+              "verified": true,
+              "status": "mechanical_clear",
+              "counts": {
+                "errors": 0,
+                "warnings": 0,
+                "total": 0
+              },
+              "draft_sha256": "eec062bbe48c79482e21452ff7a4858ecb84bb6e34ce11d96f825160a4ab815a",
+              "document_sha256": "4228f6d7a84fe7fc0a4dbd3c28b0969ea03ad611b33038e713f8502ba6ad0a88",
+              "issues": [],
+              "omitted_issues": 0,
+              "coverage": {
+                "checked": true,
+                "target": "entry/src/main/ets/entryability/EntryAbility.ets",
+                "counts": {
+                  "expected": 7,
+                  "provided": 6,
+                  "accounted": 7,
+                  "expected_versions": 6,
+                  "expected_candidates": 1,
+                  "missing_versions": 0,
+                  "missing_candidates": 0,
+                  "missing": 0,
+                  "unresolved": 0,
+                  "not_repair": 0,
+                  "deferred": 0,
+                  "unconfirmed": 0,
+                  "advisories": 0,
+                  "advisory_rows": 0,
+                  "reviewed": 6,
+                  "not_investigated": 1
+                },
+                "accounted": true,
+                "semantic_checked": false,
+                "mode": "manifest_complement",
+                "manifest_identity_valid": true,
+                "declarations_complete": false
+              }
+            }
+          ],
+          "check_calls": 2,
+          "draft_chars": 14716,
+          "returned_chars": 2634,
+          "final_document_sha256": "4228f6d7a84fe7fc0a4dbd3c28b0969ea03ad611b33038e713f8502ba6ad0a88",
+          "matched_check": 45
+        },
+        "coverage_counts": {
+          "expected": 7,
+          "provided": 6,
+          "accounted": 7,
+          "expected_versions": 6,
+          "expected_candidates": 1,
+          "missing_versions": 0,
+          "missing_candidates": 0,
+          "missing": 0,
+          "unresolved": 0,
+          "not_repair": 0,
+          "deferred": 0,
+          "unconfirmed": 0,
+          "advisories": 0,
+          "advisory_rows": 0,
+          "reviewed": 6,
+          "not_investigated": 1
+        },
+        "declarations_complete": false,
+        "trace_identity_bound": true,
+        "raw_equals_last_draft": true,
+        "yaml_equals_raw_trim": true,
+        "yaml_sha256": "eec062bbe48c79482e21452ff7a4858ecb84bb6e34ce11d96f825160a4ab815a",
+        "document_sha256": "4228f6d7a84fe7fc0a4dbd3c28b0969ea03ad611b33038e713f8502ba6ad0a88",
+        "submission_status": "accepted",
+        "locator_count": 18,
+        "locator_checks": [
+          {
+            "ref": "#2f01bcdc:4315@L100",
+            "file_matches": 1,
+            "line": 100,
+            "ok": true,
+            "file": "2f01bcdc-0a92-4961-a64d-5b181f03b3d3.jsonl",
+            "timestamp": "2026-09-03T21:17:54.675Z",
+            "source_role": "assistant",
+            "record_sha256": "aa6c7aa3d73364809534a5ce2ded8c7772f7e5644663413caf7c74a8d78b7656",
+            "native_ids": [
+              "call_1c4e6fc7af144f7d94f69fc6"
+            ]
+          },
+          {
+            "ref": "#593d4e86:4033@L168",
+            "file_matches": 1,
+            "line": 168,
+            "ok": true,
+            "file": "593d4e86-a947-4e62-8027-013014c2bafc.jsonl",
+            "timestamp": "2026-09-03T20:57:52.549Z",
+            "source_role": "assistant",
+            "record_sha256": "83f23c50d62eedfbc4f6066b14dcb6ea0a217145e45d8ec2253ce1c6d51544a6",
+            "native_ids": [
+              "call_b3b958f8f11841c38f84351b"
+            ]
+          },
+          {
+            "ref": "#593d4e86:4082@L291",
+            "file_matches": 1,
+            "line": 291,
+            "ok": true,
+            "file": "593d4e86-a947-4e62-8027-013014c2bafc.jsonl",
+            "timestamp": "2026-09-03T21:02:43.983Z",
+            "source_role": "assistant",
+            "record_sha256": "dcfe09f3626bd9ae57966107af280ddd2eac33ef82fa8a77bcea564ed821d716",
+            "native_ids": [
+              "call_7469782d0bc24095bdbafd3f"
+            ]
+          },
+          {
+            "ref": "#a27497cfed8c44856:4505@L35",
+            "file_matches": 1,
+            "line": 35,
+            "ok": true,
+            "file": "2f01bcdc-0a92-4961-a64d-5b181f03b3d3/subagents/agent-a27497cfed8c44856.jsonl",
+            "timestamp": "2026-09-03T21:18:35.605Z",
+            "source_role": "assistant",
+            "record_sha256": "e2c5c2320d2dd8bf89a1b86520e13ccb7a398b88c18a98db2f4a1cd74e1b5b81",
+            "native_ids": [
+              "call_e6d56b80320d4677b97b915b"
+            ]
+          },
+          {
+            "ref": "#a27497cfed8c44856:4507@L37",
+            "file_matches": 1,
+            "line": 37,
+            "ok": true,
+            "file": "2f01bcdc-0a92-4961-a64d-5b181f03b3d3/subagents/agent-a27497cfed8c44856.jsonl",
+            "timestamp": "2026-09-03T21:18:36.033Z",
+            "source_role": "assistant",
+            "record_sha256": "4429505296278c844975be287c5f763d10b98551f83f0a7fd89e8788c3f61683",
+            "native_ids": [
+              "call_e8130043aeef4043aa0e3ff0"
+            ]
+          },
+          {
+            "ref": "#a27497cfed8c44856:4511@L41",
+            "file_matches": 1,
+            "line": 41,
+            "ok": true,
+            "file": "2f01bcdc-0a92-4961-a64d-5b181f03b3d3/subagents/agent-a27497cfed8c44856.jsonl",
+            "timestamp": "2026-09-03T21:19:24.777Z",
+            "source_role": "assistant",
+            "record_sha256": "c146cc4cb19f479638b45729b5667285a88aeb8c3b596266d15deae467fc957a",
+            "native_ids": [
+              "call_f031a058037c467fb06fc159"
+            ]
+          },
+          {
+            "ref": "#a27497cfed8c44856:4513@L43",
+            "file_matches": 1,
+            "line": 43,
+            "ok": true,
+            "file": "2f01bcdc-0a92-4961-a64d-5b181f03b3d3/subagents/agent-a27497cfed8c44856.jsonl",
+            "timestamp": "2026-09-03T21:19:31.929Z",
+            "source_role": "assistant",
+            "record_sha256": "293cf7298c8f8f33fe2ac946178a36ddcfa2017913007853fb4151575ae62b30",
+            "native_ids": [
+              "call_7013085c03274c8183fdd455"
+            ]
+          },
+          {
+            "ref": "#a27497cfed8c44856:4515@L45",
+            "file_matches": 1,
+            "line": 45,
+            "ok": true,
+            "file": "2f01bcdc-0a92-4961-a64d-5b181f03b3d3/subagents/agent-a27497cfed8c44856.jsonl",
+            "timestamp": "2026-09-03T21:19:39.888Z",
+            "source_role": "assistant",
+            "record_sha256": "07b004834076111f9988a5e85040b50e151bb5b965bd6ae26c9e69444858477c",
+            "native_ids": [
+              "call_b6682a6aab774d88b1d1871d"
+            ]
+          },
+          {
+            "ref": "#a349784d2663f1f0a:2059@L69",
+            "file_matches": 1,
+            "line": 69,
+            "ok": true,
+            "file": "81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a349784d2663f1f0a.jsonl",
+            "timestamp": "2026-09-03T15:51:19.629Z",
+            "source_role": "assistant",
+            "record_sha256": "5393f82e3b7072abcce3003b7477297f2335d674b1dd209262dded6b74f09b9a",
+            "native_ids": []
+          },
+          {
+            "ref": "#a349784d2663f1f0a:2060@L70",
+            "file_matches": 1,
+            "line": 70,
+            "ok": true,
+            "file": "81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a349784d2663f1f0a.jsonl",
+            "timestamp": "2026-09-03T15:51:19.957Z",
+            "source_role": "assistant",
+            "record_sha256": "c57efe7fa3d2d20c33f32777eb23b5d474a8af5fa681fc830fda9234dc654bd8",
+            "native_ids": []
+          },
+          {
+            "ref": "#a349784d2663f1f0a:2061@L71",
+            "file_matches": 1,
+            "line": 71,
+            "ok": true,
+            "file": "81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a349784d2663f1f0a.jsonl",
+            "timestamp": "2026-09-03T15:51:35.645Z",
+            "source_role": "assistant",
+            "record_sha256": "6c12a40f131dafc10e44cc99b27fc6066faeb9ccc0537af7c849a3a8412c27fe",
+            "native_ids": [
+              "call_459071197f484436b71237e5"
+            ]
+          },
+          {
+            "ref": "#a635575c78cd15ff6:4551@L33",
+            "file_matches": 1,
+            "line": 33,
+            "ok": true,
+            "file": "2f01bcdc-0a92-4961-a64d-5b181f03b3d3/subagents/agent-a635575c78cd15ff6.jsonl",
+            "timestamp": "2026-09-03T21:23:40.800Z",
+            "source_role": "assistant",
+            "record_sha256": "c859439b47a2d1b44527d6c152972a0b847e23319b0703a7491e44399c1e1698",
+            "native_ids": [
+              "call_53a6741f92474c9bb9ab039c"
+            ]
+          },
+          {
+            "ref": "#a635575c78cd15ff6:4560@L43",
+            "file_matches": 1,
+            "line": 43,
+            "ok": true,
+            "file": "2f01bcdc-0a92-4961-a64d-5b181f03b3d3/subagents/agent-a635575c78cd15ff6.jsonl",
+            "timestamp": "2026-09-03T21:23:58.751Z",
+            "source_role": "assistant",
+            "record_sha256": "1f9fb760c4c8a2cc1fa7a581d2443ef45ec2722c610c3ffba4f5ca3b351139bb",
+            "native_ids": [
+              "call_01dfaa766cce469ca64faf64"
+            ]
+          },
+          {
+            "ref": "#a711c5d09fb676814:2855@L7",
+            "file_matches": 1,
+            "line": 7,
+            "ok": true,
+            "file": "81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a711c5d09fb676814.jsonl",
+            "timestamp": "2026-09-03T19:10:15.792Z",
+            "source_role": "assistant",
+            "record_sha256": "0bc10163e6eda4ebce91274e887fe7f6924a667893a990dd00533f7d1335d65c",
+            "native_ids": [
+              "call_189b2504fca14e68979322c2"
+            ]
+          },
+          {
+            "ref": "#a711c5d09fb676814:2859@L11",
+            "file_matches": 1,
+            "line": 11,
+            "ok": true,
+            "file": "81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a711c5d09fb676814.jsonl",
+            "timestamp": "2026-09-03T19:10:17.886Z",
+            "source_role": "assistant",
+            "record_sha256": "028dea57f880deba2fee2260bd5b295f8f77a66348cc26a9d37363355aa6a767",
+            "native_ids": [
+              "call_769beeda1a324d3d95de7251"
+            ]
+          },
+          {
+            "ref": "#a711c5d09fb676814:2881@L35",
+            "file_matches": 1,
+            "line": 35,
+            "ok": true,
+            "file": "81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a711c5d09fb676814.jsonl",
+            "timestamp": "2026-09-03T19:17:13.810Z",
+            "source_role": "assistant",
+            "record_sha256": "ca124a76d4213257ec504a1a8c1f9a88bc24e3064941005916d9f2576a8ba75a",
+            "native_ids": [
+              "call_003bc0a35ce74684a5296325"
+            ]
+          },
+          {
+            "ref": "#a711c5d09fb676814:2883@L37",
+            "file_matches": 1,
+            "line": 37,
+            "ok": true,
+            "file": "81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a711c5d09fb676814.jsonl",
+            "timestamp": "2026-09-03T19:17:21.617Z",
+            "source_role": "assistant",
+            "record_sha256": "b7197d5f9f4beed5084a5659b86c49f26716aa6f93a0a16a72f58bac5a3dcc90",
+            "native_ids": [
+              "call_6c1a4dd0da164350a549d420"
+            ]
+          },
+          {
+            "ref": "#a711c5d09fb676814:2885@L39",
+            "file_matches": 1,
+            "line": 39,
+            "ok": true,
+            "file": "81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a711c5d09fb676814.jsonl",
+            "timestamp": "2026-09-03T19:17:35.691Z",
+            "source_role": "assistant",
+            "record_sha256": "9aa5b948a807268d1cf8910068fad64a2c798bab89963eab63d708dc9b44665f",
+            "native_ids": [
+              "call_04086bf7960b46e7b2a00be4"
+            ]
+          }
+        ],
+        "check_revision": "首稿把search receipt作原文ref产生3errors；最终改为L69/L70/L71真实引用，无证据查询新增。0error/0warning不认证实际输入调查完整。"
+      },
+      "fact_detail_counts": {
+        "supported": 3,
+        "partial": 3,
+        "omitted": 0,
+        "contradicted": 0
+      }
+    },
+    {
+      "case": "splash",
+      "variant": "formal-v10",
+      "arm": "tools",
+      "rep": 1,
+      "run": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v10/splash/runs/tools/rep1",
+      "source_code_id": "80c099e",
+      "source_digest": "b47380bd789929d3181eae024e4dee12709d8878615ebe7bd85e0271a37a35ed",
+      "pool_digest": "a78b1373045f7558d6da3b76123e30d032635a2a0b4cdd665e7f80c0bdf8b337",
+      "common_task_sha256": "d2f9f03d6b8a4c56e405559fe7160308ecc1d054b877ebf64250dd084ec85134",
+      "model": [
+        "gpt-5.5"
+      ],
+      "effort": "medium",
+      "questions": [
+        {
+          "id": "S1",
+          "core": "partial",
+          "basis": "初版callback、正确D020/isModal决定、L346真实onWillDismiss及L352兜底均恢复；entrysetup只泛述装配，没有核删除callback原动作，后置成功builder仍漏。",
+          "mandatory_gaps": [
+            "entrysetup L123/L124删除callback的具体变更和责任没有交代。",
+            "后置builder L36/L37成功构建未说明。"
+          ],
+          "minor_omissions": [],
+          "facts": [
+            {
+              "id": "S1.f1",
+              "status": "supported",
+              "report_claim": "初版已写NavDestination onBackPressed禁用，不把后续隐私错误直接归初版。",
+              "raw_evidence": [
+                "converter L71/L72"
+              ]
+            },
+            {
+              "id": "S1.f2",
+              "status": "partial",
+              "report_claim": "认识entrysetup Navigation/pageMap装配与D020前提，但没恢复删callback动作，明确未展开其输入。",
+              "raw_evidence": [
+                "entrysetup L123/L124; Slice11 L250/L251"
+              ],
+              "gap": "只列filev5/pageMap和v13不是删除callback的明确归因。"
+            },
+            {
+              "id": "S1.f3",
+              "status": "supported",
+              "report_claim": "正确Slice11 D020/isModal判断，finding反证；实际L346脚本onWillDismiss与L352独立NavBar兜底都核。",
+              "raw_evidence": [
+                "Slice11 L250/L251; vv L227; fixer L346/L347,L352/L353"
+              ]
+            },
+            {
+              "id": "S1.f4",
+              "status": "omitted",
+              "report_claim": "只保留修后行为复测未知，未交代另一builder已经成功构建。",
+              "raw_evidence": [
+                "builder L36/L37,L39/L40; rootff L1758"
+              ],
+              "gap": "未把fixer不编译扩成全池没编译，故是漏项而非相反断言。"
+            }
+          ]
+        },
+        {
+          "id": "S2",
+          "core": "pass",
+          "basis": "早期ui-manifest主题存在、实际生成meta/skill输入和主题传递缺口区分，实际L485隐藏/disappear恢复与L488onRoute正式恢复分开。",
+          "mandatory_gaps": [],
+          "minor_omissions": [
+            "未直接追root L404原始主题回执；早期ui-manifest@v1仍足以证明要求先在。"
+          ],
+          "facts": [
+            {
+              "id": "S2.f1",
+              "status": "partial",
+              "report_claim": "ui-manifest@v1明确早期Launch全屏透明主题；未开root原始theme Read。",
+              "raw_evidence": [
+                "root9b L404,L520"
+              ],
+              "gap": "非指定locator门槛，不独立降core。"
+            },
+            {
+              "id": "S2.f2",
+              "status": "supported",
+              "report_claim": "生成方实际收到meta/fullscreen/immersive，未核主题细节直接传入；不把search当历史Read。",
+              "raw_evidence": [
+                "converter L1,L15/L16,L37/L38; root9b L520"
+              ]
+            },
+            {
+              "id": "S2.f3",
+              "status": "supported",
+              "report_claim": "候选脚本实际写隐藏/helper/disappear还原，正式v53仅onRoute还原；不能用v53diff单独证明前者。",
+              "raw_evidence": [
+                "fixer L485/L486,L488/L489"
+              ],
+              "model_received": "transcript L112完整脚本输入与L143同IDok；onWill另L126/L142。"
+            }
+          ]
+        }
+      ],
+      "extra_false_claims": [],
+      "unsupported_causal_claims": [
+        {
+          "code": "unsupported_exact_generation_entry",
+          "question": "S2",
+          "severity": "material_annotation",
+          "node": "agent:agent-aconv-splash-9d5902d803bbcde6@v1",
+          "role": "进入·缺",
+          "report_quote": "由于可核派发中没有把 .Launch 的 windowFullscreen=true 或Guide/Home还原状态栏直接交给生成方…具体要求没有充分传递到生成输入",
+          "counterevidence_quote": "早期 needs_immersive_safearea=true 不是同义于隐藏系统栏",
+          "judgment": "全局主题→实际生成输入之间有缺口的主链成立，但该材料不足以唯一/确定定位为生成方这个红进入点；仍需区分上游提炼/派发未传入与生成方已获等价规则却遗漏。",
+          "boundary": "不是必须点名某个API才可归因，也不是证明生成方无任何隐式要求；记论证不足，不记已证相反历史事实。"
+        }
+      ],
+      "annotation_requires_correction": true,
+      "annotation_reason": "S1 mandatory漏项；S2红进入点定位超过已证明的传递链，且两个正常修复事件列入entry_events保留自洽warnings。corepass与完整标注分开。",
+      "event_review": {
+        "count": 2,
+        "events": [
+          {
+            "id": "S1_E1",
+            "ref": "#a68daf720e780b4c2:15567@L346",
+            "native_id": "toolu_01DzVErQMcevEwF2f5T3E1U8",
+            "result_line": 347,
+            "model_input_result_line": 126,
+            "model_output_result_line": 142,
+            "claim": "onWillDismiss写后okSplashPage，独立候选事件，不并成v52delta"
+          },
+          {
+            "id": "S2_E1",
+            "ref": "#a68daf720e780b4c2:15655@L485",
+            "native_id": "toolu_016H83iNne123bAaGFHtEhwF",
+            "result_line": 486,
+            "model_input_result_line": 112,
+            "model_output_result_line": 143,
+            "claim": "import/windowhelper/hide/disappear写后ok，独立候选事件，不并成v53delta"
+          }
+        ]
+      },
+      "query_review": {
+        "tool_calls": 48,
+        "agent_calls": 4,
+        "successful_agent_calls": 3,
+        "agents_opened": [
+          "converter@v1",
+          "Slice11@v39",
+          "fixer@v40"
+        ],
+        "action_calls": 21,
+        "search_calls": 10,
+        "until_ts_searches": 8,
+        "blame_calls": 1,
+        "rejected_calls_metric": 1,
+        "additional_action_failure": "#aa2d7cdfd6a5cf89f:16295@L273不是该seq原行，被action拒绝；后来用id+seq拿到正确L227，最终引用已改正。",
+        "recovery_followed": true,
+        "detail": "L346与L485都实际输入/输出展开。无entrysetup agent或L123action，无builder调查。"
+      },
+      "metrics": {
+        "input_total": 1964353,
+        "cached_included_in_input": 1741312,
+        "output": 11168,
+        "total_input_plus_output": 1975521,
+        "wall_s": 267.5156947999494,
+        "end_to_end_wall_s": 281.4523930000141,
+        "tool_calls": 48,
+        "tool_chars": 457446,
+        "rejected_calls": 1,
+        "repeated_calls": 0,
+        "raw_two_rep_mean_total": 3305569.5,
+        "observed_saving_vs_raw_two_rep_mean_pct": 40.23659160698331
+      },
+      "mechanical": {
+        "final_check": {
+          "status": "matched",
+          "semantic_checked": false,
+          "checks": [
+            {
+              "step": 48,
+              "call_id": "call_nfyBOcxAQq1WZqSWh302ol2o",
+              "verified": true,
+              "status": "needs_review",
+              "counts": {
+                "errors": 0,
+                "warnings": 3,
+                "total": 3
+              },
+              "draft_sha256": "d8e8058a5848d94f4c62a6cc8303ded5a53d2e3cabafc765f9bd191434269063",
+              "document_sha256": "86508023d69e2c7df5cc67e20677a62af069cf1ba133d03a8d1b013ed3603a0c",
+              "issues": [
+                {
+                  "code": "event_entry_role_conflict",
+                  "severity": "warning",
+                  "where": "defect:S1.event_claims[0]",
+                  "node": null,
+                  "detail": "事件进入点与角色声明不一致；不自动改变角色或节点"
+                },
+                {
+                  "code": "event_entry_role_conflict",
+                  "severity": "warning",
+                  "where": "defect:S2.event_claims[0]",
+                  "node": null,
+                  "detail": "事件进入点与角色声明不一致；不自动改变角色或节点"
+                },
+                {
+                  "code": "basis_action_post_anchor",
+                  "severity": "warning",
+                  "where": "defect:S1",
+                  "node": "agent:agent-aslice11-startup-50a0622bcfe4a588@v26",
+                  "detail": "#aa2d7cdfd6a5cf89f:16295@L227：引用动作发起时刻晚于节点记录锚点；后置读回/反证可能合法，但不证明生成前已可用，不判断因果错误。"
+                }
+              ],
+              "omitted_issues": 0,
+              "coverage": {
+                "checked": true,
+                "target": "entry/src/main/ets/pages/SplashPage.ets",
+                "counts": {
+                  "expected": 29,
+                  "provided": 4,
+                  "accounted": 29,
+                  "expected_versions": 2,
+                  "expected_candidates": 27,
+                  "missing_versions": 0,
+                  "missing_candidates": 0,
+                  "missing": 0,
+                  "unresolved": 0,
+                  "not_repair": 0,
+                  "deferred": 0,
+                  "unconfirmed": 0,
+                  "advisories": 0,
+                  "advisory_rows": 0,
+                  "reviewed": 4,
+                  "not_investigated": 25
+                },
+                "accounted": true,
+                "semantic_checked": false,
+                "mode": "manifest_complement",
+                "manifest_identity_valid": true,
+                "declarations_complete": false
+              }
+            }
+          ],
+          "check_calls": 1,
+          "draft_chars": 8108,
+          "returned_chars": 1564,
+          "final_document_sha256": "86508023d69e2c7df5cc67e20677a62af069cf1ba133d03a8d1b013ed3603a0c",
+          "matched_check": 48
+        },
+        "coverage_counts": {
+          "expected": 29,
+          "provided": 4,
+          "accounted": 29,
+          "expected_versions": 2,
+          "expected_candidates": 27,
+          "missing_versions": 0,
+          "missing_candidates": 0,
+          "missing": 0,
+          "unresolved": 0,
+          "not_repair": 0,
+          "deferred": 0,
+          "unconfirmed": 0,
+          "advisories": 0,
+          "advisory_rows": 0,
+          "reviewed": 4,
+          "not_investigated": 25
+        },
+        "declarations_complete": false,
+        "trace_identity_bound": true,
+        "raw_equals_last_draft": true,
+        "yaml_equals_raw_trim": true,
+        "yaml_sha256": "d8e8058a5848d94f4c62a6cc8303ded5a53d2e3cabafc765f9bd191434269063",
+        "document_sha256": "86508023d69e2c7df5cc67e20677a62af069cf1ba133d03a8d1b013ed3603a0c",
+        "submission_status": "accepted",
+        "locator_count": 16,
+        "locator_checks": [
+          {
+            "ref": "#07108f5df45c357c:8373@L121",
+            "file_matches": 1,
+            "line": 121,
+            "ok": true,
+            "file": "9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aentry-setup-07108f5df45c357c.jsonl",
+            "timestamp": "2026-07-24T02:32:39.101Z",
+            "source_role": "assistant",
+            "record_sha256": "d7ec936d495f84e8c8d7f03454283fd95ddb3f4595237569937efadae91a273d",
+            "native_ids": [
+              "toolu_012BdYfbp7fHZXSM5MZXcipA"
+            ]
+          },
+          {
+            "ref": "#07108f5df45c357c:8397@L155",
+            "file_matches": 1,
+            "line": 155,
+            "ok": true,
+            "file": "9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aentry-setup-07108f5df45c357c.jsonl",
+            "timestamp": "2026-07-24T02:34:10.631Z",
+            "source_role": "assistant",
+            "record_sha256": "3be3f9be539eec8a8a5d19f2bbec69d4c0b6065042c3d51e3f6c69d597ab32b4",
+            "native_ids": [
+              "toolu_01DYieK3X8DWMVWsL2HYqB91"
+            ]
+          },
+          {
+            "ref": "#50a0622bcfe4a588:10751@L250",
+            "file_matches": 1,
+            "line": 250,
+            "ok": true,
+            "file": "9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aslice11-startup-50a0622bcfe4a588.jsonl",
+            "timestamp": "2026-07-24T16:01:19.499Z",
+            "source_role": "assistant",
+            "record_sha256": "ab3e80ddd3d63be2ac4fc20f1cd65fc9b7319ade87b43c58110040a167ec5bd6",
+            "native_ids": [
+              "toolu_011AdsRAjsSvTwcwt8bJiaLN"
+            ]
+          },
+          {
+            "ref": "#9b3105a2:1490@L4276",
+            "file_matches": 1,
+            "line": 4276,
+            "ok": true,
+            "file": "9b3105a2-85ec-4889-9786-b3c220f06754.jsonl",
+            "timestamp": "2026-07-24T15:33:07.174Z",
+            "source_role": "assistant",
+            "record_sha256": "8d2433cb9ecbd0cc090d2bae4c38772f7a0f07b566d68bf96f8f6ca470d026ab",
+            "native_ids": [
+              "toolu_0166wKHpvrShUuHK7pzNrcF6"
+            ]
+          },
+          {
+            "ref": "#9b3105a2:192@L520",
+            "file_matches": 1,
+            "line": 520,
+            "ok": true,
+            "file": "9b3105a2-85ec-4889-9786-b3c220f06754.jsonl",
+            "timestamp": "2026-07-23T12:43:34.616Z",
+            "source_role": "assistant",
+            "record_sha256": "e9f3540bdd7c5be2d04748d55e52e80e77dbfe69ba016391a910c053cf9d695c",
+            "native_ids": [
+              "toolu_01WrSaMTmGsM2pkfDGZr3peJ"
+            ]
+          },
+          {
+            "ref": "#9d5902d803bbcde6:7509@L15",
+            "file_matches": 1,
+            "line": 15,
+            "ok": true,
+            "file": "9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aconv-splash-9d5902d803bbcde6.jsonl",
+            "timestamp": "2026-07-24T01:56:45.935Z",
+            "source_role": "assistant",
+            "record_sha256": "981c5ac3abf09eaf6e05562d8e2193ca87273a6b2af8d19beb43caae53c5d22a",
+            "native_ids": [
+              "toolu_01Ugd9Aj6c1ZVXfv2EZcEs26"
+            ]
+          },
+          {
+            "ref": "#9d5902d803bbcde6:7548@L71",
+            "file_matches": 1,
+            "line": 71,
+            "ok": true,
+            "file": "9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aconv-splash-9d5902d803bbcde6.jsonl",
+            "timestamp": "2026-07-24T02:07:13.800Z",
+            "source_role": "assistant",
+            "record_sha256": "3c9debf2a570b62dc9285fd4f07f4d18087367c552681bc4f4d4eed54c4a9cc9",
+            "native_ids": [
+              "toolu_01Np1dfx5cY3fQ9uZrHBVkbq"
+            ]
+          },
+          {
+            "ref": "#a68daf720e780b4c2:15517@L273",
+            "file_matches": 1,
+            "line": 273,
+            "ok": true,
+            "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+            "timestamp": "2026-07-26T20:57:06.341Z",
+            "source_role": "assistant",
+            "record_sha256": "8f4ee5675726ec2aaef42c0220b1c6d49a60afaeae2e56cbf3abbeb5fa3d210c",
+            "native_ids": [
+              "toolu_015mEc97xiLggWuggAKVeWcs"
+            ]
+          },
+          {
+            "ref": "#a68daf720e780b4c2:15567@L346",
+            "file_matches": 1,
+            "line": 346,
+            "ok": true,
+            "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+            "timestamp": "2026-07-26T21:05:54.915Z",
+            "source_role": "assistant",
+            "record_sha256": "02f0e169a87a5be3ec84f52e4934cf050b093a966f5a4fc9e979895434aa609c",
+            "native_ids": [
+              "toolu_01DzVErQMcevEwF2f5T3E1U8"
+            ]
+          },
+          {
+            "ref": "#a68daf720e780b4c2:15569@L352",
+            "file_matches": 1,
+            "line": 352,
+            "ok": true,
+            "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+            "timestamp": "2026-07-26T21:06:31.863Z",
+            "source_role": "assistant",
+            "record_sha256": "a40d7bc21827e1c782b40921a135978e92e14a53ef82fe727ebbe3032f6dde42",
+            "native_ids": [
+              "toolu_01TRP8mc5pnikgvEnDDkDRuG"
+            ]
+          },
+          {
+            "ref": "#a68daf720e780b4c2:15627@L438",
+            "file_matches": 1,
+            "line": 438,
+            "ok": true,
+            "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+            "timestamp": "2026-07-26T21:16:28.992Z",
+            "source_role": "assistant",
+            "record_sha256": "45015f02beba659d8b775f1834230ba14879df8db8d91bc9944bd70a0a740dc3",
+            "native_ids": [
+              "toolu_012ikXRRimcuNK89smwLWUNn"
+            ]
+          },
+          {
+            "ref": "#a68daf720e780b4c2:15655@L485",
+            "file_matches": 1,
+            "line": 485,
+            "ok": true,
+            "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+            "timestamp": "2026-07-26T21:20:10.255Z",
+            "source_role": "assistant",
+            "record_sha256": "2cdd0931f283d641844a8ee10039f950633e1b3a8b3b97eb3e2de1eed85a2ae8",
+            "native_ids": [
+              "toolu_016H83iNne123bAaGFHtEhwF"
+            ]
+          },
+          {
+            "ref": "#a68daf720e780b4c2:15656@L488",
+            "file_matches": 1,
+            "line": 488,
+            "ok": true,
+            "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+            "timestamp": "2026-07-26T21:20:24.982Z",
+            "source_role": "assistant",
+            "record_sha256": "ae41f9a5b65c7f9101a49c48f25c68ca2d960666571ce87fa5d384d3fe398eea",
+            "native_ids": [
+              "toolu_01RknAJc4tUhzwpypigkLeRv"
+            ]
+          },
+          {
+            "ref": "#a68daf720e780b4c2:15740@L608",
+            "file_matches": 1,
+            "line": 608,
+            "ok": true,
+            "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+            "timestamp": "2026-07-26T21:35:46.240Z",
+            "source_role": "assistant",
+            "record_sha256": "31e808acebdefc34984f206ce03160362e48c1740feaeb4efa211459fcf41f90",
+            "native_ids": [
+              "toolu_01Ag84URJdUsGNfX4BptY9LC"
+            ]
+          },
+          {
+            "ref": "#a68daf720e780b4c2:15744@L615",
+            "file_matches": 1,
+            "line": 615,
+            "ok": true,
+            "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+            "timestamp": "2026-07-26T21:41:39.026Z",
+            "source_role": "assistant",
+            "record_sha256": "4a62b9fd1fe061c21e60017a33de7b9d8b769c42274aa798702cfa95016524d6",
+            "native_ids": [
+              "toolu_01XJTap83qih25dRyZQyQNkw"
+            ]
+          },
+          {
+            "ref": "#aa2d7cdfd6a5cf89f:16295@L227",
+            "file_matches": 1,
+            "line": 227,
+            "ok": true,
+            "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-aa2d7cdfd6a5cf89f.jsonl",
+            "timestamp": "2026-07-26T15:49:08.194Z",
+            "source_role": "assistant",
+            "record_sha256": "553d1134a16faa0695cbfffea87f545c782de65469fe60f70ebfc790dbea5b79",
+            "native_ids": [
+              "toolu_012SHJSogLuQsZKgKpEo6YQa"
+            ]
+          }
+        ],
+        "check_revision": "1check，0error+3warnings，两个正常事件作为entry自洽冲突与一个中性postanchor；未修改最终草稿，matched不是语义通过。"
+      },
+      "fact_detail_counts": {
+        "supported": 4,
+        "partial": 2,
+        "omitted": 1,
+        "contradicted": 0
+      }
+    }
+  ],
+  "pending_runs": [],
+  "summary": {
+    "core": {
+      "pass": 3,
+      "partial": 3,
+      "fail": 0,
+      "total": 6
+    },
+    "extra_false_claims": 1,
+    "material_extra_false_claims": 0,
+    "material_unsupported_causal_annotations": 1,
+    "joint_acceptance": false,
+    "reason": "Member/Dice/Splash eachretainmandatorycausalgaps or unsupportedexactentry. Recoveredcandidateeffects and H5 improvepartsofanswers but do notcertifyallcorrect."
+  },
+  "cost_boundary": "Input includes cached tokens; output includes reasoning. All threeV10legacy runs here are rep1 only; raw comparison uses samequestion/pooltwo-repmean. No seven-file or stabilityacceptance claim.",
+  "rep2_review": {
+    "status": "complete_for_all_three_rep2_runs",
+    "rep1_unchanged": true,
+    "runs": [
+      {
+        "case": "member-center",
+        "variant": "formal-v10",
+        "arm": "tools",
+        "rep": 2,
+        "run": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v10/member-center/runs/tools/rep2",
+        "source_code_id": "80c099e",
+        "source_digest": "b47380bd789929d3181eae024e4dee12709d8878615ebe7bd85e0271a37a35ed",
+        "pool_digest": "a78b1373045f7558d6da3b76123e30d032635a2a0b4cdd665e7f80c0bdf8b337",
+        "common_task_sha256": "e60ad7491cd5991a948f8c7128432feca230a59bee208640ca5b90a44d68dec1",
+        "model": [
+          "gpt-5.5"
+        ],
+        "effort": "medium",
+        "questions": [
+          {
+            "id": "S3",
+            "core": "pass",
+            "basis": "三站点1透明+2深色与执行/读回/设备验证边界正确；已有H5透明又未点名，按固定minor，不因rep1已答全而替代本稿。",
+            "mandatory_gaps": [],
+            "minor_omissions": [
+              "H5原有透明且跳过未交代，rep1的完整项在本稿回退。"
+            ],
+            "facts": [
+              {
+                "id": "S3.f1",
+                "status": "supported",
+                "report_claim": "AppLoad206、PayAgreement704、RenewRule728在脚本前缺失清单。",
+                "raw_evidence": [
+                  "fixer L77/L78,L103/L104"
+                ]
+              },
+              {
+                "id": "S3.f2",
+                "status": "supported",
+                "report_claim": "AppLoadTransparent、Pay/RenewPalette；脚本确运行，Pay后置读回直接支持。",
+                "raw_evidence": [
+                  "fixer L103/L104,L106/L107"
+                ]
+              },
+              {
+                "id": "S3.f3",
+                "status": "partial",
+                "report_claim": "3sites非3dark，未点名原有H5透明/被跳过。",
+                "raw_evidence": [
+                  "fixer L74/L75; Slice8 L264原有H5"
+                ],
+                "gap": "固定minor，不因此改core为partial。"
+              }
+            ]
+          },
+          {
+            "id": "S4",
+            "core": "partial",
+            "basis": "两轮Span修复、tail private来源、真实编译错和两Edit/原生成功构建成立；原始Slice8写前Kotlin→坏整写仍未调查。",
+            "mandatory_gaps": [
+              "Slice8 L21/L24→L264/L265生成期实际输入与错误整写未核。"
+            ],
+            "minor_omissions": [],
+            "facts": [
+              {
+                "id": "S4.f1",
+                "status": "partial",
+                "report_claim": "原实现仅以fixer L516后期读回说明，源逻辑主要由后期finding/attempt解释。",
+                "raw_evidence": [
+                  "Slice8 L21/L24→L264/L265"
+                ],
+                "gap": "无Slice8 agent/action；不能以修复方读取与自述替代生成时输入。"
+              },
+              {
+                "id": "S4.f2",
+                "status": "supported",
+                "report_claim": "v11/v12 ForEach/splitPriceRuns先修视觉，tail L592再改固定双Span及numeric/suffixhelpers。",
+                "raw_evidence": [
+                  "fixer L528/L529,L592/L593"
+                ]
+              },
+              {
+                "id": "S4.f3",
+                "status": "supported",
+                "report_claim": "tail新增private被ProductItemCard访问，builder报错、两Edit去private；第二轮原生EXIT=0/BUILD SUCCESSFUL。",
+                "raw_evidence": [
+                  "fixer L592/L593; builder L23/L24,L32/L33,L34/L35,L36/L37"
+                ]
+              }
+            ]
+          }
+        ],
+        "extra_false_claims": [],
+        "annotation_requires_correction": true,
+        "annotation_reason": "S4 mandatory近因链仍缺，S3 H5细项漏。rep1非selected分支标签未重现；不把删红/无nodes视为归因完成。",
+        "event_review": {
+          "count": 14,
+          "mask_events": 5,
+          "price_events": 9,
+          "version_nodes": 0,
+          "tail_event": {
+            "id": "S4_E4",
+            "ref": "#a68daf720e780b4c2:15731@L592",
+            "effect_version": null,
+            "role": "无法确认",
+            "meaning": "承认执行且后续构建证据支持，未造filev17/agentv40"
+          }
+        },
+        "query_review": {
+          "action_calls": 21,
+          "agent_calls": 2,
+          "successful_agent_calls": 0,
+          "agent_failures": [
+            "builder@v3 via=sessions",
+            "fixer@v34 via=sessions"
+          ],
+          "blame_calls": 0,
+          "search_calls": 7,
+          "until_ts_searches": 3,
+          "detail": "只围绕fixer/builder调查，无Slice8搜索/原文展开。先COMPILE RESULT:PASS零命中，后续原文action#17296成功展开EXIT=0/BUILD SUCCESSFUL，未停在summary。"
+        },
+        "metrics": {
+          "input_total": 648570,
+          "cached_included_in_input": 544768,
+          "output": 15854,
+          "total_input_plus_output": 664424,
+          "wall_s": 331.375212199986,
+          "end_to_end_wall_s": 344.76099780004006,
+          "tool_calls": 41,
+          "tool_chars": 150113,
+          "rejected_calls": 2,
+          "repeated_calls": 0
+        },
+        "mechanical": {
+          "final_check": {
+            "status": "matched",
+            "semantic_checked": false,
+            "checks": [
+              {
+                "step": 40,
+                "call_id": "call_Uc0h2Dk5Tgy2RQIwppZJq50q",
+                "verified": true,
+                "status": "needs_review",
+                "counts": {
+                  "errors": 0,
+                  "warnings": 6,
+                  "total": 6
+                },
+                "draft_sha256": "88de7c9960792fc6b4d6e65ec5b0a5c104a740d191f53a3cec601c300ab7dc3b",
+                "document_sha256": "9f144325e6efe6e8d75af768b1354eb4f7e16ec6328d6678cfb89dfb5f9f6ffc",
+                "issues": [
+                  {
+                    "code": "event_entry_role_conflict",
+                    "severity": "warning",
+                    "where": "defect:S3.event_claims[0]",
+                    "node": null,
+                    "detail": "事件进入点与角色声明不一致；不自动改变角色或节点"
+                  },
+                  {
+                    "code": "event_entry_role_conflict",
+                    "severity": "warning",
+                    "where": "defect:S3.event_claims[1]",
+                    "node": null,
+                    "detail": "事件进入点与角色声明不一致；不自动改变角色或节点"
+                  },
+                  {
+                    "code": "event_entry_role_conflict",
+                    "severity": "warning",
+                    "where": "defect:S3.event_claims[2]",
+                    "node": null,
+                    "detail": "事件进入点与角色声明不一致；不自动改变角色或节点"
+                  },
+                  {
+                    "code": "event_entry_role_conflict",
+                    "severity": "warning",
+                    "where": "defect:S4.event_claims[0]",
+                    "node": null,
+                    "detail": "事件进入点与角色声明不一致；不自动改变角色或节点"
+                  },
+                  {
+                    "code": "event_entry_role_conflict",
+                    "severity": "warning",
+                    "where": "defect:S4.event_claims[1]",
+                    "node": null,
+                    "detail": "事件进入点与角色声明不一致；不自动改变角色或节点"
+                  },
+                  {
+                    "code": "event_entry_role_conflict",
+                    "severity": "warning",
+                    "where": "defect:S4.event_claims[2]",
+                    "node": null,
+                    "detail": "事件进入点与角色声明不一致；不自动改变角色或节点"
+                  }
+                ],
+                "omitted_issues": 0,
+                "coverage": {
+                  "checked": true,
+                  "target": "entry/src/main/ets/pages/MemberCenterPage.ets",
+                  "counts": {
+                    "expected": 38,
+                    "provided": 8,
+                    "accounted": 38,
+                    "expected_versions": 7,
+                    "expected_candidates": 31,
+                    "missing_versions": 0,
+                    "missing_candidates": 0,
+                    "missing": 0,
+                    "unresolved": 0,
+                    "not_repair": 0,
+                    "deferred": 0,
+                    "unconfirmed": 0,
+                    "advisories": 0,
+                    "advisory_rows": 0,
+                    "reviewed": 8,
+                    "not_investigated": 30
+                  },
+                  "accounted": true,
+                  "semantic_checked": false,
+                  "mode": "manifest_complement",
+                  "manifest_identity_valid": true,
+                  "declarations_complete": false
+                }
+              },
+              {
+                "step": 41,
+                "call_id": "call_1r6MpgMolYXWxiUABCQ2HxSp",
+                "verified": true,
+                "status": "mechanical_clear",
+                "counts": {
+                  "errors": 0,
+                  "warnings": 0,
+                  "total": 0
+                },
+                "draft_sha256": "6666972978a72bb48824b1b17ad76deda25c5f50eea578bee524c701cdf618b1",
+                "document_sha256": "978c5e40d24a89e9ce8194606227fe1f370c18bb6ec4c7bd173675caaf2f2ee1",
+                "issues": [],
+                "omitted_issues": 0,
+                "coverage": {
+                  "checked": true,
+                  "target": "entry/src/main/ets/pages/MemberCenterPage.ets",
+                  "counts": {
+                    "expected": 38,
+                    "provided": 8,
+                    "accounted": 38,
+                    "expected_versions": 7,
+                    "expected_candidates": 31,
+                    "missing_versions": 0,
+                    "missing_candidates": 0,
+                    "missing": 0,
+                    "unresolved": 0,
+                    "not_repair": 0,
+                    "deferred": 0,
+                    "unconfirmed": 0,
+                    "advisories": 0,
+                    "advisory_rows": 0,
+                    "reviewed": 8,
+                    "not_investigated": 30
+                  },
+                  "accounted": true,
+                  "semantic_checked": false,
+                  "mode": "manifest_complement",
+                  "manifest_identity_valid": true,
+                  "declarations_complete": false
+                }
+              }
+            ],
+            "check_calls": 2,
+            "draft_chars": 21463,
+            "returned_chars": 2977,
+            "final_document_sha256": "978c5e40d24a89e9ce8194606227fe1f370c18bb6ec4c7bd173675caaf2f2ee1",
+            "matched_check": 41
+          },
+          "coverage_counts": {
+            "expected": 38,
+            "provided": 8,
+            "accounted": 38,
+            "expected_versions": 7,
+            "expected_candidates": 31,
+            "missing_versions": 0,
+            "missing_candidates": 0,
+            "missing": 0,
+            "unresolved": 0,
+            "not_repair": 0,
+            "deferred": 0,
+            "unconfirmed": 0,
+            "advisories": 0,
+            "advisory_rows": 0,
+            "reviewed": 8,
+            "not_investigated": 30
+          },
+          "declarations_complete": false,
+          "trace_identity_bound": true,
+          "raw_equals_last_draft": true,
+          "yaml_equals_raw_trim": true,
+          "yaml_sha256": "6666972978a72bb48824b1b17ad76deda25c5f50eea578bee524c701cdf618b1",
+          "document_sha256": "978c5e40d24a89e9ce8194606227fe1f370c18bb6ec4c7bd173675caaf2f2ee1",
+          "submission_status": "accepted",
+          "locator_count": 14,
+          "locator_checks": [
+            {
+              "ref": "#a68daf720e780b4c2:15361@L28",
+              "file_matches": 1,
+              "line": 28,
+              "ok": true,
+              "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+              "timestamp": "2026-07-26T20:33:52.399Z",
+              "source_role": "assistant",
+              "record_sha256": "0b58129d2362096b2baaa505cd5c9d4f82f8465f9da6b52dcc958ac9f07e13e3",
+              "native_ids": [
+                "toolu_01B8RaNhNXNsZ6LPHxobH1KV"
+              ]
+            },
+            {
+              "ref": "#a68daf720e780b4c2:15396@L77",
+              "file_matches": 1,
+              "line": 77,
+              "ok": true,
+              "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+              "timestamp": "2026-07-26T20:36:01.231Z",
+              "source_role": "assistant",
+              "record_sha256": "d62980223529c0a245178d6df6bd16ac6bf1024f80651c5e03502496fd40fade",
+              "native_ids": [
+                "toolu_016h1qeyct3Ac32r68PFp2KB"
+              ]
+            },
+            {
+              "ref": "#a68daf720e780b4c2:15406@L103",
+              "file_matches": 1,
+              "line": 103,
+              "ok": true,
+              "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+              "timestamp": "2026-07-26T20:41:07.872Z",
+              "source_role": "assistant",
+              "record_sha256": "d3662b808223939b528589cd614033c8b5bffcb83d2cf78c3b5b97c0d395b4ba",
+              "native_ids": [
+                "toolu_01T6WkXMhD7rUsHaSaMPuhgx"
+              ]
+            },
+            {
+              "ref": "#a68daf720e780b4c2:15407@L106",
+              "file_matches": 1,
+              "line": 106,
+              "ok": true,
+              "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+              "timestamp": "2026-07-26T20:41:17.462Z",
+              "source_role": "assistant",
+              "record_sha256": "cb92907b23f9a26e874433f6e41be0ab102c854f2909d65e7ac823bb2a52319e",
+              "native_ids": [
+                "toolu_019xb74vC9BgRv4xeSea6NmF"
+              ]
+            },
+            {
+              "ref": "#a68daf720e780b4c2:15670@L501",
+              "file_matches": 1,
+              "line": 501,
+              "ok": true,
+              "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+              "timestamp": "2026-07-26T21:21:29.934Z",
+              "source_role": "assistant",
+              "record_sha256": "29282cec557a01a6a9c46a8f293d85541d25bd8a98cef9ad2e032b7790c62c8a",
+              "native_ids": [
+                "toolu_01YGYsH1u6KQtX8A2AkLVXFF"
+              ]
+            },
+            {
+              "ref": "#a68daf720e780b4c2:15677@L516",
+              "file_matches": 1,
+              "line": 516,
+              "ok": true,
+              "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+              "timestamp": "2026-07-26T21:22:55.328Z",
+              "source_role": "assistant",
+              "record_sha256": "0842419d54cf337120262ca5ad80a280bc1c0f2b449a17186b855661edfb7ca6",
+              "native_ids": [
+                "toolu_019PTiyxoeX5Vc9KMJFu2jhw"
+              ]
+            },
+            {
+              "ref": "#a68daf720e780b4c2:15682@L528",
+              "file_matches": 1,
+              "line": 528,
+              "ok": true,
+              "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+              "timestamp": "2026-07-26T21:24:15.832Z",
+              "source_role": "assistant",
+              "record_sha256": "16690e1e9641c1ddf9dee4ca7979c4f3521bb478bc2799bdd0db2ab28f2ff6dc",
+              "native_ids": [
+                "toolu_016bvcNnvDn4tHXcYJY7CzLh"
+              ]
+            },
+            {
+              "ref": "#a68daf720e780b4c2:15731@L592",
+              "file_matches": 1,
+              "line": 592,
+              "ok": true,
+              "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+              "timestamp": "2026-07-26T21:30:17.239Z",
+              "source_role": "assistant",
+              "record_sha256": "247880efbf4a79665a1ed0968a3cfa8e7269a991e34aecc0715dedad965642d7",
+              "native_ids": [
+                "toolu_01BrL9dsi5PB64tZiKVRfWoa"
+              ]
+            },
+            {
+              "ref": "#a68daf720e780b4c2:15738@L605",
+              "file_matches": 1,
+              "line": 605,
+              "ok": true,
+              "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+              "timestamp": "2026-07-26T21:33:41.324Z",
+              "source_role": "assistant",
+              "record_sha256": "741d1a7840668827463dcf90559510515e7f1da77ffdf91057d0c4ac44ecd09c",
+              "native_ids": [
+                "toolu_01TAdUUGRVfADPAYGonLPJmX"
+              ]
+            },
+            {
+              "ref": "#af0e3d2ae54dbf769:17286@L23",
+              "file_matches": 1,
+              "line": 23,
+              "ok": true,
+              "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-af0e3d2ae54dbf769.jsonl",
+              "timestamp": "2026-07-26T21:45:43.448Z",
+              "source_role": "assistant",
+              "record_sha256": "dd5a088044c503af6f19786c8b1c4eb3abbcdfe58c4207eed096bbd08b436a4f",
+              "native_ids": [
+                "toolu_01SSSyTUpqQtQF1SjZy36FTe"
+              ]
+            },
+            {
+              "ref": "#af0e3d2ae54dbf769:17292@L32",
+              "file_matches": 1,
+              "line": 32,
+              "ok": true,
+              "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-af0e3d2ae54dbf769.jsonl",
+              "timestamp": "2026-07-26T21:46:11.820Z",
+              "source_role": "assistant",
+              "record_sha256": "94fd77263f2be9dbaff0629cf3399face77ec8c84e9fcba8f0f72a15877eca77",
+              "native_ids": [
+                "toolu_01W4Yg3nfX75u3Yxsk1X4wat"
+              ]
+            },
+            {
+              "ref": "#af0e3d2ae54dbf769:17294@L34",
+              "file_matches": 1,
+              "line": 34,
+              "ok": true,
+              "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-af0e3d2ae54dbf769.jsonl",
+              "timestamp": "2026-07-26T21:46:12.739Z",
+              "source_role": "assistant",
+              "record_sha256": "5dc57be6408fb9395737e8d66e0b239071524e71e5d8329f421483170690c200",
+              "native_ids": [
+                "toolu_01YcRVJymkRf9wtm51Pr5qt8"
+              ]
+            },
+            {
+              "ref": "#af0e3d2ae54dbf769:17296@L36",
+              "file_matches": 1,
+              "line": 36,
+              "ok": true,
+              "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-af0e3d2ae54dbf769.jsonl",
+              "timestamp": "2026-07-26T21:46:18.585Z",
+              "source_role": "assistant",
+              "record_sha256": "792568db4539cbb2617c22388993bf80fde9505a8b4b4a3d17ec302c6a8a1075",
+              "native_ids": [
+                "toolu_01PcjKpCh43ea95hpoivTyih"
+              ]
+            },
+            {
+              "ref": "#af0e3d2ae54dbf769:17303@L54",
+              "file_matches": 1,
+              "line": 54,
+              "ok": true,
+              "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-af0e3d2ae54dbf769.jsonl",
+              "timestamp": "2026-07-26T21:47:53.546Z",
+              "source_role": "assistant",
+              "record_sha256": "a40cf110905d0bd8bcff42abcfb91f2e260178c0e91c8f976d0e7cbffbf7bf09",
+              "native_ids": []
+            }
+          ],
+          "candidate_bindings": [
+            {
+              "source": "mention",
+              "ref": "#a68daf720e780b4c2:15406@L103",
+              "candidate": "candidate:b30f4e449bea2bd6cc42",
+              "matches": 1
+            },
+            {
+              "source": "touch",
+              "ref": "#a68daf720e780b4c2:15407@L106",
+              "candidate": "candidate:6ffcb050ddf8488c74e4",
+              "matches": 1
+            },
+            {
+              "source": "mention",
+              "ref": "#a68daf720e780b4c2:15738@L605",
+              "candidate": "candidate:5da1c93487da3b2f9408",
+              "matches": 1
+            },
+            {
+              "source": "touch",
+              "ref": "#a68daf720e780b4c2:15731@L592",
+              "candidate": "candidate:89dc8e4fea1fb9373422",
+              "matches": 1
+            }
+          ],
+          "draft_changes": [
+            {
+              "InputObject": "    entry_events: [S3_E1, S3_E2, S3_E3]",
+              "SideIndicator": "<="
+            },
+            {
+              "InputObject": "    entry_events: [S4_E1, S4_E2, S4_E3, S4_E4]",
+              "SideIndicator": "<="
+            }
+          ],
+          "check_revision": "只删除entry_events列表，未增加原文证据；6warnings→0不证明完整归因。"
+        },
+        "fact_detail_counts": {
+          "supported": 4,
+          "partial": 2,
+          "omitted": 0,
+          "contradicted": 0
+        }
+      },
+      {
+        "case": "dice-entry",
+        "variant": "formal-v10",
+        "arm": "tools",
+        "rep": 2,
+        "run": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v10/dice-entry/runs/tools/rep2",
+        "source_code_id": "80c099e",
+        "source_digest": "b47380bd789929d3181eae024e4dee12709d8878615ebe7bd85e0271a37a35ed",
+        "pool_digest": "653db4192d47366e8ca099e59ef2679e929056f18320d081768539b2f5b7443e",
+        "common_task_sha256": "9060a6c160d2a1ac2b893b9f19d12e66a16e6ce1b7d301eacae0abfb9f55eec4",
+        "model": [
+          "gpt-5.5"
+        ],
+        "effort": "medium",
+        "ledger": "atoms-2026-09-09-file-evidence5:80:c0cc62829271122172d2fc77",
+        "questions": [
+          {
+            "id": "D1",
+            "core": "pass",
+            "basis": "实际打开generator@v2、页面/F001/skill输入索引与v2无桥，后置设计/派发/模板/三Edit成立；未倒灌后置要求。",
+            "mandatory_gaps": [],
+            "minor_omissions": [
+              "只交代旧Step4 UI0/10不可达，没有核/报告后来的593d原生10/10等价回放；固定addendum作为全量缺项，不新改旧oracle核心分母。"
+            ],
+            "facts": [
+              {
+                "id": "D1.f1",
+                "status": "supported",
+                "report_claim": "生成输入有MainActivity/page/F001/Android/immersive，v2无桥，无法证明全池此前没有一般规范。",
+                "raw_evidence": [
+                  "generator L1,L51-L58,L71/L72"
+                ],
+                "model_received": "transcript L74 generator@v2已成功展开；最终引用L51/L53/L57。"
+              },
+              {
+                "id": "D1.f2",
+                "status": "supported",
+                "report_claim": "Step3明确设计§F+template要求桥，原预检查无代码后分v3-v5增量。",
+                "raw_evidence": [
+                  "bridge L7/L8,L11/L12,L23/L24,L35-L40"
+                ]
+              },
+              {
+                "id": "D1.f3",
+                "status": "supported",
+                "report_claim": "测试阶段桥要求与Stage1生成边界分开，零命中不是一般规范不存在证明。",
+                "raw_evidence": [
+                  "generator/bridge两阶段"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "D2",
+            "core": "pass",
+            "basis": "ECAT worklist、Entry/SDK读取、三Edit与原生成功构建主链成立；附加memory时序排除错误，不借新增oracle项改核心分母，完整标注不通过。",
+            "mandatory_gaps": [],
+            "minor_omissions": [
+              "may-throw WARN仍未交代，未声称0WARN。"
+            ],
+            "facts": [
+              {
+                "id": "D2.f1",
+                "status": "supported",
+                "report_claim": "ECAT iteration0明确要求观察者，Harmony框架约束、无Android对应物。",
+                "raw_evidence": [
+                  "observer L1; root2f L100"
+                ]
+              },
+              {
+                "id": "D2.f2",
+                "status": "supported",
+                "report_claim": "读Entry@v5及SDK，再import/call/实现三Edit。",
+                "raw_evidence": [
+                  "observer L23/L24,L29-L38,L41-L46"
+                ],
+                "model_received": "transcript L76 observer@v3成功展开；SDK/patch还另action核。"
+              },
+              {
+                "id": "D2.f3",
+                "status": "partial",
+                "report_claim": "gatebuild实际读含观察者的v8，CompileArkTS/PackageHap/BUILD SUCCESSFUL，callback未知；未报告WARN。",
+                "raw_evidence": [
+                  "builder L33/L34,L43/L44,L47/L48,L51/L52"
+                ]
+              }
+            ]
+          }
+        ],
+        "extra_false_claims": [
+          {
+            "code": "memory_feedback_wrong_time_exclusion",
+            "question": "D2",
+            "severity": "material",
+            "report_location": "D2.boundary",
+            "report_quote": "没有把后续记忆文件 .ecat/agents/generator/memory/arkts-app-shell/_index.md 的沉淀作为当时修复依据；它发生在修复后，只能说明该要求后来被记录。",
+            "raw_file": "257fed22-fb0e-48de-bee9-0791c45a90a9.jsonl",
+            "raw_lines": [
+              115,
+              119
+            ],
+            "raw_times": [
+              "2026-09-03T21:12:47.694Z",
+              "2026-09-03T21:12:53.922Z"
+            ],
+            "raw_ids": [
+              "call_ac8ddda9fe4e4a5a87839d90",
+              "call_8ce3690fd9384f04ab8d47bb"
+            ],
+            "raw_sha256": [
+              "42771263569577db3f45f997a8f88745e169bbb13d57747afdd42af44037d75b",
+              "ea3a2df7dc072e047f9541c7f34b93cc7a7a1c44abc9b51f29e66b5ce2f69f9b"
+            ],
+            "repair_time": "observer L41-L45 2026-09-03T21:19:24.777Z..21:19:39.888Z",
+            "model_received": {
+              "result_lines": [
+                135,
+                174
+              ],
+              "scope": "search starts21:19:39.888Z",
+              "actual_hit": "_index@v2 by a329e202 L95 at21:57; no earlierwindow query"
+            },
+            "why_false": "同路径_index@v1在21:12已包含该观察者条目；后期v2编辑不能证明整个条目修复后才沉淀。报告未限为v2改写，却用后置时间排除当时来源。",
+            "required_correction": "区分修复前feedback/index v1与修复后v2；是否实际被fixer读取仍未知，不能按错误时间排除。",
+            "core_treatment": "直接ECAT要求→实现→构建成立，保留D2corepass；沿V8相同memory错误标准记material，非minor、非语义全通过。"
+          }
+        ],
+        "annotation_requires_correction": true,
+        "annotation_reason": "memory错误时序排除是实质归因错误；D1还缺later10/10 addendum，不能把corepass等同完整正确。",
+        "event_review": {
+          "count": 3,
+          "events": [
+            "D1E1=Step4 L199启动（配旧ui-report）",
+            "D2E1=builder L33真实Read",
+            "D2E2=builder L43真实构建日志"
+          ],
+          "boundary": "没有造0effectbuilder版本；启动/summary不升级AppStorage或callback真实验证。"
+        },
+        "dice_addendum": {
+          "status": "omitted",
+          "reported": "旧Step4 ui-report/UI10条beforeEachERROR、0it执行",
+          "model_opened": "Step4 L199原始启动及ui-report@v1；未开593dL260/L267/L291",
+          "raw_later": "593d4e86 L26010/10PASS+L267onNewWant×3，独立addendum早已对两组固定",
+          "judgment": "旧报告0/10是其阶段真实事实；没有据此说所有后续均0/10，因此记later验证缺项，不将它改成核心相反断言。AppStorage未知仍正确。"
+        },
+        "query_review": {
+          "agent_calls": 3,
+          "successful_agent_calls": 3,
+          "agents_opened": [
+            "generator@v2",
+            "bridge@v4",
+            "observer@v3"
+          ],
+          "action_calls": 19,
+          "search_calls": 10,
+          "until_ts_searches": 10,
+          "rejected_calls": 1,
+          "detail": "memory相关查询全从修复结束后起，不能用postwindow首次命中推全历史先后。候选#4520L51实际只gitdiffstat+grep自检，not_repair有原文支持，不是为省清单乱判。"
+        },
+        "metrics": {
+          "input_total": 1295771,
+          "cached_included_in_input": 1176064,
+          "output": 14745,
+          "total_input_plus_output": 1310516,
+          "wall_s": 309.01192560000345,
+          "end_to_end_wall_s": 312.58224670006894,
+          "tool_calls": 48,
+          "tool_chars": 208244,
+          "rejected_calls": 1,
+          "repeated_calls": 0
+        },
+        "mechanical": {
+          "final_check": {
+            "status": "matched",
+            "semantic_checked": false,
+            "checks": [
+              {
+                "step": 47,
+                "call_id": "call_fA6GYKBMY17wO4yrpswzhcoT",
+                "verified": true,
+                "status": "needs_review",
+                "counts": {
+                  "errors": 0,
+                  "warnings": 3,
+                  "total": 3
+                },
+                "draft_sha256": "8a1eb36357aa4ba1eae4e81bf284ec7a99f5fd0e9f43cd26ce27ee7c8dc13495",
+                "document_sha256": "6543adb41fce0e388e05ce86621121226edcbbe6445e789abfa308d0a3f5dbc0",
+                "issues": [
+                  {
+                    "code": "event_entry_role_conflict",
+                    "severity": "warning",
+                    "where": "defect:D2.event_claims[0]",
+                    "node": null,
+                    "detail": "事件进入点与角色声明不一致；不自动改变角色或节点"
+                  },
+                  {
+                    "code": "entry_role_conflict",
+                    "severity": "warning",
+                    "where": "defect:D1",
+                    "node": "agent:agent-a711c5d09fb676814@v4",
+                    "detail": "同一缺陷把此节点列为进入点，却标为 正常；请核对，未代替模型改判。"
+                  },
+                  {
+                    "code": "entry_role_conflict",
+                    "severity": "warning",
+                    "where": "defect:D2",
+                    "node": "agent:agent-a27497cfed8c44856@v3",
+                    "detail": "同一缺陷把此节点列为进入点，却标为 正常；请核对，未代替模型改判。"
+                  }
+                ],
+                "omitted_issues": 0,
+                "coverage": {
+                  "checked": true,
+                  "target": "entry/src/main/ets/entryability/EntryAbility.ets",
+                  "counts": {
+                    "expected": 7,
+                    "provided": 7,
+                    "accounted": 7,
+                    "expected_versions": 6,
+                    "expected_candidates": 1,
+                    "missing_versions": 0,
+                    "missing_candidates": 0,
+                    "missing": 0,
+                    "unresolved": 0,
+                    "not_repair": 1,
+                    "deferred": 0,
+                    "unconfirmed": 0,
+                    "advisories": 0,
+                    "advisory_rows": 0,
+                    "reviewed": 7,
+                    "not_investigated": 0
+                  },
+                  "accounted": true,
+                  "semantic_checked": false,
+                  "mode": "manifest_complement",
+                  "manifest_identity_valid": true,
+                  "declarations_complete": true
+                }
+              },
+              {
+                "step": 48,
+                "call_id": "call_uK3chDmC945HYN808rbqWjiy",
+                "verified": true,
+                "status": "mechanical_clear",
+                "counts": {
+                  "errors": 0,
+                  "warnings": 0,
+                  "total": 0
+                },
+                "draft_sha256": "c9692b85a129367a403152bbd79b50b43a2bf78e81c260d2cd0c9febb2cbbaa7",
+                "document_sha256": "8b0906d55f76d8c0fa1bc2330407d0fadc81a262f5bafb2585a4d817ae019903",
+                "issues": [],
+                "omitted_issues": 0,
+                "coverage": {
+                  "checked": true,
+                  "target": "entry/src/main/ets/entryability/EntryAbility.ets",
+                  "counts": {
+                    "expected": 7,
+                    "provided": 7,
+                    "accounted": 7,
+                    "expected_versions": 6,
+                    "expected_candidates": 1,
+                    "missing_versions": 0,
+                    "missing_candidates": 0,
+                    "missing": 0,
+                    "unresolved": 0,
+                    "not_repair": 1,
+                    "deferred": 0,
+                    "unconfirmed": 0,
+                    "advisories": 0,
+                    "advisory_rows": 0,
+                    "reviewed": 7,
+                    "not_investigated": 0
+                  },
+                  "accounted": true,
+                  "semantic_checked": false,
+                  "mode": "manifest_complement",
+                  "manifest_identity_valid": true,
+                  "declarations_complete": true
+                }
+              }
+            ],
+            "check_calls": 2,
+            "draft_chars": 16852,
+            "returned_chars": 2579,
+            "final_document_sha256": "8b0906d55f76d8c0fa1bc2330407d0fadc81a262f5bafb2585a4d817ae019903",
+            "matched_check": 48
+          },
+          "coverage_counts": {
+            "expected": 7,
+            "provided": 7,
+            "accounted": 7,
+            "expected_versions": 6,
+            "expected_candidates": 1,
+            "missing_versions": 0,
+            "missing_candidates": 0,
+            "missing": 0,
+            "unresolved": 0,
+            "not_repair": 1,
+            "deferred": 0,
+            "unconfirmed": 0,
+            "advisories": 0,
+            "advisory_rows": 0,
+            "reviewed": 7,
+            "not_investigated": 0
+          },
+          "declarations_complete": true,
+          "trace_identity_bound": true,
+          "raw_equals_last_draft": true,
+          "yaml_equals_raw_trim": true,
+          "yaml_sha256": "c9692b85a129367a403152bbd79b50b43a2bf78e81c260d2cd0c9febb2cbbaa7",
+          "document_sha256": "8b0906d55f76d8c0fa1bc2330407d0fadc81a262f5bafb2585a4d817ae019903",
+          "submission_status": "accepted",
+          "locator_count": 23,
+          "locator_checks": [
+            {
+              "ref": "#a27497cfed8c44856:4495@L23",
+              "file_matches": 1,
+              "line": 23,
+              "ok": true,
+              "file": "2f01bcdc-0a92-4961-a64d-5b181f03b3d3/subagents/agent-a27497cfed8c44856.jsonl",
+              "timestamp": "2026-09-03T21:18:16.787Z",
+              "source_role": "assistant",
+              "record_sha256": "5a946162bf02487a6d3f24af4236d4a486ca39e06c423f322f263b28c70011d5",
+              "native_ids": [
+                "call_17b0486d26f74bf5aa55002e"
+              ]
+            },
+            {
+              "ref": "#a27497cfed8c44856:4502@L31",
+              "file_matches": 1,
+              "line": 31,
+              "ok": true,
+              "file": "2f01bcdc-0a92-4961-a64d-5b181f03b3d3/subagents/agent-a27497cfed8c44856.jsonl",
+              "timestamp": "2026-09-03T21:18:26.388Z",
+              "source_role": "assistant",
+              "record_sha256": "d5d5d8b17d02c78e42d4038660d7fc2f4b715d2c003673106505d2a4c4b4a4e0",
+              "native_ids": [
+                "call_b751d8c3336d470cae38df74"
+              ]
+            },
+            {
+              "ref": "#a27497cfed8c44856:4505@L35",
+              "file_matches": 1,
+              "line": 35,
+              "ok": true,
+              "file": "2f01bcdc-0a92-4961-a64d-5b181f03b3d3/subagents/agent-a27497cfed8c44856.jsonl",
+              "timestamp": "2026-09-03T21:18:35.605Z",
+              "source_role": "assistant",
+              "record_sha256": "e2c5c2320d2dd8bf89a1b86520e13ccb7a398b88c18a98db2f4a1cd74e1b5b81",
+              "native_ids": [
+                "call_e6d56b80320d4677b97b915b"
+              ]
+            },
+            {
+              "ref": "#a27497cfed8c44856:4507@L37",
+              "file_matches": 1,
+              "line": 37,
+              "ok": true,
+              "file": "2f01bcdc-0a92-4961-a64d-5b181f03b3d3/subagents/agent-a27497cfed8c44856.jsonl",
+              "timestamp": "2026-09-03T21:18:36.033Z",
+              "source_role": "assistant",
+              "record_sha256": "4429505296278c844975be287c5f763d10b98551f83f0a7fd89e8788c3f61683",
+              "native_ids": [
+                "call_e8130043aeef4043aa0e3ff0"
+              ]
+            },
+            {
+              "ref": "#a27497cfed8c44856:4511@L41",
+              "file_matches": 1,
+              "line": 41,
+              "ok": true,
+              "file": "2f01bcdc-0a92-4961-a64d-5b181f03b3d3/subagents/agent-a27497cfed8c44856.jsonl",
+              "timestamp": "2026-09-03T21:19:24.777Z",
+              "source_role": "assistant",
+              "record_sha256": "c146cc4cb19f479638b45729b5667285a88aeb8c3b596266d15deae467fc957a",
+              "native_ids": [
+                "call_f031a058037c467fb06fc159"
+              ]
+            },
+            {
+              "ref": "#a27497cfed8c44856:4513@L43",
+              "file_matches": 1,
+              "line": 43,
+              "ok": true,
+              "file": "2f01bcdc-0a92-4961-a64d-5b181f03b3d3/subagents/agent-a27497cfed8c44856.jsonl",
+              "timestamp": "2026-09-03T21:19:31.929Z",
+              "source_role": "assistant",
+              "record_sha256": "293cf7298c8f8f33fe2ac946178a36ddcfa2017913007853fb4151575ae62b30",
+              "native_ids": [
+                "call_7013085c03274c8183fdd455"
+              ]
+            },
+            {
+              "ref": "#a27497cfed8c44856:4515@L45",
+              "file_matches": 1,
+              "line": 45,
+              "ok": true,
+              "file": "2f01bcdc-0a92-4961-a64d-5b181f03b3d3/subagents/agent-a27497cfed8c44856.jsonl",
+              "timestamp": "2026-09-03T21:19:39.888Z",
+              "source_role": "assistant",
+              "record_sha256": "07b004834076111f9988a5e85040b50e151bb5b965bd6ae26c9e69444858477c",
+              "native_ids": [
+                "call_b6682a6aab774d88b1d1871d"
+              ]
+            },
+            {
+              "ref": "#a27497cfed8c44856:4520@L51",
+              "file_matches": 1,
+              "line": 51,
+              "ok": true,
+              "file": "2f01bcdc-0a92-4961-a64d-5b181f03b3d3/subagents/agent-a27497cfed8c44856.jsonl",
+              "timestamp": "2026-09-03T21:19:50.307Z",
+              "source_role": "assistant",
+              "record_sha256": "10e1437bc0a04dc5c1dc68ef301f3b27233de798eaa00b8eaae794308cdff519",
+              "native_ids": [
+                "call_15935d9b0309404dbcea7817"
+              ]
+            },
+            {
+              "ref": "#a349784d2663f1f0a:2043@L51",
+              "file_matches": 1,
+              "line": 51,
+              "ok": true,
+              "file": "81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a349784d2663f1f0a.jsonl",
+              "timestamp": "2026-09-03T15:39:17.014Z",
+              "source_role": "assistant",
+              "record_sha256": "dace27ded4b7ef8a19b61f16db273577625cdf7bf532819a655aa3d09c652247",
+              "native_ids": [
+                "call_6b3df8bad3354b9a8d07db9c"
+              ]
+            },
+            {
+              "ref": "#a349784d2663f1f0a:2045@L53",
+              "file_matches": 1,
+              "line": 53,
+              "ok": true,
+              "file": "81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a349784d2663f1f0a.jsonl",
+              "timestamp": "2026-09-03T15:39:17.927Z",
+              "source_role": "assistant",
+              "record_sha256": "126da5548c5f35ff3c7eb464e97212ee3775617beb6fe3a59b96071f470699bc",
+              "native_ids": [
+                "call_e785b4fa907646d8a4003a05"
+              ]
+            },
+            {
+              "ref": "#a349784d2663f1f0a:2049@L57",
+              "file_matches": 1,
+              "line": 57,
+              "ok": true,
+              "file": "81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a349784d2663f1f0a.jsonl",
+              "timestamp": "2026-09-03T15:39:25.327Z",
+              "source_role": "assistant",
+              "record_sha256": "cdb66b42d2c8c7c92282446573bd413258abeaec23751fb8ac879dc48d4e6631",
+              "native_ids": [
+                "call_1488a6869bea4472921ea35f"
+              ]
+            },
+            {
+              "ref": "#a349784d2663f1f0a:2061@L71",
+              "file_matches": 1,
+              "line": 71,
+              "ok": true,
+              "file": "81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a349784d2663f1f0a.jsonl",
+              "timestamp": "2026-09-03T15:51:35.645Z",
+              "source_role": "assistant",
+              "record_sha256": "6c12a40f131dafc10e44cc99b27fc6066faeb9ccc0537af7c849a3a8412c27fe",
+              "native_ids": [
+                "call_459071197f484436b71237e5"
+              ]
+            },
+            {
+              "ref": "#a52d61ac7ab7033ba:2526@L199",
+              "file_matches": 1,
+              "line": 199,
+              "ok": true,
+              "file": "81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a52d61ac7ab7033ba.jsonl",
+              "timestamp": "2026-09-03T19:35:55.153Z",
+              "source_role": "assistant",
+              "record_sha256": "f2ddce45496563d0a203f1d937e18948774634d63c81a31e5eb920212a2e6d24",
+              "native_ids": [
+                "call_be93dc52366042928a4db7d2"
+              ]
+            },
+            {
+              "ref": "#a52d61ac7ab7033ba:2571@L260",
+              "file_matches": 1,
+              "line": 260,
+              "ok": true,
+              "file": "81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a52d61ac7ab7033ba.jsonl",
+              "timestamp": "2026-09-03T19:45:29.124Z",
+              "source_role": "assistant",
+              "record_sha256": "32858b137a54e30f04e9b6973e17a29806ef3ded079a3ab7c402b8b790b26e61",
+              "native_ids": [
+                "call_96ce7a6be13e494aa626ca2e"
+              ]
+            },
+            {
+              "ref": "#a52d61ac7ab7033ba:2668@L390",
+              "file_matches": 1,
+              "line": 390,
+              "ok": true,
+              "file": "81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a52d61ac7ab7033ba.jsonl",
+              "timestamp": "2026-09-03T20:05:48.750Z",
+              "source_role": "assistant",
+              "record_sha256": "bc194d617f84a58588be01e297ebc24cb0e23dc18b9a6be3d7f784f6bec45a83",
+              "native_ids": [
+                "call_bf1ca4153f7f4401bfa2c676"
+              ]
+            },
+            {
+              "ref": "#a635575c78cd15ff6:4551@L33",
+              "file_matches": 1,
+              "line": 33,
+              "ok": true,
+              "file": "2f01bcdc-0a92-4961-a64d-5b181f03b3d3/subagents/agent-a635575c78cd15ff6.jsonl",
+              "timestamp": "2026-09-03T21:23:40.800Z",
+              "source_role": "assistant",
+              "record_sha256": "c859439b47a2d1b44527d6c152972a0b847e23319b0703a7491e44399c1e1698",
+              "native_ids": [
+                "call_53a6741f92474c9bb9ab039c"
+              ]
+            },
+            {
+              "ref": "#a635575c78cd15ff6:4560@L43",
+              "file_matches": 1,
+              "line": 43,
+              "ok": true,
+              "file": "2f01bcdc-0a92-4961-a64d-5b181f03b3d3/subagents/agent-a635575c78cd15ff6.jsonl",
+              "timestamp": "2026-09-03T21:23:58.751Z",
+              "source_role": "assistant",
+              "record_sha256": "1f9fb760c4c8a2cc1fa7a581d2443ef45ec2722c610c3ffba4f5ca3b351139bb",
+              "native_ids": [
+                "call_01dfaa766cce469ca64faf64"
+              ]
+            },
+            {
+              "ref": "#a711c5d09fb676814:2855@L7",
+              "file_matches": 1,
+              "line": 7,
+              "ok": true,
+              "file": "81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a711c5d09fb676814.jsonl",
+              "timestamp": "2026-09-03T19:10:15.792Z",
+              "source_role": "assistant",
+              "record_sha256": "0bc10163e6eda4ebce91274e887fe7f6924a667893a990dd00533f7d1335d65c",
+              "native_ids": [
+                "call_189b2504fca14e68979322c2"
+              ]
+            },
+            {
+              "ref": "#a711c5d09fb676814:2859@L11",
+              "file_matches": 1,
+              "line": 11,
+              "ok": true,
+              "file": "81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a711c5d09fb676814.jsonl",
+              "timestamp": "2026-09-03T19:10:17.886Z",
+              "source_role": "assistant",
+              "record_sha256": "028dea57f880deba2fee2260bd5b295f8f77a66348cc26a9d37363355aa6a767",
+              "native_ids": [
+                "call_769beeda1a324d3d95de7251"
+              ]
+            },
+            {
+              "ref": "#a711c5d09fb676814:2870@L23",
+              "file_matches": 1,
+              "line": 23,
+              "ok": true,
+              "file": "81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a711c5d09fb676814.jsonl",
+              "timestamp": "2026-09-03T19:12:50.664Z",
+              "source_role": "assistant",
+              "record_sha256": "c2ae60d5fd80614714259ba4b9965100f41224d4475d76e7cc99a89fde4444be",
+              "native_ids": [
+                "call_977967894b8142229423c38c"
+              ]
+            },
+            {
+              "ref": "#a711c5d09fb676814:2881@L35",
+              "file_matches": 1,
+              "line": 35,
+              "ok": true,
+              "file": "81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a711c5d09fb676814.jsonl",
+              "timestamp": "2026-09-03T19:17:13.810Z",
+              "source_role": "assistant",
+              "record_sha256": "ca124a76d4213257ec504a1a8c1f9a88bc24e3064941005916d9f2576a8ba75a",
+              "native_ids": [
+                "call_003bc0a35ce74684a5296325"
+              ]
+            },
+            {
+              "ref": "#a711c5d09fb676814:2883@L37",
+              "file_matches": 1,
+              "line": 37,
+              "ok": true,
+              "file": "81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a711c5d09fb676814.jsonl",
+              "timestamp": "2026-09-03T19:17:21.617Z",
+              "source_role": "assistant",
+              "record_sha256": "b7197d5f9f4beed5084a5659b86c49f26716aa6f93a0a16a72f58bac5a3dcc90",
+              "native_ids": [
+                "call_6c1a4dd0da164350a549d420"
+              ]
+            },
+            {
+              "ref": "#a711c5d09fb676814:2885@L39",
+              "file_matches": 1,
+              "line": 39,
+              "ok": true,
+              "file": "81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a711c5d09fb676814.jsonl",
+              "timestamp": "2026-09-03T19:17:35.691Z",
+              "source_role": "assistant",
+              "record_sha256": "9aa5b948a807268d1cf8910068fad64a2c798bab89963eab63d708dc9b44665f",
+              "native_ids": [
+                "call_04086bf7960b46e7b2a00be4"
+              ]
+            }
+          ],
+          "candidate_bindings": [
+            {
+              "source": "touch",
+              "ref": "#a27497cfed8c44856:4520@L51",
+              "candidate": "candidate:5f2d9c07547205c7eefa",
+              "matches": 1
+            }
+          ],
+          "draft_changes": [
+            {
+              "InputObject": "    entry: []",
+              "SideIndicator": "=>"
+            },
+            {
+              "InputObject": "    entry: []",
+              "SideIndicator": "=>"
+            },
+            {
+              "InputObject": "    entry: [\"agent:agent-a711c5d09fb676814@v4\"]",
+              "SideIndicator": "<="
+            },
+            {
+              "InputObject": "    entry_events: [D1E1]",
+              "SideIndicator": "<="
+            },
+            {
+              "InputObject": "    entry: [\"agent:agent-a27497cfed8c44856@v3\"]",
+              "SideIndicator": "<="
+            },
+            {
+              "InputObject": "    entry_events: [D2E1, D2E2]",
+              "SideIndicator": "<="
+            }
+          ],
+          "check_revision": "只修改entry/entry_events列表，3自洽warnings→0；memory错述未改变、未新增原文查询，matched不核原因真伪。"
+        },
+        "fact_detail_counts": {
+          "supported": 5,
+          "partial": 1,
+          "omitted": 0,
+          "contradicted": 0
+        }
+      },
+      {
+        "case": "splash",
+        "variant": "formal-v10",
+        "arm": "tools",
+        "rep": 2,
+        "run": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v10/splash/runs/tools/rep2",
+        "source_code_id": "80c099e",
+        "source_digest": "b47380bd789929d3181eae024e4dee12709d8878615ebe7bd85e0271a37a35ed",
+        "pool_digest": "a78b1373045f7558d6da3b76123e30d032635a2a0b4cdd665e7f80c0bdf8b337",
+        "common_task_sha256": "d2f9f03d6b8a4c56e405559fe7160308ecc1d054b877ebf64250dd084ec85134",
+        "model": [
+          "gpt-5.5"
+        ],
+        "effort": "medium",
+        "questions": [
+          {
+            "id": "S1",
+            "core": "partial",
+            "basis": "初版callback、协议页回跳/后置onWillDismiss与NavBar兜底、build通知有据；未交代entrysetup删除/D020及Slice11 isModal错误判断，题意缩成popInfo链。另有group2具体改写作者误归，单列material。",
+            "mandatory_gaps": [
+              "entrysetup L123/L124删除callback和后续D020接受外壳差异未交代。",
+              "Slice11声称isModal吃BACK→finding反驳的完整决策链未说明，只讲popInfo回调。"
+            ],
+            "minor_omissions": [
+              "后置构建主要按通知主张，没有直核全部native日志；已明确不作设备复测。"
+            ],
+            "facts": [
+              {
+                "id": "S1.f1",
+                "status": "supported",
+                "report_claim": "初版NavDestination onBackPressed true，隐私业务交后期Slice11。",
+                "raw_evidence": [
+                  "converter L71/L72"
+                ]
+              },
+              {
+                "id": "S1.f2",
+                "status": "omitted",
+                "report_claim": "没有entrysetup删除/D020的叙述，只从初版跳到Slice11/group2。",
+                "raw_evidence": [
+                  "entrysetup L123/L124; Slice11 L250/L251"
+                ]
+              },
+              {
+                "id": "S1.f3",
+                "status": "partial",
+                "report_claim": "核到onWillDismiss修复和后置NavBar兜底，但未说明先前isModal错误判断/其反证。",
+                "raw_evidence": [
+                  "Slice11 L236/L237,L250/L251; fixer L320/L321,L346/L347,L352/L353"
+                ],
+                "gap": "初始返回禁用与协议页popInfo链不能替代该必核决策。"
+              },
+              {
+                "id": "S1.f4",
+                "status": "supported",
+                "report_claim": "后置BUILD_STATUS PASS通知，仍不认证BACK/系统栏设备复验。",
+                "raw_evidence": [
+                  "builder L36/L37,L39/L40; rootff L1758"
+                ],
+                "model_received": "transcript L183真正展开通知"
+              }
+            ]
+          },
+          {
+            "id": "S2",
+            "core": "pass",
+            "basis": "明确生成前时间窗、早期主题已有与实际generator输入边界，隐藏/helper脚本及正式v53onRoute恢复分开；generator不再强标红进入。",
+            "mandatory_gaps": [],
+            "minor_omissions": [
+              "未追root L404原始主题Read，已有早期ui-manifest足以支持要求先在。"
+            ],
+            "facts": [
+              {
+                "id": "S2.f1",
+                "status": "partial",
+                "report_claim": "生成前ui-manifest/AndroidManifest包含Launch主题，未开rootL404原始theme回执。",
+                "raw_evidence": [
+                  "root9b L404,L520"
+                ],
+                "gap": "不以特定locator作为核心门槛。"
+              },
+              {
+                "id": "S2.f2",
+                "status": "supported",
+                "report_claim": "实际generator meta/spec/skill有immersive信息，主题字面零命中不证明语义不存在，归责generator未知。",
+                "raw_evidence": [
+                  "converter L1,L15/L16,L37/L38; root9b L520"
+                ]
+              },
+              {
+                "id": "S2.f3",
+                "status": "supported",
+                "report_claim": "先脚本aboutToAppear隐藏/disappear恢复与helper，再v53新增onRoute还原。",
+                "raw_evidence": [
+                  "fixer L485/L486,L488/L489"
+                ],
+                "boundary": "本次脚本仅开输入但头标成功，已按完整文本叙述实际修复阶段，不要求特定执行术语；最终设备结果仍未知。"
+              }
+            ]
+          }
+        ],
+        "extra_false_claims": [
+          {
+            "code": "wrong_actor_for_specific_change",
+            "question": "S1",
+            "severity": "material",
+            "report_location": "S1.nodes[group2-closer@v45].reason",
+            "node": "agent:agent-agroup2-closer-b7ebd5ae592d3c5d@v45",
+            "report_quote": "group2-closer v46 改写/补强 openAgreementPage…并把判定改为 vm.privacyDialogVisible",
+            "claimed_event": {
+              "ref": "#b7ebd5ae592d3c5d:9242@L351",
+              "file": "9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-agroup2-closer-b7ebd5ae592d3c5d.jsonl",
+              "line": 351,
+              "id": "toolu_01J61BUS87ognmrTzXEAdQAk",
+              "time": "2026-07-24T16:50:28.209Z",
+              "actual_delta": "只新增空URL guard与为何不用WebViewLauncher的注释；未改回调判定。"
+            },
+            "contrary_event": {
+              "file": "9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aslice11-startup-50a0622bcfe4a588.jsonl",
+              "line": 239,
+              "id": "toolu_017jShgEerwM5aHzA8aS1eBs",
+              "time": "2026-07-24T16:00:45.985Z",
+              "old": "reopen && !PrivacyGateReady.agreed()",
+              "new": "this.vm.privacyDialogVisible",
+              "record_sha256": "4dfd6c4851780fcb8a29b6f051905d10801b80783c158a6e3a359f3c6a21fd6c"
+            },
+            "why_false": "filev46快照有该predicate，但其新增效应发生在更早Slice11原始Edit；从快照存在误推当前writer改变它。node@v45与L351本身能定位也不能证明所述delta。",
+            "core_treatment": "保留冻结S1corepartial与原分母；这条额外group2支线material错归独立否决完整归因，不能因core不fail称本案正确。"
+          }
+        ],
+        "annotation_requires_correction": true,
+        "annotation_reason": "明确group2特定改变作者错归，且S1原有mandatory缺项。S2generator不再无依据红进入，但普通状态/改动措辞仍需精确。",
+        "advisories": [
+          {
+            "code": "restore_addition_not_literal_move",
+            "question": "S2",
+            "report_quote": "把还原动作移到onRoute",
+            "raw": "v53只新增onRoute(true)，原aboutToDisappear(true)仍保留兜底。",
+            "assessment": "可理解为主要触发时机调整，未明确声称删除旧调用；记精确措辞建议，不强行列material false/corefail。"
+          }
+        ],
+        "event_review": {
+          "count": 2,
+          "events": [
+            "S1_FINDING=L320来源finding",
+            "S2_FINDING=L438来源finding"
+          ],
+          "boundaries": "实际修复在普通node文本与原文引用中说明，不产生不存在版本。group2@v45真实对应L351，但特定变更原因仍错。"
+        },
+        "query_review": {
+          "tool_calls": 44,
+          "action_calls": 13,
+          "agent_calls": 2,
+          "successful_agent_calls": 1,
+          "successful_agent": "converter@v1",
+          "search_calls": 17,
+          "until_ts_searches": 9,
+          "rejected_calls": 1,
+          "detail": "三次生成前全池search含setWindowSystemBarEnable/Theme/状态栏，另外四次agentv1字面搜索；后置通知实际打开。L346/L485仅输入展开、无独立output调用；不能伪称已展开完整成功回执。group2只开filev46快照，未开L351真正delta。"
+        },
+        "metrics": {
+          "input_total": 1538158,
+          "cached_included_in_input": 1385984,
+          "output": 14047,
+          "total_input_plus_output": 1552205,
+          "wall_s": 306.58635570004117,
+          "end_to_end_wall_s": 319.92724220000673,
+          "tool_calls": 44,
+          "tool_chars": 250436,
+          "rejected_calls": 1,
+          "repeated_calls": 0
+        },
+        "mechanical": {
+          "final_check": {
+            "status": "matched",
+            "semantic_checked": false,
+            "checks": [
+              {
+                "step": 43,
+                "call_id": "call_rl1Pfb9xlI1MK17vus1s7gSW",
+                "verified": true,
+                "status": "needs_review",
+                "counts": {
+                  "errors": 0,
+                  "warnings": 4,
+                  "total": 4
+                },
+                "draft_sha256": "e44676769ef5aa4788cb3591fe044ee1fa42d809c2c4b3f0e5beb0d6db2f6dd5",
+                "document_sha256": "9761885854926ae24999d4205546d3ed87c2eec466b453e80c45acfa92bddb82",
+                "issues": [
+                  {
+                    "code": "entry_role_conflict",
+                    "severity": "warning",
+                    "where": "defect:S1",
+                    "node": "agent:agent-agroup2-closer-b7ebd5ae592d3c5d@v45",
+                    "detail": "同一缺陷把此节点列为进入点，却标为 带病传递；请核对，未代替模型改判。"
+                  },
+                  {
+                    "code": "entry_role_conflict",
+                    "severity": "warning",
+                    "where": "defect:S1",
+                    "node": "agent:agent-a68daf720e780b4c2@v21",
+                    "detail": "同一缺陷把此节点列为进入点，却标为 正常；请核对，未代替模型改判。"
+                  },
+                  {
+                    "code": "entry_role_conflict",
+                    "severity": "warning",
+                    "where": "defect:S2",
+                    "node": "agent:agent-aconv-splash-9d5902d803bbcde6@v1",
+                    "detail": "同一缺陷把此节点列为进入点，却标为 无法确认；请核对，未代替模型改判。"
+                  },
+                  {
+                    "code": "entry_role_conflict",
+                    "severity": "warning",
+                    "where": "defect:S2",
+                    "node": "agent:agent-a68daf720e780b4c2@v31",
+                    "detail": "同一缺陷把此节点列为进入点，却标为 正常；请核对，未代替模型改判。"
+                  }
+                ],
+                "omitted_issues": 0,
+                "coverage": {
+                  "checked": true,
+                  "target": "entry/src/main/ets/pages/SplashPage.ets",
+                  "counts": {
+                    "expected": 29,
+                    "provided": 2,
+                    "accounted": 29,
+                    "expected_versions": 2,
+                    "expected_candidates": 27,
+                    "missing_versions": 0,
+                    "missing_candidates": 0,
+                    "missing": 0,
+                    "unresolved": 0,
+                    "not_repair": 0,
+                    "deferred": 0,
+                    "unconfirmed": 0,
+                    "advisories": 0,
+                    "advisory_rows": 0,
+                    "reviewed": 2,
+                    "not_investigated": 27
+                  },
+                  "accounted": true,
+                  "semantic_checked": false,
+                  "mode": "manifest_complement",
+                  "manifest_identity_valid": true,
+                  "declarations_complete": false
+                }
+              },
+              {
+                "step": 44,
+                "call_id": "call_fJBKMzEblPYwjTY5bGiMtV5m",
+                "verified": true,
+                "status": "mechanical_clear",
+                "counts": {
+                  "errors": 0,
+                  "warnings": 0,
+                  "total": 0
+                },
+                "draft_sha256": "6af26037a83cacbfcef2964d7f21392763f3473c20991e6dd56c91974b05a1b1",
+                "document_sha256": "19bda70ee062047a1a78accf5a77be72d485a24aefcf3efb5b855fecacc56341",
+                "issues": [],
+                "omitted_issues": 0,
+                "coverage": {
+                  "checked": true,
+                  "target": "entry/src/main/ets/pages/SplashPage.ets",
+                  "counts": {
+                    "expected": 29,
+                    "provided": 2,
+                    "accounted": 29,
+                    "expected_versions": 2,
+                    "expected_candidates": 27,
+                    "missing_versions": 0,
+                    "missing_candidates": 0,
+                    "missing": 0,
+                    "unresolved": 0,
+                    "not_repair": 0,
+                    "deferred": 0,
+                    "unconfirmed": 0,
+                    "advisories": 0,
+                    "advisory_rows": 0,
+                    "reviewed": 2,
+                    "not_investigated": 27
+                  },
+                  "accounted": true,
+                  "semantic_checked": false,
+                  "mode": "manifest_complement",
+                  "manifest_identity_valid": true,
+                  "declarations_complete": false
+                }
+              }
+            ],
+            "check_calls": 2,
+            "draft_chars": 15457,
+            "returned_chars": 2782,
+            "final_document_sha256": "19bda70ee062047a1a78accf5a77be72d485a24aefcf3efb5b855fecacc56341",
+            "matched_check": 44
+          },
+          "coverage_counts": {
+            "expected": 29,
+            "provided": 2,
+            "accounted": 29,
+            "expected_versions": 2,
+            "expected_candidates": 27,
+            "missing_versions": 0,
+            "missing_candidates": 0,
+            "missing": 0,
+            "unresolved": 0,
+            "not_repair": 0,
+            "deferred": 0,
+            "unconfirmed": 0,
+            "advisories": 0,
+            "advisory_rows": 0,
+            "reviewed": 2,
+            "not_investigated": 27
+          },
+          "declarations_complete": false,
+          "trace_identity_bound": true,
+          "raw_equals_last_draft": true,
+          "yaml_equals_raw_trim": true,
+          "yaml_sha256": "6af26037a83cacbfcef2964d7f21392763f3473c20991e6dd56c91974b05a1b1",
+          "document_sha256": "19bda70ee062047a1a78accf5a77be72d485a24aefcf3efb5b855fecacc56341",
+          "submission_status": "accepted",
+          "locator_count": 12,
+          "locator_checks": [
+            {
+              "ref": "#50a0622bcfe4a588:10739@L236",
+              "file_matches": 1,
+              "line": 236,
+              "ok": true,
+              "file": "9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aslice11-startup-50a0622bcfe4a588.jsonl",
+              "timestamp": "2026-07-24T16:00:31.136Z",
+              "source_role": "assistant",
+              "record_sha256": "84cc54b4fb78658c4106930bd31368632707a3c6250850927de3a7efd6a555c9",
+              "native_ids": [
+                "toolu_01HK6amCmnLqbfQFefbryS7b"
+              ]
+            },
+            {
+              "ref": "#9b3105a2:192@L520",
+              "file_matches": 1,
+              "line": 520,
+              "ok": true,
+              "file": "9b3105a2-85ec-4889-9786-b3c220f06754.jsonl",
+              "timestamp": "2026-07-23T12:43:34.616Z",
+              "source_role": "assistant",
+              "record_sha256": "e9f3540bdd7c5be2d04748d55e52e80e77dbfe69ba016391a910c053cf9d695c",
+              "native_ids": [
+                "toolu_01WrSaMTmGsM2pkfDGZr3peJ"
+              ]
+            },
+            {
+              "ref": "#9d5902d803bbcde6:7526@L37",
+              "file_matches": 1,
+              "line": 37,
+              "ok": true,
+              "file": "9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aconv-splash-9d5902d803bbcde6.jsonl",
+              "timestamp": "2026-07-24T01:58:25.961Z",
+              "source_role": "assistant",
+              "record_sha256": "369efb564ee20a932a0f6f6c949e1d643ee0c6d4e977720a1a5caf55102f423d",
+              "native_ids": [
+                "toolu_013XZ3HDcPMmLdCP82Egq6EY"
+              ]
+            },
+            {
+              "ref": "#9d5902d803bbcde6:7548@L71",
+              "file_matches": 1,
+              "line": 71,
+              "ok": true,
+              "file": "9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aconv-splash-9d5902d803bbcde6.jsonl",
+              "timestamp": "2026-07-24T02:07:13.800Z",
+              "source_role": "assistant",
+              "record_sha256": "3c9debf2a570b62dc9285fd4f07f4d18087367c552681bc4f4d4eed54c4a9cc9",
+              "native_ids": [
+                "toolu_01Np1dfx5cY3fQ9uZrHBVkbq"
+              ]
+            },
+            {
+              "ref": "#a68daf720e780b4c2:15550@L320",
+              "file_matches": 1,
+              "line": 320,
+              "ok": true,
+              "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+              "timestamp": "2026-07-26T21:01:36.924Z",
+              "source_role": "assistant",
+              "record_sha256": "dc6cd88351bddf8276cd81b39d1b454764ada59b1d19f2634ccf9f629aea1058",
+              "native_ids": [
+                "toolu_019bvhwcGrGcXSRZpcmCqdzp"
+              ]
+            },
+            {
+              "ref": "#a68daf720e780b4c2:15567@L346",
+              "file_matches": 1,
+              "line": 346,
+              "ok": true,
+              "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+              "timestamp": "2026-07-26T21:05:54.915Z",
+              "source_role": "assistant",
+              "record_sha256": "02f0e169a87a5be3ec84f52e4934cf050b093a966f5a4fc9e979895434aa609c",
+              "native_ids": [
+                "toolu_01DzVErQMcevEwF2f5T3E1U8"
+              ]
+            },
+            {
+              "ref": "#a68daf720e780b4c2:15569@L352",
+              "file_matches": 1,
+              "line": 352,
+              "ok": true,
+              "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+              "timestamp": "2026-07-26T21:06:31.863Z",
+              "source_role": "assistant",
+              "record_sha256": "a40d7bc21827e1c782b40921a135978e92e14a53ef82fe727ebbe3032f6dde42",
+              "native_ids": [
+                "toolu_01TRP8mc5pnikgvEnDDkDRuG"
+              ]
+            },
+            {
+              "ref": "#a68daf720e780b4c2:15627@L438",
+              "file_matches": 1,
+              "line": 438,
+              "ok": true,
+              "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+              "timestamp": "2026-07-26T21:16:28.992Z",
+              "source_role": "assistant",
+              "record_sha256": "45015f02beba659d8b775f1834230ba14879df8db8d91bc9944bd70a0a740dc3",
+              "native_ids": [
+                "toolu_012ikXRRimcuNK89smwLWUNn"
+              ]
+            },
+            {
+              "ref": "#a68daf720e780b4c2:15652@L481",
+              "file_matches": 1,
+              "line": 481,
+              "ok": true,
+              "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+              "timestamp": "2026-07-26T21:19:47.143Z",
+              "source_role": "assistant",
+              "record_sha256": "ea7c1a36986013518335fef18e9f79a6c7db9ce70f1cdba1ca753970a84d0196",
+              "native_ids": [
+                "toolu_01HS1zwyoVKWev6p7ApLxPqi"
+              ]
+            },
+            {
+              "ref": "#a68daf720e780b4c2:15655@L485",
+              "file_matches": 1,
+              "line": 485,
+              "ok": true,
+              "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+              "timestamp": "2026-07-26T21:20:10.255Z",
+              "source_role": "assistant",
+              "record_sha256": "2cdd0931f283d641844a8ee10039f950633e1b3a8b3b97eb3e2de1eed85a2ae8",
+              "native_ids": [
+                "toolu_016H83iNne123bAaGFHtEhwF"
+              ]
+            },
+            {
+              "ref": "#a68daf720e780b4c2:15656@L488",
+              "file_matches": 1,
+              "line": 488,
+              "ok": true,
+              "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+              "timestamp": "2026-07-26T21:20:24.982Z",
+              "source_role": "assistant",
+              "record_sha256": "ae41f9a5b65c7f9101a49c48f25c68ca2d960666571ce87fa5d384d3fe398eea",
+              "native_ids": [
+                "toolu_01RknAJc4tUhzwpypigkLeRv"
+              ]
+            },
+            {
+              "ref": "#b7ebd5ae592d3c5d:9242@L351",
+              "file_matches": 1,
+              "line": 351,
+              "ok": true,
+              "file": "9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-agroup2-closer-b7ebd5ae592d3c5d.jsonl",
+              "timestamp": "2026-07-24T16:50:28.209Z",
+              "source_role": "assistant",
+              "record_sha256": "540272e3df13b89b8f973522ff68d3e0bcc715360565091f8ab3f1b08eea8ffa",
+              "native_ids": [
+                "toolu_01J61BUS87ognmrTzXEAdQAk"
+              ]
+            }
+          ],
+          "draft_changes": [
+            {
+              "InputObject": "    entry: [\"agent:agent-aslice11-startup-50a0622bcfe4a588@v22\"]",
+              "SideIndicator": "=>"
+            },
+            {
+              "InputObject": "    entry: []",
+              "SideIndicator": "=>"
+            },
+            {
+              "InputObject": "    entry: [\"agent:agent-aslice11-startup-50a0622bcfe4a588@v22\", \"agent:agent-agroup2-closer-b7ebd5ae592d3c5d@v45\", \"agent:agent-a68daf720e780b4c2@v21\"]",
+              "SideIndicator": "<="
+            },
+            {
+              "InputObject": "    entry: [\"agent:agent-aconv-splash-9d5902d803bbcde6@v1\", \"agent:agent-a68daf720e780b4c2@v31\"]",
+              "SideIndicator": "<="
+            }
+          ],
+          "check_revision": "4warnings只通过进入点列表改动清零；未新增原文、group2错述未纠正。matched不验证具体变化作者。"
+        },
+        "fact_detail_counts": {
+          "supported": 4,
+          "partial": 2,
+          "omitted": 1,
+          "contradicted": 0
+        }
+      }
+    ],
+    "pending_runs": [],
+    "summary": {
+      "core": {
+        "pass": 4,
+        "partial": 2,
+        "fail": 0,
+        "total": 6
+      },
+      "extra_false_claims": 2,
+      "material_extra_false_claims": 2,
+      "joint_acceptance": false
+    },
+    "cost_observations": [
+      {
+        "case": "member-center",
+        "rep1": 1734771,
+        "rep2": 664424,
+        "mean": 1199597.5,
+        "raw_two_rep_mean": 2691060,
+        "saving_pct": 55.42286310970399,
+        "boundary": "samecoreS3pass/S4partial; H5detailvaries, rep1branchlabelerrorretained"
+      },
+      {
+        "case": "dice-entry",
+        "rep1": 1452247,
+        "rep2": 1310516,
+        "mean": 1381381.5,
+        "raw_two_rep_mean": 1413930.5,
+        "saving_pct": 2.302022624167166,
+        "boundary": "rep1D1partial→rep2pass but rep2 materialmemoryexclusion; bothremaininrecord"
+      },
+      {
+        "case": "splash",
+        "rep1": 1975521,
+        "rep2": 1552205,
+        "mean": 1763863,
+        "raw_two_rep_mean": 3305569.5,
+        "saving_pct": 46.63966375536802,
+        "boundary": "bothS1partial/S2pass; rep1unsupportedentry andrep2wrongactor retained"
+      }
+    ]
+  },
+  "all_six_run_summary": {
+    "core": {
+      "pass": 7,
+      "partial": 5,
+      "fail": 0,
+      "total": 12
+    },
+    "extra_false_claims": 3,
+    "material_extra_false_claims": 2,
+    "material_unsupported_causal_annotations": 1,
+    "joint_acceptance": false,
+    "details": [
+      "rep1 Member非selected分支标签factualdetail",
+      "rep1 Splash无充分依据的generator红进入点materialannotation",
+      "rep2 Dice错误memory修复后排除materialfalse",
+      "rep2 Splash group2具体改写作者误归materialfalse"
+    ],
+    "not_accuracy_rate": true,
+    "no_rep1_replacement": true
+  },
+  "sealed_note": "All V10 legacy rep1/rep2 adjudications complete. Do not overwrite these scores with later variants; V11 requires separate documents."
+}
