@@ -103,12 +103,13 @@ def test_or_accepts_only_explicit_timezone_windows(stamp):
 
 @pytest.mark.parametrize("stamp", ["2026-01-01", "2026-01-01T00:00:05", "2026-01-01 00:00:05",
                                    " 2026-01-01T00:00:05Z "])
-def test_or_rejects_timezone_free_or_noncanonical_windows_without_changing_q(stamp):
+def test_search_rejects_timezone_free_or_noncanonical_new_windows(stamp):
     from migloop import search_terms
     assert not search_terms.valid_time(stamp)
     with pytest.raises(ValueError, match="ISO"):
         atom_queries.parameters("search", {"q_any": ["alpha", "beta"], "until_ts": stamp})
-    assert atom_queries.parameters("search", {"q": "alpha", "until_ts": stamp})["until_ts"] == stamp
+    with pytest.raises(ValueError, match="ISO"):
+        atom_queries.parameters("search", {"q": "alpha", "until_ts": stamp})
 
 
 @pytest.mark.parametrize("stamp", ["2026-01-01", "2026-01-01T00:00:02"])

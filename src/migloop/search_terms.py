@@ -39,6 +39,20 @@ def normalize(q: Any, q_any: Any, *, http_json: bool = False) -> list[str] | Non
     return list(q_any)
 
 
+def literal_span(text: str, needle: str, offset: int = 0) -> tuple[int, int] | None:
+    """Case-insensitive literal location in ORIGINAL decoded characters, not lower() indices."""
+    start = max(0, min(offset, len(text)))
+    lowered = text.lower()
+    pos = lowered.find(needle.lower(), len(text[:start].lower()))
+    if pos < 0:
+        return None
+    end = pos + len(needle.lower())
+    if len(lowered) == len(text):
+        return pos, end
+    mapping = [i for i, ch in enumerate(text) for _ in ch.lower()]
+    return (mapping[pos], mapping[end - 1] + 1) if end > pos else (start, start)
+
+
 def scan(text: str, terms: list[str]) -> dict[str, Any] | None:
     """One decoded field, one lowercase pass. Excerpts are exact field slices.
 

@@ -32,7 +32,7 @@ _RANK = {"错": 3, "缺": 2, "传递": 1}
 
 
 def _step_scope(tool: str, inp: dict[str, Any]) -> str:
-    """这一步看到了什么范围:索引 / 正文 vN / 差分 / 搜索窗口 / 原文 —— 蓝框只说明查过这个键,范围在这里。"""
+    """请求参数中的范围，不认证实际交付正文；未知内容/未命中仍可有正常工具返回。"""
     v = inp.get("v")
     vs = f" v{v}" if v is not None else ""
     if tool == "file":

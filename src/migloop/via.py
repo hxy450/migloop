@@ -109,13 +109,16 @@ class ViaState:
             self.opened.append(node)
 
 
-def search_args(args: dict[str, Any]) -> dict[str, Any]:
+def search_args(args: dict[str, Any], *, historical: bool = False) -> dict[str, Any]:
     if not isinstance(args, dict):
         raise ValueError("search 参数必须是对象")
     out = {key: args.get(key, default) for key, default in SEARCH_DEFAULTS.items()}
     if args.get("q_any") is not None:
         from . import atom_queries
-        normalized = atom_queries.parameters("search", {**out, "q_any": args["q_any"]})
+        # Replay binds the recorded arguments, not today's stricter request
+        # policy. A valid historical receipt is not proof its scope was sound.
+        normalized = atom_queries.parameters("search", {**out, "q_any": args["q_any"]},
+                                             validate_search_scope=not historical)
         out = {key: normalized[key] for key in SEARCH_DEFAULTS}
         out["q_any"] = normalized["q_any"]
     return out
@@ -161,7 +164,7 @@ def search_receipt(text: str, args: dict[str, Any]) -> dict[str, Any] | None:
         return None
     try:
         row = json.loads(footer)
-        normalized_args = search_args(args)
+        normalized_args = search_args(args, historical=True)
     except (ValueError, TypeError):
         return None
     schema = SEARCH_OR_SCHEMA if normalized_args.get("q_any") is not None else SEARCH_SCHEMA

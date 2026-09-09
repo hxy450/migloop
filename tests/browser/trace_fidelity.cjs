@@ -456,6 +456,7 @@ async function main(){
     await check('timeline transition responds to a real mouse click without inventing an edge',"document.querySelector('#canvas .node.sel').textContent.startsWith('Agent A v1') && document.querySelectorAll('.wire.route').length===0");
     await evaluate(clickAgent);
     await check('all repeated visits and query windows preserved in drawer',"document.querySelectorAll('#side .pvisit').length===3 && document.querySelector('#side .pvisits').textContent.includes('start=2 n=4')");
+    await check('query windows are labelled requested, not certified body delivery',"[...document.querySelectorAll('#side .pvisit .preason')].filter(n=>n.textContent.includes('请求范围：')).length===3 && document.querySelector('#side .pvisits').textContent.includes('不证明正文可得或全部交付')");
     await check('partial return is still opened but never labelled as full delivery',"document.querySelectorAll('#side .delivery-truncated').length===1 && document.querySelector('#side .delivery-truncated').parentElement.textContent.includes('已打开') && document.querySelector('#side .pvisits').textContent.includes('不证明全文交付')");
     await evaluate("[...document.querySelectorAll('.dchips span')].find(n=>n.textContent.startsWith('A ')).click()");
     await check('A drawer isolated',"document.querySelector('#side').textContent.includes('A 独有原因') && !document.querySelector('#side').textContent.includes('B 独有原因')");

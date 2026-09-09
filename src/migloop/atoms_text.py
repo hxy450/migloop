@@ -323,6 +323,28 @@ def render_file(ledger: atoms.Ledger, hint: str, v: int | None = None, root: str
                                   else ("部分已知(脚本字面量里的正文,不是全文;content=1 看)" if fa.get("partial_known")
                                         else "无法复原 —— " + _unknown_reason(vv_anchor)))
                    + _hops(ledger, ("f", fa["path"], anchor)) + "(累计/窗口口径;每次 agent↔文件转换算一跳,派发算一跳)")
+    # A body-window request with no recoverable body is not a request to
+    # retransmit the whole index. Keep its exact node and recovery pointers;
+    # explicitly requested diff/read/mention sections still use the full path.
+    if (content and (start is not None or n is not None) and vv_anchor is not None
+            and not vv_anchor["content_known"] and not fa.get("partial_known")
+            and not diff and not readers and not m_n and not m_all
+            and v_from is None and v_to is None):
+        out.append(f"## 请求正文不可满足：start={start if start is not None else 1}, n={n if n is not None else '未指定'}")
+        out.append("这一版内容无法复原，本次没有交付所请求的正文行；换行号不会恢复未知内容。")
+        out.append("当前版本记录：" + _who(ledger, vv_anchor["by"], vv_anchor["by_ver"])
+                   + " · " + _evidence_label(vv_anchor) + " · " + vv_anchor["ts"])
+        if vv_anchor.get("seq") is not None and ledger.locs.get(vv_anchor["seq"]):
+            out.append("原始动作：" + _core(vv_anchor["seq"], ledger.locs.get(vv_anchor["seq"]))
+                       + "；用 action(ref=该引用) 展开记录输入/输出，不保证能复原整文件。")
+        else:
+            out.append("原始定位未记录，不能拼造 action(ref) 引用；展开索引检查候选来源。")
+        out.append(f"未展开索引：≤v{anchor} 历史 {len(fa['versions'])} 版、断点 {len(fa['breaks'])} 个、"
+                   f"方向不明触碰 {len(fa.get('touches') or [])} 条、提及 {len(fa.get('mentions') or [])} 条；未展开不等于没有。")
+        out.append("完整索引仍可查：file(path=" + json.dumps(fa["path"], ensure_ascii=False)
+                   + f", v={anchor}, content=false, via="
+                   + json.dumps(f"file:{fa['path']}@v{anchor}", ensure_ascii=False) + ")。已知局部变化可用 diff/blame 或原始动作核对。")
+        return "\n".join(out)
     for b in fa["breaks"]:
         out.append(f"⚠ 断点 {b['kind']} @ {b['ts'][:19]}: {b['detail']}")
     # v 是查询锚点;v_from/v_to 仅选择锚点以内的 diff 窗口,不能偷偷换锚点。
@@ -716,16 +738,23 @@ def _window(text: str, cap: int, offset: int = 0, find: str = "") -> tuple[str, 
     误以为看到了全文(DiceRoller think #4218 有 9.8 万字,决策句在 2 万字之后)。"""
     total = len(text)
     note = ""
-    if find:
-        pos = text.lower().find(find.lower(), max(offset, 0))
-        if pos < 0:
-            note = f"「{find}」在第 {offset} 字之后未命中;"
-        else:
-            offset = max(0, pos - 200)
     offset = max(0, min(offset, total))
     if offset == total and total > 0:
-        return "", note + f"已到末尾(EOF)，共 {total} 字；本页为空，offset=0 可回到开头"
+        return "", f"已到末尾(EOF)，共 {total} 字；本页为空，offset=0 可回到开头"
+    if find:
+        from .search_terms import literal_span
+        span = literal_span(text, find, offset)
+        if span is None:
+            return "", (f"「{find}」未命中；仅检索当前解码字段字符 [{offset},{total})，共 {total} 字；"
+                        "lower()字面匹配，不是正则，不代表其他字段/范围不存在。未展开正文；去掉find、offset=0可从头展开")
+        pos, end = span
+        if end - pos > cap:
+            return "", f"命中字面量需 {end - pos} 字，超过 max_chars={cap}；正文未展开，请增大max_chars或去掉find"
+        offset = max(0, pos - min(200, cap - (end - pos)))
     piece = text[offset:offset + cap]
+    if find and find.lower() not in piece.lower():
+        return "", ("完整字段中有命中，但当前预算下片段不能独立保留 lower() 匹配上下文；正文未展开。"
+                    "请增大max_chars或去掉find；这不是零命中。")
     end = offset + len(piece)
     if offset == 0 and end == total:
         return piece, note.rstrip(";")
@@ -1142,6 +1171,7 @@ def _render_pool_search(ledger: atoms.Ledger, q: str, until_ts: str, since_ts: s
     out = [f"# search 「{q}」 全池 {win}  文件 {len(res['files'])} 个 · agent {len(res['agents'])} 个",
            f"范围: 这一刻之前 {res['n_agents']} 个 agent 的全部记录 + {res['n_files']} 个文件到这一刻为止的已知内容"
            + (f";内容未知 {res['unknown_versions']} 版查不了" if res["unknown_versions"] else "")
+           + (f";时间未知 {res['unknown_times']} 个字段/版本未纳入窗口" if res.get("unknown_times") else "")
            + " —— 零命中只支持「此范围内未检索到」,不证明此前无人见过或要求不存在;引用时把范围抄上"]
     if res["files"]:
         out.append("## 文件里(每个文件只报首次出现)")
@@ -1187,6 +1217,8 @@ def _render_window_writes(ledger: atoms.Ledger, q: str, since_ts: str | None, un
     out = [f"# 窗口内有写能力的命令 {since_ts or '…'} ~ {until_ts or '…'}  {res['n']} 条" + (f",含「{q}」" if q else ""),
            f"范围: 全池 {res['n_agents']} 个 agent 的 Bash / PowerShell / exec 里,分析器判为可能写文件的(解出了写、标了写能力、"
            "或没解出来的);不解析脚本,只按时间圈 —— 这是「实录外修改 / 内容未知」之前该看的候选,是否真改了要 action 打开自己判"]
+    if res.get("unknown_times"):
+        out.append(f"时间未知 {res['unknown_times']} 条命令未纳入窗口。")
     for r in res["rows"]:
         eff = r["effects"] or (f"未解({r['unresolved']})" if r.get("unresolved") else "无")
         out.append(f"- {_who(ledger, r['by'], r['by_ver'])} | {r['ts'][5:16]} {r['t']} | {r['cmd']} | 已解出: {eff}"
@@ -1227,6 +1259,8 @@ def render_search(ledger: atoms.Ledger, q: str, agent: str | None = None, v: int
         out = [f"# search 「{q}」 in agent {res['label']}  {scope}  命中 {len(res['hits'])} 条记录",
                "范围: 只有这个 agent 的记录(派发词 / 读到的内容 / 写入 / 命令 / 说 / 想 / 收件 / 注入);别的 agent 和文件内容不在内。"
                "零命中只支持「此范围内未检索到」;可用 search(q, until_ts=那一刻) 扩大全池范围,仍不证明无人见过或要求不存在"]
+        if res.get("unknown_times"):
+            out.append(f"时间未知 {res['unknown_times']} 个字段未纳入窗口；未知返回时刻不借用调用时刻。")
         groups: dict[str, list[dict[str, Any]]] = {}
         owner = atoms.resolve_agent(ledger, agent)
         out.append(_SEARCH_MATCH)
@@ -1357,6 +1391,7 @@ def _render_multi_search(ledger: atoms.Ledger, args: dict[str, Any], root: str,
     chosen = search_terms.fair_rows(rows, terms)
     head = ["# search 字面量 OR " + json.dumps(terms, ensure_ascii=False), "范围: " + scope, *notes,
             "匹配: lower() 后字面子串的任一项；| 不作正则。计数按唯一来源记录/字段或文件版本，非词×命中次数。",
+            "展示按词与来源轮转，不按全局时间排序；首条展示不代表最早发生。",
             "来源按记录形态区分，不证明内容真假、历史读取或因果；零命中仅支持此范围内未检索到，不证明不存在。",
             *_scan_note(ledger)]
     # Ensure each literal has a representative excerpt before filling remaining

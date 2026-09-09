@@ -59,7 +59,7 @@ def boolean(value: Any, key: str) -> bool:
     raise ValueError(f"{key} 必须是布尔值(true/false 或 1/0)")
 
 
-def parameters(tool: str, supplied: dict[str, Any]) -> dict[str, Any]:
+def parameters(tool: str, supplied: dict[str, Any], *, validate_search_scope: bool = True) -> dict[str, Any]:
     if tool not in _DEFAULTS:
         raise ValueError(f"未知工具: {tool}")
     values = dict(supplied)
@@ -94,21 +94,26 @@ def parameters(tool: str, supplied: dict[str, Any]) -> dict[str, Any]:
             raise ValueError(key)
     if tool == "agent" and not 32 <= out["summary_chars"] <= 600:
         raise ValueError("summary_chars 必须在 32–600 之间；完整原文用 action")
-    if tool == "search" and out["q_any"] is not None:
+    if tool == "search" and validate_search_scope:
         from .search_terms import normalize, valid_time
         out["q_any"] = normalize(out["q"], out["q_any"])
-        if out["agent"] and out["file"]:
-            raise ValueError("q_any 的 agent 与 file 范围互斥")
-        if out["kind"] not in (None, "write"):
-            raise ValueError("q_any 仅支持普通 search 或 kind=write")
-        if out["file"] and any(out[k] not in (None, False) for k in ("since", "after", "since_ts", "until_ts", "kind")):
-            raise ValueError("file 的 q_any 只支持 v 窗口；时间范围请用 agent 或全池查询")
-        if out["kind"] == "write" and any(out[k] is not None for k in ("agent", "file", "v", "since")):
-            raise ValueError("kind=write 的 q_any 只支持全池时间窗口")
         if any(out[k] is not None and not valid_time(out[k]) for k in ("since_ts", "until_ts")):
-            raise ValueError("q_any 的 since_ts/until_ts 必须是 ISO 时刻")
+            raise ValueError("since_ts/until_ts 必须是带明确时区的 ISO 时刻")
         if out["since_ts"] and out["until_ts"] and atoms.ts_norm(out["since_ts"]) > atoms.ts_norm(out["until_ts"]):
-            raise ValueError("q_any 的 since_ts 不能晚于 until_ts")
+            raise ValueError("since_ts 不能晚于 until_ts")
+        if out["agent"] and out["file"]:
+            raise ValueError("search 的 agent 与 file 范围互斥")
+        if out["kind"] not in (None, "write"):
+            raise ValueError("仅支持普通 search 或 kind=write")
+        if out["file"] and any(out[k] not in (None, False) for k in ("since", "after", "since_ts", "until_ts", "kind")):
+            raise ValueError("file search 只支持 v 窗口；时间范围请用 agent 或全池查询")
+        version_window = out["v"] is not None or out["since"] is not None
+        if out["kind"] == "write" and (out["agent"] or out["file"] or version_window or out["after"]):
+            raise ValueError("kind=write 只支持全池时间窗口")
+        if not out["agent"] and not out["file"] and version_window:
+            raise ValueError("全池 search 只支持时间窗口；v/since 需要指定 agent")
+        if out["agent"] and (out["since_ts"] or out["until_ts"]) and version_window:
+            raise ValueError("agent search 的时间窗口与 v/since 版本窗口不能混用；请明确选择范围")
     if tool == "action":
         if out["ref"] is not None:
             if out["id"] is not None or out["seq"] is not None:
@@ -229,7 +234,10 @@ def render_text(ledger: atoms.Ledger, root: str, tool: str, supplied: dict[str, 
     if tool == "diff":
         return atoms_text.render_diff(ledger, args["path"], args["v"], root=root)
     if tool == "search":
-        return atoms_text.render_search(ledger, root=root, navigation_hits=navigation_hits, **args)
+        text = atoms_text.render_search(ledger, root=root, navigation_hits=navigation_hits, **args)
+        if args["after"] and (not args["agent"] or args["since_ts"] or args["until_ts"]):
+            text += "\nafter 仅控制 agent 版本锚点后的命中；本次按上列时间范围，after=True 不扩大时间范围。"
+        return text
     if tool == "action":
         from .action_query import resolve
         address = resolve(ledger, id=args.pop("id"), seq=args.pop("seq"), ref=args.pop("ref"))

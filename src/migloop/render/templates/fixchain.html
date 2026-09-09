@@ -1217,7 +1217,7 @@
       if (stepsFor.length) {
         d.classList.add("p-seen");
         var stepB = el("span", "badge step", "查 #" + stepsFor.slice(0, 3).map(function (s) { return s.i; }).join(",") + (stepsFor.length > 3 ? "…" : ""));
-        stepB.title = stepsFor.map(function (s) { return "#" + s.i + " " + s.tool + " " + (s.scope || ""); }).join("\n");
+        stepB.title = stepsFor.map(function (s) { return "#" + s.i + " " + s.tool + " 请求范围：" + (s.scope || "未记录"); }).join("\n");
         d.appendChild(stepB);
       } else if (node.kind !== "leaf" && !vd && !pr.hit.length && !pr.fixed.length) {
         d.classList.add("p-dim");
@@ -1424,7 +1424,7 @@
         var t = el("span", "t", "");
         var tb = el("b", null, (callKind === "wrapper" ? "[宿主包装] " : callKind === "other" ? "[其他调用] " : "") + s.tool);
         t.appendChild(tb);
-        t.appendChild(document.createTextNode(" " + stepTarget(s) + (s.scope ? " · " + s.scope : "") + (unbound ? " · 身份不匹配 · 未绑定当前账本" : visit ? " · " + probeVisitStatus(visit.status) : (failed ? " · 失败" : "")) + " · " + (Math.round((s.chars || 0) / 100) / 10) + "千字" + (s.via ? " · via " + s.via : "")));
+        t.appendChild(document.createTextNode(" " + stepTarget(s) + (s.scope ? " · 请求范围：" + s.scope : "") + (unbound ? " · 身份不匹配 · 未绑定当前账本" : visit ? " · " + probeVisitStatus(visit.status) : (failed ? " · 失败" : "")) + " · " + (Math.round((s.chars || 0) / 100) / 10) + "千字" + (s.via ? " · via " + s.via : "")));
         if (draftCheck) t.appendChild(document.createTextNode(" · 草稿机械核查事件（不计版本访问，不验证主张真假）"));
         t.title = "参数: " + JSON.stringify(s.args) + "\n来源 provenance: " + JSON.stringify(s.provenance || null)
                 + "\ncall_id: " + (s.call_id || "未记录") + " · item_id: " + (s.item_id || "未记录")
@@ -1604,7 +1604,7 @@
         var heading = el("div", "phd", "#" + visit.step + " " + visit.tool + " · " + probeVisitStatus(visit.status));
         if (visit.delivery_truncated) heading.appendChild(el("span", "delivery-truncated", " · 返回截断／非全文"));
         row.appendChild(heading);
-        if (visit.scope) row.appendChild(el("div", "preason", visit.scope));
+        if (visit.scope) row.appendChild(el("div", "preason", "请求范围：" + visit.scope + "（不证明正文可得或全部交付）"));
         if (visit.via) row.appendChild(kv("来处", visit.via));
         var transition = (T.transitions || []).find(function (tr) { return tr.step === visit.step; });
         if (transition) {
@@ -3026,7 +3026,8 @@
       side.appendChild(body);
       var call = sec("调查调用记录（不计版本访问）");
       call.appendChild(kv("原始引用", (step.args || {}).ref || "id=" + address.aid + ", seq=" + address.seq));
-      call.appendChild(kv("当时查询范围", step.scope || "未记录"));
+      call.appendChild(kv("当时请求范围", step.scope || "未记录"));
+      call.appendChild(el("div", "muted", "范围来自查询参数；内容可能未知、未命中或截断，不代表已取得所请求的全部正文。"));
       var metadata = el("details", "action-call-meta");
       metadata.appendChild(el("summary", null, "原参数与转录来源"));
       metadata.appendChild(el("pre", "diffblock", JSON.stringify({args:step.args,call_id:step.call_id,

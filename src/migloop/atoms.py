@@ -676,12 +676,11 @@ def search_window_writes(ledger: Ledger, since_ts: str | None, until_ts: str | N
     missing_input = 0
     unknown_times = 0
     for ts, seq, aid in ledger.write_cmds:
-        if terms and not search_terms.valid_time(ts):
+        if not search_terms.valid_time(ts):
             unknown_times += 1
             continue
-        key = ts_norm(ts) if terms else ts
-        if (since_ts and key <= (ts_norm(since_ts) if terms else since_ts)) \
-                or (until_ts and key > (ts_norm(until_ts) if terms else until_ts)):
+        key = ts_norm(ts)
+        if (since_ts and key <= ts_norm(since_ts)) or (until_ts and key > ts_norm(until_ts)):
             continue
         _a, act = by_seq[seq]
         cmd = str(act.detail.get("cmd") or act.detail.get("args") or "")
@@ -719,7 +718,7 @@ def search_window_writes(ledger: Ledger, since_ts: str | None, until_ts: str | N
     result = {"rows": rows, "n": n, "n_agents": len(ledger.agents)}
     if terms:
         result["unknown_inputs"] = missing_input
-        result["unknown_times"] = unknown_times
+    result["unknown_times"] = unknown_times
     return result
 
 
@@ -1402,7 +1401,7 @@ def search_agent(ledger: Ledger, agent_id: str, q: str, v: int | None = None, si
         if since_ts or until_ts:
             start, end = sorted((ts_norm(act.ts), ts_norm(act.done_ts or act.ts)))
             known_extent = act.done_ts is not None or act.src[1] == act.src[2]
-            if terms and not (search_terms.valid_time(act.ts) and search_terms.valid_time(act.done_ts or act.ts)):
+            if not (search_terms.valid_time(act.ts) and search_terms.valid_time(act.done_ts or act.ts)):
                 known_extent = False
             if known_extent and ((since_ts and end < ts_norm(since_ts)) or (until_ts and start > ts_norm(until_ts))):
                 continue
@@ -1424,11 +1423,10 @@ def search_agent(ledger: Ledger, agent_id: str, q: str, v: int | None = None, si
             except Exception:
                 continue
             for fld, text in _record_texts(rec, act).items():
-                field_ts = str(rec.get("timestamp") or (act.done_ts if fld == "output" else act.ts) or act.ts)
-                if terms and (since_ts or until_ts):
+                field_ts = str(rec.get("timestamp") or (act.done_ts if fld == "output" else act.ts) or "")
+                if since_ts or until_ts:
                     # Missing result time is not the invocation time. Keep a
                     # gap count instead of presenting it inside a precise window.
-                    field_ts = str(rec.get("timestamp") or (act.done_ts if fld == "output" else act.ts) or "")
                     if not search_terms.valid_time(field_ts):
                         unknown_times += 1
                         continue
@@ -1480,8 +1478,7 @@ def search_agent(ledger: Ledger, agent_id: str, q: str, v: int | None = None, si
                 hits[-1].update(record_key=("action", a.id, act.seq, fld), agent=a.id, action_ok=act.ok)
     result = {"agent": a.id, "label": _agent_label(ledger.agents, a.id) or a.id, "q": q, "v": anchor, "since": since,
               "since_ts": since_ts, "until_ts": until_ts, "hits": hits, "excluded_after": excluded}
-    if terms:
-        result["unknown_times"] = unknown_times
+    result["unknown_times"] = unknown_times
     return result
 
 
@@ -1567,8 +1564,13 @@ def search_pool(ledger: Ledger, q: str, until_ts: str, since_ts: str | None = No
     since_key = ts_norm(since_ts) if since_ts else None
     files = []
     unknown = 0
+    unknown_times = 0
     for path, st in ledger.stories.items():
+        first_found = False
         for ver in st.versions:
+            if not search_terms.valid_time(ver.ts):
+                unknown_times += 1
+                continue
             version_key = ts_norm(ver.ts)
             if version_key > until_key or (since_key and version_key < since_key):
                 continue
@@ -1576,7 +1578,7 @@ def search_pool(ledger: Ledger, q: str, until_ts: str, since_ts: str | None = No
             if body is None:
                 unknown += 1
                 continue
-            if ql in body.lower():
+            if not first_found and ql in body.lower():
                 ln, snip = next(((i, _WS.sub(" ", t).strip()[:160]) for i, t in enumerate(body.split("\n"), 1)
                                  if ql in t.lower()), (None, ""))
                 files.append({"path": path, "v": ver.v, "by": ver.by, "by_ver": ver.by_ver, "seq": ver.act_seq,
@@ -1584,10 +1586,11 @@ def search_pool(ledger: Ledger, q: str, until_ts: str, since_ts: str | None = No
                               "ln": None if ver.content is None else ln, "snip": snip,
                               "n": sum(1 for t in body.split("\n") if ql in t.lower()),
                               "partial": ver.content is None})
-                break                                          # 每个文件只报首次出现
+                first_found = True  # Only show first match; still account for later unknown versions.
     agents = []
     for aid in ledger.agents:
         res = search_agent(ledger, aid, q, since_ts=since_ts or ledger.t0 or "0", until_ts=until_ts)
+        unknown_times += (res or {}).get("unknown_times", 0)
         hits = [h for h in (res or {}).get("hits", []) if h.get("seq") is not None]
         # A call launched first can return last. Earliest output means the
         # matched field's recorded time, not its invocation's sequence number.
@@ -1616,7 +1619,8 @@ def search_pool(ledger: Ledger, q: str, until_ts: str, since_ts: str | None = No
             agents.append({"agent": aid, "label": (res or {}).get("label") or aid,
                            "n": len(hits), "first": h, "sources": sources})
     return {"q": q, "until_ts": until_ts, "since_ts": since_ts, "files": files, "agents": agents,
-            "unknown_versions": unknown, "n_agents": len(ledger.agents), "n_files": len(ledger.stories)}
+            "unknown_versions": unknown, "unknown_times": unknown_times,
+            "n_agents": len(ledger.agents), "n_files": len(ledger.stories)}
 
 
 def _search_pool_any(ledger: Ledger, terms: list[str], until_ts: str,

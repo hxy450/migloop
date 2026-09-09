@@ -1,0 +1,4797 @@
+{
+  "schema": "migloop-cost-shape/1",
+  "scope": "formal-v9/formal-v10 tools rep1 seven development files; completed only; no holdout oracle",
+  "semantics_scored": false,
+  "token_metric": "usage.input_total + usage.output; cache/reasoning not added again",
+  "char_metric": "len of authenticated delivered text after trusted transport normalization, including truncation marker; not tokens or billed cost",
+  "sources": {
+    "v9": "0be4164",
+    "v10": "80c099e"
+  },
+  "totals": {
+    "formal-v9": {
+      "input": 11245834,
+      "output": 87185,
+      "uncached": 929034,
+      "cached": 10316800,
+      "chars": 1422761,
+      "calls": 356,
+      "rejected": 18,
+      "pending": 0,
+      "toolChars": {
+        "guide": 35658,
+        "sessions": 43585,
+        "index": 4348,
+        "search": 525459,
+        "file": 207112,
+        "action": 417711,
+        "check": 13749,
+        "agent": 167105,
+        "diff": 7325,
+        "blame": 709
+      },
+      "counts": {
+        "guide": 14,
+        "sessions": 9,
+        "index": 16,
+        "search": 108,
+        "file": 31,
+        "action": 141,
+        "check": 11,
+        "agent": 16,
+        "diff": 9,
+        "blame": 1
+      },
+      "draft_chars": 65370,
+      "check_calls": 11,
+      "repeat_calls": 0,
+      "repeat_return_chars": 0,
+      "search_cluster_calls": 101,
+      "cluster_count": 20,
+      "tokens": 11333019,
+      "metric_return_chars": 1462463,
+      "valid_cumulative_agent_calls": 9,
+      "cumulative_agent_chars": 131288,
+      "valid_agent_calls": 11,
+      "failed_or_rejected_calls": 18,
+      "failed_action_calls": 0,
+      "transport_partial_calls": 2,
+      "transport_omitted_chars": 39748,
+      "bad_search_time_params": 0,
+      "valid_bounded_agent_calls": 2
+    },
+    "formal-v10": {
+      "input": 9189091,
+      "output": 89485,
+      "uncached": 837859,
+      "cached": 8351232,
+      "chars": 1454601,
+      "calls": 337,
+      "rejected": 12,
+      "pending": 0,
+      "toolChars": {
+        "guide": 35658,
+        "sessions": 51337,
+        "index": 12958,
+        "file": 225061,
+        "search": 482750,
+        "action": 455524,
+        "agent": 161776,
+        "check": 16962,
+        "diff": 10952,
+        "blame": 1623
+      },
+      "counts": {
+        "guide": 14,
+        "sessions": 10,
+        "index": 14,
+        "file": 13,
+        "search": 107,
+        "action": 133,
+        "agent": 19,
+        "check": 12,
+        "diff": 14,
+        "blame": 1
+      },
+      "draft_chars": 81943,
+      "check_calls": 12,
+      "repeat_calls": 1,
+      "repeat_return_chars": 107,
+      "search_cluster_calls": 98,
+      "cluster_count": 19,
+      "tokens": 9278576,
+      "metric_return_chars": 1483475,
+      "valid_cumulative_agent_calls": 6,
+      "cumulative_agent_chars": 106800,
+      "valid_agent_calls": 9,
+      "failed_or_rejected_calls": 14,
+      "failed_action_calls": 2,
+      "transport_partial_calls": 2,
+      "transport_omitted_chars": 28918,
+      "bad_search_time_params": 0,
+      "valid_bounded_agent_calls": 3
+    }
+  },
+  "runs": [
+    {
+      "version": "formal-v9",
+      "case": "codex-c1",
+      "status": "completed",
+      "recording_complete": true,
+      "source": "0be4164",
+      "source_digest": "c5cc203b2e3583f7a8544b1c44a557faf92e3374bf74fb6329d4a6d4346ab127",
+      "runner_sha256": "1dc3964d921976f2fc6a2791fcaa599e6c0f07e8b663f32f445149d8e50d3d2b",
+      "models": [
+        "gpt-5.5"
+      ],
+      "effort": "medium",
+      "backend": "codex",
+      "task": "c41de52b97b7e85db20f3601b5ea0aa75d8ffc729569294a6ca6784e64b20397",
+      "pool": "5bcd5ed757c468cea95f79591b41a4fb88cea2a6d6f4b5b1505e0026d2dbfc78",
+      "usage": {
+        "input_total": 1225459,
+        "cache_read": 1113600,
+        "cache_creation": 0,
+        "input_uncached": 111859,
+        "output": 13504,
+        "thinking_reported": 1470,
+        "output_includes_thinking": "Codex output_tokens is used once; reasoning is not added",
+        "input_semantics": "Codex input_tokens is the total; reported cache read/write are not added to it. input_uncached means input_tokens minus cached_input_tokens."
+      },
+      "wall": 285.5543808999937,
+      "e2e": 288.3157231999794,
+      "metric_calls": 51,
+      "metric_chars": 199870,
+      "metric_rejected": 0,
+      "metric_pending": 0,
+      "normalized_calls": 51,
+      "counts": {
+        "guide": 2,
+        "sessions": 1,
+        "index": 5,
+        "search": 23,
+        "file": 2,
+        "action": 16,
+        "check": 2
+      },
+      "chars": {
+        "guide": 5094,
+        "sessions": 1020,
+        "index": 627,
+        "search": 135401,
+        "file": 4599,
+        "action": 50657,
+        "check": 2472
+      },
+      "total_chars": 199870,
+      "repeats": [],
+      "search_clusters": [
+        {
+          "scope": {
+            "after": true,
+            "until_ts": "2026-08-22T15:24:42.229000Z"
+          },
+          "steps": [
+            5,
+            20,
+            21,
+            22,
+            37,
+            38,
+            39,
+            40
+          ],
+          "queries": [
+            "onAnswer",
+            "GuideDifficulty1Component",
+            "唯一硬门",
+            "typed-return",
+            "handlers non-empty",
+            "owned handlers",
+            "empty handlers",
+            "empty handler"
+          ],
+          "chars": 12429
+        },
+        {
+          "scope": {
+            "after": true,
+            "agent": "__main__:01a009fe",
+            "until_ts": "2026-08-22T15:24:42.229000Z"
+          },
+          "steps": [
+            10,
+            11,
+            12,
+            13,
+            14
+          ],
+          "queries": [
+            "return",
+            "empty",
+            "no-op",
+            "lint",
+            "static"
+          ],
+          "chars": 106143
+        },
+        {
+          "scope": {
+            "after": true,
+            "since_ts": "2026-08-16T18:03:10.855000Z",
+            "until_ts": "2026-08-22T15:24:42.229000Z"
+          },
+          "steps": [
+            24,
+            25,
+            26,
+            27,
+            28
+          ],
+          "queries": [
+            "hvigor",
+            "BUILD SUCCESSFUL",
+            "GuideDifficulty1Component",
+            "guide_skip",
+            "guide_next"
+          ],
+          "chars": 10526
+        },
+        {
+          "scope": {
+            "after": true,
+            "until_ts": "2026-08-16T18:03:10.855000Z"
+          },
+          "steps": [
+            33,
+            34
+          ],
+          "queries": [
+            "page_0033_GuideDifficulty1Fragment",
+            "GuideDifficulty1Fragment"
+          ],
+          "chars": 4015
+        },
+        {
+          "scope": {
+            "after": true,
+            "file": "spec/baseline/ui/page_0033_GuideDifficulty1Fragment.md",
+            "until_ts": "2026-08-16T18:03:10.855000Z"
+          },
+          "steps": [
+            45,
+            46,
+            47
+          ],
+          "queries": [
+            "否",
+            "onAnswer",
+            "GuideDifficulty1"
+          ],
+          "chars": 2288
+        }
+      ],
+      "broad_agent_steps": [],
+      "action_parts": {
+        "both": 16
+      },
+      "action_windowed": 16,
+      "checks": [
+        {
+          "step": 50,
+          "draft_chars": 4856,
+          "returned_chars": 1405,
+          "use_line": 254,
+          "result_line": 257
+        },
+        {
+          "step": 51,
+          "draft_chars": 4803,
+          "returned_chars": 1067,
+          "use_line": 263,
+          "result_line": 266
+        }
+      ],
+      "metric_path": "C:\\Users\\hongy\\projects\\_migloop-eval-20260909\\attribution10\\formal-v9\\codex-c1\\runs\\tools\\rep1\\metrics.json",
+      "metric_sha": "f1e05047096ffe740b22e0219c45f65c2e0fa1af21ff125eca1e208861d30505",
+      "transcript_path": "C:\\Users\\hongy\\projects\\_migloop-eval-20260909\\attribution10\\formal-v9\\codex-c1\\runs\\tools\\rep1\\transcript.jsonl",
+      "transcript_sha": "b0232e0e556cde6599221f4408cf610f8bbd32da5f700a1369ccccc24a32e5cb"
+    },
+    {
+      "version": "formal-v9",
+      "case": "codex-c2",
+      "status": "completed",
+      "recording_complete": true,
+      "source": "0be4164",
+      "source_digest": "c5cc203b2e3583f7a8544b1c44a557faf92e3374bf74fb6329d4a6d4346ab127",
+      "runner_sha256": "1dc3964d921976f2fc6a2791fcaa599e6c0f07e8b663f32f445149d8e50d3d2b",
+      "models": [
+        "gpt-5.5"
+      ],
+      "effort": "medium",
+      "backend": "codex",
+      "task": "87bcb87a229540ac1185458de39880493a982767a2fc3d23386c8db60fd71c43",
+      "pool": "5bcd5ed757c468cea95f79591b41a4fb88cea2a6d6f4b5b1505e0026d2dbfc78",
+      "usage": {
+        "input_total": 957449,
+        "cache_read": 880128,
+        "cache_creation": 0,
+        "input_uncached": 77321,
+        "output": 11148,
+        "thinking_reported": 1151,
+        "output_includes_thinking": "Codex output_tokens is used once; reasoning is not added",
+        "input_semantics": "Codex input_tokens is the total; reported cache read/write are not added to it. input_uncached means input_tokens minus cached_input_tokens."
+      },
+      "wall": 259.03089160006493,
+      "e2e": 261.7885688999668,
+      "metric_calls": 41,
+      "metric_chars": 112602,
+      "metric_rejected": 1,
+      "metric_pending": 0,
+      "normalized_calls": 41,
+      "counts": {
+        "guide": 2,
+        "sessions": 2,
+        "index": 3,
+        "search": 18,
+        "action": 12,
+        "file": 1,
+        "agent": 1,
+        "check": 2
+      },
+      "chars": {
+        "guide": 5094,
+        "sessions": 3711,
+        "index": 30,
+        "search": 37418,
+        "action": 55998,
+        "file": 38,
+        "agent": 7377,
+        "check": 2936
+      },
+      "total_chars": 112602,
+      "repeats": [],
+      "search_clusters": [
+        {
+          "scope": {
+            "until_ts": "2026-08-22T15:24:42.229000Z"
+          },
+          "steps": [
+            5,
+            11,
+            12,
+            13,
+            18,
+            26,
+            29,
+            30,
+            31,
+            33,
+            34
+          ],
+          "queries": [
+            "WorksService",
+            "PptRecordRepository.insert",
+            "WorksFragment_generated_work_missing",
+            "saveGeneratedWork",
+            "Works 已生成作品未呈现",
+            "PptGenerationViewModel",
+            "entry/src/main/ets/viewmodels/PptGenerationViewModel.ets:27",
+            "生成完成统一走 WorksService 入库",
+            "git-diff.patch",
+            "PptRecordRepository",
+            "WorksService.saveGeneratedWork"
+          ],
+          "chars": 26623
+        },
+        {
+          "scope": {
+            "after": true,
+            "until_ts": "2026-08-22T15:24:42.229000Z"
+          },
+          "steps": [
+            20,
+            21,
+            22
+          ],
+          "queries": [
+            "generated_work_missing",
+            "定位生成是否真正到达入库步骤",
+            "Works 初始化"
+          ],
+          "chars": 6471
+        },
+        {
+          "scope": {
+            "since_ts": "2026-08-21T20:36:40Z",
+            "until_ts": "2026-08-22T15:24:42.229000Z"
+          },
+          "steps": [
+            23,
+            24,
+            25
+          ],
+          "queries": [
+            "WorksFragment_generated_work_missing",
+            "saveGeneratedWork",
+            "listWorks"
+          ],
+          "chars": 3558
+        }
+      ],
+      "broad_agent_steps": [],
+      "action_parts": {
+        "both": 12
+      },
+      "action_windowed": 12,
+      "checks": [
+        {
+          "step": 40,
+          "draft_chars": 4538,
+          "returned_chars": 756,
+          "use_line": 242,
+          "result_line": 245
+        },
+        {
+          "step": 41,
+          "draft_chars": 4542,
+          "returned_chars": 2180,
+          "use_line": 251,
+          "result_line": 254
+        }
+      ],
+      "metric_path": "C:\\Users\\hongy\\projects\\_migloop-eval-20260909\\attribution10\\formal-v9\\codex-c2\\runs\\tools\\rep1\\metrics.json",
+      "metric_sha": "2a23e3220129902c3210da56c84d1d67a6c58ce767192ad8366341c27c24abb0",
+      "transcript_path": "C:\\Users\\hongy\\projects\\_migloop-eval-20260909\\attribution10\\formal-v9\\codex-c2\\runs\\tools\\rep1\\transcript.jsonl",
+      "transcript_sha": "3b35bc8aa81a0cbefc5a099b143bf9b21b250ef56a3e5baae7303dece45a5ffe"
+    },
+    {
+      "version": "formal-v9",
+      "case": "codex-c3",
+      "status": "completed",
+      "recording_complete": true,
+      "source": "0be4164",
+      "source_digest": "c5cc203b2e3583f7a8544b1c44a557faf92e3374bf74fb6329d4a6d4346ab127",
+      "runner_sha256": "1dc3964d921976f2fc6a2791fcaa599e6c0f07e8b663f32f445149d8e50d3d2b",
+      "models": [
+        "gpt-5.5"
+      ],
+      "effort": "medium",
+      "backend": "codex",
+      "task": "b85d9db51ded7a20b54cf5482750b0287886c5d3970254de58904cbd1090f8b7",
+      "pool": "5bcd5ed757c468cea95f79591b41a4fb88cea2a6d6f4b5b1505e0026d2dbfc78",
+      "usage": {
+        "input_total": 2300034,
+        "cache_read": 2189312,
+        "cache_creation": 0,
+        "input_uncached": 110722,
+        "output": 13161,
+        "thinking_reported": 958,
+        "output_includes_thinking": "Codex output_tokens is used once; reasoning is not added",
+        "input_semantics": "Codex input_tokens is the total; reported cache read/write are not added to it. input_uncached means input_tokens minus cached_input_tokens."
+      },
+      "wall": 307.40592080005445,
+      "e2e": 310.1769385000225,
+      "metric_calls": 73,
+      "metric_chars": 163180,
+      "metric_rejected": 3,
+      "metric_pending": 0,
+      "normalized_calls": 73,
+      "counts": {
+        "guide": 2,
+        "sessions": 2,
+        "index": 3,
+        "search": 31,
+        "file": 7,
+        "action": 27,
+        "check": 1
+      },
+      "chars": {
+        "guide": 5094,
+        "sessions": 1994,
+        "index": 541,
+        "search": 66179,
+        "file": 8889,
+        "action": 79432,
+        "check": 1051
+      },
+      "total_chars": 163180,
+      "repeats": [],
+      "search_clusters": [
+        {
+          "scope": {
+            "after": true,
+            "until_ts": "2026-08-22T15:24:42.229000Z"
+          },
+          "steps": [
+            4,
+            5,
+            11,
+            12,
+            13,
+            14,
+            24,
+            25,
+            26,
+            27,
+            29,
+            30,
+            31,
+            32,
+            34,
+            39,
+            40,
+            41,
+            42,
+            47,
+            57,
+            59,
+            65,
+            68,
+            69,
+            70,
+            71
+          ],
+          "queries": [
+            "GuideInit",
+            "Monitor",
+            "visibility",
+            "独立挂载",
+            "初始 active",
+            "GuideInitComponent.ets",
+            "progressPercent Monitor",
+            "currentStep=5",
+            "currentStep === 5",
+            "active visibility",
+            "GuideInitComponent({",
+            "currentStep",
+            "Swiper",
+            "GuideInit_01_loading_intro_bubble",
+            "GuideInit_02_loading_progress",
+            "GuideInit 已封装",
+            "attempts.json",
+            "currentStep=5 时独立挂载",
+            "低置信覆盖债",
+            "visual_fixer_round_1",
+            "diff --git a/entry/src/main/ets/pages/GuideInitComponent.ets",
+            "visual_fixer_round_2",
+            "Reviewer 审核 12/12 通过",
+            "manual_review",
+            "第 6 步真实条件挂载",
+            "docs/autofix-log/round-2/visual-fixer-summary.md",
+            "fresh capture"
+          ],
+          "chars": 58537
+        },
+        {
+          "scope": {
+            "after": true,
+            "agent": "__main__:01a021e5",
+            "until_ts": "2026-08-22T15:24:42.229000Z"
+          },
+          "steps": [
+            37,
+            50,
+            62
+          ],
+          "queries": [
+            "entry/src/main/ets/pages/GuideInitComponent.ets",
+            "Sender: /root/visual_fixer_round_1",
+            "Sender: /root/visual_fixer_round_2"
+          ],
+          "chars": 5966
+        }
+      ],
+      "broad_agent_steps": [],
+      "action_parts": {
+        "both": 26,
+        "output": 1
+      },
+      "action_windowed": 27,
+      "checks": [
+        {
+          "step": 73,
+          "draft_chars": 5313,
+          "returned_chars": 1051,
+          "use_line": 379,
+          "result_line": 382
+        }
+      ],
+      "metric_path": "C:\\Users\\hongy\\projects\\_migloop-eval-20260909\\attribution10\\formal-v9\\codex-c3\\runs\\tools\\rep1\\metrics.json",
+      "metric_sha": "f51ead90d545a562abfb94c0d99dfbf2b1107efb48b4da2c768d7fc6cedbab6a",
+      "transcript_path": "C:\\Users\\hongy\\projects\\_migloop-eval-20260909\\attribution10\\formal-v9\\codex-c3\\runs\\tools\\rep1\\transcript.jsonl",
+      "transcript_sha": "e042c5538a86e1026f4a0c86a6874b1bedd25acfb73070108d831c24fa8de6c6"
+    },
+    {
+      "version": "formal-v9",
+      "case": "codex-c4",
+      "status": "completed",
+      "recording_complete": true,
+      "source": "0be4164",
+      "source_digest": "c5cc203b2e3583f7a8544b1c44a557faf92e3374bf74fb6329d4a6d4346ab127",
+      "runner_sha256": "1dc3964d921976f2fc6a2791fcaa599e6c0f07e8b663f32f445149d8e50d3d2b",
+      "models": [
+        "gpt-5.5"
+      ],
+      "effort": "medium",
+      "backend": "codex",
+      "task": "88561bcbf7c14a6b64beac1472dd35f174c7478356e3c333c1dd029ba887f727",
+      "pool": "5bcd5ed757c468cea95f79591b41a4fb88cea2a6d6f4b5b1505e0026d2dbfc78",
+      "usage": {
+        "input_total": 1704423,
+        "cache_read": 1578496,
+        "cache_creation": 0,
+        "input_uncached": 125927,
+        "output": 14895,
+        "thinking_reported": 1035,
+        "output_includes_thinking": "Codex output_tokens is used once; reasoning is not added",
+        "input_semantics": "Codex input_tokens is the total; reported cache read/write are not added to it. input_uncached means input_tokens minus cached_input_tokens."
+      },
+      "wall": 344.0919448999921,
+      "e2e": 346.8057139000157,
+      "metric_calls": 62,
+      "metric_chars": 222050,
+      "metric_rejected": 1,
+      "metric_pending": 0,
+      "normalized_calls": 62,
+      "counts": {
+        "guide": 2,
+        "sessions": 1,
+        "index": 3,
+        "search": 14,
+        "file": 2,
+        "diff": 1,
+        "blame": 1,
+        "action": 35,
+        "agent": 1,
+        "check": 2
+      },
+      "chars": {
+        "guide": 5094,
+        "sessions": 1012,
+        "index": 599,
+        "search": 83625,
+        "file": 2264,
+        "diff": 299,
+        "blame": 709,
+        "action": 97908,
+        "agent": 27732,
+        "check": 2808
+      },
+      "total_chars": 222050,
+      "repeats": [],
+      "search_clusters": [
+        {
+          "scope": {
+            "after": true,
+            "until_ts": "2026-08-22T15:24:42.229000Z"
+          },
+          "steps": [
+            4,
+            5,
+            49
+          ],
+          "queries": [
+            "HitTestMode.Block",
+            "HitTestMode.Default",
+            "\"LaunchAgreementDialog\": \"fail\""
+          ],
+          "chars": 5397
+        },
+        {
+          "scope": {
+            "after": true,
+            "agent": "__main__:01a009fe",
+            "until_ts": "2026-08-22T15:24:42.229000Z"
+          },
+          "steps": [
+            17,
+            18
+          ],
+          "queries": [
+            "HitTestMode.block",
+            "child nodes do not respond"
+          ],
+          "chars": 3349
+        },
+        {
+          "scope": {
+            "after": true,
+            "since_ts": "2026-08-17T03:11:06.675000Z",
+            "until_ts": "2026-08-22T15:24:42.229000Z"
+          },
+          "steps": [
+            33,
+            34,
+            35,
+            36
+          ],
+          "queries": [
+            "assembleHap",
+            "同意并继续",
+            "HitTestMode.Default",
+            "install"
+          ],
+          "chars": 9901
+        },
+        {
+          "scope": {
+            "after": true,
+            "agent": "__main__:01a021e5",
+            "since_ts": "2026-08-17T03:11:06.675000Z",
+            "until_ts": "2026-08-22T15:24:42.229000Z"
+          },
+          "steps": [
+            38,
+            39,
+            40,
+            41
+          ],
+          "queries": [
+            "LaunchAgreementDialog",
+            "隐私协议弹窗",
+            "安全点击",
+            "点击"
+          ],
+          "chars": 63085
+        }
+      ],
+      "broad_agent_steps": [],
+      "action_parts": {
+        "both": 34,
+        "output": 1
+      },
+      "action_windowed": 35,
+      "checks": [
+        {
+          "step": 61,
+          "draft_chars": 6054,
+          "returned_chars": 1745,
+          "use_line": 313,
+          "result_line": 316
+        },
+        {
+          "step": 62,
+          "draft_chars": 5452,
+          "returned_chars": 1063,
+          "use_line": 322,
+          "result_line": 325
+        }
+      ],
+      "metric_path": "C:\\Users\\hongy\\projects\\_migloop-eval-20260909\\attribution10\\formal-v9\\codex-c4\\runs\\tools\\rep1\\metrics.json",
+      "metric_sha": "bc062344233de5ad2de24db01ffe07322f5ff09af26f26742dfc48ffdb786f52",
+      "transcript_path": "C:\\Users\\hongy\\projects\\_migloop-eval-20260909\\attribution10\\formal-v9\\codex-c4\\runs\\tools\\rep1\\transcript.jsonl",
+      "transcript_sha": "906908ffce5bafc38d196c84d164411e8dd719b91d30a393f6f803618f326a3d"
+    },
+    {
+      "version": "formal-v9",
+      "case": "dice-entry",
+      "status": "completed",
+      "recording_complete": true,
+      "source": "0be4164",
+      "source_digest": "c5cc203b2e3583f7a8544b1c44a557faf92e3374bf74fb6329d4a6d4346ab127",
+      "runner_sha256": "1dc3964d921976f2fc6a2791fcaa599e6c0f07e8b663f32f445149d8e50d3d2b",
+      "models": [
+        "gpt-5.5"
+      ],
+      "effort": "medium",
+      "backend": "codex",
+      "task": "9060a6c160d2a1ac2b893b9f19d12e66a16e6ce1b7d301eacae0abfb9f55eec4",
+      "pool": "653db4192d47366e8ca099e59ef2679e929056f18320d081768539b2f5b7443e",
+      "usage": {
+        "input_total": 931727,
+        "cache_read": 817664,
+        "cache_creation": 0,
+        "input_uncached": 114063,
+        "output": 9350,
+        "thinking_reported": 1155,
+        "output_includes_thinking": "Codex output_tokens is used once; reasoning is not added",
+        "input_semantics": "Codex input_tokens is the total; reported cache read/write are not added to it. input_uncached means input_tokens minus cached_input_tokens."
+      },
+      "wall": 213.26296570000704,
+      "e2e": 216.75742089992855,
+      "metric_calls": 38,
+      "metric_chars": 188338,
+      "metric_rejected": 7,
+      "metric_pending": 0,
+      "normalized_calls": 38,
+      "counts": {
+        "guide": 2,
+        "sessions": 1,
+        "diff": 2,
+        "file": 11,
+        "agent": 5,
+        "search": 6,
+        "index": 1,
+        "action": 9,
+        "check": 1
+      },
+      "chars": {
+        "guide": 5094,
+        "sessions": 6349,
+        "diff": 2436,
+        "file": 43742,
+        "agent": 32227,
+        "search": 80242,
+        "index": 2395,
+        "action": 14790,
+        "check": 1063
+      },
+      "total_chars": 188338,
+      "repeats": [],
+      "search_clusters": [
+        {
+          "scope": {
+            "after": true,
+            "since_ts": "2026-09-03T19:17:35.691000Z",
+            "until_ts": "2026-09-03T22:09:07.170000Z"
+          },
+          "steps": [
+            18,
+            20,
+            21
+          ],
+          "queries": [
+            "BUILD SUCCESSFUL",
+            "__TARGET_PAGE__",
+            "PASS"
+          ],
+          "chars": 65970
+        }
+      ],
+      "broad_agent_steps": [
+        9,
+        10,
+        12,
+        13,
+        14
+      ],
+      "action_parts": {
+        "output": 8,
+        "input": 1
+      },
+      "action_windowed": 9,
+      "checks": [
+        {
+          "step": 38,
+          "draft_chars": 6162,
+          "returned_chars": 1063,
+          "use_line": 204,
+          "result_line": 207
+        }
+      ],
+      "metric_path": "C:\\Users\\hongy\\projects\\_migloop-eval-20260909\\attribution10\\formal-v9\\dice-entry\\runs\\tools\\rep1\\metrics.json",
+      "metric_sha": "c157adca6d9cdf49fc3087feb854fef89d475c929ff6ad1c0048b160cf0a2ad3",
+      "transcript_path": "C:\\Users\\hongy\\projects\\_migloop-eval-20260909\\attribution10\\formal-v9\\dice-entry\\runs\\tools\\rep1\\transcript.jsonl",
+      "transcript_sha": "20d6cd9818c86e794913dd6c1f7fd4fcc234fb60daf62590fe2ee9e58b1e5f45"
+    },
+    {
+      "version": "formal-v9",
+      "case": "member-center",
+      "status": "completed",
+      "recording_complete": true,
+      "source": "0be4164",
+      "source_digest": "c5cc203b2e3583f7a8544b1c44a557faf92e3374bf74fb6329d4a6d4346ab127",
+      "runner_sha256": "1dc3964d921976f2fc6a2791fcaa599e6c0f07e8b663f32f445149d8e50d3d2b",
+      "models": [
+        "gpt-5.5"
+      ],
+      "effort": "medium",
+      "backend": "codex",
+      "task": "e60ad7491cd5991a948f8c7128432feca230a59bee208640ca5b90a44d68dec1",
+      "pool": "a78b1373045f7558d6da3b76123e30d032635a2a0b4cdd665e7f80c0bdf8b337",
+      "usage": {
+        "input_total": 1149920,
+        "cache_read": 977408,
+        "cache_creation": 0,
+        "input_uncached": 172512,
+        "output": 11196,
+        "thinking_reported": 1022,
+        "output_includes_thinking": "Codex output_tokens is used once; reasoning is not added",
+        "input_semantics": "Codex input_tokens is the total; reported cache read/write are not added to it. input_uncached means input_tokens minus cached_input_tokens."
+      },
+      "wall": 263.69481839996297,
+      "e2e": 277.06268309999723,
+      "metric_calls": 44,
+      "metric_chars": 147691,
+      "metric_rejected": 3,
+      "metric_pending": 0,
+      "normalized_calls": 44,
+      "counts": {
+        "guide": 2,
+        "sessions": 1,
+        "action": 23,
+        "file": 4,
+        "search": 8,
+        "diff": 4,
+        "index": 1,
+        "check": 1
+      },
+      "chars": {
+        "guide": 5094,
+        "sessions": 15876,
+        "action": 83568,
+        "file": 18196,
+        "search": 20484,
+        "diff": 3250,
+        "index": 156,
+        "check": 1067
+      },
+      "total_chars": 147691,
+      "repeats": [],
+      "search_clusters": [
+        {
+          "scope": {
+            "after": true,
+            "agent": "agent-a68daf720e780b4c2",
+            "since": 5,
+            "v": 41
+          },
+          "steps": [
+            11,
+            13,
+            14
+          ],
+          "queries": [
+            "MemberCenterPage.ets:206",
+            "MemberCenterPage.ets:728",
+            "maskColor: Palette.DIALOG_MASK"
+          ],
+          "chars": 7985
+        },
+        {
+          "scope": {
+            "after": true,
+            "agent": "agent-af0e3d2ae54dbf769",
+            "since": 1,
+            "v": 3
+          },
+          "steps": [
+            31,
+            32
+          ],
+          "queries": [
+            "hvigor",
+            "BUILD SUCCESSFUL"
+          ],
+          "chars": 6213
+        },
+        {
+          "scope": {
+            "after": true,
+            "agent": "agent-a68daf720e780b4c2",
+            "since": 1,
+            "v": 41
+          },
+          "steps": [
+            37,
+            38
+          ],
+          "queries": [
+            "后缀跟着数字一起变特大",
+            "replaceSpan"
+          ],
+          "chars": 5485
+        }
+      ],
+      "broad_agent_steps": [],
+      "action_parts": {
+        "both": 22,
+        "input": 1
+      },
+      "action_windowed": 23,
+      "checks": [
+        {
+          "step": 44,
+          "draft_chars": 9760,
+          "returned_chars": 1067,
+          "use_line": 254,
+          "result_line": 257
+        }
+      ],
+      "metric_path": "C:\\Users\\hongy\\projects\\_migloop-eval-20260909\\attribution10\\formal-v9\\member-center\\runs\\tools\\rep1\\metrics.json",
+      "metric_sha": "c378900329efc7d25b45944c979613a37e380de9edc7f56ce419dca1884e00a9",
+      "transcript_path": "C:\\Users\\hongy\\projects\\_migloop-eval-20260909\\attribution10\\formal-v9\\member-center\\runs\\tools\\rep1\\transcript.jsonl",
+      "transcript_sha": "a42c5e6485b96bad9eb9c0598f2bf965642a653c789f294ca7328d284f7152ed"
+    },
+    {
+      "version": "formal-v9",
+      "case": "splash",
+      "status": "completed",
+      "recording_complete": true,
+      "source": "0be4164",
+      "source_digest": "c5cc203b2e3583f7a8544b1c44a557faf92e3374bf74fb6329d4a6d4346ab127",
+      "runner_sha256": "1dc3964d921976f2fc6a2791fcaa599e6c0f07e8b663f32f445149d8e50d3d2b",
+      "models": [
+        "gpt-5.5"
+      ],
+      "effort": "medium",
+      "backend": "codex",
+      "task": "d2f9f03d6b8a4c56e405559fe7160308ecc1d054b877ebf64250dd084ec85134",
+      "pool": "a78b1373045f7558d6da3b76123e30d032635a2a0b4cdd665e7f80c0bdf8b337",
+      "usage": {
+        "input_total": 2976822,
+        "cache_read": 2760192,
+        "cache_creation": 0,
+        "input_uncached": 216630,
+        "output": 13931,
+        "thinking_reported": 768,
+        "output_includes_thinking": "Codex output_tokens is used once; reasoning is not added",
+        "input_semantics": "Codex input_tokens is the total; reported cache read/write are not added to it. input_uncached means input_tokens minus cached_input_tokens."
+      },
+      "wall": 322.36123310006224,
+      "e2e": 336.05992789997254,
+      "metric_calls": 47,
+      "metric_chars": 428732,
+      "metric_rejected": 3,
+      "metric_pending": 0,
+      "normalized_calls": 47,
+      "counts": {
+        "guide": 2,
+        "sessions": 1,
+        "file": 4,
+        "diff": 2,
+        "agent": 9,
+        "search": 8,
+        "action": 19,
+        "check": 2
+      },
+      "chars": {
+        "guide": 5094,
+        "sessions": 13623,
+        "file": 129384,
+        "diff": 1340,
+        "agent": 99769,
+        "search": 102110,
+        "action": 35358,
+        "check": 2352
+      },
+      "total_chars": 389030,
+      "repeats": [],
+      "search_clusters": [
+        {
+          "scope": {
+            "after": true,
+            "until_ts": "2026-07-26T21:48:57.218000Z"
+          },
+          "steps": [
+            15,
+            16,
+            17,
+            18
+          ],
+          "queries": [
+            "needs_immersive_safearea",
+            "hideBar",
+            "状态栏",
+            "setWindowSystemBarEnable"
+          ],
+          "chars": 93125
+        },
+        {
+          "scope": {
+            "after": true,
+            "since_ts": "2026-07-26T21:20:24.982000Z",
+            "until_ts": "2026-07-26T21:48:57.218000Z"
+          },
+          "steps": [
+            32,
+            33,
+            34,
+            35
+          ],
+          "queries": [
+            "SplashActivity_01_back_key_dismisses_privacy_dialog",
+            "setWindowSystemBarEnable",
+            "fixed",
+            "PASS"
+          ],
+          "chars": 8985
+        }
+      ],
+      "broad_agent_steps": [
+        8,
+        9,
+        10,
+        12,
+        13,
+        14,
+        40,
+        41,
+        42
+      ],
+      "action_parts": {
+        "input": 13,
+        "output": 6
+      },
+      "action_windowed": 19,
+      "checks": [
+        {
+          "step": 46,
+          "draft_chars": 6640,
+          "returned_chars": 630,
+          "use_line": 250,
+          "result_line": 253
+        },
+        {
+          "step": 47,
+          "draft_chars": 7250,
+          "returned_chars": 1722,
+          "use_line": 259,
+          "result_line": 262
+        }
+      ],
+      "metric_path": "C:\\Users\\hongy\\projects\\_migloop-eval-20260909\\attribution10\\formal-v9\\splash\\runs\\tools\\rep1\\metrics.json",
+      "metric_sha": "b666ac8b872c52142601f41f1aeb2693e0ad76b8ab17e41d04a2256ab79787da",
+      "transcript_path": "C:\\Users\\hongy\\projects\\_migloop-eval-20260909\\attribution10\\formal-v9\\splash\\runs\\tools\\rep1\\transcript.jsonl",
+      "transcript_sha": "01fad5e669f91cf49f7d69df5dbdfe2cdad7844021d6d744ace3b84067e47231"
+    },
+    {
+      "version": "formal-v10",
+      "case": "codex-c1",
+      "status": "completed",
+      "recording_complete": true,
+      "source": "80c099e",
+      "source_digest": "b47380bd789929d3181eae024e4dee12709d8878615ebe7bd85e0271a37a35ed",
+      "runner_sha256": "4874a8064f0cf69e2d94b60b4c765c9c7841194163b3f793f5672bdc8e7e6a19",
+      "models": [
+        "gpt-5.5"
+      ],
+      "effort": "medium",
+      "backend": "codex",
+      "task": "c41de52b97b7e85db20f3601b5ea0aa75d8ffc729569294a6ca6784e64b20397",
+      "pool": "5bcd5ed757c468cea95f79591b41a4fb88cea2a6d6f4b5b1505e0026d2dbfc78",
+      "usage": {
+        "input_total": 842508,
+        "cache_read": 757248,
+        "cache_creation": 0,
+        "input_uncached": 85260,
+        "output": 12260,
+        "thinking_reported": 934,
+        "output_includes_thinking": "Codex output_tokens is used once; reasoning is not added",
+        "input_semantics": "Codex input_tokens is the total; reported cache read/write are not added to it. input_uncached means input_tokens minus cached_input_tokens."
+      },
+      "wall": 265.8134250000585,
+      "e2e": 268.64964429999236,
+      "metric_calls": 44,
+      "metric_chars": 134360,
+      "metric_rejected": 0,
+      "metric_pending": 0,
+      "normalized_calls": 44,
+      "counts": {
+        "guide": 2,
+        "sessions": 1,
+        "index": 2,
+        "file": 1,
+        "search": 16,
+        "action": 18,
+        "agent": 2,
+        "check": 2
+      },
+      "chars": {
+        "guide": 5094,
+        "sessions": 1420,
+        "index": 163,
+        "file": 3654,
+        "search": 22590,
+        "action": 52876,
+        "agent": 46254,
+        "check": 2309
+      },
+      "total_chars": 134360,
+      "repeats": [],
+      "search_clusters": [
+        {
+          "scope": {
+            "after": true,
+            "file": "entry/src/main/ets/pages/GuideDifficulty1Component.ets",
+            "v": 1
+          },
+          "steps": [
+            5,
+            6,
+            40,
+            41
+          ],
+          "queries": [
+            "onAnswer",
+            "return",
+            "guide_skip",
+            "guide_next"
+          ],
+          "chars": 2988
+        },
+        {
+          "scope": {
+            "after": true,
+            "agent": "__main__:01a009fe",
+            "since": 80,
+            "v": 105
+          },
+          "steps": [
+            10,
+            11,
+            12
+          ],
+          "queries": [
+            "empty block",
+            "no-empty",
+            "onAnswer"
+          ],
+          "chars": 5211
+        },
+        {
+          "scope": {
+            "after": true,
+            "agent": "__main__:01a009fe",
+            "since": 104,
+            "v": 115
+          },
+          "steps": [
+            18,
+            19,
+            20
+          ],
+          "queries": [
+            "illegal_placeholders",
+            "build_run",
+            "GuideDifficulty1Component.ets:3"
+          ],
+          "chars": 4184
+        },
+        {
+          "scope": {
+            "after": true,
+            "until_ts": "2026-08-16T18:03:10.855000Z"
+          },
+          "steps": [
+            26,
+            27,
+            28,
+            29,
+            32,
+            33
+          ],
+          "queries": [
+            "未登记空回调",
+            "必须由父组件传入",
+            "() => {}",
+            "page_0033_GuideDifficulty1Fragment",
+            "父页接线留给 Stage 3",
+            "@Event"
+          ],
+          "chars": 10207
+        }
+      ],
+      "broad_agent_steps": [],
+      "action_parts": {
+        "input": 2,
+        "both": 13,
+        "output": 3
+      },
+      "action_windowed": 18,
+      "checks": [
+        {
+          "step": 43,
+          "draft_chars": 5044,
+          "returned_chars": 1242,
+          "use_line": 217,
+          "result_line": 220
+        },
+        {
+          "step": 44,
+          "draft_chars": 5014,
+          "returned_chars": 1067,
+          "use_line": 226,
+          "result_line": 229
+        }
+      ],
+      "metric_path": "C:\\Users\\hongy\\projects\\_migloop-eval-20260909\\attribution10\\formal-v10\\codex-c1\\runs\\tools\\rep1\\metrics.json",
+      "metric_sha": "4c4c0b2400a24191d8115e5d950c4d9c24290e723a40dc61f1e8feb5bdd6a75b",
+      "transcript_path": "C:\\Users\\hongy\\projects\\_migloop-eval-20260909\\attribution10\\formal-v10\\codex-c1\\runs\\tools\\rep1\\transcript.jsonl",
+      "transcript_sha": "02a9226980dbc9b5fe371ed6858102e35f285b6adf6781f8f0c4811a8106f772"
+    },
+    {
+      "version": "formal-v10",
+      "case": "codex-c2",
+      "status": "completed",
+      "recording_complete": true,
+      "source": "80c099e",
+      "source_digest": "b47380bd789929d3181eae024e4dee12709d8878615ebe7bd85e0271a37a35ed",
+      "runner_sha256": "4874a8064f0cf69e2d94b60b4c765c9c7841194163b3f793f5672bdc8e7e6a19",
+      "models": [
+        "gpt-5.5"
+      ],
+      "effort": "medium",
+      "backend": "codex",
+      "task": "87bcb87a229540ac1185458de39880493a982767a2fc3d23386c8db60fd71c43",
+      "pool": "5bcd5ed757c468cea95f79591b41a4fb88cea2a6d6f4b5b1505e0026d2dbfc78",
+      "usage": {
+        "input_total": 1454351,
+        "cache_read": 1364480,
+        "cache_creation": 0,
+        "input_uncached": 89871,
+        "output": 12149,
+        "thinking_reported": 1338,
+        "output_includes_thinking": "Codex output_tokens is used once; reasoning is not added",
+        "input_semantics": "Codex input_tokens is the total; reported cache read/write are not added to it. input_uncached means input_tokens minus cached_input_tokens."
+      },
+      "wall": 284.41091500001494,
+      "e2e": 287.2081654999638,
+      "metric_calls": 47,
+      "metric_chars": 135197,
+      "metric_rejected": 1,
+      "metric_pending": 0,
+      "normalized_calls": 47,
+      "counts": {
+        "guide": 2,
+        "sessions": 3,
+        "index": 6,
+        "search": 19,
+        "action": 13,
+        "agent": 2,
+        "check": 2
+      },
+      "chars": {
+        "guide": 5094,
+        "sessions": 5927,
+        "index": 11628,
+        "search": 44886,
+        "action": 56742,
+        "agent": 7862,
+        "check": 3058
+      },
+      "total_chars": 135197,
+      "repeats": [],
+      "search_clusters": [
+        {
+          "scope": {
+            "after": true,
+            "until_ts": "2026-08-22T15:24:42.229000Z"
+          },
+          "steps": [
+            6,
+            7,
+            8,
+            9,
+            17,
+            18,
+            19,
+            20,
+            27,
+            28,
+            31,
+            32,
+            39,
+            40,
+            42,
+            43
+          ],
+          "queries": [
+            "WorksService",
+            "作品",
+            "入库",
+            "PptGenerationViewModel",
+            "PptRecordRepository.insert",
+            "WorksLibraryUpdated",
+            "saveGeneratedWork",
+            "WorksFragment_generated_work_missing",
+            "生成完成统一走 WorksService",
+            "git-diff.patch",
+            "没改变实际持久化",
+            "目标态数据是否存在",
+            "missing_feature_generated_work_list",
+            "PptCreateDao.getInstance",
+            "listWorks",
+            "initialize"
+          ],
+          "chars": 41557
+        }
+      ],
+      "broad_agent_steps": [],
+      "action_parts": {
+        "both": 11,
+        "output": 2
+      },
+      "action_windowed": 13,
+      "checks": [
+        {
+          "step": 45,
+          "draft_chars": 4905,
+          "returned_chars": 2180,
+          "use_line": 265,
+          "result_line": 268
+        },
+        {
+          "step": 47,
+          "draft_chars": 4905,
+          "returned_chars": 878,
+          "use_line": 283,
+          "result_line": 286
+        }
+      ],
+      "metric_path": "C:\\Users\\hongy\\projects\\_migloop-eval-20260909\\attribution10\\formal-v10\\codex-c2\\runs\\tools\\rep1\\metrics.json",
+      "metric_sha": "74f06a60e903e5c8dcd2375281ac24c764b7e0217edecf31e99d89e121a27cab",
+      "transcript_path": "C:\\Users\\hongy\\projects\\_migloop-eval-20260909\\attribution10\\formal-v10\\codex-c2\\runs\\tools\\rep1\\transcript.jsonl",
+      "transcript_sha": "b6b30d89ef686002341fcc0530f1439f917a5456b181f13c11a790a59c7aebf8"
+    },
+    {
+      "version": "formal-v10",
+      "case": "codex-c3",
+      "status": "completed",
+      "recording_complete": true,
+      "source": "80c099e",
+      "source_digest": "b47380bd789929d3181eae024e4dee12709d8878615ebe7bd85e0271a37a35ed",
+      "runner_sha256": "4874a8064f0cf69e2d94b60b4c765c9c7841194163b3f793f5672bdc8e7e6a19",
+      "models": [
+        "gpt-5.5"
+      ],
+      "effort": "medium",
+      "backend": "codex",
+      "task": "b85d9db51ded7a20b54cf5482750b0287886c5d3970254de58904cbd1090f8b7",
+      "pool": "5bcd5ed757c468cea95f79591b41a4fb88cea2a6d6f4b5b1505e0026d2dbfc78",
+      "usage": {
+        "input_total": 840519,
+        "cache_read": 764416,
+        "cache_creation": 0,
+        "input_uncached": 76103,
+        "output": 8229,
+        "thinking_reported": 575,
+        "output_includes_thinking": "Codex output_tokens is used once; reasoning is not added",
+        "input_semantics": "Codex input_tokens is the total; reported cache read/write are not added to it. input_uncached means input_tokens minus cached_input_tokens."
+      },
+      "wall": 193.37478349998128,
+      "e2e": 196.13071349996608,
+      "metric_calls": 37,
+      "metric_chars": 119420,
+      "metric_rejected": 0,
+      "metric_pending": 0,
+      "normalized_calls": 37,
+      "counts": {
+        "guide": 2,
+        "sessions": 2,
+        "index": 2,
+        "search": 15,
+        "action": 15,
+        "check": 1
+      },
+      "chars": {
+        "guide": 5094,
+        "sessions": 5094,
+        "index": 122,
+        "search": 60692,
+        "action": 47367,
+        "check": 1051
+      },
+      "total_chars": 119420,
+      "repeats": [],
+      "search_clusters": [
+        {
+          "scope": {
+            "until_ts": "2026-08-22T15:24:42.229000Z"
+          },
+          "steps": [
+            5,
+            7,
+            8,
+            9,
+            14,
+            15,
+            16,
+            22,
+            23,
+            24,
+            26,
+            27,
+            28,
+            29
+          ],
+          "queries": [
+            "GuideInit",
+            "Monitor",
+            "visibility",
+            "独立挂载",
+            "GuideInitComponent.ets",
+            "currentStep=5",
+            "currentStep = 5",
+            "第 6 步",
+            "条件挂载",
+            "GuideInit fresh capture",
+            "currentStep===5",
+            "GuideInitComponent({",
+            "cached Swiper",
+            "GuidePage.ets"
+          ],
+          "chars": 30048
+        }
+      ],
+      "broad_agent_steps": [],
+      "action_parts": {
+        "both": 12,
+        "input": 2,
+        "output": 1
+      },
+      "action_windowed": 15,
+      "checks": [
+        {
+          "step": 37,
+          "draft_chars": 5514,
+          "returned_chars": 1051,
+          "use_line": 211,
+          "result_line": 214
+        }
+      ],
+      "metric_path": "C:\\Users\\hongy\\projects\\_migloop-eval-20260909\\attribution10\\formal-v10\\codex-c3\\runs\\tools\\rep1\\metrics.json",
+      "metric_sha": "da256a33876c3059b2bdcd9517f218141819d89ceaca2f7b7e4fc0527787bb74",
+      "transcript_path": "C:\\Users\\hongy\\projects\\_migloop-eval-20260909\\attribution10\\formal-v10\\codex-c3\\runs\\tools\\rep1\\transcript.jsonl",
+      "transcript_sha": "d6092cfb7443f5ba763c7bc3f2d6609044913c2270db91f68c218f993cbc5059"
+    },
+    {
+      "version": "formal-v10",
+      "case": "codex-c4",
+      "status": "completed",
+      "recording_complete": true,
+      "source": "80c099e",
+      "source_digest": "b47380bd789929d3181eae024e4dee12709d8878615ebe7bd85e0271a37a35ed",
+      "runner_sha256": "4874a8064f0cf69e2d94b60b4c765c9c7841194163b3f793f5672bdc8e7e6a19",
+      "models": [
+        "gpt-5.5"
+      ],
+      "effort": "medium",
+      "backend": "codex",
+      "task": "88561bcbf7c14a6b64beac1472dd35f174c7478356e3c333c1dd029ba887f727",
+      "pool": "5bcd5ed757c468cea95f79591b41a4fb88cea2a6d6f4b5b1505e0026d2dbfc78",
+      "usage": {
+        "input_total": 932200,
+        "cache_read": 846336,
+        "cache_creation": 0,
+        "input_uncached": 85864,
+        "output": 13821,
+        "thinking_reported": 629,
+        "output_includes_thinking": "Codex output_tokens is used once; reasoning is not added",
+        "input_semantics": "Codex input_tokens is the total; reported cache read/write are not added to it. input_uncached means input_tokens minus cached_input_tokens."
+      },
+      "wall": 300.22607810003683,
+      "e2e": 302.9126108000055,
+      "metric_calls": 60,
+      "metric_chars": 129569,
+      "metric_rejected": 1,
+      "metric_pending": 0,
+      "normalized_calls": 60,
+      "counts": {
+        "guide": 2,
+        "sessions": 1,
+        "index": 3,
+        "search": 23,
+        "file": 1,
+        "diff": 1,
+        "action": 26,
+        "agent": 1,
+        "check": 2
+      },
+      "chars": {
+        "guide": 5094,
+        "sessions": 1412,
+        "index": 599,
+        "search": 54056,
+        "file": 2227,
+        "diff": 299,
+        "action": 63136,
+        "agent": 93,
+        "check": 2653
+      },
+      "total_chars": 129569,
+      "repeats": [],
+      "search_clusters": [
+        {
+          "scope": {
+            "until_ts": "2026-08-22T15:24:42.229000Z"
+          },
+          "steps": [
+            4,
+            5,
+            50
+          ],
+          "queries": [
+            "HitTestMode.Block",
+            "HitTestMode.Default",
+            "首启隐私门"
+          ],
+          "chars": 5755
+        },
+        {
+          "scope": {
+            "since_ts": "2026-08-17T03:11:06.675000Z",
+            "until_ts": "2026-08-22T15:24:42.229000Z"
+          },
+          "steps": [
+            15,
+            16,
+            19,
+            20,
+            21,
+            39,
+            51
+          ],
+          "queries": [
+            "编译验证",
+            "LaunchAgreementDialog",
+            "未生成新 HAP",
+            "Run entry",
+            "点击",
+            "同意并继续",
+            "hitTestBehavior"
+          ],
+          "chars": 16645
+        },
+        {
+          "scope": {
+            "until_ts": "2026-08-17T03:11:06.675000Z"
+          },
+          "steps": [
+            29,
+            30,
+            31,
+            32,
+            33,
+            57
+          ],
+          "queries": [
+            "同意并继续",
+            "同意",
+            "点不了",
+            "不同意",
+            "隐私",
+            "截图里按钮样式正常"
+          ],
+          "chars": 14419
+        },
+        {
+          "scope": {
+            "agent": "__main__:01a021e5",
+            "since_ts": "2026-08-21T01:19:15.586000Z",
+            "until_ts": "2026-08-22T15:24:42.229000Z"
+          },
+          "steps": [
+            40,
+            41,
+            44,
+            45
+          ],
+          "queries": [
+            "HitTestMode.Default",
+            "HitTestMode.Block",
+            "冷启先出现隐私协议弹窗",
+            "安全点击"
+          ],
+          "chars": 5017
+        },
+        {
+          "scope": {
+            "agent": "__main__:01a021e5",
+            "since_ts": "2026-08-21T01:19:15.586000Z",
+            "until_ts": "2026-08-21T03:00:00Z"
+          },
+          "steps": [
+            46,
+            47
+          ],
+          "queries": [
+            "LaunchAgreementDialog",
+            "同意并继续"
+          ],
+          "chars": 10626
+        }
+      ],
+      "broad_agent_steps": [],
+      "action_parts": {
+        "both": 22,
+        "input": 1,
+        "output": 3
+      },
+      "action_windowed": 26,
+      "checks": [
+        {
+          "step": 59,
+          "draft_chars": 5025,
+          "returned_chars": 1590,
+          "use_line": 285,
+          "result_line": 288
+        },
+        {
+          "step": 60,
+          "draft_chars": 4946,
+          "returned_chars": 1063,
+          "use_line": 294,
+          "result_line": 297
+        }
+      ],
+      "metric_path": "C:\\Users\\hongy\\projects\\_migloop-eval-20260909\\attribution10\\formal-v10\\codex-c4\\runs\\tools\\rep1\\metrics.json",
+      "metric_sha": "ef438580bafcdffb29efb8ce1f1f8dbe5cc31af5b5ee59ad0bf8c22ef305657f",
+      "transcript_path": "C:\\Users\\hongy\\projects\\_migloop-eval-20260909\\attribution10\\formal-v10\\codex-c4\\runs\\tools\\rep1\\transcript.jsonl",
+      "transcript_sha": "ca913dd275640f74ccf94a5445c9e77bb715271d70d5b2d5c3e86a439fb08b34"
+    },
+    {
+      "version": "formal-v10",
+      "case": "dice-entry",
+      "status": "completed",
+      "recording_complete": true,
+      "source": "80c099e",
+      "source_digest": "b47380bd789929d3181eae024e4dee12709d8878615ebe7bd85e0271a37a35ed",
+      "runner_sha256": "4874a8064f0cf69e2d94b60b4c765c9c7841194163b3f793f5672bdc8e7e6a19",
+      "models": [
+        "gpt-5.5"
+      ],
+      "effort": "medium",
+      "backend": "codex",
+      "task": "9060a6c160d2a1ac2b893b9f19d12e66a16e6ce1b7d301eacae0abfb9f55eec4",
+      "pool": "653db4192d47366e8ca099e59ef2679e929056f18320d081768539b2f5b7443e",
+      "usage": {
+        "input_total": 1438560,
+        "cache_read": 1315328,
+        "cache_creation": 0,
+        "input_uncached": 123232,
+        "output": 13687,
+        "thinking_reported": 1172,
+        "output_includes_thinking": "Codex output_tokens is used once; reasoning is not added",
+        "input_semantics": "Codex input_tokens is the total; reported cache read/write are not added to it. input_uncached means input_tokens minus cached_input_tokens."
+      },
+      "wall": 304.88168540003244,
+      "e2e": 308.6406719000079,
+      "metric_calls": 45,
+      "metric_chars": 222176,
+      "metric_rejected": 7,
+      "metric_pending": 0,
+      "normalized_calls": 45,
+      "counts": {
+        "guide": 2,
+        "sessions": 1,
+        "diff": 6,
+        "agent": 8,
+        "action": 14,
+        "search": 10,
+        "file": 2,
+        "check": 2
+      },
+      "chars": {
+        "guide": 5094,
+        "sessions": 7350,
+        "diff": 4423,
+        "agent": 20514,
+        "action": 60437,
+        "search": 113955,
+        "file": 7769,
+        "check": 2634
+      },
+      "total_chars": 222176,
+      "repeats": [
+        {
+          "tool": "agent",
+          "steps": [
+            18,
+            19
+          ],
+          "chars": 107,
+          "args": {
+            "id": "agent-a27497cfed8c44856",
+            "v": 3,
+            "via": "agent:主会话·2f01bcdc@v5",
+            "reads": true,
+            "seen": true,
+            "summary_chars": 500
+          }
+        }
+      ],
+      "search_clusters": [
+        {
+          "scope": {
+            "after": true,
+            "agent": "agent-a27497cfed8c44856",
+            "since": 0,
+            "v": 3
+          },
+          "steps": [
+            21,
+            27
+          ],
+          "queries": [
+            "errorManager",
+            "onException"
+          ],
+          "chars": 15330
+        },
+        {
+          "scope": {
+            "after": true,
+            "since_ts": "2026-09-03T19:17:35.691000Z",
+            "until_ts": "2026-09-03T22:09:07.170000Z"
+          },
+          "steps": [
+            29,
+            30,
+            32
+          ],
+          "queries": [
+            "BUILD SUCCESSFUL",
+            "__TEST_MODE__",
+            "PASS"
+          ],
+          "chars": 73467
+        },
+        {
+          "scope": {
+            "after": true,
+            "agent": "agent-a349784d2663f1f0a",
+            "since": 0,
+            "v": 1
+          },
+          "steps": [
+            39,
+            40,
+            41
+          ],
+          "queries": [
+            "__test_mode__",
+            "__target_page__",
+            "EntryAbility"
+          ],
+          "chars": 17370
+        }
+      ],
+      "broad_agent_steps": [
+        9,
+        10,
+        13,
+        14,
+        16,
+        18,
+        19,
+        20
+      ],
+      "action_parts": {
+        "both": 3,
+        "output": 10,
+        "input": 1
+      },
+      "action_windowed": 14,
+      "checks": [
+        {
+          "step": 44,
+          "draft_chars": 7384,
+          "returned_chars": 1571,
+          "use_line": 270,
+          "result_line": 273
+        },
+        {
+          "step": 45,
+          "draft_chars": 7332,
+          "returned_chars": 1063,
+          "use_line": 279,
+          "result_line": 282
+        }
+      ],
+      "metric_path": "C:\\Users\\hongy\\projects\\_migloop-eval-20260909\\attribution10\\formal-v10\\dice-entry\\runs\\tools\\rep1\\metrics.json",
+      "metric_sha": "b95b8f383aa38011071e582cc72143056f142946db8a732401861f84b4e3c47a",
+      "transcript_path": "C:\\Users\\hongy\\projects\\_migloop-eval-20260909\\attribution10\\formal-v10\\dice-entry\\runs\\tools\\rep1\\transcript.jsonl",
+      "transcript_sha": "cb24995ca8e3a68d225751651bfefcb9d2aa906ef56547cfd2f076fbac613ab4"
+    },
+    {
+      "version": "formal-v10",
+      "case": "member-center",
+      "status": "completed",
+      "recording_complete": true,
+      "source": "80c099e",
+      "source_digest": "b47380bd789929d3181eae024e4dee12709d8878615ebe7bd85e0271a37a35ed",
+      "runner_sha256": "4874a8064f0cf69e2d94b60b4c765c9c7841194163b3f793f5672bdc8e7e6a19",
+      "models": [
+        "gpt-5.5"
+      ],
+      "effort": "medium",
+      "backend": "codex",
+      "task": "e60ad7491cd5991a948f8c7128432feca230a59bee208640ca5b90a44d68dec1",
+      "pool": "a78b1373045f7558d6da3b76123e30d032635a2a0b4cdd665e7f80c0bdf8b337",
+      "usage": {
+        "input_total": 1716600,
+        "cache_read": 1562112,
+        "cache_creation": 0,
+        "input_uncached": 154488,
+        "output": 18171,
+        "thinking_reported": 1326,
+        "output_includes_thinking": "Codex output_tokens is used once; reasoning is not added",
+        "input_semantics": "Codex input_tokens is the total; reported cache read/write are not added to it. input_uncached means input_tokens minus cached_input_tokens."
+      },
+      "wall": 402.4389009999577,
+      "e2e": 416.0596371999709,
+      "metric_calls": 56,
+      "metric_chars": 285307,
+      "metric_rejected": 2,
+      "metric_pending": 0,
+      "normalized_calls": 56,
+      "counts": {
+        "guide": 2,
+        "sessions": 1,
+        "action": 26,
+        "diff": 5,
+        "file": 4,
+        "search": 14,
+        "agent": 2,
+        "check": 2
+      },
+      "chars": {
+        "guide": 5094,
+        "sessions": 16197,
+        "action": 99150,
+        "diff": 4890,
+        "file": 54693,
+        "search": 95559,
+        "agent": 6031,
+        "check": 3693
+      },
+      "total_chars": 285307,
+      "repeats": [],
+      "search_clusters": [
+        {
+          "scope": {
+            "agent": "agent-a68daf720e780b4c2",
+            "since": 27,
+            "v": 33
+          },
+          "steps": [
+            23,
+            24,
+            25
+          ],
+          "queries": [
+            "后缀跟着数字一起变特大",
+            "tvProductPrice.text",
+            "price cell"
+          ],
+          "chars": 4468
+        },
+        {
+          "scope": {
+            "after": true,
+            "until_ts": "2026-07-26T21:48:57.218000Z"
+          },
+          "steps": [
+            26,
+            27,
+            28,
+            36,
+            37,
+            38,
+            39,
+            47,
+            48,
+            49
+          ],
+          "queries": [
+            "商品价格",
+            "AbsoluteSizeSpan",
+            "价格区",
+            "ALIGN_PPayAgreementDialog_color_mismatch_dialog-mask.md",
+            "弹窗蒙层 α≈0.20，安卓 0.55",
+            "Palette.DIALOG_MASK",
+            "DIALOG_MASK",
+            "entry/src/main/ets/pages/MemberCenterPage.ets:206",
+            "showPayAgreementDialog",
+            "renewRuleDialog"
+          ],
+          "chars": 90298
+        }
+      ],
+      "broad_agent_steps": [
+        52,
+        53
+      ],
+      "action_parts": {
+        "both": 25,
+        "output": 1
+      },
+      "action_windowed": 26,
+      "checks": [
+        {
+          "step": 55,
+          "draft_chars": 11944,
+          "returned_chars": 2626,
+          "use_line": 257,
+          "result_line": 260
+        },
+        {
+          "step": 56,
+          "draft_chars": 11822,
+          "returned_chars": 1067,
+          "use_line": 266,
+          "result_line": 269
+        }
+      ],
+      "metric_path": "C:\\Users\\hongy\\projects\\_migloop-eval-20260909\\attribution10\\formal-v10\\member-center\\runs\\tools\\rep1\\metrics.json",
+      "metric_sha": "44038a0fe809f83423c25cc5d6a1b144e89c5a98e9beda8f2c0bf56088c3346f",
+      "transcript_path": "C:\\Users\\hongy\\projects\\_migloop-eval-20260909\\attribution10\\formal-v10\\member-center\\runs\\tools\\rep1\\transcript.jsonl",
+      "transcript_sha": "5c364fe6486f04dfba7204fea03f15b06d1e016d6dbadabb45111eb5f5a3faf8"
+    },
+    {
+      "version": "formal-v10",
+      "case": "splash",
+      "status": "completed",
+      "recording_complete": true,
+      "source": "80c099e",
+      "source_digest": "b47380bd789929d3181eae024e4dee12709d8878615ebe7bd85e0271a37a35ed",
+      "runner_sha256": "4874a8064f0cf69e2d94b60b4c765c9c7841194163b3f793f5672bdc8e7e6a19",
+      "models": [
+        "gpt-5.5"
+      ],
+      "effort": "medium",
+      "backend": "codex",
+      "task": "d2f9f03d6b8a4c56e405559fe7160308ecc1d054b877ebf64250dd084ec85134",
+      "pool": "a78b1373045f7558d6da3b76123e30d032635a2a0b4cdd665e7f80c0bdf8b337",
+      "usage": {
+        "input_total": 1964353,
+        "cache_read": 1741312,
+        "cache_creation": 0,
+        "input_uncached": 223041,
+        "output": 11168,
+        "thinking_reported": 1070,
+        "output_includes_thinking": "Codex output_tokens is used once; reasoning is not added",
+        "input_semantics": "Codex input_tokens is the total; reported cache read/write are not added to it. input_uncached means input_tokens minus cached_input_tokens."
+      },
+      "wall": 267.5156947999494,
+      "e2e": 281.4523930000141,
+      "metric_calls": 48,
+      "metric_chars": 457446,
+      "metric_rejected": 1,
+      "metric_pending": 0,
+      "normalized_calls": 48,
+      "counts": {
+        "guide": 2,
+        "sessions": 1,
+        "file": 5,
+        "diff": 2,
+        "blame": 1,
+        "agent": 4,
+        "action": 21,
+        "search": 10,
+        "index": 1,
+        "check": 1
+      },
+      "chars": {
+        "guide": 5094,
+        "sessions": 13937,
+        "file": 156718,
+        "diff": 1340,
+        "blame": 1623,
+        "agent": 81022,
+        "action": 75816,
+        "search": 91012,
+        "index": 446,
+        "check": 1564
+      },
+      "total_chars": 428572,
+      "repeats": [],
+      "search_clusters": [
+        {
+          "scope": {
+            "after": true,
+            "until_ts": "2026-07-26T21:48:57.218000Z"
+          },
+          "steps": [
+            14,
+            16,
+            17,
+            30,
+            34
+          ],
+          "queries": [
+            "setWindowSystemBarEnable",
+            "状态栏",
+            "系统栏",
+            "onWillDismiss",
+            "冷启弹窗态连按"
+          ],
+          "chars": 80267
+        },
+        {
+          "scope": {
+            "after": true,
+            "since_ts": "2026-07-26T21:06:31.863Z",
+            "until_ts": "2026-07-26T21:48:57.218000Z"
+          },
+          "steps": [
+            36,
+            37
+          ],
+          "queries": [
+            "SplashActivity_01_back_key_dismisses_privacy_dialog",
+            "复测"
+          ],
+          "chars": 2568
+        },
+        {
+          "scope": {
+            "after": true,
+            "file": "entry/src/main/ets/pages/SplashPage.ets",
+            "v": 53
+          },
+          "steps": [
+            45,
+            46
+          ],
+          "queries": [
+            "Navigation()",
+            "pageMap"
+          ],
+          "chars": 6808
+        }
+      ],
+      "broad_agent_steps": [
+        8,
+        12,
+        15,
+        33
+      ],
+      "action_parts": {
+        "input": 8,
+        "output": 6,
+        "both": 7
+      },
+      "action_windowed": 21,
+      "checks": [
+        {
+          "step": 48,
+          "draft_chars": 8108,
+          "returned_chars": 1564,
+          "use_line": 230,
+          "result_line": 233
+        }
+      ],
+      "metric_path": "C:\\Users\\hongy\\projects\\_migloop-eval-20260909\\attribution10\\formal-v10\\splash\\runs\\tools\\rep1\\metrics.json",
+      "metric_sha": "5d2b039fd365d159b44c858aa06191cbbbe512fcdd643035293be2ab2aad19ed",
+      "transcript_path": "C:\\Users\\hongy\\projects\\_migloop-eval-20260909\\attribution10\\formal-v10\\splash\\runs\\tools\\rep1\\transcript.jsonl",
+      "transcript_sha": "7b2919fbd338a4387d8d56d545ac335d4b1704dd77824319761f480356274c6d"
+    }
+  ],
+  "boundaries": [
+    {
+      "version": "formal-v9",
+      "case": "codex-c1",
+      "badtime": [],
+      "partials": [],
+      "agents": [],
+      "failed": [],
+      "same_body_repeats": []
+    },
+    {
+      "version": "formal-v9",
+      "case": "codex-c2",
+      "badtime": [],
+      "partials": [],
+      "agents": [
+        {
+          "step": 38,
+          "tool": "agent",
+          "args": {
+            "id": "__main__:01a021e5",
+            "v": 218,
+            "via": "search:2fbd88a68e1cad89b19524ef:2",
+            "since": 214,
+            "reads": true,
+            "seen": true
+          },
+          "chars": 7377,
+          "lines": [
+            226,
+            229
+          ],
+          "id": "call_TBlwU53hJ6ECQg411JGxtbdv",
+          "sha": "0c6aba6eeab897807104e2963df070ffae17b801c2878909a942e547ca806f9d",
+          "record_sha": "d09ba61ee79e020cda4bae467787c5028541eb5b5b514284363b0563c2cb2f53",
+          "prefix": "# agent 主会话·01a021e5  id=__main__:01a021e5  v218 / 共 223 版  窗口 v215–v218(只给喂养这段版本的动作) · 上游 19/1 跳\n身份: agent · 会话 01a021e5\n全池时间边界: 2 个会话分组 · ",
+          "cumulative": false,
+          "seen": true,
+          "rejected": false
+        }
+      ],
+      "failed": [
+        {
+          "step": 17,
+          "tool": "file",
+          "args": {
+            "path": "/Users/ventiu/Desktop/HUAWEI/AIPPT_830_test/spec/fix/round-2/feat/WorksFragment_generated_work_missing.md",
+            "v": 1,
+            "via": "search:abd6b2c4ab8ff6c21c894b30:4",
+            "content": true,
+            "start": 1,
+            "n": 80
+          },
+          "chars": 38,
+          "lines": [
+            109,
+            112
+          ],
+          "id": "call_GO1GrcKYVzFL6JtNzM1vSe6a",
+          "sha": "b4fa0804a5baec59e4e5794513414b9f25ddb85cd524af87de6de76e7fcf61a7",
+          "record_sha": "3258b1ac3d7f14a773bd5b6838803a1f44c16374a224f323cb049b6222e9ef87",
+          "prefix": "⛔ search 命中与目标精确坐标不一致,不得换文件、agent 或版本。"
+        }
+      ],
+      "same_body_repeats": []
+    },
+    {
+      "version": "formal-v9",
+      "case": "codex-c3",
+      "badtime": [],
+      "partials": [],
+      "agents": [],
+      "failed": [
+        {
+          "step": 6,
+          "tool": "file",
+          "args": {
+            "path": "entry/src/main/ets/pages/GuidePage.ets",
+            "v": 1,
+            "via": "sessions",
+            "content": true,
+            "start": 1,
+            "n": 80,
+            "readers": true,
+            "m_n": 40
+          },
+          "chars": 70,
+          "lines": [
+            50,
+            56
+          ],
+          "id": "call_tuD6BDVU3KsBrwndpcWFzUJF",
+          "sha": "9e6798d89837dcbe30461e5198fcf43e2de8785bc1bccb2e3c119d306b725b33",
+          "record_sha": "dbc5d92ebdb87249bd5ea9840238a0f3a80695bb8e000fbdd6a88350974d6ebf",
+          "prefix": "⛔ 目标版本不存在: file:entry/src/main/ets/pages/GuidePage.ets@v1;账本共 0 版,未打开。"
+        },
+        {
+          "step": 19,
+          "tool": "file",
+          "args": {
+            "path": "entry/src/main/ets/pages/GuideInitComponent.ets",
+            "v": 0,
+            "via": "sessions",
+            "m_all": true,
+            "m_n": 80,
+            "readers": true
+          },
+          "chars": 95,
+          "lines": [
+            107,
+            110
+          ],
+          "id": "call_2HKZNFUBK8z6PIQMqTHajJUE",
+          "sha": "b6f0ede5031d977eedd462b665f4dadce0abd9d3d13de71a6d6cd36389e8f726",
+          "record_sha": "84b211999fd0945d8a2a331e9f9e51157906dd6ba8c0a8584d4e42b1f6aa70df",
+          "prefix": "⛔ via=sessions/task 只能用于第一次 file / agent;之后必须从已打开的节点跳。已打开:file:_index.md@v1、file:_summary.md@v1"
+        },
+        {
+          "step": 33,
+          "tool": "file",
+          "args": {
+            "path": "/Users/ventiu/Desktop/HUAWEI/AIPPT_830_test/spec/fix/round-0/feat/GuideInit_01_loading_intro_bubble.md",
+            "v": 1,
+            "via": "search:346739450be72c4b5d44d480:5",
+            "content": true,
+            "start": 1,
+            "n": 120
+          },
+          "chars": 38,
+          "lines": [
+            169,
+            175
+          ],
+          "id": "call_ABLPiBqUk2y9dfaCjVcAtTc5",
+          "sha": "b4fa0804a5baec59e4e5794513414b9f25ddb85cd524af87de6de76e7fcf61a7",
+          "record_sha": "753ae20d0b0203615f87f046127780574ad2833660748a12168d55302f12e527",
+          "prefix": "⛔ search 命中与目标精确坐标不一致,不得换文件、agent 或版本。"
+        }
+      ],
+      "same_body_repeats": []
+    },
+    {
+      "version": "formal-v9",
+      "case": "codex-c4",
+      "badtime": [],
+      "partials": [],
+      "agents": [
+        {
+          "step": 19,
+          "tool": "agent",
+          "args": {
+            "id": "__main__:01a009fe",
+            "v": 249,
+            "via": "search:1bc397872945df15072d0dfa:3",
+            "since": 245,
+            "reads": true,
+            "seen": true
+          },
+          "chars": 27732,
+          "lines": [
+            113,
+            116
+          ],
+          "id": "call_C8TdYLGbxrHjCO7aUq1QMMgF",
+          "sha": "c76e5ec15c3ea4e15b0aa2dbd73a1f35d1cf66535e2cb4334245f1ff9b0a4c7f",
+          "record_sha": "00cfffec718029de03f2d2b59616086300f0f86c2ea5df7fc6b22f8a5524fc74",
+          "prefix": "# agent 主会话·01a009fe  id=__main__:01a009fe  v249 / 共 249 版  窗口 v246–v249(只给喂养这段版本的动作) · 上游 17/2 跳\n身份: agent · 会话 01a009fe\n全池时间边界: 2 个会话分组 · ",
+          "cumulative": false,
+          "seen": true,
+          "rejected": false
+        }
+      ],
+      "failed": [
+        {
+          "step": 47,
+          "tool": "file",
+          "args": {
+            "path": "spec/visual-verify/batches/trip_1_logged_out_batch_02/manifest.json",
+            "v": 1,
+            "via": "search:c45c9d58a1b9775323b378c6:56",
+            "content": true,
+            "start": 1,
+            "n": 120,
+            "diff": false
+          },
+          "chars": 38,
+          "lines": [
+            233,
+            236
+          ],
+          "id": "call_XlukIF2PN0Ioe8ZDSF5lxa0M",
+          "sha": "b4fa0804a5baec59e4e5794513414b9f25ddb85cd524af87de6de76e7fcf61a7",
+          "record_sha": "6b45002a5d1dc1f8d8b96436b4b1cc1b50e8e4d4c0602451047f597cff49ed6b",
+          "prefix": "⛔ search 命中与目标精确坐标不一致,不得换文件、agent 或版本。"
+        }
+      ],
+      "same_body_repeats": []
+    },
+    {
+      "version": "formal-v9",
+      "case": "dice-entry",
+      "badtime": [],
+      "partials": [],
+      "agents": [
+        {
+          "step": 9,
+          "tool": "agent",
+          "args": {
+            "id": "agent-a711c5d09fb676814",
+            "v": 4,
+            "via": "sessions",
+            "reads": true,
+            "seen": true
+          },
+          "chars": 82,
+          "lines": [
+            55,
+            64
+          ],
+          "id": "call_iTdgvfvt1MuO7VvqJz0eroKz",
+          "sha": "8f37e47a6067da1de1cfc58e21aa95f2e67afedf7868dae3c3ab9e662c1e0959",
+          "record_sha": "6bd8120a31ad5697ace4a5a35b28ff6d218139f4f5f6f5ac11c72e92004b4ff0",
+          "prefix": "⛔ via=sessions/task 只能用于第一次 file / agent;之后必须从已打开的节点跳。已打开:file:EntryAbility.ets@v5",
+          "cumulative": true,
+          "seen": true,
+          "rejected": true
+        },
+        {
+          "step": 10,
+          "tool": "agent",
+          "args": {
+            "id": "agent-a27497cfed8c44856",
+            "v": 3,
+            "via": "sessions",
+            "reads": true,
+            "seen": true
+          },
+          "chars": 82,
+          "lines": [
+            56,
+            65
+          ],
+          "id": "call_HXCbzrQKz7rKZyGTJ0ZfFc3p",
+          "sha": "8f37e47a6067da1de1cfc58e21aa95f2e67afedf7868dae3c3ab9e662c1e0959",
+          "record_sha": "1af2091d5c9d98cd0ec90b1717d8d9516f9a7b6d34c323f6a8462b38f6fe36a0",
+          "prefix": "⛔ via=sessions/task 只能用于第一次 file / agent;之后必须从已打开的节点跳。已打开:file:EntryAbility.ets@v5",
+          "cumulative": true,
+          "seen": true,
+          "rejected": true
+        },
+        {
+          "step": 12,
+          "tool": "agent",
+          "args": {
+            "id": "agent-a711c5d09fb676814",
+            "v": 4,
+            "via": "file:EntryAbility.ets@v5",
+            "reads": true,
+            "seen": true
+          },
+          "chars": 9712,
+          "lines": [
+            72,
+            79
+          ],
+          "id": "call_ajlF0pVykC2x8zLAYLetkBe6",
+          "sha": "641996c73d4a1cc3e4aeb8a06d1f6f4b5604eba29cee84d81b7164e97ae226d3",
+          "record_sha": "8f1af3b439ffa0f30c6a0165ec3de887e15895c6441789fae5e88e582d09f48f",
+          "prefix": "# agent UI-T Step3 生成 P0001 测试  id=agent-a711c5d09fb676814  v4 / 共 5 版 · 上游 23/2 跳\n身份: general-purpose · 会话 81e0a463 · UI-T Step3 生成 P0001 测",
+          "cumulative": true,
+          "seen": true,
+          "rejected": false
+        },
+        {
+          "step": 13,
+          "tool": "agent",
+          "args": {
+            "id": "agent-a27497cfed8c44856",
+            "v": 3,
+            "via": "file:EntryAbility.ets@v5",
+            "reads": true,
+            "seen": true
+          },
+          "chars": 6944,
+          "lines": [
+            73,
+            80
+          ],
+          "id": "call_CtKUeTYykqPWgU3ihNWOZ6II",
+          "sha": "934d7054baa36878a790748c7b5b10aac0bbb77152d86efcaf1828cbf5244913",
+          "record_sha": "75ade2b2c238bf96db0676834d5c2004ee8dfab7a4ebc89b1a80f24b1c92aec7",
+          "prefix": "# agent fix-errobserver  id=agent-a27497cfed8c44856  v3 / 共 3 版 · 上游 34/1 跳\n身份: a2h-migration-worker · 会话 2f01bcdc · Add global error observ",
+          "cumulative": true,
+          "seen": true,
+          "rejected": false
+        },
+        {
+          "step": 14,
+          "tool": "agent",
+          "args": {
+            "id": "agent-a349784d2663f1f0a",
+            "v": 2,
+            "via": "file:EntryAbility.ets@v8",
+            "reads": true,
+            "seen": true
+          },
+          "chars": 15407,
+          "lines": [
+            86,
+            92
+          ],
+          "id": "call_jnPg2dIfDV98DsxezAMnKk61",
+          "sha": "b622e3bac3a39f5b56cdb29bb0dd433b26c31082dcdf3248abaf45a71bf539ba",
+          "record_sha": "18411fae5473e23b9b6475afe3dbecc3d7f5f9113f4b1b76d0471f3f5e984f9b",
+          "prefix": "# agent conv-page-0001  id=agent-a349784d2663f1f0a  v2 / 共 9 版 · 上游 9/2 跳\n身份: a2h-activity-converter · 会话 81e0a463 · Stage 1 转换 page_0001\n全池",
+          "cumulative": true,
+          "seen": true,
+          "rejected": false
+        }
+      ],
+      "failed": [
+        {
+          "step": 5,
+          "tool": "file",
+          "args": {
+            "path": "entry/src/main/ets/entryability/EntryAbility.ets",
+            "v": 5,
+            "via": "file:entry/src/main/ets/entryability/EntryAbility.ets@v5",
+            "content": true,
+            "start": 1,
+            "n": 120
+          },
+          "chars": 98,
+          "lines": [
+            37,
+            46
+          ],
+          "id": "call_B8HXMLqKK7K8sE8OY1WKo8Ek",
+          "sha": "23822006a88439ac9b16bf9b202d456fc0b3a7adb42b7ce81fc2f659685f00c0",
+          "record_sha": "bd1b04d2e27ca68779fd02eb6602711d97770e5d404ea4ef8dd8c1ab3f07e9ea",
+          "prefix": "⛔ via 不是已打开的节点:file:entry/src/main/ets/entryability/EntryAbility.ets@v5。打开了什么只能从什么跳。已打开:(还没打开任何节点)"
+        },
+        {
+          "step": 6,
+          "tool": "file",
+          "args": {
+            "path": "entry/src/main/ets/entryability/EntryAbility.ets",
+            "v": 8,
+            "via": "file:entry/src/main/ets/entryability/EntryAbility.ets@v8",
+            "content": true,
+            "start": 1,
+            "n": 180
+          },
+          "chars": 98,
+          "lines": [
+            38,
+            47
+          ],
+          "id": "call_Jpm9vPp4CS4YyX5YuRB2Y9In",
+          "sha": "b44138fb5dbc3a03d83d95f5c4b789ef504c3c5d727b5546c438238e23d78993",
+          "record_sha": "4e9b02e59fb751a1047a234518ae7f5aa2fb070797724afe3baaff02053807d5",
+          "prefix": "⛔ via 不是已打开的节点:file:entry/src/main/ets/entryability/EntryAbility.ets@v8。打开了什么只能从什么跳。已打开:(还没打开任何节点)"
+        },
+        {
+          "step": 8,
+          "tool": "file",
+          "args": {
+            "path": "entry/src/main/ets/entryability/EntryAbility.ets",
+            "v": 8,
+            "via": "sessions",
+            "content": true,
+            "start": 1,
+            "n": 180,
+            "diff": true
+          },
+          "chars": 82,
+          "lines": [
+            54,
+            63
+          ],
+          "id": "call_NbRCfGuCcbM4jN6oK6t8GETG",
+          "sha": "8f37e47a6067da1de1cfc58e21aa95f2e67afedf7868dae3c3ab9e662c1e0959",
+          "record_sha": "f447e451e473ffbc150d4ea62bf9f6ef54929a7ea9400e97b31c89c76ef94826",
+          "prefix": "⛔ via=sessions/task 只能用于第一次 file / agent;之后必须从已打开的节点跳。已打开:file:EntryAbility.ets@v5"
+        },
+        {
+          "step": 9,
+          "tool": "agent",
+          "args": {
+            "id": "agent-a711c5d09fb676814",
+            "v": 4,
+            "via": "sessions",
+            "reads": true,
+            "seen": true
+          },
+          "chars": 82,
+          "lines": [
+            55,
+            64
+          ],
+          "id": "call_iTdgvfvt1MuO7VvqJz0eroKz",
+          "sha": "8f37e47a6067da1de1cfc58e21aa95f2e67afedf7868dae3c3ab9e662c1e0959",
+          "record_sha": "6bd8120a31ad5697ace4a5a35b28ff6d218139f4f5f6f5ac11c72e92004b4ff0",
+          "prefix": "⛔ via=sessions/task 只能用于第一次 file / agent;之后必须从已打开的节点跳。已打开:file:EntryAbility.ets@v5"
+        },
+        {
+          "step": 10,
+          "tool": "agent",
+          "args": {
+            "id": "agent-a27497cfed8c44856",
+            "v": 3,
+            "via": "sessions",
+            "reads": true,
+            "seen": true
+          },
+          "chars": 82,
+          "lines": [
+            56,
+            65
+          ],
+          "id": "call_HXCbzrQKz7rKZyGTJ0ZfFc3p",
+          "sha": "8f37e47a6067da1de1cfc58e21aa95f2e67afedf7868dae3c3ab9e662c1e0959",
+          "record_sha": "1af2091d5c9d98cd0ec90b1717d8d9516f9a7b6d34c323f6a8462b38f6fe36a0",
+          "prefix": "⛔ via=sessions/task 只能用于第一次 file / agent;之后必须从已打开的节点跳。已打开:file:EntryAbility.ets@v5"
+        },
+        {
+          "step": 27,
+          "tool": "file",
+          "args": {
+            "path": "/private/tmp/claude-502/-Users-fengyi-Workspace-migbot-set-hmigbot-plus/12b07daf-a671-4616-96a1-c214864ee609/scratchpad/dice-hmos/spec/verify/ui/round-1/final-summary.md",
+            "v": 1,
+            "via": "agent:__main__:593d4e86@v10",
+            "content": true,
+            "start": 1,
+            "n": 80
+          },
+          "chars": 189,
+          "lines": [
+            143,
+            149
+          ],
+          "id": "call_VjlVo3xxjVR65mKGWpDFdoJs",
+          "sha": "59c21045417fbeb0a143c37ad20042c1ffdf30dbeb7c2d01338a18629ae7ca25",
+          "record_sha": "73b70c02f6c9c9926fe0909e5178ee29b40a2f7c9188bab5227ac8baf690ac1d",
+          "prefix": "⛔ via 不是已打开的节点:agent:__main__:593d4e86@v10。打开了什么只能从什么跳。已打开:file:EntryAbility.ets@v5、file:EntryAbility.ets@v8、agent:UI-T Step3 生成 P0001 测试@v4"
+        },
+        {
+          "step": 32,
+          "tool": "file",
+          "args": {
+            "path": "spec/test/ui-test/design/P0001_MainActivity.md",
+            "v": 1,
+            "via": "agent:UI-T Step3 生成 P0001 测试@v4",
+            "content": true,
+            "start": 150,
+            "n": 90
+          },
+          "chars": 282,
+          "lines": [
+            168,
+            174
+          ],
+          "id": "call_fIrrCD4rbd1zfOTHqxYKF8tb",
+          "sha": "bbf5f875a56aa91bd351c1fd981094048413e08836d60e7f29639c3c434250de",
+          "record_sha": "746ba047c39adbebed874d1dcb29129af8f5c23d13330ed03277c875f26cbab4",
+          "prefix": "⛔ via 解析不了或不在账本:agent:UI-T Step3 生成 P0001 测试@v4。via 必须是已打开的节点之一:file:EntryAbility.ets@v5、file:EntryAbility.ets@v8、agent:UI-T Step3 生成 P0001 "
+        }
+      ],
+      "same_body_repeats": []
+    },
+    {
+      "version": "formal-v9",
+      "case": "member-center",
+      "badtime": [],
+      "partials": [],
+      "agents": [],
+      "failed": [
+        {
+          "step": 7,
+          "tool": "file",
+          "args": {
+            "path": "entry/src/main/ets/pages/MemberCenterPage.ets",
+            "v": 14,
+            "via": "file:entry/src/main/ets/pages/MemberCenterPage.ets@v14",
+            "content": true,
+            "start": 1,
+            "n": 35
+          },
+          "chars": 96,
+          "lines": [
+            59,
+            64
+          ],
+          "id": "call_HusBvVPp7Vq9XsuxMGVoSaHE",
+          "sha": "b132194c9e05d352ed3cafc0757d8a022afd21ee32e724f384e27be0b887624a",
+          "record_sha": "904484773d1c9346d893fc59e94fb8e8071846d541caa175152136fc7af284be",
+          "prefix": "⛔ via 不是已打开的节点:file:entry/src/main/ets/pages/MemberCenterPage.ets@v14。打开了什么只能从什么跳。已打开:(还没打开任何节点)"
+        },
+        {
+          "step": 8,
+          "tool": "file",
+          "args": {
+            "path": "entry/src/main/ets/pages/MemberCenterPage.ets",
+            "v": 14,
+            "via": "file:entry/src/main/ets/pages/MemberCenterPage.ets@v14",
+            "content": true,
+            "start": 198,
+            "n": 45
+          },
+          "chars": 96,
+          "lines": [
+            60,
+            67
+          ],
+          "id": "call_IrGi3VThKfTvbImW9w8Uk0dP",
+          "sha": "b132194c9e05d352ed3cafc0757d8a022afd21ee32e724f384e27be0b887624a",
+          "record_sha": "2ac8c5790659eb4dbe2eb7931497a2d904c12e58c829df66525b482616686318",
+          "prefix": "⛔ via 不是已打开的节点:file:entry/src/main/ets/pages/MemberCenterPage.ets@v14。打开了什么只能从什么跳。已打开:(还没打开任何节点)"
+        },
+        {
+          "step": 9,
+          "tool": "file",
+          "args": {
+            "path": "entry/src/main/ets/pages/MemberCenterPage.ets",
+            "v": 14,
+            "via": "file:entry/src/main/ets/pages/MemberCenterPage.ets@v14",
+            "content": true,
+            "start": 698,
+            "n": 55
+          },
+          "chars": 96,
+          "lines": [
+            61,
+            68
+          ],
+          "id": "call_QKcL5vxVFGh9rccwAnadm8sw",
+          "sha": "b132194c9e05d352ed3cafc0757d8a022afd21ee32e724f384e27be0b887624a",
+          "record_sha": "2cd7ecf0d05c3a4b3e9d4c2d4f8278cb8504e228b60b1dda14b25605a37d5cb2",
+          "prefix": "⛔ via 不是已打开的节点:file:entry/src/main/ets/pages/MemberCenterPage.ets@v14。打开了什么只能从什么跳。已打开:(还没打开任何节点)"
+        }
+      ],
+      "same_body_repeats": []
+    },
+    {
+      "version": "formal-v9",
+      "case": "splash",
+      "badtime": [],
+      "partials": [
+        {
+          "step": 3,
+          "tool": "file",
+          "args": {
+            "path": "entry/src/main/ets/pages/SplashPage.ets",
+            "v": 53,
+            "via": "sessions",
+            "diff": true,
+            "v_from": 1,
+            "v_to": 53,
+            "content": false,
+            "readers": true
+          },
+          "chars": 37938,
+          "lines": [
+            37,
+            42
+          ],
+          "id": "call_PtXr0hdrKv4nGjqiE9OJPjXV",
+          "sha": "ed0d52312080f1184d63f08a8feff57c100e3b75ffd294dddfcd6645b30756fb",
+          "record_sha": "2cc729e5595fb65543a62b313047f51425b24cfaaf485833de21e8ca65bb49aa",
+          "prefix": "# 文件 entry/src/main/ets/pages/SplashPage.ets @v53  (共 53 版)\n完整路径: /Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723/entry",
+          "normalization": {
+            "kind": "codex_native_input_text_blocks",
+            "status": "verified",
+            "header": "Wall time: 0.1480 seconds\nOutput:",
+            "response_result_line": 42,
+            "runtime_result_line": 41,
+            "runtime_item_id": "call_PtXr0hdrKv4nGjqiE9OJPjXV",
+            "exact_body_match": false,
+            "response_body_chars": 37938,
+            "runtime_body_chars": 65348,
+            "response_body_sha256": "ed0d52312080f1184d63f08a8feff57c100e3b75ffd294dddfcd6645b30756fb",
+            "runtime_body_sha256": "1453f96e1446e01b01de4fc677ea65098c98117067dd07cbfce6c2e9fe0f6441",
+            "note": "返回截断／非全文:交付正文的可见前后缀与同 ID 原生返回逐字吻合;保留交付片段,未用完整原生正文替代",
+            "delivery_truncated": true,
+            "visible_chars": 37915,
+            "omitted_chars": 27433,
+            "omission_start": 18702,
+            "omission_end": 46135,
+            "reported_omitted_tokens": 8641
+          }
+        },
+        {
+          "step": 14,
+          "tool": "agent",
+          "args": {
+            "id": "agent-a68daf720e780b4c2",
+            "v": 31,
+            "via": "file:entry/src/main/ets/pages/SplashPage.ets@v53",
+            "reads": true,
+            "seen": true
+          },
+          "chars": 40792,
+          "lines": [
+            82,
+            91
+          ],
+          "id": "call_Q0eaVWh93OUiZ80pDIkvHB8A",
+          "sha": "022f662300e5dcbc357ace67cfc88a378f649e7000b1021e3c36a486a1d721e6",
+          "record_sha": "b47ca0e7958c7e798c2cd22f65b2a9e4fe2c157b493bdbbc423b578816e05cbe",
+          "prefix": "# agent fixer-r1  id=agent-a68daf720e780b4c2  v31 / 共 40 版 · 上游 228/5 跳\n身份: visual-fixer · 会话 ff019d8a · visual-fixer 修复 round-1\n全池时间边界: 2 个",
+          "normalization": {
+            "kind": "codex_native_input_text_blocks",
+            "status": "verified",
+            "header": "Wall time: 0.4161 seconds\nOutput:",
+            "response_result_line": 91,
+            "runtime_result_line": 89,
+            "runtime_item_id": "call_Q0eaVWh93OUiZ80pDIkvHB8A",
+            "exact_body_match": false,
+            "response_body_chars": 40792,
+            "runtime_body_chars": 53084,
+            "response_body_sha256": "022f662300e5dcbc357ace67cfc88a378f649e7000b1021e3c36a486a1d721e6",
+            "runtime_body_sha256": "5e529d2883899199020f666a2d4ced51f9b5a4fd64631262743751f80b2babce",
+            "note": "返回截断／非全文:交付正文的可见前后缀与同 ID 原生返回逐字吻合;保留交付片段,未用完整原生正文替代",
+            "delivery_truncated": true,
+            "visible_chars": 40769,
+            "omitted_chars": 12315,
+            "omission_start": 19852,
+            "omission_end": 32167,
+            "reported_omitted_tokens": 3465
+          }
+        }
+      ],
+      "agents": [
+        {
+          "step": 8,
+          "tool": "agent",
+          "args": {
+            "id": "agent-aconv-splash-9d5902d803bbcde6",
+            "v": 1,
+            "via": "file:entry/src/main/ets/pages/SplashPage.ets@v1",
+            "reads": true,
+            "seen": true
+          },
+          "chars": 8725,
+          "lines": [
+            54,
+            63
+          ],
+          "id": "call_nEc0NBBcxsBx1m1XAzm2wmxU",
+          "sha": "b36b50fc4d4542156c2aeaa6fca0ddfe43f24ac6a6d0bd333331d49a569e13a5",
+          "record_sha": "66cc50e9f475cbeaa817397d1639fb7e45a29061cbb96ad7c759dd7e5eb37d08",
+          "prefix": "# agent conv-splash  id=agent-aconv-splash-9d5902d803bbcde6  v1 / 共 3 版 · 上游 17/2 跳\n身份: a2h-activity-converter · 会话 9b3105a2 · 转换 SplashActi",
+          "cumulative": true,
+          "seen": true,
+          "rejected": false
+        },
+        {
+          "step": 9,
+          "tool": "agent",
+          "args": {
+            "id": "agent-aentry-setup-07108f5df45c357c",
+            "v": 7,
+            "via": "file:entry/src/main/ets/pages/SplashPage.ets@v6",
+            "reads": true,
+            "seen": true
+          },
+          "chars": 205,
+          "lines": [
+            55,
+            64
+          ],
+          "id": "call_fawzsIuBxGva4ZIYD4OC1l7s",
+          "sha": "ab5a4d6234a7242f5f2e69fa46e275016091cf8ffd0640d73149767bd6879513",
+          "record_sha": "3983d10deaf4ac2671ca85cdb74ed016edbe796f33f88ff98f69027e98f15b5e",
+          "prefix": "⛔ via 不是已打开的节点:file:entry/src/main/ets/pages/SplashPage.ets@v6。你打开的是 file:SplashPage.ets@v53、file:SplashPage.ets@v1,版本对不上。打开了什么只能从什么跳。已打开:fi",
+          "cumulative": true,
+          "seen": true,
+          "rejected": true
+        },
+        {
+          "step": 10,
+          "tool": "agent",
+          "args": {
+            "id": "agent-aentry-setup-07108f5df45c357c",
+            "v": 7,
+            "via": "file:entry/src/main/ets/pages/SplashPage.ets@v53",
+            "reads": true,
+            "seen": true
+          },
+          "chars": 12689,
+          "lines": [
+            70,
+            73
+          ],
+          "id": "call_ND24TpkjwXQXmQKfElbjsrf8",
+          "sha": "01fb31c72e22d9843ba8d6c796d244d40d0311119f3485325148489ff0e13d1f",
+          "record_sha": "9022448387025ec8e43abf4af5119b4cfe227d49d1be58ef1b6d399cc83cd2f8",
+          "prefix": "# agent entry-setup  id=agent-aentry-setup-07108f5df45c357c  v7 / 共 14 版 · 上游 29/1 跳\n身份: a2h-migration-worker · 会话 9b3105a2 · sonnet · 入口Nav",
+          "cumulative": true,
+          "seen": true,
+          "rejected": false
+        },
+        {
+          "step": 12,
+          "tool": "agent",
+          "args": {
+            "id": "agent-aslice11-startup-50a0622bcfe4a588",
+            "v": 38,
+            "via": "file:entry/src/main/ets/pages/SplashPage.ets@v53",
+            "reads": true,
+            "seen": true
+          },
+          "chars": 28116,
+          "lines": [
+            80,
+            87
+          ],
+          "id": "call_n9vUWjYiiPO31FAfXDhHadab",
+          "sha": "4cb3a27af0f36f26af18abcb577c2c204759dbb08b9ee3230bf579d229358616",
+          "record_sha": "c0f48fc3c6b4166954f5fb74c4c855dd936653aa224449c3eeffb601563ac833",
+          "prefix": "# agent slice11-startup  id=agent-aslice11-startup-50a0622bcfe4a588  v38 / 共 39 版 · 上游 159/7 跳\n身份: a2h-migration-worker · 会话 9b3105a2 · Slic",
+          "cumulative": true,
+          "seen": true,
+          "rejected": false
+        },
+        {
+          "step": 13,
+          "tool": "agent",
+          "args": {
+            "id": "agent-a68daf720e780b4c2",
+            "v": 21,
+            "via": "file:entry/src/main/ets/pages/SplashPage.ets@v52",
+            "reads": true,
+            "seen": true
+          },
+          "chars": 301,
+          "lines": [
+            81,
+            90
+          ],
+          "id": "call_GOOUG3kq0zRN77h8HKBPU6gA",
+          "sha": "f0dda6469b53f19304165e273a59ca8b6da4620abccf5691455033b29c3b7d28",
+          "record_sha": "38a8b642a5e2d5d16eb8490bb798152943d8a0e1882f33ec30e82fc16f514021",
+          "prefix": "⛔ via 不是已打开的节点:file:entry/src/main/ets/pages/SplashPage.ets@v52。你打开的是 file:SplashPage.ets@v53、file:SplashPage.ets@v1、file:SplashPage.ets@v45",
+          "cumulative": true,
+          "seen": true,
+          "rejected": true
+        },
+        {
+          "step": 14,
+          "tool": "agent",
+          "args": {
+            "id": "agent-a68daf720e780b4c2",
+            "v": 31,
+            "via": "file:entry/src/main/ets/pages/SplashPage.ets@v53",
+            "reads": true,
+            "seen": true
+          },
+          "chars": 40792,
+          "lines": [
+            82,
+            91
+          ],
+          "id": "call_Q0eaVWh93OUiZ80pDIkvHB8A",
+          "sha": "022f662300e5dcbc357ace67cfc88a378f649e7000b1021e3c36a486a1d721e6",
+          "record_sha": "b47ca0e7958c7e798c2cd22f65b2a9e4fe2c157b493bdbbc423b578816e05cbe",
+          "prefix": "# agent fixer-r1  id=agent-a68daf720e780b4c2  v31 / 共 40 版 · 上游 228/5 跳\n身份: visual-fixer · 会话 ff019d8a · visual-fixer 修复 round-1\n全池时间边界: 2 个",
+          "cumulative": true,
+          "seen": true,
+          "rejected": false
+        },
+        {
+          "step": 40,
+          "tool": "agent",
+          "args": {
+            "id": "agent-af0e3d2ae54dbf769",
+            "v": 3,
+            "via": "search:6c9d9babf9a18e15228ead87:4",
+            "reads": true,
+            "seen": true
+          },
+          "chars": 38,
+          "lines": [
+            202,
+            205
+          ],
+          "id": "call_S0h21NPakL8TisuWkeNoSZmn",
+          "sha": "b4fa0804a5baec59e4e5794513414b9f25ddb85cd524af87de6de76e7fcf61a7",
+          "record_sha": "1b15161563b18c5d0e55507f6be29e7ea360352959cc0767e118b70e817c4314",
+          "prefix": "⛔ search 命中与目标精确坐标不一致,不得换文件、agent 或版本。",
+          "cumulative": true,
+          "seen": true,
+          "rejected": true
+        },
+        {
+          "step": 41,
+          "tool": "agent",
+          "args": {
+            "id": "agent-af0e3d2ae54dbf769",
+            "v": 1,
+            "via": "search:6c9d9babf9a18e15228ead87:4",
+            "reads": true,
+            "seen": true
+          },
+          "chars": 3402,
+          "lines": [
+            209,
+            212
+          ],
+          "id": "call_0sdAYfeDE5XyoKr9v8xOK12r",
+          "sha": "9c15eb3fba71b7b86ca8b9801745ce622f65fc721ab83ae2175df0a6af251394",
+          "record_sha": "383715ef703fc4b550896e396ede7ccf452308c6ef2ac5fce7f7bbdc4f80995a",
+          "prefix": "# agent build-verify-r1  id=agent-af0e3d2ae54dbf769  v1 / 共 3 版 · 上游 2/1 跳\n身份: hmos-builder · 会话 ff019d8a · 编译验证 fixer 改动\n全池时间边界: 2 个会话分组 · ",
+          "cumulative": true,
+          "seen": true,
+          "rejected": false
+        },
+        {
+          "step": 42,
+          "tool": "agent",
+          "args": {
+            "id": "agent-af0e3d2ae54dbf769",
+            "v": 3,
+            "via": "agent:agent-af0e3d2ae54dbf769@v1",
+            "reads": true,
+            "seen": true
+          },
+          "chars": 5501,
+          "lines": [
+            218,
+            221
+          ],
+          "id": "call_rMJP56fGSlGQgOYtochfefpG",
+          "sha": "a0d1403e4595d9c857c77c6df4e8ca0fafe230dff8a3d93ff493ec570e09e830",
+          "record_sha": "21e35f8a0d556c750a53c39548a4592400de6284cbb9672aa266781269c2121a",
+          "prefix": "# agent build-verify-r1  id=agent-af0e3d2ae54dbf769  v3 / 共 3 版 · 上游 234/1 跳\n身份: hmos-builder · 会话 ff019d8a · 编译验证 fixer 改动\n全池时间边界: 2 个会话分组 ",
+          "cumulative": true,
+          "seen": true,
+          "rejected": false
+        }
+      ],
+      "failed": [
+        {
+          "step": 9,
+          "tool": "agent",
+          "args": {
+            "id": "agent-aentry-setup-07108f5df45c357c",
+            "v": 7,
+            "via": "file:entry/src/main/ets/pages/SplashPage.ets@v6",
+            "reads": true,
+            "seen": true
+          },
+          "chars": 205,
+          "lines": [
+            55,
+            64
+          ],
+          "id": "call_fawzsIuBxGva4ZIYD4OC1l7s",
+          "sha": "ab5a4d6234a7242f5f2e69fa46e275016091cf8ffd0640d73149767bd6879513",
+          "record_sha": "3983d10deaf4ac2671ca85cdb74ed016edbe796f33f88ff98f69027e98f15b5e",
+          "prefix": "⛔ via 不是已打开的节点:file:entry/src/main/ets/pages/SplashPage.ets@v6。你打开的是 file:SplashPage.ets@v53、file:SplashPage.ets@v1,版本对不上。打开了什么只能从什么跳。已打开:fi"
+        },
+        {
+          "step": 13,
+          "tool": "agent",
+          "args": {
+            "id": "agent-a68daf720e780b4c2",
+            "v": 21,
+            "via": "file:entry/src/main/ets/pages/SplashPage.ets@v52",
+            "reads": true,
+            "seen": true
+          },
+          "chars": 301,
+          "lines": [
+            81,
+            90
+          ],
+          "id": "call_GOOUG3kq0zRN77h8HKBPU6gA",
+          "sha": "f0dda6469b53f19304165e273a59ca8b6da4620abccf5691455033b29c3b7d28",
+          "record_sha": "38a8b642a5e2d5d16eb8490bb798152943d8a0e1882f33ec30e82fc16f514021",
+          "prefix": "⛔ via 不是已打开的节点:file:entry/src/main/ets/pages/SplashPage.ets@v52。你打开的是 file:SplashPage.ets@v53、file:SplashPage.ets@v1、file:SplashPage.ets@v45"
+        },
+        {
+          "step": 40,
+          "tool": "agent",
+          "args": {
+            "id": "agent-af0e3d2ae54dbf769",
+            "v": 3,
+            "via": "search:6c9d9babf9a18e15228ead87:4",
+            "reads": true,
+            "seen": true
+          },
+          "chars": 38,
+          "lines": [
+            202,
+            205
+          ],
+          "id": "call_S0h21NPakL8TisuWkeNoSZmn",
+          "sha": "b4fa0804a5baec59e4e5794513414b9f25ddb85cd524af87de6de76e7fcf61a7",
+          "record_sha": "1b15161563b18c5d0e55507f6be29e7ea360352959cc0767e118b70e817c4314",
+          "prefix": "⛔ search 命中与目标精确坐标不一致,不得换文件、agent 或版本。"
+        }
+      ],
+      "same_body_repeats": []
+    },
+    {
+      "version": "formal-v10",
+      "case": "codex-c1",
+      "badtime": [],
+      "partials": [],
+      "agents": [
+        {
+          "step": 9,
+          "tool": "agent",
+          "args": {
+            "id": "__main__:01a009fe",
+            "v": 105,
+            "via": "file:entry/src/main/ets/pages/GuideDifficulty1Component.ets@v1",
+            "since": 80,
+            "reads": true,
+            "seen": true,
+            "summary_chars": 250
+          },
+          "chars": 28564,
+          "lines": [
+            67,
+            73
+          ],
+          "id": "call_FXxOgosnJKbxiu42HISGfJOX",
+          "sha": "ced6353ef5600544c2bd80c9342829d57e5dc335f5e73bcc4237800feb04a542",
+          "record_sha": "48e86a64f6797f3114a814710ca268575dce03d40f64e8625a66affa2f9e7ddd",
+          "prefix": "# agent 主会话·01a009fe  id=__main__:01a009fe  v105 / 共 249 版  窗口 v81–v105(只给喂养这段版本的动作) · 上游 3/1 跳\n身份: agent · 会话 01a009fe\n动作摘要每条至多 250 字；summa",
+          "cumulative": false,
+          "seen": true,
+          "rejected": false
+        },
+        {
+          "step": 17,
+          "tool": "agent",
+          "args": {
+            "id": "__main__:01a009fe",
+            "v": 115,
+            "via": "agent:__main__:01a009fe@v105",
+            "since": 104,
+            "reads": true,
+            "seen": true,
+            "summary_chars": 260
+          },
+          "chars": 17690,
+          "lines": [
+            101,
+            107
+          ],
+          "id": "call_mwaM5Tk921UbtXSOEEZIztJd",
+          "sha": "f0627725e87ab48a23b4cc1ea080406bc5d43c61d78dfc8651d20c12f22c5983",
+          "record_sha": "9886a2ce290e68cc7538953ea207358e3d8226873fa30ce125213d5977373741",
+          "prefix": "# agent 主会话·01a009fe  id=__main__:01a009fe  v115 / 共 249 版  窗口 v105–v115(只给喂养这段版本的动作) · 上游 5/0 跳\n身份: agent · 会话 01a009fe\n动作摘要每条至多 260 字；summ",
+          "cumulative": false,
+          "seen": true,
+          "rejected": false
+        }
+      ],
+      "failed": [],
+      "same_body_repeats": []
+    },
+    {
+      "version": "formal-v10",
+      "case": "codex-c2",
+      "badtime": [],
+      "partials": [],
+      "agents": [
+        {
+          "step": 34,
+          "tool": "agent",
+          "args": {
+            "id": "__main__:01a021e5",
+            "v": 218,
+            "since": 214,
+            "via": "agent:__main__:01a021e5@v218",
+            "reads": true,
+            "seen": true,
+            "summary_chars": 200
+          },
+          "chars": 70,
+          "lines": [
+            194,
+            197
+          ],
+          "id": "call_zPNm7YZ6OzqIoh98gfgwflzs",
+          "sha": "e0dfee3f3478c2bd7d139ca2a40897cbafaf1b55a04a1dfc586f833aaae69bc8",
+          "record_sha": "0a5a716025b5729258c5d0c7a76463c47e1c897e7e41c198ffb579ab7b56bfc1",
+          "prefix": "⛔ via 不是已打开的节点:agent:__main__:01a021e5@v218。打开了什么只能从什么跳。已打开:(还没打开任何节点)",
+          "cumulative": false,
+          "seen": true,
+          "rejected": true
+        },
+        {
+          "step": 35,
+          "tool": "agent",
+          "args": {
+            "id": "__main__:01a021e5",
+            "v": 218,
+            "since": 214,
+            "via": "search:695e23cc5459a202168d637a:6",
+            "reads": true,
+            "seen": true,
+            "summary_chars": 200
+          },
+          "chars": 7792,
+          "lines": [
+            203,
+            206
+          ],
+          "id": "call_CUYSx2CakL3uGJlqVJhTPLep",
+          "sha": "6e6ff1c6be2cbc773f67de793613827453cb03443fcfd8e2965de59fc3dcc614",
+          "record_sha": "b4b3dea5fd6e763ff77439c1584f9ba05ff6656e959d770ce6860ef1ddcbb46e",
+          "prefix": "# agent 主会话·01a021e5  id=__main__:01a021e5  v218 / 共 223 版  窗口 v215–v218(只给喂养这段版本的动作) · 上游 19/1 跳\n身份: agent · 会话 01a021e5\n动作摘要每条至多 200 字；sum",
+          "cumulative": false,
+          "seen": true,
+          "rejected": false
+        }
+      ],
+      "failed": [
+        {
+          "step": 34,
+          "tool": "agent",
+          "args": {
+            "id": "__main__:01a021e5",
+            "v": 218,
+            "since": 214,
+            "via": "agent:__main__:01a021e5@v218",
+            "reads": true,
+            "seen": true,
+            "summary_chars": 200
+          },
+          "chars": 70,
+          "lines": [
+            194,
+            197
+          ],
+          "id": "call_zPNm7YZ6OzqIoh98gfgwflzs",
+          "sha": "e0dfee3f3478c2bd7d139ca2a40897cbafaf1b55a04a1dfc586f833aaae69bc8",
+          "record_sha": "0a5a716025b5729258c5d0c7a76463c47e1c897e7e41c198ffb579ab7b56bfc1",
+          "prefix": "⛔ via 不是已打开的节点:agent:__main__:01a021e5@v218。打开了什么只能从什么跳。已打开:(还没打开任何节点)"
+        }
+      ],
+      "same_body_repeats": []
+    },
+    {
+      "version": "formal-v10",
+      "case": "codex-c3",
+      "badtime": [],
+      "partials": [],
+      "agents": [],
+      "failed": [],
+      "same_body_repeats": []
+    },
+    {
+      "version": "formal-v10",
+      "case": "codex-c4",
+      "badtime": [],
+      "partials": [],
+      "agents": [
+        {
+          "step": 36,
+          "tool": "agent",
+          "args": {
+            "id": "__main__:01a009fe",
+            "v": 249,
+            "via": "agent:__main__:01a009fe@v249",
+            "since": 240,
+            "reads": true,
+            "seen": true,
+            "summary_chars": 200
+          },
+          "chars": 93,
+          "lines": [
+            166,
+            173
+          ],
+          "id": "call_bnBCk4UmFKPjLk0qoeWj6YUG",
+          "sha": "438234276943137adf78fbd68ec6af6ea5202d251cfabb48781017527b7c06d6",
+          "record_sha": "f9da6b9b3d453f269e81256b067169c69ad7a09518f83aaa841938aeac74c486",
+          "prefix": "⛔ via 不是已打开的节点:agent:__main__:01a009fe@v249。打开了什么只能从什么跳。已打开:file:LaunchAgreementDialog.ets@v1",
+          "cumulative": false,
+          "seen": true,
+          "rejected": true
+        }
+      ],
+      "failed": [
+        {
+          "step": 36,
+          "tool": "agent",
+          "args": {
+            "id": "__main__:01a009fe",
+            "v": 249,
+            "via": "agent:__main__:01a009fe@v249",
+            "since": 240,
+            "reads": true,
+            "seen": true,
+            "summary_chars": 200
+          },
+          "chars": 93,
+          "lines": [
+            166,
+            173
+          ],
+          "id": "call_bnBCk4UmFKPjLk0qoeWj6YUG",
+          "sha": "438234276943137adf78fbd68ec6af6ea5202d251cfabb48781017527b7c06d6",
+          "record_sha": "f9da6b9b3d453f269e81256b067169c69ad7a09518f83aaa841938aeac74c486",
+          "prefix": "⛔ via 不是已打开的节点:agent:__main__:01a009fe@v249。打开了什么只能从什么跳。已打开:file:LaunchAgreementDialog.ets@v1"
+        },
+        {
+          "step": 38,
+          "tool": "action",
+          "args": {
+            "ref": "#01a009fe-68e3-7f42-b76b-5e863c555976:2421@L11",
+            "max_chars": 3000
+          },
+          "chars": 66,
+          "lines": [
+            180,
+            187
+          ],
+          "id": "call_IOXtNrvCTXW621mXYh8n4v77",
+          "sha": "0ebf2b7a74710d10e2a1af17b4e50dca3f3dc756752fe6e0f2a00de53429b50a",
+          "record_sha": "c4493131f8a2ecf805ba71b8495f9f6aeca00a72bf51d793e1c4e666f1a154d1",
+          "prefix": "Error executing tool action: action.ref 无法唯一定位: missing；不得仅按 #n 猜测"
+        }
+      ],
+      "same_body_repeats": []
+    },
+    {
+      "version": "formal-v10",
+      "case": "dice-entry",
+      "badtime": [],
+      "partials": [],
+      "agents": [
+        {
+          "step": 9,
+          "tool": "agent",
+          "args": {
+            "id": "agent-a711c5d09fb676814",
+            "v": 4,
+            "via": "sessions",
+            "reads": true,
+            "seen": true,
+            "summary_chars": 300
+          },
+          "chars": 10843,
+          "lines": [
+            69,
+            75
+          ],
+          "id": "call_tOq0rMnijOwdSOhWWN0xJ9kd",
+          "sha": "ff8d6cb1a5426bb99fcb0f7adc76dac7fe32d17cb594dde5540169401fbd6afc",
+          "record_sha": "cefaf6028e56386736c29ec9b9b9ed51bfad55504b1d5998407c75474e0fd56a",
+          "prefix": "# agent UI-T Step3 生成 P0001 测试  id=agent-a711c5d09fb676814  v4 / 共 5 版 · 上游 23/2 跳\n身份: general-purpose · 会话 81e0a463 · UI-T Step3 生成 P0001 测",
+          "cumulative": true,
+          "seen": true,
+          "rejected": false
+        },
+        {
+          "step": 10,
+          "tool": "agent",
+          "args": {
+            "id": "agent-a27497cfed8c44856",
+            "v": 3,
+            "via": "sessions",
+            "reads": true,
+            "seen": true,
+            "summary_chars": 300
+          },
+          "chars": 89,
+          "lines": [
+            70,
+            79
+          ],
+          "id": "call_qXRMG4k4RGSzUTJFhTEADgpy",
+          "sha": "495aa99654f246caec668caf34a60cd1fd09abda9ad277218c8305630f5c7d4c",
+          "record_sha": "c4c131210d26c72b27616c7085bb8afd674c5f301bea63d4b1f1a19b3552a6c9",
+          "prefix": "⛔ via=sessions/task 只能用于第一次 file / agent;之后必须从已打开的节点跳。已打开:agent:UI-T Step3 生成 P0001 测试@v4",
+          "cumulative": true,
+          "seen": true,
+          "rejected": true
+        },
+        {
+          "step": 13,
+          "tool": "agent",
+          "args": {
+            "id": "agent-a27497cfed8c44856",
+            "v": 3,
+            "via": "agent:fix-errobserver@v1",
+            "reads": true,
+            "seen": true,
+            "summary_chars": 400
+          },
+          "chars": 87,
+          "lines": [
+            87,
+            90
+          ],
+          "id": "call_XuXapdExQMK38pMQGSBHaLxh",
+          "sha": "13a17dc9c44d625f0a3c5651cfac6f8881acdeee5dced02464342b534ec9295e",
+          "record_sha": "b8cdc0233f8ea2ba270886cd53a176f3fc0f3ebc3f2ab7fb69c75642ce806cea",
+          "prefix": "⛔ via 不是已打开的节点:agent:fix-errobserver@v1。打开了什么只能从什么跳。已打开:agent:UI-T Step3 生成 P0001 测试@v4",
+          "cumulative": true,
+          "seen": true,
+          "rejected": true
+        },
+        {
+          "step": 14,
+          "tool": "agent",
+          "args": {
+            "id": "agent-a27497cfed8c44856",
+            "v": 3,
+            "via": "agent:agent-a27497cfed8c44856@v1",
+            "reads": true,
+            "seen": true,
+            "summary_chars": 400
+          },
+          "chars": 95,
+          "lines": [
+            94,
+            97
+          ],
+          "id": "call_dvIiBDGsdkAIhXrJv96u97y6",
+          "sha": "37658e480043ed5d3b35a35f1ad9e9e1687a711e86d5ee63e45b8b3ece42fbfc",
+          "record_sha": "60a4c537fc428dc28d0d8905edd23353021b24e860334e3375c09c675d941a2f",
+          "prefix": "⛔ via 不是已打开的节点:agent:agent-a27497cfed8c44856@v1。打开了什么只能从什么跳。已打开:agent:UI-T Step3 生成 P0001 测试@v4",
+          "cumulative": true,
+          "seen": true,
+          "rejected": true
+        },
+        {
+          "step": 16,
+          "tool": "agent",
+          "args": {
+            "id": "__main__:2f01bcdc",
+            "v": 5,
+            "via": "search:d91326405560edf92dcb2d7a:1",
+            "reads": true,
+            "seen": true,
+            "summary_chars": 500
+          },
+          "chars": 9071,
+          "lines": [
+            108,
+            111
+          ],
+          "id": "call_JhCuvRJ0ntXwRWPEB574ZRl4",
+          "sha": "501ee3441b9202e9fe774b97db530da39435e5757636311c4836338453ac0656",
+          "record_sha": "0cdc1397cde46f6d9d39a9796ed8b4296e8decb122d0f271f19a0106373c7c51",
+          "prefix": "# agent 主会话·2f01bcdc  id=__main__:2f01bcdc  v5 / 共 8 版 · 上游 33/0 跳\n身份: agent · 会话 2f01bcdc\n动作摘要每条至多 500 字；summary_chars=200/600 可展开已有摘要，仍非原文",
+          "cumulative": true,
+          "seen": true,
+          "rejected": false
+        },
+        {
+          "step": 18,
+          "tool": "agent",
+          "args": {
+            "id": "agent-a27497cfed8c44856",
+            "v": 3,
+            "via": "agent:主会话·2f01bcdc@v5",
+            "reads": true,
+            "seen": true,
+            "summary_chars": 500
+          },
+          "chars": 107,
+          "lines": [
+            116,
+            121
+          ],
+          "id": "call_81uqyfF4nwyNuOXS9UnsPu7z",
+          "sha": "d46b8b89b689289410f74a401a13755fbc727a5209f5507c238ea55dd7ef8af9",
+          "record_sha": "85a5ecbafe693a0a58fb8ffcbfaa6e6655b764db2807e3d1e171dc7ad5d2a3f9",
+          "prefix": "⛔ via 解析不了或不在账本:agent:主会话·2f01bcdc@v5。via 必须是已打开的节点之一:agent:UI-T Step3 生成 P0001 测试@v4、agent:主会话·2f01bcdc@v5",
+          "cumulative": true,
+          "seen": true,
+          "rejected": true
+        },
+        {
+          "step": 19,
+          "tool": "agent",
+          "args": {
+            "id": "agent-a27497cfed8c44856",
+            "v": 3,
+            "via": "agent:主会话·2f01bcdc@v5",
+            "reads": true,
+            "seen": true,
+            "summary_chars": 500
+          },
+          "chars": 107,
+          "lines": [
+            127,
+            130
+          ],
+          "id": "call_3PlPLr4XYxaDnaN7TRUCj7IU",
+          "sha": "d46b8b89b689289410f74a401a13755fbc727a5209f5507c238ea55dd7ef8af9",
+          "record_sha": "5984f8b559094e4d1bbf8d853eac989bfff9901e7417aeff2b5a1fd436b66ae6",
+          "prefix": "⛔ via 解析不了或不在账本:agent:主会话·2f01bcdc@v5。via 必须是已打开的节点之一:agent:UI-T Step3 生成 P0001 测试@v4、agent:主会话·2f01bcdc@v5",
+          "cumulative": true,
+          "seen": true,
+          "rejected": true
+        },
+        {
+          "step": 20,
+          "tool": "agent",
+          "args": {
+            "id": "agent-a27497cfed8c44856",
+            "v": 3,
+            "via": "agent(__main__:2f01bcdc, v=5)",
+            "reads": true,
+            "seen": true,
+            "summary_chars": 500
+          },
+          "chars": 115,
+          "lines": [
+            136,
+            139
+          ],
+          "id": "call_mTiaH2Aa03ni3TIX6NuCJLfO",
+          "sha": "5e976a1d9eb1b0fad735046a1ac9679c202acb2daed5cd993fa9a2ff59f9aa8b",
+          "record_sha": "0baa09c925c006ea492d663aadf4eaf9863992f1dffa82d00986a39b31cc32db",
+          "prefix": "⛔ via 解析不了或不在账本:agent(__main__:2f01bcdc, v=5)。via 必须是已打开的节点之一:agent:UI-T Step3 生成 P0001 测试@v4、agent:主会话·2f01bcdc@v5",
+          "cumulative": true,
+          "seen": true,
+          "rejected": true
+        }
+      ],
+      "failed": [
+        {
+          "step": 10,
+          "tool": "agent",
+          "args": {
+            "id": "agent-a27497cfed8c44856",
+            "v": 3,
+            "via": "sessions",
+            "reads": true,
+            "seen": true,
+            "summary_chars": 300
+          },
+          "chars": 89,
+          "lines": [
+            70,
+            79
+          ],
+          "id": "call_qXRMG4k4RGSzUTJFhTEADgpy",
+          "sha": "495aa99654f246caec668caf34a60cd1fd09abda9ad277218c8305630f5c7d4c",
+          "record_sha": "c4c131210d26c72b27616c7085bb8afd674c5f301bea63d4b1f1a19b3552a6c9",
+          "prefix": "⛔ via=sessions/task 只能用于第一次 file / agent;之后必须从已打开的节点跳。已打开:agent:UI-T Step3 生成 P0001 测试@v4"
+        },
+        {
+          "step": 13,
+          "tool": "agent",
+          "args": {
+            "id": "agent-a27497cfed8c44856",
+            "v": 3,
+            "via": "agent:fix-errobserver@v1",
+            "reads": true,
+            "seen": true,
+            "summary_chars": 400
+          },
+          "chars": 87,
+          "lines": [
+            87,
+            90
+          ],
+          "id": "call_XuXapdExQMK38pMQGSBHaLxh",
+          "sha": "13a17dc9c44d625f0a3c5651cfac6f8881acdeee5dced02464342b534ec9295e",
+          "record_sha": "b8cdc0233f8ea2ba270886cd53a176f3fc0f3ebc3f2ab7fb69c75642ce806cea",
+          "prefix": "⛔ via 不是已打开的节点:agent:fix-errobserver@v1。打开了什么只能从什么跳。已打开:agent:UI-T Step3 生成 P0001 测试@v4"
+        },
+        {
+          "step": 14,
+          "tool": "agent",
+          "args": {
+            "id": "agent-a27497cfed8c44856",
+            "v": 3,
+            "via": "agent:agent-a27497cfed8c44856@v1",
+            "reads": true,
+            "seen": true,
+            "summary_chars": 400
+          },
+          "chars": 95,
+          "lines": [
+            94,
+            97
+          ],
+          "id": "call_dvIiBDGsdkAIhXrJv96u97y6",
+          "sha": "37658e480043ed5d3b35a35f1ad9e9e1687a711e86d5ee63e45b8b3ece42fbfc",
+          "record_sha": "60a4c537fc428dc28d0d8905edd23353021b24e860334e3375c09c675d941a2f",
+          "prefix": "⛔ via 不是已打开的节点:agent:agent-a27497cfed8c44856@v1。打开了什么只能从什么跳。已打开:agent:UI-T Step3 生成 P0001 测试@v4"
+        },
+        {
+          "step": 18,
+          "tool": "agent",
+          "args": {
+            "id": "agent-a27497cfed8c44856",
+            "v": 3,
+            "via": "agent:主会话·2f01bcdc@v5",
+            "reads": true,
+            "seen": true,
+            "summary_chars": 500
+          },
+          "chars": 107,
+          "lines": [
+            116,
+            121
+          ],
+          "id": "call_81uqyfF4nwyNuOXS9UnsPu7z",
+          "sha": "d46b8b89b689289410f74a401a13755fbc727a5209f5507c238ea55dd7ef8af9",
+          "record_sha": "85a5ecbafe693a0a58fb8ffcbfaa6e6655b764db2807e3d1e171dc7ad5d2a3f9",
+          "prefix": "⛔ via 解析不了或不在账本:agent:主会话·2f01bcdc@v5。via 必须是已打开的节点之一:agent:UI-T Step3 生成 P0001 测试@v4、agent:主会话·2f01bcdc@v5"
+        },
+        {
+          "step": 19,
+          "tool": "agent",
+          "args": {
+            "id": "agent-a27497cfed8c44856",
+            "v": 3,
+            "via": "agent:主会话·2f01bcdc@v5",
+            "reads": true,
+            "seen": true,
+            "summary_chars": 500
+          },
+          "chars": 107,
+          "lines": [
+            127,
+            130
+          ],
+          "id": "call_3PlPLr4XYxaDnaN7TRUCj7IU",
+          "sha": "d46b8b89b689289410f74a401a13755fbc727a5209f5507c238ea55dd7ef8af9",
+          "record_sha": "5984f8b559094e4d1bbf8d853eac989bfff9901e7417aeff2b5a1fd436b66ae6",
+          "prefix": "⛔ via 解析不了或不在账本:agent:主会话·2f01bcdc@v5。via 必须是已打开的节点之一:agent:UI-T Step3 生成 P0001 测试@v4、agent:主会话·2f01bcdc@v5"
+        },
+        {
+          "step": 20,
+          "tool": "agent",
+          "args": {
+            "id": "agent-a27497cfed8c44856",
+            "v": 3,
+            "via": "agent(__main__:2f01bcdc, v=5)",
+            "reads": true,
+            "seen": true,
+            "summary_chars": 500
+          },
+          "chars": 115,
+          "lines": [
+            136,
+            139
+          ],
+          "id": "call_mTiaH2Aa03ni3TIX6NuCJLfO",
+          "sha": "5e976a1d9eb1b0fad735046a1ac9679c202acb2daed5cd993fa9a2ff59f9aa8b",
+          "record_sha": "0baa09c925c006ea492d663aadf4eaf9863992f1dffa82d00986a39b31cc32db",
+          "prefix": "⛔ via 解析不了或不在账本:agent(__main__:2f01bcdc, v=5)。via 必须是已打开的节点之一:agent:UI-T Step3 生成 P0001 测试@v4、agent:主会话·2f01bcdc@v5"
+        },
+        {
+          "step": 38,
+          "tool": "file",
+          "args": {
+            "path": "entry/src/main/ets/entryability/EntryAbility.ets",
+            "v": 2,
+            "via": "sessions",
+            "content": true,
+            "start": 1,
+            "n": 120
+          },
+          "chars": 111,
+          "lines": [
+            234,
+            240
+          ],
+          "id": "call_bTTLvzBknL8bBB4bmNJmYqUR",
+          "sha": "87868fbded80824b1871dff2c1258a7e93b99a2538fd2b9adfeecae5dd6afb59",
+          "record_sha": "298133a16b4d7d7ab510290422286ff03b642dfc8b8d071dc4bf9bb74024d210",
+          "prefix": "⛔ via=sessions/task 只能用于第一次 file / agent;之后必须从已打开的节点跳。已打开:agent:UI-T Step3 生成 P0001 测试@v4、agent:主会话·2f01bcdc@v5"
+        }
+      ],
+      "same_body_repeats": []
+    },
+    {
+      "version": "formal-v10",
+      "case": "member-center",
+      "badtime": [],
+      "partials": [],
+      "agents": [
+        {
+          "step": 52,
+          "tool": "agent",
+          "args": {
+            "id": "agent-af0e3d2ae54dbf769",
+            "v": 3,
+            "via": "agent:agent-af0e3d2ae54dbf769@v3",
+            "reads": true,
+            "seen": true,
+            "summary_chars": 200
+          },
+          "chars": 93,
+          "lines": [
+            232,
+            235
+          ],
+          "id": "call_mxaROv2cSZ7xAuBvYnznZxwQ",
+          "sha": "adbbe05ff0de860c032f62f83f65f6dede2b28635d62663553c6357aa4880acf",
+          "record_sha": "2a928bb86545a025d1520888974a94a1b83c080c0ce0b6969ae2ae85be947963",
+          "prefix": "⛔ via 不是已打开的节点:agent:agent-af0e3d2ae54dbf769@v3。打开了什么只能从什么跳。已打开:file:MemberCenterPage.ets@v16",
+          "cumulative": true,
+          "seen": true,
+          "rejected": true
+        },
+        {
+          "step": 53,
+          "tool": "agent",
+          "args": {
+            "id": "agent-af0e3d2ae54dbf769",
+            "v": 3,
+            "via": "file:MemberCenterPage.ets@v16",
+            "reads": true,
+            "seen": true,
+            "summary_chars": 200
+          },
+          "chars": 5938,
+          "lines": [
+            241,
+            244
+          ],
+          "id": "call_ibP4qY3MMa2o8hmvotOmzpkG",
+          "sha": "89220719e6bfbe61954fe1b6d8a58a39eae89a5c4ba1a23b2b40884ca82a2320",
+          "record_sha": "1a2cefecd5eb0c229b63f02831b939e05b531eca946292133c4d38c982f2ddd6",
+          "prefix": "# agent build-verify-r1  id=agent-af0e3d2ae54dbf769  v3 / 共 3 版 · 上游 234/1 跳\n身份: hmos-builder · 会话 ff019d8a · 编译验证 fixer 改动\n动作摘要每条至多 200 字；s",
+          "cumulative": true,
+          "seen": true,
+          "rejected": false
+        }
+      ],
+      "failed": [
+        {
+          "step": 12,
+          "tool": "file",
+          "args": {
+            "path": "entry/src/main/ets/pages/MemberCenterPage.ets",
+            "v": 16,
+            "via": "sessions",
+            "content": true,
+            "start": 700,
+            "n": 55
+          },
+          "chars": 87,
+          "lines": [
+            62,
+            75
+          ],
+          "id": "call_CiMg3lbXVHfQtVNK82DLjs9U",
+          "sha": "2c7bcba5e2a2206a4a095b56848050a8d50b7ed7ba6fb4c0aff2915cd8062415",
+          "record_sha": "43d9ccff73e1a6473fb8543317ba80412773b4cc868ff78e881c51cbe3c4231e",
+          "prefix": "⛔ via=sessions/task 只能用于第一次 file / agent;之后必须从已打开的节点跳。已打开:file:MemberCenterPage.ets@v16"
+        },
+        {
+          "step": 52,
+          "tool": "agent",
+          "args": {
+            "id": "agent-af0e3d2ae54dbf769",
+            "v": 3,
+            "via": "agent:agent-af0e3d2ae54dbf769@v3",
+            "reads": true,
+            "seen": true,
+            "summary_chars": 200
+          },
+          "chars": 93,
+          "lines": [
+            232,
+            235
+          ],
+          "id": "call_mxaROv2cSZ7xAuBvYnznZxwQ",
+          "sha": "adbbe05ff0de860c032f62f83f65f6dede2b28635d62663553c6357aa4880acf",
+          "record_sha": "2a928bb86545a025d1520888974a94a1b83c080c0ce0b6969ae2ae85be947963",
+          "prefix": "⛔ via 不是已打开的节点:agent:agent-af0e3d2ae54dbf769@v3。打开了什么只能从什么跳。已打开:file:MemberCenterPage.ets@v16"
+        }
+      ],
+      "same_body_repeats": [
+        {
+          "tool": "file",
+          "sha": "b73c6a4c1fee3c9bcba4cf74ea6fbf4fd6d6a43062fd7a52ded00db47ad7f606",
+          "steps": [
+            11,
+            16,
+            17
+          ],
+          "chars_repeated": 36404,
+          "rows": [
+            {
+              "step": 11,
+              "tool": "file",
+              "args": {
+                "path": "entry/src/main/ets/pages/MemberCenterPage.ets",
+                "v": 16,
+                "via": "sessions",
+                "content": true,
+                "start": 190,
+                "n": 60
+              },
+              "chars": 18202,
+              "lines": [
+                61,
+                70
+              ],
+              "id": "call_hL6mdmKPzwRp2qulxsD820xg",
+              "sha": "b73c6a4c1fee3c9bcba4cf74ea6fbf4fd6d6a43062fd7a52ded00db47ad7f606",
+              "record_sha": "6192c1284ac816bfbf3287272e923ecaa556a6291fb670af81a85a9f3ce009d9",
+              "prefix": "# 文件 entry/src/main/ets/pages/MemberCenterPage.ets @v16  (共 16 版)\n完整路径: /Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723"
+            },
+            {
+              "step": 16,
+              "tool": "file",
+              "args": {
+                "path": "entry/src/main/ets/pages/MemberCenterPage.ets",
+                "v": 16,
+                "via": "file:MemberCenterPage.ets@v16",
+                "content": true,
+                "start": 190,
+                "n": 60
+              },
+              "chars": 18202,
+              "lines": [
+                84,
+                93
+              ],
+              "id": "call_BbW0z8FHPGvFrLfl4xDZFZzF",
+              "sha": "b73c6a4c1fee3c9bcba4cf74ea6fbf4fd6d6a43062fd7a52ded00db47ad7f606",
+              "record_sha": "d862359d9c60f6b95209e1617c6c77b76464da434fc74d981e3ceacc215357b0",
+              "prefix": "# 文件 entry/src/main/ets/pages/MemberCenterPage.ets @v16  (共 16 版)\n完整路径: /Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723"
+            },
+            {
+              "step": 17,
+              "tool": "file",
+              "args": {
+                "path": "entry/src/main/ets/pages/MemberCenterPage.ets",
+                "v": 16,
+                "via": "file:MemberCenterPage.ets@v16",
+                "content": true,
+                "start": 700,
+                "n": 55
+              },
+              "chars": 18202,
+              "lines": [
+                85,
+                95
+              ],
+              "id": "call_DuVha3kte0OJceiZwfHpupta",
+              "sha": "b73c6a4c1fee3c9bcba4cf74ea6fbf4fd6d6a43062fd7a52ded00db47ad7f606",
+              "record_sha": "4206ad7a9cf8b39aefce7e66e1832edda7ed41de94f4c39fa5e40073a4e1475f",
+              "prefix": "# 文件 entry/src/main/ets/pages/MemberCenterPage.ets @v16  (共 16 版)\n完整路径: /Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "version": "formal-v10",
+      "case": "splash",
+      "badtime": [],
+      "partials": [
+        {
+          "step": 33,
+          "tool": "agent",
+          "args": {
+            "id": "agent-a68daf720e780b4c2",
+            "v": 40,
+            "via": "file:entry/src/main/ets/pages/SplashPage.ets@v53",
+            "reads": true,
+            "seen": true,
+            "summary_chars": 220
+          },
+          "chars": 41300,
+          "lines": [
+            153,
+            162
+          ],
+          "id": "call_nAe0EeIRyEzZ2nvmpGkX4oyN",
+          "sha": "57a7e8f957d65fda5026bcc34a5c81859e2d31c9e28e9a10dac22f58a26d0085",
+          "record_sha": "2f82aff06b75663167d32c474ca7c0d3c6839134e79b2c81c8b10fdcd8803b18",
+          "prefix": "# agent fixer-r1  id=agent-a68daf720e780b4c2  v40 / 共 40 版 · 上游 238/3 跳\n身份: visual-fixer · 会话 ff019d8a · visual-fixer 修复 round-1\n动作摘要每条至多 22",
+          "normalization": {
+            "kind": "codex_native_input_text_blocks",
+            "status": "verified",
+            "header": "Wall time: 2.5445 seconds\nOutput:",
+            "response_result_line": 162,
+            "runtime_result_line": 159,
+            "runtime_item_id": "call_nAe0EeIRyEzZ2nvmpGkX4oyN",
+            "exact_body_match": false,
+            "response_body_chars": 41300,
+            "runtime_body_chars": 70093,
+            "response_body_sha256": "57a7e8f957d65fda5026bcc34a5c81859e2d31c9e28e9a10dac22f58a26d0085",
+            "runtime_body_sha256": "e19e1b52b4a71e76bbbade2003be502f5a36344c3b09aa5873aeb190c76306b5",
+            "note": "返回截断／非全文:交付正文的可见前后缀与同 ID 原生返回逐字吻合;保留交付片段,未用完整原生正文替代",
+            "delivery_truncated": true,
+            "visible_chars": 41277,
+            "omitted_chars": 28816,
+            "omission_start": 20042,
+            "omission_end": 48858,
+            "reported_omitted_tokens": 8022
+          }
+        },
+        {
+          "step": 43,
+          "tool": "file",
+          "args": {
+            "path": "entry/src/main/ets/pages/SplashPage.ets",
+            "v": 35,
+            "via": "file:entry/src/main/ets/pages/SplashPage.ets@v53",
+            "content": true,
+            "start": 1,
+            "n": 360
+          },
+          "chars": 38338,
+          "lines": [
+            203,
+            209
+          ],
+          "id": "call_ug9hSZDBaHZ3fRiQIuuQPzay",
+          "sha": "85661b30fdb00e7e90597d8eda126e51361c0186431e13bbd3118c0baab7eb74",
+          "record_sha": "c43c6686ebd283f18092f03c31d75720c7d86bbffcb95628bcc171e6f2f838f5",
+          "prefix": "# 文件 entry/src/main/ets/pages/SplashPage.ets @v35  (共 53 版)\n完整路径: /Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723/entry",
+          "normalization": {
+            "kind": "codex_native_input_text_blocks",
+            "status": "verified",
+            "header": "Wall time: 0.1337 seconds\nOutput:",
+            "response_result_line": 209,
+            "runtime_result_line": 207,
+            "runtime_item_id": "call_ug9hSZDBaHZ3fRiQIuuQPzay",
+            "exact_body_match": false,
+            "response_body_chars": 38338,
+            "runtime_body_chars": 38419,
+            "response_body_sha256": "85661b30fdb00e7e90597d8eda126e51361c0186431e13bbd3118c0baab7eb74",
+            "runtime_body_sha256": "dbd48bda06a13d7245336ef48705ac82f02c3ca894a2e4f798335074829af259",
+            "note": "返回截断／非全文:交付正文的可见前后缀与同 ID 原生返回逐字吻合;保留交付片段,未用完整原生正文替代",
+            "delivery_truncated": true,
+            "visible_chars": 38317,
+            "omitted_chars": 102,
+            "omission_start": 19170,
+            "omission_end": 19272,
+            "reported_omitted_tokens": 29
+          }
+        }
+      ],
+      "agents": [
+        {
+          "step": 8,
+          "tool": "agent",
+          "args": {
+            "id": "agent-aconv-splash-9d5902d803bbcde6",
+            "v": 1,
+            "via": "file:entry/src/main/ets/pages/SplashPage.ets@v53",
+            "reads": true,
+            "seen": true,
+            "summary_chars": 240
+          },
+          "chars": 9187,
+          "lines": [
+            52,
+            59
+          ],
+          "id": "call_ocd4HSC7bFdbEsdP6nHm7S5W",
+          "sha": "7661c7c4efc53b78c5e6a0f969288ec8671b40430efccdffe5680af2690da0d3",
+          "record_sha": "6bd21c21e2eb4a0899516cdd5fd44e3a42c032ca38807b586ebae96ebef5164f",
+          "prefix": "# agent conv-splash  id=agent-aconv-splash-9d5902d803bbcde6  v1 / 共 3 版 · 上游 17/2 跳\n身份: a2h-activity-converter · 会话 9b3105a2 · 转换 SplashActi",
+          "cumulative": true,
+          "seen": true,
+          "rejected": false
+        },
+        {
+          "step": 12,
+          "tool": "agent",
+          "args": {
+            "id": "agent-aslice11-startup-50a0622bcfe4a588",
+            "v": 42,
+            "via": "file:entry/src/main/ets/pages/SplashPage.ets@v45",
+            "reads": true,
+            "seen": true,
+            "summary_chars": 320
+          },
+          "chars": 74,
+          "lines": [
+            68,
+            77
+          ],
+          "id": "call_X1oLHh7l8hrKe7VfxqMW3w1l",
+          "sha": "009f3bfd495f0dc1265c1a6a00924934a036ce72a45c4e14bee2d86ee421ae1c",
+          "record_sha": "5408d4fbf9d7bd72c11d4f258e372092b7a36023f165d57a66bb0cd3e6f3df07",
+          "prefix": "⛔ 目标版本不存在: agent:agent-aslice11-startup-50a0622bcfe4a588@v42;账本共 39 版,未打开。",
+          "cumulative": true,
+          "seen": true,
+          "rejected": true
+        },
+        {
+          "step": 15,
+          "tool": "agent",
+          "args": {
+            "id": "agent-aslice11-startup-50a0622bcfe4a588",
+            "v": 39,
+            "via": "file:entry/src/main/ets/pages/SplashPage.ets@v45",
+            "reads": true,
+            "seen": true,
+            "summary_chars": 260
+          },
+          "chars": 30461,
+          "lines": [
+            85,
+            91
+          ],
+          "id": "call_n4ESgsB0SHPecdA6bZqw6LCF",
+          "sha": "28d3a6eb4126b8cf5fc6a2bde2c420848547ff3e744b03f26106da78645576bc",
+          "record_sha": "19ac4c2d081721854831d046fc5101b8dafea8e9df058b02c1861a23ab5bc496",
+          "prefix": "# agent slice11-startup  id=agent-aslice11-startup-50a0622bcfe4a588  v39 / 共 39 版 · 上游 159/1 跳\n身份: a2h-migration-worker · 会话 9b3105a2 · Slic",
+          "cumulative": true,
+          "seen": true,
+          "rejected": false
+        },
+        {
+          "step": 33,
+          "tool": "agent",
+          "args": {
+            "id": "agent-a68daf720e780b4c2",
+            "v": 40,
+            "via": "file:entry/src/main/ets/pages/SplashPage.ets@v53",
+            "reads": true,
+            "seen": true,
+            "summary_chars": 220
+          },
+          "chars": 41300,
+          "lines": [
+            153,
+            162
+          ],
+          "id": "call_nAe0EeIRyEzZ2nvmpGkX4oyN",
+          "sha": "57a7e8f957d65fda5026bcc34a5c81859e2d31c9e28e9a10dac22f58a26d0085",
+          "record_sha": "2f82aff06b75663167d32c474ca7c0d3c6839134e79b2c81c8b10fdcd8803b18",
+          "prefix": "# agent fixer-r1  id=agent-a68daf720e780b4c2  v40 / 共 40 版 · 上游 238/3 跳\n身份: visual-fixer · 会话 ff019d8a · visual-fixer 修复 round-1\n动作摘要每条至多 22",
+          "cumulative": true,
+          "seen": true,
+          "rejected": false
+        }
+      ],
+      "failed": [
+        {
+          "step": 12,
+          "tool": "agent",
+          "args": {
+            "id": "agent-aslice11-startup-50a0622bcfe4a588",
+            "v": 42,
+            "via": "file:entry/src/main/ets/pages/SplashPage.ets@v45",
+            "reads": true,
+            "seen": true,
+            "summary_chars": 320
+          },
+          "chars": 74,
+          "lines": [
+            68,
+            77
+          ],
+          "id": "call_X1oLHh7l8hrKe7VfxqMW3w1l",
+          "sha": "009f3bfd495f0dc1265c1a6a00924934a036ce72a45c4e14bee2d86ee421ae1c",
+          "record_sha": "5408d4fbf9d7bd72c11d4f258e372092b7a36023f165d57a66bb0cd3e6f3df07",
+          "prefix": "⛔ 目标版本不存在: agent:agent-aslice11-startup-50a0622bcfe4a588@v42;账本共 39 版,未打开。"
+        },
+        {
+          "step": 25,
+          "tool": "action",
+          "args": {
+            "ref": "#aa2d7cdfd6a5cf89f:16295@L273",
+            "max_chars": 8000
+          },
+          "chars": 66,
+          "lines": [
+            121,
+            130
+          ],
+          "id": "call_YxeabxUvACCyOHipMoXKMZA5",
+          "sha": "0ebf2b7a74710d10e2a1af17b4e50dca3f3dc756752fe6e0f2a00de53429b50a",
+          "record_sha": "241c4319c89acdf49d18ff11712d3285c3e60438b46341927d0d327fb215bd6b",
+          "prefix": "Error executing tool action: action.ref 无法唯一定位: missing；不得仅按 #n 猜测"
+        }
+      ],
+      "same_body_repeats": []
+    }
+  ],
+  "selected_return_proofs": [
+    {
+      "version": "formal-v10",
+      "case": "member-center",
+      "step": 11,
+      "tool": "file",
+      "args": {
+        "path": "entry/src/main/ets/pages/MemberCenterPage.ets",
+        "v": 16,
+        "via": "sessions",
+        "content": true,
+        "start": 190,
+        "n": 60
+      },
+      "chars": 18202,
+      "lines": [
+        61,
+        70
+      ],
+      "call_id": "call_hL6mdmKPzwRp2qulxsD820xg",
+      "body_sha": "b73c6a4c1fee3c9bcba4cf74ea6fbf4fd6d6a43062fd7a52ded00db47ad7f606",
+      "record_sha": "6192c1284ac816bfbf3287272e923ecaa556a6291fb670af81a85a9f3ce009d9",
+      "prefix": "# 文件 entry/src/main/ets/pages/MemberCenterPage.ets @v16  (共 16 版)\n完整路径: /Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723/entry/src/main/ets/pages/MemberCenterPage.ets\n全池时间边界: 2 个会话",
+      "excerpts": [
+        {
+          "token": "正文",
+          "text": "2 条(只读检查 = cat / grep / wc / ls;写入内容 = 别的文件正文里列了它;正文 = 说 / 想 / 收件;m_all=1 铺)\n候选仅计数,未展开 160 条;需要时 file(path, v=16, m_n=40, m_from=1) 查看。没有展开不等于没有候选,也不能据此断言无人读写。\n## 内容: 无法复原"
+        },
+        {
+          "token": "内容未知",
+          "text": "769) | 07-26T21:46 T+81:43 | native · Edit·报告成功 · 内容未知 (#af0e3d2ae54dbf769:17294@L34) ◀\n## 读者 0 个(下游;readers=1 展开;按词找用 search(file=))\n## 碰过它、方向不明的调用(106) —— 不立版本;action(id, n) 展开看是读是写\n- conv-guideinit v2 (id=agent-aconv-guideinit-91062be71f3ce4ac) | 07-24T02:35 T+14:32 | 条件分支,读取未获证实(不是已见输入) | action(#91062be71f3ce4ac:5863@L58)\n- 主会话·9b3105a2 v73 (i"
+        },
+        {
+          "token": "复原",
+          "text": "0, m_from=1) 查看。没有展开不等于没有候选,也不能据此断言无人读写。\n## 内容: 无法复原"
+        },
+        {
+          "token": "未知",
+          "text": "8daf720e780b4c2) | 07-26T21:30 T+81:27 | 条件分支,是否执行未知(候选写) | action(#a68daf720e780b4c2:15731@L592)\n- fixer-r1 收尾后(喂养槽 41，未形成版本；action 查原文) (id=agent-a68daf720e780b4c2) | 07-26T21:30 T+81:27 | 条件分支,读取未获证实(不是已见输入) | action(#a68daf720e780b4c2:15731@L592)\n## 提到它的命令(337,其中 201 条账本没记到读写)—— 命令行 / heredoc 体 / 跑的脚本正文 / 工具输出里出现这个路径;版本无法复原或实录外修改时先看这里,action 展开"
+        }
+      ],
+      "tail": " / wc / ls;写入内容 = 别的文件正文里列了它;正文 = 说 / 想 / 收件;m_all=1 铺)\n候选仅计数,未展开 160 条;需要时 file(path, v=16, m_n=40, m_from=1) 查看。没有展开不等于没有候选,也不能据此断言无人读写。\n## 内容: 无法复原"
+    },
+    {
+      "version": "formal-v10",
+      "case": "member-center",
+      "step": 16,
+      "tool": "file",
+      "args": {
+        "path": "entry/src/main/ets/pages/MemberCenterPage.ets",
+        "v": 16,
+        "via": "file:MemberCenterPage.ets@v16",
+        "content": true,
+        "start": 190,
+        "n": 60
+      },
+      "chars": 18202,
+      "lines": [
+        84,
+        93
+      ],
+      "call_id": "call_BbW0z8FHPGvFrLfl4xDZFZzF",
+      "body_sha": "b73c6a4c1fee3c9bcba4cf74ea6fbf4fd6d6a43062fd7a52ded00db47ad7f606",
+      "record_sha": "d862359d9c60f6b95209e1617c6c77b76464da434fc74d981e3ceacc215357b0",
+      "prefix": "# 文件 entry/src/main/ets/pages/MemberCenterPage.ets @v16  (共 16 版)\n完整路径: /Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723/entry/src/main/ets/pages/MemberCenterPage.ets\n全池时间边界: 2 个会话",
+      "excerpts": [
+        {
+          "token": "正文",
+          "text": "2 条(只读检查 = cat / grep / wc / ls;写入内容 = 别的文件正文里列了它;正文 = 说 / 想 / 收件;m_all=1 铺)\n候选仅计数,未展开 160 条;需要时 file(path, v=16, m_n=40, m_from=1) 查看。没有展开不等于没有候选,也不能据此断言无人读写。\n## 内容: 无法复原"
+        },
+        {
+          "token": "内容未知",
+          "text": "769) | 07-26T21:46 T+81:43 | native · Edit·报告成功 · 内容未知 (#af0e3d2ae54dbf769:17294@L34) ◀\n## 读者 0 个(下游;readers=1 展开;按词找用 search(file=))\n## 碰过它、方向不明的调用(106) —— 不立版本;action(id, n) 展开看是读是写\n- conv-guideinit v2 (id=agent-aconv-guideinit-91062be71f3ce4ac) | 07-24T02:35 T+14:32 | 条件分支,读取未获证实(不是已见输入) | action(#91062be71f3ce4ac:5863@L58)\n- 主会话·9b3105a2 v73 (i"
+        },
+        {
+          "token": "复原",
+          "text": "0, m_from=1) 查看。没有展开不等于没有候选,也不能据此断言无人读写。\n## 内容: 无法复原"
+        },
+        {
+          "token": "未知",
+          "text": "8daf720e780b4c2) | 07-26T21:30 T+81:27 | 条件分支,是否执行未知(候选写) | action(#a68daf720e780b4c2:15731@L592)\n- fixer-r1 收尾后(喂养槽 41，未形成版本；action 查原文) (id=agent-a68daf720e780b4c2) | 07-26T21:30 T+81:27 | 条件分支,读取未获证实(不是已见输入) | action(#a68daf720e780b4c2:15731@L592)\n## 提到它的命令(337,其中 201 条账本没记到读写)—— 命令行 / heredoc 体 / 跑的脚本正文 / 工具输出里出现这个路径;版本无法复原或实录外修改时先看这里,action 展开"
+        }
+      ],
+      "tail": " / wc / ls;写入内容 = 别的文件正文里列了它;正文 = 说 / 想 / 收件;m_all=1 铺)\n候选仅计数,未展开 160 条;需要时 file(path, v=16, m_n=40, m_from=1) 查看。没有展开不等于没有候选,也不能据此断言无人读写。\n## 内容: 无法复原"
+    },
+    {
+      "version": "formal-v10",
+      "case": "member-center",
+      "step": 17,
+      "tool": "file",
+      "args": {
+        "path": "entry/src/main/ets/pages/MemberCenterPage.ets",
+        "v": 16,
+        "via": "file:MemberCenterPage.ets@v16",
+        "content": true,
+        "start": 700,
+        "n": 55
+      },
+      "chars": 18202,
+      "lines": [
+        85,
+        95
+      ],
+      "call_id": "call_DuVha3kte0OJceiZwfHpupta",
+      "body_sha": "b73c6a4c1fee3c9bcba4cf74ea6fbf4fd6d6a43062fd7a52ded00db47ad7f606",
+      "record_sha": "4206ad7a9cf8b39aefce7e66e1832edda7ed41de94f4c39fa5e40073a4e1475f",
+      "prefix": "# 文件 entry/src/main/ets/pages/MemberCenterPage.ets @v16  (共 16 版)\n完整路径: /Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723/entry/src/main/ets/pages/MemberCenterPage.ets\n全池时间边界: 2 个会话",
+      "excerpts": [
+        {
+          "token": "正文",
+          "text": "2 条(只读检查 = cat / grep / wc / ls;写入内容 = 别的文件正文里列了它;正文 = 说 / 想 / 收件;m_all=1 铺)\n候选仅计数,未展开 160 条;需要时 file(path, v=16, m_n=40, m_from=1) 查看。没有展开不等于没有候选,也不能据此断言无人读写。\n## 内容: 无法复原"
+        },
+        {
+          "token": "内容未知",
+          "text": "769) | 07-26T21:46 T+81:43 | native · Edit·报告成功 · 内容未知 (#af0e3d2ae54dbf769:17294@L34) ◀\n## 读者 0 个(下游;readers=1 展开;按词找用 search(file=))\n## 碰过它、方向不明的调用(106) —— 不立版本;action(id, n) 展开看是读是写\n- conv-guideinit v2 (id=agent-aconv-guideinit-91062be71f3ce4ac) | 07-24T02:35 T+14:32 | 条件分支,读取未获证实(不是已见输入) | action(#91062be71f3ce4ac:5863@L58)\n- 主会话·9b3105a2 v73 (i"
+        },
+        {
+          "token": "复原",
+          "text": "0, m_from=1) 查看。没有展开不等于没有候选,也不能据此断言无人读写。\n## 内容: 无法复原"
+        },
+        {
+          "token": "未知",
+          "text": "8daf720e780b4c2) | 07-26T21:30 T+81:27 | 条件分支,是否执行未知(候选写) | action(#a68daf720e780b4c2:15731@L592)\n- fixer-r1 收尾后(喂养槽 41，未形成版本；action 查原文) (id=agent-a68daf720e780b4c2) | 07-26T21:30 T+81:27 | 条件分支,读取未获证实(不是已见输入) | action(#a68daf720e780b4c2:15731@L592)\n## 提到它的命令(337,其中 201 条账本没记到读写)—— 命令行 / heredoc 体 / 跑的脚本正文 / 工具输出里出现这个路径;版本无法复原或实录外修改时先看这里,action 展开"
+        }
+      ],
+      "tail": " / wc / ls;写入内容 = 别的文件正文里列了它;正文 = 说 / 想 / 收件;m_all=1 铺)\n候选仅计数,未展开 160 条;需要时 file(path, v=16, m_n=40, m_from=1) 查看。没有展开不等于没有候选,也不能据此断言无人读写。\n## 内容: 无法复原"
+    },
+    {
+      "version": "formal-v10",
+      "case": "dice-entry",
+      "step": 10,
+      "tool": "agent",
+      "args": {
+        "id": "agent-a27497cfed8c44856",
+        "v": 3,
+        "via": "sessions",
+        "reads": true,
+        "seen": true,
+        "summary_chars": 300
+      },
+      "chars": 89,
+      "lines": [
+        70,
+        79
+      ],
+      "call_id": "call_qXRMG4k4RGSzUTJFhTEADgpy",
+      "body_sha": "495aa99654f246caec668caf34a60cd1fd09abda9ad277218c8305630f5c7d4c",
+      "record_sha": "c4c131210d26c72b27616c7085bb8afd674c5f301bea63d4b1f1a19b3552a6c9",
+      "prefix": "⛔ via=sessions/task 只能用于第一次 file / agent;之后必须从已打开的节点跳。已打开:agent:UI-T Step3 生成 P0001 测试@v4",
+      "excerpts": [],
+      "tail": "⛔ via=sessions/task 只能用于第一次 file / agent;之后必须从已打开的节点跳。已打开:agent:UI-T Step3 生成 P0001 测试@v4"
+    },
+    {
+      "version": "formal-v10",
+      "case": "dice-entry",
+      "step": 13,
+      "tool": "agent",
+      "args": {
+        "id": "agent-a27497cfed8c44856",
+        "v": 3,
+        "via": "agent:fix-errobserver@v1",
+        "reads": true,
+        "seen": true,
+        "summary_chars": 400
+      },
+      "chars": 87,
+      "lines": [
+        87,
+        90
+      ],
+      "call_id": "call_XuXapdExQMK38pMQGSBHaLxh",
+      "body_sha": "13a17dc9c44d625f0a3c5651cfac6f8881acdeee5dced02464342b534ec9295e",
+      "record_sha": "b8cdc0233f8ea2ba270886cd53a176f3fc0f3ebc3f2ab7fb69c75642ce806cea",
+      "prefix": "⛔ via 不是已打开的节点:agent:fix-errobserver@v1。打开了什么只能从什么跳。已打开:agent:UI-T Step3 生成 P0001 测试@v4",
+      "excerpts": [],
+      "tail": "⛔ via 不是已打开的节点:agent:fix-errobserver@v1。打开了什么只能从什么跳。已打开:agent:UI-T Step3 生成 P0001 测试@v4"
+    },
+    {
+      "version": "formal-v10",
+      "case": "dice-entry",
+      "step": 14,
+      "tool": "agent",
+      "args": {
+        "id": "agent-a27497cfed8c44856",
+        "v": 3,
+        "via": "agent:agent-a27497cfed8c44856@v1",
+        "reads": true,
+        "seen": true,
+        "summary_chars": 400
+      },
+      "chars": 95,
+      "lines": [
+        94,
+        97
+      ],
+      "call_id": "call_dvIiBDGsdkAIhXrJv96u97y6",
+      "body_sha": "37658e480043ed5d3b35a35f1ad9e9e1687a711e86d5ee63e45b8b3ece42fbfc",
+      "record_sha": "60a4c537fc428dc28d0d8905edd23353021b24e860334e3375c09c675d941a2f",
+      "prefix": "⛔ via 不是已打开的节点:agent:agent-a27497cfed8c44856@v1。打开了什么只能从什么跳。已打开:agent:UI-T Step3 生成 P0001 测试@v4",
+      "excerpts": [],
+      "tail": "⛔ via 不是已打开的节点:agent:agent-a27497cfed8c44856@v1。打开了什么只能从什么跳。已打开:agent:UI-T Step3 生成 P0001 测试@v4"
+    },
+    {
+      "version": "formal-v10",
+      "case": "dice-entry",
+      "step": 18,
+      "tool": "agent",
+      "args": {
+        "id": "agent-a27497cfed8c44856",
+        "v": 3,
+        "via": "agent:主会话·2f01bcdc@v5",
+        "reads": true,
+        "seen": true,
+        "summary_chars": 500
+      },
+      "chars": 107,
+      "lines": [
+        116,
+        121
+      ],
+      "call_id": "call_81uqyfF4nwyNuOXS9UnsPu7z",
+      "body_sha": "d46b8b89b689289410f74a401a13755fbc727a5209f5507c238ea55dd7ef8af9",
+      "record_sha": "85a5ecbafe693a0a58fb8ffcbfaa6e6655b764db2807e3d1e171dc7ad5d2a3f9",
+      "prefix": "⛔ via 解析不了或不在账本:agent:主会话·2f01bcdc@v5。via 必须是已打开的节点之一:agent:UI-T Step3 生成 P0001 测试@v4、agent:主会话·2f01bcdc@v5",
+      "excerpts": [],
+      "tail": "⛔ via 解析不了或不在账本:agent:主会话·2f01bcdc@v5。via 必须是已打开的节点之一:agent:UI-T Step3 生成 P0001 测试@v4、agent:主会话·2f01bcdc@v5"
+    },
+    {
+      "version": "formal-v10",
+      "case": "dice-entry",
+      "step": 19,
+      "tool": "agent",
+      "args": {
+        "id": "agent-a27497cfed8c44856",
+        "v": 3,
+        "via": "agent:主会话·2f01bcdc@v5",
+        "reads": true,
+        "seen": true,
+        "summary_chars": 500
+      },
+      "chars": 107,
+      "lines": [
+        127,
+        130
+      ],
+      "call_id": "call_3PlPLr4XYxaDnaN7TRUCj7IU",
+      "body_sha": "d46b8b89b689289410f74a401a13755fbc727a5209f5507c238ea55dd7ef8af9",
+      "record_sha": "5984f8b559094e4d1bbf8d853eac989bfff9901e7417aeff2b5a1fd436b66ae6",
+      "prefix": "⛔ via 解析不了或不在账本:agent:主会话·2f01bcdc@v5。via 必须是已打开的节点之一:agent:UI-T Step3 生成 P0001 测试@v4、agent:主会话·2f01bcdc@v5",
+      "excerpts": [],
+      "tail": "⛔ via 解析不了或不在账本:agent:主会话·2f01bcdc@v5。via 必须是已打开的节点之一:agent:UI-T Step3 生成 P0001 测试@v4、agent:主会话·2f01bcdc@v5"
+    },
+    {
+      "version": "formal-v10",
+      "case": "dice-entry",
+      "step": 20,
+      "tool": "agent",
+      "args": {
+        "id": "agent-a27497cfed8c44856",
+        "v": 3,
+        "via": "agent(__main__:2f01bcdc, v=5)",
+        "reads": true,
+        "seen": true,
+        "summary_chars": 500
+      },
+      "chars": 115,
+      "lines": [
+        136,
+        139
+      ],
+      "call_id": "call_mTiaH2Aa03ni3TIX6NuCJLfO",
+      "body_sha": "5e976a1d9eb1b0fad735046a1ac9679c202acb2daed5cd993fa9a2ff59f9aa8b",
+      "record_sha": "0baa09c925c006ea492d663aadf4eaf9863992f1dffa82d00986a39b31cc32db",
+      "prefix": "⛔ via 解析不了或不在账本:agent(__main__:2f01bcdc, v=5)。via 必须是已打开的节点之一:agent:UI-T Step3 生成 P0001 测试@v4、agent:主会话·2f01bcdc@v5",
+      "excerpts": [],
+      "tail": "⛔ via 解析不了或不在账本:agent(__main__:2f01bcdc, v=5)。via 必须是已打开的节点之一:agent:UI-T Step3 生成 P0001 测试@v4、agent:主会话·2f01bcdc@v5"
+    },
+    {
+      "version": "formal-v10",
+      "case": "dice-entry",
+      "step": 21,
+      "tool": "search",
+      "args": {
+        "q": "errorManager",
+        "agent": "agent-a27497cfed8c44856",
+        "v": 3,
+        "since": 0,
+        "after": true
+      },
+      "chars": 11185,
+      "lines": [
+        143,
+        146
+      ],
+      "call_id": "call_GrfZr9hTFi7SXHZrPa1B6IE5",
+      "body_sha": "162f4c08e84f536ea15a30a0b16390c34ef719ed473dfa9acbce4b888e8538ef",
+      "record_sha": "9ab568e8682e2dd7f47c2db50af8e30853739e6000695e0262052e760463f628",
+      "prefix": "# search 「errorManager」 in agent fix-errobserver  ≤ v3(窗口 v1–v3)  命中 22 条记录\n范围: 只有这个 agent 的记录(派发词 / 读到的内容 / 写入 / 命令 / 说 / 想 / 收件 / 注入);别的 agent 和文件内容不在内。零命中只支持「此范围内未检索到」;可用 search(q, until_ts=那一刻) 扩大",
+      "excerpts": [
+        {
+          "token": "第 ",
+          "text": "Manager` 在本镜像 SDK 中：\n    - `@kit.AbilityKit.d.ts` 第 46 行 `import errorManager from '@ohos.app.ability.errorManager';` + 第 95 行 export 列表含 `errorManager`\n    - 所以正确路径是 `import { errorManager } from '@kit.AbilityKit';`\n- 想 收尾后(没有形成 v4，不能用作节点坐标；该 agent 最后效应为 v3) (锚点之后) (#a27497cfed8c44856:4517@L47 T+6:53) · 命中 1 行  → action(#4517) 展开原文\n    1. 确认 `@kit"
+        }
+      ],
+      "tail": "/scratchpad/dice-hmos/entry/src/main/ets/entryability/EntryAbility.ets\",\"v\":8,\"seq\":4515,\"field\":\"input\",\"via\":\"search:6bda2afcc43060c39be594f6:22\"}]}"
+    },
+    {
+      "version": "formal-v10",
+      "case": "dice-entry",
+      "step": 22,
+      "tool": "action",
+      "args": {
+        "ref": "#a711c5d09fb676814:2859@L11",
+        "part": "output",
+        "find": "§F",
+        "max_chars": 8000
+      },
+      "chars": 8825,
+      "lines": [
+        152,
+        158
+      ],
+      "call_id": "call_019dk6U0WSYAcr1rlLEoYxev",
+      "body_sha": "1e151d1af17f127d3d1878e6513ba770c86a5c59b39bd067c524c8ce6c6bb95a",
+      "record_sha": "dd4ac4a4b615d7e0dfdf333a015663caee2aec27a2bc327220be0004c0c6fb16",
+      "prefix": "# 动作 #2859 · Read · 2026-09-03T19:10:17 · 成功 · 喂 v1\n原文引用: #a711c5d09fb676814:2859@L11\n事件 id 81e0a463:agent-a711c5d09fb676814:call_769beeda1a324d3d95de7251(会话:转录:原始事件ID或行/块;用于事件识别,不是上行的原文引用)\n发自 UI-T St",
+      "excerpts": [
+        {
+          "token": "第 ",
+          "text": ".md, v=1)\n## 输入\n```\n(未展开;part=input 查看)\n```\n## 输出(第 5210-13209 字 / 共 13597 字;剩余 388 字,offset=13209 继续;part=output 单独展开/翻页)\n```\n() == true`\n88\t- **预期-状态**：`AppStorage.get<boolean>('__TEST_MODE__') == true`（桥键已写入，证 want 参数链路通）；业务状态无 AppStorage 键（见通道说明）→ diceValue 经意图层探针在 AC01/AC10 用例覆盖\n89\t- **依赖/Mock**：无外部依赖；需 EntryAbility 测试桥（§F）\n90\t- **稳定性**：低；land"
+        },
+        {
+          "token": "## 输入",
+          "text": "c/test/ui-test/design/P0001_MainActivity.md, v=1)\n## 输入\n```\n(未展开;part=input 查看)\n```\n## 输出(第 5210-13209 字 / 共 13597 字;剩余 388 字,offset=13209 继续;part=output 单独展开/翻页)\n```\n() == true`\n88\t- **预期-状态**：`AppStorage.get<boolean>('__TEST_MODE__') == true`（桥键已写入，证 want 参数链路通）；业务状态无 AppStorage 键（见通道说明）→ diceValue 经意图层探针在 AC01/AC10 用例覆盖\n89\t- **依赖/Mock**：无外部依赖；需 "
+        },
+        {
+          "token": "## 输出",
+          "text": "tivity.md, v=1)\n## 输入\n```\n(未展开;part=input 查看)\n```\n## 输出(第 5210-13209 字 / 共 13597 字;剩余 388 字,offset=13209 继续;part=output 单独展开/翻页)\n```\n() == true`\n88\t- **预期-状态**：`AppStorage.get<boolean>('__TEST_MODE__') == true`（桥键已写入，证 want 参数链路通）；业务状态无 AppStorage 键（见通道说明）→ diceValue 经意图层探针在 AC01/AC10 用例覆盖\n89\t- **依赖/Mock**：无外部依赖；需 EntryAbility 测试桥（§F）\n90\t- **稳定性**："
+        }
+      ],
+      "tail": "或空）时仅消费 token，既有 `loadContent('pages/Index')` 即宿主落地，不改 Index。未来新增子页时按工程既有 Layer-1 先例（WindowModel 模式）建 `@ObservedV2 TestMountModel` + `AppStorageV2\n```"
+    },
+    {
+      "version": "formal-v10",
+      "case": "dice-entry",
+      "step": 23,
+      "tool": "action",
+      "args": {
+        "ref": "#a711c5d09fb676814:2855@L7",
+        "part": "output",
+        "find": "6.1",
+        "max_chars": 7000
+      },
+      "chars": 7863,
+      "lines": [
+        153,
+        160
+      ],
+      "call_id": "call_TWjtwYorDgOKJEfGT9Z81ehZ",
+      "body_sha": "865791db5b0bb88ff60b454b51bb295bafbc584c802087344f69401812f40bdc",
+      "record_sha": "98016df368517fc5d3a79312a75346147461df6dbffa48a8620c189c49fcd60b",
+      "prefix": "# 动作 #2855 · Read · 2026-09-03T19:10:15 · 成功 · 喂 v1\n原文引用: #a711c5d09fb676814:2855@L7\n事件 id 81e0a463:agent-a711c5d09fb676814:call_189b2504fca14e68979322c2(会话:转录:原始事件ID或行/块;用于事件识别,不是上行的原文引用)\n发自 UI-T Ste",
+      "excerpts": [
+        {
+          "token": "第 ",
+          "text": ".md, v=1)\n## 输入\n```\n(未展开;part=input 查看)\n```\n## 输出(第 5711-12710 字 / 共 19387 字;剩余 6677 字,offset=12710 继续;part=output 单独展开/翻页)\n```\nvigation vs Router 二选一）\n137\t\n138\t**架构探测**：根页 `entry/src/main/ets/pages/<RootPage>.ets` `grep ': NavPathStack'` 命中 → `NAVIGATION_DIRECT_MOUNT`；否则 → `ROUTER_LOAD_CONTENT`。两套桥**互斥**，不要同时注入。\n139\t\n140\t### 6.1 共享：EntryAbility 读 "
+        },
+        {
+          "token": "## 输入",
+          "text": "i-verifier/references/test-case-template.md, v=1)\n## 输入\n```\n(未展开;part=input 查看)\n```\n## 输出(第 5711-12710 字 / 共 19387 字;剩余 6677 字,offset=12710 继续;part=output 单独展开/翻页)\n```\nvigation vs Router 二选一）\n137\t\n138\t**架构探测**：根页 `entry/src/main/ets/pages/<RootPage>.ets` `grep ': NavPathStack'` 命中 → `NAVIGATION_DIRECT_MOUNT`；否则 → `ROUTER_LOAD_CONTENT`。两套桥**互斥**，不要同"
+        },
+        {
+          "token": "## 输出",
+          "text": "mplate.md, v=1)\n## 输入\n```\n(未展开;part=input 查看)\n```\n## 输出(第 5711-12710 字 / 共 19387 字;剩余 6677 字,offset=12710 继续;part=output 单独展开/翻页)\n```\nvigation vs Router 二选一）\n137\t\n138\t**架构探测**：根页 `entry/src/main/ets/pages/<RootPage>.ets` `grep ': NavPathStack'` 命中 → `NAVIGATION_DIRECT_MOUNT`；否则 → `ROUTER_LOAD_CONTENT`。两套桥**互斥**，不要同时注入。\n139\t\n140\t### 6.1 共享：EntryAbil"
+        }
+      ],
+      "tail": "顶部以常量字典登记，运行时查表\n286\tconst STATE_KEY_MAP: Record<string, string> = {\n287\t  // 由 step3-generate 从 manifest §map 抄入；none 标记跳过状态层\n288\t  // 'settings_s\n```"
+    },
+    {
+      "version": "formal-v10",
+      "case": "dice-entry",
+      "step": 24,
+      "tool": "action",
+      "args": {
+        "ref": "#a27497cfed8c44856:4500@L29",
+        "part": "output",
+        "find": "interface ErrorObserver",
+        "max_chars": 7000
+      },
+      "chars": 7705,
+      "lines": [
+        154,
+        163
+      ],
+      "call_id": "call_icDhjvcz4SBOe3Rqwrc5TuGx",
+      "body_sha": "c714117bb770f99240ab58c0ee1fe91319419f6e22761adc265b39a41ffaa011",
+      "record_sha": "0b5a8dd23998ef1a45f927c05460892f09971ffe9dcd519708fb02cf9e6bad97",
+      "prefix": "# 动作 #4500 · Bash · 2026-09-03T21:18:25 · 成功 · 喂 v1\n原文引用: #a27497cfed8c44856:4500@L29\n事件 id 2f01bcdc:agent-a27497cfed8c44856:call_f3722a2fa80c4d2bbee5b99e(会话:转录:原始事件ID或行/块;用于事件识别,不是上行的原文引用)\n发自 fix-err",
+      "excerpts": [
+        {
+          "token": "第 ",
+          "text": "art=input 查看)\n```\n## 输出(「interface ErrorObserver」在第 0 字之后未命中;第 1-7000 字 / 共 26029 字;剩余 19029 字,offset=7000 继续;part=output 单独展开/翻页)\n```\n/*\n * Copyright (c) 2022-2023 Huawei Device Co., Ltd.\n * Licensed under the Apache License, Version 2.0 (the \"License\");\n * you may not use this file except in compliance with the License.\n * You may obtain a copy o"
+        },
+        {
+          "token": "## 输入",
+          "text": "ets/api/@ohos.app.ability.errorManager.d.ts, v=1)\n## 输入\n```\n(未展开;part=input 查看)\n```\n## 输出(「interface ErrorObserver」在第 0 字之后未命中;第 1-7000 字 / 共 26029 字;剩余 19029 字,offset=7000 继续;part=output 单独展开/翻页)\n```\n/*\n * Copyright (c) 2022-2023 Huawei Device Co., Ltd.\n * Licensed under the Apache License, Version 2.0 (the \"License\");\n * you may not use this file"
+        },
+        {
+          "token": "## 输出",
+          "text": "ager.d.ts, v=1)\n## 输入\n```\n(未展开;part=input 查看)\n```\n## 输出(「interface ErrorObserver」在第 0 字之后未命中;第 1-7000 字 / 共 26029 字;剩余 19029 字,offset=7000 继续;part=output 单独展开/翻页)\n```\n/*\n * Copyright (c) 2022-2023 Huawei Device Co., Ltd.\n * Licensed under the Apache License, Version 2.0 (the \"License\");\n * you may not use this file except in compliance with the Lic"
+        }
+      ],
+      "tail": "yRuntime.Core\n     * @crossplatform\n     * @atomicservice\n     * @since 19\n     */\n    function off(type: 'error', observerId: number): Promise<vo\n```"
+    },
+    {
+      "version": "formal-v10",
+      "case": "dice-entry",
+      "step": 25,
+      "tool": "action",
+      "args": {
+        "ref": "#a27497cfed8c44856:4505@L35",
+        "part": "output",
+        "max_chars": 4000
+      },
+      "chars": 2465,
+      "lines": [
+        155,
+        164
+      ],
+      "call_id": "call_3qHjkiwfHB8GtGA8K3UHahpx",
+      "body_sha": "dc8cdb4a3ca6302c0e84304ada08d8ef0485ce43de5bb585ace1883082f892d8",
+      "record_sha": "88a22782beeffee75f517fcb788ec5cc46478ba5a7584412919893634fc6c6b8",
+      "prefix": "# 动作 #4505 · Bash · 2026-09-03T21:18:35 · 成功 · 喂 v1\n原文引用: #a27497cfed8c44856:4505@L35\n事件 id 2f01bcdc:agent-a27497cfed8c44856:call_e6d56b80320d4677b97b915b(会话:转录:原始事件ID或行/块;用于事件识别,不是上行的原文引用)\n发自 fix-err",
+      "excerpts": [
+        {
+          "token": "## 输入",
+          "text": "t/openharmony/ets/kits/@kit.AbilityKit.d.ts, v=1)\n## 输入\n```\n(未展开;part=input 查看)\n```\n## 输出\n```\n46:import errorManager from '@ohos.app.ability.errorManager';\n95:export { Ability, AbilityConstant, AbilityLifecycleCallback, AbilityStage, ActionExtensionAbility, ApplicationStateChangeCallback, Callee, CalleeCallback, Caller, CheckPackageHasInstalledOpti"
+        },
+        {
+          "token": "## 输出",
+          "text": "yKit.d.ts, v=1)\n## 输入\n```\n(未展开;part=input 查看)\n```\n## 输出\n```\n46:import errorManager from '@ohos.app.ability.errorManager';\n95:export { Ability, AbilityConstant, AbilityLifecycleCallback, AbilityStage, ActionExtensionAbility, ApplicationStateChangeCallback, Callee, CalleeCallback, Caller, CheckPackageHasInstalledOptions, CheckPackageHasInstalledRespo"
+        }
+      ],
+      "tail": "ilityStartCallback, AbilityStartFailureCode, FailureCode, systemConfiguration, AgentExtensionAbility, AgentUIExtensionAbility, hyperSnapManager };\n```"
+    },
+    {
+      "version": "formal-v10",
+      "case": "dice-entry",
+      "step": 26,
+      "tool": "action",
+      "args": {
+        "ref": "#a27497cfed8c44856:4500@L29",
+        "part": "output",
+        "find": "onUnhandledException",
+        "max_chars": 5000
+      },
+      "chars": 5702,
+      "lines": [
+        168,
+        171
+      ],
+      "call_id": "call_6kuN9elS5YxYYCXKLYgd1F0v",
+      "body_sha": "6066c37cb6d4c53b588f89ebfe8b7609bddcb20f9260bac382f617c0324d6bad",
+      "record_sha": "d0337efc3c88de2ba0b3e80e59f00d137017e13b03ac206fd5b2e8975bdb3240",
+      "prefix": "# 动作 #4500 · Bash · 2026-09-03T21:18:25 · 成功 · 喂 v1\n原文引用: #a27497cfed8c44856:4500@L29\n事件 id 2f01bcdc:agent-a27497cfed8c44856:call_f3722a2fa80c4d2bbee5b99e(会话:转录:原始事件ID或行/块;用于事件识别,不是上行的原文引用)\n发自 fix-err",
+      "excerpts": [
+        {
+          "token": "第 ",
+          "text": "开;part=input 查看)\n```\n## 输出(「onUnhandledException」在第 0 字之后未命中;第 1-5000 字 / 共 26029 字;剩余 21029 字,offset=5000 继续;part=output 单独展开/翻页)\n```\n/*\n * Copyright (c) 2022-2023 Huawei Device Co., Ltd.\n * Licensed under the Apache License, Version 2.0 (the \"License\");\n * you may not use this file except in compliance with the License.\n * You may obtain a copy o"
+        },
+        {
+          "token": "## 输入",
+          "text": "ets/api/@ohos.app.ability.errorManager.d.ts, v=1)\n## 输入\n```\n(未展开;part=input 查看)\n```\n## 输出(「onUnhandledException」在第 0 字之后未命中;第 1-5000 字 / 共 26029 字;剩余 21029 字,offset=5000 继续;part=output 单独展开/翻页)\n```\n/*\n * Copyright (c) 2022-2023 Huawei Device Co., Ltd.\n * Licensed under the Apache License, Version 2.0 (the \"License\");\n * you may not use this file ex"
+        },
+        {
+          "token": "## 输出",
+          "text": "ager.d.ts, v=1)\n## 输入\n```\n(未展开;part=input 查看)\n```\n## 输出(「onUnhandledException」在第 0 字之后未命中;第 1-5000 字 / 共 26029 字;剩余 21029 字,offset=5000 继续;part=output 单独展开/翻页)\n```\n/*\n * Copyright (c) 2022-2023 Huawei Device Co., Ltd.\n * Licensed under the Apache License, Version 2.0 (the \"License\");\n * you may not use this file except in compliance with the Licens"
+        }
+      ],
+      "tail": "ID does not exist.\n     * @syscap SystemCapability.Ability.AbilityRuntime.Core\n     * @crossplatform\n     * @atomicservice\n     * @since 19\n     *\n```"
+    },
+    {
+      "version": "formal-v10",
+      "case": "dice-entry",
+      "step": 27,
+      "tool": "search",
+      "args": {
+        "q": "onException",
+        "agent": "agent-a27497cfed8c44856",
+        "v": 3,
+        "since": 0,
+        "after": true
+      },
+      "chars": 4145,
+      "lines": [
+        177,
+        180
+      ],
+      "call_id": "call_xDOIlzS8ZNyE0u6ZeKyKkvJb",
+      "body_sha": "33bb528cf9fb187a2953ec6b7a7f80a0dc690c187d6624f61d77032b03984159",
+      "record_sha": "13e50ed9dcf1d07f5ff67baf0d68e87e8763ccf09bc2cb7d3ac8acd9c0de3218",
+      "prefix": "# search 「onException」 in agent fix-errobserver  ≤ v3(窗口 v1–v3)  命中 8 条记录\n范围: 只有这个 agent 的记录(派发词 / 读到的内容 / 写入 / 命令 / 说 / 想 / 收件 / 注入);别的 agent 和文件内容不在内。零命中只支持「此范围内未检索到」;可用 search(q, until_ts=那一刻) 扩大全池",
+      "excerpts": [],
+      "tail": "9/scratchpad/dice-hmos/entry/src/main/ets/entryability/EntryAbility.ets\",\"v\":8,\"seq\":4515,\"field\":\"input\",\"via\":\"search:f019f63c837af2ea3704f7a5:8\"}]}"
+    },
+    {
+      "version": "formal-v9",
+      "case": "codex-c4",
+      "step": 9,
+      "tool": "action",
+      "args": {
+        "id": "__main__:01a009fe",
+        "seq": 2388,
+        "max_chars": 6000
+      },
+      "chars": 6561,
+      "lines": [
+        65,
+        71
+      ],
+      "call_id": "call_bRKN7AyzAhOOGd8y7aE5wrtV",
+      "body_sha": "085dbc3d1fdd3e6298d28332e5a541e16a955f4c0d39f7613dcb91cf79db5d11",
+      "record_sha": "dfdc7b9acdc2f29efa1899a2ea297c042e2cd85b2d3fbc1ce8a840c330fd9de5",
+      "prefix": "# 动作 #2388 · exec · 2026-08-17T03:10:07 · 成功 · 喂 v249\n原文引用: #01a009fe-68e3-7f42-b76b-5e863c555976:2388@L8026\n事件 id 01a009fe:rollout-2026-08-16T17-54-23-01a009fe-68e3-7f42-b76b-5e863c555976:call_7fkY9p",
+      "excerpts": [
+        {
+          "token": "第 ",
+          "text": ";\n  text(`\\n### ${f}\\n${r.output}`);\n}\n\n```\n## 输出(第 1-5067 字 / 共 37354 字;剩余 32287 字,offset=5067 继续;part=output 单独展开/翻页)\n```\nScript completed\nWall time 0.5 seconds\nOutput:\n\n\n### /Users/ventiu/Desktop/HUAWEI/AIPPT_830_test/entry/src/main/ets/pages/LaunchAgreementDialog.ets\n     1\timport { EmbeddedWebLoadState, EmbeddedWebPage } from '../components/co"
+        },
+        {
+          "token": "## 输入",
+          "text": "009fe, seq=2388, m_n=40, m_from=1) 查看。未展开不等于没有候选。\n## 输入\n```\nconst files = [\n\"/Users/ventiu/Desktop/HUAWEI/AIPPT_830_test/entry/src/main/ets/pages/LaunchAgreementDialog.ets\",\n\"/Users/ventiu/Desktop/HUAWEI/AIPPT_830_test/entry/src/main/ets/pages/SplashPage.ets\",\n\"/Users/ventiu/Desktop/HUAWEI/AIPPT_830_test/entry/src/main/ets/viewmodels/LaunchViewMode"
+        },
+        {
+          "token": "## 输出",
+          "text": "0000});\n  text(`\\n### ${f}\\n${r.output}`);\n}\n\n```\n## 输出(第 1-5067 字 / 共 37354 字;剩余 32287 字,offset=5067 继续;part=output 单独展开/翻页)\n```\nScript completed\nWall time 0.5 seconds\nOutput:\n\n\n### /Users/ventiu/Desktop/HUAWEI/AIPPT_830_test/entry/src/main/ets/pages/LaunchAgreementDialog.ets\n     1\timport { EmbeddedWebLoadState, EmbeddedWebPage } from '../compone"
+        }
+      ],
+      "tail": "   97\t          }\n    98\t          .width('86%')\n    99\t          .padding(24)\n   100\t          .backgroundColor($r('app.color.white'))\n   101\t   \n```"
+    },
+    {
+      "version": "formal-v9",
+      "case": "codex-c4",
+      "step": 10,
+      "tool": "action",
+      "args": {
+        "id": "__main__:01a009fe",
+        "seq": 2392,
+        "max_chars": 6000
+      },
+      "chars": 3575,
+      "lines": [
+        66,
+        75
+      ],
+      "call_id": "call_zzOw7mFelI3Gll6pziJwtSJv",
+      "body_sha": "1617a923741442e232cd5d67be75a6470130a40b638e0a691c06353932a28017",
+      "record_sha": "640f2a7dceeb1ff96c927372b3c891541cb9c674850c43dd771d980929312028",
+      "prefix": "# 动作 #2392 · exec · 2026-08-17T03:10:40 · 成功 · 喂 v249\n原文引用: #01a009fe-68e3-7f42-b76b-5e863c555976:2392@L8044\n事件 id 01a009fe:rollout-2026-08-16T17-54-23-01a009fe-68e3-7f42-b76b-5e863c555976:call_6PIBYO",
+      "excerpts": [
+        {
+          "token": "## 输入",
+          "text": "9fe) v249(喂这一版) → agent(__main__:01a009fe, v=249)\n## 输入\n```\nconst r = await tools.exec_command({\n  cmd: \"rg -n 'enum HitTestMode|HitTestMode' /Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/ets -g '*.d.ts' -g '*.ts' | head -80\",\n  workdir: \"/Users/ventiu/Desktop/HUAWEI\",\n  yield_time_ms: 10000,\n  max_output_tokens: 12000\n});\ntext(r"
+        },
+        {
+          "token": "## 输出",
+          "text": "max_output_tokens: 12000\n});\ntext(r.output);\n\n```\n## 输出\n```\nScript completed\nWall time 0.2 seconds\nOutput:\n\n/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/ets/build-tools/ets-loader/declarations/enums.d.ts:7747:declare enum HitTestMode {\n/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/ets/build-tools/ets-loader/de"
+        }
+      ],
+      "tail": "Studio.app/Contents/sdk/default/openharmony/ets/component/common.d.ts:27116:    onTouchIntercept(callback: Callback<TouchEvent, HitTestMode>): T;\n\n```"
+    },
+    {
+      "version": "formal-v10",
+      "case": "codex-c4",
+      "step": 8,
+      "tool": "action",
+      "args": {
+        "id": "__main__:01a009fe",
+        "seq": 2388,
+        "max_chars": 6000
+      },
+      "chars": 6561,
+      "lines": [
+        52,
+        65
+      ],
+      "call_id": "call_w0MzQEht1oGzQz2CbiVKwngM",
+      "body_sha": "085dbc3d1fdd3e6298d28332e5a541e16a955f4c0d39f7613dcb91cf79db5d11",
+      "record_sha": "295f1a404ab859aefb86fc2c6781c3e597961c7b460935d51dc00e2ced7e7e0b",
+      "prefix": "# 动作 #2388 · exec · 2026-08-17T03:10:07 · 成功 · 喂 v249\n原文引用: #01a009fe-68e3-7f42-b76b-5e863c555976:2388@L8026\n事件 id 01a009fe:rollout-2026-08-16T17-54-23-01a009fe-68e3-7f42-b76b-5e863c555976:call_7fkY9p",
+      "excerpts": [
+        {
+          "token": "第 ",
+          "text": ";\n  text(`\\n### ${f}\\n${r.output}`);\n}\n\n```\n## 输出(第 1-5067 字 / 共 37354 字;剩余 32287 字,offset=5067 继续;part=output 单独展开/翻页)\n```\nScript completed\nWall time 0.5 seconds\nOutput:\n\n\n### /Users/ventiu/Desktop/HUAWEI/AIPPT_830_test/entry/src/main/ets/pages/LaunchAgreementDialog.ets\n     1\timport { EmbeddedWebLoadState, EmbeddedWebPage } from '../components/co"
+        },
+        {
+          "token": "## 输入",
+          "text": "009fe, seq=2388, m_n=40, m_from=1) 查看。未展开不等于没有候选。\n## 输入\n```\nconst files = [\n\"/Users/ventiu/Desktop/HUAWEI/AIPPT_830_test/entry/src/main/ets/pages/LaunchAgreementDialog.ets\",\n\"/Users/ventiu/Desktop/HUAWEI/AIPPT_830_test/entry/src/main/ets/pages/SplashPage.ets\",\n\"/Users/ventiu/Desktop/HUAWEI/AIPPT_830_test/entry/src/main/ets/viewmodels/LaunchViewMode"
+        },
+        {
+          "token": "## 输出",
+          "text": "0000});\n  text(`\\n### ${f}\\n${r.output}`);\n}\n\n```\n## 输出(第 1-5067 字 / 共 37354 字;剩余 32287 字,offset=5067 继续;part=output 单独展开/翻页)\n```\nScript completed\nWall time 0.5 seconds\nOutput:\n\n\n### /Users/ventiu/Desktop/HUAWEI/AIPPT_830_test/entry/src/main/ets/pages/LaunchAgreementDialog.ets\n     1\timport { EmbeddedWebLoadState, EmbeddedWebPage } from '../compone"
+        }
+      ],
+      "tail": "   97\t          }\n    98\t          .width('86%')\n    99\t          .padding(24)\n   100\t          .backgroundColor($r('app.color.white'))\n   101\t   \n```"
+    },
+    {
+      "version": "formal-v10",
+      "case": "codex-c4",
+      "step": 9,
+      "tool": "action",
+      "args": {
+        "id": "__main__:01a009fe",
+        "seq": 2392,
+        "max_chars": 6000
+      },
+      "chars": 3575,
+      "lines": [
+        53,
+        66
+      ],
+      "call_id": "call_aZCkm2lsyYzN8ac5ZJ4wZefN",
+      "body_sha": "1617a923741442e232cd5d67be75a6470130a40b638e0a691c06353932a28017",
+      "record_sha": "65b406af6a8d0100a4f53f97eb7ea0ed17ffe9b7e20eb09df8480014357f49aa",
+      "prefix": "# 动作 #2392 · exec · 2026-08-17T03:10:40 · 成功 · 喂 v249\n原文引用: #01a009fe-68e3-7f42-b76b-5e863c555976:2392@L8044\n事件 id 01a009fe:rollout-2026-08-16T17-54-23-01a009fe-68e3-7f42-b76b-5e863c555976:call_6PIBYO",
+      "excerpts": [
+        {
+          "token": "## 输入",
+          "text": "9fe) v249(喂这一版) → agent(__main__:01a009fe, v=249)\n## 输入\n```\nconst r = await tools.exec_command({\n  cmd: \"rg -n 'enum HitTestMode|HitTestMode' /Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/ets -g '*.d.ts' -g '*.ts' | head -80\",\n  workdir: \"/Users/ventiu/Desktop/HUAWEI\",\n  yield_time_ms: 10000,\n  max_output_tokens: 12000\n});\ntext(r"
+        },
+        {
+          "token": "## 输出",
+          "text": "max_output_tokens: 12000\n});\ntext(r.output);\n\n```\n## 输出\n```\nScript completed\nWall time 0.2 seconds\nOutput:\n\n/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/ets/build-tools/ets-loader/declarations/enums.d.ts:7747:declare enum HitTestMode {\n/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/ets/build-tools/ets-loader/de"
+        }
+      ],
+      "tail": "Studio.app/Contents/sdk/default/openharmony/ets/component/common.d.ts:27116:    onTouchIntercept(callback: Callback<TouchEvent, HitTestMode>): T;\n\n```"
+    },
+    {
+      "version": "formal-v10",
+      "case": "member-center",
+      "step": 3,
+      "tool": "action",
+      "args": {
+        "ref": "#a68daf720e780b4c2:15406@L103",
+        "part": null,
+        "max_chars": 12000
+      },
+      "chars": 5046,
+      "lines": [
+        35,
+        44
+      ],
+      "call_id": "call_dnLcfxKZrnfpaeNxeW3SKTTP",
+      "body_sha": "5703c18b0113136205194828120f4d188464564f91d306b21f40c0261fb69056",
+      "record_sha": "ff83eecf7524ac165d0331eaf57d83b58be72c09f82fe477d02039f6a0a25f76",
+      "prefix": "# 动作 #15406 · Bash · 2026-07-26T20:41:07 · 成功 · 喂 v5\n原文引用: #a68daf720e780b4c2:15406@L103\n事件 id ff019d8a:agent-a68daf720e780b4c2:toolu_01T6WkXMhD7rUsHaSaMPuhgx(会话:转录:原始事件ID或行/块;用于事件识别,不是上行的原文引用)\n发自 fix",
+      "excerpts": [
+        {
+          "token": "## 输入",
+          "text": "b4c2, seq=15406, m_n=40, m_from=1) 查看。未展开不等于没有候选。\n## 输入\n```\n{\n \"command\": \"cat > /tmp/patch_mask.py <<'PYEOF'\\nimport os, re\\n\\nROOT='entry/src/main/ets'\\nfiles=[]\\nfor root,d,fs in os.walk(ROOT):\\n    for f in fs:\\n        if f.endswith('.ets'): files.append(os.path.join(root,f))\\n\\ndef rel_import(path):\\n    # path like entry/src/main/ets/pages/X"
+        },
+        {
+          "token": "## 输出",
+          "text": "on\": \"Patch all controllers with maskColor\"\n}\n```\n## 输出\n```\n 1 sites  import=+  entry/src/main/ets/components/AppUpdateHost.ets\n 1 sites  import=+  entry/src/main/ets/components/HomeDocComponent.ets\n 1 sites  import=+  entry/src/main/ets/components/HomeLongTxtComponent.ets\n 1 sites  import=+  entry/src/main/ets/components/HomeTabComponent.ets\n 4 si"
+        },
+        {
+          "token": "Color.Transparent",
+          "text": "压暗背景\\\"\\n            txt+=f\\\"\\\\n{indent}maskColor: Color.Transparent,\\\"\\n        else:\\n            txt=f\\\"{indent}// dimAmount=0.55f（BaseDialogFragment.kt:47）→ 蒙层 #8C000000\\\"\\n            txt+=f\\\"\\\\n{indent}maskColor: Palette.DIALOG_MASK,\\\"\\n        edits.append((i,txt,builder))\\n    if not edits: continue\\n    need_palette=any(b!='AppLoadDialog' f"
+        },
+        {
+          "token": "AppLoadDialog",
+          "text": "atch(r'\\\\s*', nxt).group(0)\\n        if builder=='AppLoadDialog':\\n            txt=f\\\"{indent}// dimAmount=0.0f（AppLoadDialog.kt:93 覆写）→ 不压暗背景\\\"\\n            txt+=f\\\"\\\\n{indent}maskColor: Color.Transparent,\\\"\\n        else:\\n            txt=f\\\"{indent}// dimAmount=0.55f（BaseDialogFragment.kt:47）→ 蒙层 #8C000000\\\"\\n            txt+=f\\\"\\\\n{indent}maskC"
+        },
+        {
+          "token": "3 sites",
+          "text": "port=+  entry/src/main/ets/pages/AboutUsPage.ets\n 3 sites  import=+  entry/src/main/ets/pages/AccountInfoPage.ets\n 3 sites  import=+  entry/src/main/ets/pages/CreateOutlinePage.ets\n 5 sites  import=+  entry/src/main/ets/pages/CustomerServicePage.ets\n 2 sites  import=+  entry/src/main/ets/pages/FileListPage.ets\n 1 sites  import=+  entry/src/main/ets"
+        }
+      ],
+      "tail": "2 sites  import=+  entry/src/main/ets/pages/TemplatePreviewPage.ets\n 1 sites  import=+  entry/src/main/ets/pages/VideoPlayPage.ets\nTOTAL sites: 51\n```"
+    }
+  ],
+  "unlocated_actions": [
+    {
+      "version": "formal-v9",
+      "case": "codex-c4",
+      "step": 24,
+      "args": {
+        "sid": "C:\\Users\\hongy\\projects\\_migloop-eval-20260909\\attribution10\\formal-v1\\codex-c4\\pool\\rollout-2026-08-21T09-18-20-01a021e5-c150-7b12-a610-d40c07816b98.jsonl",
+        "id": "__main__:01a009fe",
+        "seq": 2404,
+        "max_chars": 7000
+      },
+      "lines": [
+        136,
+        142
+      ],
+      "is_error": false,
+      "prefix": "没有这个动作: __main__:01a009fe #2404(或它没有原始记录指针)"
+    },
+    {
+      "version": "formal-v10",
+      "case": "codex-c4",
+      "step": 23,
+      "args": {
+        "sid": "C:\\Users\\hongy\\projects\\_migloop-eval-20260909\\attribution10\\formal-v1\\codex-c4\\pool\\rollout-2026-08-21T09-18-20-01a021e5-c150-7b12-a610-d40c07816b98.jsonl",
+        "id": "__main__:01a009fe",
+        "seq": 2404,
+        "max_chars": 4000
+      },
+      "lines": [
+        113,
+        120
+      ],
+      "is_error": false,
+      "prefix": "没有这个动作: __main__:01a009fe #2404(或它没有原始记录指针)"
+    },
+    {
+      "version": "formal-v10",
+      "case": "codex-c4",
+      "step": 38,
+      "args": {
+        "sid": "C:\\Users\\hongy\\projects\\_migloop-eval-20260909\\attribution10\\formal-v1\\codex-c4\\pool\\rollout-2026-08-21T09-18-20-01a021e5-c150-7b12-a610-d40c07816b98.jsonl",
+        "ref": "#01a009fe-68e3-7f42-b76b-5e863c555976:2421@L11",
+        "max_chars": 3000
+      },
+      "lines": [
+        180,
+        187
+      ],
+      "is_error": true,
+      "prefix": "Error executing tool action: action.ref 无法唯一定位: missing；不得仅按 #n 猜测"
+    },
+    {
+      "version": "formal-v10",
+      "case": "splash",
+      "step": 25,
+      "args": {
+        "sid": "C:\\Users\\hongy\\projects\\_migloop-eval-20260909\\attribution10\\formal-v1\\splash\\pool\\ff019d8a-5172-4cdd-8ce3-77a21682c1b6.jsonl",
+        "ref": "#aa2d7cdfd6a5cf89f:16295@L273",
+        "max_chars": 8000
+      },
+      "lines": [
+        121,
+        130
+      ],
+      "is_error": true,
+      "prefix": "Error executing tool action: action.ref 无法唯一定位: missing；不得仅按 #n 猜测"
+    }
+  ],
+  "limitations": [
+    "One rep per source; descriptive, not causal or accuracy estimate.",
+    "Same-scope searches can depend on earlier results; counts are not mergeable-call or savings guarantees.",
+    "Cumulative agent calls mean since absent/0 and until absent, still bounded by requested v, not necessarily the entire lifecycle.",
+    "Native runtime full result is not substituted for truncated delivered text.",
+    "No model attention/semantic correctness inferred from open, receipt, or check."
+  ]
+}
