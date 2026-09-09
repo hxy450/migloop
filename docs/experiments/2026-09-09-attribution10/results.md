@@ -42,6 +42,14 @@
 
 浏览器合同检查另覆盖：不确定读取、搜索发现未读取的 spec、重复访问、被拒调用、未查询结论、缺陷切换、证据点击、版本错配和清单分母。它们证明这些机制的有限行为，不证明报告里的自由文本为真。
 
+最终代码检查：836 项 Python 测试通过；53 项浏览器合同检查通过。`ef5fbc5` 查看器实页另验证：
+
+- Codex C1：6 个实体、5 次访问、4 条转移完整显示；实际 atom 抽屉加载完成，部分交付提示仍可见。见 [截断提示实页](screenshots/independent-ef5fbc5-codex-c1-partial-loaded.png)。
+- Codex C2 首轮：无效结论保留错误，但已认证的 13 次打开、3 次拒绝、13 条转移仍显示。见 [结论失败不抹查询](screenshots/independent-ef5fbc5-codex-c2-invalid-claim.png)。
+- Member 迭代：12 个实体与 5 条转移完整显示，点击节点可见相应原因。见 [会员页实页](screenshots/member-v2-trace.png)。这张图忠实展示模型标注，包括本报告已经指出的错误，不认证红色节点一定归因正确。
+
+本机查看入口（需要对应本机服务仍在运行）：[Codex C1](http://127.0.0.1:19659/api/insight1/fixchain/01a021e5?probe=attribution10/formal-v1/codex-c1/runs/tools/rep1)、[Member 迭代](http://127.0.0.1:19658/api/insight1/fixchain/ff019d8a?probe=attribution10/formal-v2/member-center/runs/tools/rep1)。后者使用 `733c526` 查看器，前者使用修正 UUID 入口的 `ef5fbc5`；账本身份未变化。
+
 ## 成本：只给观察值，不宣称总体提效
 
 | 任务 | v1 时间 s | v2 时间 s | v1 input_total | v2 input_total | v1 未缓存输入 | v2 未缓存输入 |
