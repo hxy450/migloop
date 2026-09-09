@@ -36,14 +36,24 @@ def _step_scope(tool: str, inp: dict[str, Any]) -> str:
     v = inp.get("v")
     vs = f" v{v}" if v is not None else ""
     if tool == "file":
-        if inp.get("diff"):
+        from .atom_queries import boolean
+        try:
+            want_diff = boolean(inp.get("diff", False), "diff")
+            want_content = boolean(inp.get("content", False), "content")
+        except ValueError:
+            return "文件查询" + vs + "（展示开关无效；原始请求参数保留）"
+        if want_diff:
             window = (f" 窗口 v{inp.get('v_from', 1)}–v{inp.get('v_to', v)}"
                       if inp.get("v_from") is not None or inp.get("v_to") is not None else "")
             return "差分" + vs + window
-        if inp.get("content"):
-            start = int(inp.get("start") or 1)
-            rng = (f" {start}-{start + int(inp['n']) - 1}行" if inp.get("n")
-                   else (f" 从{start}行起" if inp.get("start") else ""))
+        if want_content:
+            start, n = _int(inp.get("start")), _int(inp.get("n"))
+            if ((inp.get("start") is not None and (start is None or start < 1))
+                    or (inp.get("n") is not None and (n is None or n < 1))):
+                return "正文" + vs + "（行范围未确认；原始请求参数保留）"
+            start = start if start is not None else 1
+            rng = (f" {start}-{start + n - 1}行" if n is not None
+                   else (f" 从{start}行起" if inp.get("start") is not None else ""))
             return f"正文{vs}{rng}"
         return "索引" + vs
     if tool == "diff":
@@ -95,9 +105,10 @@ def _main_id(ledger: atoms.Ledger, sid: str | None) -> str | None:
 
 
 def _int(x: Any) -> int | None:
+    from .atom_queries import optional_int
     try:
-        return int(x) if x is not None and str(x).strip() != "" else None
-    except (TypeError, ValueError):
+        return optional_int({"value": x}, "value")
+    except (TypeError, ValueError, OverflowError):
         return None
 
 
