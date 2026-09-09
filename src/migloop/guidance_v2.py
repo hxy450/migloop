@@ -5,6 +5,7 @@ VERDICT = """\
 输出一个完整 migloop-verdict/2 YAML 草稿交 check。reason/boundary/notes/recommendation 等自由文本用 `|-` 块字符串；坐标/引用加引号。不必再抄调查路线，系统保留原始调用。
 
 三种声明分开：target_file 是本条讨论的文件范围，不是修复事实；nodes 描述真实 file@v/agent@v 状态；event_claims 描述真实原始动作，尤其未产生正式版本的脚本/尾后动作。事件不是第三种图原子，不把最近版本借来标红。
+进入点应定位具体进入事件；早期决策可以解释较晚累计状态，但不能因此把较晚效应版说成最初进入点。check 的坐标对账只提示这个区别，不替你判定原因。
 
 ```yaml
 schema: migloop-verdict/2

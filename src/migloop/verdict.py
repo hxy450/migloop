@@ -636,6 +636,16 @@ def _consistency(defect: dict[str, Any], ledger: atoms.Ledger | None = None) -> 
         if ledger is not None and basis is not None and n.get("ok"):
             from .evidence_boundary import node_advisories
             warnings.extend(node_advisories(ledger, n, defect["id"]))
+        alignment = n.get("entry_effect_alignment") or {}
+        if alignment.get("status") == "earlier_effects_only":
+            versions = sorted({event["effect_v"] for event in alignment["events"]})
+            warnings.append({"code": "entry_effect_earlier_only", "level": "warning",
+                "defect": defect["id"], "node": n.get("spec"), "source": "ledger_coordinates",
+                "semantic_checked": False, "boundary": alignment,
+                "message": "实际侧引用的是同一 agent 较早的效应 " + ", ".join(f"v{v}" for v in versions)
+                           + (" 等" if alignment["events_omitted"] else "") + f"，不是声明进入点 v{n['v']} 的效应。"
+                             "它们可能合法解释累计状态或早期决策，但未定位进入事件；请区分两者，必要时用事件坐标。"
+                             "此提示不判原因错误、不改角色或连边，也不要求删除早期证据。"})
     return warnings
 
 
@@ -726,6 +736,11 @@ def build(ledger: atoms.Ledger, data: dict[str, Any] | None, errors: list[str],
                    "boundary": n.get("boundary"), "checks": _norm_checks(n.get("checks")),
                    "entry": (r["kind"], r["key"], r["v"]) in entry_keys, "defect": did,
                    "checked": "not_checked"}
+            if bound:
+                from .evidence_boundary import entry_effect_alignment
+                alignment = entry_effect_alignment(ledger, row)
+                if alignment is not None:
+                    row["entry_effect_alignment"] = alignment
             nodes.append(row)
             if r["ok"]:
                 roles.setdefault(str(r["key"]), []).append(row)

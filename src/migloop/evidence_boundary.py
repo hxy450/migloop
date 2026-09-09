@@ -26,6 +26,63 @@ _READ_LABELS = {
 }
 
 
+def entry_effect_alignment(ledger: Ledger, node: dict[str, Any]) -> dict[str, Any] | None:
+    """Compare an explicit entry coordinate with actual-side effect locators.
+
+    This is not proof that the first defect occurred at either location. Earlier
+    effects may legitimately explain cumulative state. Never reinterpret a read,
+    text record, or feeding slot as an effect version to obtain a comparison.
+    """
+    if not (node.get("ok") and node.get("entry") and node.get("kind") == "agent"
+            and node.get("role") in ("进入·错", "进入·缺") and node.get("basis")):
+        return None
+    result: dict[str, Any] = {
+        "schema": "migloop-entry-effect-alignment/1", "status": "indeterminate",
+        "anchor_agent": node["key"], "anchor_v": node["v"], "events": [],
+        "events_omitted": 0, "source": "ledger_coordinates", "semantic_checked": False,
+        "note": "只比较声明进入点与实际侧引用的效应版本，不认证进入原因或首次发生时刻。",
+    }
+    refs = node["basis"].get("actual_evidence") or []
+    comparable = bool(refs)
+    events = []
+    seen = set()
+    for ref in refs:
+        if ref.get("type") != "action" or ref.get("status") not in ("ok", "drifted"):
+            comparable = False
+            continue
+        aid, seq = ref.get("aid"), ref.get("seq")
+        owner = ledger.agents.get(aid)
+        actions = [action for action in owner.actions if action.seq == seq] if owner and type(seq) is int else []
+        if len(actions) != 1:
+            comparable = False
+            continue
+        action = actions[0]
+        if aid != node["key"] or type(action.ver) is not int:
+            comparable = False
+        if (aid, seq) not in seen:
+            seen.add((aid, seq))
+            events.append({"ref": ref.get("original_ref", ref.get("ref")), "agent": aid,
+                           "seq": seq, "effect_v": action.ver})
+    if comparable and events:
+        versions = [event["effect_v"] for event in events]
+        result["status"] = ("anchor_cited" if node["v"] in versions else
+                            "earlier_effects_only" if all(v < node["v"] for v in versions) else
+                            "later_or_mixed_effects")
+    if result["status"] == "earlier_effects_only":
+        # A current-effect citation in the ordinary evidence field is still
+        # direct coordinate evidence; the basis subset must not erase it.
+        owner = ledger.agents.get(node["key"])
+        for ref in node.get("evidence") or []:
+            if ref.get("type") == "action" and ref.get("status") in ("ok", "drifted") and ref.get("aid") == node["key"]:
+                matching = [action for action in owner.actions if action.seq == ref.get("seq")] if owner else []
+                if len(matching) == 1 and matching[0].ver == node["v"]:
+                    result["status"] = "anchor_cited_elsewhere"
+                    break
+    result["events"] = events[:MAX_ADVISORIES]
+    result["events_omitted"] = max(0, len(events) - MAX_ADVISORIES)
+    return result
+
+
 def _anchor_ts(ledger: Ledger, node: dict[str, Any]) -> str | None:
     if node["kind"] == "file":
         story = ledger.stories.get(node["key"])
