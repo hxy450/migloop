@@ -691,12 +691,10 @@ def atom_json(path: str, tool: str, args: dict[str, Any]) -> dict[str, Any] | No
         if result is None:
             return None
         until = _opt_int(args, "until")
-        scope = time_scope.for_atom(ledger, "agent", result, until=until)
         if until is not None:
-            # Match the MCP text cutoff; time metadata must not claim an earlier
-            # window while the JSON silently includes later input rows.
-            for key in ("reads", "actions", "inbox"):
-                result[key] = [r for r in result[key] if r.get("seq") is None or r["seq"] <= until]
+            from .atom_scope import agent_until
+            result = agent_until(ledger, result, until)
+        scope = result.get("time_scope") or time_scope.for_atom(ledger, "agent", result, until=until)
         return {"time_scope": scope} if _flag(args, "scope_only", "0") else {**result, "time_scope": scope}
     if tool == "blame":
         if not args.get("path"):

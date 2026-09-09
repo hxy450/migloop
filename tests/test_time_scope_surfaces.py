@@ -87,3 +87,56 @@ def test_search_reports_literal_semantics_without_turning_pipe_into_or(tmp_path)
         result = atoms_text.render_search(ledger, "target|absent", **args)
         assert "字面子串" in result and "不支持正则/OR" in result
         assert "首次出现: v1" not in result
+
+
+def test_search_tail_does_not_advertise_an_uncreated_agent_version(tmp_path):
+    ledger = _example(tmp_path)
+    result = atoms_text.render_search(ledger, "later", agent=MAIN_ID, after=True)
+    assert "没有形成 v2" in result and "不能用作节点坐标" in result
+    assert "喂 v2" not in result
+
+
+def test_http_and_text_cutoff_do_not_leak_late_read_body(monkeypatch):
+    from tests.test_atom_scope import AID, fixture
+
+    ledger, _ = fixture()
+    monkeypatch.setattr(service, "session_ledger", lambda _: ledger)
+    monkeypatch.setattr(service, "session_cwd", lambda _: "/proj")
+    args = {"id": AID, "v": 3, "until": 3, "seen": True}
+    data = service.atom_json("unused", "agent", args)
+    text = service.atom_text("unused", "agent", args)
+    assert data["reads"] == [] and data["children"] == []
+    assert [r["v"] for r in data["writes"]] == [1]
+    assert "SECRET_RETURN" not in str(data) + text
+    assert "FUTURE_SUMMARY" not in str(data) + text
+    assert "截止时未确认可用的读取 1 条" in text
+    assert "尚未返回" in text and "窗口外索引项另计" in text
+    with pytest.raises(ValueError):
+        service.atom_json("unused", "agent", {**args, "until": 999})
+    assert service.atom_text("unused", "agent", {**args, "until": 999}).startswith("⛔")
+
+
+def test_invalid_cutoff_mcp_does_not_register_a_successful_open():
+    pytest.importorskip("mcp")
+    from migloop import mcp_server
+    from tests.test_atom_scope import AID, fixture
+
+    ledger, _ = fixture()
+
+    class Backend:
+        async def get_ledger(self, sid):
+            return ledger
+
+        async def get_session_cwd(self, sid):
+            return "/proj"
+
+    async def query():
+        server = mcp_server.build_server(Backend())
+        args = {"sid": "unused", "id": AID, "v": 3, "via": "sessions", "seen": True}
+        bad = await server.call_tool("agent", {**args, "until": 999})
+        good = await server.call_tool("agent", {**args, "until": 3})
+        return bad[0].text, good[0].text
+
+    bad, good = asyncio.run(query())
+    assert bad.startswith("⛔")
+    assert good.startswith("# agent") and "SECRET_RETURN" not in good

@@ -112,9 +112,14 @@ def test_agent_slot_shows_possible_touch_and_until_cut(tmp_path: Any) -> None:
     led = _base(tmp_path, [
         *_call(at("00:02:00"), "t1", "Bash", {"command": "cd /proj && perl -pi -e 's/x/y/' entry/A.ets"}, out=""),
         *_read_call(at("00:03:00"), "t2", "/proj/spec/s.md", "spec\n"),
+        # The cutoff must be inside a real effect window, not a fabricated
+        # post-lifecycle agent version. The opaque invocation is still indexed.
+        *_call(at("00:04:00"), "t3", "Write", {"file_path": A, "content": "later\n"}, out="ok"),
     ])
     co = next(a for a in led.agents[MAIN_ID].actions if a.tool == "Bash")
     text = atoms_text.render_agent(led, MAIN_ID, None, root="/proj")
     assert "可能碰了 entry/A.ets@v1" in text and "spec/s.md" in text
     cut = atoms_text.render_agent(led, MAIN_ID, None, root="/proj", until=co.seq)
-    assert "可能碰了 entry/A.ets@v1" in cut and "spec/s.md" not in cut and f"截到 #{co.seq}" in cut
+    assert "已发起 Bash" in cut and "spec/s.md" not in cut and f"截到 #{co.seq}" in cut
+    # At the invocation boundary its later paired result is not already input.
+    assert "尚未返回" in cut and str(co.seq) in cut

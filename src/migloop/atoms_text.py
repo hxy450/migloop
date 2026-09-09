@@ -90,6 +90,8 @@ def _read_tags(r: dict[str, Any]) -> str:
         t.append("版本就近绑定(不确定)")
     if r.get("observation_uncertain"):
         t.append("读写窗口重叠,观测时刻未确认")
+    if r.get("availability_basis") in ("input", "dependency"):
+        t.append("工具输入/依赖线索,不是返回读回")
     return f" [{' '.join(t)}]" if t else ""
 
 
@@ -488,9 +490,11 @@ def render_agent(ledger: atoms.Ledger, agent_id: str, v: int | None = None,
     if ag is None:
         return f"账本里没有该 agent: {agent_id}"
     if until is not None:
-        # 从一条命令进来只想看它之前的输入:槽截到 #until,之后的囊余不算这一版的依据
-        for key in ("reads", "actions", "inbox"):
-            ag[key] = [r for r in ag[key] if r.get("seq") is None or r["seq"] <= until]
+        from .atom_scope import agent_until
+        try:
+            ag = agent_until(ledger, ag, until)
+        except ValueError as exc:
+            return f"⛔ until 时间截止无法核验，未打开 agent: {exc}"
     anchor = ag["v"]
     big_note = ""
     if reads and since is None and ag["n_versions"] > 25:
@@ -508,7 +512,21 @@ def render_agent(ledger: atoms.Ledger, agent_id: str, v: int | None = None,
     if ag.get("description"):
         ident.append(ag["description"])
     out.append("身份: " + " · ".join(ident))
-    out.append(render_time_scope(time_scope.for_atom(ledger, "agent", ag, until=until)))
+    out.append(render_time_scope(ag.get("time_scope") or time_scope.for_atom(ledger, "agent", ag, until=until)))
+    cutoff = ag.get("cutoff")
+    if cutoff:
+        out.append("截止输入边界: " + cutoff["use_ts"] + "；发起序号在前不等于结果已返回。")
+        for kind in ("deferred_reads", "deferred_effects"):
+            rows = cutoff.get(kind) or []
+            if rows:
+                out.append(("截止时未确认可用的读取" if kind == "deferred_reads" else "截止时未确认完成的效应")
+                           + f" {len(rows)} 条，不计为当时已知输入/完成输出。")
+                for r in rows:
+                    out.append(f"  {_core(r.get('seq'), ledger.locs.get(r.get('seq')))} "
+                               + str(r.get("path") or r.get("tool") or "") + " · " + str(r.get("reason") or "需核时刻")
+                               + "；action 可核原文（可能含截止后结果）。")
+        if any((cutoff.get("excluded") or {}).values()):
+            out.append("窗口外索引项另计: " + str(cutoff["excluded"]) + "；去掉 until 可查，不是没有发生。")
     out += _scan_note(ledger, ag["id"])
     if ag.get("t0"):
         out.append(f"时刻: 动作号旁的 T+h:mm 相对迁移开始 {ag['t0']}(池子里最早一条动作),跨 agent 对先后用它;"
@@ -557,6 +575,10 @@ def render_agent(ledger: atoms.Ledger, agent_id: str, v: int | None = None,
         for a in slot["eff"]:
             d = a["detail"]
             tag = " " + _ref(a["seq"], a.get("t"), lines.get(a["seq"]))
+            if a.get("completion_state") in ("pending", "unknown"):
+                out.append(f"- 已发起 {a['tool']}{tag} · 截止时" + ("尚未返回" if a["completion_state"] == "pending" else "完成情况未知")
+                           + "；不作为已完成写入/派发，action 可核原文。")
+                continue
             if a["kind"] == "dispatch":
                 out.append(f"- 派发 {d.get('name') or d.get('description') or '子agent'}"
                            + (f"  (子 agent id={d['child']})" if d.get("child") else "") + tag)
@@ -607,6 +629,10 @@ def render_agent(ledger: atoms.Ledger, agent_id: str, v: int | None = None,
         for a in others:
             d = a["detail"]
             ref = _ref(a["seq"], a.get("t"), lines.get(a["seq"]))
+            if a.get("completion_state") in ("pending", "unknown"):
+                out.append(f"  已发起 {a['tool']} {ref} · 截止时" + ("尚未返回" if a["completion_state"] == "pending" else "完成情况未知")
+                           + "；不作为已返回输入，action 可核原文。")
+                continue
             if a["kind"] in _TEXT_KINDS:
                 out.append(f"  {_TEXT_KINDS[a['kind']]}: {_clip(d.get('skill') or d.get('text') or '', 120)} {ref}")
                 continue
@@ -1134,6 +1160,8 @@ def render_search(ledger: atoms.Ledger, q: str, agent: str | None = None, v: int
                 if h.get("claim_note"):
                     where += " · 消息主张(未独立核验)" + (" 来自 " + str(h["sender"]) if h.get("sender") else "")
                 fed = "" if h["seq"] is None else (f" 效应 v{h['ver']}" if h["ver"] is not None else f" 喂 v{h['at']}")
+                if owner and h["seq"] is not None and h["ver"] is None and h["at"] > owner.n_versions:
+                    fed = f" 收尾后(没有形成 v{h['at']}，不能用作节点坐标；该 agent 最后效应为 v{owner.n_versions})"
                 late = " (锚点之后)" if h.get("after") else ""
                 ref = "" if h["seq"] is None else " " + _ref(h["seq"], h.get("t"), h.get("line"))
                 out.append(f"- {_SEARCH_KIND.get(kind, kind)}{where}{fed}{late}{ref} · 命中 {h['n']} 行"
