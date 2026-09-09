@@ -215,6 +215,8 @@
   .node .badge.fixed, .probe .badge.fixed, .side .badge.fixed { background: rgba(212,160,23,.18); color: #8a6400; font-weight: 700; }
   .wire.cand { stroke: var(--c-fix); stroke-dasharray: 5 4; stroke-width: 1.8; }
   .wire.succ { stroke-dasharray: 2 4; }
+  .legend label.cand { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; color: var(--ink-2); }
+  .legend label.cand input { margin: 0; }
   .wire.via { stroke: #2b6cb0; stroke-dasharray: 6 3; stroke-width: 1.5; opacity: .8; }
   .wire.via.differ { stroke: #c05621; }
   .wire.extra { opacity: .75; }
@@ -280,6 +282,7 @@
         <i><span class="sw" style="border-color:var(--c-spec); border-style:dotted"></span>下游(读者 / 产出)</i>
         <i><span class="sw" style="border-color:var(--c-fix)"></span>修复方</i>
         <i>★ 被修行原作者</i><i>▲ 读的是旧版</i><i>行段 · 依赖 · 写前读 · 脚本 = 标签,不裁剪</i>
+        <label class="cand" title="词法层沾边的命令:改动类画成「⋯ 可能写」虚线节点,只读检查折成「+N 只读提及」桩;账本没记到读写,只导航不归因"><input type="checkbox" id="cand" checked> 词法候选</label>
       </div>
       <div class="zoomctl"><button id="zo">−</button><button id="zi">+</button><button id="zf">适应</button><button id="z1">1:1</button></div>
     </div>
@@ -735,7 +738,6 @@
     // 词法层沾边的命令:改动类 / 正文提到 / 输出里 且账本没记到读写的,按 (agent, 版本) 合成一个虚线「可能写」节点挂在上游;
     // 只读检查折成一个灰桩(不展开)。不立版本、不进 blame —— 只导航,点它开 agent 抽屉
     function possibleWriters(node, fa) {
-      if ((XT && XT.noPossible) || (PROBE && !PROBE.error)) return;   // 载入调查后只铺账本邻居,不画词法候选(桩展开、换根都一样)
       var ms = (fa.mentions || []).filter(function (m) {
         if (m.effect) return false;
         if (node.anchorV && m.win && m.win > node.anchorV) return false;
@@ -800,7 +802,6 @@
       drawerFor(node);
       if (node.kind === "leaf" && node.isLedgerStub) { expandLedgerKids(XT.byId[node.parent], node); return; }
       if (node.traj) { renderTree(tid); return; }          // 轨迹树的节点不沿账本展开 / 折叠,点它只看抽屉
-      if (node.kind === "leaf" && node.isStub) { unstub(node); renderTree(node.parent); return; }
       if (node.busy || node.kind === "leaf" || node.isRight || node.possible) { renderTree(tid); return; }
       if (node.expanded) { collapse(node); renderTree(tid); return; }
       node.busy = true;
@@ -866,7 +867,7 @@
             addRight(root, xtNode("agent", { aid: f.id, anchorVer: null, isFixer: true, label: f.desc || agentKey(f.id).slice(0, 20), badges: [{ cls: "stale", t: "修复方" }] }));
           });
         }
-        expandFile(root, function () { renderTree(root.tid); probeExpand(); });
+        expandFile(root, function () { renderTree(root.tid); });
         drawerFor(root);
       });
     }
@@ -894,7 +895,7 @@
           if (w.via === "script") b.push({ cls: "via", t: "脚本落盘" });
           addRight(root, xtNode("file", { path: w.path, anchorV: w.v, label: baseName(w.path) + "@v" + w.v, badges: b }));
         });
-        expandAgent(root, function () { renderTree(root.tid); probeExpand(); });
+        expandAgent(root, function () { renderTree(root.tid); });
         drawerFor(root);
       });
     }
@@ -1032,7 +1033,6 @@
       } else if (node.kind !== "leaf" && !vd && !pr.hit.length && !pr.fixed.length) {
         d.classList.add("p-dim");
       }
-      if (node.probeDup) d.appendChild(el("span", "badge dup", "↑ 已在上方展开"));
     }
     function probeOnChain(node) {
       if (!PROBE || PROBE.error) return false;
@@ -1072,7 +1072,7 @@
       ld.appendChild(inp);
       ld.appendChild(btn);
       probeEl.appendChild(ld);
-      if (!PROBE) { probeEl.appendChild(el("div", "sum", "载入一次调查员的跑:树上只有它查过的和结论点名的节点(每个一次),边只画账本核得出来的写 / 读 / 派发 / 前一版,根是被修文件的最终版本;模型每次查询声明的来处(via)画成蓝色虚线,和账本边不重合的橙色;结论按缺陷 × 版本上色,进入点描边。")); return; }
+      if (!PROBE) { probeEl.appendChild(el("div", "sum", "载入一次调查员的跑:树 = 它打开的节点按 via 挂(父 = 它声明的来处),每跳标账本关系;结论按缺陷 × 版本上色,进入点描边;「+N 未查」点开沿账本铺邻居;词法候选看图例开关。")); return; }
       if (PROBE.error) { probeEl.appendChild(el("div", "sum", "载入失败:" + PROBE.error)); return; }
       var sum = el("div", "sum", "");
       sum.innerHTML = "<b>" + (PROBE.links || []).length + "</b> 环 · 进入点 <b>" + (PROBE.entry != null ? "环 " + (PROBE.entries || [PROBE.entry]).join(" / ") : "未标") + "</b> · 查过 <b>" + Object.keys(PROBE.byKey).length + "</b> 个节点"
@@ -1302,6 +1302,8 @@
           p.runDir = run;
           probeIndex(p);
           PROBE = p;
+          showCand = false;
+          document.getElementById("cand").checked = false;
           renderProbe();
           var old = document.getElementById("probe-chip");
           if (old) old.remove();
@@ -1316,8 +1318,7 @@
           var go = function () {
             if (!dataReady) { setTimeout(go, 400); return; }
             if (p.trajectory) probeBuildTrajectory();
-            else if (XT) probeExpand();
-            else if (p.root) openRoot({ kind: "file", path: p.root, v: null });
+            else if (!XT && p.root) openRoot({ kind: "file", path: p.root, v: null });
           };
           go();
         })
@@ -1442,9 +1443,7 @@
         return vs.some(function (v) { return v === kid.anchorVer || (kid.verMin != null && v >= kid.verMin && v <= kid.anchorVer); });
       }
       node.busy = true;
-      XT.noPossible = true;
       var fin = function () {
-        XT.noPossible = false;
         var added = (node.children || []).filter(function (t) { var kid = XT.byId[t]; if (!kid) return false; if (onRoute(kid)) { delete XT.byId[t]; return false; } kid.ledgerKid = true; return true; });
         node.children = keep.concat(added);
         node.expanded = true;
@@ -1452,99 +1451,11 @@
       };
       if (node.kind === "file") expandFile(node, fin); else expandAgent(node, fin);
     }
-    // ═══════════ 调查树(没有轨迹的老 run):查过的节点都要在树上 ═══════════
-    // 根开好之后沿账本的边自动往上游长:每一层只展开落在 probe 集合(查过 / 判过 / 提到)里的子节点,其余折成一个
-    // 「+N 未查」桩(点开可看);同一个键只展开一次(主会话在很多 agent 的派发边上都会出现,再出现只标「已在上方展开」);
-    // 最深 PROBE_DEPTH 层。查过但沿边够不到的节点(模型用 search 跳过去的)列在面板里。
-    var PROBE_DEPTH = 10;
-    function probeHas(node) {
-      var k = probeKeyOf(node);
-      return !!(k && PROBE && !PROBE.error && (PROBE.byKey[k] || (PROBE.verdicts && PROBE.verdicts[k]) || (PROBE.mentions && PROBE.mentions[k])
-                                             || (PROBE.roleIdx && PROBE.roleIdx[k]) || (PROBE.fixIdx && PROBE.fixIdx[k])));
-    }
-    function unstub(stub) {
-      var p = XT.byId[stub.parent];
-      if (!p) return;
-      p.children = (p.children || []).filter(function (t) { return t !== stub.tid; });
-      (stub.hiddenKids || []).forEach(function (kid) { XT.byId[kid.tid] = kid; p.children.push(kid.tid); });
-      delete XT.byId[stub.tid];
-    }
-    var probeExpanding = false;
-    function probeExpand() {
-      if (!PROBE || PROBE.error || !XT || probeExpanding) return;
-      if (PROBE.trajectory) return;          // 有轨迹的 run:树由服务端给;换根只是普通账本树 + 角色着色,不按键铺候选
-      probeExpanding = true;
-      var expandedKeys = {};
-      var rootN = XT.byId[XT.root];
-      expandedKeys[probeKeyOf(rootN) + (rootN.kind === "agent" ? "@" + rootN.anchorVer : "")] = 1;
-      var queue = [];
-      function fold(node) {
-        var keep = [], rest = [];
-        (node.children || []).forEach(function (tid) {
-          var kid = XT.byId[tid];
-          if (!kid) return;
-          if (kid.kind === "leaf" || probeHas(kid)) keep.push(kid); else rest.push(kid);
-        });
-        if (rest.length) {
-          rest.forEach(function (kid) { collapse(kid); delete XT.byId[kid.tid]; });
-          var stub = xtNode("leaf", { label: "+" + rest.length + " 未查", isStub: true, hiddenKids: rest });
-          stub.parent = node.tid; stub.depth = node.depth + 1;
-          node.children = keep.map(function (k) { return k.tid; }).concat([stub.tid]);
-        }
-        keep.forEach(function (kid) {
-          if (kid.kind === "leaf") return;
-          // 文件按键去重(早先版本的子树是同一个故事);agent 按 键 + 版本(主会话 v1 / v83 派发的是不同的人)
-          var k = probeKeyOf(kid) + (kid.kind === "agent" ? "@" + kid.anchorVer : "");
-          if (expandedKeys[k]) { kid.probeDup = true; return; }
-          expandedKeys[k] = 1;
-          if (kid.depth < PROBE_DEPTH) queue.push(kid);
-        });
-      }
-      function finish() {
-        var placed = {};
-        Object.keys(XT.byId).forEach(function (t) { var k = probeKeyOf(XT.byId[t]); if (k) placed[k] = 1; });
-        var keys = Object.keys(PROBE.byKey);
-        PROBE.placed = keys.filter(function (k) { return placed[k]; }).length;
-        // 每一环的主语(键 + 版本)是否真落在树上:没落上的在面板里标出来;红只在对上的节点
-        var onTree = {};
-        Object.keys(XT.byId).forEach(function (t) {
-          var pm = probeMark(XT.byId[t]);
-          if (pm && pm.vd) pm.vd.links.forEach(function (no) { onTree[no] = 1; });
-        });
-        (PROBE.links || []).forEach(function (lk) { lk.onTree = !!onTree[lk.no]; });
-        // 结构化结论:每条 (缺陷, 键, 版本) 是否真落在树上(精确到版本)
-        var seenRole = {};
-        Object.keys(XT.byId).forEach(function (t) {
-          var nd = XT.byId[t];
-          var saved = PROBE.defect; PROBE.defect = null;
-          probeRolesFor(nd).hit.forEach(function (r) { seenRole[r.defect + "|" + r.key + "|" + r.v] = 1; });
-          PROBE.defect = saved;
-        });
-        var tot = 0, on = 0;
-        Object.keys(PROBE.roleIdx || {}).forEach(function (k) { (PROBE.roleIdx[k] || []).forEach(function (r) { tot++; if (seenRole[r.defect + "|" + r.key + "|" + r.v]) on++; }); });
-        PROBE.rolesTotal = tot; PROBE.rolesOnTree = on;
-        PROBE.unplaced = keys.filter(function (k) { return !placed[k]; }).map(function (k) { return PROBE.byKey[k][0].node; });
-        probeExpanding = false;
-        autoFit = true;
-        autoFloor = null;     // 调查树一次长出五六列,整棵放进视口,不用自动适应的下限
-        renderTree(XT.root);
-        renderProbe();
-      }
-      function step() {
-        var node = queue.shift();
-        if (!node) { finish(); return; }
-        if (node.expanded) { fold(node); step(); return; }
-        node.busy = true;
-        var fin = function () { fold(node); step(); };
-        if (node.kind === "file") expandFile(node, fin); else expandAgent(node, fin);
-      }
-      fold(rootN);
-      step();
-    }
+    // 调查树只由服务端给(路线树 / 账本边树);没有转录的 run 只做着色与步号,页面不自己铺树
     function nodeCls(node) {
       var c;
       if (node.kind === "agent") c = node.isDispatch ? "dispatch" : (isFixAt(node.aid, node.anchorVer) || node.isFixer) ? "fix" : "gen" + (node.sharp ? " sharp" : "");
-      else if (node.kind === "leaf") c = "leaf" + (node.isStub ? " stub" : "");
+      else if (node.kind === "leaf") c = "leaf";
       else c = "file" + (node.stale ? " stale" : "");
       if (node.isRoot) c += " root";
       if (node.isRight) c += " down";
@@ -1556,8 +1467,27 @@
     // ---- 布局:整齐树。纵向占位 = max(自身, 子树占位之和),子节点在父占位内连续堆叠、父居中;
     // 展开谁,谁的子树把兄弟推开,边呈扇形不打结。横向:深度即列,上游在左、根居中偏右、下游最右。----
     var NODE_W = 196, NODE_H = 30, GAP_Y = 8, GAP_X = 74, TOP = 34;
+    // 词法候选层:开关关着时候选节点(⋯ 可能写 / 只读提及桩)和它们的子树不参与布局、不画;载入调查默认关,纯探索默认开
+    var showCand = true;
+    function candOf(n) { return !!(n.possible || n.isRoStub); }
+    function markHidden() {
+      Object.keys(XT.byId).forEach(function (t) { XT.byId[t].hidden = false; });
+      function walk(n, hid) {
+        n.hidden = hid || (!showCand && candOf(n));
+        (n.children || []).forEach(function (t) { var k = XT.byId[t]; if (k) walk(k, n.hidden); });
+      }
+      var root = XT.byId[XT.root];
+      if (root) walk(root, false);
+      XT.rights.forEach(function (t) { var k = XT.byId[t]; if (k) walk(k, false); });
+    }
+    function kidsOf(n) { return (n.children || []).map(function (t) { return XT.byId[t]; }).filter(function (k) { return k && !k.hidden; }); }
+    document.getElementById("cand").addEventListener("change", function () { showCand = this.checked; if (XT) renderTree(XT.root); });
+    // 调试口:控制台里看树的内部状态(XT / PROBE)、手动载入调查、切候选
+    window.__mig = { xt: function () { return XT; }, probe: function () { return PROBE; }, load: function (run) { loadProbe(run); },
+                     setCand: function (on) { showCand = !!on; document.getElementById("cand").checked = !!on; if (XT) renderTree(XT.root); },
+                     expandStub: function (tid) { var s = XT.byId[tid]; if (s) expandLedgerKids(XT.byId[s.parent], s); } };
     function measure(n) {
-      var kids = (n.children || []).map(function (t) { return XT.byId[t]; }).filter(Boolean);
+      var kids = kidsOf(n);
       if (!kids.length) { n.ext = NODE_H; return n.ext; }
       var total = 0;
       kids.forEach(function (k) { total += measure(k); });
@@ -1567,7 +1497,7 @@
     }
     function place(n, y0) {
       n.y = y0 + (n.ext - NODE_H) / 2;
-      var kids = (n.children || []).map(function (t) { return XT.byId[t]; }).filter(Boolean);
+      var kids = kidsOf(n);
       if (!kids.length) return;
       var total = 0;
       kids.forEach(function (k) { total += k.ext; });
@@ -1613,12 +1543,13 @@
     }
     function renderTree(focusTid) {
       var root = XT.byId[XT.root];
+      markHidden();
       measure(root);
       var rightsH = XT.rights.length ? XT.rights.length * (NODE_H + GAP_Y) - GAP_Y : 0;
       var top = TOP + Math.max(0, (rightsH - root.ext) / 2);
       place(root, top);
       var maxD = 0;
-      Object.keys(XT.byId).forEach(function (tid) { var n = XT.byId[tid]; if (n.depth > maxD) maxD = n.depth; });
+      Object.keys(XT.byId).forEach(function (tid) { var n = XT.byId[tid]; if (!n.hidden && n.depth > maxD) maxD = n.depth; });
       var colX = function (d) { return 24 + (maxD - d) * (NODE_W + GAP_X); };
       var rightsX = colX(0) + NODE_W + GAP_X;
       var totalH = Math.max(root.ext, rightsH) + TOP + 40;
@@ -1644,6 +1575,7 @@
       }
       Object.keys(XT.byId).forEach(function (tid) {
         var n = XT.byId[tid];
+        if (n.hidden) return;
         if (n.depth >= 0) n.x = colX(n.depth);
         addTreeNode(n);
       });
@@ -1683,9 +1615,9 @@
       var frag = document.createDocumentFragment();
       Object.keys(XT.byId).forEach(function (tid) {
         var n = XT.byId[tid];
-        if (!n.parent || n.unlinked) return;
+        if (!n.parent || n.unlinked || n.hidden) return;
         var p = XT.byId[n.parent];
-        if (!p) return;
+        if (!p || p.hidden) return;
         var a, b;
         if (n.x < p.x) { a = n; b = p; } else { a = p; b = n; }
         var x1 = a.x + NODE_W, y1 = a.y + NODE_H / 2, x2 = b.x, y2 = b.y + NODE_H / 2;
@@ -1701,7 +1633,7 @@
       });
       (XT.via || []).forEach(function (e) {
         var n = XT.byId[e.a], p = XT.byId[e.b];
-        if (!n || !p) return;
+        if (!n || !p || n.hidden || p.hidden) return;
         var a, b;
         if (n.x < p.x) { a = n; b = p; } else { a = p; b = n; }
         var x1 = a.x + NODE_W, y1 = a.y + NODE_H / 2 + 5, x2 = b.x, y2 = b.y + NODE_H / 2 + 5;
@@ -1718,7 +1650,7 @@
       });
       (XT.extra || []).forEach(function (e) {
         var n = XT.byId[e.a], p = XT.byId[e.b];
-        if (!n || !p) return;
+        if (!n || !p || n.hidden || p.hidden) return;
         var a, b;
         if (n.x < p.x) { a = n; b = p; } else { a = p; b = n; }
         var x1 = a.x + NODE_W, y1 = a.y + NODE_H / 2, x2 = b.x, y2 = b.y + NODE_H / 2;

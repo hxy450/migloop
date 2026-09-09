@@ -6,7 +6,6 @@ import os
 from typing import Any
 
 from migloop import atoms_text, probe
-
 from tests.test_atoms import MAIN_ID, _call, _ledger, _read_call, _rec
 
 
@@ -69,8 +68,9 @@ def test_fixchain_template_has_probe_hooks() -> None:
     from migloop.service import load_asset
     html = load_asset("fixchain.html")
     assert 'id="probe"' in html and "U.probe" in html and "probeDecorate(d, node)" in html and "bootProbe()" in html
-    # 调查树:根开好后自动展开到每个查过的节点;没查过的兄弟折成桩;被归因的链整条标红(节点 + 边)
-    assert "probeExpand(" in html and "unstub(" in html and "isStub" in html
+    # 调查树由服务端给(probeBuildTrajectory),页面不再自己按键铺树;词法候选是图例里的显式开关
+    assert "probeBuildTrajectory(" in html and "probeExpand" not in html and "unstub" not in html
+    assert 'id="cand"' in html and "showCand" in html and "markHidden(" in html and "kidsOf(" in html
     # 树上虚线:改动类可能写者挂上游、只读提及折灰桩;调查树按缺陷分组
     assert ".node.possible" in html and "possibleWriters(" in html and "只读提及" in html
     assert "probeDefect(" in html and "PROBE.defect" in html
