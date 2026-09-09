@@ -1,0 +1,180 @@
+{
+  "schema": "migloop-attribution-v5-c4-adjudication/1",
+  "status": "complete",
+  "scope": {
+    "run": "_migloop-eval-20260909/attribution10/formal-v5/codex-c4/runs/tools/rep1",
+    "source_code_id": "5b770be",
+    "reference": "_migloop-eval-20260909/attribution10/reference-v1/codex-reference.json",
+    "actual_model": "gpt-5.5",
+    "actual_effort": "medium",
+    "transport": "native"
+  },
+  "overall": {
+    "core": "accepted",
+    "full_annotation": "requires_bounded_semantic_correction",
+    "summary": "Static Block-to-Default diagnosis and the R1/R2 build boundary are correct. The later behavior evidence was actually opened but is a saved walk artifact, not an independently replayed click or patch-bound validation."
+  },
+  "claims": [
+    {
+      "id": "static_near_cause",
+      "grade": "correct",
+      "confidence": "high",
+      "finding": "R1 source, SDK semantics, one-line patch, patch success, and source readback directly support a strong code-level near-cause candidate.",
+      "locators": [
+        "R1 #4562, physical L8026-L8027",
+        "R1 #4598/#4601, physical L8047-L8048 and L8051-L8052",
+        "R1 #4607, physical L8066-L8067",
+        "R1 #4620, physical L8109-L8110"
+      ],
+      "boundary": "Strong static semantics do not by themselves establish sole runtime causality or an A/B device result."
+    },
+    {
+      "id": "r1_immediate_build",
+      "grade": "correct",
+      "confidence": "high",
+      "finding": "The 08-17 session read back Default but did not produce a new HAP; the observed HAP predated the patch.",
+      "locators": ["R1 #4620 / L8109-L8110", "R1 final report L8115"]
+    },
+    {
+      "id": "r2_native_build_install",
+      "grade": "correct",
+      "confidence": "high",
+      "finding": "The investigator opens native R2 outputs showing a later HAP rebuild, BUILD SUCCESSFUL, successful bundle installation, and HAP installed.",
+      "locators": ["R2 #5059 / L840-L841", "R2 #5062 / L851-L852"]
+    },
+    {
+      "id": "saved_walk_behavior",
+      "grade": "overstated",
+      "confidence": "high",
+      "finding": "R2 #5191 is a native command that reads saved handoff/walk-ledger artifacts. Those artifacts record that consent advanced into Guide. The investigator did not replay the click or inspect the referenced screenshot, dump, or run log. The final notes and summary incorrectly upgrade the stored record to device evidence proving advancement.",
+      "locator": "R2 #5191 / physical L1073-L1074",
+      "supported_wording": "A later stored walk artifact records one consent-to-Guide transition."
+    },
+    {
+      "id": "remaining_interactions",
+      "grade": "correctly_bounded",
+      "confidence": "high",
+      "finding": "Native judge output marks the page fail for text findings and does not pass consent progression, reject completion, or link navigation. The report does not claim four-interaction closure.",
+      "locators": ["R2 #6509 / L4426-L4427", "R2 child-agent report #6511 / L4430"]
+    },
+    {
+      "id": "patch_artifact_behavior_binding",
+      "grade": "correctly_unknown",
+      "confidence": "high",
+      "finding": "No target-source hash, HAP hash, exact-line read, or A/B result binds the Block-to-Default patch to the later build or stored transition record."
+    }
+  ],
+  "route_audit": {
+    "critical_sources_opened": true,
+    "opened": [
+      "R1 pre-patch source and handlers",
+      "R1 SDK Default/Block definitions",
+      "R1 patch and readback",
+      "R1 immediate no-new-HAP report",
+      "R2 native build/install #5059/#5062",
+      "R2 saved walk output #5191",
+      "R2 native judge/manifest output #6509"
+    ],
+    "not_opened_or_performed": [
+      "independent device click replay",
+      "underlying #5191 screenshot/dump/run-log inspection",
+      "source-to-HAP identity binding"
+    ]
+  },
+  "yaml": {
+    "nodes_total": 6,
+    "nodes_resolved": 6,
+    "evidence_references_located": 18,
+    "explicit_edges_true": 1,
+    "v253_fixed": true,
+    "entry_empty_defensible": true,
+    "red_basis_feature_exercised": false,
+    "note": "No red node exists, so absence of node.basis does not violate the red-node requirement and does not test that feature."
+  },
+  "draft_check": {
+    "calls": 2,
+    "submitted_draft_chars": 8197,
+    "returned_chars": 2253,
+    "first": {
+      "status": "needs_review",
+      "issues": ["reference_drift at #4564@L8032", "invalid agent:__main__:01a009fe@v253"]
+    },
+    "second": {
+      "status": "mechanical_clear",
+      "issues": 0,
+      "draft_sha256": "ef2069b74092c000b8bb914f6650c537f164be4667cdaac6e3592a16c567ee01",
+      "document_sha256": "d8ec37d9680cd82da6e46f8ec68068b4933bf1ced43c8d897cddc9d4d8c3d1c4",
+      "matches_final_canonical_document": true,
+      "text_binding": "Checked draft equals final fenced YAML after removing one trailing LF from the draft."
+    },
+    "audit_parser": {
+      "reported_status": "unverifiable",
+      "matched_check": null,
+      "source": "original 5b770be run metrics/audit",
+      "assessment": "probe._tool_output reformatted the explicit text JSON instead of preserving its bytes for strict comparison; contradicted by the original native event result and manually reproducible draft/final binding"
+    },
+    "post_run_viewer_audit": {
+      "viewer_source": "source-d14853c",
+      "same_as_investigator": false,
+      "artifact": "_migloop-eval-20260909/attribution10/audits-v5/codex-c4-viewer-d14853c.json",
+      "status": "matched",
+      "matched_check": 58,
+      "both_call_ids_verified": true,
+      "assessment": "Read-only re-audit of the same recorded events with exact body preservation. It repairs audit transport accounting only and does not change or semantically validate the model answer."
+    },
+    "semantic_checked": false
+  },
+  "tools": {
+    "total_calls": 58,
+    "total_return_chars": 316233,
+    "action": {"calls": 32, "chars": 113938},
+    "search": {
+      "calls": 15,
+      "chars": 139574,
+      "full_pool": {"calls": 6, "chars": 15301},
+      "agent": {"calls": 7, "chars": 122753},
+      "file": {"calls": 2, "chars": 1520}
+    },
+    "check": {"calls": 2, "chars": 2253},
+    "failed_calls": 0
+  },
+  "cost": {
+    "v4": {
+      "input_total": 1088730,
+      "cache_read": 973824,
+      "input_uncached": 114906,
+      "output": 10502,
+      "tool_calls": 54,
+      "tool_return_chars": 200888,
+      "end_to_end_wall_s": 283.207
+    },
+    "v5": {
+      "input_total": 1428312,
+      "cache_read": 1264640,
+      "input_uncached": 163672,
+      "output": 15253,
+      "tool_calls": 58,
+      "tool_return_chars": 316233,
+      "wall_s": 332.77324769995175,
+      "end_to_end_wall_s": 335.6563601999078,
+      "currency_cost": null
+    },
+    "v5_vs_v4_pct": {
+      "input_total": 31.2,
+      "input_uncached": 42.4,
+      "output": 45.2,
+      "tool_calls": 7.4,
+      "tool_return_chars": 57.4,
+      "end_to_end_wall": 18.5
+    },
+    "interpretation": "V5 fixes the invalid coordinate but is more expensive on every measured token/text/time dimension. Check returned 2253 characters, and its two submitted drafts total 8197 characters that were generated and re-entered context; search/action returns also increased. The aggregate run cannot decompose the increase among check, repeated drafting, wider investigation, or interaction effects. input_total already includes cache_read."
+  },
+  "paired_v4_to_v5": {
+    "static_core": "unchanged_correct",
+    "r2_build_install": "unchanged_correct_and_direct",
+    "invalid_v253": "fixed_after_first_check",
+    "behavior_boundary": "wording_partly_improved_but_still_overstated",
+    "patch_binding": "unchanged_correctly_unknown",
+    "full_annotation": "V5 is structurally stronger than V4, but still needs the saved-artifact behavior downgrade."
+  }
+}

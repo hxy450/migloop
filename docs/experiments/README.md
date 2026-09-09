@@ -9,6 +9,7 @@
 - [pilot 裁决](2026-09-09-attribution10/pilot-adjudication.md)：旧源码、通用整文件任务的三次试跑，不能与后续指向性问题任务直接算版本提升。
 - `prepare_suite.py` 冻结输入/参考并只将中性问题给模型；`audit_run.py` 按该 run 的冻结源码导出审计，不改旧报告。
 - [实现边界](2026-09-09-attribution10/implementation-notes.md)：共享证据标签、并发读取、Codex 消息、搜索跳转与历史关系分离。
+- [V5 预检与归因对照](2026-09-09-attribution10/v5-results.md)：真实草稿修正、独立语义裁决、原/新查看器截图与全成本；机械进步不代表总体更准或更省。
 
 ## 2026-09-08-evidence-contracts/ —— 证据契约机械验收（非模型对照实验）
 

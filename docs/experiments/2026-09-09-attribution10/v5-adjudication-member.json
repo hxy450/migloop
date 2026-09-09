@@ -1,0 +1,104 @@
+{
+  "schema": "migloop-independent-adjudication/1",
+  "status": "completed-partial",
+  "prepared_at": "2026-09-09T15:49:46Z",
+  "report_read_at": null,
+  "report_read_after_completion_notice": true,
+  "completed_at": "2026-09-09T16:02:52Z",
+  "run": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v5/member-center/runs/tools/rep1",
+  "source_code_id": "5b770be",
+  "source_digest": "10ec296d9c3fdf06be99589047f30b6294e5754950e726603f597a3a143977de",
+  "common_task_sha256": "e60ad7491cd5991a948f8c7128432feca230a59bee208640ca5b90a44d68dec1",
+  "pool_digest": "a78b1373045f7558d6da3b76123e30d032635a2a0b4cdd665e7f80c0bdf8b337",
+  "reference": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/reference-v1/legacy-reference.json",
+  "reference_sha256": "2c015536094fff1e42bb3b6b5cc2dce743c0f2a0f6924254027f7f8a5faac927",
+  "original_pool": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v1/member-center/pool",
+  "target_file": "entry/src/main/ets/pages/MemberCenterPage.ets",
+  "scope": "Independent original-evidence assessment; guide/basis/check/schema/locator success are not semantic truth. Core answers and full annotations are graded separately. No model calls or frozen artifact mutations.",
+  "cases": [
+    {
+      "id": "S3",
+      "core_outcome": "partial",
+      "annotation_outcome": "mechanically-valid-semantically-partial",
+      "required_boundaries": [
+        "Recorded successful script writes three sites: AppLoadDialog transparent; PayAgreementDialog and RenewRuleDialog DIALOG_MASK.",
+        "H5 already transparent and excluded by maskColor guard.",
+        "Actual execution evidence is not merely an assistant claim; formal version reconstruction is not a prerequisite to acknowledging it.",
+        "Execution, complete snapshot, readback and device validation are distinct. Correct repair does not alone establish initial author fault."
+      ],
+      "original_evidence": [
+        {"file":"ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl","lines":[75,80,81,103,104]},
+        {"file":"9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aslice8-pay-80bbb1f44b77da0f.jsonl","lines":[264,265]}
+      ],
+      "findings": [
+        {"code":"site_mapping_correct","status":"pass","detail":"Correctly maps AppLoadDialog to Transparent and PayAgreementDialog/RenewRuleDialog to DIALOG_MASK; no fabricated dark-three claim or red repairer.","run_calls":[3,4,5,6]},
+        {"code":"h5_exception_missing","status":"missing","detail":"Final YAML has no H5 mention. Original Slice8 L264 and fixer L75 show existing Transparent H5, excluded by script guard."},
+        {"code":"execution_snapshot_scope_mixed","status":"partial","detail":"Node reason acknowledges writes, but boundary limits knowledge to script report because no formal version was reconstructed; notes say branch should write. Actual write-before-report execution is supported, while final complete snapshot/device effects remain unknown.","run_calls":[3,7,12]},
+        {"code":"device_validation_not_overclaimed","status":"pass","detail":"Distinguishes PayAgreement readback, build logs and later no-rollback self-report from device validation."}
+      ]
+    },
+    {
+      "id": "S4",
+      "core_outcome": "partial-input-attribution; bounded-compile-chain-pass",
+      "annotation_outcome": "mechanically-valid-semantically-partial",
+      "required_boundaries": [
+        "Slice8 received Kotlin digit-only size logic before its nearest relevant full rewrite.",
+        "ForEach splitPriceRuns is intermediate; final fixed Spans use priceDigits/priceSuffix.",
+        "Fixer introduced private helpers; builder detected then removed private in two successful Edits before successful build.",
+        "First exact-string hit is not first single Text implementation; initial numeric priceText semantics need their own evidence.",
+        "Compile success is not universal price-format or device visual validation."
+      ],
+      "original_evidence": [
+        {"file":"9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aslice8-pay-80bbb1f44b77da0f.jsonl","lines":[24,264,265]},
+        {"file":"ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl","lines":[528,529,592,593]},
+        {"file":"ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-af0e3d2ae54dbf769.jsonl","lines":[24,32,33,34,35,37]},
+        {"file":"9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aconv-member-08b3dcf6deb3c515.jsonl","lines":[61]}
+      ],
+      "findings": [
+        {"code":"nearest_bad_writer_found","status":"pass","detail":"Slice8@v13 -> MemberCenter@v7 is the correct relevant rewrite; file content query exposes the old 30vp Text.","run_calls":[47,48,59,60]},
+        {"code":"early_correct_input_not_investigated","status":"missing","detail":"Only Slice8 since=12/v=13 window was opened. Expected basis cites later fixer Kotlin/XML reads, not Slice8's original L24 Kotlin input; final report honestly leaves original input unknown.","run_calls":[49,50,51,59]},
+        {"code":"two_repairs_and_private_source","status":"pass","detail":"Separates ForEach intermediate from final fixed Spans. Final private helper source is fixer@v53; builder detects, removes private twice, then build succeeds.","run_calls":[27,33,34,35,36,38,52]},
+        {"code":"no_overbroad_first_seen_claim","status":"pass","detail":"Does not claim first single Text or first private pattern began at the final exact-string hit. Initial converter L61 remains a counterexample to such a broader claim."},
+        {"code":"action_find_delivery_limit","status":"limited","detail":"Call 60's find applies to default output side; first 11780/44250 input characters were returned, not the target price lines. Actual price-code evidence came from file call 48."}
+      ]
+    }
+  ],
+  "metrics": {
+    "model":"gpt-5.5","effort":"medium","tool_transport":"native",
+    "started_at":"2026-09-09T15:46:20.997359+00:00","ended_at":"2026-09-09T15:56:49.915507+00:00",
+    "wall_s":628.9322824000847,"end_to_end_wall_s":642.66245850001,
+    "tool_calls":64,"tool_chars":226518,"rejected_calls":2,"identical_repeated_calls":0,
+    "check_calls":2,"check_draft_chars":26278,"native_check_return_chars":2343,
+    "input_total":3019500,"cached_included_in_input":2855424,"input_uncached":164076,
+    "output_total":27188,"reasoning_included_in_output":2698,"cost_usd":null,
+    "until":0,"until_seq":0,"since_ts":3,"until_ts":3,
+    "postcheck_window":{"calls":[53,54,55],"source_lines":[307,309,310],"since_ts":"2026-07-26T21:46:18.585000Z","until_ts":"2026-07-26T21:48:57.218000Z"},
+    "integrity_after":{"pool_unchanged":true,"source_unchanged":true,"task_unchanged":true}
+  },
+  "annotation_review": {
+    "ledger_identity":"atoms-2026-09-09-observation4:146:ad3df8fea1211a0e909b7f98",
+    "frozen_engine_identity_rebuilt_and_matched":true,"schema_errors":[],"harness_auto_repair":false,
+    "ordinary_evidence":{"occurrences":59,"unique":37,"ok":59},
+    "basis_evidence":{"occurrences":5,"unique":5,"ok":5},
+    "all_evidence_unique":38,"explicit_edges":{"count":7,"true":7},
+    "implicit_adjacencies":{"false":7,"unknown":2,"not_model_edge_claims":true},
+    "coverage":{"expected":22,"versions":9,"candidates":13,"accounted":22,"complete":true,"explained":12,"deferred":8,"not_repair":2,"missing":0,"advisories":0,"semantic_complete":false},
+    "coverage_not_repair_basis":[{"seq":24052,"raw_line":615,"target_effect":"attempt docs and /tmp/att7.json, not target page code"},{"seq":24060,"raw_line":626,"target_effect":"read-only git diff file list"}],
+    "red_nodes":2,"red_nodes_with_basis":2,"consistency_advisories":0,
+    "semantic_checked_by_mechanical_tools":false
+  },
+  "draft_check_review": {
+    "original_metrics_status":"unverifiable","original_metrics_returned_chars":2572,
+    "viewer_revision":"d14853c","viewer_status":"matched",
+    "viewer_audit":"C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/audits-v5/member-center-viewer-d14853c.json",
+    "frozen_artifacts_modified":false,
+    "cause":"Frozen probe recursively reserialized JSON-looking explicit text. Viewer fix preserves explicit text bytes; identity/provenance gates remain strict.",
+    "checks":[
+      {"call":63,"source_line":371,"id":"call_1sfbOFjAuTW4aTZLHR3cc2Qt","status":"needs_review","errors":3,"draft_chars":13135,"return_chars":1404,"raw_hash_verified":true,"document_hash_verified":true,"final_matches":false,"changes_requested":["builder v6 out of range","two unparsed L54/0 references"]},
+      {"call":64,"source_line":379,"id":"call_Y0L4jClAYJb7U1e4nuCgXSnT","status":"mechanical_clear","errors":0,"draft_chars":13143,"return_chars":939,"raw_hash_verified":true,"document_hash_verified":true,"final_matches":true}
+    ],
+    "final_document_sha256":"99a6128a11a095f8df1352149f9cc7bb42a269af01e1d59cdb5c7429902b25fe",
+    "semantic_gaps_remain":["H5 skip missing","Slice8 early correct Kotlin input not investigated"],
+    "text_fix_readonly_review":"No new fact upgrade found: preserve explicit text/input_text and error flags; legacy single-result decoding is limited to coordinates and labeled; provider, pairing, ledger and semantic_checked=false guards unchanged."
+  }
+}
