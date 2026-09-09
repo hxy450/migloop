@@ -99,3 +99,39 @@ def test_manifest_text_keeps_every_version_and_candidate_with_uncertainty(monkey
     assert "file:A.ets@v2" in text and "candidate:" + "a" * 20 in text
     assert "#abc:1@L10" in text and "#abc:2@L20" in text and "actor full window" in text
     assert "候选不等于修复" in text and "已交代不等于已查清" in text
+
+
+def test_agent_shorter_summaries_preserve_actions_refs_and_raw_source(tmp_path):
+    import re
+    command = "some_tool " + "prefix " * 20 + "MARKER_BEYOND_PREVIEW"
+    led = _ledger(tmp_path, [
+        *_call("2026-01-01T00:00:00Z", "w", "Write", {"file_path": "/proj/A.ets", "content": "a"}),
+        *_call("2026-01-01T00:00:01Z", "run", "Bash", {"command": command}),
+        *_call("2026-01-01T00:00:03Z", "w2", "Write", {"file_path": "/proj/A.ets", "content": "b"}),
+    ])
+    identity = atoms.ledger_identity(led)
+    small = atoms_text.render_agent(led, MAIN_ID, 2)
+    wide = atoms_text.render_agent(led, MAIN_ID, 2, summary_chars=600)
+    refs = lambda text: re.findall(r"#[^\s()]+@L\d+(?:/\d+)?", text)
+    assert refs(small) == refs(wide)
+    assert "MARKER_BEYOND_PREVIEW" not in small and "MARKER_BEYOND_PREVIEW" in wide
+    assert "summary_chars=200/600" in small and "截断" in small
+    action = next(a for a in led.agents[MAIN_ID].actions if a.tuid == "run")
+    assert atoms.action_raw(led, MAIN_ID, action.seq)["input"]["command"] == command
+    assert atoms.ledger_identity(led) == identity
+
+
+def test_agent_summary_limit_is_shared_by_http_text(tmp_path, monkeypatch):
+    from migloop import atom_queries
+    import pytest
+    led = _ledger(tmp_path, [*_call("2026-01-01T00:00:00Z", "w", "Write", {
+        "file_path": "/proj/A.ets", "content": "a"})])
+    monkeypatch.setattr(service, "session_ledger", lambda _: led)
+    monkeypatch.setattr(service, "session_cwd", lambda _: "/proj")
+    args = {"id": MAIN_ID, "v": 1, "summary_chars": "200"}
+    assert service.atom_text("ignored", "agent", args) == atoms_text.render_agent(led, MAIN_ID, 1, root="/proj", summary_chars=200)
+    for value in (0, 31, 601, True, 1.5):
+        with pytest.raises(ValueError):
+            atom_queries.parameters("agent", {"id": MAIN_ID, "summary_chars": value})
+    with pytest.raises(ValueError, match="JSON 投影不支持"):
+        atom_queries.json_data(led, "agent", args)

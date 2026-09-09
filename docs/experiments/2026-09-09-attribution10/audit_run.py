@@ -74,12 +74,17 @@ def main() -> None:
     integrity = harness.check_frozen(case_dir, case)
     if not all(integrity[key] for key in ("pool_unchanged", "source_unchanged", "task_unchanged")):
         raise RuntimeError(f"Cannot authenticate changed inputs: {integrity}")
+    metrics = json.loads((run / "metrics.json").read_text(encoding="utf-8"))
     os.environ["MIGLOOP_FROZEN_POOL"] = case["pool"]
+    # Replay the recorded observation scope, not a viewer's ambient setting or
+    # a newly inferred anchor. Historical runs retain their original semantics.
+    os.environ["MIGLOOP_FROZEN_ANCHOR"] = metrics.get("frozen_anchor") or ""
+    os.environ["MIGLOOP_FROZEN_ROOTS"] = json.dumps(metrics["frozen_roots"], ensure_ascii=False) \
+        if metrics.get("frozen_anchor") and metrics.get("frozen_roots") else ""
     service, _, _ = harness.load_modules(viewer)
     from migloop import probe
     ledger = service.session_ledger(case["current_root"])
     payload = probe.probe_payload(ledger, str(run), service.fixchain_payload(case["current_root"]))
-    metrics = json.loads((run / "metrics.json").read_text(encoding="utf-8"))
     structure = payload.get("structured") or {}
     trajectory = payload.get("trajectory") or {}
     nodes = [node for defect in structure.get("defects", []) for node in defect.get("nodes", [])]
@@ -94,6 +99,8 @@ def main() -> None:
         "viewer": {"source": str(viewer), "source_digest": harness.inventory(viewer / "src/migloop")["content_digest"],
                    "same_as_investigator": viewer == Path(case["source"]).resolve()},
         "integrity": integrity, "trace_identity": payload.get("trace_identity"),
+        "observation_scope": service.observation_scope(case["current_root"])
+                             if hasattr(service, "observation_scope") else None,
         "conclusion_identity": structure.get("identity"),
         "schema_errors": structure.get("errors", []),
         "nodes": {"total": len(nodes), "resolved": sum(node.get("ok") is True for node in nodes)},

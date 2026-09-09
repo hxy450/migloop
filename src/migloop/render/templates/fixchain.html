@@ -325,6 +325,7 @@
   <h1>返修链路<em id="rootlbl">两原子探索树 —— 版本文件 × 版本 agent,任何一个版本都能当根</em>
     <span class="clear" id="clear">✕ 回到入口</span></h1>
   <div class="chips" id="chips"></div>
+  <details id="observation-scope" class="time-scope" hidden></details>
 </header>
 <div class="stage-wrap" id="wrap" hidden>
   <aside class="rail panel" id="rail">
@@ -393,6 +394,18 @@
     }
     chip("session <b>" + (DATA.sid8 || "") + "</b>");
     chip("<b>" + (DATA.project || "") + "</b>");
+    function renderObservationScope(scope) {
+      var box = document.getElementById("observation-scope");
+      box.textContent = "";
+      box.hidden = !scope || scope.mode !== "frozen_anchor";
+      if (box.hidden) return;
+      var roots = scope.roots || [];
+      box.appendChild(el("summary", "", "固定调查范围 · " + roots.length + " 个根（调用者显式指定）"));
+      box.appendChild(el("div", "time-scope-note", "固定入口：" + (scope.anchor || "")));
+      roots.forEach(function (root) { box.appendChild(el("div", "time-scope-root mono", root)); });
+      box.appendChild(el("div", "time-scope-note", "切换清单内的会话号不会换账本。历史查询用版本/时间窗口；清单不证明同工程或读写关系。"));
+    }
+    renderObservationScope(DATA.observation_scope);
     // 没有返修链也开门:任何 文件@v / agent vN 都能当根,返修入口只是最常用的一个入口
     DATA.fixes = DATA.fixes || [];
     document.getElementById("wrap").hidden = false;
@@ -488,7 +501,7 @@
     fetch(U.data, { credentials: "include" })
       .then(function (r) { return r.json(); })
       .then(function (d) {
-        if (d && d.chains) { indexData(d); }
+        if (d && d.chains) { indexData(d); renderObservationScope(d.observation_scope || DATA.observation_scope); }
         else { loadChip.textContent = "返修链装配失败:" + ((d || {}).error || "未知"); }
       })
       .catch(function (e) { loadChip.textContent = "返修链装配失败:" + e; });

@@ -303,7 +303,10 @@ def mcp_server_config(case: dict[str, Any], final_mode: str = "document") -> dic
         raise ValueError("final_mode must be document or reference")
     return {"command": sys.executable, "args": ["-m", "migloop.mcp_server"], "cwd": case["source"],
             "env": {"PYTHONPATH": str(Path(case["source"]) / "src"), "PYTHONDONTWRITEBYTECODE": "1",
-                    "MIGLOOP_FROZEN_POOL": case["pool"], "MIGLOOP_FINAL_MODE": final_mode}}
+                    "MIGLOOP_FROZEN_POOL": case["pool"],
+                    "MIGLOOP_FROZEN_ANCHOR": case.get("current_root", ""),
+                    "MIGLOOP_FROZEN_ROOTS": json.dumps(case["roots"], ensure_ascii=False) if case.get("current_root") else "",
+                    "MIGLOOP_FINAL_MODE": final_mode}}
 
 
 def toml_value(value: Any) -> str:
@@ -833,13 +836,17 @@ def collect_verdict(case: dict[str, Any], result: dict[str, Any], arm: str,
     if final_mode not in ("document", "reference"):
         raise ValueError("final_mode must be document or reference")
     service, atoms, verdict = load_modules(Path(case["source"]))
-    old_pool = os.environ.get("MIGLOOP_FROZEN_POOL")
+    old_scope = {key: os.environ.get(key) for key in ("MIGLOOP_FROZEN_POOL", "MIGLOOP_FROZEN_ANCHOR", "MIGLOOP_FROZEN_ROOTS")}
     os.environ["MIGLOOP_FROZEN_POOL"] = case["pool"]
+    os.environ["MIGLOOP_FROZEN_ANCHOR"] = case["current_root"]
+    os.environ["MIGLOOP_FROZEN_ROOTS"] = json.dumps(case["roots"], ensure_ascii=False)
     try:
         ledger = service.session_ledger(case["current_root"])
         identity = atoms.ledger_identity(ledger)
         if arm == "raw":
-            return {"required": False, "found": False, "data": None, "errors": [], "harness_identity": identity, "repaired": False}
+            return {"required": False, "found": False, "data": None, "errors": [], "harness_identity": identity,
+                    "observation_scope": service.observation_scope(case["current_root"])
+                                         if hasattr(service, "observation_scope") else None, "repaired": False}
         supports_coverage = (Path(case["source"]) / "src/migloop/coverage.py").is_file()
         calls: list[dict[str, Any]] = []
         trace: dict[str, Any] = {}
@@ -869,7 +876,9 @@ def collect_verdict(case: dict[str, Any], result: dict[str, Any], arm: str,
         if not loaded.get("found"):
             loaded["errors"] = list(loaded.get("errors") or []) + ["Required YAML verdict block was not found"]
         out = {**loaded, "required": True, "harness_identity": identity, "repaired": False, "repair": None,
-               "schema": (loaded.get("data") or {}).get("schema")}
+               "schema": (loaded.get("data") or {}).get("schema"),
+               "observation_scope": service.observation_scope(case["current_root"])
+                                    if hasattr(service, "observation_scope") else None}
         if supports_coverage:
             coverage = importlib.import_module("migloop.coverage")
             bound = verdict.build(ledger, loaded.get("data"), loaded.get("errors") or [],
@@ -899,10 +908,11 @@ def collect_verdict(case: dict[str, Any], result: dict[str, Any], arm: str,
                     identity_bound=(trace.get("bound") is True and bound.get("identity", {}).get("bound") is True))
         return out
     finally:
-        if old_pool is None:
-            os.environ.pop("MIGLOOP_FROZEN_POOL", None)
-        else:
-            os.environ["MIGLOOP_FROZEN_POOL"] = old_pool
+        for key, value in old_scope.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
 
 
 def actual_codex_context(result: dict[str, Any], transcript: dict[str, Any] | None) -> dict[str, Any]:
@@ -962,6 +972,8 @@ def run_one(case_dir: Path, arm: str, rep: int, model: str | None = "gpt-5.6-sol
               "turn_limit_enforced": backend == "claude", "dollar_limit_enforced": backend == "claude",
               "source": case["source"], "source_code_id": case["source_code_id"], "runner_sha256": sha256(Path(__file__)),
               "source_digest": case["source_digest"], "pool_digest": case["pool_digest"], "current_root": case["current_root"],
+              "frozen_anchor": case["current_root"],
+              "frozen_roots": case["roots"],
               "common_task_sha256": case["common_task_sha256"], "prompt_sha256": sha256(run_dir / "prompt.md")}
     write_json(run_dir / "config.json", config)
     write_json(run_dir / "command.json", {"argv": cmd, "cwd": str(run_dir), "stdin": "prompt.md", "mcp_config": mcp})
@@ -969,6 +981,8 @@ def run_one(case_dir: Path, arm: str, rep: int, model: str | None = "gpt-5.6-sol
     env["PYTHONPATH"] = str(Path(case["source"]) / "src")
     env["PYTHONDONTWRITEBYTECODE"] = "1"
     env["MIGLOOP_FROZEN_POOL"] = case["pool"]
+    env["MIGLOOP_FROZEN_ANCHOR"] = case["current_root"]
+    env["MIGLOOP_FROZEN_ROOTS"] = json.dumps(case["roots"], ensure_ascii=False)
     env["MIGLOOP_FINAL_MODE"] = final_mode
     started = time.perf_counter()
     metrics: dict[str, Any] = {**config, "started_at": now(), "attempts": 1, "status": "starting", "cost_usd": None,
@@ -1114,7 +1128,8 @@ def run_smoke(source: Path, store: Path, model: str = "gpt-5.6-sol", effort: str
     write_json(store / "config.json", config)
     write_json(store / "command.json", {"argv": command, "cwd": str(store), "stdin": "prompt.md", "mcp_config": mcp})
     env = os.environ.copy()
-    env.update(PYTHONPATH=str(source / "src"), PYTHONDONTWRITEBYTECODE="1", MIGLOOP_FROZEN_POOL=str(pool))
+    env.update(PYTHONPATH=str(source / "src"), PYTHONDONTWRITEBYTECODE="1", MIGLOOP_FROZEN_POOL=str(pool),
+               MIGLOOP_FROZEN_ANCHOR="", MIGLOOP_FROZEN_ROOTS="")
     started = time.perf_counter()
     metrics: dict[str, Any] = {**config, "run_dir": str(store), "started_at": now(), "status": "starting", "attempts": 1,
                               "cost_usd": None, "cost_usd_total": None, "wall_s": None, "transcript": None}

@@ -212,7 +212,7 @@ def test_collect_verdict_uses_submission_only_when_frozen_source_has_module(tmp_
     monkeypatch.setattr(pair, "load_modules", lambda _source: (service, atoms, verdict))
     monkeypatch.setattr(probe, "_transcript_calls", lambda _folder: calls)
     monkeypatch.setattr(via, "trace_identity", lambda *_args, **_kwargs: trace(ledger))
-    case = {"source": str(source), "pool": str(tmp_path), "current_root": "synthetic", "file": "A.ets"}
+    case = {"source": str(source), "pool": str(tmp_path), "current_root": "synthetic", "roots": ["synthetic"], "file": "A.ets"}
     result = {"response_text": reference(ledger, draft, doc)}
     got = pair.collect_verdict(case, result, "tools", tmp_path, "reference")
     assert got["errors"] == [] and got["data"] == doc

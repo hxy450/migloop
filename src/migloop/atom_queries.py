@@ -13,7 +13,7 @@ from . import atoms, time_scope
 
 
 _INTS = frozenset({"v", "since", "until", "start", "n", "v_from", "v_to", "diff_chars",
-                   "m_from", "m_n", "max_chars", "offset", "seq", "limit"})
+                   "m_from", "m_n", "max_chars", "offset", "seq", "limit", "summary_chars"})
 _BOOLS = frozenset({"content", "diff", "readers", "m_all", "reads", "seen", "after", "scope_only", "changed"})
 _DEFAULTS: dict[str, dict[str, Any]] = {
     "sessions": {"file": None},
@@ -22,7 +22,7 @@ _DEFAULTS: dict[str, dict[str, Any]] = {
              "readers": False, "v_from": None, "v_to": None, "diff_chars": None,
              "m_from": 1, "m_n": 0, "m_all": False, "scope_only": False},
     "agent": {"id": None, "v": None, "since": None, "until": None, "reads": None, "seen": False,
-              "scope_only": False},
+              "scope_only": False, "summary_chars": 96},
     "blame": {"path": None, "v": None, "start": None, "n": None, "changed": False},
     "diff": {"path": None, "v": None},
     "search": {"q": "", "agent": None, "v": None, "since": None, "file": None, "after": False,
@@ -89,6 +89,8 @@ def parameters(tool: str, supplied: dict[str, Any]) -> dict[str, Any]:
     for key in _REQUIRED.get(tool, ()):
         if out[key] is None or out[key] == "":
             raise ValueError(key)
+    if tool == "agent" and not 32 <= out["summary_chars"] <= 600:
+        raise ValueError("summary_chars 必须在 32–600 之间；完整原文用 action")
     if tool == "action":
         if out["ref"] is not None:
             if out["id"] is not None or out["seq"] is not None:
@@ -184,6 +186,9 @@ def render_text(ledger: atoms.Ledger, root: str, tool: str, supplied: dict[str, 
         if chains is None:
             raise ValueError("sessions 需要链清单")
         out = atoms_text.render_chains(chains, root=root, file=args["file"], identity=atoms.ledger_identity(ledger))
+        scope_text = atoms_text.render_observation_scope(chains.get("observation_scope"))
+        if scope_text:
+            out += "\n\n" + scope_text
         out += "\n\n" + atoms_text.render_time_scope(time_scope.overview(ledger))
         if args["file"]:
             out += "\n\n" + atoms_text.render_repair_manifest(ledger, chains, args["file"], root=root)

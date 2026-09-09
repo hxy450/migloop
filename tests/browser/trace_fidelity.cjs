@@ -78,6 +78,7 @@ agents[0].reads=[
 ];
 agents[0].reads.forEach(r=>{r.proof={execution:'confirmed',delivery:r.dep?'dependency':'content',operation_basis:'fixture_native_read',snapshot:'reported',rule:'fixture'};});
 const data={sid:'fixture',sid8:'fixture',project:'Trace fidelity regression',urls:{data:'/data',atom:'/atom',probe:'/probe',filediff:'/diff',report:null}};
+data.observation_scope={mode:'frozen_anchor',roots_source:'explicit_configuration',anchor:'/fixture/anchor.jsonl',roots:['/fixture/early.jsonl','/fixture/anchor<b>.jsonl']};
 const html=fs.readFileSync(path.join(repo,'src/migloop/render/templates/fixchain.html'),'utf8').replace('__FIXCHAIN_JSON__',JSON.stringify(data));
 let activeFixture='fixture';
 function timeScopeFixture(v, agent){
@@ -428,6 +429,10 @@ async function main(){
     await until("window.__mig && __mig.xt() && __mig.xt().walk && document.querySelectorAll('.wire.route').length === 0");
     await check('all transitions including revisit, multi-parent and self-loop remain only in the timeline',"JSON.stringify(__mig.probe().trajectory.transitions.map(n=>n.step))==='[2,3,4,5,6]' && JSON.stringify([...document.querySelectorAll('.navigation-event')].map(n=>Number(n.dataset.step)))==='[2,3,4,5,6]' && document.querySelectorAll('.wire').length===0");
     await evaluate("window.originalTrajectory=JSON.stringify(__mig.probe().trajectory)");
+    await check('fixed scope displays configured roots as literal text, never as causal edges',"!document.querySelector('#observation-scope').hidden && document.querySelector('#observation-scope').textContent.includes('固定调查范围') && document.querySelector('#observation-scope').textContent.includes('/fixture/anchor<b>.jsonl') && !document.querySelector('#observation-scope b') && document.querySelector('#observation-scope').textContent.includes('不证明同工程或读写关系')");
+    await evaluate("document.querySelector('#observation-scope').open=true");
+    await check('opening the fixed scope never changes recorded investigation',"JSON.stringify(__mig.probe().trajectory)===window.originalTrajectory && document.querySelectorAll('.wire').length===0");
+    await evaluate("document.querySelector('#observation-scope').open=false");
     await check('one entity per exact version',"Object.values(__mig.xt().byId).filter(n=>n.traj).length === 4");
     await check('unqueried conclusion version has no checked badge',"[...document.querySelectorAll('#canvas .node')].some(n=>n.textContent.startsWith('A.ets@v1') && n.textContent.includes('未查询') && !n.querySelector('.badge.step'))");
     await check('rejected visit overrides successful transport status',"[...document.querySelectorAll('#probe .st')].some(n=>n.textContent.startsWith('✗7') && n.textContent.includes('被拒 · 未打开'))");

@@ -110,10 +110,12 @@ def build_server(backend: Any | None = None) -> Any:
 
     @srv.tool(**text_options)
     async def agent(sid: str, id: str, v: int, since: int | None = None,
-                    reads: bool | None = None, seen: bool = False, until: int | None = None, via: str = "") -> str:
+                    reads: bool | None = None, seen: bool = False, until: int | None = None, via: str = "",
+                    summary_chars: int = 96) -> str:
         """打开 agent@v 的累计输入/效应索引(不是全文)。v/via 必填，同 file 导航规则。
         since 只看(since,v]，主会话宜缩窗口；早期输入索引可另开，不能据窗口断言没读。
         reads 默认自动折叠大代理，True 显式展开、False 只计数；seen 展开已见片段。
+        summary_chars=32..600 控制每条动作摘要(默认96字)，不删动作；长摘要仍非原文。
         until=#调用号按发起时刻截已返回输入，未完成读取不算当时已知；原文用 action。"""
         ledger, cwd = await _ctx(sid)
         st = via_state(ledger)
@@ -125,7 +127,7 @@ def build_server(backend: Any | None = None) -> Any:
             return target_error or "⛔ 目标 agent 无法核验,未打开。"
         from . import atom_queries
         out = atom_queries.render_text(ledger, cwd, "agent", dict(id=node[1], v=v, since=since, reads=reads,
-                                                                seen=seen, until=until))
+                                                                seen=seen, until=until, summary_chars=summary_chars))
         if via_mod.returned_node(ledger, "agent", out) != node:
             return "⛔ agent 返回的版本与目标不一致,未打开。\n" + out
         st.open(node)

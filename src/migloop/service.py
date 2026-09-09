@@ -15,6 +15,7 @@ import json
 import os
 import re
 import threading
+from datetime import UTC, datetime
 from typing import Any
 
 from . import adapters, atoms, atoms_collect, atoms_text, audit, crosschain, filestory
@@ -29,7 +30,9 @@ _LOCK = threading.RLock()
 _TRACE_CACHE: dict[str, tuple[Any, dict[str, Any]]] = {}
 _LEDGER_CACHE: dict[str, tuple[Any, Any]] = {}
 _FIXCHAIN_CACHE: dict[str, tuple[Any, dict[str, Any]]] = {}
+_ROOT_SIGNATURE_CACHE: dict[str, tuple[Any, tuple[str, str | None]]] = {}
 _CACHE_MAX = 3
+_ROOT_SIGNATURE_CACHE_MAX = 256
 _ATOM_FORMATS = ("claude", "codex")
 
 
@@ -39,6 +42,8 @@ def _frozen_pool() -> str | None:
     """显式实验模式;不从 cwd、用户目录或清单 original 字段推断另一个池子。"""
     value = os.environ.get("MIGLOOP_FROZEN_POOL", "").strip()
     if not value:
+        if os.environ.get("MIGLOOP_FROZEN_ANCHOR", "").strip() or os.environ.get("MIGLOOP_FROZEN_ROOTS", "").strip():
+            raise SessionLookupError("MIGLOOP_FROZEN_ANCHOR/ROOTS 只能与 MIGLOOP_FROZEN_POOL 一起使用")
         return None
     pool = os.path.realpath(os.path.abspath(value))
     if not os.path.isdir(pool):
@@ -70,6 +75,128 @@ def _frozen_root(path: str, pool: str) -> str:
 
 def _frozen_roots(pool: str) -> list[str]:
     return sorted(_frozen_root(path, pool) for path in glob.glob(os.path.join(pool, "*.jsonl")))
+
+
+def _frozen_anchor(pool: str) -> str | None:
+    value = os.environ.get("MIGLOOP_FROZEN_ANCHOR", "").strip()
+    if not value:
+        return None
+    return _frozen_root(value, pool)
+
+
+def _configured_frozen_roots(pool: str) -> list[str] | None:
+    value = os.environ.get("MIGLOOP_FROZEN_ROOTS", "").strip()
+    if not value:
+        return None
+    try:
+        configured = json.loads(value)
+    except ValueError as exc:
+        raise SessionLookupError("MIGLOOP_FROZEN_ROOTS 必须是 JSON 数组") from exc
+    if not isinstance(configured, list) or not configured:
+        raise SessionLookupError("MIGLOOP_FROZEN_ROOTS 必须是非空 JSON 数组")
+    roots: list[str] = []
+    for item in configured:
+        if not isinstance(item, str) or not item.strip():
+            raise SessionLookupError("MIGLOOP_FROZEN_ROOTS 每项必须是根 JSONL 路径")
+        roots.append(_frozen_root(item, pool))
+    if len({os.path.normcase(path) for path in roots}) != len(roots):
+        raise SessionLookupError("MIGLOOP_FROZEN_ROOTS 不接受重复根")
+    return roots
+
+
+def _root_signature(path: str) -> tuple[str, str | None]:
+    """Cheap immutable-root identity: adapter format plus exact slash-normalized recorded cwd.
+
+    Only the bounded first JSONL record is inspected. Missing cwd stays unknown;
+    it is never guessed from the host path or another root.
+    """
+    path = os.path.realpath(os.path.abspath(path))
+    key = _stat_key([path])
+    with _LOCK:
+        hit = _ROOT_SIGNATURE_CACHE.get(path)
+        if hit is not None and hit[0] == key:
+            return hit[1]
+    fmt = str(adapters.detect(path).FORMAT)
+    cwd: Any = None
+    try:
+        with open(path, encoding="utf-8-sig") as stream:
+            record = json.loads(stream.readline(1024 * 1024))
+        if isinstance(record, dict):
+            cwd = record.get("cwd")
+            payload = record.get("payload")
+            if not cwd and isinstance(payload, dict):
+                cwd = payload.get("cwd")
+    except (OSError, ValueError):
+        cwd = None
+    normalized = str(cwd).replace("\\", "/").rstrip("/") if isinstance(cwd, str) and cwd.strip() else None
+    result = (fmt, normalized)
+    with _LOCK:
+        if len(_ROOT_SIGNATURE_CACHE) >= _ROOT_SIGNATURE_CACHE_MAX and path not in _ROOT_SIGNATURE_CACHE:
+            _ROOT_SIGNATURE_CACHE.pop(next(iter(_ROOT_SIGNATURE_CACHE)))
+        _ROOT_SIGNATURE_CACHE[path] = (key, result)
+    return result
+
+
+def _root_first_time(path: str) -> datetime:
+    raw = crosschain._first_record_ts(path)
+    try:
+        stamp = datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
+    except (TypeError, ValueError) as exc:
+        raise SessionLookupError(f"冻结 root 缺少可排序首条时刻: {path}") from exc
+    if stamp.tzinfo is None:
+        raise SessionLookupError(f"冻结 root 首条时刻缺时区，不能认证相对 anchor 的先后: {path}")
+    return stamp.astimezone(UTC)
+
+
+def _anchored_roots(pool: str, anchor: str, configured: list[str]) -> list[str]:
+    """Validate and order the caller-selected fixed observation book."""
+    if anchor not in configured:
+        raise SessionLookupError("MIGLOOP_FROZEN_ANCHOR 必须包含在 MIGLOOP_FROZEN_ROOTS 中")
+    anchor_fmt, _anchor_cwd = _root_signature(anchor)
+    anchor_ts = _root_first_time(anchor)
+    rows: list[tuple[datetime, str]] = []
+    for candidate in configured:
+        fmt, _cwd = _root_signature(candidate)
+        if fmt != anchor_fmt:
+            raise SessionLookupError("MIGLOOP_FROZEN_ROOTS 含与 anchor 不同的会话格式")
+        ts = _root_first_time(candidate)
+        if ts > anchor_ts:
+            raise SessionLookupError(f"冻结 root 晚于 anchor: {candidate}")
+        rows.append((ts, candidate))
+    return [path for _ts, path in sorted(rows, key=lambda row: (row[0], os.path.normcase(row[1])))]
+
+
+def observation_scope(path: str) -> dict[str, Any]:
+    """Return the single observation range used by all high-level service entrypoints."""
+    pool = _frozen_pool()
+    if pool is None:
+        requested = os.path.abspath(path)
+        return {"requested_root": requested, "anchor": requested, "roots": [requested], "mode": "live_dynamic"}
+    requested = _frozen_root(path, pool)
+    anchor = _frozen_anchor(pool)
+    configured = _configured_frozen_roots(pool)
+    if anchor is None and configured is None:
+        return {"requested_root": requested, "anchor": requested, "roots": [requested], "mode": "frozen_dynamic"}
+    if anchor is None or configured is None:
+        raise SessionLookupError("冻结 anchor 模式必须同时配置 MIGLOOP_FROZEN_ANCHOR 和 MIGLOOP_FROZEN_ROOTS")
+    roots = _anchored_roots(pool, anchor, configured)
+    if requested not in roots:
+        raise SessionLookupError("冻结入口不在调用者指定的 MIGLOOP_FROZEN_ROOTS 观察范围")
+    return {
+        "requested_root": requested,
+        "anchor": anchor,
+        "roots": roots,
+        "root_details": [
+            {"root": root, "format": _root_signature(root)[0], "cwd": _root_signature(root)[1]}
+            for root in roots
+        ],
+        "mode": "frozen_anchor",
+        "roots_source": "explicit_configuration",
+    }
+
+
+def _observation_root(path: str) -> str:
+    return str(observation_scope(path)["anchor"])
 
 
 _UUID = r"[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}"
@@ -107,7 +234,7 @@ def locate_session(target: str, roots: dict[str, str] | None = None) -> str:
     if pool is not None:
         want = str(target or "").strip()
         if os.path.isabs(want) or "/" in want or "\\" in want or want.lower().endswith(".jsonl"):
-            return _frozen_root(want, pool)
+            return _observation_root(_frozen_root(want, pool))
         known_roots = _frozen_roots(pool)
         hits = {p for p in known_roots if want and os.path.basename(p)[:-6].startswith(want)}
         if re.fullmatch(r"[0-9a-f-]+", want, re.I):
@@ -118,7 +245,7 @@ def locate_session(target: str, roots: dict[str, str] | None = None) -> str:
         if len(hits) != 1:
             reason = "前缀有歧义" if hits else "找不到根会话"
             raise SessionLookupError(f"冻结池{reason}: {target}")
-        return next(iter(hits))
+        return _observation_root(next(iter(hits)))
     if os.path.isfile(target):
         return os.path.abspath(target)
     rows = list(adapters.discover(roots or {}))
@@ -196,6 +323,10 @@ def prior_roots(fmt: str, path: str, cwd: str) -> list[str]:
     loop engine 续接的 worker)都是 root,DiceRoller 0903 一个 run 就有 17 个,默认只取 3 个会把返修链切断。"""
     pool = _frozen_pool()
     if pool is not None:
+        anchor = _frozen_anchor(pool)
+        if anchor is not None:
+            scope = observation_scope(path)
+            return [root for root in scope["roots"] if root != scope["anchor"]]
         return _frozen_adjacent_roots(pool, path, later=False)
     if fmt == "codex":
         return crosschain.find_prior_codex_roots(path, cwd, limit=64)
@@ -207,6 +338,9 @@ def prior_roots(fmt: str, path: str, cwd: str) -> list[str]:
 def later_roots(fmt: str, path: str, cwd: str) -> list[str]:
     pool = _frozen_pool()
     if pool is not None:
+        if _frozen_anchor(pool) is not None:
+            observation_scope(path)  # validate the requested alias even though fixed scope has no later root
+            return []
         return _frozen_adjacent_roots(pool, path, later=True)
     if fmt == "codex":
         return crosschain.find_later_codex_roots(path, cwd, 1)
@@ -245,7 +379,10 @@ def run_stage_intervals(path: str, cwd: str) -> list[dict[str, Any]]:
     pool = _frozen_pool()
     cands: list[str] = []
     if pool is not None:
-        path = _frozen_root(path, pool)
+        path = _observation_root(path)
+        if _frozen_anchor(pool) is not None:
+            _fmt, anchor_cwd = _root_signature(path)
+            cwd = anchor_cwd or cwd
         marks = _frozen_path(os.path.join(pool, "stage-marks.json"), pool)
         if os.path.isfile(marks):
             cands.append(marks)
@@ -295,16 +432,20 @@ def _collect(fmt: str, roots: list[str], stage_intervals: list[dict[str, Any]] |
 def session_ledger(path: str) -> Any:
     """当前会话 + 同工程前序会话的账本(跨会话同一本史书)。"""
     pool = _frozen_pool()
+    scope: dict[str, Any] | None = None
     if pool is not None:
-        path = _frozen_root(path, pool)
+        scope = observation_scope(path)
+        path = str(scope["anchor"])
     data = extract_trace(path)
     fmt = _fmt_of(data)
     if fmt not in _ATOM_FORMATS:
         raise SessionLookupError(f"返修链路 / 两原子暂不支持 {fmt} 会话")
     cwd = str((data.get("meta") or {}).get("cwd") or "")
-    roots = [*prior_roots(fmt, path, cwd), path]           # 时间正序:前序在前
+    roots = list(scope["roots"]) if scope and scope["mode"] == "frozen_anchor" \
+        else [*prior_roots(fmt, path, cwd), path]
     intervals = run_stage_intervals(path, cwd)
-    key = [*pool_key(roots), tuple((iv["stage"], iv["start_ts"]) for iv in intervals), ("frozen_pool", pool)]
+    key = [*pool_key(roots), tuple((iv["stage"], iv["start_ts"]) for iv in intervals),
+           ("frozen_pool", pool), ("frozen_anchor", scope["anchor"] if scope else None)]
     with _LOCK:
         hit = _LEDGER_CACHE.get(path)
         if hit is not None and hit[0] == key:
@@ -315,7 +456,7 @@ def session_ledger(path: str) -> Any:
 
 
 def session_cwd(path: str) -> str:
-    return str((extract_trace(path).get("meta") or {}).get("cwd") or "")
+    return str((extract_trace(_observation_root(path)).get("meta") or {}).get("cwd") or "")
 
 
 def ledger_main_sid8(ledger: Any, path: str, fmt: str, meta_sid8: str) -> str:
@@ -506,19 +647,24 @@ def attach_fix_basis(chains: list[dict[str, Any]], ledger: Any) -> None:
 def fixchain_payload(path: str) -> dict[str, Any]:
     """chains + cross + t0 —— 全部从两原子账本算;修复方判定只在 filestory.build_fix_chains。"""
     pool = _frozen_pool()
+    scope: dict[str, Any] | None = None
     if pool is not None:
-        path = _frozen_root(path, pool)
+        scope = observation_scope(path)
+        path = str(scope["anchor"])
     data = extract_trace(path)
     fmt = _fmt_of(data)
     meta = data.get("meta") or {}
     cwd = str(meta.get("cwd") or "")
-    priors = prior_roots(fmt, path, cwd) if fmt in _ATOM_FORMATS else []
-    key = [*_stat_key([path, *priors]), ("frozen_pool", pool)]
+    priors = ([root for root in scope["roots"] if root != path] if scope and scope["mode"] == "frozen_anchor"
+              else prior_roots(fmt, path, cwd) if fmt in _ATOM_FORMATS else [])
+    ledger = session_ledger(path)
+    key = [*_stat_key([path, *priors]), ("frozen_pool", pool),
+           ("frozen_anchor", scope["anchor"] if scope else None),
+           ("ledger_identity", atoms.ledger_identity(ledger)), ("ledger_object", id(ledger))]
     with _LOCK:
         hit = _FIXCHAIN_CACHE.get(path)
         if hit is not None and hit[0] == key:
-            return hit[1]
-        ledger = session_ledger(path)
+            return {**hit[1], "observation_scope": scope} if scope is not None else hit[1]
         prior_traces = [extract_trace(p) for p in priors]
         meta_map, fixer_map, sid_of = agent_meta_maps(data, prior_traces)
         meta_map = _merge_ledger_meta(meta_map, ledger)
@@ -551,7 +697,7 @@ def fixchain_payload(path: str) -> dict[str, Any]:
                      "n_cross": n_cross}
         payload = {"chains": chains, "cross": cross, "t0": ledger.t0, "touched": touched}
         _put(_FIXCHAIN_CACHE, path, (key, payload))
-        return payload
+        return {**payload, "observation_scope": scope} if scope is not None else payload
 
 
 # ═══════════════ 页面 ═══════════════
@@ -563,7 +709,11 @@ def report_trace(path: str, *, static: bool = False, with_chains: bool = True,
     static=True 是导出的自包含 HTML / live 快照:没有服务端,页面上的返修链路入口藏起来
     (``urls.fixchain`` 为空);with_chains=False 跳过建账(live 每次刷新都重算太贵)。
     不支持两原子的来源(DevEco)没有返修追溯卡,其余审计照出。"""
+    scope = observation_scope(path)
+    path = str(scope["anchor"])
     data = dict(extract_trace(path, storage_root))
+    if scope["mode"] == "frozen_anchor":
+        data["observation_scope"] = scope
     fmt = _fmt_of(data)
     chains: list[dict[str, Any]] | None = None
     pool_builds: list[dict[str, Any]] | None = None
@@ -585,8 +735,9 @@ def report_trace(path: str, *, static: bool = False, with_chains: bool = True,
             chains = None                          # 链算不出不拖垮报告
     data["audit"] = audit.build_audit(data, fix_chains=chains, pool_builds=pool_builds,
                                       pool_agents=pool_agents)
-    later = later_roots(fmt, path, cwd)
-    prior = prior_roots(fmt, path, cwd)[:1]
+    fixed_scope = scope["mode"] == "frozen_anchor"
+    later = [] if fixed_scope else later_roots(fmt, path, cwd)
+    prior = [] if fixed_scope else prior_roots(fmt, path, cwd)[:1]
     hint = {"later": root_sid8(fmt, later[0]) if later else None,
             "prior": root_sid8(fmt, prior[0]) if prior else None}
     if hint["later"] or hint["prior"]:
@@ -603,8 +754,10 @@ def report_html(path: str) -> str:
 def fixchain_light(path: str) -> dict[str, Any]:
     """链页首屏:入口列表只从链缓存拿(没缓存先空着,页面拿到 fixchain-data 自己填)。"""
     pool = _frozen_pool()
+    scope: dict[str, Any] | None = None
     if pool is not None:
-        path = _frozen_root(path, pool)
+        scope = observation_scope(path)
+        path = str(scope["anchor"])
     data = extract_trace(path)
     meta = data.get("meta") or {}
     fmt = _fmt_of(data)
@@ -616,7 +769,7 @@ def fixchain_light(path: str) -> dict[str, Any]:
     fixers: list[dict[str, Any]] = []
     with _LOCK:
         hit = _FIXCHAIN_CACHE.get(path)
-    if hit is not None and hit[0] and hit[0][-1] == ("frozen_pool", pool):
+    if (scope is None or scope["mode"] != "frozen_anchor") and hit is not None and ("frozen_pool", pool) in hit[0]:
         fixes, fixers = filestory.chain_entry_lists(list(hit[1].get("chains") or []))
     later_paths = later_roots(fmt, path, cwd)
     later = None
@@ -625,11 +778,14 @@ def fixchain_light(path: str) -> dict[str, Any]:
         if lsid:
             later = {"sid8": lsid, "url": f"/api/insight1/fixchain/{lsid}"}
     sid = str(meta.get("session_id") or root_sid8(fmt, path))
-    return {
+    payload = {
         "sid8": sid[:8], "sid": sid,
         "project": next((x for x in reversed(cwd_norm.split("/")) if x), ""),
         "fixes": fixes, "fixers": fixers, "later": later,
     }
+    if scope is not None and scope["mode"] == "frozen_anchor":
+        payload["observation_scope"] = scope
+    return payload
 
 
 def probe_payload(path: str, run_dir: str) -> dict[str, Any]:

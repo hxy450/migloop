@@ -83,6 +83,49 @@ def test_common_task_explicitly_allows_all_in_pool_roots_for_both_arms(frozen_ca
         assert "不访问池外原工程、其他会话" not in text
 
 
+def test_frozen_anchor_is_explicit_and_smoke_cannot_inherit_an_anchor(frozen_case: Path, monkeypatch):
+    case = pair.read_json(frozen_case / "case.json")
+    monkeypatch.setenv("MIGLOOP_FROZEN_ANCHOR", "unrelated-ambient-root")
+    config = pair.mcp_server_config(case)
+    assert config["env"]["MIGLOOP_FROZEN_ANCHOR"] == case["current_root"]
+    assert json.loads(config["env"]["MIGLOOP_FROZEN_ROOTS"]) == case["roots"]
+    smoke = pair.mcp_server_config({"source": case["source"], "pool": case["pool"]})
+    assert smoke["env"]["MIGLOOP_FROZEN_ANCHOR"] == ""
+    assert smoke["env"]["MIGLOOP_FROZEN_ROOTS"] == ""
+
+
+@pytest.mark.parametrize("old_anchor", [None, "previous-anchor"])
+@pytest.mark.parametrize("raises", [False, True])
+def test_verdict_collection_restores_anchor_even_when_ledger_fails(frozen_case: Path, monkeypatch,
+                                                                 old_anchor, raises):
+    case = pair.read_json(frozen_case / "case.json")
+    if old_anchor is None:
+        monkeypatch.delenv("MIGLOOP_FROZEN_ANCHOR", raising=False)
+    else:
+        monkeypatch.setenv("MIGLOOP_FROZEN_ANCHOR", old_anchor)
+    monkeypatch.setenv("MIGLOOP_FROZEN_ROOTS", "previous-roots")
+    observed = []
+    def ledger(root):
+        observed.append((root, os.environ.get("MIGLOOP_FROZEN_ANCHOR")))
+        assert json.loads(os.environ["MIGLOOP_FROZEN_ROOTS"]) == case["roots"]
+        if raises:
+            raise ValueError("ledger failure")
+        return object()
+    service = SimpleNamespace(session_ledger=ledger,
+                              observation_scope=lambda root: {"anchor": root, "mode": "frozen_anchor"})
+    monkeypatch.setattr(pair, "load_modules", lambda src: (service,
+                        SimpleNamespace(ledger_identity=lambda ledger: "identity"), object()))
+    if raises:
+        with pytest.raises(ValueError, match="ledger failure"):
+            pair.collect_verdict(case, {}, "raw")
+    else:
+        result = pair.collect_verdict(case, {}, "raw")
+        assert result["observation_scope"]["anchor"] == case["current_root"]
+    assert observed == [(case["current_root"], case["current_root"])]
+    assert os.environ.get("MIGLOOP_FROZEN_ANCHOR") == old_anchor
+    assert os.environ["MIGLOOP_FROZEN_ROOTS"] == "previous-roots"
+
+
 def test_harness_coverage_is_separate_from_schema_and_respects_actual_trace(frozen_case: Path, monkeypatch):
     from migloop import atoms, probe, verdict
     from tests.test_repair_coverage import PATH, declaration, splash_ledger

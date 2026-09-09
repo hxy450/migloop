@@ -492,15 +492,31 @@ def _possible_suffix(ledger: atoms.Ledger, a: dict[str, Any], root: str) -> str:
     return " · 可能碰了 " + ", ".join(items) + (f" …共 {len(paths)}" if len(paths) > 3 else "")
 
 
+def render_observation_scope(scope: dict[str, Any] | None) -> str:
+    """Display caller-chosen scope without claiming same-project inference."""
+    if not scope or scope.get("mode") != "frozen_anchor":
+        return ""
+    roots = list(scope.get("roots") or [])
+    basename = lambda path: str(path).replace("\\", "/").rsplit("/", 1)[-1]
+    return (f"## 固定观察范围（调用者显式指定 {len(roots)} 个根）\n"
+            + "anchor: " + str(scope.get("anchor") or "") + "\n"
+            + "范围根: " + " | ".join(basename(path) for path in roots) + "\n"
+            + "这些根的 SID 都打开同一本账，不随入口切换范围；查历史用版本/时间窗口。"
+              "清单不证明根之间属于同一工程，也不建立读写边。")
+
+
 def render_agent(ledger: atoms.Ledger, agent_id: str, v: int | None = None,
                  root: str = "", full_text: bool = True, since: int | None = None,
-                 reads: bool | None = None, seen: bool = False, until: int | None = None) -> str:
+                 reads: bool | None = None, seen: bool = False, until: int | None = None,
+                 summary_chars: int = 96) -> str:
     """默认是索引:头部、派发词全文、收件索引行、逐版效应、读记录按调用合行(安卓路径缩短、看见的行只留行号)、
     正文索引行、收尾。0723 复盘:agent 整段 1.27 万字里三分之二是读清单和看见的行,报告每根只引 6 个文件名和
     6 次「看见」;信息不删,只是不默认铺开 —— seen=True 铺原文,reads=False 只给每版读的条数。
     曾试过默认折叠非目标版本的窗口(变体 B):调查员改用逐窗口查询,总字符没省,还把 AboutUsPage 那条链
     误判成「漏读」—— 整段仍给,只是压短。"""
     from .atom_queries import agent_data
+    if type(summary_chars) is not int or not 32 <= summary_chars <= 600:
+        raise ValueError("summary_chars 必须在 32–600 之间；完整原文用 action")
     try:
         ag = agent_data(ledger, agent_id, v, since=since, until=until)
     except ValueError as exc:
@@ -526,6 +542,8 @@ def render_agent(ledger: atoms.Ledger, agent_id: str, v: int | None = None,
     if ag.get("description"):
         ident.append(ag["description"])
     out.append("身份: " + " · ".join(ident))
+    out.append(f"动作摘要每条至多 {summary_chars} 字；summary_chars=200/600 可展开已有摘要，仍非原文。"
+               "动作与引用不因摘要缩短而省略；action 展开完整输入输出。")
     out.append(render_time_scope(ag.get("time_scope") or time_scope.for_atom(ledger, "agent", ag, until=until)))
     input_scope = ag.get("input_scope") or {}
     omitted = input_scope.get("omitted_prior") or {}
@@ -576,7 +594,7 @@ def render_agent(ledger: atoms.Ledger, agent_id: str, v: int | None = None,
         for m in inbox:
             late = " (锚点之后)" if m["after_anchor"] else ""
             out.append(f"- 喂 v{m['at']}{late} · 来自 {m['from']}" + (f" · {m['summary']}" if m.get("summary") else "")
-                       + f" · {_clip(' '.join(str(m.get('text') or '').split()), 160)} "
+                       + f" · {_clip(' '.join(str(m.get('text') or '').split()), summary_chars)} "
                        + _ref(m.get("seq"), None, lines.get(m.get("seq") or -1)))
     by_ver: dict[int, dict[str, list[Any]]] = {}
     for a in ag["actions"]:
@@ -608,20 +626,20 @@ def render_agent(ledger: atoms.Ledger, agent_id: str, v: int | None = None,
                            + "；不作为已完成写入/派发，action 可核原文。")
                 continue
             if a["kind"] == "dispatch":
-                out.append(f"- 派发 {d.get('name') or d.get('description') or '子agent'}"
+                out.append(f"- 派发 {_clip(d.get('name') or d.get('description') or '子agent', summary_chars)}"
                            + (f"  (子 agent id={d['child']})" if d.get("child") else "") + tag)
             elif a["kind"] == "message":
-                out.append(f"- 发消息 → {d.get('to')}: {_clip(d.get('text') or '', 300)}{tag}")
+                out.append(f"- 发消息 → {d.get('to')}: {_clip(d.get('text') or '', summary_chars)}{tag}")
             else:
                 fs = [f for f in a["files"] if f["op"] != "read"]
                 if fs:
                     out.append("- " + ", ".join(
                         ("删 " if f["op"] == "delete" else "写 ") + f"{rel(f['path'], root)}@v{f['v']}"
                         + ("(脚本落盘)" if f["via"] == "script" else "(shell)" if f["via"] == "shell" else "")
-                        for f in fs) + (f"  ← {d['cmd']}" if d.get("cmd") else "") + tag)
+                        for f in fs) + (f"  ← {_clip(d['cmd'], summary_chars)}" if d.get("cmd") else "") + tag)
                 else:
                     out.append(f"- {a['tool']}" + ("" if a["ok"] else "(失败)")
-                               + (f": {d['cmd']}" if d.get("cmd") else "") + tag)
+                               + (f": {_clip(d['cmd'], summary_chars)}" if d.get("cmd") else "") + tag)
         rs = reads_by_at.get(k, [])
         if rs and not reads:
             out.append(f"  读 {len(rs)} 条(reads=True 展开)")
@@ -662,15 +680,15 @@ def render_agent(ledger: atoms.Ledger, agent_id: str, v: int | None = None,
                            + "；不作为已返回输入，action 可核原文。")
                 continue
             if a["kind"] in _TEXT_KINDS:
-                out.append(f"  {_TEXT_KINDS[a['kind']]}: {_clip(d.get('skill') or d.get('text') or '', 120)} {ref}")
+                out.append(f"  {_TEXT_KINDS[a['kind']]}: {_clip(d.get('skill') or d.get('text') or '', summary_chars)} {ref}")
                 continue
             desc = d.get("cmd") or d.get("pattern") or d.get("skill") or d.get("url") or ""
             poss = _possible_suffix(ledger, a, root)
             if d.get("unresolved"):
                 # 解析不了的读写不许静默:调查员据此知道该展开哪次 action 看原文
-                out.append(f"  ⚠ 未解析读写({d['unresolved']}) {a['tool']}: {_clip(desc, 120)} {ref}{poss}")
+                out.append(f"  ⚠ 未解析读写({d['unresolved']}) {a['tool']}: {_clip(desc, summary_chars)} {ref}{poss}")
                 continue
-            out.append(f"  {a['tool']}" + ("" if a["ok"] else "(失败)") + (f": {desc}" if desc else "") + " " + ref + poss)
+            out.append(f"  {a['tool']}" + ("" if a["ok"] else "(失败)") + (f": {_clip(desc, summary_chars)}" if desc else "") + " " + ref + poss)
         inboxes = [a for a in slot["inp"] if a["kind"] == "inbox"]
         if inboxes:
             out.append(f"  收件 {len(inboxes)} 条(见上)")

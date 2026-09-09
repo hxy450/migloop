@@ -193,18 +193,21 @@ def main():
             webbrowser.open(pathlib.Path(out).resolve().as_uri())
         return
 
+    if args.serve:
+        # The service is the authority for frozen-pool and anchored scope.
+        # Resolving an alias via global discovery first can select a live copy
+        # outside the explicitly configured frozen pool.
+        from . import serve as serve_mod
+        serve_mod.serve(args.targets[0], host=args.host, port=args.port, open_browser=args.open,
+                        roots={"claude": root, "codex": codex_root, "deveco": deveco_root})
+        return
+
     jsonl = resolve_target(args.targets[0], root, codex_root, deveco_root)
     adapter = adapters.detect(jsonl)
     fmt = adapter.FORMAT
     sub = os.path.join(os.path.splitext(jsonl)[0], "subagents")
     if fmt == "claude" and not os.path.isdir(sub):
         print("提示: 未找到 %s,子代理泳道将为空(分享 session 时请连同同名目录一起拷贝)" % sub)
-
-    if args.serve:
-        from . import serve as serve_mod
-        serve_mod.serve(jsonl, host=args.host, port=args.port, open_browser=args.open,
-                        roots={"claude": root, "codex": codex_root, "deveco": deveco_root})
-        return
 
     if args.live:
         if not adapter.SUPPORTS_LIVE:
