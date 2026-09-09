@@ -1,0 +1,136 @@
+{
+  "schema": "migloop-paired-adjudication/1",
+  "audited_at": "2026-09-09T14:27:29Z",
+  "scope": "Member S3/S4 formal-v3 tools/rep1 versus formal-v2 tools/rep1",
+  "mode": "read-only original run/reference/raw-event audit; no model, source writes, screenshot or identity rebinding",
+  "experiment_root": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10",
+  "reference": {"path": "reference-v1/legacy-reference.json", "sha256": "2c015536094fff1e42bb3b6b5cc2dce743c0f2a0f6924254027f7f8a5faac927", "ids": ["S3", "S4"]},
+  "pair": {
+    "same_questions_task_prompt_pool": true,
+    "common_task_sha256": "e60ad7491cd5991a948f8c7128432feca230a59bee208640ca5b90a44d68dec1",
+    "prompt_sha256": "c875ecdd81e7155b15575d74cbe20045e0595fafbb070396e5ba77a97c89e6f3",
+    "pool": "formal-v1/member-center/pool",
+    "pool_digest": "a78b1373045f7558d6da3b76123e30d032635a2a0b4cdd665e7f80c0bdf8b337",
+    "same_ledger_identity": false,
+    "model": "gpt-5.5",
+    "effort": "medium",
+    "transport": "native MCP",
+    "limit": "One run per frozen implementation, not proof of a specific prompt's causal effect or general quality/cost superiority."
+  },
+  "runs": [
+    {
+      "variant": "formal-v2", "path": "formal-v2/member-center/runs/tools/rep1",
+      "run_id": "7450547a-e797-45de-8ab8-ea836b3f1e22", "source_code_id": "733c526",
+      "ledger": "atoms-2026-09-09-observation4:146:4886b8384a15114e1dce3c0d",
+      "wall_s": 341.34104700002354, "tool_calls": 53, "tool_chars": 200620, "rejected_calls": 4,
+      "usage": {"input_total": 1937108, "cache_read": 1821184, "input_uncached": 115924, "output": 12748},
+      "cost_usd": null,
+      "artifact_sha256": {
+        "result.json": "354c6d765cea5c57c098f77d1a8028b8c210eb3b1a710bab20fd49b8417568b1",
+        "metrics.json": "18a5cd3677a6e488c5ff6fc7aea74da6950f86d50feea011365fde50b40a9c47",
+        "transcript.jsonl": "11d1f28416a1ea975f49126320712e06b9afa31add9c1a9230f065527fb8c421"
+      }
+    },
+    {
+      "variant": "formal-v3", "path": "formal-v3/member-center/runs/tools/rep1",
+      "run_id": "a5a3bb82-a65d-4e65-b677-f6a3802b9088", "source_code_id": "18b8f7f",
+      "source_digest": "59ef6956e09fa888ec039ce55e24d1721601faef421934f1f89c7a42685acedf",
+      "ledger": "atoms-2026-09-09-observation4:146:bc4e9e2dd01e9ff0d0a1de37",
+      "status": "completed", "started_at": "2026-09-09T14:18:50.075483+00:00", "ended_at": "2026-09-09T14:23:30.242332+00:00",
+      "wall_s": 280.17246449994855, "end_to_end_wall_s": 293.05744379991665,
+      "tool_calls": 60, "tool_chars": 230543, "rejected_calls": 6,
+      "tool_counts": {"guide": 1, "sessions": 1, "diff": 6, "action": 27, "file": 8, "search": 10, "agent": 4, "blame": 3},
+      "usage": {"input_total": 876504, "cache_read": 759808, "input_uncached": 116696, "output": 11945},
+      "cost_usd": null, "verdict_ok": true, "coverage_complete": true,
+      "coverage_counts": {"expected": 22, "accounted": 22, "expected_versions": 9, "expected_candidates": 13, "unresolved": 0, "not_repair": 0, "deferred": 9, "unconfirmed": 9, "advisories": 0, "advisory_rows": 0},
+      "artifact_sha256": {
+        "result.json": "1c8ac5ab0215929a1d7729cf861a54978f4458ef319bf3fc838ba88b75f8b09e",
+        "metrics.json": "513089698d3f772a024e3bee709e47de362a358bc08705294ca658bcdc752d59",
+        "verdict.json": "4c9631fbdb69ee35564485b63b2e779830de38bf1373f48080fdd54833d67ca1",
+        "transcript.jsonl": "6a6aaa2d9d119068ab86dc257218f90ca1ae4fe2643ceb81b305c3f2a985cec1"
+      }
+    }
+  ],
+  "items": [
+    {
+      "id": "S3",
+      "fact_status": "pass_core_one_transparent_two_dark_with_H5_omission",
+      "execution_evidence": "Successful exact-target script execution supports three writes without requiring a synthesized formal file version.",
+      "execution_comparison": "v3 accepts execution output more than v2's categorical no-version underclaim; still appropriately lacks complete readback/device verification.",
+      "attribution_status": "regressed_unsupported_fault_entry_for_correct_patch",
+      "entry": "agent:agent-a68daf720e780b4c2@v5",
+      "role_issue": "Reason describes correct branch values but labels actor as entry error; no violated requirement or wrong operation demonstrated.",
+      "repair_anchor_status": "no_fabricated_mask_version_anchor",
+      "validation_status": "partial_independent_readback_not_device_validation",
+      "omission": "H5PayDialog already had Transparent and was skipped by the existing-mask guard; still not explicitly answered.",
+      "evidence": [
+        {"type": "v3_call", "step": 9, "call_id": "call_YwaXCnXglb8di2WYx3GOQ8Gn", "result_line": 65, "tool": "action", "seq": 23502, "basis": "write before report.append; successful target 3 sites output"},
+        {"type": "v3_calls", "steps": [12, 13, 53, 54, 56, 59], "result_lines": [73, 74, 238, 239, 253, 260], "basis": "site classification, literal DIALOG_MASK value, post-read and preexisting-transparent cues"},
+        {"type": "raw", "path": "formal-v1/member-center/pool/ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl", "lines": [68, 69, 77, 78, 80, 81, 103, 104, 106, 107], "basis": "token definition, scan, script, successful result, PayAgreement readback"},
+        {"type": "raw", "path": "formal-v1/member-center/pool/9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aslice8-pay-80bbb1f44b77da0f.jsonl", "lines": [264], "basis": "H5PayDialog already Transparent before mask patch"}
+      ]
+    },
+    {
+      "id": "S4",
+      "repair_fact_status": "pass_two_rewrites_private_failure_two_visibility_fixes_and_build",
+      "nearest_writer_input_status": "regressed_from_v2; Slice8 before-write Kotlin input not investigated",
+      "actual_Slice8_agent_action_search_calls": 0,
+      "attribution_status": "partial_core_missing_and_incorrect_fault_roles",
+      "role_issues": [
+        {"node": "agent:agent-a68daf720e780b4c2@v45", "status": "unsupported_by_stated_reason", "note": "Reason says price semantics were corrected; first script does contain private helpers, so do not infer v45 is necessarily clean. The report must state the actual error it attributes."},
+        {"node": "agent:agent-a68daf720e780b4c2@v53", "status": "private_helper_introducer_supported_but_reason_incomplete", "note": "Reason focuses on two-Span simplification without clearly tying its private helper introduction to the compiler failure."},
+        {"node": "agent:agent-af0e3d2ae54dbf769@v3", "status": "wrong_fault_role", "note": "Cited original events show error detection and correction, not introduction; builder is red although it is not in entry."}
+      ],
+      "extra_claims": [
+        {"claim": "fixed two Spans avoid conditional/loop rendering risk", "status": "inference_not_confirmed_failure", "basis": "script comment and description support simplification; no opened evidence proves prior ForEach failure"},
+        {"claim": "signed and unsigned HAP outputs", "status": "supported_by_direct_tool_output", "basis": "builder L39/L40 task log and output directory listing"},
+        {"claim": "repair v7 to v18", "status": "known_old_baseline_only_not_reconstructed_net_diff", "basis": "intervening content unknown is disclosed"}
+      ],
+      "validation_status": "compile_confirmed_device_and_all_formats_unproven",
+      "evidence": [
+        {"type": "v3_call", "step": 39, "call_id": "call_ERc74PjQcpeZAFHdzooIYYPB", "result_line": 187, "tool": "file", "target": "MemberCenterPage.ets@v7", "returned_lines": "1080-1179", "basis": "old whole-price Text at 30vp"},
+        {"type": "v3_calls", "steps": [40, 41], "result_lines": [189, 194], "basis": "Android read by later fixer, not by Slice8"},
+        {"type": "v3_calls", "steps": [25, 26, 30, 31, 35, 36, 37, 38], "result_lines": [120, 132, 141, 142, 169, 173, 174, 175], "basis": "two edits, private access error, visibility edits, direct successful build and HAP evidence"},
+        {"type": "raw", "path": "formal-v1/member-center/pool/9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aslice8-pay-80bbb1f44b77da0f.jsonl", "lines": [24, 264], "basis": "gold near-cause input before full rewrite, present in pool and opened in v2 but omitted in v3"},
+        {"type": "raw", "path": "formal-v1/member-center/pool/ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl", "lines": [521, 522, 523, 524, 528, 529, 592, 593], "basis": "fixer source evidence and successful price edits"},
+        {"type": "raw", "path": "formal-v1/member-center/pool/ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-af0e3d2ae54dbf769.jsonl", "lines": [23, 24, 26, 27, 32, 33, 34, 35, 36, 37, 39, 40], "basis": "compiler failure, correction, successful rerun and generated HAP listing"}
+      ]
+    }
+  ],
+  "coverage_semantics": {
+    "overall": "improved_deferral_with_remaining_wrong_cross_version_defect_association",
+    "fixed_v2_errors": ["v10 now out_of_scope", "v14 now out_of_scope", "image candidate 87dd5a4b1ea9aaf30258 now out_of_scope"],
+    "remaining_error": {
+      "node": "file:entry/src/main/ets/pages/MemberCenterPage.ets@v13",
+      "status": "explained", "defects": ["S4"],
+      "reason_issue": "Report says this version is banner work not attributed in the question, but associates it with the price defect using shared action identity.",
+      "saved_manifest_basis": "verdict.json repair_manifest.items[v=13] has seven literal indicator color/position additions, no price lines",
+      "original_ref": "#a68daf720e780b4c2:23954@L528",
+      "minimum_correction": "out_of_scope, or separately explain and link its actual issue without borrowing v11/v12"
+    },
+    "explained_readonly_scans": "Not automatically incorrect when the reason clearly describes evidence gathering rather than repair execution.",
+    "new_claims_verified": ["23492 output confirms pre-patch NO-IMPORT", "23507 output shows added Palette import"],
+    "machine_metrics_unchanged": true,
+    "zero_advisories_limit": "No matches to narrow warning rules does not certify red-node causal roles or shared-action defect association."
+  },
+  "citation_precision": [
+    {"claimed": "#a68daf720e780b4c2:23405@L69", "actual": "systemic Read use/result L28/L29", "wrong_line_contains": "DesignTokens Edit result", "impact": "duplicate bad pointer; correct systemic pointer also supplied"},
+    {"claimed": "#af0e3d2ae54dbf769:26418@L43", "actual": "HAP verification use/result L39/L40", "wrong_line_contains": "different git-status command", "impact": "bad line suffix; requested action result itself supports HAP claim"}
+  ],
+  "time_boundary_usage": {
+    "explicit_until": 0, "explicit_until_seq": 0, "explicit_until_ts": 1, "explicit_since_ts": 1,
+    "query": {"step": 50, "call_id": "call_PqymnJoLptub6MWlfcLGuwiV", "result_line": 221, "tool": "search", "q": "BUILD_STATUS", "since_ts": "2026-07-26T21:46:18.585000Z", "until_ts": "2026-07-26T21:48:57.218000Z", "returned_fields": ["notify", "say"], "purpose": "post-build validation statements, not early-generation input"},
+    "critical_raw_order_checked": ["fixer Kotlin outputs L522/L524 precede first price write L528", "builder error output L24 precedes correction L32"],
+    "seq_only_bug_attribution": "No demonstrated causal connection to this run's missed Slice8 input or wrong roles.",
+    "limit": "Zero explicit until does not certify every internal version-window cutoff; not an exhaustive per-result timing audit."
+  },
+  "observed_deltas_percent_v3_vs_v2": {"wall_s": -17.92, "tool_calls": 13.21, "tool_chars": 14.92, "input_total": -54.75, "input_uncached": 0.67, "output": -6.3},
+  "cost_semantics": "cached is included in input total; reasoning included in output; null USD is not estimated; one observed pair only",
+  "overall": {
+    "core_fact_reconstruction": "mostly retained",
+    "core_attribution": "regressed_from_v2",
+    "coverage_semantics": "partly_improved_not_fully_correct",
+    "full_success": false,
+    "no_frozen_artifact_modified": true
+  }
+}

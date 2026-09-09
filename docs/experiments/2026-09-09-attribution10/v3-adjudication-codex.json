@@ -1,0 +1,121 @@
+{
+  "schema": "migloop-attribution-v3-c4-adjudication/1",
+  "status": "complete",
+  "scope": {
+    "run": "_migloop-eval-20260909/attribution10/formal-v3/codex-c4/runs/tools/rep1",
+    "source_code_id": "18b8f7f",
+    "reference": "_migloop-eval-20260909/attribution10/reference-v1/codex-reference.json",
+    "paired_v2": "_migloop-eval-20260909/attribution10/formal-v2/codex-c4/runs/tools/rep1",
+    "rule": "YAML/parser success is structural only; semantic claims are checked against the frozen raw pool.",
+    "correction": "Earlier draft incorrectly equated two searches with different literals and called the result a late-read cutoff reproduction. That inference has been removed."
+  },
+  "semantic": {
+    "overall": "core_correct_full_annotation_accept_after_bounded_corrections",
+    "core": {
+      "grade": "correct",
+      "confidence": "high",
+      "finding": "The report correctly establishes a strong code-level near-cause from the pre-patch Block line, clickable descendants, SDK semantics, exact Block-to-Default patch, and source readback. It does not claim that the patch itself has four-click device closure."
+    },
+    "later_verification": {
+      "grade": "correct_boundary_with_stronger_direct_evidence_omitted",
+      "confidence": "high",
+      "finding": "Unlike V2, V3 distinguishes the immediate R1 failure/pre-fix HAP from later R2 new-package installation and privacy-gate/replay claims. It explicitly refuses to bind those later results to the exact C4 source line because the target file has no later recoverable version/hash and the R2 main record has no HitTestMode literal.",
+      "support": [
+        "v3 result.json:5 boundary and R2 main@v181 node",
+        "R2 rollout:5018 main-session install statement",
+        "R2 rollout:6300 main-session privacy-gate statement",
+        "R2 rollout:6366 child-agent completion claim"
+      ]
+    },
+    "omissions": [
+      {
+        "confidence": "medium_high",
+        "finding": "The report acknowledges later build/install only through main-session and child-agent claims; it does not open or cite the stronger native builder output at R2 physical line 7694 (`BUILD SUCCESSFUL in 12 s 22 ms` and `HAP installed`). This is recoverable because the report already reaches the correct non-binding boundary.",
+        "counterevidence": [
+          "rollout-2026-08-21T09-18-20-01a021e5-c150-7b12-a610-d40c07816b98.jsonl:7694 tool result for action #7859"
+        ]
+      },
+      {
+        "confidence": "medium",
+        "finding": "The report could distinguish more sharply between main-session statements, child-agent summaries, file/path existence, and direct device command output. It generally labels these as claims, so this is annotation precision rather than overclaimed closure."
+      }
+    ],
+    "unsupported": [],
+    "must_reject_check": {
+      "passed": true,
+      "details": "It has direct source/patch evidence, does not claim four interactions passed because of the patch, keeps the immediate R1 HAP pre-fix, and no longer claims that the full pool lacked a later successful build/install."
+    }
+  },
+  "yaml_semantics": [
+    {
+      "grade": "mostly_correct",
+      "confidence": "high",
+      "finding": "`entry: []` is justified because changed blame cannot identify who introduced Block. The fixing main@v252 is correctly `正常`, and unbound later R2 evidence is correctly `无法确认`. The separately declared R1 v253 node is invalid, as detailed below."
+    },
+    {
+      "grade": "invalid_agent_coordinate",
+      "confidence": "high",
+      "finding": "`agent:__main__:01a009fe@v253` is out of range: the ledger has main versions 1..252. Search rendered tail activity as `喂 v253 (锚点之后)`, but that synthetic tail/feed label is not a valid agent node coordinate. The R1 post-patch validation actions may be cited as later boundary evidence, but must not be materialized as agent@v253.",
+      "audit": "_migloop-eval-20260909/attribution10/audits-v3/codex-c4.json reports nodes 3/4 resolved and diagnoses v253 as 版本越界(1..252)."
+    },
+    {
+      "grade": "invalid_evidence_locator",
+      "confidence": "high",
+      "finding": "The v253 node cites `#...:4618@L8096`, but action #4618 is physically at lines 8100-8101; physical line 8096 is a different response item. The audit therefore records one missing evidence reference."
+    },
+    {
+      "grade": "temporal_node_ambiguity",
+      "confidence": "medium",
+      "finding": "The node `agent:__main__:01a021e5@v181` cites physical line 6505/action #7439, which belongs to main v185. That later action is legitimate post-v181 boundary evidence, but it was not input available to agent@v181. The reason should label it explicitly as subsequent evidence or use a v185 boundary node; the current grouping is ambiguous rather than proof that the semantic conclusion is wrong."
+    },
+    {
+      "grade": "allowed_repair_after_node",
+      "confidence": "medium_high",
+      "finding": "Listing repaired file@v2 as a `正常` node is allowed by the current interpretation: the prohibition is against marking repair.after as a red/faulty node. The GUIDE wording can read ambiguously, so this may be redundant, but it is not graded as an error."
+    },
+    {
+      "grade": "structurally_valid_not_truth_certified",
+      "confidence": "high",
+      "finding": "The parsed verdict has zero schema errors and complete empty coverage, but those checks do not authenticate the behavioural or temporal claims above."
+    }
+  ],
+  "query_audit": {
+    "totals": {
+      "tool_calls": 51,
+      "tool_return_chars": 261628,
+      "search_calls": 16,
+      "search_return_chars": 119995,
+      "full_pool_searches": 4,
+      "full_pool_search_chars": 4634,
+      "single_agent_searches": 12,
+      "single_agent_search_chars": 115361,
+      "pipe_OR_mistakes": 0
+    },
+    "improvements": [
+      "V2 had zero full-pool searches; V3 performs four post-patch full-pool searches with explicit since/until timestamps.",
+      "V3 opens index(kind=time), identifies both allowed session groups, and then searches the R2 main agent through v231.",
+      "V3 does not use pipe-separated pseudo-OR terms; tool output also explicitly states that search is literal."
+    ],
+    "remaining_issues": [
+      "The full-pool term `hvigor` is broad and reports only the earliest match per agent, which is an R2 system-prompt hit rather than the later build result.",
+      "The subsequent R2 term `install` returns 26,022 characters and many unrelated hits. The run opens earlier install statements instead of the direct #7859/L7694 builder result.",
+      "Most search text remains actor-scoped: 12/16 searches and 115,361/119,995 search characters. This is not wrong after R2 discovery, but it is inefficient."
+    ]
+  },
+  "time_scope_review": {
+    "known_anchor_excluded": false,
+    "finding": "The chosen upper bound, 2026-08-22T15:24:42.229Z, is later than the known R2 line-7694 build/install, and later agent@v231 searches have no time cutoff; therefore the omission of that anchor was not caused by the upper bound excluding it.",
+    "integer_until_calls": 0,
+    "late_read_bug_reproduced": false,
+    "correction": "The full-pool zero-hit query used the literal `点击同意`; the later 20-hit R2-agent query used the different literal `同意并继续`. These results are not comparable evidence of a cutoff defect. The run makes no `agent(until=<action sequence>)` call—the mechanism recently fixed—so this adjudication cannot attribute anything to that bug.",
+    "remaining_boundary": "Time index warns that some action times may be missing or unsortable, so time-bounded searches retain their stated scope limits; no specific C4 failure from that condition was reproduced here."
+  },
+  "paired_v2_to_v3": {
+    "core_static_diagnosis": "unchanged_correct",
+    "later_build_install_existence": "materially_improved: V3 acknowledges later new-package/install and replay activity; V2 incorrectly said none existed",
+    "exact_native_builder_anchor": "still_omitted",
+    "patch_to_artifact_or_behavior_binding": "correctly_unknown_in_both",
+    "roles": "improved: v252 fixer is normal rather than V2's overly uncertain role",
+    "overall": "V3 fixes V2's material global-timeline error. Remaining problems are a stronger-evidence omission and two bounded YAML annotation inconsistencies, not a core causal failure."
+  }
+}

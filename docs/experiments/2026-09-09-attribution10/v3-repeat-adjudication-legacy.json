@@ -1,0 +1,136 @@
+{
+  "schema": "migloop-repeat-adjudication/1",
+  "audited_at": "2026-09-09T14:39:28Z",
+  "scope": "formal-v3 Member S3/S4 rep2 with rep1 preserved",
+  "mode": "read-only original evidence plus same-frozen-source location/edge verification; no model/source/run/reference writes or identity rebinding",
+  "experiment_root": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10",
+  "plan": {
+    "path": "docs/experiments/2026-09-09-attribution10/v3-repeat-plan.md",
+    "path_root": "C:/Users/hongy/projects/migloop",
+    "sha256": "8983c4bed391975398a27f2df44f7eed7058a06ef331f19a77eb77453676157b",
+    "local_last_write_utc": "2026-09-09T14:29:22Z",
+    "planned_extra_repeats": 1,
+    "retain_both_replicates": true,
+    "no_extra_answer_feedback": true
+  },
+  "reference": {"path": "reference-v1/legacy-reference.json", "sha256": "2c015536094fff1e42bb3b6b5cc2dce743c0f2a0f6924254027f7f8a5faac927", "ids": ["S3", "S4"]},
+  "shared_conditions": {
+    "source_code_id": "18b8f7f",
+    "source_digest": "59ef6956e09fa888ec039ce55e24d1721601faef421934f1f89c7a42685acedf",
+    "common_task_sha256": "e60ad7491cd5991a948f8c7128432feca230a59bee208640ca5b90a44d68dec1",
+    "prompt_sha256": "c875ecdd81e7155b15575d74cbe20045e0595fafbb070396e5ba77a97c89e6f3",
+    "pool_digest": "a78b1373045f7558d6da3b76123e30d032635a2a0b4cdd665e7f80c0bdf8b337",
+    "ledger": "atoms-2026-09-09-observation4:146:bc4e9e2dd01e9ff0d0a1de37",
+    "model": "gpt-5.5", "effort": "medium", "transport": "native MCP",
+    "limit": "Same frozen configuration and initial prompt, not an assertion of identical subsequent query contexts or random seeds."
+  },
+  "runs": [
+    {
+      "rep": 1, "path": "formal-v3/member-center/runs/tools/rep1",
+      "run_id": "a5a3bb82-a65d-4e65-b677-f6a3802b9088", "status": "completed",
+      "wall_s": 280.17246449994855, "tool_calls": 60, "tool_chars": 230543, "rejected_calls": 6,
+      "usage": {"input_total": 876504, "cache_read": 759808, "input_uncached": 116696, "output": 11945},
+      "verdict_ok": true, "coverage_complete": true, "deferred": 9,
+      "core_attribution": "regressed_missing_Slice8_input_and_wrong_repairer_detector_roles",
+      "retained_not_replaced": true,
+      "artifact_sha256": {
+        "result.json": "1c8ac5ab0215929a1d7729cf861a54978f4458ef319bf3fc838ba88b75f8b09e",
+        "metrics.json": "513089698d3f772a024e3bee709e47de362a358bc08705294ca658bcdc752d59",
+        "verdict.json": "4c9631fbdb69ee35564485b63b2e779830de38bf1373f48080fdd54833d67ca1",
+        "transcript.jsonl": "6a6aaa2d9d119068ab86dc257218f90ca1ae4fe2643ceb81b305c3f2a985cec1"
+      }
+    },
+    {
+      "rep": 2, "path": "formal-v3/member-center/runs/tools/rep2",
+      "run_id": "3207ee3e-f388-4f69-b057-7a46dbf1f9f5", "status": "completed",
+      "started_at": "2026-09-09T14:29:23.446855+00:00", "ended_at": "2026-09-09T14:34:29.899452+00:00",
+      "wall_s": 306.45809400000144, "end_to_end_wall_s": 319.3078167999629,
+      "tool_calls": 40, "tool_chars": 191833, "rejected_calls": 4,
+      "tool_counts": {"guide": 1, "sessions": 1, "file": 3, "action": 19, "search": 4, "blame": 3, "agent": 8, "index": 1},
+      "usage": {"input_total": 1934960, "cache_read": 1830400, "input_uncached": 104560, "output": 10696},
+      "verdict_ok": true, "coverage_complete": true,
+      "coverage_counts": {"expected": 22, "accounted": 22, "expected_versions": 9, "expected_candidates": 13, "not_repair": 0, "unresolved": 0, "deferred": 11, "unconfirmed": 11, "advisories": 0, "advisory_rows": 0},
+      "artifact_sha256": {
+        "result.json": "b9200defd991b44db6c056acfea82a7b772e29680ca67b658f3a1fa83c1e03d5",
+        "metrics.json": "beb490105713999e7a242fb24891d3c2c538e5ac2317d3328a5bde7c4b487834",
+        "verdict.json": "fe75c17872ff75c78464551e77d1ccd25da66bd43ca3de9569b51bdf05e68afd",
+        "transcript.jsonl": "abeb37752a8e6de9c33f72faa3d36b331d923c89a8c32d6f4702c6e59cbb0a21"
+      }
+    }
+  ],
+  "items": [
+    {
+      "id": "S3",
+      "core_fact_status": "correct_site_value_mapping_but_execution_underclaim_and_H5_omission",
+      "fault_entry_status": "improved_empty_entry_no_false_blame_of_correct_patch",
+      "execution_issue": "Successful exact-target script result is still described as only attempts/claims because no formal file version exists.",
+      "supported_statement": "Three recorded writes, one Transparent and two DIALOG_MASK; complete snapshot absent, independent readback limited to import and PayAgreement, device behavior unverified.",
+      "omission": "H5PayDialog already Transparent and excluded by existing-mask guard.",
+      "repair_anchor_status": "correctly_no_synthesized_version_anchor",
+      "evidence": [
+        {"type": "rep2_call", "step": 7, "call_id": "call_jA8YeaUK14tLQvm1BvuWyzyY", "result_line": 60, "tool": "action", "seq": 23502},
+        {"type": "rep2_calls", "steps": [5, 6, 8, 10, 11], "result_lines": [56, 59, 67, 83, 86], "basis": "pre-count, classification, PayAgreement and Palette import readback"},
+        {"type": "raw", "path": "formal-v1/member-center/pool/ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl", "lines": [77, 78, 80, 81, 103, 104, 106, 107, 109, 110]},
+        {"type": "raw", "path": "formal-v1/member-center/pool/9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aslice8-pay-80bbb1f44b77da0f.jsonl", "lines": [264], "basis": "preexisting H5 Transparent"}
+      ]
+    },
+    {
+      "id": "S4",
+      "bounded_core_status": "pass_restored_actual_read_to_bad_rewrite_and_repair_compile_attribution",
+      "attribution_comparison": "rep2 directly opens Slice8 input/write missing in rep1; final private helper belongs to fixer, detector/corrector builder normal",
+      "v45_role": "normal_scoped_to_price_correction_acceptable_not_global_clean_code_certificate",
+      "v45_limit": "v12 already contains private splitPriceRuns/isDigitRun; observed final compiler error names v16 priceDigits/priceSuffix. No intermediate build failure was established.",
+      "extra_claim_issue": "Exact-expression first known match v7 is overstated as first single-Text price implementation; original v1 already has Text(item.priceText).fontSize(30). This does not itself prove the original generator violated the same dynamic-input obligation.",
+      "validation": "build pass confirmed; no independently established post-fix visual comparison",
+      "evidence": [
+        {"type": "rep2_calls", "steps": [27, 29, 32], "result_lines": [170, 186, 205], "basis": "exact old-expression search, file@v7, Slice8 input/action overview"},
+        {"type": "rep2_call", "step": 34, "call_id": "call_kvrj0mE5NZcpOReVOxE364LT", "result_line": 219, "tool": "action", "seq": 20509, "basis": "actual Kotlin return with replaceSpan/AbsoluteSizeSpan"},
+        {"type": "rep2_call", "step": 35, "call_id": "call_b7asjKploky3kcr6wETfQKjG", "result_line": 226, "tool": "action", "seq": 20723, "basis": "actual Write input with whole-price 30vp"},
+        {"type": "rep2_calls", "steps": [15, 22, 23, 24, 26, 39], "result_lines": [102, 139, 140, 147, 161, 256], "basis": "two price edits, private compile error, visibility edits, successful build"},
+        {"type": "raw", "path": "formal-v1/member-center/pool/9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aslice8-pay-80bbb1f44b77da0f.jsonl", "lines": [24, 264], "timestamps": ["2026-07-24T15:33:51.671Z", "2026-07-24T16:04:37.440Z"]},
+        {"type": "raw", "path": "formal-v1/member-center/pool/9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aconv-member-08b3dcf6deb3c515.jsonl", "lines": [61], "basis": "counterexample to broad syntactic single-Text first occurrence; priceText described as numeric in that version"},
+        {"type": "raw", "path": "formal-v1/member-center/pool/ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl", "lines": [528, 592], "basis": "first private helper pattern then final named helpers"}
+      ]
+    }
+  ],
+  "mechanical_checks": {
+    "engine": "original frozen source-18b8f7f, not current working tree",
+    "identity_exact_match_required_and_observed": true,
+    "evidence_occurrences": 46, "unique_evidence": 28, "unique_evidence_status": {"ok": 28},
+    "location_validity_not_semantic_truth": true,
+    "explicit_write_edges": [
+      {"from": "agent:agent-aslice8-pay-80bbb1f44b77da0f@v13", "to": "file:entry/src/main/ets/pages/MemberCenterPage.ets@v7", "status": "true"},
+      {"from": "agent:agent-a68daf720e780b4c2@v45", "to": "file:entry/src/main/ets/pages/MemberCenterPage.ets@v11", "status": "true"},
+      {"from": "agent:agent-a68daf720e780b4c2@v53", "to": "file:entry/src/main/ets/pages/MemberCenterPage.ets@v16", "status": "true"},
+      {"from": "agent:agent-af0e3d2ae54dbf769@v3", "to": "file:entry/src/main/ets/pages/MemberCenterPage.ets@v17", "status": "true"},
+      {"from": "agent:agent-af0e3d2ae54dbf769@v4", "to": "file:entry/src/main/ets/pages/MemberCenterPage.ets@v18", "status": "true"}
+    ],
+    "implicit_adjacent_checks": {"count": 5, "status_false": 5, "model_claims": false, "note": "Added by verdict.build from adjacent nodes, including S3 despite explicit edges=[]; not five model-fabricated relations."},
+    "consistency_advisories": 0,
+    "raw_artifacts_written": false
+  },
+  "coverage_adjudication": {
+    "status": "bounded_scope_handling_pass",
+    "v13": "out_of_scope fixes rep1's borrowed S4 association",
+    "v10_v14_image_candidate": "out_of_scope, remain in denominator, not asserted non-repairs",
+    "uninvestigated_23492": "out_of_scope accepted without forcing extra investigation",
+    "explained_scans": "Clearly described as S3 evidence gathering, not automatic claims of executed repair",
+    "complete_is_not_full_truth": true
+  },
+  "time_boundary_usage": {
+    "explicit_until": 0, "explicit_until_seq": 0, "explicit_until_ts": 1, "explicit_since_ts": 1,
+    "query": {"step": 40, "call_id": "call_Gtb8tpQ5v7d1DlGrRT4dN2iL", "result_line": 263, "q": "product-price-suffix", "since_ts": "2026-07-26T21:30:17.239Z", "until_ts": "2026-07-26T21:48:57.218000Z", "returned": "fixer attempt-script write, not early Read or independent runtime validation"},
+    "seq_only_until_bug_observed": false,
+    "limit": "Not an exhaustive certification of every internal version-window cutoff. Critical Slice8 raw return precedes its Write."
+  },
+  "observed_deltas_rep2_vs_rep1_percent": {"wall_s": 9.38, "tool_calls": -33.33, "tool_chars": -16.79, "input_total": 120.76, "input_uncached": -10.4, "output": -10.46},
+  "query_difference": "rep2 uses file v_from=10,v_to=18 diff aggregation once, not six separate diff calls",
+  "cost_semantics": "cache_read already included in input; reasoning already included in output; cost_usd null, no estimation",
+  "overall": {
+    "rep1_preserved": true,
+    "rep2_core": "S4 restored; S3 mapping and fault-entry handling improve but evidence wording/omission remain",
+    "rep2_full_annotation": "partial_not_fully_correct",
+    "stability": "Observed within-version output variation; two runs do not establish reliable success or population failure rate",
+    "best_run_substitution": false
+  }
+}

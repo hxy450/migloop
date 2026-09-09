@@ -1,0 +1,150 @@
+{
+  "schema": "migloop-attribution-v4-c4-adjudication/1",
+  "status": "complete",
+  "scope": {
+    "run": "_migloop-eval-20260909/attribution10/formal-v4/codex-c4/runs/tools/rep1",
+    "source_code_id": "a579cdf",
+    "reference": "_migloop-eval-20260909/attribution10/reference-v1/codex-reference.json",
+    "paired_v3": "_migloop-eval-20260909/attribution10/formal-v3/codex-c4/runs/tools/rep1",
+    "frozen_source_boundary": "Receipt field metadata is judged as emitted by a579cdf; the later local 328f510 field fix is not projected backward."
+  },
+  "semantic": {
+    "overall": "static_core_correct_validation_answer_needs_bounded_downgrade",
+    "code_near_cause": {
+      "grade": "correct",
+      "confidence": "high",
+      "finding": "The report correctly joins the pre-patch Block line, child click handlers, SDK Block/Default semantics, exact one-line patch, and readback into a strong code-level near-cause candidate. It does not invent an original author and does not claim the user's wording prescribed HitTestMode."
+    },
+    "native_build_install": {
+      "grade": "correct",
+      "confidence": "high",
+      "finding": "V4 directly opens R2 action #5059. Its native output shows HAP rebuild, `BUILD SUCCESSFUL in 1 s 581 ms`, successful bundle installation, and `HAP installed`. This is valid alternative evidence to reference line 7694 for the existence of a later build/install.",
+      "locator": "R2 rollout action #5059, tool use physical line 839 and tool result physical line 840; V4 events result line 119"
+    },
+    "patch_binding": {
+      "grade": "correctly_unknown",
+      "confidence": "high",
+      "finding": "The report does not infer that #5059 contains the exact C4 source state merely because it is later and in the same project. No source/artifact hash or later target-file version binds the build to Block→Default."
+    },
+    "manifest_behavior": {
+      "grade": "overstated",
+      "confidence": "medium_high",
+      "finding": "Action #6328 directly reads a stored capture manifest whose `behavior_observations` record trigger `同意并继续`, outcome `page_change`, landed `GuideStatusFragment`, and evidence paths. This proves what the artifact records. The investigation did not open the referenced run.jsonl, screenshot, or dump and did not replay the device action itself. Therefore `这验证到了…行为层` and the final `实际行为验证最高到...page_change` are too strong; the supported wording is `the manifest records one later page_change observation`.",
+      "locator": "R2 rollout action #6328 / physical line 3917; V4 events result line 105",
+      "causal_boundary": "Even if the recorded observation is accepted, it is not bound to C4: no artifact/source identity is supplied. No additional claim about later target-file edits is required."
+    },
+    "remaining_interactions": {
+      "grade": "correct",
+      "confidence": "high",
+      "finding": "The report correctly notes that the judge leaves `同意并继续` skipped, records page-level fail for title/content, and does not exercise/pass reject or agreement-link navigation. It does not claim full-page or four-interaction closure.",
+      "locators": [
+        "R2 rollout action #6509 / physical line 4426",
+        "R2 reviewer message #6511 / physical line 4430"
+      ]
+    },
+    "must_reject_check": {
+      "passed": false,
+      "details": "The source/patch, pre-fix R1 HAP, later-build existence, non-binding, and incomplete-interaction boundaries pass. The strict device-behaviour boundary needs correction because a stored manifest record is described as behaviour validation rather than recorded evidence requiring its underlying run artifacts."
+    }
+  },
+  "yaml_semantics": [
+    {
+      "grade": "correct_entry_boundary",
+      "confidence": "high",
+      "finding": "`entry: []` and file v1 `无法确认` are defensible: the Block line is observable, but changed blame cannot identify its introducer and device causality remains unclosed."
+    },
+    {
+      "grade": "correct_fixer_role",
+      "confidence": "high",
+      "finding": "R1 main@v252 is correctly `正常`; its diagnosis inputs and edit are direct. The duplicated v252 node is redundant but not contradictory."
+    },
+    {
+      "grade": "invalid_agent_coordinate",
+      "confidence": "high",
+      "finding": "`agent:__main__:01a009fe@v253` remains invalid because the ledger range is 1..252. The a579cdf search calls themselves clamp requests for v253 to `≤v252` and return no receipt target; tail actions can be cited as post-effect boundary evidence but cannot form an agent@v253 node.",
+      "audit": "Mechanical audit resolves 7/8 nodes; 16/16 evidence references locate."
+    },
+    {
+      "grade": "behavior_role_too_positive",
+      "confidence": "medium",
+      "finding": "R2 main@v118 is marked `正常` while its reason upgrades a manifest record to verified behaviour. If retained as an evidence-reader node, `无法确认` or an explicit artifact-record boundary better matches the lack of underlying replay inspection and patch binding."
+    },
+    {
+      "grade": "correct_later_build_role",
+      "confidence": "high",
+      "finding": "R2 main@v17 `正常` is supported for the narrow build/install activity, and its reason explicitly refuses patch-specific inference."
+    }
+  ],
+  "receipt_boundary": {
+    "source_grouping_helped": true,
+    "finding": "The broad full-pool `hvigor` result still shows R2 tool-output first as environment inspection #4834, not a build. A later exact HAP-path search places R2 native tool output #5059 in the tool-output bucket and the model opens it. Thus grouping exposes source type but does not semantically select a successful build; focused query and action expansion remain necessary.",
+    "a579cdf_field_issue": "The frozen receipt records displayed tool-output hits with action kind in `field` (for example #5059 as `field:other`) rather than the underlying `output` field. The via target and displayed action are genuine, so navigation/evidence identity is unaffected. The later 328f510 metadata correction is not attributed to this run."
+  },
+  "query_audit": {
+    "v4": {
+      "tool_calls": 54,
+      "tool_return_chars": 200888,
+      "action_calls": 25,
+      "action_return_chars": 61466,
+      "search_calls": 20,
+      "search_return_chars": 79167,
+      "full_pool_searches": 7,
+      "full_pool_search_chars": 12623,
+      "agent_searches": 11,
+      "agent_search_chars": 65030,
+      "file_searches": 2,
+      "file_search_chars": 1514,
+      "pipe_OR_mistakes": 0,
+      "integer_until_calls": 0
+    },
+    "v3": {
+      "tool_calls": 51,
+      "tool_return_chars": 261628,
+      "action_calls": 27,
+      "action_return_chars": 84784,
+      "search_calls": 16,
+      "search_return_chars": 119995,
+      "full_pool_searches": 4,
+      "full_pool_search_chars": 4634,
+      "agent_searches": 12,
+      "agent_search_chars": 115361
+    },
+    "interpretation": "V4 makes three more calls but returns 23.2% fewer tool characters. Source buckets plus a focused HAP-path query lead to native #5059; no pipe-as-OR or integer-until issue occurs. Different search literals are not compared as a bug signal."
+  },
+  "cost": {
+    "currency_cost": "unknown (NULL in both runs)",
+    "v3": {
+      "input_total": 1262524,
+      "cache_read": 1120256,
+      "input_uncached": 142268,
+      "output": 10548,
+      "wall_s": 261.002,
+      "end_to_end_wall_s": 263.682
+    },
+    "v4": {
+      "input_total": 1088730,
+      "cache_read": 973824,
+      "input_uncached": 114906,
+      "output": 10502,
+      "wall_s": 280.577,
+      "end_to_end_wall_s": 283.207
+    },
+    "v4_vs_v3": {
+      "input_total_pct": -13.8,
+      "input_uncached_pct": -19.2,
+      "output_pct": -0.4,
+      "tool_return_chars_pct": -23.2,
+      "tool_calls_pct": 5.9,
+      "end_to_end_wall_pct": 7.4
+    },
+    "interpretation": "V4 lowers token input and tool text but is slower wall-clock; it is not uniformly cheaper on every dimension. Cached input is included in input_total and is not added again."
+  },
+  "paired_v3_to_v4": {
+    "static_core": "unchanged_correct",
+    "native_build_install": "improved: V4 opens direct #5059 output instead of relying on statements",
+    "patch_binding": "unchanged_correctly_unknown",
+    "behavior_boundary": "regressed: V4 upgrades a stored manifest observation to validation",
+    "v253_coordinate": "not_improved",
+    "full_annotation": "Neither is unconditionally acceptable. V4 has stronger build evidence and lower input/tool text, but still needs the v253 removal and a downgrade of manifest semantics."
+  }
+}
