@@ -1,0 +1,878 @@
+{
+  "schema": "migloop-semantic-adjudication/1",
+  "status": "complete_rep2_with_rep1_comparison",
+  "review_date": "2026-09-09",
+  "case": "member-center",
+  "rep": 2,
+  "scope": "Same reference-v1 and raw Member pool, independent semantic evidence audit. Rep2 supplements rather than replaces rep1; no old run/source/reference/holdout changes or model calls.",
+  "run": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v8/member-center/runs/tools/rep2",
+  "reference": {
+    "path": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/reference-v1/legacy-reference.json",
+    "sha256": "2c015536094fff1e42bb3b6b5cc2dce743c0f2a0f6924254027f7f8a5faac927",
+    "case_ids": [
+      "S3",
+      "S4"
+    ],
+    "fact_policy": "Each original facts array element receives supported/partial/omitted/contradicted. Partial is not a full hit. Read the whole saved submission including coverage. Extra errors are not hidden by fact-hit counts."
+  },
+  "raw_pool": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v1/member-center/pool",
+  "fact_counts": {
+    "supported": 4,
+    "partial": 2,
+    "omitted": 0,
+    "contradicted": 0,
+    "total": 6
+  },
+  "fact_counts_not_accuracy": true,
+  "facts": [
+    {
+      "id": "S3.f1",
+      "reference_fact": "扫描列出的三处是 AppLoadDialog、PayAgreementDialog、RenewRuleDialog。",
+      "status": "supported",
+      "report_quote": "MemberCenterPage 有三处：206 行 AppLoadDialog、704 行 PayAgreementDialog、728 行 RenewRuleDialog。",
+      "report_location": "S3_MASK nodes[1], notes",
+      "raw": [
+        "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl:L77-L81"
+      ],
+      "reason": "Actually opened scan and builder classification actions; exact three named, not all controllers dark."
+    },
+    {
+      "id": "S3.f2",
+      "reference_fact": "脚本跳过已设 mask 的 controller；AppLoad 分支补 Color.Transparent，其余缺失项补 Palette.DIALOG_MASK。",
+      "status": "supported",
+      "report_quote": "批量脚本实际执行：AppLoadDialog 插入 Color.Transparent；其他 builder 插入 Palette.DIALOG_MASK；输出报告 MemberCenterPage 3 sites import=+。",
+      "report_location": "coverage candidate:b30f4e449bea2bd6cc42; S3 notes",
+      "raw": [
+        "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl:L103-L104"
+      ],
+      "reason": "Actually opened full script input and output; scan of missing-mask controllers and correct values support fixed fact. Raw code writes before report.append/print. Report's lack of final persistence readback is valid limitation, not a reason to deny execution. Does not prove final device state."
+    },
+    {
+      "id": "S3.f3",
+      "reference_fact": "3 sites 是总修改数，不是三个深色/non-loading controller。H5 已透明并被跳过。",
+      "status": "partial",
+      "report_quote": "按脚本逻辑，AppLoadDialog 取 Color.Transparent，其余两个取 Palette.DIALOG_MASK",
+      "report_location": "notes",
+      "raw": [
+        "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl:L74-L75,L103-L104",
+        "9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aslice8-pay-80bbb1f44b77da0f.jsonl:L264"
+      ],
+      "reason": "Correct 1 transparent +2 Palette interpretation. H5 already transparent/skipped never named anywhere, and L74 existing-mask scan is explicitly out_of_scope. H5 original member controller is available in earlier native full Write; no credit for unqueried proof."
+    },
+    {
+      "id": "S4.f1",
+      "reference_fact": "Slice 8 在整文件写入之前读到 Kotlin replaceSpan 数字段逻辑，后来实现仍把非滚动价格后缀与数字统一使用 30vp。",
+      "status": "partial",
+      "report_quote": "原始缺陷进入点未追到生成期；本题只核 round-1 要求、修复前读到的代码、安卓真值、以及修复动作。",
+      "report_location": "S4_PRICE boundary",
+      "raw": [
+        "9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aslice8-pay-80bbb1f44b77da0f.jsonl:L21-L24,L264-L265",
+        "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl:L516,L523"
+      ],
+      "reason": "Correct later single 30vp Text code and Android rule, but never investigates actual Slice8 pre-Write correct Kotlin input. No agent or blame queries, no v7 source/action open. Transparent concession is not completed attribution."
+    },
+    {
+      "id": "S4.f2",
+      "reference_fact": "修复先采用片段迭代，后改为 priceDigits/priceSuffix 两个固定 Span，不能把中间态当最终态。",
+      "status": "supported",
+      "report_quote": "第一次正式修复为 ForEach(splitPriceRuns) 分段，随后收尾后候选脚本又简化为 priceDigits/priceSuffix 两个 Span",
+      "report_location": "S4_PRICE nodes[2..4], notes",
+      "raw": [
+        "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl:L528-L529,L592-L593"
+      ],
+      "reason": "Actually opened first script and tail script including native post-write ok and readback. Did not mistake ForEach intermediate for final recorded change; 30/16 preserved."
+    },
+    {
+      "id": "S4.f3",
+      "reference_fact": "视觉修复新增 private static helper 被兄弟组件调用，后置编译报 private access；两次 Edit 去掉 private，随后构建成功。",
+      "status": "supported",
+      "report_quote": "该后续脚本引入 private static 可见性编译错误，build-verify 再把两个方法改为非 private。最终只核到 hvigor BUILD SUCCESSFUL，未核到视觉回归通过。",
+      "report_location": "notes; S4_COMPILE",
+      "raw": [
+        "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl:L592-L593",
+        "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-af0e3d2ae54dbf769.jsonl:L23-L24,L32-L37"
+      ],
+      "reason": "Correct fixer vs discovering/repairing builder and two native Edit effects +actual build stdout. Neither runtime visual validation nor successful current snapshot invented; exact node-window issue kept separate."
+    }
+  ],
+  "core": {
+    "S3": "partial full target: actual three writes and 1 transparent+2 dark supported; H5 existing exception omitted. Final persistence unknown correctly distinguished.",
+    "S4": "partial attribution: later price repair/private-error chain supported, historical Slice8 correct-input->bad full rewrite not investigated. More uncertainty is not higher accuracy."
+  },
+  "extra_issues": [
+    {
+      "id": "mask_arbitrary_repair_pair",
+      "severity": "material_annotation",
+      "report_quote": "repair: {before: file:entry/src/main/ets/pages/MemberCenterPage.ets@v9, after: file:entry/src/main/ets/pages/MemberCenterPage.ets@v16",
+      "reason": "Reintroduced broad pair absent in rep1. No formal mask effect exists at either endpoint; v16 is builder's priceSuffix visibility Edit. Report says v16 content unknown, so cannot certify v16 as mask repair landing. Legitimate temporal bracket must not become exact effect or fixed status.",
+      "raw": [
+        "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl:L103-L104",
+        "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-af0e3d2ae54dbf769.jsonl:L34-L35"
+      ]
+    },
+    {
+      "id": "tail_still_on_last_agent_node",
+      "severity": "annotation_boundary",
+      "node": "agent:agent-a68daf720e780b4c2@v40",
+      "report_quote": "收尾后脚本又把 ForEach 方案改成固定两个 Span",
+      "reason": "#15731 / L592 actually feeding slot41 after40 recorded effects and no effect_version. Action L137 explicitly states this. Final attaches it to v40 node with 无法确认; unlike rep1 it is not a red entering node and has no fake write edge. Disclosure prevents treating text as an undisclosed first-v40 write, but a generic node UI must not imply this action belongs inside v40.",
+      "raw": [
+        "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl:L592-L593"
+      ],
+      "observed_tool_result_line": 137
+    },
+    {
+      "id": "compile_before_scope",
+      "severity": "boundary",
+      "report_quote": "repair.before 只能用上一正式目标版本 v14 作账本边界，不能声称 v14 本身已经包含该错误。",
+      "reason": "v14 original native effect only adds banner constants; private helper arrives in separate later script. Report explicitly limits before to ledger bracket, not faulty content. Preserve this limitation; do not paint v14 private-bug snapshot or infer it from build1 log.",
+      "raw": [
+        "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl:L532-L533,L592-L593",
+        "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-af0e3d2ae54dbf769.jsonl:L23-L24"
+      ]
+    },
+    {
+      "id": "role_conflict",
+      "severity": "model_annotation",
+      "node": "agent:agent-a68daf720e780b4c2@v5",
+      "reason": "Same S3 node has both 正常 and 无法确认 for implementation vs final verification. Actual check warns and preserves both; no silent role selection or semantic clearance."
+    },
+    {
+      "id": "no_fake_generator_origin",
+      "severity": "improvement_with_gap",
+      "reason": "No red Slice8 node this time, no misidentification of later finder as generator. This removes rep1 unsupported red-origin claim but leaves required early-input investigation missing."
+    }
+  ],
+  "query_audit": {
+    "tools": [
+      {
+        "Name": "guide",
+        "Count": 2
+      },
+      {
+        "Name": "sessions",
+        "Count": 1
+      },
+      {
+        "Name": "action",
+        "Count": 24
+      },
+      {
+        "Name": "diff",
+        "Count": 5
+      },
+      {
+        "Name": "file",
+        "Count": 1
+      },
+      {
+        "Name": "search",
+        "Count": 8
+      },
+      {
+        "Name": "check",
+        "Count": 1
+      }
+    ],
+    "tool_calls": 42,
+    "action_ref_calls": 24,
+    "action_successful": 23,
+    "action_errors": 1,
+    "metrics_rejected_calls": 0,
+    "actual_error": {
+      "step": 10,
+      "result_line": 60,
+      "ref": "#a68daf720e780b4c2:17286@L23",
+      "body": "Error executing tool action: action.ref 无法唯一定位: missing；不得仅按 #n 猜测",
+      "isError": true,
+      "next_step": 11,
+      "corrected_ref": "#af0e3d2ae54dbf769:17286@L23"
+    },
+    "agent_queries": 0,
+    "blame_queries": 0,
+    "until_ts_queries": 0,
+    "seq_only_until": 0,
+    "search_scope": "File known-content/reader search and explicit fixer/builder agent effect ranges; no generation input time investigation.",
+    "slice8_entry_delivered": [
+      {
+        "result_line": 78,
+        "meaning": "file v16 spine lists native v7 writer id and #13670@L264"
+      },
+      {
+        "result_line": 92,
+        "meaning": "maskColor search returns v7 Transparent line and exact search receipt"
+      }
+    ],
+    "slice8_followups": 0,
+    "h5_followups": 0
+  },
+  "coverage": {
+    "expected": 38,
+    "provided": 38,
+    "accounted": 38,
+    "expected_versions": 7,
+    "expected_candidates": 31,
+    "missing_versions": 0,
+    "missing_candidates": 0,
+    "missing": 0,
+    "unresolved": 0,
+    "not_repair": 0,
+    "deferred": 23,
+    "unconfirmed": 23,
+    "advisories": 0,
+    "advisory_rows": 0,
+    "explained": 15,
+    "out_of_scope": 23,
+    "semantic_complete": false,
+    "notes": "Unrelated v10/v13/v14/image deferral valid. L501 price finding explained correctly; L615 uninvestigated rather than false pure-CTA claim. H5-needed existing-mask L74 remains uninvestigated."
+  },
+  "mechanical": {
+    "check_count": 1,
+    "step": 42,
+    "result_line": 214,
+    "status": "needs_review",
+    "errors": 0,
+    "warnings": 1,
+    "warning": "node_role_conflict",
+    "red_nodes": 0,
+    "basis_nodes": 0,
+    "final_binding": "matched",
+    "meaning": "No basis needed under v1 non-red schema; few warnings not proof complete causal answer. Read-boundary diagnostics intentionally do not inspect non-red ordinary evidence, so tail node receives no new temporal basis warning."
+  },
+  "metadata": {
+    "source_code_id": "b540cb2",
+    "actual_models": [
+      "gpt-5.5"
+    ],
+    "actual_effort": "medium",
+    "source_digest": "008bb634b4c614dd480ecdd632f3ae3679e41147dff78160f45631cbe59ad981",
+    "pool_digest": "a78b1373045f7558d6da3b76123e30d032635a2a0b4cdd665e7f80c0bdf8b337",
+    "common_task_sha256": "e60ad7491cd5991a948f8c7128432feca230a59bee208640ca5b90a44d68dec1",
+    "started_at": "2026-09-09T20:02:04.113910+00:00",
+    "ended_at": "2026-09-09T20:06:51.763833+00:00",
+    "wall_s": 287.6555157999974,
+    "end_to_end_wall_s": 301.4001699000364,
+    "usage": {
+      "input_total": 846003,
+      "cache_read": 689664,
+      "cache_creation": 0,
+      "input_uncached": 156339,
+      "output": 12859,
+      "thinking_reported": 1269,
+      "output_includes_thinking": "Codex output_tokens is used once; reasoning is not added",
+      "input_semantics": "Codex input_tokens is the total; reported cache read/write are not added to it. input_uncached means input_tokens minus cached_input_tokens."
+    },
+    "tool_counts": [
+      {
+        "Name": "guide",
+        "Count": 2
+      },
+      {
+        "Name": "sessions",
+        "Count": 1
+      },
+      {
+        "Name": "action",
+        "Count": 24
+      },
+      {
+        "Name": "diff",
+        "Count": 5
+      },
+      {
+        "Name": "file",
+        "Count": 1
+      },
+      {
+        "Name": "search",
+        "Count": 8
+      },
+      {
+        "Name": "check",
+        "Count": 1
+      }
+    ],
+    "tool_calls": 42,
+    "tool_chars": 157131,
+    "repeated_calls": 0,
+    "rejected_calls": 0,
+    "coverage_counts": {
+      "expected": 38,
+      "provided": 38,
+      "accounted": 38,
+      "expected_versions": 7,
+      "expected_candidates": 31,
+      "missing_versions": 0,
+      "missing_candidates": 0,
+      "missing": 0,
+      "unresolved": 0,
+      "not_repair": 0,
+      "deferred": 23,
+      "unconfirmed": 23,
+      "advisories": 0,
+      "advisory_rows": 0
+    },
+    "draft_check": {
+      "status": "matched",
+      "semantic_checked": false,
+      "checks": [
+        {
+          "step": 42,
+          "call_id": "call_YBZ7607nEA4MSJEh0eAYIhv1",
+          "verified": true,
+          "status": "needs_review",
+          "counts": {
+            "errors": 0,
+            "warnings": 1,
+            "total": 1
+          },
+          "draft_sha256": "ffb5daf67747d547b0ee4e8043778cd753c425e7d4321663787c3d056b47453b",
+          "document_sha256": "5a91b80909bafb6c419f91f5bb264b5ace65eb069902b9c45933fc46db9d35e1",
+          "issues": [
+            {
+              "code": "node_role_conflict",
+              "severity": "warning",
+              "where": "defect:S3_MASK",
+              "node": "agent:agent-a68daf720e780b4c2@v5",
+              "detail": "同一缺陷的同一节点版本有不同角色声明，均已保留。"
+            }
+          ],
+          "omitted_issues": 0,
+          "coverage": {
+            "checked": true,
+            "target": "entry/src/main/ets/pages/MemberCenterPage.ets",
+            "counts": {
+              "expected": 38,
+              "provided": 38,
+              "accounted": 38,
+              "expected_versions": 7,
+              "expected_candidates": 31,
+              "missing_versions": 0,
+              "missing_candidates": 0,
+              "missing": 0,
+              "unresolved": 0,
+              "not_repair": 0,
+              "deferred": 23,
+              "unconfirmed": 23,
+              "advisories": 0,
+              "advisory_rows": 0
+            },
+            "accounted": true,
+            "semantic_checked": false
+          }
+        }
+      ],
+      "check_calls": 1,
+      "draft_chars": 15286,
+      "returned_chars": 1092,
+      "final_document_sha256": "5a91b80909bafb6c419f91f5bb264b5ace65eb069902b9c45933fc46db9d35e1",
+      "matched_check": 42
+    }
+  },
+  "locator_audit": {
+    "references": [
+      {
+        "ref": "#a68daf720e780b4c2:15361@L28",
+        "relative_file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+        "line": 28,
+        "native_ids": [
+          "toolu_01B8RaNhNXNsZ6LPHxobH1KV"
+        ],
+        "timestamp": "2026-07-26T20:33:52.399Z",
+        "record_sha256": "0b58129d2362096b2baaa505cd5c9d4f82f8465f9da6b52dcc958ac9f07e13e3",
+        "located": true
+      },
+      {
+        "ref": "#a68daf720e780b4c2:15363@L31",
+        "relative_file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+        "line": 31,
+        "native_ids": [
+          "toolu_01QjWicXTWEUbEKnyoM2Dwra"
+        ],
+        "timestamp": "2026-07-26T20:34:00.083Z",
+        "record_sha256": "5521b5ed0bbd02079e0f20f90dd718f557bb5454b4171ce5a6d5caf3abdb9c65",
+        "located": true
+      },
+      {
+        "ref": "#a68daf720e780b4c2:15371@L42",
+        "relative_file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+        "line": 42,
+        "native_ids": [
+          "toolu_01JKCtmH5cVhRuivGMjbvQQi"
+        ],
+        "timestamp": "2026-07-26T20:34:15.052Z",
+        "record_sha256": "e3b1aa7e4c15bf623a94d65653390076e68df7a81553d0f592ec5534a7341423",
+        "located": true
+      },
+      {
+        "ref": "#a68daf720e780b4c2:15394@L71",
+        "relative_file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+        "line": 71,
+        "native_ids": [
+          "toolu_01JfRDQZ6RoisHjhkCsmRK5u"
+        ],
+        "timestamp": "2026-07-26T20:35:37.651Z",
+        "record_sha256": "e2eecb8dd559711f201ac6e1ef6875731d840fc7cfe3d94b18e49378fb29d5bd",
+        "located": true
+      },
+      {
+        "ref": "#a68daf720e780b4c2:15395@L74",
+        "relative_file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+        "line": 74,
+        "native_ids": [
+          "toolu_01WYkvw5vN1kASRqmt5EkUbM"
+        ],
+        "timestamp": "2026-07-26T20:35:47.493Z",
+        "record_sha256": "7c9e42179203997eb9ee51265bcf31633911b1040baad87bf220f177ad3f3255",
+        "located": true
+      },
+      {
+        "ref": "#a68daf720e780b4c2:15396@L77",
+        "relative_file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+        "line": 77,
+        "native_ids": [
+          "toolu_016h1qeyct3Ac32r68PFp2KB"
+        ],
+        "timestamp": "2026-07-26T20:36:01.231Z",
+        "record_sha256": "d62980223529c0a245178d6df6bd16ac6bf1024f80651c5e03502496fd40fade",
+        "located": true
+      },
+      {
+        "ref": "#a68daf720e780b4c2:15397@L80",
+        "relative_file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+        "line": 80,
+        "native_ids": [
+          "toolu_011svikWwqqHYsLcQxAET1dW"
+        ],
+        "timestamp": "2026-07-26T20:36:15.076Z",
+        "record_sha256": "7c126ee113537ab79cb559e72cae3ce3ecd4d02cd20f81ad3ebeac8af9d46fb5",
+        "located": true
+      },
+      {
+        "ref": "#a68daf720e780b4c2:15401@L91",
+        "relative_file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+        "line": 91,
+        "native_ids": [
+          "toolu_013kUKtN53kS5i7VWj25SfKF"
+        ],
+        "timestamp": "2026-07-26T20:40:20.655Z",
+        "record_sha256": "0ae5e70cc50a5bda5d1fe32d4fea2281effe5f1b22e79b5c716e52b2d282102d",
+        "located": true
+      },
+      {
+        "ref": "#a68daf720e780b4c2:15406@L103",
+        "relative_file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+        "line": 103,
+        "native_ids": [
+          "toolu_01T6WkXMhD7rUsHaSaMPuhgx"
+        ],
+        "timestamp": "2026-07-26T20:41:07.872Z",
+        "record_sha256": "d3662b808223939b528589cd614033c8b5bffcb83d2cf78c3b5b97c0d395b4ba",
+        "located": true
+      },
+      {
+        "ref": "#a68daf720e780b4c2:15407@L106",
+        "relative_file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+        "line": 106,
+        "native_ids": [
+          "toolu_019xb74vC9BgRv4xeSea6NmF"
+        ],
+        "timestamp": "2026-07-26T20:41:17.462Z",
+        "record_sha256": "cb92907b23f9a26e874433f6e41be0ab102c854f2909d65e7ac823bb2a52319e",
+        "located": true
+      },
+      {
+        "ref": "#a68daf720e780b4c2:15408@L109",
+        "relative_file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+        "line": 109,
+        "native_ids": [
+          "toolu_01TDAaS2AzfpSuoTnkCXnYo7"
+        ],
+        "timestamp": "2026-07-26T20:41:25.785Z",
+        "record_sha256": "bc7c206264391781300f83deaf3b882ccfeaa6f4957c64e291292c4e8a26b809",
+        "located": true
+      },
+      {
+        "ref": "#a68daf720e780b4c2:15411@L116",
+        "relative_file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+        "line": 116,
+        "native_ids": [
+          "toolu_01WBp6qmCNwyR2R8HpqBzr4T"
+        ],
+        "timestamp": "2026-07-26T20:41:51.396Z",
+        "record_sha256": "56cbe92259042ecab55549b68e06965c8d8240c7e6829dca60240fbfcb55469e",
+        "located": true
+      },
+      {
+        "ref": "#a68daf720e780b4c2:15428@L141",
+        "relative_file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+        "line": 141,
+        "native_ids": [
+          "toolu_012em43cG4JkvcjLqTY4shcs"
+        ],
+        "timestamp": "2026-07-26T20:44:05.741Z",
+        "record_sha256": "48032b6aae2dc505e8e9ae210ba5d5c63ed1ebeab6ab30e8d59f025454d677e5",
+        "located": true
+      },
+      {
+        "ref": "#a68daf720e780b4c2:15469@L195",
+        "relative_file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+        "line": 195,
+        "native_ids": [
+          "toolu_01F67NetoXG2uc6qdxYcsXNA"
+        ],
+        "timestamp": "2026-07-26T20:49:16.395Z",
+        "record_sha256": "897b76c6320225d64954778a9c1e38243bc31e1374bbebb8a6a6e1c5daa13108",
+        "located": true
+      },
+      {
+        "ref": "#a68daf720e780b4c2:15473@L206",
+        "relative_file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+        "line": 206,
+        "native_ids": [
+          "toolu_01SBSYCdnmszD2VkSqefhpCg"
+        ],
+        "timestamp": "2026-07-26T20:50:41.549Z",
+        "record_sha256": "96790f02ac6fcfaa54635b6c2daa54b3427ef70c14e757f03bc4baa85ec53b3e",
+        "located": true
+      },
+      {
+        "ref": "#a68daf720e780b4c2:15489@L233",
+        "relative_file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+        "line": 233,
+        "native_ids": [
+          "toolu_01DeqiV3n9uPH5cLqUA6a8Yn"
+        ],
+        "timestamp": "2026-07-26T20:54:02.690Z",
+        "record_sha256": "46be1603cde9050c22a9fd276f6963c50b544291e3e2304068465427ea6ac434",
+        "located": true
+      },
+      {
+        "ref": "#a68daf720e780b4c2:15604@L398",
+        "relative_file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+        "line": 398,
+        "native_ids": [
+          "toolu_013cAjv5sywDgSN6x1DScSky"
+        ],
+        "timestamp": "2026-07-26T21:12:15.990Z",
+        "record_sha256": "db7370085b256d5f91968ea192eb61be47bd4f525983ab902b3a98503659f827",
+        "located": true
+      },
+      {
+        "ref": "#a68daf720e780b4c2:15605@L401",
+        "relative_file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+        "line": 401,
+        "native_ids": [
+          "toolu_01TNhXhFRHWXbwkWjbX59zgN"
+        ],
+        "timestamp": "2026-07-26T21:12:32.663Z",
+        "record_sha256": "70550556e549b32e003f86df502bc69a5e8e62d565262a57535a0a54fcf7af37",
+        "located": true
+      },
+      {
+        "ref": "#a68daf720e780b4c2:15619@L425",
+        "relative_file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+        "line": 425,
+        "native_ids": [
+          "toolu_013eYDXVP5TaTQ9sez1LQDAF"
+        ],
+        "timestamp": "2026-07-26T21:14:42.553Z",
+        "record_sha256": "be4762b9113b48a246c41b6ca97910f0303f84fefcb3ea9a03658cf131b6b273",
+        "located": true
+      },
+      {
+        "ref": "#a68daf720e780b4c2:15620@L428",
+        "relative_file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+        "line": 428,
+        "native_ids": [
+          "toolu_0183DMQX3A45vEYP75VK1WHy"
+        ],
+        "timestamp": "2026-07-26T21:15:22.798Z",
+        "record_sha256": "c8b314896fe747897cd283f80464d55cfc37630e5d00ec5318b9c1ad03d9290e",
+        "located": true
+      },
+      {
+        "ref": "#a68daf720e780b4c2:15621@L430",
+        "relative_file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+        "line": 430,
+        "native_ids": [
+          "toolu_018HkF74ftoZebLRLYr9inG9"
+        ],
+        "timestamp": "2026-07-26T21:15:32.270Z",
+        "record_sha256": "b71146909c20062bae75d1700042485ba07c68ef71267e3dc52f4744a2a6eb95",
+        "located": true
+      },
+      {
+        "ref": "#a68daf720e780b4c2:15624@L436",
+        "relative_file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+        "line": 436,
+        "native_ids": [
+          "toolu_01JFX7XbxsbxexCTxvvuGvUy"
+        ],
+        "timestamp": "2026-07-26T21:16:18.424Z",
+        "record_sha256": "08c8269ea6c0c98e9208143b83d37b9d3c103745822f2b86657b6f726df914bc",
+        "located": true
+      },
+      {
+        "ref": "#a68daf720e780b4c2:15670@L501",
+        "relative_file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+        "line": 501,
+        "native_ids": [
+          "toolu_01YGYsH1u6KQtX8A2AkLVXFF"
+        ],
+        "timestamp": "2026-07-26T21:21:29.934Z",
+        "record_sha256": "29282cec557a01a6a9c46a8f293d85541d25bd8a98cef9ad2e032b7790c62c8a",
+        "located": true
+      },
+      {
+        "ref": "#a68daf720e780b4c2:15676@L514",
+        "relative_file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+        "line": 514,
+        "native_ids": [
+          "toolu_01FtpChSvY6ZyLF571yQrYm5"
+        ],
+        "timestamp": "2026-07-26T21:22:46.628Z",
+        "record_sha256": "d89bb2679d09c0cb6f8063a454843d5228d2a912e43fa7a161b147c0e106a672",
+        "located": true
+      },
+      {
+        "ref": "#a68daf720e780b4c2:15677@L516",
+        "relative_file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+        "line": 516,
+        "native_ids": [
+          "toolu_019PTiyxoeX5Vc9KMJFu2jhw"
+        ],
+        "timestamp": "2026-07-26T21:22:55.328Z",
+        "record_sha256": "0842419d54cf337120262ca5ad80a280bc1c0f2b449a17186b855661edfb7ca6",
+        "located": true
+      },
+      {
+        "ref": "#a68daf720e780b4c2:15680@L523",
+        "relative_file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+        "line": 523,
+        "native_ids": [
+          "toolu_01XBPsevwzempBkQ2sBNTsvW"
+        ],
+        "timestamp": "2026-07-26T21:23:32.334Z",
+        "record_sha256": "e46907395da4194bc57e06c99a44eb56e1238d961c03e069ea78bfd714846b50",
+        "located": true
+      },
+      {
+        "ref": "#a68daf720e780b4c2:15681@L526",
+        "relative_file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+        "line": 526,
+        "native_ids": [
+          "toolu_018iigK7PXctAwha3ACowNZP"
+        ],
+        "timestamp": "2026-07-26T21:23:48.943Z",
+        "record_sha256": "bd088e069c147c83094ed38f227fcd610cb50ea4d719aecfdda17eefe4f613e4",
+        "located": true
+      },
+      {
+        "ref": "#a68daf720e780b4c2:15682@L528",
+        "relative_file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+        "line": 528,
+        "native_ids": [
+          "toolu_016bvcNnvDn4tHXcYJY7CzLh"
+        ],
+        "timestamp": "2026-07-26T21:24:15.832Z",
+        "record_sha256": "16690e1e9641c1ddf9dee4ca7979c4f3521bb478bc2799bdd0db2ab28f2ff6dc",
+        "located": true
+      },
+      {
+        "ref": "#a68daf720e780b4c2:15687@L530",
+        "relative_file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+        "line": 530,
+        "native_ids": [
+          "toolu_01GbF86KFoovojjdVCEe2cfx"
+        ],
+        "timestamp": "2026-07-26T21:24:24.172Z",
+        "record_sha256": "eb11856c18d6346843f1f26de435cba5b098f67c35fb5f02fcabf423fbdea023",
+        "located": true
+      },
+      {
+        "ref": "#a68daf720e780b4c2:15688@L532",
+        "relative_file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+        "line": 532,
+        "native_ids": [
+          "toolu_012iDuZirwvtQcB6kboc6BwR"
+        ],
+        "timestamp": "2026-07-26T21:24:34.699Z",
+        "record_sha256": "b86a3542d46366852c44819b58328f993df377b0d2066003db6d28b60c485d86",
+        "located": true
+      },
+      {
+        "ref": "#a68daf720e780b4c2:15731@L592",
+        "relative_file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+        "line": 592,
+        "native_ids": [
+          "toolu_01BrL9dsi5PB64tZiKVRfWoa"
+        ],
+        "timestamp": "2026-07-26T21:30:17.239Z",
+        "record_sha256": "247880efbf4a79665a1ed0968a3cfa8e7269a991e34aecc0715dedad965642d7",
+        "located": true
+      },
+      {
+        "ref": "#a68daf720e780b4c2:15738@L605",
+        "relative_file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+        "line": 605,
+        "native_ids": [
+          "toolu_01TAdUUGRVfADPAYGonLPJmX"
+        ],
+        "timestamp": "2026-07-26T21:33:41.324Z",
+        "record_sha256": "741d1a7840668827463dcf90559510515e7f1da77ffdf91057d0c4ac44ecd09c",
+        "located": true
+      },
+      {
+        "ref": "#a68daf720e780b4c2:15744@L615",
+        "relative_file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+        "line": 615,
+        "native_ids": [
+          "toolu_01XJTap83qih25dRyZQyQNkw"
+        ],
+        "timestamp": "2026-07-26T21:41:39.026Z",
+        "record_sha256": "4a62b9fd1fe061c21e60017a33de7b9d8b769c42274aa798702cfa95016524d6",
+        "located": true
+      },
+      {
+        "ref": "#a68daf720e780b4c2:15750@L626",
+        "relative_file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+        "line": 626,
+        "native_ids": [
+          "toolu_01P7rxYCDJpHmYNJoodwP45U"
+        ],
+        "timestamp": "2026-07-26T21:42:48.118Z",
+        "record_sha256": "bead39ad37b50be6bbd58405170dd4f9c26fe3ace157c4b4189df956d8b68568",
+        "located": true
+      },
+      {
+        "ref": "#af0e3d2ae54dbf769:17286@L23",
+        "relative_file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-af0e3d2ae54dbf769.jsonl",
+        "line": 23,
+        "native_ids": [
+          "toolu_01SSSyTUpqQtQF1SjZy36FTe"
+        ],
+        "timestamp": "2026-07-26T21:45:43.448Z",
+        "record_sha256": "dd5a088044c503af6f19786c8b1c4eb3abbcdfe58c4207eed096bbd08b436a4f",
+        "located": true
+      },
+      {
+        "ref": "#af0e3d2ae54dbf769:17292@L32",
+        "relative_file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-af0e3d2ae54dbf769.jsonl",
+        "line": 32,
+        "native_ids": [
+          "toolu_01W4Yg3nfX75u3Yxsk1X4wat"
+        ],
+        "timestamp": "2026-07-26T21:46:11.820Z",
+        "record_sha256": "94fd77263f2be9dbaff0629cf3399face77ec8c84e9fcba8f0f72a15877eca77",
+        "located": true
+      },
+      {
+        "ref": "#af0e3d2ae54dbf769:17294@L34",
+        "relative_file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-af0e3d2ae54dbf769.jsonl",
+        "line": 34,
+        "native_ids": [
+          "toolu_01YcRVJymkRf9wtm51Pr5qt8"
+        ],
+        "timestamp": "2026-07-26T21:46:12.739Z",
+        "record_sha256": "5dc57be6408fb9395737e8d66e0b239071524e71e5d8329f421483170690c200",
+        "located": true
+      },
+      {
+        "ref": "#af0e3d2ae54dbf769:17296@L36",
+        "relative_file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-af0e3d2ae54dbf769.jsonl",
+        "line": 36,
+        "native_ids": [
+          "toolu_01PcjKpCh43ea95hpoivTyih"
+        ],
+        "timestamp": "2026-07-26T21:46:18.585Z",
+        "record_sha256": "792568db4539cbb2617c22388993bf80fde9505a8b4b4a3d17ec302c6a8a1075",
+        "located": true
+      },
+      {
+        "ref": "#af0e3d2ae54dbf769:17299@L43",
+        "relative_file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-af0e3d2ae54dbf769.jsonl",
+        "line": 43,
+        "native_ids": [
+          "toolu_01Y5Mmfw9CY66VzjtUWc3SyY"
+        ],
+        "timestamp": "2026-07-26T21:46:52.739Z",
+        "record_sha256": "6c91601c283c76da7787d31b2185a6ea4f6364ac8904a98f1d7104a4e801f649",
+        "located": true
+      }
+    ],
+    "verdict_yaml_sha256": "ffb5daf67747d547b0ee4e8043778cd753c425e7d4321663787c3d056b47453b",
+    "result_json_sha256": "10698e344521d5d93ee63226da69e0a236314ea295f6cb79e2825fee6e1f0bbe",
+    "fixed_facts": [
+      {
+        "id": "S3",
+        "facts": [
+          "扫描列出的三处是 AppLoadDialog、PayAgreementDialog、RenewRuleDialog。",
+          "脚本跳过已设 mask 的 controller；AppLoad 分支补 Color.Transparent，其余缺失项补 Palette.DIALOG_MASK。",
+          "3 sites 是总修改数，不是三个深色/non-loading controller。H5 已透明并被跳过。"
+        ]
+      },
+      {
+        "id": "S4",
+        "facts": [
+          "Slice 8 在整文件写入之前读到 Kotlin replaceSpan 数字段逻辑，后来实现仍把非滚动价格后缀与数字统一使用 30vp。",
+          "修复先采用片段迭代，后改为 priceDigits/priceSuffix 两个固定 Span，不能把中间态当最终态。",
+          "视觉修复新增 private static helper 被兄弟组件调用，后置编译报 private access；两次 Edit 去掉 private，随后构建成功。"
+        ]
+      }
+    ],
+    "located_count": 39,
+    "meaning": "39 final original references locate real source lines/native IDs. Failed intermediate reference not included in final. Locator support not semantic truth."
+  },
+  "comparison": {
+    "rep1_report": "v8-adjudication-member.md",
+    "rep2_replaces_rep1": false,
+    "rep1": {
+      "facts": {
+        "supported": 4,
+        "partial": 2,
+        "omitted": 0,
+        "contradicted": 0,
+        "total": 6
+      },
+      "total_tokens": 781133,
+      "wall_s": 525.3831888999557,
+      "agent_success": 0,
+      "blame_calls": 1,
+      "slice8_followup": 0,
+      "red_tail_at_v40": true,
+      "mask_fake_pair": false
+    },
+    "rep2": {
+      "facts": {
+        "supported": 4,
+        "partial": 2
+      },
+      "total_tokens": 858862,
+      "wall_s": 287.6555157999974,
+      "agent_success": 0,
+      "blame_calls": 0,
+      "slice8_followup": 0,
+      "red_tail_at_v40": false,
+      "nonred_tail_on_v40": true,
+      "mask_fake_pair": true
+    },
+    "paired_means": {
+      "total_tokens": 819997.5,
+      "wall_s": 406.51935234997654,
+      "e2e_s": 420.3385974499979
+    },
+    "versus_v7_tools": {
+      "mean_total_tokens": 1349627,
+      "change_percent": -39.2426574157156,
+      "mean_wall_s": 431.2978296500514,
+      "wall_change_percent": -5.7450966818404225,
+      "facts_each": {
+        "supported": 5,
+        "partial": 1
+      }
+    },
+    "interpretation": "Both planned V8 samples miss H5 and Slice8 input, unlike V7 H5 mention. Token savings relative V7 observed but accuracy not better; no stability/causal guarantee from n2 or combined multi-mechanism changes."
+  },
+  "conclusion": "Action locator interface usually succeeds, but neither V8 Member run investigates available early writer inputs. Fixed core gaps repeat; shape/roles differ. No joint savings+better raw attribution+faithful UI acceptance."
+}

@@ -1,0 +1,39 @@
+{
+  "schema": "migloop-v7-raw-c1-c3-adjudication/1",
+  "status": "complete",
+  "scope": {
+    "cases": ["C1", "C2", "C3"],
+    "repetitions_each": 2,
+    "model": "gpt-5.5",
+    "effort": "medium",
+    "transport": "native_raw_shell",
+    "reference": "_migloop-eval-20260909/attribution10/reference-v1/codex-reference.json"
+  },
+  "runs": [
+    {"case":"C1","rep":1,"core":"accepted","full":"accepted_with_recoverable_omissions","facts":["supported","supported","supported"],"major_errors":[],"minor":["patch_apply_end UUID is not an outer call_id"],"metrics":{"input_total":716836,"cache_read":597504,"input_uncached":119332,"output":7740,"calls":15,"tool_return_chars":3506378,"result_chars":3220,"wall_s":172.467,"end_to_end_wall_s":174.879}},
+    {"case":"C1","rep":2,"core":"accepted","full":"accepted_with_recoverable_omissions","facts":["supported","supported","supported"],"major_errors":[],"metrics":{"input_total":773947,"cache_read":594432,"input_uncached":179515,"output":6374,"calls":13,"tool_return_chars":2961631,"result_chars":2383,"wall_s":160.072,"end_to_end_wall_s":162.576}},
+    {"case":"C2","rep":1,"core":"accepted","full":"accepted_with_recoverable_omissions","facts":["supported","supported","supported","omitted"],"major_errors":[],"metrics":{"input_total":1572761,"cache_read":1436160,"input_uncached":136601,"output":12053,"calls":22,"tool_return_chars":2515979,"result_chars":3984,"wall_s":289.955,"end_to_end_wall_s":292.452}},
+    {"case":"C2","rep":2,"core":"accepted","full":"accepted_with_recoverable_omissions","facts":["supported","supported","supported","omitted"],"major_errors":[],"metrics":{"input_total":1197405,"cache_read":970240,"input_uncached":227165,"output":9690,"calls":18,"tool_return_chars":1784115,"result_chars":3607,"wall_s":234.119,"end_to_end_wall_s":236.448}},
+    {"case":"C3","rep":1,"core":"accepted","full":"accepted_with_recoverable_omissions","facts":["supported","partial","partial","supported"],"major_errors":[],"metrics":{"input_total":1037870,"cache_read":883200,"input_uncached":154670,"output":8553,"calls":13,"tool_return_chars":3813998,"result_chars":4743,"wall_s":197.126,"end_to_end_wall_s":199.626}},
+    {"case":"C3","rep":2,"core":"accepted","full":"requires_material_fact_completeness_correction","facts":["omitted","partial","partial","supported"],"major_errors":[],"metrics":{"input_total":1905106,"cache_read":1717760,"input_uncached":187346,"output":9576,"calls":18,"tool_return_chars":4420185,"result_chars":3287,"wall_s":237.344,"end_to_end_wall_s":239.783}}
+  ],
+  "mean": {
+    "n": 6,
+    "input_total": 1200654,
+    "cache_read": 1033216,
+    "input_uncached": 167438,
+    "output": 8998,
+    "calls": 16.5,
+    "tool_return_chars": 3167048,
+    "result_chars": 3537,
+    "wall_s": 215.181,
+    "end_to_end_wall_s": 217.628
+  },
+  "overall": {
+    "core_acceptance": "6/6",
+    "full_accepted_with_recoverable_omissions": 5,
+    "full_requires_material_fact_completeness_correction": 1,
+    "major_false_causal_or_closure_claims": 0,
+    "general_efficacy_claim_supported": false
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "schema": "migloop-v8-c1-c4-adjudication/1",
+  "status": "complete",
+  "scope": {"source_code_id":"b540cb2","model":"gpt-5.5","effort":"medium","transport":"native_tools","repetitions_each":1,"reference":"_migloop-eval-20260909/attribution10/reference-v1/codex-reference.json"},
+  "runs": [
+    {"case":"C1","core":"accepted","full":"accepted_with_recoverable_omissions","facts":["partial","supported","supported"],"major_errors":[],"delivery":{"verdict_ok":true,"coverage_complete":true},"metrics":{"input_total":395626,"cache_read":344064,"input_uncached":51562,"output":7210,"calls":31,"tool_return_chars":84582,"result_chars":269,"wall_s":169.530,"end_to_end_wall_s":172.436}},
+    {"case":"C2","core":"accepted","full":"accepted_with_recoverable_omissions","facts":["omitted","supported","supported","omitted"],"major_errors":[],"delivery":{"verdict_ok":true,"coverage_complete":false,"note":"absent target chain/version; separate from semantic grading"},"metrics":{"input_total":934641,"cache_read":811520,"input_uncached":123121,"output":9713,"calls":48,"tool_return_chars":475213,"result_chars":269,"wall_s":230.477,"end_to_end_wall_s":233.189}},
+    {"case":"C3","core":"accepted","full":"accepted_with_recoverable_omissions","facts":["omitted","supported","supported","supported"],"major_errors":[],"delivery":{"verdict_ok":true,"coverage_complete":true},"metrics":{"input_total":2188513,"cache_read":2027520,"input_uncached":160993,"output":18305,"calls":90,"tool_return_chars":243762,"result_chars":269,"wall_s":400.306,"end_to_end_wall_s":403.379}},
+    {"case":"C4","core":"accepted","full":"accepted_with_recoverable_omission","facts":["partial","supported","supported","supported","supported"],"major_errors":[],"delivery":{"verdict_ok":true,"coverage_complete":true},"metrics":{"input_total":1107183,"cache_read":1013248,"input_uncached":93935,"output":11071,"calls":39,"tool_return_chars":150061,"result_chars":443,"wall_s":257.648,"end_to_end_wall_s":260.412}}
+  ],
+  "overall": {"core_acceptance":"4/4","major_false_causal_or_closure_claims":0,"semantic_checked_by_mechanical_check":false,"general_efficacy_claim_supported":false}
+}

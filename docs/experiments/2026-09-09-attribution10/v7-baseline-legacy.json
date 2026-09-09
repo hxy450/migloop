@@ -1,0 +1,1649 @@
+{
+  "schema": "migloop-semantic-adjudication/1",
+  "status": "complete_for_two_raw_repetitions_each",
+  "review_date": "2026-09-09",
+  "scope": "Frozenreference-v1 D1/D2/S1/S2, rawbaseline only. No YAML requirement, no penalty for missing structured coverage, no requirement to enumerate unrelated file repairs. Facts are diagnostic rows, not overallaccuracy.",
+  "reference": {
+    "path": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/reference-v1/legacy-reference.json",
+    "sha256": "2c015536094fff1e42bb3b6b5cc2dce743c0f2a0f6924254027f7f8a5faac927",
+    "unchanged": true
+  },
+  "pools": {
+    "dice_entry": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v1/dice-entry/pool",
+    "splash": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v1/splash/pool"
+  },
+  "runs": [
+    {
+      "case": "dice-entry",
+      "arm": "raw",
+      "rep": 1,
+      "path": "formal-v7/dice-entry/runs/raw/rep1",
+      "status": "adjudicated",
+      "model": "gpt-5.5",
+      "effort": "medium",
+      "source": "84bfcf8",
+      "metrics": {
+        "input": 1703830,
+        "cache_included": 1464832,
+        "output": 9267,
+        "total": 1713097,
+        "tool_calls": 21,
+        "tool_chars": 4313468,
+        "wall_s": 208.53726080001798,
+        "e2e_s": 211.4167626000708,
+        "completed_at": "2026-09-09T19:02:41.346005+00:00",
+        "task_sha256": "9060a6c160d2a1ac2b893b9f19d12e66a16e6ce1b7d301eacae0abfb9f55eec4",
+        "pool_digest": "653db4192d47366e8ca099e59ef2679e929056f18320d081768539b2f5b7443e"
+      },
+      "facts": [
+        {
+          "id": "D1.f1",
+          "fact": "生成方实际读取页面/F001/沉浸式输入，已记录的生成 Write 未含后来测试桥。",
+          "status": "partial",
+          "quote": "把 onCreate 从仅 hilog.info 改为调用 this.consumeTestWant(want)",
+          "note": "报告正确呈现加桥前局部代码，但没有还原最初生成方实际读过page/F001/immersive三类输入及其native Write；不能用测试阶段派发替代生成输入。",
+          "evidence_ids": [
+            "D03",
+            "D04",
+            "D05",
+            "D06",
+            "D07"
+          ]
+        },
+        {
+          "id": "D1.f2",
+          "fact": "UI 测试设计及后续派发明确要求 Want→AppStorage 测试桥，实施方以成功 Edit 加入。",
+          "status": "supported",
+          "quote": "桥收敛为 EntryAbility 侧消费 token",
+          "note": "派发/UI设计的策略、V2约束、onCreate/onNewWant与AppStorage键及三段Edit均具体说明；不要求逐字复述全部工单。",
+          "evidence_ids": [
+            "D08",
+            "D09",
+            "D10",
+            "D13",
+            "D15",
+            "D16",
+            "D17"
+          ]
+        },
+        {
+          "id": "D1.f3",
+          "fact": "生成时刻与后续测试阶段须分开，不将后置明确要求自动认定为初始生成遗漏。",
+          "status": "supported",
+          "quote": "测试参数桥是在 arkts-ui-verifier 的第 3 步 UI 测试生成阶段加入的，不属于最初业务迁移主功能。",
+          "note": "区分阶段，未把后来明确要求倒推为早期已传入，也保留不能从关键词推断全部早期要求。",
+          "evidence_ids": [
+            "D01",
+            "D06",
+            "D09"
+          ]
+        },
+        {
+          "id": "D2.f1",
+          "fact": "ECAT 修复派发明确要求注册全局未捕获异常观察者。",
+          "status": "supported",
+          "quote": "主会话派发 fix-errobserver ... 要求实现 errorManager.on('error')",
+          "note": "原始2f01bcdc root L100及fixer L1直接支持；框架观察能力要求不是Android业务需求。",
+          "evidence_ids": [
+            "D18"
+          ]
+        },
+        {
+          "id": "D2.f2",
+          "fact": "修复方读取入口和 SDK 后，三次成功 Edit 加入 import、注册调用和观察者实现。",
+          "status": "supported",
+          "quote": "根据本机 SDK d.ts 将 import 从原 prompt 预设的 @kit.ArkTS 改为 @kit.AbilityKit",
+          "note": "报告以真实diff分别说明import/注册/实现，并点明SDK决定。未逐条列三次Edit或入口Read编号，不按漏复述某词扣核心命中。原始Read L23/L24、SDK探测、Edit L41–46及diff L55/L56可核。",
+          "evidence_ids": [
+            "D19",
+            "D20",
+            "D21",
+            "D22",
+            "D24",
+            "D25",
+            "D26"
+          ]
+        },
+        {
+          "id": "D2.f3",
+          "fact": "后置 builder 有直接成功构建日志，也有 may-throw 类 WARN。",
+          "status": "supported",
+          "quote": "主构建与 ohosTest 构建均 PASS，0 ERROR ... EntryAbility.ets 140:5 Function may throw exceptions",
+          "note": "构建与WARN事实正确；正文主要引builder L82 summary，审计另核L48/L52等原生回执。没有把WARN当失败，也没有把编译当observer回调实测。",
+          "evidence_ids": [
+            "D-build",
+            "D-warn"
+          ]
+        }
+      ],
+      "fact_counts": {
+        "supported": 5,
+        "partial": 1,
+        "omitted": 0,
+        "contradicted": 0,
+        "total": 6
+      },
+      "core_answers": [
+        {
+          "id": "D1",
+          "status": "partial",
+          "reason": "阶段性测试桥的原因/实施及运行验证边界大体正确，但题目所问初生成输入链缺失；后置通道状态另有不完整陈述。"
+        },
+        {
+          "id": "D2",
+          "status": "supported",
+          "reason": "框架门禁来源、SDK适配、三段代码变更、编译/WARN与回调未知均有原始支持。不给未逐字列每个Read或Edit额外扣分。"
+        }
+      ],
+      "full_answer": {
+        "status": "partial",
+        "reason": "生成输入缺项与后置通道状态不完整，不能称整体完整；没有YAML/coverage不扣分。"
+      },
+      "citation_locator_check": {
+        "case": "dice-entry",
+        "ids": 10,
+        "missing_ids": [],
+        "native_locations": {
+          "call_1c4e6fc7af144f7d94f69fc6": [
+            {
+              "file": "2f01bcdc-0a92-4961-a64d-5b181f03b3d3.jsonl",
+              "line": 100,
+              "kind": "tool_use",
+              "tool": "Agent",
+              "ts": "2026-09-03T21:17:54.675Z"
+            },
+            {
+              "file": "2f01bcdc-0a92-4961-a64d-5b181f03b3d3.jsonl",
+              "line": 102,
+              "kind": "tool_result",
+              "tool": null,
+              "ts": "2026-09-03T21:17:54.688Z"
+            }
+          ],
+          "call_86ef24539b644c61830b5a1a": [
+            {
+              "file": "2f01bcdc-0a92-4961-a64d-5b181f03b3d3/subagents/agent-a27497cfed8c44856.jsonl",
+              "line": 55,
+              "kind": "tool_use",
+              "tool": "Bash",
+              "ts": "2026-09-03T21:20:05.427Z"
+            },
+            {
+              "file": "2f01bcdc-0a92-4961-a64d-5b181f03b3d3/subagents/agent-a27497cfed8c44856.jsonl",
+              "line": 56,
+              "kind": "tool_result",
+              "tool": null,
+              "ts": "2026-09-03T21:20:05.745Z"
+            }
+          ],
+          "call_04086bf7960b46e7b2a00be4": [
+            {
+              "file": "81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a711c5d09fb676814.jsonl",
+              "line": 39,
+              "kind": "tool_use",
+              "tool": "Edit",
+              "ts": "2026-09-03T19:17:35.691Z"
+            },
+            {
+              "file": "81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a711c5d09fb676814.jsonl",
+              "line": 40,
+              "kind": "tool_result",
+              "tool": null,
+              "ts": "2026-09-03T19:17:35.704Z"
+            }
+          ],
+          "call_6c1a4dd0da164350a549d420": [
+            {
+              "file": "81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a711c5d09fb676814.jsonl",
+              "line": 37,
+              "kind": "tool_use",
+              "tool": "Edit",
+              "ts": "2026-09-03T19:17:21.617Z"
+            },
+            {
+              "file": "81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a711c5d09fb676814.jsonl",
+              "line": 38,
+              "kind": "tool_result",
+              "tool": null,
+              "ts": "2026-09-03T19:17:21.630Z"
+            }
+          ],
+          "call_003bc0a35ce74684a5296325": [
+            {
+              "file": "81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a711c5d09fb676814.jsonl",
+              "line": 35,
+              "kind": "tool_use",
+              "tool": "Edit",
+              "ts": "2026-09-03T19:17:13.810Z"
+            },
+            {
+              "file": "81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a711c5d09fb676814.jsonl",
+              "line": 36,
+              "kind": "tool_result",
+              "tool": null,
+              "ts": "2026-09-03T19:17:13.830Z"
+            }
+          ],
+          "call_8ce3690fd9384f04ab8d47bb": [
+            {
+              "file": "257fed22-fb0e-48de-bee9-0791c45a90a9.jsonl",
+              "line": 119,
+              "kind": "tool_use",
+              "tool": "Write",
+              "ts": "2026-09-03T21:12:53.922Z"
+            },
+            {
+              "file": "257fed22-fb0e-48de-bee9-0791c45a90a9.jsonl",
+              "line": 121,
+              "kind": "tool_result",
+              "tool": null,
+              "ts": "2026-09-03T21:12:53.954Z"
+            }
+          ],
+          "call_eaf420062a1346c2abea1599": [
+            {
+              "file": "81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-aa1ccf93d575837a2.jsonl",
+              "line": 36,
+              "kind": "tool_use",
+              "tool": "Write",
+              "ts": "2026-09-03T19:09:22.074Z"
+            },
+            {
+              "file": "81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-aa1ccf93d575837a2.jsonl",
+              "line": 37,
+              "kind": "tool_result",
+              "tool": null,
+              "ts": "2026-09-03T19:09:22.097Z"
+            }
+          ],
+          "call_48aeee7fcb7a4d7197741024": [
+            {
+              "file": "81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a711c5d09fb676814.jsonl",
+              "line": 31,
+              "kind": "tool_use",
+              "tool": "Write",
+              "ts": "2026-09-03T19:17:04.881Z"
+            },
+            {
+              "file": "81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a711c5d09fb676814.jsonl",
+              "line": 32,
+              "kind": "tool_result",
+              "tool": null,
+              "ts": "2026-09-03T19:17:04.897Z"
+            }
+          ],
+          "call_315c69975f9b430fa122de2e": [
+            {
+              "file": "593d4e86-a947-4e62-8027-013014c2bafc.jsonl",
+              "line": 80,
+              "kind": "tool_use",
+              "tool": "Read",
+              "ts": "2026-09-03T20:53:43.500Z"
+            },
+            {
+              "file": "593d4e86-a947-4e62-8027-013014c2bafc.jsonl",
+              "line": 82,
+              "kind": "tool_result",
+              "tool": null,
+              "ts": "2026-09-03T20:53:43.814Z"
+            }
+          ],
+          "call_25a6cb16ac65438480f62cc1": [
+            {
+              "file": "593d4e86-a947-4e62-8027-013014c2bafc.jsonl",
+              "line": 21,
+              "kind": "tool_use",
+              "tool": "Read",
+              "ts": "2026-09-03T20:49:42.866Z"
+            },
+            {
+              "file": "593d4e86-a947-4e62-8027-013014c2bafc.jsonl",
+              "line": 23,
+              "kind": "tool_result",
+              "tool": null,
+              "ts": "2026-09-03T20:49:42.880Z"
+            }
+          ]
+        },
+        "result_sha256": "627558861a29175bafa2e29911f24fd6490048c99183b7ac6fe77098d7e79b74"
+      },
+      "extra_issues": [
+        {
+          "code": "round1_equivalent_channel_omitted",
+          "kind": "verification_scope_incomplete",
+          "quote": "UI TDD 当前是 DEFERRED",
+          "supported_boundary": "canonical arkxtest仍DEFERRED，桥键仍未认证，这部分正确。",
+          "missing_boundary": "同池593d4e86 L256→L260真实回放10/10 PASS/HARD21/21与L265→267产物及onNewWant×3未交代；未注明仅指canonical时，当前总状态过宽。",
+          "oracle_policy": "此补充不在旧D1facts/旧witness列表；不悄悄新增核心分母，作为额外后置状态审计，同标准适用于未来工具组。",
+          "refs": [
+            "593d4e86-a947-4e62-8027-013014c2bafc.jsonl:L256/L260",
+            "593d4e86-a947-4e62-8027-013014c2bafc.jsonl:L265/L267"
+          ]
+        },
+        {
+          "code": "summary_vs_direct_build_receipt",
+          "kind": "citation_strength",
+          "note": "报告主要引用builder-ac3b...L40与a635...L82总结。相关成功构建/WARN有直接原始回执可核，故不把真实构建结论判错；但总结和执行回执类别需分清。"
+        }
+      ]
+    },
+    {
+      "case": "splash",
+      "arm": "raw",
+      "rep": 1,
+      "path": "formal-v7/splash/runs/raw/rep1",
+      "status": "adjudicated",
+      "model": "gpt-5.5",
+      "effort": "medium",
+      "source": "84bfcf8",
+      "metrics": {
+        "input": 3516725,
+        "cache_included": 3261952,
+        "output": 16208,
+        "total": 3532933,
+        "tool_calls": 31,
+        "tool_chars": 6384849,
+        "wall_s": 527.1071258999873,
+        "e2e_s": 539.8684723000042,
+        "completed_at": "2026-09-09T19:11:31.999911+00:00",
+        "task_sha256": "d2f9f03d6b8a4c56e405559fe7160308ecc1d054b877ebf64250dd084ec85134",
+        "pool_digest": "a78b1373045f7558d6da3b76123e30d032635a2a0b4cdd665e7f80c0bdf8b337"
+      },
+      "facts": [
+        {
+          "id": "S1.f1",
+          "fact": "初版已有 onBackPressed 拦截代码及返回禁用的源要求，不能说初版完全没有实现。",
+          "status": "supported",
+          "quote": "初始写入 SplashPage.ets，含 .onBackPressed(() => true)",
+          "note": "初版规格与代码均点出。'方向正确'在上下文指实现方向，不当独立设备运行通过。",
+          "evidence_ids": [
+            "S01",
+            "S02",
+            "S05"
+          ]
+        },
+        {
+          "id": "S1.f2",
+          "fact": "entry-setup 将页面装配为 Navigation 外壳时删除原拦截，后续 D-020 接受页面外壳的行为差异。",
+          "status": "contradicted",
+          "quote": "Slice 11 装配时把页面改成根 Navigation 后，记录了 D-020 放弃外壳层返回拦截",
+          "note": "D020后置决策找对，但最初装配删除被明确错归Slice11。原始entry-setup L123/L124在07-24 02:32:52成功Edit删callback；Slice11之后承接/说明，不是该删除动作作者。",
+          "evidence_ids": [
+            "S07",
+            "S08",
+            "S09",
+            "S10",
+            "S17"
+          ]
+        },
+        {
+          "id": "S1.f3",
+          "fact": "Slice 11 为隐私控制器写入 isModal 会吃掉系统返回的解释；历史 finding 反驳该解释，修复追加 onWillDismiss。",
+          "status": "supported",
+          "quote": "隐私弹窗返回处理的错误假设来自 Slice 11 装配",
+          "note": "准确分开isModal注释、历史finding主张及fixer的onWillDismiss变更。未将调查本身说成设备测试。",
+          "evidence_ids": [
+            "S15",
+            "S16",
+            "S19",
+            "S20"
+          ]
+        },
+        {
+          "id": "S1.f4",
+          "fact": "后置另一 builder 成功构建，不能把 fixer 自身不重编扩大成整个池没有构建。",
+          "status": "omitted",
+          "quote": null,
+          "note": "正文没有给后置builder成功构建；也没有反向断言全池无构建，因此是缺项而非说谎。原始builder-af0e... L36/L37直接EXIT0/BUILD SUCCESSFUL。",
+          "evidence_ids": [
+            "M-build-ok"
+          ]
+        },
+        {
+          "id": "S2.f1",
+          "fact": "生成 Write 之前，主会话的原始读取结果已经包含主题 windowFullscreen=true。",
+          "status": "partial",
+          "quote": "开屏隐藏系统栏的语义在 Android 源里已有",
+          "note": "认识已有主题语义，但仅用fixer后置themes Read L479佐证；未找到07-23主root L404已经读到该项这一关键时间/持有者事实。没有声称池内首次出现于finding。",
+          "evidence_ids": [
+            "S-theme-earlier"
+          ]
+        },
+        {
+          "id": "S2.f2",
+          "fact": "已核生成输入有 page_type/full_screen、沉浸式和安全区信息，但尚未建立主题细节到页面生成的完整传递证据。",
+          "status": "supported",
+          "quote": "可见输入只传递了 needs_immersive_safearea，不是显隐 API 要求",
+          "note": "page_type/full_screen、safearea与显示/隐藏系统栏作了区分；虽然局部措辞偏绝对，末尾明确不能由零命中证明任何其他输入不存在，未把search命中当历史Read。",
+          "evidence_ids": [
+            "S01",
+            "S02",
+            "S05"
+          ]
+        },
+        {
+          "id": "S2.f3",
+          "fact": "后续修复增加入页隐藏及离页/跳转时恢复系统栏。",
+          "status": "supported",
+          "quote": "进入 Splash 隐藏，路由到 Guide/Home 或离开时恢复",
+          "note": "列出setWindowSystemBarEnable([])及两次实际变更；不宣称最终设备复验。",
+          "evidence_ids": [
+            "S23",
+            "S24",
+            "S25",
+            "S26"
+          ]
+        }
+      ],
+      "fact_counts": {
+        "supported": 4,
+        "partial": 1,
+        "omitted": 1,
+        "contradicted": 1,
+        "total": 7
+      },
+      "core_answers": [
+        {
+          "id": "S1",
+          "status": "partial",
+          "reason": "初版有实现、Slice11错误解释与后置修复找对，但装配删除错归作者，后置构建缺项。"
+        },
+        {
+          "id": "S2",
+          "status": "partial",
+          "reason": "识别既有语义未充分传递及修复显隐逻辑，但没有还原主题已在生成前进入主会话的关键事实。"
+        }
+      ],
+      "full_answer": {
+        "status": "partial",
+        "reason": "装配删除错归+主题前置读取缺项+后置编译缺项，不能称整体完整；不要求题外所有Splash修复清单。"
+      },
+      "citation_locator_check": {
+        "case": "splash",
+        "ids": 14,
+        "missing_ids": [],
+        "native_locations": {
+          "toolu_01Np1dfx5cY3fQ9uZrHBVkbq": [
+            {
+              "file": "9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aconv-splash-9d5902d803bbcde6.jsonl",
+              "line": 71,
+              "kind": "tool_use",
+              "tool": "Write",
+              "ts": "2026-07-24T02:07:13.800Z"
+            },
+            {
+              "file": "9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aconv-splash-9d5902d803bbcde6.jsonl",
+              "line": 72,
+              "kind": "tool_result",
+              "tool": null,
+              "ts": "2026-07-24T02:07:13.860Z"
+            }
+          ],
+          "toolu_01Ag84URJdUsGNfX4BptY9LC": [
+            {
+              "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+              "line": 608,
+              "kind": "tool_use",
+              "tool": "Bash",
+              "ts": "2026-07-26T21:35:46.240Z"
+            },
+            {
+              "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+              "line": 609,
+              "kind": "tool_result",
+              "tool": null,
+              "ts": "2026-07-26T21:35:50.223Z"
+            }
+          ],
+          "toolu_01DnbtniZgjmhVuoJ2jnBzJQ": [
+            {
+              "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+              "line": 478,
+              "kind": "tool_use",
+              "tool": "Bash",
+              "ts": "2026-07-26T21:19:35.454Z"
+            },
+            {
+              "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+              "line": 479,
+              "kind": "tool_result",
+              "tool": null,
+              "ts": "2026-07-26T21:19:38.507Z"
+            }
+          ],
+          "toolu_01RknAJc4tUhzwpypigkLeRv": [
+            {
+              "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+              "line": 488,
+              "kind": "tool_use",
+              "tool": "Edit",
+              "ts": "2026-07-26T21:20:24.982Z"
+            },
+            {
+              "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+              "line": 489,
+              "kind": "tool_result",
+              "tool": null,
+              "ts": "2026-07-26T21:20:25.049Z"
+            }
+          ],
+          "toolu_01HK6amCmnLqbfQFefbryS7b": [
+            {
+              "file": "9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aslice11-startup-50a0622bcfe4a588.jsonl",
+              "line": 236,
+              "kind": "tool_use",
+              "tool": "Edit",
+              "ts": "2026-07-24T16:00:31.136Z"
+            },
+            {
+              "file": "9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aslice11-startup-50a0622bcfe4a588.jsonl",
+              "line": 237,
+              "kind": "tool_result",
+              "tool": null,
+              "ts": "2026-07-24T16:00:31.208Z"
+            }
+          ],
+          "toolu_016pyWzeLfAnRbMuipZ9NeDi": [
+            {
+              "file": "9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aslice11-startup-50a0622bcfe4a588.jsonl",
+              "line": 17,
+              "kind": "tool_use",
+              "tool": "Read",
+              "ts": "2026-07-24T15:33:34.115Z"
+            },
+            {
+              "file": "9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aslice11-startup-50a0622bcfe4a588.jsonl",
+              "line": 18,
+              "kind": "tool_result",
+              "tool": null,
+              "ts": "2026-07-24T15:33:34.178Z"
+            }
+          ],
+          "toolu_011AdsRAjsSvTwcwt8bJiaLN": [
+            {
+              "file": "9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aslice11-startup-50a0622bcfe4a588.jsonl",
+              "line": 250,
+              "kind": "tool_use",
+              "tool": "Edit",
+              "ts": "2026-07-24T16:01:19.499Z"
+            },
+            {
+              "file": "9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aslice11-startup-50a0622bcfe4a588.jsonl",
+              "line": 251,
+              "kind": "tool_result",
+              "tool": null,
+              "ts": "2026-07-24T16:01:19.564Z"
+            }
+          ],
+          "toolu_01HzaxtnGPqoBRGu77uek45v": [
+            {
+              "file": "9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aconv-splash-9d5902d803bbcde6.jsonl",
+              "line": 7,
+              "kind": "tool_use",
+              "tool": "Read",
+              "ts": "2026-07-24T01:56:39.184Z"
+            },
+            {
+              "file": "9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aconv-splash-9d5902d803bbcde6.jsonl",
+              "line": 9,
+              "kind": "tool_result",
+              "tool": null,
+              "ts": "2026-07-24T01:56:39.240Z"
+            }
+          ],
+          "toolu_012ikXRRimcuNK89smwLWUNn": [
+            {
+              "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+              "line": 438,
+              "kind": "tool_use",
+              "tool": "Bash",
+              "ts": "2026-07-26T21:16:28.992Z"
+            },
+            {
+              "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+              "line": 439,
+              "kind": "tool_result",
+              "tool": null,
+              "ts": "2026-07-26T21:16:34.311Z"
+            }
+          ],
+          "toolu_01DzVErQMcevEwF2f5T3E1U8": [
+            {
+              "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+              "line": 346,
+              "kind": "tool_use",
+              "tool": "Bash",
+              "ts": "2026-07-26T21:05:54.915Z"
+            },
+            {
+              "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+              "line": 347,
+              "kind": "tool_result",
+              "tool": null,
+              "ts": "2026-07-26T21:05:58.983Z"
+            }
+          ],
+          "toolu_01FhXRrWwqAqg2mjabdoa3Dt": [
+            {
+              "file": "9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aslice11-startup-50a0622bcfe4a588.jsonl",
+              "line": 11,
+              "kind": "tool_use",
+              "tool": "Read",
+              "ts": "2026-07-24T15:33:24.587Z"
+            },
+            {
+              "file": "9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aslice11-startup-50a0622bcfe4a588.jsonl",
+              "line": 12,
+              "kind": "tool_result",
+              "tool": null,
+              "ts": "2026-07-24T15:33:24.632Z"
+            }
+          ],
+          "toolu_011RBrkJVD9ZAhnfMauLZkby": [
+            {
+              "file": "9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aslice11-startup-50a0622bcfe4a588.jsonl",
+              "line": 56,
+              "kind": "tool_use",
+              "tool": "Read",
+              "ts": "2026-07-24T15:34:42.583Z"
+            },
+            {
+              "file": "9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aslice11-startup-50a0622bcfe4a588.jsonl",
+              "line": 57,
+              "kind": "tool_result",
+              "tool": null,
+              "ts": "2026-07-24T15:34:42.662Z"
+            }
+          ],
+          "toolu_016H83iNne123bAaGFHtEhwF": [
+            {
+              "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+              "line": 485,
+              "kind": "tool_use",
+              "tool": "Bash",
+              "ts": "2026-07-26T21:20:10.255Z"
+            },
+            {
+              "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+              "line": 486,
+              "kind": "tool_result",
+              "tool": null,
+              "ts": "2026-07-26T21:20:13.995Z"
+            }
+          ],
+          "toolu_01D414MRqtL9SuQJuSsPCgKb": [
+            {
+              "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-aa2d7cdfd6a5cf89f.jsonl",
+              "line": 235,
+              "kind": "tool_use",
+              "tool": "Write",
+              "ts": "2026-07-26T15:52:44.043Z"
+            },
+            {
+              "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-aa2d7cdfd6a5cf89f.jsonl",
+              "line": 236,
+              "kind": "tool_result",
+              "tool": null,
+              "ts": "2026-07-26T15:52:44.127Z"
+            }
+          ]
+        },
+        "result_sha256": "bb92c6c94eab07b06999d7b30bf42e73e18d8abbe853e431d1a8750cbd268152"
+      },
+      "extra_issues": [
+        {
+          "code": "assembly_delete_wrong_actor",
+          "kind": "major_attribution",
+          "quote": "Slice 11 装配时把页面改成根 Navigation",
+          "refs": [
+            "9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aentry-setup-07108f5df45c357c.jsonl:L123/L124"
+          ],
+          "note": "删除实际发生于entry-setup。D020属于后续Slice11，两个动作不能合并为同一作者。"
+        },
+        {
+          "code": "initial_effect_not_runtime_certified",
+          "kind": "boundary_preserved",
+          "quote": "初始实现归 aconv-splash，方向正确",
+          "note": "结合报告给出的代码与验证边界，按有实现不等于设备通过解读；不无依据把方向正确判成初版设备认证。"
+        },
+        {
+          "code": "generation_input_negative_claim_scope",
+          "kind": "scope_caution",
+          "quote": "初始生成方实际收到的是 ... 不是明确的隐藏 status/navigation bar",
+          "note": "可见输入与未证明全输入须区分；报告末尾明确不由零命中断言绝对没读，未指定唯一skill/agent为全链根因。"
+        }
+      ]
+    },
+    {
+      "case": "dice-entry",
+      "arm": "raw",
+      "rep": 2,
+      "path": "formal-v7/dice-entry/runs/raw/rep2",
+      "status": "adjudicated",
+      "model": "gpt-5.5",
+      "effort": "medium",
+      "source": "84bfcf8",
+      "metrics": {
+        "input": 1104559,
+        "cache_included": 948736,
+        "output": 10205,
+        "total": 1114764,
+        "tool_calls": 15,
+        "tool_chars": 3187665,
+        "wall_s": 223.88668110000435,
+        "e2e_s": 227.00347750005312,
+        "completed_at": "2026-09-09T19:26:37.146377+00:00",
+        "task_sha256": "9060a6c160d2a1ac2b893b9f19d12e66a16e6ce1b7d301eacae0abfb9f55eec4",
+        "pool_digest": "653db4192d47366e8ca099e59ef2679e929056f18320d081768539b2f5b7443e"
+      },
+      "facts": [
+        {
+          "id": "D1.f1",
+          "fact": "生成方实际读取页面/F001/沉浸式输入，已记录的生成 Write 未含后来测试桥。",
+          "status": "partial",
+          "quote": "加入前已有设计/manifest 输入，但代码未注入。",
+          "note": "仍从测试生成agent前置检查开始，未还原原converter page/F001/immersive输入及最初Write。加桥前代码状态与初生成输入是不同要求。",
+          "evidence_ids": [
+            "D03",
+            "D04",
+            "D05",
+            "D06",
+            "D07"
+          ]
+        },
+        {
+          "id": "D1.f2",
+          "fact": "UI 测试设计及后续派发明确要求 Want→AppStorage 测试桥，实施方以成功 Edit 加入。",
+          "status": "supported",
+          "quote": "测试数据计划明确包括 EntryAbility 桥需求（__test_mode__ / __target_page__ 检测 → AppStorage.setOrCreate）",
+          "note": "派发/UI设计的策略、V2约束、onCreate/onNewWant与AppStorage键及三段Edit均具体说明；不要求逐字复述全部工单。",
+          "evidence_ids": [
+            "D08",
+            "D09",
+            "D10",
+            "D13",
+            "D15",
+            "D16",
+            "D17"
+          ]
+        },
+        {
+          "id": "D1.f3",
+          "fact": "生成时刻与后续测试阶段须分开，不将后置明确要求自动认定为初始生成遗漏。",
+          "status": "supported",
+          "quote": "测试参数桥不是初始迁移业务需求，而是在 arkts-ui-verifier 第三步生成 UI 测试代码时 ... 加入的测试基础设施。",
+          "note": "区分阶段，未把后来明确要求倒推为早期已传入，也保留不能从关键词推断全部早期要求。",
+          "evidence_ids": [
+            "D01",
+            "D06",
+            "D09"
+          ]
+        },
+        {
+          "id": "D2.f1",
+          "fact": "ECAT 修复派发明确要求注册全局未捕获异常观察者。",
+          "status": "supported",
+          "quote": "修复任务明确只做 1 项 ... errorManager.on('error')，且不参考 Android 源码。",
+          "note": "原始2f01bcdc root L100及fixer L1直接支持；框架观察能力要求不是Android业务需求。",
+          "evidence_ids": [
+            "D18"
+          ]
+        },
+        {
+          "id": "D2.f2",
+          "fact": "修复方读取入口和 SDK 后，三次成功 Edit 加入 import、注册调用和观察者实现。",
+          "status": "supported",
+          "quote": "代理查 SDK errorManager.d.ts，确认 Register error observer 接口。",
+          "note": "明确SDK前置核验，结合三部分diff/import/注册/实现和后续Read说明；不要求复述每个Edit行号。",
+          "evidence_ids": [
+            "D19",
+            "D20",
+            "D21",
+            "D22",
+            "D24",
+            "D25",
+            "D26"
+          ]
+        },
+        {
+          "id": "D2.f3",
+          "fact": "后置 builder 有直接成功构建日志，也有 may-throw 类 WARN。",
+          "status": "supported",
+          "quote": "编译门记录主构建 BUILD_EXIT_CODE=0、BUILD SUCCESSFUL ... 编译记录还提到 ... Function may throw exceptions 类 WARN",
+          "note": "构建/WARN与运行时未验证界限正确。主要引用root L206的queue-operation通知携带builder总结，不能当独立nativebuildstdout；原始builder回执支持真实构建。",
+          "evidence_ids": [
+            "D-build",
+            "D-warn"
+          ]
+        }
+      ],
+      "fact_counts": {
+        "supported": 5,
+        "partial": 1,
+        "omitted": 0,
+        "contradicted": 0,
+        "total": 6
+      },
+      "core_answers": [
+        {
+          "id": "D1",
+          "status": "partial",
+          "reason": "阶段性测试桥的原因/实施及运行验证边界大体正确，但题目所问初生成输入链缺失；后置通道状态另有不完整陈述。"
+        },
+        {
+          "id": "D2",
+          "status": "supported",
+          "reason": "框架门禁来源、SDK适配、三段代码变更、编译/WARN与回调未知均有原始支持。不给未逐字列每个Read或Edit额外扣分。"
+        }
+      ],
+      "full_answer": {
+        "status": "partial",
+        "reason": "D1初生成输入仍缺；后置验证通道比rep1完整且主张/桥键不可观测边界正确。无需YAML或结构化coverage。"
+      },
+      "citation_locator_check": {
+        "case": "dice-entry",
+        "rep": 2,
+        "anchors": 22,
+        "bad": [],
+        "rows": [
+          {
+            "file": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v1/dice-entry/pool/257fed22-fb0e-48de-bee9-0791c45a90a9.jsonl",
+            "line": 1,
+            "within_pool": true,
+            "record_sha256": "a3ca174d49a293619ae8b353e9520c25330b0f2c82a1e4e7707f1d59fc408ce3",
+            "ts": "2026-09-03T21:07:47.178Z",
+            "native": []
+          },
+          {
+            "file": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v1/dice-entry/pool/2f01bcdc-0a92-4961-a64d-5b181f03b3d3.jsonl",
+            "line": 100,
+            "within_pool": true,
+            "record_sha256": "aa6c7aa3d73364809534a5ce2ded8c7772f7e5644663413caf7c74a8d78b7656",
+            "ts": "2026-09-03T21:17:54.675Z",
+            "native": [
+              {
+                "id": "call_1c4e6fc7af144f7d94f69fc6",
+                "kind": "tool_use",
+                "tool": "Agent"
+              }
+            ]
+          },
+          {
+            "file": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v1/dice-entry/pool/2f01bcdc-0a92-4961-a64d-5b181f03b3d3.jsonl",
+            "line": 206,
+            "within_pool": true,
+            "record_sha256": "26949d0efe408f27d7ea7fd8c3dd1fbedc5a00752f91399506ee589358267acf",
+            "ts": "2026-09-03T21:26:56.744Z",
+            "native": []
+          },
+          {
+            "file": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v1/dice-entry/pool/2f01bcdc-0a92-4961-a64d-5b181f03b3d3.jsonl",
+            "line": 220,
+            "within_pool": true,
+            "record_sha256": "2eca3640ed8f5b3f4b745ba51e9c4a2d9c2c2a68a30e242f186bfdcacede69bb",
+            "ts": "2026-09-03T21:27:15.917Z",
+            "native": [
+              {
+                "id": "call_d47cf3ae4f0c4b5aba8a4675",
+                "kind": "tool_result",
+                "tool": null
+              }
+            ]
+          },
+          {
+            "file": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v1/dice-entry/pool/2f01bcdc-0a92-4961-a64d-5b181f03b3d3.jsonl",
+            "line": 224,
+            "within_pool": true,
+            "record_sha256": "5bace2012ca64c37ce7b450f99b20f582b19b5037de2a398443c367fdf68788e",
+            "ts": "2026-09-03T21:27:41.515Z",
+            "native": []
+          },
+          {
+            "file": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v1/dice-entry/pool/2f01bcdc-0a92-4961-a64d-5b181f03b3d3/subagents/agent-a27497cfed8c44856.jsonl",
+            "line": 25,
+            "within_pool": true,
+            "record_sha256": "3196c8a775497bc09fb26eefb1149342423d4ff635317f0ee3b96bbc1d79b4e1",
+            "ts": "2026-09-03T21:18:17.580Z",
+            "native": [
+              {
+                "id": "call_2a0e067c13a64de7b7220f8d",
+                "kind": "tool_use",
+                "tool": "Bash"
+              }
+            ]
+          },
+          {
+            "file": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v1/dice-entry/pool/2f01bcdc-0a92-4961-a64d-5b181f03b3d3/subagents/agent-a27497cfed8c44856.jsonl",
+            "line": 30,
+            "within_pool": true,
+            "record_sha256": "4687c59e2f8f5f1b71f4887489504b1705a6b50b6fe3b2e965606801fe81e512",
+            "ts": "2026-09-03T21:18:25.089Z",
+            "native": [
+              {
+                "id": "call_f3722a2fa80c4d2bbee5b99e",
+                "kind": "tool_result",
+                "tool": null
+              }
+            ]
+          },
+          {
+            "file": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v1/dice-entry/pool/2f01bcdc-0a92-4961-a64d-5b181f03b3d3/subagents/agent-a27497cfed8c44856.jsonl",
+            "line": 43,
+            "within_pool": true,
+            "record_sha256": "293cf7298c8f8f33fe2ac946178a36ddcfa2017913007853fb4151575ae62b30",
+            "ts": "2026-09-03T21:19:31.929Z",
+            "native": [
+              {
+                "id": "call_7013085c03274c8183fdd455",
+                "kind": "tool_use",
+                "tool": "Edit"
+              }
+            ]
+          },
+          {
+            "file": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v1/dice-entry/pool/2f01bcdc-0a92-4961-a64d-5b181f03b3d3/subagents/agent-a27497cfed8c44856.jsonl",
+            "line": 56,
+            "within_pool": true,
+            "record_sha256": "41445cddee18177c9ba673d6a1b825ad60e1fbca2e9122356db01d6351492fa6",
+            "ts": "2026-09-03T21:20:05.745Z",
+            "native": [
+              {
+                "id": "call_86ef24539b644c61830b5a1a",
+                "kind": "tool_result",
+                "tool": null
+              }
+            ]
+          },
+          {
+            "file": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v1/dice-entry/pool/332534c3-ab39-43c2-a1b3-669c41d6e422.jsonl",
+            "line": 1,
+            "within_pool": true,
+            "record_sha256": "4231f7c90bb1f48bf2d5938a008479e43381532c6d8026fc0dcc6501a70eac68",
+            "ts": "2026-09-03T21:07:00.688Z",
+            "native": []
+          },
+          {
+            "file": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v1/dice-entry/pool/81e0a463-c9d3-4a7a-a671-b7f064830af1.jsonl",
+            "line": 3327,
+            "within_pool": true,
+            "record_sha256": "edc1bc645d1a2f4960334f134ea66ffe1d7692b968f7de3ff1cf2eaa9ec6558a",
+            "ts": "2026-09-03T18:56:19.641Z",
+            "native": [
+              {
+                "id": "call_a6dac05d1c3e415b98796b62",
+                "kind": "tool_use",
+                "tool": "Agent"
+              }
+            ]
+          },
+          {
+            "file": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v1/dice-entry/pool/81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a711c5d09fb676814.jsonl",
+            "line": 30,
+            "within_pool": true,
+            "record_sha256": "def0d31161bbca74442eba92a1499b21dd94465fa35fab329adb25c7250dfc16",
+            "ts": "2026-09-03T19:17:00.424Z",
+            "native": []
+          },
+          {
+            "file": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v1/dice-entry/pool/81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a711c5d09fb676814.jsonl",
+            "line": 31,
+            "within_pool": true,
+            "record_sha256": "15c88abfe355a3c94f51f455014c9bdd3838c7a1f359a993283720352bc14cd2",
+            "ts": "2026-09-03T19:17:04.881Z",
+            "native": [
+              {
+                "id": "call_48aeee7fcb7a4d7197741024",
+                "kind": "tool_use",
+                "tool": "Write"
+              }
+            ]
+          },
+          {
+            "file": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v1/dice-entry/pool/81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a711c5d09fb676814.jsonl",
+            "line": 35,
+            "within_pool": true,
+            "record_sha256": "ca124a76d4213257ec504a1a8c1f9a88bc24e3064941005916d9f2576a8ba75a",
+            "ts": "2026-09-03T19:17:13.810Z",
+            "native": [
+              {
+                "id": "call_003bc0a35ce74684a5296325",
+                "kind": "tool_use",
+                "tool": "Edit"
+              }
+            ]
+          },
+          {
+            "file": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v1/dice-entry/pool/81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a711c5d09fb676814.jsonl",
+            "line": 37,
+            "within_pool": true,
+            "record_sha256": "b7197d5f9f4beed5084a5659b86c49f26716aa6f93a0a16a72f58bac5a3dcc90",
+            "ts": "2026-09-03T19:17:21.617Z",
+            "native": [
+              {
+                "id": "call_6c1a4dd0da164350a549d420",
+                "kind": "tool_use",
+                "tool": "Edit"
+              }
+            ]
+          },
+          {
+            "file": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v1/dice-entry/pool/81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a711c5d09fb676814.jsonl",
+            "line": 39,
+            "within_pool": true,
+            "record_sha256": "9aa5b948a807268d1cf8910068fad64a2c798bab89963eab63d708dc9b44665f",
+            "ts": "2026-09-03T19:17:35.691Z",
+            "native": [
+              {
+                "id": "call_04086bf7960b46e7b2a00be4",
+                "kind": "tool_use",
+                "tool": "Edit"
+              }
+            ]
+          },
+          {
+            "file": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v1/dice-entry/pool/81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a711c5d09fb676814.jsonl",
+            "line": 52,
+            "within_pool": true,
+            "record_sha256": "f719916923d5a0e1919081307b09b68f49aba29b2d44a62c57e80b58d88a944f",
+            "ts": "2026-09-03T19:19:12.655Z",
+            "native": []
+          },
+          {
+            "file": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v1/dice-entry/pool/a329e202-1d33-49f8-abd9-daa156504a35.jsonl",
+            "line": 1,
+            "within_pool": true,
+            "record_sha256": "8592afc907758daa06665fcdee91167fc4c0a31a092a0233d0b44fadf223011a",
+            "ts": "2026-09-03T21:50:02.102Z",
+            "native": []
+          },
+          {
+            "file": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v1/dice-entry/pool/a329e202-1d33-49f8-abd9-daa156504a35/subagents/agent-acf71dec27b044ba7.jsonl",
+            "line": 9,
+            "within_pool": true,
+            "record_sha256": "590147f1666f2b75e4080a16559703dcaa55325f6a712517f1d02aa42a5199cf",
+            "ts": "2026-09-03T21:54:15.243Z",
+            "native": [
+              {
+                "id": "call_d83830d4def64e39bd5bec54",
+                "kind": "tool_result",
+                "tool": null
+              }
+            ]
+          },
+          {
+            "file": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v1/dice-entry/pool/efdc8b71-8d3f-40f6-a7e2-044748cf875b.jsonl",
+            "line": 24,
+            "within_pool": true,
+            "record_sha256": "267f6863502629e20fab9420c632ad0f7119aa7aa638dfc34eb70492215927b3",
+            "ts": "2026-09-03T20:28:18.081Z",
+            "native": [
+              {
+                "id": "call_0105a206f1f049afb3fda8d4",
+                "kind": "tool_result",
+                "tool": null
+              }
+            ]
+          },
+          {
+            "file": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v1/dice-entry/pool/efdc8b71-8d3f-40f6-a7e2-044748cf875b.jsonl",
+            "line": 426,
+            "within_pool": true,
+            "record_sha256": "8924b8ad987a68259efe98010fcb24fa354a617157aaf6968602ff0b509458f7",
+            "ts": "2026-09-03T20:45:31.989Z",
+            "native": [
+              {
+                "id": "call_6035958bc9b340efaa800eba",
+                "kind": "tool_result",
+                "tool": null
+              }
+            ]
+          },
+          {
+            "file": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v1/dice-entry/pool/efdc8b71-8d3f-40f6-a7e2-044748cf875b.jsonl",
+            "line": 450,
+            "within_pool": true,
+            "record_sha256": "70b8e1dbafa8cf88fbd7897a1f8e4350da522b361f537fb2e90d6b44baaaa350",
+            "ts": "2026-09-03T20:46:38.434Z",
+            "native": [
+              {
+                "id": "call_e1ca8634cc2747e7ac5be431",
+                "kind": "tool_use",
+                "tool": "Write"
+              }
+            ]
+          }
+        ],
+        "result_sha256": "e7d07bbb104c790ee8c3415d160e68b72b4c9916ba7119bcf93469a1ed29b567"
+      },
+      "extra_issues": [
+        {
+          "code": "generation_input_chain_missing",
+          "kind": "core_omission",
+          "note": "D1.f1旧核心缺项，未因后置验证描述更完整而补分。"
+        },
+        {
+          "code": "round1_equivalent_channel_acknowledged_as_claim",
+          "kind": "verification_scope_improved",
+          "quote": "round-1 10/10 PASS，同时 SMOKE AppStorage 桥键列为 UNOBSERVABLE。这是来源主张",
+          "refs": [
+            "332534c3-ab39-43c2-a1b3-669c41d6e422.jsonl:L1"
+          ],
+          "note": "比rep1笼统当前DEFERRED完整，恰当标为前置worker文本主张。没有开新补充的593d4e86L260/L267回执；不因此把报告声称改成已核执行，也不把桥键当验证成功。"
+        },
+        {
+          "code": "notification_not_native_build_stdout",
+          "kind": "citation_strength",
+          "refs": [
+            "2f01bcdc-0a92-4961-a64d-5b181f03b3d3.jsonl:L206"
+          ],
+          "note": "该行是queue-operation/enqueue task-notification，包含builder总结。它支持作者报告了构建通过；直接回执在builder转录L48/L52。构建结论本身有原始支持，未因引用类别差异判为假。"
+        },
+        {
+          "code": "static_crash_score_not_runtime_observer_test",
+          "kind": "boundary_preserved",
+          "refs": [
+            "a329e202-1d33-49f8-abd9-daa156504a35.jsonl:L1"
+          ],
+          "note": "crash_risk0静态评分确在后置输入report中。模型明确它不是未捕获异常回调/日志认证，保留正确区别。"
+        }
+      ]
+    },
+    {
+      "case": "splash",
+      "arm": "raw",
+      "rep": 2,
+      "path": "formal-v7/splash/runs/raw/rep2",
+      "status": "adjudicated",
+      "model": "gpt-5.5",
+      "effort": "medium",
+      "source": "84bfcf8",
+      "metrics": {
+        "input": 3063154,
+        "cache_included": 2801152,
+        "output": 15052,
+        "total": 3078206,
+        "tool_calls": 26,
+        "tool_chars": 7735246,
+        "wall_s": 442.265670599998,
+        "e2e_s": 454.3216613000259,
+        "completed_at": "2026-09-09T19:34:03.218235+00:00",
+        "task_sha256": "d2f9f03d6b8a4c56e405559fe7160308ecc1d054b877ebf64250dd084ec85134",
+        "pool_digest": "a78b1373045f7558d6da3b76123e30d032635a2a0b4cdd665e7f80c0bdf8b337"
+      },
+      "facts": [
+        {
+          "id": "S1.f1",
+          "fact": "初版已有 onBackPressed 拦截代码及返回禁用的源要求，不能说初版完全没有实现。",
+          "status": "supported",
+          "quote": "最初生成方实际写入了返回拦截。",
+          "note": "最初nativeWrite与注释确有callback，未把已有实现自动认证设备通过。",
+          "evidence_ids": [
+            "S01",
+            "S02",
+            "S05"
+          ]
+        },
+        {
+          "id": "S1.f2",
+          "fact": "entry-setup 将页面装配为 Navigation 外壳时删除原拦截，后续 D-020 接受页面外壳的行为差异。",
+          "status": "partial",
+          "quote": "具体移除补丁点本次未定位。",
+          "note": "不再把entry-setup删除错归Slice11，且承认batch2前Navigation已存在；但未找到原始entry-setup L123/L124，不能因更多未知算完整。",
+          "evidence_ids": [
+            "S07",
+            "S08",
+            "S09",
+            "S10",
+            "S17"
+          ]
+        },
+        {
+          "id": "S1.f3",
+          "fact": "Slice 11 为隐私控制器写入 isModal 会吃掉系统返回的解释；历史 finding 反驳该解释，修复追加 onWillDismiss。",
+          "status": "partial",
+          "quote": "fixer 的记录声称用 onWillDismiss 修复弹窗 BACK",
+          "note": "Slice11 isModal解释和历史finding正确；唯一onWillDismiss修复引用却指向无关rootL897，原文不存在所引片段，因此该复合事实不能完整命中。实际修复在fixer L346/L347及L608，结论内容正确不弥补引用错置。",
+          "evidence_ids": [
+            "S15",
+            "S16",
+            "S19",
+            "S20"
+          ]
+        },
+        {
+          "id": "S1.f4",
+          "fact": "后置另一 builder 成功构建，不能把 fixer 自身不重编扩大成整个池没有构建。",
+          "status": "supported",
+          "quote": "后置编译验证通过；未找到行为复测证明 BACK 已真实修好。",
+          "note": "引用builderL54总结，编译事实由原始L36/L37直接回执支持。未声称设备行为复验通过。",
+          "evidence_ids": [
+            "M-build-ok"
+          ]
+        },
+        {
+          "id": "S2.f1",
+          "fact": "生成 Write 之前，主会话的原始读取结果已经包含主题 windowFullscreen=true。",
+          "status": "supported",
+          "quote": "源侧要求：早在规约/源样式读取阶段已存在。",
+          "note": "这次明确定位主root L404的windowFullscreen及早期Launch theme来源，不要求逐字复述其UTC时间才给分。",
+          "evidence_ids": [
+            "S-theme-earlier"
+          ]
+        },
+        {
+          "id": "S2.f2",
+          "fact": "已核生成输入有 page_type/full_screen、沉浸式和安全区信息，但尚未建立主题细节到页面生成的完整传递证据。",
+          "status": "supported",
+          "quote": "生成方拿到了 meta 和样式来源索引；但这里没有具体 windowFullscreen/statusBarColor/navigationBarColor 值。",
+          "note": "具体meta输入L16与未建立主题值传递边界正确，不声称全输入绝无该要求。",
+          "evidence_ids": [
+            "S01",
+            "S02",
+            "S05"
+          ]
+        },
+        {
+          "id": "S2.f3",
+          "fact": "后续修复增加入页隐藏及离页/跳转时恢复系统栏。",
+          "status": "partial",
+          "quote": "直接找到的是恢复显示补丁；隐藏系统栏的具体写入点本次未定位。",
+          "note": "离页恢复L488有证据；入页隐藏写点L485/L486未核，是实际可查的缺项。",
+          "evidence_ids": [
+            "S23",
+            "S24",
+            "S25",
+            "S26"
+          ]
+        }
+      ],
+      "fact_counts": {
+        "supported": 4,
+        "partial": 3,
+        "omitted": 0,
+        "contradicted": 0,
+        "total": 7
+      },
+      "core_answers": [
+        {
+          "id": "S1",
+          "status": "partial",
+          "reason": "初版/Navigation先后/D020/后置编译较完整，删除动作未定位且onWillDismiss关键引用不支持。"
+        },
+        {
+          "id": "S2",
+          "status": "partial",
+          "reason": "早期主题进入主会话找对，生成实际输入边界较完整，但仅定位恢复显示、未定位入页隐藏写入。"
+        }
+      ],
+      "full_answer": {
+        "status": "partial",
+        "reason": "没有重复rep1错归Slice11删除，但保留缺项且新增真实ID配无关原文的错误引用；不罚无YAML。"
+      },
+      "citation_locator_check": {
+        "case": "splash",
+        "rep": 2,
+        "anchors": 17,
+        "rows": [
+          {
+            "file": "9b3105a2-85ec-4889-9786-b3c220f06754.jsonl",
+            "line": 2175,
+            "record_sha256": "6e0e564f4d4e600523fa0478c3786cb93138d4cfa75b6347363ef9ab08199521",
+            "type": "user",
+            "ts": "2026-07-24T02:35:04.505Z",
+            "native": []
+          },
+          {
+            "file": "9b3105a2-85ec-4889-9786-b3c220f06754.jsonl",
+            "line": 257,
+            "record_sha256": "35c2cb2cb5d5d9e23b49305a34efc5a41bb09c1e114deeac0fc2b32b96aaa62c",
+            "type": "user",
+            "ts": "2026-07-23T12:28:43.711Z",
+            "native": [
+              {
+                "id": "toolu_01Uv7Dy99gMrmueTC1cKNrnV",
+                "kind": "tool_result",
+                "tool": null
+              }
+            ]
+          },
+          {
+            "file": "9b3105a2-85ec-4889-9786-b3c220f06754.jsonl",
+            "line": 404,
+            "record_sha256": "5ae89ad8449fb28e32c43b251da2682be15a554be2a3e0be6dfdc86a756b40ed",
+            "type": "user",
+            "ts": "2026-07-23T12:36:37.214Z",
+            "native": [
+              {
+                "id": "toolu_01D2gEdmemEPbWvNKr7iExYb",
+                "kind": "tool_result",
+                "tool": null
+              }
+            ]
+          },
+          {
+            "file": "9b3105a2-85ec-4889-9786-b3c220f06754.jsonl",
+            "line": 4276,
+            "record_sha256": "8d2433cb9ecbd0cc090d2bae4c38772f7a0f07b566d68bf96f8f6ca470d026ab",
+            "type": "assistant",
+            "ts": "2026-07-24T15:33:07.174Z",
+            "native": [
+              {
+                "id": "toolu_0166wKHpvrShUuHK7pzNrcF6",
+                "kind": "tool_use",
+                "tool": "Agent"
+              }
+            ]
+          },
+          {
+            "file": "9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-abatch2-closer-0cd2cc98e7736f2f.jsonl",
+            "line": 1,
+            "record_sha256": "698f9ab51a8f1e2aa2bff2f37306def45421ab48f0c26268cac6a6efc538dcef",
+            "type": "user",
+            "ts": "2026-07-24T02:36:40.330Z",
+            "native": []
+          },
+          {
+            "file": "9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aconv-splash-9d5902d803bbcde6.jsonl",
+            "line": 1,
+            "record_sha256": "f761b7245e4b833d7df507eec1c527aa123489bb6c5684621fba4919c9623875",
+            "type": "user",
+            "ts": "2026-07-24T01:56:27.797Z",
+            "native": []
+          },
+          {
+            "file": "9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aconv-splash-9d5902d803bbcde6.jsonl",
+            "line": 16,
+            "record_sha256": "3ccb22f770cc9932336c4d76f188ea45493e25e243f03544475e5f4c2d64784e",
+            "type": "user",
+            "ts": "2026-07-24T01:56:46.002Z",
+            "native": [
+              {
+                "id": "toolu_01Ugd9Aj6c1ZVXfv2EZcEs26",
+                "kind": "tool_result",
+                "tool": null
+              }
+            ]
+          },
+          {
+            "file": "9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aconv-splash-9d5902d803bbcde6.jsonl",
+            "line": 71,
+            "record_sha256": "3c9debf2a570b62dc9285fd4f07f4d18087367c552681bc4f4d4eed54c4a9cc9",
+            "type": "assistant",
+            "ts": "2026-07-24T02:07:13.800Z",
+            "native": [
+              {
+                "id": "toolu_01Np1dfx5cY3fQ9uZrHBVkbq",
+                "kind": "tool_use",
+                "tool": "Write"
+              }
+            ]
+          },
+          {
+            "file": "9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aconv-splash-9d5902d803bbcde6.jsonl",
+            "line": 86,
+            "record_sha256": "2f8d659c52818661787e459ebde5a7dc8ab0dbd58ca3b5253714606ba6a457a1",
+            "type": "assistant",
+            "ts": "2026-07-24T02:10:28.219Z",
+            "native": [
+              {
+                "id": "toolu_015zSZ1qD49tWYDia8qVFKQT",
+                "kind": "tool_use",
+                "tool": "SendMessage"
+              }
+            ]
+          },
+          {
+            "file": "9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aslice11-startup-50a0622bcfe4a588.jsonl",
+            "line": 250,
+            "record_sha256": "ab3e80ddd3d63be2ac4fc20f1cd65fc9b7319ade87b43c58110040a167ec5bd6",
+            "type": "assistant",
+            "ts": "2026-07-24T16:01:19.499Z",
+            "native": [
+              {
+                "id": "toolu_011AdsRAjsSvTwcwt8bJiaLN",
+                "kind": "tool_use",
+                "tool": "Edit"
+              }
+            ]
+          },
+          {
+            "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6.jsonl",
+            "line": 1418,
+            "record_sha256": "6836a6f19b49cbb0afd4b10e34880b55caa9f8e18350067c45f7f2d92e1833b4",
+            "type": "user",
+            "ts": "2026-07-26T15:55:59.777Z",
+            "native": []
+          },
+          {
+            "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6.jsonl",
+            "line": 777,
+            "record_sha256": "07f76067b54e389578ac5f6d7d2b22748568e3dae823eb6ff0e1cff10472e99b",
+            "type": "user",
+            "ts": "2026-07-26T03:58:49.751Z",
+            "native": [
+              {
+                "id": "toolu_01K72jN3mrxMvAiGnRUPZuw7",
+                "kind": "tool_result",
+                "tool": null
+              }
+            ]
+          },
+          {
+            "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6.jsonl",
+            "line": 865,
+            "record_sha256": "504141c81998778caa62a051cf7dc38f069bda358f4dce70b091342af8c7cce6",
+            "type": "user",
+            "ts": "2026-07-26T04:43:21.951Z",
+            "native": [
+              {
+                "id": "toolu_01FfvEw36wGwDkBBTDC3v4dS",
+                "kind": "tool_result",
+                "tool": null
+              }
+            ]
+          },
+          {
+            "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6.jsonl",
+            "line": 897,
+            "record_sha256": "70f79d4344e1eec5851f0250a486101b1f9526ebc71f99f46e6b2dc16d2e6fb7",
+            "type": "assistant",
+            "ts": "2026-07-26T04:46:11.765Z",
+            "native": [
+              {
+                "id": "toolu_01CnpgzerWYWKBoNVRKLskZF",
+                "kind": "tool_use",
+                "tool": "Bash"
+              }
+            ]
+          },
+          {
+            "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+            "line": 1,
+            "record_sha256": "ef097e918f08cb8bb6b4f2815438fbd58ca862a004d251736149fe828674b141",
+            "type": "user",
+            "ts": "2026-07-26T20:33:34.783Z",
+            "native": []
+          },
+          {
+            "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+            "line": 488,
+            "record_sha256": "ae41f9a5b65c7f9101a49c48f25c68ca2d960666571ce87fa5d384d3fe398eea",
+            "type": "assistant",
+            "ts": "2026-07-26T21:20:24.982Z",
+            "native": [
+              {
+                "id": "toolu_01RknAJc4tUhzwpypigkLeRv",
+                "kind": "tool_use",
+                "tool": "Edit"
+              }
+            ]
+          },
+          {
+            "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-af0e3d2ae54dbf769.jsonl",
+            "line": 54,
+            "record_sha256": "a40cf110905d0bd8bcff42abcfb91f2e260178c0e91c8f976d0e7cbffbf7bf09",
+            "type": "assistant",
+            "ts": "2026-07-26T21:47:53.546Z",
+            "native": []
+          }
+        ],
+        "result_sha256": "ab5e55df09b6a6b4c5d6802602849a43e8dbb9e01d93ae64ce78396c6a7e8258",
+        "wrong_quote_check": {
+          "line": 897,
+          "contains_onWillDismiss": false,
+          "contains_D020": false,
+          "description": "生成 t1b prompt",
+          "native_id": "toolu_01CnpgzerWYWKBoNVRKLskZF"
+        }
+      },
+      "extra_issues": [
+        {
+          "code": "valid_locator_false_quote_support",
+          "kind": "major_citation",
+          "quote": "隐私弹窗控制器新增 onWillDismiss ... D-020 只覆盖弹窗之外的开屏页返回",
+          "reported_ref": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6.jsonl:L897",
+          "native_id": "toolu_01CnpgzerWYWKBoNVRKLskZF",
+          "actual": "07-26 04:46:11 Bash生成t1b safety_review/extras/prompt，command没有onWillDismiss或D-020。L898只返回prompt生成结果。",
+          "correct_refs": [
+            "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl:L346/L347",
+            "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl:L608"
+          ],
+          "note": "Locator and nativeID are real; quotation is not supported. Do not let successful ID lookup certify semantic evidence."
+        },
+        {
+          "code": "later_baseline_evidence_as_applicable_requirement",
+          "kind": "scope_caution",
+          "refs": [
+            "ff019d8a...jsonl:L777",
+            "ff019d8a...jsonl:L865"
+          ],
+          "note": "These observations areJul26,afterinitialconverter; actualinitialWritecomment/spec supportthethenrequirement. Reportdoesnotexplicitlyclaimthesetoolresultswereconverterinputs, soflagthetemporalboundaryratherthanfalseinputedge."
+        },
+        {
+          "code": "build_summary_not_fresh_device_verification",
+          "kind": "boundary_preserved",
+          "refs": [
+            "agent-af0e3d2ae54dbf769.jsonl:L54"
+          ],
+          "note": "Builder summary supportsitsreportedcompilepass; underlyingnativebuildexists. No freshdeviceBACK/systembarverificationclaimed."
+        }
+      ]
+    }
+  ],
+  "pending_runs": [],
+  "extra_raw_evidence": [
+    {
+      "supplement": 260,
+      "file": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v1/dice-entry/pool/593d4e86-a947-4e62-8027-013014c2bafc.jsonl",
+      "record_sha256": "d0bdea3e3501e2137d49a16f818fb36770ef4163c71e90b29e018a0e3a066b2d",
+      "selector": [
+        "message",
+        "content",
+        0,
+        "content"
+      ],
+      "field_sha256": "bb8d9a53c01927641445a511c60e00838367ec0c27a9e09b4ea7db267a0acfae",
+      "tool_use_id": "call_1a4f6f34ebd54fabb47c8373",
+      "timestamp": "2026-09-03T21:01:35.309Z",
+      "kind": "tool_result",
+      "is_error": false,
+      "uses": [
+        {
+          "line": 256,
+          "name": "Bash",
+          "ts": "2026-09-03T21:01:14.338Z",
+          "input": {
+            "command": "cd \"/private/tmp/claude-502/-Users-fengyi-Workspace-migbot-set-hmigbot-plus/12b07daf-a671-4616-96a1-c214864ee609/scratchpad/dice-hmos/spec/verify/ui/round-1\" && python3 replay_ui_cases.py 2>&1; echo \"EXIT=$?\"",
+            "description": "执行 round-1 十用例回放",
+            "timeout": 420000
+          }
+        }
+      ],
+      "classification": "native_tool_result_not_assistant_summary",
+      "added_as": "extra_validation_evidence_not_reference_v1_mutation",
+      "interpretation": "Successful recorded Python UI replay:10/10 cases PASS,HARD21/21,7UNOBSERVABLE; explicit AppStorage bridge NOT_ASSERTED. This does not certify the bridge, unavailable a11y values, or all original assertion dimensions.",
+      "future_comparability": "Use same validation-state boundary for future tools/raw groups; do not retrofit old core scores silently."
+    },
+    {
+      "supplement": 267,
+      "file": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v1/dice-entry/pool/593d4e86-a947-4e62-8027-013014c2bafc.jsonl",
+      "record_sha256": "2894f5e5712d2846271d4328082daa0285e23269fb3a7d881309f69ea2b2bc80",
+      "selector": [
+        "message",
+        "content",
+        0,
+        "content"
+      ],
+      "field_sha256": "cf8255f39d135430b3dcabe89594b72b9cf03b28c566f906d640efbe591ebb03",
+      "tool_use_id": "call_771a81f381114e5da211cde1",
+      "timestamp": "2026-09-03T21:01:43.921Z",
+      "kind": "tool_result",
+      "is_error": false,
+      "uses": [
+        {
+          "line": 265,
+          "name": "Bash",
+          "ts": "2026-09-03T21:01:43.428Z",
+          "input": {
+            "command": "cd \"/private/tmp/claude-502/-Users-fengyi-Workspace-migbot-set-hmigbot-plus/12b07daf-a671-4616-96a1-c214864ee609/scratchpad/dice-hmos/spec/verify/ui/round-1\" && ls -la && echo \"===dumps===\" && ls dumps/ && echo \"===hilog===\" && cat hilog_entryability.txt && echo \"===results head===\" && python3 -c \"\nimport json; d=json.load(open('results.json'))\nprint({k:v for k,v in d.items() if k!='results'})\"",
+            "description": "核验 round-1 证据产物"
+          }
+        }
+      ],
+      "classification": "native_tool_result_not_assistant_summary",
+      "added_as": "extra_validation_evidence_not_reference_v1_mutation",
+      "interpretation": "Native readback lists14dump files,hilog onCreate/LoadPage/onNewWant×3,andresults summary10/10,HARD21/21,UNOBSERVABLE7.",
+      "future_comparability": "Use same validation-state boundary for future tools/raw groups; do not retrofit old core scores silently."
+    }
+  ],
+  "invariant_boundaries": [
+    "Quoted native IDs locating successfully do not certify semantic support.",
+    "Historical code/assertion/claim differs from actual tool receipt, and both differ from fresh independent device verification.",
+    "No keywordzero inference of all missinginputs; no postrepair requirement automatically blamed on originalgenerator.",
+    "Cached input is included in input; reasoning is included in output.",
+    "No model calls, source changes, frozenrun edits, reference edits, holdout or V8 reading during adjudication."
+  ],
+  "summary": {
+    "core_scope": "D1/D2/S1/S2 only; noYAMLorcoverageobligation; unrelatedrepairsoptional.",
+    "fact_row_counts": {
+      "supported": 18,
+      "partial": 6,
+      "omitted": 1,
+      "contradicted": 1,
+      "total": 26
+    },
+    "fact_counts_not_accuracy": true,
+    "groups": [
+      {
+        "case": "dice-entry",
+        "rep_count": 2,
+        "means": {
+          "input": 1404194.5,
+          "cache_included": 1206784,
+          "output": 9736,
+          "total": 1413930.5,
+          "tool_calls": 18,
+          "tool_chars": 3750566.5,
+          "wall_s": 216.21197095001116,
+          "e2e_s": 219.21012005006196
+        }
+      },
+      {
+        "case": "splash",
+        "rep_count": 2,
+        "means": {
+          "input": 3289939.5,
+          "cache_included": 3031552,
+          "output": 15630,
+          "total": 3305569.5,
+          "tool_calls": 28.5,
+          "tool_chars": 7060047.5,
+          "wall_s": 484.68639824999264,
+          "e2e_s": 497.09506680001505
+        }
+      }
+    ],
+    "interpretation": "DiceD1initialinputgapstable; D2coreanswerssupported. Splashcoreanswerspartialinbothrunswithdifferentfailuremodes. Rep2mustnotreplaceRep1. Moreunknownisnotmorecorrect; exactlocatorisnotquote support.",
+    "supplement_policy": "DiceL260/L267 native10/10addendum separatefromoldoracle; appliesequallytofuturetools/raw. BridgeAppStorageNOT_ASSERTEDretained."
+  }
+}

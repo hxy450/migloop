@@ -1,0 +1,400 @@
+{
+  "schema": "migloop-semantic-adjudication/1",
+  "status": "complete_for_member_rep1",
+  "review_date": "2026-09-09",
+  "scope": "Independent semantic adjudication, frozenV8 Memberrep1 only. Same reference-v1 facts and raw pool as V7; no model calls, source/frozenrun/reference edits, rebinding, or holdout reading. Code/interface functionality is not semantic truth.",
+  "reference": {
+    "path": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/reference-v1/legacy-reference.json",
+    "sha256": "2c015536094fff1e42bb3b6b5cc2dce743c0f2a0f6924254027f7f8a5faac927",
+    "case_ids": [
+      "S3",
+      "S4"
+    ],
+    "fact_policy": "Each original facts array element receives supported/partial/omitted/contradicted. Partial is not a full hit. Read the whole saved submission including coverage. Extra errors are not hidden by fact-hit counts."
+  },
+  "raw_pool": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v1/member-center/pool",
+  "raw_aliases": {
+    "fixer": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+    "Slice8": "9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aslice8-pay-80bbb1f44b77da0f.jsonl",
+    "builder": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-af0e3d2ae54dbf769.jsonl",
+    "A02": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a64594a2e464bd6af.jsonl"
+  },
+  "oracle": [
+    {
+      "id": "S3-sites",
+      "refs": [
+        "fixer L71/L72",
+        "fixer L74/L75",
+        "fixer L77/L78",
+        "fixer L80/L81"
+      ],
+      "facts": "4 controllers/1 pre-existing mask. Missing AppLoad206/PayAgreement704/RenewRule728; H5 existing Color.Transparent."
+    },
+    {
+      "id": "S3-execution",
+      "refs": [
+        "fixer L103/L104",
+        "fixer L106/L107"
+      ],
+      "native_id": "toolu_01T6WkXMhD7rUsHaSaMPuhgx",
+      "facts": "Script skips existing mask. AppLoadTransparent, othersPalette. open(path,'w').write(new) happens before report.append; same-ID successful output MemberCenter3sites import=+. Writeback excerpt confirms PayAgreement. This is execution evidence, not merely a proposed command; final snapshot/device success still unknown."
+    },
+    {
+      "id": "S4-generation-input",
+      "refs": [
+        "Slice8 L21/L24"
+      ],
+      "native_id": "toolu_011NHFj8Nxr2YVMafvTUkkjY",
+      "use_ts": "2026-07-24T15:33:49.105Z",
+      "done_ts": "2026-07-24T15:33:51.671Z",
+      "facts": "Native Read returns Kotlin lines276–282: showNowPrice.replaceSpan(Regex digits) with AbsoluteSizeSpan30."
+    },
+    {
+      "id": "S4-generation-write",
+      "refs": [
+        "Slice8 L264/L265"
+      ],
+      "native_id": "toolu_014KPLsf5z2NXVMADVFHfxbz",
+      "use_ts": "2026-07-24T16:04:37.440Z",
+      "done_ts": "2026-07-24T16:04:37.575Z",
+      "file_v": 7,
+      "writer": "agent-aslice8-pay-80bbb1f44b77da0f@v12",
+      "facts": "Successful native full Write has stripCurrency(showNowPrice), separate currency16 and whole nonrolling priceText30; H5 alreadyTransparent. It follows actual correct Kotlin input."
+    },
+    {
+      "id": "S4-first-repair",
+      "refs": [
+        "fixer L528/L529"
+      ],
+      "facts": "Successful script replaces singleText with animated/nonanimated branches and ForEach splitPriceRuns30/16; also edits banner. Formal price deltas v11/v12."
+    },
+    {
+      "id": "S4-v14",
+      "refs": [
+        "fixer L532/L533"
+      ],
+      "use_ts": "2026-07-26T21:24:34.699Z",
+      "facts": "Adds BANNER_DOT_COLOR/BANNER_DOT_SELECTED_COLOR/BANNER_INDICATOR_LEFT only; not priceDigits."
+    },
+    {
+      "id": "S4-second-repair",
+      "refs": [
+        "fixer L592/L593"
+      ],
+      "use_ts": "2026-07-26T21:30:17.239Z",
+      "done_ts": "2026-07-26T21:30:20.292Z",
+      "facts": "Successful script and returned code show fixedpriceDigits30/priceSuffix16 with newprivate static helpers. Tail feeding_slot41 beyond40effectversions; no agentv41, cannot move to earlier v40/v33 or formalfilev14."
+    },
+    {
+      "id": "S4-build",
+      "refs": [
+        "builder L23/L24",
+        "builder L28/L29",
+        "builder L32/L33",
+        "builder L34/L35",
+        "builder L36/L37",
+        "builder L39/L40"
+      ],
+      "facts": "Compilerprivate errors1222/1223; real laterRead seeshelpers but binding tofilev14 uncertain. Two successful nativeEdits removeprivate, native secondbuild EXIT=0/BUILD SUCCESSFUL andtasks/outputs readback. This is compile evidence, not visual/runtime/allformats validation."
+    },
+    {
+      "id": "S4-finding-strength",
+      "refs": [
+        "fixer L501/L502",
+        "fixer L615"
+      ],
+      "facts": "L501/L502 mixedfindings includeprice suffix (not onlybanner); L615 mixedattempts includeprice correction fromestimated3tier tosource16/30/16 (not onlyCTA). These remain claims where no directsourceopened."
+    }
+  ],
+  "run": {
+    "path": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v8/member-center/runs/tools/rep1",
+    "source": "b540cb2",
+    "source_digest": "008bb634b4c614dd480ecdd632f3ae3679e41147dff78160f45631cbe59ad981",
+    "pool_digest": "a78b1373045f7558d6da3b76123e30d032635a2a0b4cdd665e7f80c0bdf8b337",
+    "common_task_sha256": "e60ad7491cd5991a948f8c7128432feca230a59bee208640ca5b90a44d68dec1",
+    "model": "gpt-5.5",
+    "effort": "medium",
+    "started_at": "2026-09-09T19:22:21.371976+00:00",
+    "completed_at": "2026-09-09T19:31:06.745953+00:00",
+    "input": 762351,
+    "cache_included": 672768,
+    "output": 18782,
+    "total": 781133,
+    "tool_calls": 38,
+    "tool_chars": 123739,
+    "wall_s": 525.3831888999557,
+    "e2e_s": 539.2770249999594
+  },
+  "facts": [
+    {
+      "id": "S3.f1",
+      "fact": "扫描列出的三处是 AppLoadDialog、PayAgreementDialog、RenewRuleDialog。",
+      "status": "supported",
+      "quote": "3 个缺 mask 站点：206 AppLoadDialog、704 PayAgreementDialog、728 RenewRuleDialog。",
+      "report_location": "S3.nodes[1].reason",
+      "note": "三站点正确。",
+      "raw_refs": [
+        "fixer L80/L81"
+      ]
+    },
+    {
+      "id": "S3.f2",
+      "fact": "脚本跳过已设 mask 的 controller；AppLoad 分支补 Color.Transparent，其余缺失项补 Palette.DIALOG_MASK。",
+      "status": "supported",
+      "quote": "批量脚本规则为 AppLoadDialog 写 Color.Transparent，其余 builder 写 Palette.DIALOG_MASK",
+      "report_location": "S3.nodes[1].reason + coverage[candidate:b30f4e449bea2bd6cc42]",
+      "note": "文本与脚本动作说明只补缺失项，实际执行被明确承认；最终快照/设备验证仍未知。",
+      "raw_refs": [
+        "fixer L103/L104"
+      ]
+    },
+    {
+      "id": "S3.f3",
+      "fact": "3 sites 是总修改数，不是三个深色/non-loading controller。H5 已透明并被跳过。",
+      "status": "partial",
+      "quote": "MemberCenterPage.ets 有 4 个 controller、已有 1 个 mask",
+      "report_location": "S3.nodes[1].reason",
+      "note": "3sites总数与1透明+2Palette正确，但全文包括coverage均未点名既有H5透明及跳过；L74grep候选明确未展开。沿用V7相同要求，不能把泛称已有1mask当完整H5例外交代。",
+      "raw_refs": [
+        "fixer L74/L75",
+        "fixer L103/L104",
+        "Slice8 L264/L265"
+      ]
+    },
+    {
+      "id": "S4.f1",
+      "fact": "Slice 8 在整文件写入之前读到 Kotlin replaceSpan 数字段逻辑，后来实现仍把非滚动价格后缀与数字统一使用 30vp。",
+      "status": "partial",
+      "quote": "未展开 v7 原文，本进入点基于 sessions 脊柱和修复前读取输出",
+      "report_location": "S4_PRICE.nodes[1].reason",
+      "note": "真实Slice8id进入红节点，但无该agent/原生Write/早期KotlinRead打开。模型正确指出单Text30问题，却未建立已收到正确输入→错误重写。最近可靠全文提示不是自动blame。",
+      "raw_refs": [
+        "Slice8 L21/L24",
+        "Slice8 L264/L265"
+      ]
+    },
+    {
+      "id": "S4.f2",
+      "fact": "修复先采用片段迭代，后改为 priceDigits/priceSuffix 两个固定 Span，不能把中间态当最终态。",
+      "status": "supported",
+      "quote": "收尾后二次简化为 priceDigits/priceSuffix",
+      "report_location": "notes + S4_COMPILE.nodes[0]",
+      "note": "完整提及ForEach→固定双Span、30/16；虽分在PRICE/COMPILE两个缺陷，按完整提交计入。",
+      "raw_refs": [
+        "fixer L528/L529",
+        "fixer L592/L593"
+      ]
+    },
+    {
+      "id": "S4.f3",
+      "fact": "视觉修复新增 private static helper 被兄弟组件调用，后置编译报 private access；两次 Edit 去掉 private，随后构建成功。",
+      "status": "supported",
+      "quote": "两次 Edit 分别把 priceDigits、priceSuffix 从 private static 改为 static ... EXIT=0 和 hvigor BUILD SUCCESSFUL",
+      "report_location": "S4_COMPILE.nodes[1].reason",
+      "note": "actor-level私有helper引入、跨ProductItemCard调用、builder修复与真实构建正确。没有把构建当视觉复验；尾后版本错绑另列。",
+      "raw_refs": [
+        "fixer L592/L593",
+        "builder L23/L24",
+        "builder L32/L33",
+        "builder L34/L35",
+        "builder L36/L37",
+        "builder L39/L40"
+      ]
+    }
+  ],
+  "fact_counts": {
+    "supported": 4,
+    "partial": 2,
+    "omitted": 0,
+    "contradicted": 0,
+    "total": 6
+  },
+  "core_answer": {
+    "S3": "partial: sites/values/execution sound, H5exception omitted",
+    "S4": "partial: repair+compile events sound, generation-input investigation missing and tailcoordinate wrong"
+  },
+  "full_annotation": {
+    "status": "not_complete_semantically",
+    "reason": "Structurallyprovided38/38 does not fix unsupportedgenerationbasis or inventedlastversionstandin."
+  },
+  "interface_observations": {
+    "action": {
+      "count": 18,
+      "ref_count": 18,
+      "successful_returns": 18,
+      "id_guess_failures": 0,
+      "interpretation": "Observable callable-ref benefit; no claim it caused all token savings."
+    },
+    "navigation": {
+      "slice8_real_id_returned": true,
+      "where": [
+        "transcript.jsonl:L63 search",
+        "transcript.jsonl:L67 blame recovery",
+        "transcript.jsonl:L78 file spine"
+      ],
+      "slice8_agent_opened": false,
+      "slice8_write_action_opened": false,
+      "slice8_early_kotlin_read_opened": false,
+      "file_v7_opened": false,
+      "agent_attempts": 1,
+      "agent_successes": 0,
+      "agent_rejection": {
+        "step": 28,
+        "line": 144,
+        "id": "agent-a68daf720e780b4c2",
+        "v": 33,
+        "via": "agent:agent-a68daf720e780b4c2@v33",
+        "reason": "Source not previously opened; action inspection does not open owner agent."
+      },
+      "other_rejections": [
+        {
+          "step": 9,
+          "line": 65,
+          "reason": "filev16viaitself beforeanynodeopened"
+        },
+        {
+          "step": 10,
+          "line": 66,
+          "reason": "sameunopenedsource"
+        }
+      ],
+      "interpretation": "Providing correct id and query receipt did not result in upstream inspection in this sample. The final Slice8 red coordinate is valid, but not an investigationvisit."
+    },
+    "recovery": {
+      "called": true,
+      "step": 11,
+      "line": 67,
+      "tool": "blame",
+      "input": {
+        "v": 16,
+        "changed": true,
+        "start": 1,
+        "n": 130
+      },
+      "returned": {
+        "nearest_snapshot_v": 7,
+        "writer": "agent-aslice8-pay-80bbb1f44b77da0f@v12",
+        "write_ref": "#80bbb1f44b77da0f:13670@L264",
+        "earliest_gap_ref": "#b7ebd5ae592d3c5d:9236@L345",
+        "formal_intervening": 8,
+        "explicit_effect_candidates": 1,
+        "unverified_mentions": 64
+      },
+      "explicit_queries": [
+        "file(v=7,content=true)",
+        "agent(id=agent-aslice8-pay-80bbb1f44b77da0f,v=12,reads=true)",
+        "action(id=agent-aslice8-pay-80bbb1f44b77da0f,seq=13670)"
+      ],
+      "followed": false,
+      "warning_returned": "最近全文写者不是被替换行作者，不自动归责",
+      "interpretation": "Recovery was delivered, not followed. Report explicitly substitutes spine+laterread foropeningv7; cannot credit successful rootcause recovery."
+    },
+    "time_queries": {
+      "until": 0,
+      "until_ts": 3,
+      "scope": "Allafter-generation July26 windows; no explicitgenerationinputcutoffquery."
+    }
+  },
+  "mechanical_check": {
+    "verdict_ok": true,
+    "identity_bound": true,
+    "final_binding": "matched",
+    "semantic_checked": false,
+    "first": {
+      "step": 37,
+      "use_line": 200,
+      "result_line": 202,
+      "errors": 3,
+      "warnings": 2,
+      "invalid_nodes": [
+        "builder@v4",
+        "fixer@v41 entry",
+        "fixer@v41 node"
+      ],
+      "warnings_codes": [
+        "node_role_conflict",
+        "basis_action_post_anchor"
+      ]
+    },
+    "last": {
+      "step": 38,
+      "use_line": 209,
+      "result_line": 211,
+      "errors": 0,
+      "warnings": 4,
+      "status": "needs_review",
+      "warnings_codes": [
+        "basis_action_post_anchor",
+        "basis_action_post_anchor",
+        "basis_agent_window_boundary",
+        "basis_action_post_anchor"
+      ]
+    },
+    "document_sha256": "d3eff5c2ef999c6f2b7978fc0b6d1c974d0bf8d5b927150aa6b67e646329935c",
+    "draft_sha256": "a2eacaa702e45d5ce94e7d29c6d879729b3a500dc6b61fdcb0c2ff8b2f37d7c6",
+    "response_to_check": "No newevidence callsbetweenchecks. Invalidtailv41 becomeslastv40; builderv4 becomesv3; duplicateS3role row removed. Reddefects remain, andfinalstillcontains4warnings.",
+    "interpretation": "Notmechanical_clear and notsemanticallyverified. Itdidnotsimplydeletered; itretainedredusinga disclosedbutinvalidlastversionstandin."
+  },
+  "extra_issues": [
+    {
+      "code": "tail_event_last_version_standin",
+      "severity": "major_attribution",
+      "node": "agent:agent-a68daf720e780b4c2@v40",
+      "quote": "这里用 fixer-r1@v40 表示该候选写之前的最后可导航 agent 状态",
+      "report_location": "S4_COMPILE.boundary + entry + nodes[0]",
+      "evidence": "RawfixerL592/L593 is21:30:17 candidateafter40effects; transcriptL94andfinalcheckL211 explicitlysaynoformalversion/donotrebindtolastversion.",
+      "note": "Disclosuredoesnotmakea previousstate theerror-entryevent. Actor-levelintroductionisright, exactredcoordinateisnot."
+    },
+    {
+      "code": "nearest_snapshot_author_used_without_opening_evidence",
+      "severity": "major_evidence_gap",
+      "node": "agent:agent-aslice8-pay-80bbb1f44b77da0f@v12",
+      "quote": "本进入点基于 sessions 脊柱和修复前读取输出",
+      "evidence": "Theusedactualref#15677/L516isJuly26;targetwriter isJuly24. edit-miss liesbetween. Actualnativev7doescontainthebadcode,butrunneveropensitorthecorrectearlyKotlininput.",
+      "note": "Do not call theactualactorfalse; theclaimedbasisdoesnotestablishtheexacthistoricalcause. Recoveryitselfexplicitlydisclaimssuchblame."
+    },
+    {
+      "code": "h5_exception_uninvestigated",
+      "severity": "core_omission",
+      "quote": "maskColor grep 线索，未单独展开",
+      "report_location": "coverage[candidate:db1b4359923dd4cfac67]",
+      "evidence": "RawfixerL74/L75andSlice8L264giveexistingH5Transparent. V7bothreportsnamedH5incov; V8doesnot.",
+      "note": "Generic4controllers/1maskispartial,notcompleteexceptioncoverage."
+    }
+  ],
+  "coverage": {
+    "provided": 38,
+    "expected_versions": 7,
+    "expected_candidates": 31,
+    "explained": 17,
+    "deferred": 21,
+    "missing": 0,
+    "not_repair": 0,
+    "positives": [
+      "No fabricatedS3formalrepairpair.",
+      "v10/v13/v14/imagewrite correctlyout_of_scope,notnot_repair.",
+      "L501pricefindingcorrectlyexplained."
+    ],
+    "limits": [
+      "L615notinvestigated isallowed and not mislabeledunrelated.",
+      "Coveragecountsaremechanicalaccounting,not38repairsor38trueclaims."
+    ]
+  },
+  "comparison": {
+    "baseline": "V7Membertwofrozenplannedrepetitions,notpairedn2V8",
+    "v7_total_mean": 1349627,
+    "v8_total": 781133,
+    "observed_token_change_pct": -42.12230490350297,
+    "v7_wall_mean": 431.2978296500514,
+    "observed_wall_change_pct": 21.814475469594584,
+    "v7_facts_each": {
+      "supported": 5,
+      "partial": 1
+    },
+    "v8_facts": {
+      "supported": 4,
+      "partial": 2
+    },
+    "interpretation": "SingleV8sampletotalinput+outputis42.1%belowV7mean,butruntime21.8%longerandfixedfactsnotbetter. Sampling+multipleinterfacechangespreventclaimingcausalorstablegain. Jointtoken+accuracy+UIacceptanceisnotdemonstrated."
+  }
+}

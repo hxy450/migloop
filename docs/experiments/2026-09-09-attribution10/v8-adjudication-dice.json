@@ -1,0 +1,782 @@
+{
+  "schema": "migloop-semantic-adjudication/1",
+  "status": "complete_single_tools_rep",
+  "review_date": "2026-09-09",
+  "case": "dice-entry",
+  "questions": [
+    "D1",
+    "D2"
+  ],
+  "scope": "Independent raw-evidence adjudication of formal-v8 tools rep1; reference-v1 unchanged, Dice native 10/10 addendum separate and shared with raw baseline. No source/run/pool/reference mutations, model calls or private holdout.",
+  "run": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v8/dice-entry/runs/tools/rep1",
+  "reference": {
+    "path": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/reference-v1/legacy-reference.json",
+    "sha256": "2c015536094fff1e42bb3b6b5cc2dce743c0f2a0f6924254027f7f8a5faac927"
+  },
+  "raw_pool": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v1/dice-entry/pool",
+  "fact_counts": {
+    "supported": 5,
+    "partial": 1,
+    "omitted": 0,
+    "contradicted": 0,
+    "total": 6
+  },
+  "fact_counts_not_accuracy": true,
+  "core": {
+    "D1": "supported: actual generation inputs and unbridged output, later explicit requirement and successful edits, no retroactive blame. Full later validation state incomplete.",
+    "D2": "supported bounded causal core: ECAT work list -> SDK reads -> three edits -> actual compile, not runtime proof. Fixed full fact f3 remains partial because may-throw WARN omitted."
+  },
+  "facts": [
+    {
+      "id": "D1.f1",
+      "reference_fact": "生成方实际读取页面/F001/沉浸式输入，已记录的生成 Write 未含后来测试桥。",
+      "status": "supported",
+      "report_quote": "生成期可确认输入包括页面迁移、F001 行为和沉浸式安全区，实际输出 v2 未含桥。",
+      "report_location": "notes; D1 nodes[0..1]",
+      "raw": [
+        "81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a349784d2663f1f0a.jsonl:L1,L51-L54,L57-L58,L71-L72"
+      ],
+      "reason": "Native Read calls establish actual input consumption before successful Write. Tool run opened cumulative generator v2 with reads=true/seen=true at transcript L90; generated v2 diff at L75. This is stronger than raw reps' missing generator-input investigation, without treating zero literal matches as complete absence."
+    },
+    {
+      "id": "D1.f2",
+      "reference_fact": "UI 测试设计及后续派发明确要求 Want→AppStorage 测试桥，实施方以成功 Edit 加入。",
+      "status": "supported",
+      "report_quote": "后续 UI-T Step3 的派发明确要求只做测试代码与测试数据落地，并在流程第 2 步写 TestDataSetup + 桥",
+      "report_location": "D1 nodes[2..3], coverage v3-v5",
+      "raw": [
+        "81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a711c5d09fb676814.jsonl:L1,L7-L8,L11-L12,L17-L18,L35-L40"
+      ],
+      "reason": "Actual design/template/readback and three same-ID successful native Edit pairs support import, lifecycle calls, and consumeTestWant. Agent v5 is cumulative overview; exact write effects are agent v2/v3/v4, not all v5."
+    },
+    {
+      "id": "D1.f3",
+      "reference_fact": "生成时刻与后续测试阶段须分开，不将后置明确要求自动认定为初始生成遗漏。",
+      "status": "supported",
+      "report_quote": "对生成方 agent@v2 的 __target_page__ 字面检索为零命中只说明该 agent 记录范围内未检索到该字面，不能证明要求此前语义上不存在。",
+      "report_location": "D1 boundary",
+      "raw": [
+        "81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a349784d2663f1f0a.jsonl:L71",
+        "81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a711c5d09fb676814.jsonl:L1,L35-L40"
+      ],
+      "reason": "No red/entry claim that initial generator violated an already supplied bridge requirement; correct temporal separation. Actual generator Write 15:51 UTC precedes bridge edits 19:17 UTC."
+    },
+    {
+      "id": "D2.f1",
+      "reference_fact": "ECAT 修复派发明确要求注册全局未捕获异常观察者。",
+      "status": "supported",
+      "report_quote": "fix-errobserver 的派发 work list 明确要求在 AbilityStage 或 EntryAbility.onCreate 注册全局未捕获异常观察者",
+      "report_location": "D2 nodes[2], boundary",
+      "raw": [
+        "2f01bcdc-0a92-4961-a64d-5b181f03b3d3/subagents/agent-a27497cfed8c44856.jsonl:L1",
+        "257fed22-fb0e-48de-bee9-0791c45a90a9.jsonl:L115,L119"
+      ],
+      "reason": "Explicit work list returned in agent query L93. Additional 21:12 memory is a recorded later requirement statement, not proof early generator saw it; report states this distinction."
+    },
+    {
+      "id": "D2.f2",
+      "reference_fact": "修复方读取入口和 SDK 后，三次成功 Edit 加入 import、注册调用和观察者实现。",
+      "status": "supported",
+      "report_quote": "v6-v8 实际合并 import errorManager、在 onCreate 中调用 registerGlobalErrorObserver，并在类尾用 errorManager.on('error', observer) 注册 observer，回调内只 hilog.error。",
+      "report_location": "D2 nodes[2..3], coverage v6-v8",
+      "raw": [
+        "2f01bcdc-0a92-4961-a64d-5b181f03b3d3/subagents/agent-a27497cfed8c44856.jsonl:L23-L24,L29-L30,L35-L38,L41-L46"
+      ],
+      "reason": "Native inputs and successful Edit pairs corroborate exact changes; SDK observed lines support imports/members without upgrading their nearest-version binding to whole SDK snapshot."
+    },
+    {
+      "id": "D2.f3",
+      "reference_fact": "后置 builder 有直接成功构建日志，也有 may-throw 类 WARN。",
+      "status": "partial",
+      "report_quote": "记录 BUILD_EXIT_CODE=0、0 ERROR、主 HAP/测试 HAP 存在；但未记录触发未捕获异常或核验回调日志，因此只证明构建口径通过",
+      "report_location": "D2 nodes[3], notes",
+      "raw": [
+        "2f01bcdc-0a92-4961-a64d-5b181f03b3d3/subagents/agent-a635575c78cd15ff6.jsonl:L33-L34,L43-L44,L47-L48,L51-L52,L67-L68"
+      ],
+      "reason": "Actual native build evidence correctly used, not merely parent summary. Report omits all WARN/may-throw mention. The queried L47/L48 output already contains EntryAbility warnings including 140:5; L51/L52 spells out Function may throw exceptions. Not a claim of build failure and not requiring arbitrary extra source."
+    }
+  ],
+  "extra_claims": [
+    {
+      "id": "D1.validation.latest_channel",
+      "classification": "omitted_later_state_not_false_old_Step4",
+      "report_quote": "后续验证可确认编译/安装记录，但 UI 10 it 未进入断言体，不能确认桥的运行行为。",
+      "reason": "Step4 report really records canonical 10 beforeEach errors. But later host-side 10/10/HARD21/21 and seven unobservables are absent. AppStorage NOT_ASSERTED remains true; omission does not turn bridge unknown into a mistake. Final broad validation summary is incomplete under shared addendum.",
+      "raw": [
+        "593d4e86-a947-4e62-8027-013014c2bafc.jsonl:L256,L260,L265,L267"
+      ],
+      "same_scale": "Raw rep1 also omitted later state; raw rep2 mentioned 10/10 as a copied summary claim but did not inspect native L260/L267. None receives bridge-certification credit."
+    },
+    {
+      "id": "D1.Step4.evidence_kind",
+      "classification": "source_report_not_native_test_stdout",
+      "report_quote": "后续 Step4 报告能确认主 HAP 与 ohosTest 编译、安装成功",
+      "reason": "Cited #a52d61ac7ab7033ba:4069@L390 is native Write of generated ui-report.md, not a native aa-test result. action(part=output) confirms file creation only. The report explicitly calls it Step4 report; do not inflate this to individually audited test receipts.",
+      "raw": [
+        "81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a52d61ac7ab7033ba.jsonl:L390"
+      ],
+      "observed_tool_results": [
+        133,
+        135
+      ]
+    },
+    {
+      "id": "D2.normal_role",
+      "classification": "normal_for_assigned_work_not_runtime_certified",
+      "reason": "No final unsupported red node or fake event-owner edge. '正常' on executed assigned bridge/observer work should be read with explicit runtime unknown, not claim a tested callback."
+    }
+  ],
+  "annotation": {
+    "red_nodes": 0,
+    "entries": 0,
+    "explicit_final_edges": 0,
+    "coverage_expected": 7,
+    "formal_versions": 6,
+    "candidates": 1,
+    "explained": 6,
+    "not_repair": 1,
+    "out_of_scope": 0,
+    "missing": 0,
+    "reason": "Only candidate #a27497cfed8c44856:616@L51 is actual git diff --stat plus grep/echo; opened via action L249. Read-only not_repair is supported, not a denial of recorded changes. Coverage complete is per-row accounting, not causal truth."
+  },
+  "query_audit": {
+    "tools": [
+      {
+        "Name": "guide",
+        "Count": 2
+      },
+      {
+        "Name": "sessions",
+        "Count": 1
+      },
+      {
+        "Name": "file",
+        "Count": 4
+      },
+      {
+        "Name": "agent",
+        "Count": 10
+      },
+      {
+        "Name": "action",
+        "Count": 21
+      },
+      {
+        "Name": "search",
+        "Count": 10
+      },
+      {
+        "Name": "check",
+        "Count": 2
+      }
+    ],
+    "action_ref_calls": 21,
+    "action_successful": 21,
+    "agent_attempts": 10,
+    "agent_successful": 3,
+    "rejected_calls": 7,
+    "rejection_detail": {
+      "sessions_as_agent_via": 3,
+      "unopened_source_file": 2,
+      "observer_v8_out_of_range": 1,
+      "builder_v1_with_zero_effects": 1
+    },
+    "successful_agents": [
+      {
+        "id": "agent-a349784d2663f1f0a",
+        "v": 2,
+        "result_line": 90
+      },
+      {
+        "id": "agent-a711c5d09fb676814",
+        "v": 5,
+        "result_line": 92
+      },
+      {
+        "id": "agent-a27497cfed8c44856",
+        "v": 3,
+        "result_line": 93
+      }
+    ],
+    "search_calls": 10,
+    "until_ts_searches": 8,
+    "seq_only_until": 0,
+    "zero_match_searches": {
+      "lines": [
+        224,
+        225
+      ],
+      "scope": "generator@v2 only; final explicitly limits absence inference"
+    },
+    "later_search_gap": "Tests run search at L156 starts after observer patch 21:19:39, so native 21:01 host replay is outside that query. Other searches start 19:18 and do include that interval, but term/selection did not lead to opening L260/L267. Not proof the service hid it."
+  },
+  "check_interpretation": {
+    "first_check": {
+      "step": 49,
+      "result_line": 259,
+      "errors": 9,
+      "reason": "Four search-receipt tokens used as evidence refs; five wrong exact writer-version edges."
+    },
+    "final_check": {
+      "step": 50,
+      "result_line": 268,
+      "errors": 0,
+      "warnings": 0,
+      "status": "mechanical_clear"
+    },
+    "evidence_calls_between_checks": 0,
+    "action": "Removed four invalid refs and all explicit edges; no new evidence query. Removal avoids final false edges but does not supply omitted WARN/later validation.",
+    "binding": "matched; content identity only, semantic_checked=false"
+  },
+  "metadata": {
+    "source_code_id": "b540cb2",
+    "actual_models": [
+      "gpt-5.5"
+    ],
+    "actual_effort": "medium",
+    "source_digest": "008bb634b4c614dd480ecdd632f3ae3679e41147dff78160f45631cbe59ad981",
+    "pool_digest": "653db4192d47366e8ca099e59ef2679e929056f18320d081768539b2f5b7443e",
+    "common_task_sha256": "9060a6c160d2a1ac2b893b9f19d12e66a16e6ce1b7d301eacae0abfb9f55eec4",
+    "started_at": "2026-09-09T19:35:42.013223+00:00",
+    "ended_at": "2026-09-09T19:41:16.969544+00:00",
+    "wall_s": 334.96348549996037,
+    "end_to_end_wall_s": 338.9046601000009,
+    "usage": {
+      "input_total": 1616936,
+      "cache_read": 1495040,
+      "cache_creation": 0,
+      "input_uncached": 121896,
+      "output": 14910,
+      "thinking_reported": 1381,
+      "output_includes_thinking": "Codex output_tokens is used once; reasoning is not added",
+      "input_semantics": "Codex input_tokens is the total; reported cache read/write are not added to it. input_uncached means input_tokens minus cached_input_tokens."
+    },
+    "tool_counts": [
+      {
+        "Name": "guide",
+        "Count": 2
+      },
+      {
+        "Name": "sessions",
+        "Count": 1
+      },
+      {
+        "Name": "file",
+        "Count": 4
+      },
+      {
+        "Name": "agent",
+        "Count": 10
+      },
+      {
+        "Name": "action",
+        "Count": 21
+      },
+      {
+        "Name": "search",
+        "Count": 10
+      },
+      {
+        "Name": "check",
+        "Count": 2
+      }
+    ],
+    "tool_calls": 50,
+    "tool_chars": 207988,
+    "repeated_calls": 0,
+    "rejected_calls": 7,
+    "action_calls": 21,
+    "action_ref_calls": 21,
+    "search_calls": 10,
+    "search_with_until_ts": 8,
+    "search_seq_until": 0,
+    "coverage_counts": {
+      "expected": 7,
+      "provided": 7,
+      "accounted": 7,
+      "expected_versions": 6,
+      "expected_candidates": 1,
+      "missing_versions": 0,
+      "missing_candidates": 0,
+      "missing": 0,
+      "unresolved": 0,
+      "not_repair": 1,
+      "deferred": 0,
+      "unconfirmed": 0,
+      "advisories": 0,
+      "advisory_rows": 0
+    },
+    "draft_check": {
+      "status": "matched",
+      "semantic_checked": false,
+      "checks": [
+        {
+          "step": 49,
+          "call_id": "call_DjWGnhPAfb5oldg5shIzCy4X",
+          "verified": true,
+          "status": "needs_review",
+          "counts": {
+            "errors": 9,
+            "warnings": 0,
+            "total": 9
+          },
+          "draft_sha256": "20f6662134f88589f8cc8bf5abfe1604d57d7b3f970dd2302e1dc5048584e8f2",
+          "document_sha256": "465242f57216bdb7d617803a0ee23df4b8fa17a9ccd9ea7185d25fc7c3edafc4",
+          "issues": [
+            {
+              "code": "invalid_reference",
+              "severity": "error",
+              "where": "defect:D1.nodes[0].evidence[3]",
+              "node": null,
+              "detail": "#6ace3b7fa6825762bf9c4d42: unparsed;引用位置可核不代表原文支持断言"
+            },
+            {
+              "code": "invalid_reference",
+              "severity": "error",
+              "where": "defect:D1.nodes[3].evidence[5]",
+              "node": null,
+              "detail": "#45a6bebf2f37872ed0d7d188: unparsed;引用位置可核不代表原文支持断言"
+            },
+            {
+              "code": "edge_unconfirmed",
+              "severity": "error",
+              "where": "defect:D1.edges[0]",
+              "node": null,
+              "detail": "是它写的,但写者版本是 v2,不是 v5"
+            },
+            {
+              "code": "edge_unconfirmed",
+              "severity": "error",
+              "where": "defect:D1.edges[1]",
+              "node": null,
+              "detail": "是它写的,但写者版本是 v3,不是 v5"
+            },
+            {
+              "code": "edge_unconfirmed",
+              "severity": "error",
+              "where": "defect:D1.edges[2]",
+              "node": null,
+              "detail": "是它写的,但写者版本是 v4,不是 v5"
+            },
+            {
+              "code": "invalid_reference",
+              "severity": "error",
+              "where": "defect:D2.nodes[0].evidence[1]",
+              "node": null,
+              "detail": "#d7561b58eb8a911c2ab84793: unparsed;引用位置可核不代表原文支持断言"
+            },
+            {
+              "code": "invalid_reference",
+              "severity": "error",
+              "where": "defect:D2.nodes[1].evidence[2]",
+              "node": null,
+              "detail": "#1cd82b3c296d5738ad55e599: unparsed;引用位置可核不代表原文支持断言"
+            },
+            {
+              "code": "edge_unconfirmed",
+              "severity": "error",
+              "where": "defect:D2.edges[0]",
+              "node": null,
+              "detail": "是它写的,但写者版本是 v1,不是 v3"
+            },
+            {
+              "code": "edge_unconfirmed",
+              "severity": "error",
+              "where": "defect:D2.edges[1]",
+              "node": null,
+              "detail": "是它写的,但写者版本是 v2,不是 v3"
+            }
+          ],
+          "omitted_issues": 0,
+          "coverage": {
+            "checked": true,
+            "target": "entry/src/main/ets/entryability/EntryAbility.ets",
+            "counts": {
+              "expected": 7,
+              "provided": 7,
+              "accounted": 7,
+              "expected_versions": 6,
+              "expected_candidates": 1,
+              "missing_versions": 0,
+              "missing_candidates": 0,
+              "missing": 0,
+              "unresolved": 0,
+              "not_repair": 1,
+              "deferred": 0,
+              "unconfirmed": 0,
+              "advisories": 0,
+              "advisory_rows": 0
+            },
+            "accounted": true,
+            "semantic_checked": false
+          }
+        },
+        {
+          "step": 50,
+          "call_id": "call_RY56qPE0gK7CSAvXQ1LY1NKU",
+          "verified": true,
+          "status": "mechanical_clear",
+          "counts": {
+            "errors": 0,
+            "warnings": 0,
+            "total": 0
+          },
+          "draft_sha256": "084960b18da67000078e4c8ead65bb294ef34c6ab8daf9fab8ecc8a10b1ce473",
+          "document_sha256": "b4cbe3d06665b38f137f4e461b004497059ff90fc52db26a9c070e4331166316",
+          "issues": [],
+          "omitted_issues": 0,
+          "coverage": {
+            "checked": true,
+            "target": "entry/src/main/ets/entryability/EntryAbility.ets",
+            "counts": {
+              "expected": 7,
+              "provided": 7,
+              "accounted": 7,
+              "expected_versions": 6,
+              "expected_candidates": 1,
+              "missing_versions": 0,
+              "missing_candidates": 0,
+              "missing": 0,
+              "unresolved": 0,
+              "not_repair": 1,
+              "deferred": 0,
+              "unconfirmed": 0,
+              "advisories": 0,
+              "advisory_rows": 0
+            },
+            "accounted": true,
+            "semantic_checked": false
+          }
+        }
+      ],
+      "check_calls": 2,
+      "draft_chars": 15910,
+      "returned_chars": 3129,
+      "final_document_sha256": "b4cbe3d06665b38f137f4e461b004497059ff90fc52db26a9c070e4331166316",
+      "matched_check": 50
+    }
+  },
+  "reference_locator_audit": {
+    "references": [
+      {
+        "ref": "#257fed22:1006@L115",
+        "relative_file": "257fed22-fb0e-48de-bee9-0791c45a90a9.jsonl",
+        "line": 115,
+        "native_ids": [
+          "call_ac8ddda9fe4e4a5a87839d90"
+        ],
+        "timestamp": "2026-09-03T21:12:47.694Z",
+        "record_sha256": "42771263569577db3f45f997a8f88745e169bbb13d57747afdd42af44037d75b",
+        "located": true
+      },
+      {
+        "ref": "#257fed22:1008@L119",
+        "relative_file": "257fed22-fb0e-48de-bee9-0791c45a90a9.jsonl",
+        "line": 119,
+        "native_ids": [
+          "call_8ce3690fd9384f04ab8d47bb"
+        ],
+        "timestamp": "2026-09-03T21:12:53.922Z",
+        "record_sha256": "ea3a2df7dc072e047f9541c7f34b93cc7a7a1c44abc9b51f29e66b5ce2f69f9b",
+        "located": true
+      },
+      {
+        "ref": "#a27497cfed8c44856:596@L29",
+        "relative_file": "2f01bcdc-0a92-4961-a64d-5b181f03b3d3/subagents/agent-a27497cfed8c44856.jsonl",
+        "line": 29,
+        "native_ids": [
+          "call_f3722a2fa80c4d2bbee5b99e"
+        ],
+        "timestamp": "2026-09-03T21:18:25.065Z",
+        "record_sha256": "c048ba117b2188501f7ae03a222bfea4daed5714a00c31bd1b2b9956f936b151",
+        "located": true
+      },
+      {
+        "ref": "#a27497cfed8c44856:601@L35",
+        "relative_file": "2f01bcdc-0a92-4961-a64d-5b181f03b3d3/subagents/agent-a27497cfed8c44856.jsonl",
+        "line": 35,
+        "native_ids": [
+          "call_e6d56b80320d4677b97b915b"
+        ],
+        "timestamp": "2026-09-03T21:18:35.605Z",
+        "record_sha256": "e2c5c2320d2dd8bf89a1b86520e13ccb7a398b88c18a98db2f4a1cd74e1b5b81",
+        "located": true
+      },
+      {
+        "ref": "#a27497cfed8c44856:603@L37",
+        "relative_file": "2f01bcdc-0a92-4961-a64d-5b181f03b3d3/subagents/agent-a27497cfed8c44856.jsonl",
+        "line": 37,
+        "native_ids": [
+          "call_e8130043aeef4043aa0e3ff0"
+        ],
+        "timestamp": "2026-09-03T21:18:36.033Z",
+        "record_sha256": "4429505296278c844975be287c5f763d10b98551f83f0a7fd89e8788c3f61683",
+        "located": true
+      },
+      {
+        "ref": "#a27497cfed8c44856:607@L41",
+        "relative_file": "2f01bcdc-0a92-4961-a64d-5b181f03b3d3/subagents/agent-a27497cfed8c44856.jsonl",
+        "line": 41,
+        "native_ids": [
+          "call_f031a058037c467fb06fc159"
+        ],
+        "timestamp": "2026-09-03T21:19:24.777Z",
+        "record_sha256": "c146cc4cb19f479638b45729b5667285a88aeb8c3b596266d15deae467fc957a",
+        "located": true
+      },
+      {
+        "ref": "#a27497cfed8c44856:609@L43",
+        "relative_file": "2f01bcdc-0a92-4961-a64d-5b181f03b3d3/subagents/agent-a27497cfed8c44856.jsonl",
+        "line": 43,
+        "native_ids": [
+          "call_7013085c03274c8183fdd455"
+        ],
+        "timestamp": "2026-09-03T21:19:31.929Z",
+        "record_sha256": "293cf7298c8f8f33fe2ac946178a36ddcfa2017913007853fb4151575ae62b30",
+        "located": true
+      },
+      {
+        "ref": "#a27497cfed8c44856:611@L45",
+        "relative_file": "2f01bcdc-0a92-4961-a64d-5b181f03b3d3/subagents/agent-a27497cfed8c44856.jsonl",
+        "line": 45,
+        "native_ids": [
+          "call_b6682a6aab774d88b1d1871d"
+        ],
+        "timestamp": "2026-09-03T21:19:39.888Z",
+        "record_sha256": "07b004834076111f9988a5e85040b50e151bb5b965bd6ae26c9e69444858477c",
+        "located": true
+      },
+      {
+        "ref": "#a27497cfed8c44856:616@L51",
+        "relative_file": "2f01bcdc-0a92-4961-a64d-5b181f03b3d3/subagents/agent-a27497cfed8c44856.jsonl",
+        "line": 51,
+        "native_ids": [
+          "call_15935d9b0309404dbcea7817"
+        ],
+        "timestamp": "2026-09-03T21:19:50.307Z",
+        "record_sha256": "10e1437bc0a04dc5c1dc68ef301f3b27233de798eaa00b8eaae794308cdff519",
+        "located": true
+      },
+      {
+        "ref": "#a349784d2663f1f0a:3440@L47",
+        "relative_file": "81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a349784d2663f1f0a.jsonl",
+        "line": 47,
+        "native_ids": [
+          "call_bc17fd91fb594eb8a9997c01"
+        ],
+        "timestamp": "2026-09-03T15:39:05.683Z",
+        "record_sha256": "3a0a8ced9ebadf770ad0a8445e0e0441c22ba0aa8e418e39542c7febd7b07fa1",
+        "located": true
+      },
+      {
+        "ref": "#a349784d2663f1f0a:3462@L71",
+        "relative_file": "81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a349784d2663f1f0a.jsonl",
+        "line": 71,
+        "native_ids": [
+          "call_459071197f484436b71237e5"
+        ],
+        "timestamp": "2026-09-03T15:51:35.645Z",
+        "record_sha256": "6c12a40f131dafc10e44cc99b27fc6066faeb9ccc0537af7c849a3a8412c27fe",
+        "located": true
+      },
+      {
+        "ref": "#a52d61ac7ab7033ba:4069@L390",
+        "relative_file": "81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a52d61ac7ab7033ba.jsonl",
+        "line": 390,
+        "native_ids": [
+          "call_bf1ca4153f7f4401bfa2c676"
+        ],
+        "timestamp": "2026-09-03T20:05:48.750Z",
+        "record_sha256": "bc194d617f84a58588be01e297ebc24cb0e23dc18b9a6be3d7f784f6bec45a83",
+        "located": true
+      },
+      {
+        "ref": "#a635575c78cd15ff6:647@L33",
+        "relative_file": "2f01bcdc-0a92-4961-a64d-5b181f03b3d3/subagents/agent-a635575c78cd15ff6.jsonl",
+        "line": 33,
+        "native_ids": [
+          "call_53a6741f92474c9bb9ab039c"
+        ],
+        "timestamp": "2026-09-03T21:23:40.800Z",
+        "record_sha256": "c859439b47a2d1b44527d6c152972a0b847e23319b0703a7491e44399c1e1698",
+        "located": true
+      },
+      {
+        "ref": "#a635575c78cd15ff6:659@L47",
+        "relative_file": "2f01bcdc-0a92-4961-a64d-5b181f03b3d3/subagents/agent-a635575c78cd15ff6.jsonl",
+        "line": 47,
+        "native_ids": [
+          "call_552108735f094b3f8d8a9e0d"
+        ],
+        "timestamp": "2026-09-03T21:24:08.671Z",
+        "record_sha256": "6b7eaa04d470a423d2934b8f4f38f13c47bba9ef3d1af09361fc1e8917169388",
+        "located": true
+      },
+      {
+        "ref": "#a635575c78cd15ff6:674@L67",
+        "relative_file": "2f01bcdc-0a92-4961-a64d-5b181f03b3d3/subagents/agent-a635575c78cd15ff6.jsonl",
+        "line": 67,
+        "native_ids": [
+          "call_8f969a5b29af41dd9cf09479"
+        ],
+        "timestamp": "2026-09-03T21:25:43.667Z",
+        "record_sha256": "28b98e4714e278d1b94150243fc978c5d2dfedb554555ffe64cb97e6a57eb2e7",
+        "located": true
+      },
+      {
+        "ref": "#a711c5d09fb676814:4256@L7",
+        "relative_file": "81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a711c5d09fb676814.jsonl",
+        "line": 7,
+        "native_ids": [
+          "call_189b2504fca14e68979322c2"
+        ],
+        "timestamp": "2026-09-03T19:10:15.792Z",
+        "record_sha256": "0bc10163e6eda4ebce91274e887fe7f6924a667893a990dd00533f7d1335d65c",
+        "located": true
+      },
+      {
+        "ref": "#a711c5d09fb676814:4260@L11",
+        "relative_file": "81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a711c5d09fb676814.jsonl",
+        "line": 11,
+        "native_ids": [
+          "call_769beeda1a324d3d95de7251"
+        ],
+        "timestamp": "2026-09-03T19:10:17.886Z",
+        "record_sha256": "028dea57f880deba2fee2260bd5b295f8f77a66348cc26a9d37363355aa6a767",
+        "located": true
+      },
+      {
+        "ref": "#a711c5d09fb676814:4266@L17",
+        "relative_file": "81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a711c5d09fb676814.jsonl",
+        "line": 17,
+        "native_ids": [
+          "call_ad63a77294304198a5c64ece"
+        ],
+        "timestamp": "2026-09-03T19:10:25.612Z",
+        "record_sha256": "0ff32ad35ddd89dbb00d20efbb03ab680080a5364a4b1f632f1b9bf7800788eb",
+        "located": true
+      },
+      {
+        "ref": "#a711c5d09fb676814:4282@L35",
+        "relative_file": "81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a711c5d09fb676814.jsonl",
+        "line": 35,
+        "native_ids": [
+          "call_003bc0a35ce74684a5296325"
+        ],
+        "timestamp": "2026-09-03T19:17:13.810Z",
+        "record_sha256": "ca124a76d4213257ec504a1a8c1f9a88bc24e3064941005916d9f2576a8ba75a",
+        "located": true
+      },
+      {
+        "ref": "#a711c5d09fb676814:4284@L37",
+        "relative_file": "81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a711c5d09fb676814.jsonl",
+        "line": 37,
+        "native_ids": [
+          "call_6c1a4dd0da164350a549d420"
+        ],
+        "timestamp": "2026-09-03T19:17:21.617Z",
+        "record_sha256": "b7197d5f9f4beed5084a5659b86c49f26716aa6f93a0a16a72f58bac5a3dcc90",
+        "located": true
+      },
+      {
+        "ref": "#a711c5d09fb676814:4286@L39",
+        "relative_file": "81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a711c5d09fb676814.jsonl",
+        "line": 39,
+        "native_ids": [
+          "call_04086bf7960b46e7b2a00be4"
+        ],
+        "timestamp": "2026-09-03T19:17:35.691Z",
+        "record_sha256": "9aa5b948a807268d1cf8910068fad64a2c798bab89963eab63d708dc9b44665f",
+        "located": true
+      }
+    ],
+    "verdict_yaml_sha256": "084960b18da67000078e4c8ead65bb294ef34c6ab8daf9fab8ecc8a10b1ce473",
+    "result_json_sha256": "46925419981aa19bc858c4ecfffeabe4e0d213c75d6a550d17404e54cbc3f2c5",
+    "reference_sha256": "2c015536094fff1e42bb3b6b5cc2dce743c0f2a0f6924254027f7f8a5faac927",
+    "located_count": 21,
+    "sequence_scope": "Checks above verify transcript tag + physical source line + native IDs and record hash. Exact global seq validity is recorded check result; this raw audit does not reconstruct a different current ledger."
+  },
+  "dice_addendum": [
+    {
+      "supplement": 260,
+      "file": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v1/dice-entry/pool/593d4e86-a947-4e62-8027-013014c2bafc.jsonl",
+      "record_sha256": "d0bdea3e3501e2137d49a16f818fb36770ef4163c71e90b29e018a0e3a066b2d",
+      "selector": [
+        "message",
+        "content",
+        0,
+        "content"
+      ],
+      "field_sha256": "bb8d9a53c01927641445a511c60e00838367ec0c27a9e09b4ea7db267a0acfae",
+      "tool_use_id": "call_1a4f6f34ebd54fabb47c8373",
+      "timestamp": "2026-09-03T21:01:35.309Z",
+      "kind": "tool_result",
+      "is_error": false,
+      "uses": [
+        {
+          "line": 256,
+          "name": "Bash",
+          "ts": "2026-09-03T21:01:14.338Z",
+          "input": {
+            "command": "cd \"/private/tmp/claude-502/-Users-fengyi-Workspace-migbot-set-hmigbot-plus/12b07daf-a671-4616-96a1-c214864ee609/scratchpad/dice-hmos/spec/verify/ui/round-1\" && python3 replay_ui_cases.py 2>&1; echo \"EXIT=$?\"",
+            "description": "执行 round-1 十用例回放",
+            "timeout": 420000
+          }
+        }
+      ],
+      "classification": "native_tool_result_not_assistant_summary",
+      "added_as": "extra_validation_evidence_not_reference_v1_mutation",
+      "interpretation": "Successful recorded Python UI replay:10/10 cases PASS,HARD21/21,7UNOBSERVABLE; explicit AppStorage bridge NOT_ASSERTED. This does not certify the bridge, unavailable a11y values, or all original assertion dimensions.",
+      "future_comparability": "Use same validation-state boundary for future tools/raw groups; do not retrofit old core scores silently."
+    },
+    {
+      "supplement": 267,
+      "file": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v1/dice-entry/pool/593d4e86-a947-4e62-8027-013014c2bafc.jsonl",
+      "record_sha256": "2894f5e5712d2846271d4328082daa0285e23269fb3a7d881309f69ea2b2bc80",
+      "selector": [
+        "message",
+        "content",
+        0,
+        "content"
+      ],
+      "field_sha256": "cf8255f39d135430b3dcabe89594b72b9cf03b28c566f906d640efbe591ebb03",
+      "tool_use_id": "call_771a81f381114e5da211cde1",
+      "timestamp": "2026-09-03T21:01:43.921Z",
+      "kind": "tool_result",
+      "is_error": false,
+      "uses": [
+        {
+          "line": 265,
+          "name": "Bash",
+          "ts": "2026-09-03T21:01:43.428Z",
+          "input": {
+            "command": "cd \"/private/tmp/claude-502/-Users-fengyi-Workspace-migbot-set-hmigbot-plus/12b07daf-a671-4616-96a1-c214864ee609/scratchpad/dice-hmos/spec/verify/ui/round-1\" && ls -la && echo \"===dumps===\" && ls dumps/ && echo \"===hilog===\" && cat hilog_entryability.txt && echo \"===results head===\" && python3 -c \"\nimport json; d=json.load(open('results.json'))\nprint({k:v for k,v in d.items() if k!='results'})\"",
+            "description": "核验 round-1 证据产物"
+          }
+        }
+      ],
+      "classification": "native_tool_result_not_assistant_summary",
+      "added_as": "extra_validation_evidence_not_reference_v1_mutation",
+      "interpretation": "Native readback lists14dump files,hilog onCreate/LoadPage/onNewWant×3,andresults summary10/10,HARD21/21,UNOBSERVABLE7.",
+      "future_comparability": "Use same validation-state boundary for future tools/raw groups; do not retrofit old core scores silently."
+    }
+  ],
+  "cost_comparison": {
+    "total_tokens": 1631846,
+    "raw_two_rep_mean": {
+      "input": 1404194.5,
+      "cache_included": 1206784,
+      "output": 9736,
+      "total": 1413930.5,
+      "tool_calls": 18,
+      "tool_chars": 3750566.5,
+      "wall_s": 216.21197095001116,
+      "e2e_s": 219.21012005006196
+    },
+    "total_token_change_percent": 15.412037578933324,
+    "wall_change_percent": 54.92365386993529,
+    "e2e_change_percent": 54.602652479093486,
+    "interpretation": "Single tools sample versus two same-question frozen-pool raw runs; observed cost, not stable effect or library-specific attribution. Cache is included in input, reasoning included in output. Saving threshold not met."
+  },
+  "verdict": "Core initial-input trace is a genuine improvement over raw baselines. Fixed fact completeness remains 5/6 supported with a different missing component, not an overall accuracy percentage; full validation annotation remains incomplete. Token cost is higher, no multiobjective acceptance."
+}
