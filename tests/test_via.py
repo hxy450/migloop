@@ -14,7 +14,7 @@ def test_mcp_queries_advertise_read_only_evidence_access():
     from migloop.mcp_server import build_server
 
     tools = asyncio.run(build_server().list_tools())
-    assert len(tools) == 9
+    assert len(tools) == 10
     for tool in tools:
         assert tool.annotations.readOnlyHint is True
         assert tool.annotations.destructiveHint is False

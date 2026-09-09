@@ -58,6 +58,8 @@ def _step_scope(tool: str, inp: dict[str, Any]) -> str:
         return f"原文 #{inp.get('seq')}" + (f" {inp['part']}" if inp.get("part") else "")
     if tool == "sessions":
         return "返修链"
+    if tool == "check":
+        return "草稿机械核查（不验证语义、不打开节点）"
     return "索引查询"
 
 
@@ -244,6 +246,13 @@ def probe_payload(ledger: atoms.Ledger, run_dir: str, chain_payload: dict[str, A
     if not root and fm:
         root = filestory.find_story_path(ledger.stories, fm.group(1))
     structured = _structured(ledger, run_dir, report, trace_identity=trace_identity)
+    from . import draft_check
+    # Bind the document actually displayed (a saved schema-repair result may
+    # differ from the original report), not a second hidden interpretation.
+    checked_draft = draft_check.final_binding(ledger, calls, None,
+        identity_bound=(trace_identity.get("bound") is True
+                        and (structured or {}).get("identity", {}).get("bound") is True),
+        final_document_sha256=(structured or {}).get("document_sha256"))
     if structured is not None:
         if structured["defects"]:
             defects = {d["id"]: d["title"] for d in structured["defects"]}
@@ -267,7 +276,7 @@ def probe_payload(ledger: atoms.Ledger, run_dir: str, chain_payload: dict[str, A
             "bad_refs": sum(len(lk["bad_refs"]) for lk in links), "defects": defects, "report": report,
             "legacy": structured is None, "structured": structured,
             "trace_identity": trace_identity, "repair_manifest": repair_manifest, "coverage": coverage_report,
-            "repair_manifest_origin": manifest_origin,
+            "repair_manifest_origin": manifest_origin, "draft_check": checked_draft,
             "roles": (structured or {}).get("roles") or {}, "fixed": (structured or {}).get("fixed") or [],
              "trajectory": _trajectory(ledger, run_dir, steps, root, structured, verdicts, calls, trace_identity)}
 
@@ -316,7 +325,7 @@ def _structured(ledger: atoms.Ledger, run_dir: str, report: str,
 # 「出现于 #j」只说明第 j 次返回文本含精确坐标,不推出模型为何选择下一跳。
 
 
-_MIGLOOP_TOOLS = frozenset(("guide", "sessions", "index", "file", "agent", "search", "blame", "diff", "action"))
+_MIGLOOP_TOOLS = frozenset(("guide", "sessions", "index", "file", "agent", "search", "blame", "diff", "action", "check"))
 
 
 def _tool_origin(name: Any, namespace: Any = None, server: Any = None) -> dict[str, Any]:
@@ -566,6 +575,17 @@ def _deduplicate_runtime_calls(rows: list[dict[str, Any]]) -> list[dict[str, Any
                 primary[key] = row[key]
         primary["is_error"] = primary["is_error"] or row["is_error"]
     for call in kept:
+        provenance = call["provenance"]
+        if provenance["format"] in ("claude_transcript", "codex_rollout"):
+            # Direct native records establish pairing by their own ID and
+            # ordered use/result events, including after runtime deduplication.
+            provenance["complete_pair"] = bool(
+                call.get("call_id") and call.get("has_result")
+                and isinstance(call.get("use_event"), int)
+                and isinstance(call.get("result_event"), int)
+                and call["use_event"] < call["result_event"]
+                and provenance.get("tool_origin", {}).get("verified") is True
+                and not provenance.get("origin_unverified"))
         envelope = call.pop("_transport_blocks", None)
         if envelope and "output_normalization" not in call["provenance"]:
             call["provenance"]["output_normalization"] = {

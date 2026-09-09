@@ -28,7 +28,7 @@ import uuid
 
 
 MCP_TOOLS = ["mcp__migloop__" + name for name in
-             ("guide", "sessions", "index", "file", "agent", "search", "blame", "diff", "action")]
+             ("guide", "sessions", "index", "file", "agent", "search", "blame", "diff", "action", "check")]
 COMMON_TASK = """调查目标文件：{file}
 调查数据仅限冻结池：{pool}
 当前返修根转录（调查起点，不是范围边界）：{current_root}
@@ -810,6 +810,10 @@ def collect_verdict(case: dict[str, Any], result: dict[str, Any], arm: str,
                        coverage=coverage.reconcile(ledger, manifest, (loaded.get("data") or {}).get("coverage"),
                                                    (loaded.get("data") or {}).get("defects") or [],
                                                    identity_bound=bound.get("identity", {}).get("bound") is True))
+            if (Path(case["source"]) / "src/migloop/draft_check.py").is_file():
+                check = importlib.import_module("migloop.draft_check")
+                out["draft_check"] = check.final_binding(ledger, calls, loaded.get("data"),
+                    identity_bound=(trace.get("bound") is True and bound.get("identity", {}).get("bound") is True))
         return out
     finally:
         if old_pool is None:
@@ -946,6 +950,7 @@ def run_one(case_dir: Path, arm: str, rep: int, model: str | None = "gpt-5.6-sol
                    verdict_ok=(bool(verdict.get("data")) and not verdict.get("errors")) if arm == "tools" else None,
                    coverage_complete=(verdict.get("coverage") or {}).get("complete"),
                    coverage_counts=(verdict.get("coverage") or {}).get("counts"),
+                   draft_check=verdict.get("draft_check"),
                    recording_complete=bool(transcript_status["copied"] and metrics["transcript"] is not None),
                    models_reported_by_context=(metrics.get("transcript") or {}).get("models_reported_by_context"),
                    result_chars=len(result["result"]) if isinstance(result.get("result"), str) else None,

@@ -667,6 +667,9 @@ def atom_json(path: str, tool: str, args: dict[str, Any]) -> dict[str, Any] | No
     from . import time_scope
 
     ledger = session_ledger(path)
+    if tool == "check":
+        from . import draft_check
+        return draft_check.evaluate(ledger, args.get("draft"), fixchain_payload(path), args.get("file"))
     if tool in ("file", "agent") and _opt_int(args, "v") is not None:
         from .via import target
         _, error = target(ledger, tool, str(args.get("path" if tool == "file" else "id") or ""), _opt_int(args, "v"))
@@ -730,6 +733,9 @@ def atom_text(path: str, tool: str, args: dict[str, Any]) -> str:
             out += "\n\n" + atoms_text.render_repair_manifest(ledger, payload, str(hint), root=cwd)
         return out
     ledger = session_ledger(path)
+    if tool == "check":
+        from . import draft_check
+        return draft_check.render(ledger, args.get("draft"), fixchain_payload(path), args.get("file"))
     if tool in ("file", "agent") and _opt_int(args, "v") is not None:
         from .via import target
         _, error = target(ledger, tool, str(args.get("path" if tool == "file" else "id") or ""), _opt_int(args, "v"))

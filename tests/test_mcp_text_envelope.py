@@ -12,10 +12,11 @@ from migloop import atoms_text, mcp_server
 from tests.test_atoms import MAIN_ID, _call, _ledger
 
 
-def test_all_nine_queries_advertise_text_only_without_a_duplicate_output_schema():
+def test_all_queries_advertise_text_only_without_a_duplicate_output_schema():
     server = mcp_server.build_server()
     tools = asyncio.run(server.list_tools())
-    assert len(tools) == 9
+    assert len(tools) == 10
+    assert {t.name for t in tools} == {"guide", "sessions", "index", "file", "agent", "search", "blame", "diff", "action", "check"}
     assert all(t.outputSchema is None for t in tools)
 
 

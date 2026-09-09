@@ -68,11 +68,12 @@ def main() -> None:
         "entry_role_conflicts": [{"defect": node.get("defect"), "node": node.get("spec"), "role": node.get("role")}
                                  for node in nodes if node.get("entry") and node.get("role") not in ("进入·错", "进入·缺")],
         "coverage": payload.get("coverage"),
+        "draft_check": payload.get("draft_check"),
         "trajectory_summary": {key: trajectory.get(key) for key in ("mode", "root", "verification", "verification_note")},
         "visit_status": dict(Counter(visit.get("status") for visit in trajectory.get("visits", []))),
         "transition_status": dict(Counter(hop.get("relation_status") for hop in trajectory.get("transitions", []))),
         "metrics": {key: metrics.get(key) for key in ("status", "actual_models", "actual_effort", "wall_s",
-                    "end_to_end_wall_s", "usage", "verdict_ok", "coverage_complete", "recording_complete")},
+                    "end_to_end_wall_s", "usage", "verdict_ok", "coverage_complete", "recording_complete", "draft_check")},
         "boundary": "Mechanical checks authenticate recorded locations, identities and ledger relations only; no attribution truth score or attention/behavior proof.",
         "payload": payload,
     }

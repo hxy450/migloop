@@ -141,6 +141,37 @@ const server=http.createServer((req,res)=>{
       for(let i=0;i<41;i++) body.steps.push({i:78+i,tool:i%2?'functions.exec':'exec',ok:true,args:{input:'host wrapper'},call_id:'host-'+i,use_line:100+i*2,result_line:101+i*2,provenance:{format:'codex_rollout',path:'transcript.jsonl',pairing:'call_id'}});
     }
     if(run==='other-calls') body.steps.push({i:8,tool:'Bash',ok:true,args:{command:'read-only'},provenance:{format:'claude_transcript',path:'transcript.jsonl'}});
+    if(run==='draft-check') body.steps.push({i:8,tool:'check',ok:true,args:{draft:'schema: migloop-verdict/1'},node:null,
+      provenance:{format:'codex_rollout',path:'transcript.jsonl',pairing:'call_id'},call_id:'draft-check-8'});
+    if(run.startsWith('draft-state-')){
+      const status=run.slice('draft-state-'.length), empty=status==='not_checked';
+      body.draft_check={status,semantic_checked:false,final_document_sha256:'final-hash',
+        checks:empty?[]:[{step:8,call_id:'<img src=x onerror="window.draftXss=1">',status:'needs_review',counts:{errors:12,warnings:4,total:16},
+          draft_sha256:'draft-hash',document_sha256:'document-hash',verified:status==='matched',
+          issues:status==='unverifiable'?undefined:Array.from({length:12},(_,i)=>({code:'issue_'+i,severity:'error',
+            message:i===0?'<img src=x onerror="window.issueXss=1">':i===11?'LAST_RETURNED_ISSUE':'diagnostic '+i,
+            extra:{location:'nodes['+i+']'}})),
+          omitted_issues:status==='unverifiable'?undefined:4,
+          coverage:status==='unverifiable'?undefined:{checked:true,target:file,counts:{expected:7,unresolved:2},accounted:true,semantic_checked:false}}],
+        matched_check:status==='matched'?8:null,check_calls:empty?0:1,draft_chars:200,returned_chars:80};
+    }
+    if(run.startsWith('with-basis')){
+      const basis=(tag)=>({expected:tag+' EXPECTED <img src=x onerror="window.basisXss=1">',
+        actual:tag+' ACTUAL\noutput statement',counterevidence:tag+' COUNTER <b>not HTML</b>',
+        expected_evidence:[{type:'action',ref:'#a:41@L41',original_ref:'  #a:41@L41  ',status:'ok',aid:'agent-a',v:1,seq:41}],
+        actual_evidence:[{type:'text',ref:'missing <script>window.basisXss=2</script>',status:'missing'},
+          {type:'node',ref:'file:/fixture/A.ets@v1',status:'ok',node:{kind:'file',key:file,v:1,ok:true}}],
+        source:'model',semantic_checked:false});
+      for(let i=0;i<2;i++){
+        const value=basis(i?'B':'A');
+        if(run==='with-basis-tail-reference') value.expected_evidence.push(
+          {type:'action',ref:'#a:43@L43',status:'ok',aid:'agent-a',v:3,seq:43},
+          {type:'action',ref:'#missing:44@L44',status:'ok',aid:'agent-missing',v:8,seq:44});
+        Object.assign(body.roles['agent-a'][i],{basis:value,basis_evidence_bad:1});
+        Object.assign(body.structured.defects[i].nodes[0],{basis:structuredClone(value),basis_evidence_bad:1});
+      }
+      if(run==='with-basis-unbound') body.structured.identity={bound:false,match:false,status:'mismatch'};
+    }
     if(run==='legacy'){body.structured=null;body.legacy=true;delete body.trace_identity;}
     if(run.startsWith('consistency')){
       const advice={code:'entry_role_conflict',level:'warning',defect:'A',node:'agent:agent-a@v1',message:'声明间需核对 <b>不判原因真假</b>'};
@@ -392,6 +423,52 @@ async function main(){
     await evaluate("document.querySelector('.reader-row[data-seq=\"301\"] .reader-version').click()");
     await until("__mig.xt()?.rootKind==='agent' && __mig.xt().byId[__mig.xt().root].anchorVer===1");
     await check('ordinary known reader keeps its exact agent navigation',"__mig.xt().byId[__mig.xt().root].aid==='agent-a' && !performance.getEntriesByType('resource').some(r=>{const u=new URL(r.name);return u.pathname==='/atom/agent'&&['3','8'].includes(u.searchParams.get('v'))})");
+    await send('Page.navigate',{url:origin+'/?probe=fixture'});
+    await until("__mig.xt()?.walk && document.querySelectorAll('.wire.route').length===5");
+    await check('historical reports without basis do not acquire invented attribution fields',"!document.querySelector('.attribution-basis') && __mig.probe().structured.errors.length===0");
+    await evaluate("window.beforeBasisColors=[...document.querySelectorAll('#canvas .node')].map(n=>n.className.replace(/ sel/g,'')).join('|');window.beforeBasisVisits=JSON.stringify(__mig.probe().trajectory.visits);__mig.load('with-basis')");
+    await until("__mig.probe().runDir==='with-basis' && document.querySelector('#probe .attribution-basis')");
+    await check('structured node attribution is collapsed and explicitly a model claim',"document.querySelectorAll('#probe .attribution-basis').length===2 && [...document.querySelectorAll('#probe .attribution-basis')].every(n=>!n.open&&n.dataset.source==='model'&&n.dataset.semanticChecked==='false'&&n.querySelector('summary').textContent==='归因对照（模型主张，未验证）')");
+    await evaluate("window.beforeBasisDrawer=document.querySelector('#side .tag').textContent;document.querySelector('#probe .attribution-basis summary').click()");
+    await check('expanding attribution neither navigates nor alters original node color or visits',"document.querySelector('#probe .attribution-basis').open && document.querySelector('#side .tag').textContent===window.beforeBasisDrawer && [...document.querySelectorAll('#canvas .node')].map(n=>n.className.replace(/ sel/g,'')).join('|')===window.beforeBasisColors && JSON.stringify(__mig.probe().trajectory.visits)===window.beforeBasisVisits");
+    await check('basis fields and original references are escaped with separate bad-reference diagnostics',"document.querySelector('#probe .attribution-basis').textContent.includes('A EXPECTED <img') && document.querySelector('#probe .attribution-basis').textContent.includes('A COUNTER <b>not HTML</b>') && document.querySelector('#probe .basis-expected-evidence .mono').textContent==='  #a:41@L41  ' && document.querySelector('#probe .basis-evidence-note').textContent.includes('引用位置未核 1 条') && !document.querySelector('.attribution-basis img,.attribution-basis script,.attribution-basis b') && !window.basisXss");
+    await evaluate("document.querySelector('#probe .basis-expected-evidence .more').click()");
+    await until("document.querySelector('#probe .basis-expected-evidence').textContent.includes('EVIDENCE 41')");
+    await check('expected evidence reuses the actual action loader without treating location as semantic support',"document.querySelector('#probe .attribution-basis').textContent.includes('位置可核不证明支持此归因') && document.querySelector('#probe .attribution-basis').textContent.includes('内容齐全不代表验证通过') && document.querySelector('#probe .basis-actual-evidence .verow.bad')!==null && JSON.stringify(__mig.probe().trajectory.visits)===window.beforeBasisVisits");
+    await evaluate(clickAgent);
+    await until("document.querySelector('#side .attribution-basis')!==null");
+    await check('reason drawer exposes each defect own attribution basis without assigning verification',"document.querySelectorAll('#side .attribution-basis').length===2 && document.querySelector('#side .attribution-basis').textContent.includes('当时要求') && document.querySelector('#side .attribution-basis').textContent.includes('实际输出') && document.querySelector('#side .attribution-basis').textContent.includes('反证边界') && __mig.probe().roles['agent-a'].every(n=>n.checked==='not_checked')");
+    await evaluate("[...document.querySelectorAll('.dchips span')].find(n=>n.textContent.startsWith('B ')).click()");
+    await check('switching defects isolates both structured and drawer attribution',"document.querySelectorAll('#probe .attribution-basis').length===1 && document.querySelectorAll('#side .attribution-basis').length===1 && document.querySelector('#side .attribution-basis').textContent.includes('B EXPECTED') && !document.querySelector('#side .attribution-basis').textContent.includes('A EXPECTED') && !document.querySelector('#probe .attribution-basis').textContent.includes('A EXPECTED')");
+    await evaluate("document.querySelector('#side .attribution-basis').open=true;document.querySelector('#side .basis-actual-evidence .lnk').click()");
+    await check('actual node evidence keeps the existing exact-version navigation mechanism',"document.querySelector('#side .tag').textContent.includes('@v1') && document.querySelectorAll('.wire.route').length===5 && JSON.stringify(__mig.probe().trajectory.visits)===window.beforeBasisVisits");
+    await evaluate("__mig.load('with-basis-unbound')");
+    await until("__mig.probe().structured.identity.bound===false && document.querySelector('#probe .attribution-basis')");
+    await check('unbound attribution retains text without source validation or action links',"document.querySelector('#probe .attribution-basis').textContent.includes('EXPECTED') && document.querySelector('#probe .attribution-basis').textContent.includes('历史引用未绑定') && !document.querySelector('.attribution-basis .lnk,.attribution-basis .more,.attribution-basis .verow.ok') && !document.querySelector('#canvas .node.p-chain')");
+    await evaluate("__mig.load('draft-check')");
+    await until("__mig.probe().runDir==='draft-check'");
+    await check('draft check is a mechanical MCP event rather than an opened atom or edge',"document.querySelector('.call-summary').dataset.mcp==='8' && [...document.querySelectorAll('#probe .st')].some(n=>n.dataset.callKind==='mcp'&&n.classList.contains('na')&&n.textContent.includes('草稿机械核查事件')) && __mig.probe().trajectory.nodes.length===4 && __mig.probe().trajectory.visits.length===7 && document.querySelectorAll('.wire.route').length===5 && !Object.values(__mig.probe().byKey).flat().some(s=>s.i===8)");
+    await evaluate("window.beforeDraftGraph=JSON.stringify(__mig.probe().trajectory);window.beforeDraftColors=[...document.querySelectorAll('#canvas .node')].map(n=>n.className.replace(/ sel/g,'')).join('|')");
+    const draftLabels={matched:'草稿机检与当前稿一致（语义未核验）',mismatch:'最终稿与最后核查稿不同',
+      not_checked:'未核查',unverifiable:'草稿核查不可核',invalid_final:'最终稿无效，无法核对草稿机检'};
+    for(const [status,label] of Object.entries(draftLabels)){
+      await evaluate("__mig.load('draft-state-"+status+"')");
+      await until("document.querySelector('.draft-check-summary')?.dataset.status==='"+status+"'");
+      await check('draft status '+status+' is diagnostic only and does not repaint or alter the graph',
+        "document.querySelector('.draft-check-summary').textContent.includes("+JSON.stringify(label)+") && document.querySelector('.draft-check-summary').dataset.semanticChecked==='false' && !document.querySelector('.draft-check-summary').textContent.includes('✓') && !document.querySelector('.draft-check-summary .r-ok,.draft-check-summary .r-err') && JSON.stringify(__mig.probe().trajectory)===window.beforeDraftGraph && [...document.querySelectorAll('#canvas .node')].map(n=>n.className.replace(/ sel/g,'')).join('|')===window.beforeDraftColors");
+      if(status==='unverifiable') await check('missing returned diagnostics do not become an invented zero-issue result',
+        "document.querySelector('.draft-check-issues').textContent.includes('未提供诊断明细') && document.querySelector('.draft-check-omitted').textContent.includes('省略数量未记录') && document.querySelectorAll('.draft-check-issue').length===0");
+    }
+    await evaluate("document.querySelector('.draft-check-details').open=true");
+    await check('draft diagnostic keeps source proofs escaped without claiming model attention',"document.querySelector('.draft-check-summary').textContent.includes('不证明模型阅读或采纳了反馈') && document.querySelector('.draft-check-details').textContent.includes('final-hash') && document.querySelector('.draft-check-details').textContent.includes('<img src=x') && !document.querySelector('.draft-check-details img') && !window.draftXss");
+    await check('all supplied issues and omitted count remain visible and escaped',"document.querySelectorAll('.draft-check-issue').length===12 && document.querySelector('.draft-check-issues').textContent.includes('LAST_RETURNED_ISSUE') && document.querySelector('.draft-check-issue').textContent.includes('<img src=x') && document.querySelector('.draft-check-issue').textContent.includes('nodes[0]') && document.querySelector('.draft-check-omitted').textContent.includes('另省略 4 条') && !document.querySelector('.draft-check-issues img') && !window.issueXss");
+    await check('returned coverage diagnostics retain unresolved counts without proving repair truth',"document.querySelector('.draft-check-coverage').textContent.includes('\"unresolved\": 2') && document.querySelector('.draft-check-coverage').textContent.includes('\"accounted\": true') && document.querySelector('.draft-check-record').textContent.includes('覆盖齐全不代表修复已确认') && document.querySelector('.draft-check-summary').dataset.semanticChecked==='false' && JSON.stringify(__mig.probe().trajectory)===window.beforeDraftGraph");
+    await evaluate("__mig.load('with-basis-tail-reference')");
+    await until("__mig.probe().runDir==='with-basis-tail-reference' && document.querySelector('#probe .basis-expected-evidence')");
+    await check('locatable action references do not certify tail slots or unknown-owner agent versions',"(()=>{const rs=[...document.querySelectorAll('#probe .basis-expected-evidence .verow')],tail=rs.find(r=>r.textContent.includes('#a:43@L43')),unknown=rs.find(r=>r.textContent.includes('#missing:44@L44')),valid=rs.find(r=>r.textContent.includes('#a:41@L41'));return tail.classList.contains('ok')&&unknown.classList.contains('ok')&&!tail.querySelector('.lnk')&&!unknown.querySelector('.lnk')&&!!tail.querySelector('.more')&&!!unknown.querySelector('.more')&&!!valid.querySelector('.lnk')&&tail.textContent.includes('喂养槽 3')})()");
+    await evaluate("window.beforeTailEvidence=JSON.stringify(__mig.probe().trajectory);document.querySelector('#probe .attribution-basis').open=true;[...document.querySelectorAll('#probe .basis-expected-evidence .verow')].find(r=>r.textContent.includes('#a:43@L43')).querySelector('.more').click()");
+    await until("[...document.querySelectorAll('#probe .basis-expected-evidence .verow')].some(r=>r.textContent.includes('EVIDENCE 43'))");
+    await check('tail citation retains exact raw action navigation without inventing an agent version',"JSON.stringify(__mig.probe().trajectory)===window.beforeTailEvidence && !Object.values(__mig.xt().byId).some(n=>n.kind==='agent'&&n.anchorVer===3) && __mig.probe().structured.defects[0].nodes[0].basis.expected_evidence[1].v===3 && __mig.probe().structured.defects[0].nodes[0].basis.expected_evidence[1].status==='ok'");
     const output=process.env.MIGLOOP_BROWSER_SCREENSHOT_DIR||path.join(repo,'docs/experiments/2026-09-09-trace-fidelity/screenshots');
     fs.mkdirSync(output,{recursive:true});
     const screenshot=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});

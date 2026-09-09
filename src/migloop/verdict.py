@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import re
 from typing import Any
 
@@ -24,7 +25,8 @@ RELATIONS = ("写", "读", "派发", "候选", "省略")
 CHECK_RESULTS = ("true", "false", "unknown", "not_checked")
 _TOP = {"schema", "run", "ledger", "root", "defects", "notes", "coverage"}
 _DEFECT = {"id", "title", "repair", "entry", "boundary", "nodes", "edges"}
-_NODE = {"node", "role", "reason", "evidence", "boundary", "checks"}
+_NODE = {"node", "role", "reason", "evidence", "boundary", "checks", "basis"}
+_BASIS = {"expected", "actual", "expected_evidence", "actual_evidence", "counterevidence"}
 _EDGE = {"from", "to", "relation", "note"}
 _REPAIR = {"before", "after", "evidence"}
 _CHECK = {"claim", "result"}
@@ -159,6 +161,21 @@ def _check_node_spec(x: Any, where: str, errs: list[str]) -> None:
             errs.append(f"{where}: 缺版本号(@v<N>)")
 
 
+def _check_basis(value: Any, where: str, errs: list[str]) -> None:
+    """Optional for legacy nodes, strict when provided; content is still a model claim."""
+    if not isinstance(value, dict):
+        errs.append(f"{where}: basis 必须是映射")
+        return
+    _check_keys(value, _BASIS, where, errs)
+    for key in ("expected", "actual", "counterevidence"):
+        if not _is_str(value.get(key)):
+            errs.append(f"{where}.{key}: 必须是非空字符串")
+    for key in ("expected_evidence", "actual_evidence"):
+        refs = value.get(key)
+        if not isinstance(refs, list) or not refs or not all(_is_str(ref) for ref in refs):
+            errs.append(f"{where}.{key}: 必须是非空引用字符串列表,至少一项")
+
+
 def validate(data: Any) -> list[str]:
     """严格 schema:未知键、类型不对、词表外的角色 / 关系 / 检查结果都算错。"""
     errs: list[str] = []
@@ -240,6 +257,8 @@ def validate(data: Any) -> list[str]:
                 errs.append(f"{wn}: evidence 必须是字符串列表")
             if n.get("boundary") is not None and not isinstance(n["boundary"], str):
                 errs.append(f"{wn}: boundary 必须是字符串")
+            if "basis" in n:
+                _check_basis(n["basis"], f"{wn}.basis", errs)
             checks = n.get("checks")
             if checks is not None:
                 if not isinstance(checks, list):
@@ -530,8 +549,9 @@ def _norm_checks(checks: Any) -> list[dict[str, str]]:
 def _consistency(defect: dict[str, Any]) -> list[dict[str, Any]]:
     """Check structured assertions against each other, not the truth of prose reasons.
 
-    Only resolved coordinates may be compared. These advisories neither erase
-    claims nor promote a role, repair anchor, or causal explanation to fact.
+    Coordinate comparisons require resolved coordinates. Causal-side text checks
+    only flag missing/identical assertions, never their semantic truth. These
+    advisories neither erase claims nor promote a role or explanation to fact.
     """
     warnings: list[dict[str, Any]] = []
 
@@ -566,6 +586,16 @@ def _consistency(defect: dict[str, Any]) -> list[dict[str, Any]]:
             warn("repair_not_file_pair", after, "修复前后锚点不是两个文件版本，无法按文件变化核对修复。")
         elif before["key"] == after["key"] and before["v"] >= after["v"]:
             warn("repair_non_increasing", after, "同一文件的修复后版本没有晚于修复前版本；此区间不能证明发生了修复。")
+    for n in nodes:
+        if n["role"] not in RED:
+            continue
+        basis = n.get("basis")
+        if basis is None:
+            warn("missing_causal_basis", n, "红色归因节点缺少期望、实际、双方证据与反证的结构化对照；"
+                 "格式仍合法，但论证尚待补充，不代替模型改判。")
+        elif basis["expected"].strip() == basis["actual"].strip():
+            warn("identical_causal_sides", n, "期望与实际的文字相同，尚未展开支持红色归因的差异；"
+                 "请核对或补充描述，不据此认定原因必错。")
     return warnings
 
 
@@ -584,6 +614,9 @@ def build(ledger: atoms.Ledger, data: dict[str, Any] | None, errors: list[str],
     diag = ("账本身份不匹配,原始主张未绑定当前账本" if conflict else
             "模型未记录账本身份,原始主张未绑定当前账本" if not bound else None)
     out: dict[str, Any] = {
+        "document_sha256": hashlib.sha256(json.dumps(data, ensure_ascii=False, sort_keys=True,
+                                                     separators=(",", ":")).encode("utf-8")).hexdigest()
+                           if data is not None and not errors else None,
         "schema": (data or {}).get("schema"), "kind": meta.get("kind"), "raw": meta.get("raw"),
         "errors": list(errors), "repaired": bool(meta.get("repaired")),
         "identity": {"current": cur, "claimed": model or harness, "model": model, "harness": harness,
@@ -615,6 +648,16 @@ def build(ledger: atoms.Ledger, data: dict[str, Any] | None, errors: list[str],
             return resolve_evidence(ledger, ref)
         return {"ref": str(ref), "type": "text", "status": "not_checked", "diag": diag}
 
+    def causal_basis(value: dict[str, Any] | None) -> dict[str, Any] | None:
+        if value is None:
+            return None
+        # Preserve model text separately from resolver normalization, including
+        # whitespace in the original references; no semantic certification here.
+        return {"expected": value["expected"], "actual": value["actual"],
+                "counterevidence": value["counterevidence"], "source": "model", "semantic_checked": False,
+                "expected_evidence": [{**evidence(ref), "original_ref": ref} for ref in value["expected_evidence"]],
+                "actual_evidence": [{**evidence(ref), "original_ref": ref} for ref in value["actual_evidence"]]}
+
     if data.get("root"):
         out["root"] = node(data["root"])
     roles: dict[str, list[dict[str, Any]]] = {}
@@ -630,6 +673,8 @@ def build(ledger: atoms.Ledger, data: dict[str, Any] | None, errors: list[str],
         for n in d.get("nodes") or []:
             r = node(n.get("node"))
             ev = [evidence(x) for x in n.get("evidence") or []]
+            basis = causal_basis(n.get("basis"))
+            basis_refs = basis["expected_evidence"] + basis["actual_evidence"] if basis else []
             role = str(n.get("role"))
             if (r["ok"] and after and after["ok"] and role in RED
                     and (r["kind"], r["key"], r["v"]) == (after["kind"], after["key"], after["v"])):
@@ -637,6 +682,7 @@ def build(ledger: atoms.Ledger, data: dict[str, Any] | None, errors: list[str],
                 r["diag"] = "修复后的版本是修复落点(repair.after),不能标带病;修复后是否还有问题另标"
             row = {**r, "role": role, "reason": str(n.get("reason") or ""), "evidence": ev,
                    "evidence_bad": sum(1 for x in ev if x["status"] not in ("ok", "drifted")),
+                   "basis": basis, "basis_evidence_bad": sum(1 for x in basis_refs if x["status"] not in ("ok", "drifted")),
                    "boundary": n.get("boundary"), "checks": _norm_checks(n.get("checks")),
                    "entry": (r["kind"], r["key"], r["v"]) in entry_keys, "defect": did,
                    "checked": "not_checked"}

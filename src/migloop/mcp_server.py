@@ -168,6 +168,16 @@ defects:
         reason: |-
           <一到三句>
         evidence: ["#标识:n@L行", "file:<路径>@v<N>"]
+        # 标红时填写 basis；正常/无法确认无需强填，不为凑字段编造依据。
+        basis:
+          expected: |-
+            <当时适用的要求或应保持的行为>
+          expected_evidence: ["#标识:n@L行"]
+          actual: |-
+            <此节点实际输出与要求的具体差异，不是仅说它参与了修复>
+          actual_evidence: ["#标识:n@L行"]
+          counterevidence: |-
+            <核过哪些反证；是否只是发现/正确修复；仍有哪些未知>
     edges:                                  # 可省;每条对应账本里的一条 写 / 读 / 派发 边;拿不准写 候选 或 省略
       - {from: agent:<id>@v<K>, to: file:<路径>@v<N>, relation: 写}
 coverage:                                   # sessions(file=目标) 清单的每个版本与候选各一项,不能用区间冒充逐项覆盖
@@ -206,6 +216,13 @@ file/agent 给出当前锚点及全池最晚记录，index(kind=time) 展开所�
 候选里的修复可在对应已打开的 agent 节点写原因,repair.after 未有确定版本时可省略;不得虚构 file@v 来安放它。
 目标没有可核文件版本时,root 可用实际打开的 agent:<id>@v<K>,在 notes 写目标路径与版本缺口;
 未建立文件修复清单就不声称覆盖所有文件版本。只有生成期内部修改也应如实标明,不硬称执行结束后的返修。
+
+## 提交前草稿核查
+正式输出前调用 check(sid, draft=准备提交的完整YAML文本, file=目标文件)；无需围栏也可，不要另写重复散文。
+它只核格式、账本身份、节点/引用/显式关系、coverage及红节点basis是否交代，不调用评委模型，不验证原因真假，不算打开节点。
+根据定位诊断改错或补查；不能为清零删掉真实问题或把所有结论降成未知。basis齐全也只是模型主张，expected/actual须有实际输入和输出依据。
+报告指出验证结果时分清“读取到报告/manifest记录”与“独立复核底层执行/截图/设备证据”；读取报告的工具输出不会把报告内容变成已验证事实。
+check返回draft_sha256只对应这次提交的草稿；改过内容后旧核查不认证新稿。可复查后提交，无法解决的诊断保留边界；mechanical_clear也不代表语义正确。
 """
 
 
@@ -381,6 +398,16 @@ def build_server(backend: Any | None = None) -> Any:
         ledger, _cwd = await _ctx(sid)
         return atoms_text.render_action(ledger, id, seq, max_chars=max_chars, offset=offset, find=find,
                                         part=part, m_n=m_n, m_from=m_from)
+
+    @srv.tool(**text_options)
+    async def check(sid: str, draft: str, file: str | None = None) -> str:
+        """提交前只读核查 YAML/JSON 草稿。反馈节点/引用/边/覆盖及红节点论据缺口，不判归因语义、不打开任何节点。
+        draft最大120000字符；反馈最多40条并注明省略数量。file为本次要对账的目标，不代表全部用户任务范围。
+        输出即使 mechanical_clear 也不证明原因正确或真正读过证据；不会保存、修复或替换正式结论。"""
+        from . import draft_check
+        ledger, _cwd = await _ctx(sid)
+        payload = await _be().get_fixchain(sid)
+        return draft_check.render(ledger, draft, payload, file)
 
     return srv
 

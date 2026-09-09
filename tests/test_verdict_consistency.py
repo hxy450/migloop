@@ -8,7 +8,9 @@ from tests.test_verdict import _build, _pool
 def _data(role="正常", before="file:A.ets@v1", after="file:A.ets@v2"):
     return {"schema": verdict.SCHEMA, "defects": [{"id": "A", "title": "test",
             "entry": ["agent:agent-c@v1"], "repair": {"before": before, "after": after},
-            "nodes": [{"node": "agent:agent-c@v1", "role": role, "reason": "original reason"}]}]}
+            "nodes": [{"node": "agent:agent-c@v1", "role": role, "reason": "original reason",
+                       "basis": {"expected": "expected", "actual": "actual", "counterevidence": "unknown",
+                                 "expected_evidence": ["file:A.ets@v1"], "actual_evidence": ["file:A.ets@v2"]}}]}]}
 
 
 def test_conflicting_entry_remains_a_model_claim(tmp_path):

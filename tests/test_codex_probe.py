@@ -81,7 +81,7 @@ def test_rollout_pairs_native_ids_and_preserves_physical_positions(tmp_path: Pat
     assert (calls[1]["use_line"], calls[1]["result_line"]) == (3, 4)
     assert calls[1]["use_event"] < calls[1]["result_event"]
     assert {k: v for k, v in calls[1]["provenance"].items() if k != "tool_origin"} == {
-        "format": "codex_rollout", "path": "transcript.jsonl", "pairing": "call_id"}
+        "format": "codex_rollout", "path": "transcript.jsonl", "pairing": "call_id", "complete_pair": True}
 
 
 def test_missing_id_prior_output_and_invalid_arguments_never_establish_success(tmp_path: Path) -> None:

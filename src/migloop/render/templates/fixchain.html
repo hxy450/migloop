@@ -240,6 +240,23 @@
   .verow { display: flex; gap: 6px; align-items: baseline; flex-wrap: wrap; font-size: 11.5px; padding: 1px 0; }
   .verow .vst { font-weight: 700; } .verow.ok .vst { color: var(--c-gen); } .verow.bad .vst { color: var(--c-fix); }
   .verow .vdiag { color: var(--ink-3); } .verow pre { flex-basis: 100%; }
+  .attribution-basis { margin: 5px 0; padding: 5px 7px; border: 1px solid var(--ring); border-radius: 5px;
+                       color: var(--ink-2); background: var(--surface); min-width: 0; font-size: 11.5px; }
+  .attribution-basis summary { cursor: pointer; color: var(--ink-2); }
+  .probe .pn > .attribution-basis { grid-column: 2; }
+  .basis-source, .basis-evidence-note, .basis-note { margin-top: 5px; color: var(--ink-3); white-space: pre-wrap; }
+  .basis-field, .basis-evidence-group { margin-top: 6px; }
+  .basis-label { color: var(--ink-2); font-weight: 600; }
+  .basis-text { white-space: pre-wrap; overflow-wrap: anywhere; }
+  .draft-check-summary { margin: 5px 0; padding: 5px 7px; border-left: 3px solid var(--ring);
+                         color: var(--ink-2); font-size: 11.5px; overflow-wrap: anywhere; }
+  .draft-check-summary.warning { border-left-color: #d4a017; }
+  .draft-check-summary.warning > .draft-check-label { color: #88651a; }
+  .draft-check-note, .draft-check-details { margin-top: 5px; color: var(--ink-3); }
+  .draft-check-details summary { cursor: pointer; }
+  .draft-check-record { padding-top: 5px; margin-top: 5px; border-top: 1px solid var(--ring); white-space: pre-wrap; }
+  .draft-check-issue, .draft-check-coverage { margin: 5px 0; padding: 4px; background: var(--wash);
+                                             white-space: pre-wrap; overflow-wrap: anywhere; font-size: 11px; }
   .probe .warn { color: #9a6b00; font-size: 11.5px; padding: 3px 6px; border-left: 3px solid #d4a017; margin: 4px 0; }
   .probe .bad { color: var(--c-fix); font-size: 11.5px; padding: 3px 6px; border-left: 3px solid var(--c-fix); margin: 4px 0; white-space: pre-wrap; }
   .probe .pn { display: grid; grid-template-columns: 22px 1fr; gap: 6px; padding: 2px 6px; border-radius: 6px; cursor: pointer; font-size: 11.5px; border-left: 3px solid transparent; }
@@ -1042,6 +1059,7 @@
       ((p.trajectory || {}).visits || []).forEach(function (v) { p.visitByStep[v.step] = v; });
       (p.steps || []).forEach(function (s) {
         var n = s.node;
+        if (probeDraftCheck(s)) return; // A draft diagnostic is not a version visit, including legacy payloads.
         if (!n || s.ok === false || s.identity_unbound || probeTraceUnbound(p)) return; // 未绑定历史调用不算当前账本查过
         if (p.trajectory && p.trajectory.mode === "via" && s.tool !== "file" && s.tool !== "agent") return;
         if (p.visitByStep[s.i] && p.visitByStep[s.i].status !== "opened") return;
@@ -1208,9 +1226,10 @@
       if (/^mcp__/.test(tool) || format === "codex_rollout_event" || format === "codex_exec_events") return "mcp";
       if (format === "codex_rollout" && /^(?:functions\.)?(?:exec|wait|custom|custom_tool_call)$/.test(tool)) return "wrapper";
       // probe 已剥掉 migloop 的 MCP 前缀;旧转录没有 provenance,按已知的归一化工具名兼容。
-      if (["guide", "sessions", "index", "file", "agent", "blame", "search", "action", "diff"].indexOf(tool) >= 0) return "mcp";
+      if (["guide", "sessions", "index", "file", "agent", "blame", "search", "action", "diff", "check"].indexOf(tool) >= 0) return "mcp";
       return "other";
     }
+    function probeDraftCheck(s) { return /^(?:mcp__migloop__)?check$/.test(String(s.tool || "")); }
     function renderProbe() {
       probeEl.hidden = false;
       probeEl.innerHTML = "";
@@ -1260,6 +1279,7 @@
       renderTraceIdentity(probeEl);
       renderRepairCoverage(probeEl);
       if (PROBE.structured || PROBE.legacy) renderStructuredHead(probeEl);
+      renderDraftCheck(probeEl);
       if (PROBE.trajectory && PROBE.trajectory.verification_note) probeEl.appendChild(el("div", "warn", PROBE.trajectory.verification_note));
       if (PROBE.trajectory && PROBE.trajectory.mode === "via") probeEl.appendChild(el("div", "sum", "箭头 #步号 = 模型声明的查询转移,不是因果边;蓝色‘账本’为已核关系,黄褐点线‘候选’为读取/提及待核,灰蓝虚线‘导航’为版本或搜索探索。回访与自环全部保留;红色问题角色是模型主张,不会把探索边变成红色因果边。"));
       var dkeys = Object.keys(PROBE.defects || {});
@@ -1303,7 +1323,7 @@
       probeEl.appendChild(el("div", "sub", "全部调用记录 · 保留原始步号与来源"));
       (PROBE.steps || []).forEach(function (s) {
         var n = s.node, unbound = probeTraceUnbound(PROBE) || s.identity_unbound;
-        var can = !!(!unbound && n && (n.path || n.aid));
+        var draftCheck = probeDraftCheck(s), can = !!(!draftCheck && !unbound && n && (n.path || n.aid));
         var visit = (PROBE.visitByStep || {})[s.i], failed = s.ok === false || (visit && visit.status !== "opened");
         var row = el("div", "st" + (can ? "" : " na"));
         var callKind = probeCallKind(s);
@@ -1313,6 +1333,7 @@
         var tb = el("b", null, (callKind === "wrapper" ? "[宿主包装] " : callKind === "other" ? "[其他调用] " : "") + s.tool);
         t.appendChild(tb);
         t.appendChild(document.createTextNode(" " + stepTarget(s) + (s.scope ? " · " + s.scope : "") + (unbound ? " · 身份不匹配 · 未绑定当前账本" : visit ? " · " + probeVisitStatus(visit.status) : (failed ? " · 失败" : "")) + " · " + (Math.round((s.chars || 0) / 100) / 10) + "千字" + (s.via ? " · via " + s.via : "")));
+        if (draftCheck) t.appendChild(document.createTextNode(" · 草稿机械核查事件（不计版本访问，不验证主张真假）"));
         t.title = "参数: " + JSON.stringify(s.args) + "\n来源 provenance: " + JSON.stringify(s.provenance || null)
                 + "\ncall_id: " + (s.call_id || "未记录") + " · item_id: " + (s.item_id || "未记录")
                 + "\n转录行: " + (s.use_line == null ? "?" : s.use_line) + " → " + (s.result_line == null ? "?" : s.result_line);
@@ -1354,7 +1375,9 @@
       row.appendChild(el("span", "vst", e.status === "ok" ? "✓" : e.status === "drifted" ? "≈" : "✗"));
       row.appendChild(el("span", "mono", e.ref));
       if (e.type === "action" && e.seq != null && e.aid) {
-        row.appendChild(el("span", "vdiag", agentLabelOf(e.aid) + (e.v != null ? " v" + e.v : "") + " #" + e.seq));
+        var anchor = readerAnchor({ by: e.aid, at: e.v });
+        row.appendChild(el("span", "vdiag", agentLabelOf(e.aid) + (anchor.v != null ? " v" + anchor.v
+          : " · 未核出可导航效应版本" + (Number.isInteger(e.v) ? "（喂养槽 " + e.v + "）" : "")) + " #" + e.seq));
         var lk = el("span", "more", " 原文"), pre = null;
         lk.addEventListener("click", function (ev) {
           ev.stopPropagation();
@@ -1365,7 +1388,7 @@
           loadActionInto(pre, e.aid, e.seq);
         });
         row.appendChild(lk);
-        row.appendChild(lnk(" 到 agent", "", function () { openRoot({ kind: "agent", id: e.aid, v: e.v || null }); }));
+        if (anchor.v != null) row.appendChild(lnk(" 到 agent", "", function () { openRoot({ kind: "agent", id: e.aid, v: anchor.v }); }));
       } else if (e.type === "node" && e.node && e.node.ok) {
         row.appendChild(lnk(" 打开", "", function () {
           openProbeNode(e.node.kind === "file" ? { kind: "file", path: e.node.key, v: e.node.v } : { kind: "agent", aid: e.node.key, v: e.node.v });
@@ -1374,6 +1397,45 @@
       if (!good) row.appendChild(el("span", "vdiag", EV_DIAG[e.status] || e.status + (e.node && e.node.diag ? ":" + e.node.diag : "")));
       else if (e.status === "drifted") row.appendChild(el("span", "vdiag", EV_DIAG.drifted));
       return row;
+    }
+    function attributionBasis(node) {
+      var basis = node.basis;
+      if (!basis || typeof basis !== "object" || Array.isArray(basis)) return null;
+      var bound = probeClaimsBound(PROBE), box = el("details", "attribution-basis");
+      // A complete contrast or resolvable citation is still a model assertion.
+      box.dataset.source = "model"; box.dataset.semanticChecked = "false";
+      box.appendChild(el("summary", null, "归因对照（模型主张，未验证）"));
+      box.addEventListener("click", function (ev) { ev.stopPropagation(); });
+      box.appendChild(el("div", "basis-source", "来源：model（模型主张） · 语义未验证"));
+      [["expected", "当时要求"], ["actual", "实际输出"], ["counterevidence", "反证边界"]].forEach(function (field) {
+        var group = el("div", "basis-field basis-" + field[0]);
+        group.appendChild(el("div", "basis-label", field[1]));
+        group.appendChild(el("div", "basis-text", typeof basis[field[0]] === "string" && basis[field[0]]
+          ? basis[field[0]] : "未填写（不推测）"));
+        box.appendChild(group);
+      });
+      var refs = [];
+      [["expected_evidence", "当时要求 · 引用", "expected"], ["actual_evidence", "实际输出 · 引用", "actual"]].forEach(function (field) {
+        var items = Array.isArray(basis[field[0]]) ? basis[field[0]] : [];
+        var group = el("div", "basis-evidence-group basis-" + field[2] + "-evidence");
+        group.appendChild(el("div", "basis-label", field[1]));
+        items.forEach(function (e) {
+          refs.push(e);
+          // Preserve the original spelling/whitespace without changing the
+          // resolver's action/node coordinates used by evidenceRow.
+          var display = typeof e.original_ref === "string" ? Object.assign({}, e, { ref: e.original_ref }) : e;
+          group.appendChild(evidenceRow(display));
+        });
+        if (!items.length) group.appendChild(el("div", "basis-note", "未列引用"));
+        box.appendChild(group);
+      });
+      if (bound) {
+        var bad = Number.isInteger(node.basis_evidence_bad) ? Math.max(0, node.basis_evidence_bad)
+          : refs.filter(function (e) { return e.status !== "ok" && e.status !== "drifted"; }).length;
+        box.appendChild(el("div", "basis-evidence-note", "引用位置未核 " + bad + " 条；位置可核不证明支持此归因。"));
+      } else box.appendChild(el("div", "basis-evidence-note", "历史主张未绑定：保留文字与引用，不核当前位置，也不提供导航。"));
+      box.appendChild(el("div", "basis-note", "内容齐全不代表验证通过；不改变节点角色、图色或缺陷判定。"));
+      return box;
     }
     // 抽屉顶部的结论块:这个节点(键 + 版本)在每条缺陷下的角色、原因、证据、核验状态;别的版本的判定只做提示
     function probeReason(node) {
@@ -1395,6 +1457,7 @@
         box.appendChild(hd);
         box.appendChild(el("div", "preason", r.reason || "(没写原因)"));
         if (r.boundary) box.appendChild(kv("边界", r.boundary));
+        var basis = attributionBasis(r); if (basis) box.appendChild(basis);
         (r.evidence || []).forEach(function (e) { box.appendChild(evidenceRow(e)); });
         var chk = "核验:" + (r.checked === "not_checked" ? "未机检(引用 ✓ 只证明位置可核,不证明原文支持这段原因)" : r.checked)
                 + (r.evidence_bad ? " · 无效引用 " + r.evidence_bad + " 条" : "");
@@ -1638,6 +1701,57 @@
       line.title = "结论按缺陷事项计数;同一节点在不同缺陷下的角色分别计数。关系核验只查账本关系,不验证模型问题主张或缺陷因果。";
       host.appendChild(line);
     }
+    function renderDraftCheck(host) {
+      var report = PROBE.draft_check;
+      if (!report || typeof report !== "object") return; // Old reports do not acquire an invented check result.
+      var labels = {
+        matched: "草稿机检与当前稿一致（语义未核验）",
+        mismatch: "最终稿与最后核查稿不同",
+        not_checked: "未核查（未记录可用的草稿机检）",
+        unverifiable: "草稿核查不可核（记录来源或内容无法核验）",
+        invalid_final: "最终稿无效，无法核对草稿机检"
+      };
+      var status = Object.prototype.hasOwnProperty.call(labels, report.status) ? report.status : "unverifiable";
+      var warning = status !== "matched" && status !== "not_checked";
+      var box = el("div", "draft-check-summary" + (warning ? " warning" : ""));
+      box.dataset.status = status; box.dataset.semanticChecked = "false";
+      box.appendChild(el("div", "draft-check-label", labels[status]));
+      box.appendChild(el("div", "draft-check-note", "仅比对机器核查记录与当前稿；不验证主张真假，不证明模型阅读或采纳了反馈。"));
+      var details = el("details", "draft-check-details"), checks = Array.isArray(report.checks) ? report.checks : [];
+      details.appendChild(el("summary", null, "核查记录明细（已提供 " + checks.length + " 条）"));
+      function value(v) { return v == null ? "未记录" : String(v); }
+      details.appendChild(el("div", null, "核查调用 " + value(report.check_calls) + " · 草稿字符 " + value(report.draft_chars)
+        + " · 返回字符 " + value(report.returned_chars)));
+      details.appendChild(el("div", null, "当前稿 document SHA-256：" + value(report.final_document_sha256)));
+      if (report.matched_check != null) details.appendChild(el("div", null, "匹配核查步骤：#" + report.matched_check));
+      checks.forEach(function (check) {
+        var record = el("div", "draft-check-record");
+        record.appendChild(el("div", null, "步骤 #" + value(check.step) + " · call_id=" + value(check.call_id)
+          + " · 状态 " + value(check.status)));
+        record.appendChild(el("div", null, "调用记录认证：" + (check.verified === true ? "已认证" : check.verified === false ? "未认证" : "未记录")
+          + "（不是语义验证）"));
+        record.appendChild(el("div", null, "draft SHA-256：" + value(check.draft_sha256)));
+        record.appendChild(el("div", null, "document SHA-256：" + value(check.document_sha256)));
+        if (check.counts) record.appendChild(el("div", null, "机械计数：" + JSON.stringify(check.counts)));
+        var issues = el("div", "draft-check-issues");
+        if (Array.isArray(check.issues)) {
+          issues.appendChild(el("div", null, "工具实际返回的诊断：已提供 " + check.issues.length + " 条（非语义验证）"));
+          check.issues.forEach(function (issue) {
+            issues.appendChild(el("pre", "draft-check-issue", typeof issue === "string" ? issue : JSON.stringify(issue, null, 2)));
+          });
+        } else issues.appendChild(el("div", null, "未提供诊断明细，不能推断没有问题。"));
+        record.appendChild(issues);
+        var omitted = Number.isInteger(check.omitted_issues) && check.omitted_issues >= 0 ? check.omitted_issues : null;
+        record.appendChild(el("div", "draft-check-omitted", omitted == null ? "省略数量未记录。"
+          : "工具返回另省略 " + omitted + " 条诊断" + (omitted ? "；本页无法补回未返回内容。" : "。")));
+        if (check.coverage != null) {
+          record.appendChild(el("div", null, "覆盖对账（工具原始返回）：覆盖齐全不代表修复已确认。"));
+          record.appendChild(el("pre", "draft-check-coverage", JSON.stringify(check.coverage, null, 2)));
+        } else record.appendChild(el("div", null, "未提供覆盖诊断。"));
+        details.appendChild(record);
+      });
+      box.appendChild(details); host.appendChild(box);
+    }
     function renderConsistency(host, structured, defect, claimsBound) {
       var consistency = structured.consistency || {};
       var advisories = defect.advisories || (consistency.advisories || []).filter(function (a) { return a.defect === defect.id; });
@@ -1720,6 +1834,7 @@
           t.appendChild(document.createTextNode(" " + n.label + (!claimsBound ? " [未绑定当前账本]" : n.ok ? "" : " [无效: " + n.diag + "]") + (n.evidence_bad ? " ⚠引用 " + n.evidence_bad : "") + " — " + (n.reason || "")));
           t.title = n.spec + "\n" + (n.reason || "");
           row.appendChild(t);
+          var basis = attributionBasis(n); if (basis) row.appendChild(basis);
           if (n.ok && claimsBound) row.addEventListener("click", function () { openProbeNode(nodeSpecOf(n)); });
           host.appendChild(row);
         });
