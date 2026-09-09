@@ -8,6 +8,7 @@ result.json 的 result(Claude)或 response_text(Codex)是报告正文。文件�
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -190,7 +191,9 @@ def probe_payload(ledger: atoms.Ledger, run_dir: str, chain_payload: dict[str, A
                       "use_line": s.get("use_line"), "result_line": s.get("result_line"),
                       "use_event": s.get("use_event"), "result_event": s.get("result_event"),
                       "use_time_ms": s.get("use_time_ms"), "result_time_ms": s.get("result_time_ms"),
-                      "scope": _step_scope(str(s.get("tool")), inp),
+                      "scope": _step_scope(str(s.get("tool")), inp)
+                               + (" · 返回截断／非全文" if s.get("delivery_truncated") else ""),
+                      "delivery_truncated": bool(s.get("delivery_truncated")),
                       "identity_unbound": trace_identity["bound"] is False,
                       "via": str(inp.get("via") or "")})
     entries = _entries(report)
@@ -395,9 +398,17 @@ def _transcript_calls(run_dir: str) -> list[dict[str, Any]] | None:
             return                                      # 无 id 的结果不可与另一个无 id 的调用互猜
         txt, content_error = _tool_output(output)
         raw_chars = len(output) if isinstance(output, str) else len(txt)
-        results.setdefault(f"{fmt}:{tid}", {"text": txt, "chars": raw_chars, "has_result": True,
-                           "is_error": failed or content_error, "result_line": line_no, "result_event": event,
-                           "result_time_ms": record_ms})
+        response = {"text": txt, "chars": raw_chars, "has_result": True,
+                    "is_error": failed or content_error, "result_line": line_no, "result_event": event,
+                    "result_time_ms": record_ms}
+        # Observed native Codex format: a separate runtime-header input_text block
+        # followed by body blocks. Merely recognizing its shape is not authority
+        # to strip it; dedup must corroborate the exact body with a trusted item.
+        if fmt == "codex_rollout" and isinstance(output, list) and len(output) >= 2 \
+                and all(isinstance(b, dict) and b.get("type") == "input_text" and isinstance(b.get("text"), str) for b in output) \
+                and re.fullmatch(r"Wall time: \d+(?:\.\d+)? seconds\nOutput:", output[0]["text"]):
+            response["_transport_blocks"] = {"header": output[0]["text"], "body": "\n".join(b["text"] for b in output[1:])}
+        results.setdefault(f"{fmt}:{tid}", response)
 
     with open(p, encoding="utf-8", errors="ignore") as fh:
         for line_no, line in enumerate(fh, 1):
@@ -480,6 +491,27 @@ def _transcript_calls(run_dir: str) -> list[dict[str, Any]] | None:
     return rows
 
 
+def _partial_delivery(delivered: str, runtime: str) -> dict[str, int] | None:
+    """One observed Codex middle-omission marker, with both visible sides exact.
+
+    Token count is only the transport's report; omitted character count is checked.
+    The complete first line must be visible, so a cut header never authenticates a node.
+    """
+    markers = list(re.finditer(r"…([1-9][0-9]{0,8}) tokens truncated…", delivered))
+    if len(markers) != 1:
+        return None
+    marker = markers[0]
+    prefix, suffix = delivered[:marker.start()], delivered[marker.end():]
+    first_end = runtime.find("\n")
+    omitted = len(runtime) - len(prefix) - len(suffix)
+    if first_end < 0 or len(prefix) <= first_end or not suffix or omitted <= 0 \
+            or not runtime.startswith(prefix) or not runtime.endswith(suffix):
+        return None
+    return {"visible_chars": len(prefix) + len(suffix), "omitted_chars": omitted,
+            "omission_start": len(prefix), "omission_end": len(runtime) - len(suffix),
+            "reported_omitted_tokens": int(marker[1])}
+
+
 def _deduplicate_runtime_calls(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """同一原生调用的两种表示只按明确 id 合并,不按参数或时间相似性猜。"""
     direct = {c["call_id"]: c for c in rows if c.get("call_id") and c["provenance"]["format"] == "codex_rollout"}
@@ -502,10 +534,44 @@ def _deduplicate_runtime_calls(rows: list[dict[str, Any]]) -> list[dict[str, Any
                                                  "tool_origin": provenance["tool_origin"], "input": row["input"],
                                                  "started_at_ms": row.get("use_time_ms"),
                                                  "completed_at_ms": row.get("result_time_ms")}
+        envelope = primary.get("_transport_blocks")
+        if envelope:
+            trusted = origin["verified"] and provenance.get("complete_pair") is True and row["has_result"]
+            matches_body = envelope["body"] == row["text"]
+            partial = None if matches_body else _partial_delivery(envelope["body"], row["text"])
+            normalization = {"kind": "codex_native_input_text_blocks", "status": "unverified",
+                             "header": envelope["header"], "response_result_line": primary["result_line"],
+                             "runtime_result_line": row["result_line"], "runtime_item_id": row["item_id"],
+                             "exact_body_match": matches_body,
+                             "response_body_chars": len(envelope["body"]), "runtime_body_chars": len(row["text"]),
+                             "response_body_sha256": hashlib.sha256(envelope["body"].encode("utf-8")).hexdigest(),
+                             "runtime_body_sha256": hashlib.sha256(row["text"].encode("utf-8")).hexdigest(),
+                             "note": "原生来源/完整配对或正文一致性未核验,保留原始文本"}
+            if trusted and (matches_body or partial is not None):
+                primary.setdefault("raw_text", primary["text"])
+                primary["text"] = envelope["body"]
+                primary["delivery_truncated"] = partial is not None
+                normalization.update(status="verified", note="独立传输头块已移除;正文与同 ID、来源和参数一致的完整原生返回逐字相同")
+                normalization.update(delivery_truncated=partial is not None,
+                                     visible_chars=len(envelope["body"]), omitted_chars=0)
+                if partial is not None:
+                    normalization.update(partial)
+                    normalization["note"] = "返回截断／非全文:交付正文的可见前后缀与同 ID 原生返回逐字吻合;保留交付片段,未用完整原生正文替代"
+            elif "raw_text" in primary:
+                primary["text"] = primary["raw_text"]
+                primary["delivery_truncated"] = False
+            primary["provenance"]["output_normalization"] = normalization
         if not primary["has_result"] and row["has_result"]:
             for key in ("has_result", "text", "chars", "result_line", "result_event", "result_time_ms"):
                 primary[key] = row[key]
         primary["is_error"] = primary["is_error"] or row["is_error"]
+    for call in kept:
+        envelope = call.pop("_transport_blocks", None)
+        if envelope and "output_normalization" not in call["provenance"]:
+            call["provenance"]["output_normalization"] = {
+                "kind": "codex_native_input_text_blocks", "status": "unverified", "header": envelope["header"],
+                "response_result_line": call["result_line"], "runtime_result_line": None,
+                "note": "无同 ID 完整原生返回核对,未剥离疑似传输头"}
     return kept
 
 
@@ -1074,6 +1140,7 @@ def _trajectory_walk(ledger: atoms.Ledger, steps: list[dict[str, Any]], texts: l
         visit: dict[str, Any] = {"step": i, "tool": s["tool"], "node": requested, "requested_node": requested,
                                 "actual_node": _traj_id(*actual) if actual else None, "status": "opened",
                                 "verified": False, "via": pv["text"], "from": None, "scope": s.get("scope") or "",
+                                "delivery_truncated": bool(s.get("delivery_truncated")),
                                 "args": s.get("args") or {}, "result_ref": s.get("result_ref"),
                                 "call_id": s.get("call_id"), "item_id": s.get("item_id"),
                                 "provenance": s.get("provenance"),
@@ -1175,6 +1242,13 @@ def _trajectory_walk(ledger: atoms.Ledger, steps: list[dict[str, Any]], texts: l
         if s.get("result_time_ms") is not None:
             received_ms[n["id"]] = min(received_ms.get(n["id"], s["result_time_ms"]), s["result_time_ms"])
         declared.append(row)
+
+    for visit in visits:
+        if visit["delivery_truncated"]:
+            delivered = (visit.get("provenance") or {}).get("output_normalization") or {}
+            note = (f"返回截断／非全文:可见 {delivered.get('visible_chars')} 字,省略 {delivered.get('omitted_chars')} 字;"
+                    "只核对已交付片段与版本头,不证明收到完整正文")
+            visit["note"] = (visit["note"] + " · " if visit.get("note") else "") + note
 
     def side_add(kind: str, key: str, v: int | None, source: str, note: str) -> dict[str, Any]:
         nid = _traj_id(kind, key, v)

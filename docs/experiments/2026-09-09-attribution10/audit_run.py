@@ -1,7 +1,8 @@
 """Export mechanical audit evidence using the run's frozen source, never truth scores.
 
-One invocation audits one case. The output must be new and outside the frozen pool,
-source and run; original metrics/reports are never repaired or overwritten.
+One invocation audits one case. An optional separately frozen viewer may reparse the
+same recording; both source versions are recorded and ledger binding still applies.
+The output must be new and outside pool/source/run; original artifacts never change.
 """
 from __future__ import annotations
 
@@ -21,12 +22,14 @@ def main() -> None:
     parser.add_argument("--arm", choices=("tools", "raw"), default="tools")
     parser.add_argument("--rep", type=int, default=1)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--viewer-source", type=Path, help="Explicit alternative viewer; never changes the investigator's source or artifacts")
     args = parser.parse_args()
     case_dir = args.case_dir.resolve()
     case = json.loads((case_dir / "case.json").read_text(encoding="utf-8"))
     run = case_dir / "runs" / args.arm / f"rep{args.rep}"
     output = args.output.resolve()
-    protected = (Path(case["pool"]).resolve(), Path(case["source"]).resolve(), run)
+    viewer = (args.viewer_source or Path(case["source"])).resolve()
+    protected = (Path(case["pool"]).resolve(), Path(case["source"]).resolve(), run, viewer)
     if output.exists() or any(output.is_relative_to(root) for root in protected):
         raise ValueError("Audit destination must be new and outside pool/source/run")
     harness_path = Path(__file__).resolve().parents[1] / "2026-09-09-fidelity-cost/run_pair.py"
@@ -37,7 +40,7 @@ def main() -> None:
     if not all(integrity[key] for key in ("pool_unchanged", "source_unchanged", "task_unchanged")):
         raise RuntimeError(f"Cannot authenticate changed inputs: {integrity}")
     os.environ["MIGLOOP_FROZEN_POOL"] = case["pool"]
-    service, _, _ = harness.load_modules(Path(case["source"]))
+    service, _, _ = harness.load_modules(viewer)
     from migloop import probe
     ledger = service.session_ledger(case["current_root"])
     payload = probe.probe_payload(ledger, str(run), service.fixchain_payload(case["current_root"]))
@@ -52,12 +55,18 @@ def main() -> None:
     doc = {
         "schema": "migloop-attribution-run-audit/1", "case": case["case"], "run_dir": str(run),
         "source_code_id": case["source_code_id"], "task_sha256": case["common_task_sha256"],
+        "viewer": {"source": str(viewer), "source_digest": harness.inventory(viewer / "src/migloop")["content_digest"],
+                   "same_as_investigator": viewer == Path(case["source"]).resolve()},
         "integrity": integrity, "trace_identity": payload.get("trace_identity"),
         "conclusion_identity": structure.get("identity"),
         "schema_errors": structure.get("errors", []),
         "nodes": {"total": len(nodes), "resolved": sum(node.get("ok") is True for node in nodes)},
         "evidence_status": dict(Counter(item.get("status") for item in evidence)),
         "conclusion_edge_status": dict(Counter(edge.get("status") for edge in edges)),
+        "explicit_edge_status": dict(Counter(edge.get("status") for edge in edges if edge.get("implicit") is False)),
+        "implicit_adjacency_status": dict(Counter(edge.get("status") for edge in edges if edge.get("implicit") is True)),
+        "entry_role_conflicts": [{"defect": node.get("defect"), "node": node.get("spec"), "role": node.get("role")}
+                                 for node in nodes if node.get("entry") and node.get("role") not in ("进入·错", "进入·缺")],
         "coverage": payload.get("coverage"),
         "trajectory_summary": {key: trajectory.get(key) for key in ("mode", "root", "verification", "verification_note")},
         "visit_status": dict(Counter(visit.get("status") for visit in trajectory.get("visits", []))),

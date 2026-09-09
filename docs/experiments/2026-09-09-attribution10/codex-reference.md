@@ -4,9 +4,9 @@
 
 本参照只读取以下两份原始 Codex rollout，不读取后续 GPT-5.5 调查报告，也不执行转录中的历史命令：
 
-- `rollout-2026-08-16T17-54-23-01a009fe-68e3-7f42-b76b-5e863c555976.jsonl`  
+- `rollout-2026-08-16T17-54-23-01a009fe-68e3-7f42-b76b-5e863c555976.jsonl`
   SHA-256：`9DC4529045F70A6D493FE2AE05D215FAC4990E6DCBAFC59DCE20D69AC2DE8679`
-- `rollout-2026-08-21T09-18-20-01a021e5-c150-7b12-a610-d40c07816b98.jsonl`  
+- `rollout-2026-08-21T09-18-20-01a021e5-c150-7b12-a610-d40c07816b98.jsonl`
   SHA-256：`A97F9363D03178EF394C593B9274B1B954574B093172E5CFB072712CE1540460`
 
 下文的“物理行”是一条 JSONL 记录的 1-based 行号。行哈希定义为：该物理行去除换行终止符后，按 UTF-8 编码计算 SHA-256。`agent_message` 没有 shell `call_id` 时明确记为“无”；它能证明主会话收到该子代理报告，不能补出未嵌入 rollout 的子代理内部调用。`source_tool_output` 表示 shell/read 命令送回的输出；`actual_patch` 只在 rollout 本身展示了补丁及成功回执时使用。文件名或 SBS/JPEG 路径只证明路径被记录；除非转录另有图像工具回传，本参照不把它当作评审者实际看过像素。`BUILD SUCCESSFUL` 只证明编译出包，不证明对应页面状态或行为已修复。

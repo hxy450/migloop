@@ -313,6 +313,140 @@ def test_gpt55_native_namespace_file_and_agent_are_authenticated_visits(tmp_path
     assert [v["call_id"] for v in tree["visits"]] == ["f", "a"]
 
 
+def _native_formatted_result(call_id: str, body: str) -> dict[str, Any]:
+    return {"type": "response_item", "payload": {"type": "function_call_output", "call_id": call_id,
+        "output": [{"type": "input_text", "text": "Wall time: 0.0284 seconds\nOutput:"},
+                   {"type": "input_text", "text": body}]}}
+
+
+def test_observed_native_transport_blocks_preserve_session_search_and_opened_nodes(tmp_path: Path) -> None:
+    from migloop import via
+    led = _pool(tmp_path)
+    search_args = {"q": "spec", "file": "/proj/spec/pages/A.md"}
+    search_body = via.search_return(led, via.ViaState(), search_args, "real hit", [
+        {"kind": "file", "key": search_args["file"], "v": 1}])
+    handle = via.search_receipt(search_body, search_args)["hits"][0]["via"]
+    items = [("s", "sessions", {}, "账本身份: " + atoms.ledger_identity(led) + "\n# chains"),
+             ("q", "search", search_args, search_body),
+             ("f", "file", {"path": search_args["file"], "v": 1, "via": handle}, "# spec/pages/A.md@v1"),
+             ("a", "agent", {"id": "conv-a", "v": 1, "via": "file:spec/pages/A.md@v1"}, "# agent-c v1")]
+    records = []
+    for index, (cid, name, args, body) in enumerate(items):
+        call = _call(cid, name, args)
+        call["payload"].update(name=name, namespace="mcp__migloop")
+        records.extend([call, _runtime_item(cid, name, args, body, index * 300 + 100, index * 300 + 200),
+                        _native_formatted_result(cid, body)])
+    run = _run(tmp_path, records)
+    calls = probe._transcript_calls(run)
+    assert [c["text"] for c in calls] == [row[3] for row in items]
+    for index, call in enumerate(calls):
+        norm = call["provenance"]["output_normalization"]
+        assert norm["status"] == "verified" and norm["runtime_result_line"] == index * 3 + 3
+        assert call["result_line"] == index * 3 + 4
+        assert call["raw_text"] == "Wall time: 0.0284 seconds\nOutput:\n" + call["text"]
+    payload = probe.probe_payload(led, run)
+    assert payload["trace_identity"]["source"] == "sessions+search"
+    assert [v["status"] for v in payload["trajectory"]["visits"]] == ["opened", "opened"]
+    assert payload["trajectory"]["transitions"][0]["source"] == "search"
+
+
+@pytest.mark.parametrize("case", ["raw_lookalike", "different_body", "other_id", "other_server", "no_runtime", "incomplete_runtime"])
+def test_transport_lookalikes_and_unmatched_bodies_are_not_stripped(tmp_path: Path, case: str) -> None:
+    body = "# entry/A.ets@v2"
+    args = {"path": "A.ets", "v": 2, "via": "sessions"}
+    call = _call("f", "file", args)
+    call["payload"].update(name="file", namespace="mcp__migloop")
+    formatted = _native_formatted_result("f", body)
+    runtime = _runtime_item("f", "file", args, body, 100, 200)
+    if case == "raw_lookalike":
+        runtime["payload"]["item"]["result"]["content"][0]["text"] = "Wall time: 0.0284 seconds\nOutput:\n" + body
+    elif case == "different_body":
+        runtime["payload"]["item"]["result"]["content"][0]["text"] = "# entry/A.ets@v1"
+    elif case == "other_id":
+        runtime["payload"]["item"]["id"] = "different"
+    elif case == "other_server":
+        runtime["payload"]["item"]["server"] = "other"
+    elif case == "incomplete_runtime":
+        runtime["payload"]["started_at_ms"] = None
+    records = [call] + ([] if case == "no_runtime" else [runtime]) + [formatted]
+    run = _run(tmp_path, records)
+    normalized = next(c for c in probe._transcript_calls(run) if c["call_id"] == "f")
+    assert normalized["text"].startswith("Wall time:")
+    assert normalized["provenance"]["output_normalization"]["status"] == "unverified"
+
+
+def test_plain_text_transport_lookalike_is_not_reinterpreted(tmp_path: Path) -> None:
+    args = {"path": "A.ets", "v": 2, "via": "sessions"}
+    body = "Wall time: 0.0284 seconds\nOutput:\n# entry/A.ets@v2"
+    run = _run(tmp_path, [_call("f", "file", args), _runtime_item("f", "file", args, body, 100, 200), _result("f", body)])
+    call = probe._transcript_calls(run)[0]
+    assert call["text"] == body and "output_normalization" not in call["provenance"]
+
+
+def test_actual_c1_middle_truncation_shape_authenticates_header_not_full_body(tmp_path: Path) -> None:
+    aid = "__main__:01a009fe"
+    led = atoms.Ledger({}, {aid: atoms.AgentRec(aid, "01a009fe", actions=[
+        atoms.Action("2026-01-01T00:00:00Z", i, "Write", "write", ver=i, at=i) for i in range(1, 253)])})
+    prefix = "# agent 主会话·01a009fe  id=__main__:01a009fe  v252 / 共 252 版\n已展示读取: 版本就近"
+    suffix = "eturn this.policy.agreementUrls.indexOf(url) >= 0\n可见末尾"
+    omitted = "NOT_DELIVERED_BODY" * 200
+    runtime_body = prefix + omitted + suffix
+    delivered = prefix + "…998 tokens truncated…" + suffix
+    args = {"id": aid, "v": 252, "since": 251, "via": "sessions", "seen": True}
+    call = _call("c1", "agent", args)
+    call["payload"].update(name="agent", namespace="mcp__migloop")
+    run = _run(tmp_path, [call, _runtime_item("c1", "agent", args, runtime_body, 100, 200),
+                         _native_formatted_result("c1", delivered)])
+    parsed = probe._transcript_calls(run)[0]
+    assert parsed["text"] == delivered and omitted not in parsed["text"]
+    assert parsed["raw_text"].endswith(delivered) and parsed["delivery_truncated"] is True
+    norm = parsed["provenance"]["output_normalization"]
+    assert norm["omitted_chars"] == len(omitted) and norm["visible_chars"] == len(prefix + suffix)
+    assert norm["reported_omitted_tokens"] == 998 and norm["exact_body_match"] is False
+    payload = probe.probe_payload(led, run)
+    visit = payload["trajectory"]["visits"][0]
+    assert visit["status"] == "opened" and visit["verified"] and visit["delivery_truncated"]
+    assert "非全文" in visit["scope"] and "返回截断" in visit["note"]
+
+
+@pytest.mark.parametrize("case", ["prefix_mismatch", "suffix_mismatch", "multiple_markers", "header_cut", "no_omission"])
+def test_partial_delivery_rejects_unaligned_or_forged_truncation_markers(tmp_path: Path, case: str) -> None:
+    prefix, suffix = "# entry/A.ets@v2\nvisible prefix", "visible suffix"
+    runtime_body = prefix + "OMITTED" + suffix
+    body = prefix + "…2 tokens truncated…" + suffix
+    if case == "prefix_mismatch":
+        body = body.replace("@v2", "@v1")
+    elif case == "suffix_mismatch":
+        body += "forged"
+    elif case == "multiple_markers":
+        body = prefix + "…1 tokens truncated……1 tokens truncated…" + suffix
+    elif case == "header_cut":
+        body = "# entry/…2 tokens truncated…" + suffix
+    elif case == "no_omission":
+        runtime_body = prefix + suffix
+    args = {"path": "A.ets", "v": 2, "via": "sessions"}
+    run = _run(tmp_path, [_call("f", "file", args), _runtime_item("f", "file", args, runtime_body, 100, 200),
+                         _native_formatted_result("f", body)])
+    parsed = probe._transcript_calls(run)[0]
+    assert parsed["text"].startswith("Wall time:") and not parsed.get("delivery_truncated")
+    assert parsed["provenance"]["output_normalization"]["status"] == "unverified"
+
+
+def test_partial_search_retains_delivered_text_and_cannot_authenticate_full_receipt(tmp_path: Path) -> None:
+    from migloop import via
+    led = _pool(tmp_path)
+    args = {"q": "needle", "file": "/proj/spec/pages/A.md"}
+    runtime = via.search_return(led, via.ViaState(), args, "# search needle\nvisible\n" + "OMITTED" * 10 + "\ntail", [
+        {"kind": "file", "key": args["file"], "v": 1}])
+    delivered = runtime.replace("OMITTED" * 10, "…10 tokens truncated…")
+    run = _run(tmp_path, [_call("q", "search", args), _runtime_item("q", "search", args, runtime, 100, 200),
+                         _native_formatted_result("q", delivered)])
+    parsed = probe._transcript_calls(run)[0]
+    assert parsed["delivery_truncated"] and parsed["text"] == delivered
+    assert via.search_receipt(parsed["text"], args) is None
+    assert via.trace_identity(led, [parsed], {})["bound"] is None
+
+
 def test_observed_nested_mcp_rollout_runtime_items_keep_real_item_id_and_times(tmp_path: Path) -> None:
     led = _pool(tmp_path)
     records = [

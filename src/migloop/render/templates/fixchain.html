@@ -1171,7 +1171,9 @@
       } else if (PROBE.structured) {
         var visits = trajectory && trajectory.visits;
         var opened = visits ? visits.filter(function (v) { return v.status === "opened"; }).length : null;
+        var partial = visits ? visits.filter(function (v) { return v.status === "opened" && v.delivery_truncated; }).length : 0;
         sum.innerHTML = (opened != null ? "成功版本访问 <b>" + opened + "</b> 次"
+                          + (partial ? " · 其中 " + partial + " 次返回截断／非全文" : "")
                           + (visits.length > opened ? " · 未打开 " + (visits.length - opened) + " 次" : "") + " · " : "")
                       + "去重已查版本节点 <b>" + queriedCount + "</b> 个"
                       + (trajectory ? " · 图中版本节点 <b>" + (trajectory.nodes || []).length + "</b> 个" : "");
@@ -1353,7 +1355,9 @@
       var wrap = el("div", "body vbody pvisits"), block = sec("查询记录 · " + visits.length + " 次");
       visits.forEach(function (visit) {
         var row = el("div", "prow pvisit");
-        row.appendChild(el("div", "phd", "#" + visit.step + " " + visit.tool + " · " + probeVisitStatus(visit.status)));
+        var heading = el("div", "phd", "#" + visit.step + " " + visit.tool + " · " + probeVisitStatus(visit.status));
+        if (visit.delivery_truncated) heading.appendChild(el("span", "delivery-truncated", " · 返回截断／非全文"));
+        row.appendChild(heading);
         if (visit.scope) row.appendChild(el("div", "preason", visit.scope));
         if (visit.via) row.appendChild(kv("来处", visit.via));
         var transition = (T.transitions || []).find(function (tr) { return tr.step === visit.step; });

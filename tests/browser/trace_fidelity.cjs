@@ -35,6 +35,7 @@ const visits = [1,2,3,4,5,6].map(step=>{
   const tr=transitions.find(t=>t.step===step), id=tr ? tr.to : root;
   const n=nodes.find(n=>n.id===id);
   return {step,tool:n.kind,node:id,requested_node:id,from:tr?tr.from:null,status:'opened',verified:true,
+    delivery_truncated:step===5,note:step===5?'返回截断／非全文：只收到可见片段，不证明全文交付':null,
     via:tr?tr.from.replace(/@(\d+)$/, '@v$1'):'sessions',scope:step===5?'窗口 v0→v1 · start=2 n=4':'正文 v'+n.v,
     result_ref:'toolu_'+step,args:n.kind==='file'?{path:file,v:n.v}:{id:n.key,v:n.v,since:step===5?0:undefined,start:step===5?2:undefined,n:step===5?4:undefined}};
 });
@@ -187,7 +188,7 @@ async function main(){
     await check('unqueried conclusion version has no checked badge',"[...document.querySelectorAll('#canvas .node')].some(n=>n.textContent.startsWith('A.ets@v1') && n.textContent.includes('未查询') && !n.querySelector('.badge.step'))");
     await check('rejected visit overrides successful transport status',"[...document.querySelectorAll('#probe .st')].some(n=>n.textContent.startsWith('✗7') && n.textContent.includes('被拒 · 未打开'))");
     await check('structured summary excludes prose ring metrics',"!document.querySelector('#probe').textContent.includes('判定落到树上') && !document.querySelector('#probe').textContent.includes('报告的环') && document.querySelector('#probe').textContent.includes('结构化结论 2 项')");
-    await check('revisits, unqueried claims and rejected visits counted separately',"document.querySelector('.visit-summary').textContent==='成功版本访问 6 次 · 未打开 1 次 · 去重已查版本节点 3 个 · 图中版本节点 4 个'");
+    await check('revisits, partial deliveries, unqueried claims and rejected visits counted separately',"document.querySelector('.visit-summary').textContent==='成功版本访问 6 次 · 其中 1 次返回截断／非全文 · 未打开 1 次 · 去重已查版本节点 3 个 · 图中版本节点 4 个'");
     await check('unrelated navigation is neutral and explicitly noncausal',"[...document.querySelectorAll('.badge.navigation')].some(n=>n.textContent==='探索跳转：未核出直接账本边' && n.title.includes('不是因果边') && !n.classList.contains('stale')) && [...document.querySelectorAll('.wire.route title')].every(n=>n.textContent.includes('不是因果边'))");
     const point=await evaluate("(()=>{const r=document.querySelector('.route-step[data-step=\"4\"]').getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2}})()");
     await send('Input.dispatchMouseEvent',{type:'mousePressed',button:'left',clickCount:1,...point});
@@ -195,6 +196,7 @@ async function main(){
     await check('transition step label responds to a real mouse click',"document.querySelector('#canvas .node.sel').textContent.startsWith('Agent A v1')");
     await evaluate(clickAgent);
     await check('all repeated visits and query windows preserved in drawer',"document.querySelectorAll('#side .pvisit').length===3 && document.querySelector('#side .pvisits').textContent.includes('start=2 n=4')");
+    await check('partial return is still opened but never labelled as full delivery',"document.querySelectorAll('#side .delivery-truncated').length===1 && document.querySelector('#side .delivery-truncated').parentElement.textContent.includes('已打开') && document.querySelector('#side .pvisits').textContent.includes('不证明全文交付')");
     await evaluate("[...document.querySelectorAll('.dchips span')].find(n=>n.textContent.startsWith('A ')).click()");
     await check('A drawer isolated',"document.querySelector('#side').textContent.includes('A 独有原因') && !document.querySelector('#side').textContent.includes('B 独有原因')");
     await evaluate("[...document.querySelectorAll('.dchips span')].find(n=>n.textContent.startsWith('B ')).click()");
