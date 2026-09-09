@@ -688,6 +688,12 @@ def _tool_output(output: Any, depth: int = 0) -> tuple[str, bool]:
         return "\n".join(text for text, _ in parts if text), any(error for _, error in parts)
     if isinstance(output, dict):
         failed = bool(output.get("isError") or output.get("is_error"))
+        if output.get("type") in ("text", "input_text") and isinstance(output.get("text"), str):
+            # An explicit text block is already the payload, not another
+            # transport envelope. Preserve JSON-looking bodies byte-for-byte:
+            # recursively decoding them changes whitespace or drops fields
+            # named content/result/error, breaking native body authentication.
+            return output["text"], failed
         for key in ("text", "content", "result", "output"):
             if key in output:
                 text, nested_error = _tool_output(output[key], depth + 1)
@@ -708,12 +714,9 @@ def _transcript_results(run_dir: str) -> list[str] | None:
 
 def _unwrap_result(txt: str) -> str:
     """MCP 客户端把工具的字符串返回包成 {"result": "..."} 写进转录;拆出来才是模型看到的正文。"""
-    if txt.lstrip().startswith('{"result"'):
-        try:
-            obj = json.loads(txt)
-        except json.JSONDecodeError:
-            return txt
-        if isinstance(obj, dict) and isinstance(obj.get("result"), str):
+    if txt.lstrip().startswith('{'):
+        obj, errors = verdict.parse_block("json", txt)
+        if not errors and isinstance(obj, dict) and set(obj) == {"result"} and isinstance(obj["result"], str):
             return obj["result"]
     return txt
 
@@ -1155,13 +1158,17 @@ def _trajectory_walk(ledger: atoms.Ledger, steps: list[dict[str, Any]], texts: l
         land = _step_landing(s)
         i = int(s["i"])
         pv = via.parse(ledger, str(s.get("via") or ""))
-        text = texts[i - 1] if i - 1 < len(texts) else ""
+        raw_return = texts[i - 1] if i - 1 < len(texts) else ""
+        # Interpret the documented legacy single-result wrapper only for atom
+        # coordinate parsing. The recorded/compared text remains untouched.
+        text = _unwrap_result(raw_return)
         requested = _traj_id(*land) if land is not None else None
         actual = via.returned_node(ledger, str(s["tool"]), text)
         visit: dict[str, Any] = {"step": i, "tool": s["tool"], "node": requested, "requested_node": requested,
                                 "actual_node": _traj_id(*actual) if actual else None, "status": "opened",
                                 "verified": False, "via": pv["text"], "from": None, "scope": s.get("scope") or "",
                                 "delivery_truncated": bool(s.get("delivery_truncated")),
+                                "coordinate_envelope": "legacy_single_result" if text != raw_return else None,
                                 "args": s.get("args") or {}, "result_ref": s.get("result_ref"),
                                 "call_id": s.get("call_id"), "item_id": s.get("item_id"),
                                 "provenance": s.get("provenance"),

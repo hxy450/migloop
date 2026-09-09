@@ -118,6 +118,8 @@ def test_rollout_revisits_self_loop_errors_and_pending_keep_the_route_contract(t
     assert tree["visits"][1]["scope"] == "正文 v2 3-7行"
     assert tree["visits"][1]["call_id"] == "self"
     assert tree["visits"][1]["provenance"]["format"] == "codex_rollout"
+    assert tree["visits"][0]["coordinate_envelope"] == "legacy_single_result"
+    assert probe._transcript_calls(run_dir)[0]["text"] == '{"result": "# entry/A.ets@v2"}'
     assert not payload["steps"][-1]["ok"] and not payload["steps"][-1]["result_present"]
 
 

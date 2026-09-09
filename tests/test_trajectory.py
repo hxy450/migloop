@@ -430,4 +430,5 @@ def test_transcript_pairs_by_id_and_keeps_missing_result_and_deduplicates_replay
     calls = probe._transcript_calls(run_dir)
     assert calls is not None and len(calls) == 2
     assert calls[0]["id"] == "a" and calls[0]["has_result"] is False
-    assert calls[1]["id"] == "b" and calls[1]["text"] == "B result" and calls[1]["has_result"] is True
+    assert calls[1]["id"] == "b" and calls[1]["text"] == '{"result": "B result"}' and calls[1]["has_result"] is True
+    assert probe._unwrap_result(calls[1]["text"]) == "B result"  # Interpret legacy wrapper without altering recorded text.
