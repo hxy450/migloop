@@ -735,6 +735,7 @@
     // 词法层沾边的命令:改动类 / 正文提到 / 输出里 且账本没记到读写的,按 (agent, 版本) 合成一个虚线「可能写」节点挂在上游;
     // 只读检查折成一个灰桩(不展开)。不立版本、不进 blame —— 只导航,点它开 agent 抽屉
     function possibleWriters(node, fa) {
+      if ((XT && XT.noPossible) || (PROBE && !PROBE.error)) return;   // 载入调查后只铺账本邻居,不画词法候选(桩展开、换根都一样)
       var ms = (fa.mentions || []).filter(function (m) {
         if (m.effect) return false;
         if (node.anchorV && m.win && m.win > node.anchorV) return false;
@@ -797,6 +798,7 @@
       if (!node) return;
       selTid = tid;
       drawerFor(node);
+      if (node.kind === "leaf" && node.isLedgerStub) { expandLedgerKids(XT.byId[node.parent], node); return; }
       if (node.traj) { renderTree(tid); return; }          // 轨迹树的节点不沿账本展开 / 折叠,点它只看抽屉
       if (node.kind === "leaf" && node.isStub) { unstub(node); renderTree(node.parent); return; }
       if (node.busy || node.kind === "leaf" || node.isRight || node.possible) { renderTree(tid); return; }
@@ -1383,7 +1385,7 @@
         XT.extra.push({ a: byId[e.from].tid, b: byId[e.to].tid, rel: e.relation });
       });
       T.nodes.forEach(function (n) {
-        if (n.unseen > 0 && n.side === "up") addKid(byId[n.id], xtNode("leaf", { label: "+" + n.unseen + " 未查", isRoStub: true }));
+        if (n.unseen > 0 && (n.side === "up" || n.side === "root")) addKid(byId[n.id], xtNode("leaf", { label: "+" + n.unseen + " 未查", isLedgerStub: true }));
       });
       // 声明边:模型每次查询说的「我从 X 来」,蓝色虚线;和账本边重合 ✓,不重合橙色 ✗;来处不是节点的只在徽标上标
       XT.via = [];
@@ -1417,6 +1419,39 @@
       renderTree(XT.root);
       renderProbe();
     }
+    // 路线树上的「+N 未查」:点开沿账本铺出这个节点没在路线上的邻居(普通节点,可继续按账本展开);路线上已有的不重复,不画词法候选
+    function expandLedgerKids(node, stub) {
+      if (!node || node.busy) return;
+      var keep = (node.children || []).filter(function (t) { return t !== stub.tid; });
+      delete XT.byId[stub.tid];
+      var route = {};
+      Object.keys(XT.byId).forEach(function (t) {
+        var r = XT.byId[t];
+        if (!r.traj) return;
+        var k = probeKeyOf(r);
+        if (!k) return;
+        var v = r.kind === "file" ? r.anchorV : r.anchorVer;
+        (route[k] = route[k] || []).push(v == null ? "*" : v);
+      });
+      function onRoute(kid) {
+        var k = probeKeyOf(kid);
+        var vs = k && route[k];
+        if (!vs) return false;
+        if (vs.indexOf("*") >= 0) return true;
+        if (kid.kind === "file") return vs.indexOf(kid.anchorV) >= 0;
+        return vs.some(function (v) { return v === kid.anchorVer || (kid.verMin != null && v >= kid.verMin && v <= kid.anchorVer); });
+      }
+      node.busy = true;
+      XT.noPossible = true;
+      var fin = function () {
+        XT.noPossible = false;
+        var added = (node.children || []).filter(function (t) { var kid = XT.byId[t]; if (!kid) return false; if (onRoute(kid)) { delete XT.byId[t]; return false; } kid.ledgerKid = true; return true; });
+        node.children = keep.concat(added);
+        node.expanded = true;
+        renderTree(node.tid);
+      };
+      if (node.kind === "file") expandFile(node, fin); else expandAgent(node, fin);
+    }
     // ═══════════ 调查树(没有轨迹的老 run):查过的节点都要在树上 ═══════════
     // 根开好之后沿账本的边自动往上游长:每一层只展开落在 probe 集合(查过 / 判过 / 提到)里的子节点,其余折成一个
     // 「+N 未查」桩(点开可看);同一个键只展开一次(主会话在很多 agent 的派发边上都会出现,再出现只标「已在上方展开」);
@@ -1437,6 +1472,7 @@
     var probeExpanding = false;
     function probeExpand() {
       if (!PROBE || PROBE.error || !XT || probeExpanding) return;
+      if (PROBE.trajectory) return;          // 有轨迹的 run:树由服务端给;换根只是普通账本树 + 角色着色,不按键铺候选
       probeExpanding = true;
       var expandedKeys = {};
       var rootN = XT.byId[XT.root];
@@ -1513,6 +1549,7 @@
       if (node.isRoot) c += " root";
       if (node.isRight) c += " down";
       if (node.possible) c += " possible";
+      if (node.ledgerKid) c += " p-dim";
       return c;
     }
 

@@ -189,5 +189,8 @@ def test_walk_tree_follows_via_and_labels_ledger_relations(tmp_path: Any) -> Non
     assert d == {2: "入口", 3: "账本有边", 4: "账本有边", 5: "via 指向没打开过的节点", 6: "被拒(via 不合规,没打开)",
                  7: "账本有边", 8: "账本有边"}
     assert p["steps"][2]["via"] == "file:entry/A.ets 写者"
+    # 整个文件 = 最新版视图:上游邻居按全部版本算(写 v1 的 conv-a v1、写 v2 的 fixer v1);在场的整个 fixer 覆盖它所有版本 → 未查 0
+    assert root["unseen"] == 0
+    assert by["agent:agent-c@1"]["unseen"] == 0                    # conv-a v1 的上游:读的 A.md@v1 在场,派发它的主会话 v1 在场
     # 没有 via 的老 run 仍走账本树
     assert probe.probe_payload(led, _run_dir(tmp_path, [("file", {"path": "A.ets"}, "x")], _block(led), name="noVia"))["trajectory"]["mode"] == "ledger"

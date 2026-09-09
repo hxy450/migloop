@@ -370,14 +370,14 @@ def _n_versions(ledger: atoms.Ledger, kind: str, key: str) -> int:
 
 
 def _upstream_neighbors(ledger: atoms.Ledger, kind: str, key: str, v: int | None) -> set[tuple[str, str, int | None]]:
-    """账本里这个节点的上游邻居(精确版本才算):file@v → 写者@写者版本;agent@v → 喂养 ≤v 的确定读取 + 派发者。"""
+    """账本里这个节点的上游邻居:file@v → 写者@写者版本;agent@v → 喂养 ≤v 的确定读取 + 派发者。
+    v=None(整个:文件的索引就是最新版视图,agent 的整个逐版都列)→ 全部版本的邻居并起来。"""
     out: set[tuple[str, str, int | None]] = set()
-    if v is None:
-        return out
     if kind == "file":
         st = ledger.stories.get(key)
-        if st and 1 <= v <= len(st.versions):
-            ver = st.versions[v - 1]
+        if st is None:
+            return out
+        for ver in st.versions if v is None else st.versions[v - 1:v]:
             if ver.by in ledger.agents:
                 out.add(("agent", ver.by, ver.by_ver))
         return out
@@ -386,7 +386,7 @@ def _upstream_neighbors(ledger: atoms.Ledger, kind: str, key: str, v: int | None
         return out
     for act in a.actions:
         feed = act.ver if act.ver is not None else act.at
-        if feed > v:
+        if v is not None and feed > v:
             continue
         for ref in act.files:
             if ref.op == "read" and ref.v is not None and ref.certain and not ref.ev.dep:
@@ -742,8 +742,10 @@ def _trajectory_walk(ledger: atoms.Ledger, steps: list[dict[str, Any]], texts: l
             d += 1
         n["depth"] = d
     present = {(n["kind"], n["key"], n["v"]) for n in order}
+    whole = {(n["kind"], n["key"]) for n in order if n["v"] is None}       # 在场的整个节点覆盖它的所有版本
     for n in order:
-        n["unseen"] = len([x for x in _upstream_neighbors(ledger, n["kind"], n["key"], n["v"]) if x not in present])
+        n["unseen"] = len([x for x in _upstream_neighbors(ledger, n["kind"], n["key"], n["v"])
+                           if x not in present and (x[0], x[1]) not in whole])
     edges = [{"from": n["parent"], "to": n["id"], "relation": n["edge"] or "无", "skipped": 0}
              for n in order if n["parent"] and n["side"] == "up"]
     return {"mode": "via", "root": root["id"], "nodes": order, "edges": edges, "declared": declared,
