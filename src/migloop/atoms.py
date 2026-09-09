@@ -921,8 +921,12 @@ def blame(ledger: Ledger, hint: str, v: int | None = None,
             counts[o[0]] = counts.get(o[0], 0) + 1
     summary = [{"owner": k, "owner_name": _agent_label(ledger.agents, k), "n": c}
                for k, c in sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))]
-    return {"path": path, "v": anchor, "n_versions": len(st.versions), "known": known,
-            "n_lines": len(text), "lines": lines, "summary": summary, "unknown": unknown}
+    result = {"path": path, "v": anchor, "n_versions": len(st.versions), "known": known,
+              "n_lines": len(text), "lines": lines, "summary": summary, "unknown": unknown}
+    if not known:
+        from .blame_recovery import build
+        result["recovery"] = build(ledger, path, anchor)
+    return result
 
 
 def _blame_changed(ledger: Ledger, path: str, st: FileStory, anchor: int) -> dict[str, Any]:
@@ -935,11 +939,15 @@ def _blame_changed(ledger: Ledger, path: str, st: FileStory, anchor: int) -> dic
                             "summary": [], "unknown": None, "note": "",
                             "comparison_basis": "unavailable", "comparison_note": ""}
     if anchor < 2:
-        base["note"] = "创建版,没有前一版可比"
+        from .blame_recovery import build
+        base["note"] = "无前版记录，无法比较；首个记录版本不是必然新建文件"
+        base["recovery"] = build(ledger, path, anchor)
         return base
     prev, ver = st.versions[anchor - 2], st.versions[anchor - 1]
     if prev.content is None or ver.content is None:
+        from .blame_recovery import build
         base["note"] = "前一版或本版内容未知,无法定位被替换行(见 file 的复原原因)"
+        base["recovery"] = build(ledger, path, anchor)
         return base
     old, new = prev.content.splitlines(), ver.content.splitlines()
     rows = line_origins(st)[anchor - 2]

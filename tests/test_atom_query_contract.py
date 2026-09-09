@@ -110,6 +110,27 @@ def test_window_data_matches_legacy_selector_without_reclassifying_prior_inputs(
             assert unified[field] == legacy[field], field
 
 
+def test_prior_preview_preserves_range_and_uncertainty_without_copying_read_body():
+    ledger, _ = fixture(done=8)
+    read = ledger.agents[AID].actions[1]
+    read.at = 1
+    read.files[0].observation_uncertain = True
+    got = atom_queries.agent_data(ledger, AID, v=3, since=1)
+    preview = got["input_scope"]["prior_read_preview"][0]
+    assert preview["full"] is True and preview["seen_n"] == 1
+    assert preview["observation_uncertain"] is True
+    assert "seen" not in preview and "SECRET_RETURN" not in str(preview)
+    assert "范围未知" not in atoms_text._read_tags(preview)
+    assert "读写窗口重叠" in atoms_text._read_tags(preview)
+
+
+@pytest.mark.parametrize("offset", [3, 100])
+def test_action_page_after_end_is_explicit_empty_eof_not_an_inverted_range(offset):
+    text, note = atoms_text._window("abc", 10, offset)
+    assert text == "" and "EOF" in note and "共 3 字" in note
+    assert "4-3" not in note
+
+
 @pytest.mark.parametrize("kind,args", [("file", {"path": "A.ets", "v": 2}),
                                       ("agent", {"id": "agent-c", "v": 1})])
 def test_scope_only_projects_the_same_metadata_without_bodies(tmp_path, kind, args):

@@ -1159,7 +1159,8 @@ def test_blame_changed_lists_only_lines_the_fix_replaced(tmp_path: Any) -> None:
     assert "v2 替换/删除了 v1 的 1 行" in text and "新增 2 行" in text
     assert "| b" in text and "| c" not in text and "| a" not in text
     first = atoms.blame(led, "A.ets", 1, changed=True)
-    assert first is not None and first["lines"] == [] and first["prev_v"] is None and "创建版" in first["note"]
+    assert first is not None and first["lines"] == [] and first["prev_v"] is None and "无前版记录" in first["note"]
+    assert "不是必然新建" in first["note"] and "创建版" not in first["note"]
 
 
 def test_grep_hit_reads_are_not_labeled_full_text(tmp_path: Any) -> None:

@@ -1153,6 +1153,8 @@ def _relation_check(ledger: atoms.Ledger, a: dict[str, Any], b: dict[str, Any]) 
             relation = ("派发 " if left["key"] == a["key"] else "派发自 ") + f"v{left['v']}"
         elif kind == "候选":
             ag, fl = (aa, bb) if aa["kind"] == "agent" else (bb, aa)
+            for act, basis in verdict._read_path_candidates(ledger, ag, fl["key"]):
+                cite(ag["key"], act.seq, basis)
             for mention in ledger.mentions.get(fl["key"], []):
                 if mention.by == ag["key"] and mention.by_ver == ag["v"]:
                     cite(ag["key"], mention.seq, "lexical_mention")

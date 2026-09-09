@@ -17,7 +17,7 @@ from typing import Any
 import pytest
 
 from migloop import serve, service
-from migloop.mcp_server import GUIDE
+from migloop.mcp_server import GUIDE, guide_text
 
 CWD = "/proj"
 SID = "abcdef12-0000-0000-0000-000000000000"
@@ -119,7 +119,8 @@ def test_pages_and_atoms(session: tuple[str, dict[str, str]]) -> None:
     with pytest.raises(ValueError):
         service.atom_json(path, "nosuch", {})
 
-    assert service.atom_text(path, "guide", {}) == GUIDE
+    assert service.atom_text(path, "guide", {}) == guide_text()
+    assert service.atom_text(path, "guide", {"topic": "full"}) == GUIDE
     assert "A.ets" in service.atom_text(path, "sessions", {})
     agent_txt = service.atom_text(path, "agent", {"id": MAIN_ID})
     assert "T+0:00" in agent_txt and "arkts-visual-verify" in agent_txt
@@ -159,7 +160,11 @@ def test_serve_routes(session: tuple[str, dict[str, str]]) -> None:
         st, body, _ = _get(base, "/api/insight1/fixchain-data/abcdef12")
         assert st == 200 and len(json.loads(body)["chains"]) == 1
         st, body, _ = _get(base, "/api/insight1/atom/abcdef12/text/guide")
+        assert st == 200 and body.decode("utf-8") == guide_text()
+        st, body, _ = _get(base, "/api/insight1/atom/abcdef12/text/guide?topic=full")
         assert st == 200 and body.decode("utf-8") == GUIDE
+        st, body, _ = _get(base, "/api/insight1/atom/abcdef12/text/guide?topic=typo")
+        assert st == 400
         st, body, _ = _get(base, "/api/insight1/atom/abcdef12/index")
         assert st == 200 and json.loads(body)["files"]
         st, body, _ = _get(base, "/api/insight1/atom/abcdef12/file?path=A.ets&v=3&content=1")

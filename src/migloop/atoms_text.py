@@ -698,6 +698,8 @@ def _window(text: str, cap: int, offset: int = 0, find: str = "") -> tuple[str, 
         else:
             offset = max(0, pos - 200)
     offset = max(0, min(offset, total))
+    if offset == total and total > 0:
+        return "", note + f"已到末尾(EOF)，共 {total} 字；本页为空，offset=0 可回到开头"
     piece = text[offset:offset + cap]
     end = offset + len(piece)
     if offset == 0 and end == total:
@@ -848,12 +850,14 @@ def render_blame(ledger: atoms.Ledger, hint: str, v: int | None = None,
     bl = atoms.blame(ledger, hint, v, start, n, changed=changed)
     if bl is None:
         return f"账本里没有该文件: {hint}"
+    from .blame_recovery import render
+    recovery = "\n" + render(bl["recovery"], root) if bl.get("recovery") else ""
     if changed:
-        return _render_blame_changed(ledger, bl, root)
+        return _render_blame_changed(ledger, bl, root) + recovery
     out = [f"# 逐行归属 {rel(bl['path'], root)} @v{bl['v']}  (共 {bl['n_versions']} 版)"]
     if not bl["known"]:
         out.append("这一版内容未知,无法逐行归属(见 file 的复原原因)。")
-        return "\n".join(out)
+        return "\n".join(out) + recovery
     out.append("## 汇总")
     for s in bl["summary"]:
         out.append(f"- {atoms.agent_label(ledger, s['owner'])} (id={s['owner']}): {s['n']} 行")

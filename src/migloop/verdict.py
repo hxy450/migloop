@@ -481,8 +481,6 @@ def _rel_read(ledger: atoms.Ledger, fl: dict[str, Any], ag: dict[str, Any]) -> t
                                      f"#{act.seq} 依赖读,内容未进上下文" if basis == "dependency_read" else
                                      f"#{act.seq} 版本是就近绑定,不确定" if basis == "uncertain_version" else
                                      f"#{act.seq} 有读取线索,操作/执行/正文观测未全部确认")
-        if best == "false" and fl["key"] in (act.detail.get("conditional_reads") or []):
-            best, note = "unknown", f"#{act.seq} 条件分支里提到,是否读到未知"
     return best, note
 
 
@@ -506,10 +504,34 @@ def _rel(ledger: atoms.Ledger, a: dict[str, Any], b: dict[str, Any], rel: str) -
     return None
 
 
+def _read_path_candidates(ledger: atoms.Ledger, ag: dict[str, Any],
+                          path: str) -> list[tuple[atoms.Action, str]]:
+    """Unversioned read hints for navigation only; never bind them to file@vN."""
+    found: list[tuple[atoms.Action, str]] = []
+    for act in ledger.agents[ag["key"]].actions:
+        feed = act.ver if act.ver is not None else act.at
+        if feed > ag["v"]:
+            continue
+        conditional = path in (act.detail.get("conditional_reads") or [])
+        if conditional:
+            found.append((act, "conditional_read"))
+            continue
+        if any(isinstance(row, dict) and row.get("path") == path
+               for row in (act.detail.get("read_candidates") or [])):
+            found.append((act, "unverified_read"))
+    return found
+
+
 def _candidate(ledger: atoms.Ledger, a: dict[str, Any], b: dict[str, Any]) -> str | None:
     ag, fl = (a, b) if a["kind"] == "agent" else (b, a)
     if ag["kind"] != "agent" or fl["kind"] != "file":
         return None
+    candidates = _read_path_candidates(ledger, ag, fl["key"])
+    if candidates:
+        act, basis = candidates[-1]
+        return (f"路径读取候选(#{act.seq}):"
+                + ("条件分支是否执行未知" if basis == "conditional_read"
+                   else "读取执行/正文交付未获证实"))
     for m in ledger.mentions.get(fl["key"], []):
         if m.by == ag["key"] and m.by_ver == ag["v"]:
             return f"词法沾边({m.cls}):{m.ctx[:60]}"

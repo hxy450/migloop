@@ -138,7 +138,10 @@ def agent_data(ledger: atoms.Ledger, aid: str, v: int | None = None, *,
         "schema": "migloop-input-scope/1", "anchor": f"agent:{data['id']}@v{data['v']}",
         "since": since, "until": until, "omitted_prior": counts,
         "prior_read_preview": [
-            {key: r.get(key) for key in ("path", "v", "seq", "at", "via", "dep", "certain", "proof")}
+            {**{key: r.get(key) for key in ("path", "v", "seq", "at", "via", "dep", "certain", "proof",
+                                           "start", "n", "full", "observation_uncertain", "availability_basis",
+                                           "completion_state", "stale", "latest_v", "self_written")},
+             "seen_n": len(r.get("seen") or [])}
             for r in prior_reads[:8]],
         "prior_read_remaining": max(0, len(prior_reads) - 8),
         "prior_query": {"id": data["id"], "v": min(since, data["v"]), "reads": True}

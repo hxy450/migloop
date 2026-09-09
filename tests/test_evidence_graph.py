@@ -4,7 +4,7 @@ from dataclasses import replace
 
 import pytest
 
-from migloop import atoms, probe
+from migloop import atoms, probe, verdict
 from tests.test_trajectory import _pool, _run_dir
 
 
@@ -52,7 +52,7 @@ def test_write_follows_effect_direction_not_query(tmp_path):
     assert (edge["from"], edge["to"], edge["kind"]) == (ag["id"], fl["id"], "write")
 
 
-@pytest.mark.parametrize("basis", ["uncertain_version", "dependency_read", "overlapping_read", "conditional_read", "unverified_read"])
+@pytest.mark.parametrize("basis", ["uncertain_version", "dependency_read", "overlapping_read", "unverified_read"])
 def test_supported_read_candidates_do_not_become_confirmed(tmp_path, basis):
     ledger = _pool(tmp_path)
     ag, fl = node("agent", "agent-c"), node("file", "/proj/spec/pages/A.md")
@@ -66,13 +66,44 @@ def test_supported_read_candidates_do_not_become_confirmed(tmp_path, basis):
         ref.observation_uncertain = True
     elif basis == "unverified_read":
         ref.ev = replace(ref.ev, proof=None)
-    else:
-        act.files = []
-        act.detail["conditional_reads"] = [fl["key"]]
     graph = project(ledger, tree(ledger, ag, fl))
     assert graph["counts"]["candidate_read"] == 1 and graph["counts"]["confirmed_read"] == 0
     assert graph["edges"][0]["status"] == "unknown"
     assert graph["edges"][0]["evidence"][0]["basis"] == basis
+
+
+@pytest.mark.parametrize("basis", ["conditional_read", "read_candidate"])
+@pytest.mark.parametrize("file_v", [1, 2])
+def test_unversioned_path_candidate_never_projects_to_old_or_future_file_version(tmp_path, basis, file_v):
+    ledger = _pool(tmp_path)
+    path = "/proj/spec/pages/A.md"
+    agent = ledger.agents["agent-f"]
+    act = next(row for row in agent.actions if row.src is not None)
+    if basis == "conditional_read":
+        act.detail["conditional_reads"] = [path]
+        expected_basis = "conditional_read"
+    else:
+        act.detail["read_candidates"] = [{"path": path, "via": "stdout", "proof": {
+            "operation_basis": "output_locator", "execution": "unknown",
+            "delivery": "unknown", "snapshot": "unknown", "rule": "test"}}]
+        expected_basis = "unverified_read"
+    if file_v == 2:
+        old = ledger.stories[path].versions[0]
+        ledger.stories[path].versions.append(replace(
+            old, v=2, ts="2027-01-01T00:00:00Z", seq=999, by=atoms.EXTERNAL,
+            by_ver=None, act_seq=None))
+    ag, fl = node("agent", "agent-f"), node("file", path, file_v)
+    checked = probe._relation_check(ledger, ag, fl)
+    assert checked["relation_status"] == "unknown"
+    assert checked["relation_kind"] == "候选"
+    assert checked["relation"] is None
+    assert checked["causal_from"] is None and checked["causal_to"] is None
+    assert checked["relation_evidence"][0]["basis"] == expected_basis
+    assert verdict._rel_read(ledger, fl, ag)[0] == "false"
+    graph = project(ledger, tree(ledger, ag, fl))
+    assert graph["edges"] == []
+    assert graph["counts"]["candidate_read"] == 0
+    assert graph["excluded"][0]["reason"] == "non_read_write"
 
 
 @pytest.mark.parametrize("bound", [False, None])

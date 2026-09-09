@@ -49,13 +49,13 @@ def test_saved_reference_cannot_hide_a_broken_authentication_chain(tmp_path, fai
     assert findings.project(got)["items"] == {}
 
 
-def test_final_mode_is_explicit_and_does_not_change_the_common_investigation_guide(monkeypatch):
-    assert mcp_server.guide_text("document") == mcp_server.GUIDE
-    assert mcp_server.guide_text("reference").startswith(mcp_server.GUIDE)
+def test_final_mode_is_explicit_and_keeps_the_full_reference_available(monkeypatch):
+    assert mcp_server.guide_text("document", topic="full") == mcp_server.GUIDE
+    assert mcp_server.guide_text("reference", topic="full").startswith(mcp_server.GUIDE)
     with pytest.raises(ValueError): mcp_server.guide_text("typo")
     monkeypatch.setenv("MIGLOOP_FINAL_MODE", "reference")
     expected = mcp_server.guide_text()
-    assert "schema: migloop-verdict-ref/1" in expected
+    assert "migloop-verdict-ref/1" in expected
     assert service.atom_text("unused", "guide", {}) == expected
     pytest.importorskip("mcp")
     blocks = asyncio.run(mcp_server.build_server().call_tool("guide", {}))

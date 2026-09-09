@@ -271,8 +271,11 @@ def test_route_keeps_read_uncertainty_and_candidate_evidence(tmp_path: Any, case
     if status != "false":
         assert tr["relation_evidence"][0]["seq"] == act.seq
         assert tr["relation_evidence"][0]["event_id"] == atoms.event_id(led, "agent-c", act.seq)
-    if case in ("certain", "uncertain", "dependency", "conditional"):
+    if case in ("certain", "uncertain", "dependency"):
         assert tr["causal_from"] == "file:" + path + "@1" and tr["causal_to"] == "agent:agent-c@1"
+    if case == "conditional":
+        assert tr["relation_kind"] == "候选"
+        assert tr["causal_from"] is None and tr["causal_to"] is None
     if status == "unknown":
         assert tr["match"] == "账本关系待核" and "候选" in tr["relation_label"]
     if case == "overlap":
