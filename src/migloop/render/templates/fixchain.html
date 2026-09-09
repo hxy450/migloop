@@ -1002,7 +1002,8 @@
         if (ROLE_RED[w.role]) d.classList.add("p-chain");
         if (pr.hit.some(function (r) { return r.entry; })) d.classList.add("p-entry");
         pr.hit.forEach(function (r) {
-          d.appendChild(el("span", "badge r-" + ROLE_CLS[r.role], (r.entry ? "★ " : "") + r.defect + " " + r.role + (r.evidence_bad ? " ⚠" + r.evidence_bad : "")));
+          var whole = node.kind === "file" ? node.anchorV == null : node.anchorVer == null;
+          d.appendChild(el("span", "badge r-" + ROLE_CLS[r.role], (r.entry ? "★ " : "") + r.defect + " " + r.role + (whole && r.v != null ? " @v" + r.v : "") + (r.evidence_bad ? " ⚠" + r.evidence_bad : "")));
         });
       } else if (pr.other.length) {
         d.appendChild(el("span", "badge dup", pr.other[0].defect + " 判的是 v" + pr.other[0].v));
