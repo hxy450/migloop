@@ -1088,7 +1088,9 @@ def action_links(ledger: Ledger, agent_id: str, seq: int) -> dict[str, Any]:
     act = next((x for x in a.actions if x.seq == seq), None) if a else None
     if a is None or act is None:
         return {}
-    ver = act.ver if act.ver is not None else act.at
+    slot = act.ver if act.ver is not None else act.at
+    n = a.n_versions
+    ver = slot if type(slot) is int and 1 <= slot <= n else None
     files = [file_ref_payload(f) for f in act.files]
     seen = {f.path for f in act.files}
     possible = []
@@ -1101,7 +1103,9 @@ def action_links(ledger: Ledger, agent_id: str, seq: int) -> dict[str, Any]:
                 possible.append({"path": path, "v": _versions_at(st, act.ts) if st else 0,
                                  "ambiguous": m.ambiguous, "ctx": m.ctx})
                 break
-    return {"agent": a.id, "label": agent_label(ledger, a.id), "ver": ver, "is_effect": act.ver is not None,
+    return {"agent": a.id, "label": agent_label(ledger, a.id), "ver": ver, "agent_v": ver,
+            "feeding_slot": act.at, "n_versions": n,
+            "after_last_effect": type(slot) is int and slot > n, "is_effect": act.ver is not None,
             "files": files, "possible": possible}
 
 

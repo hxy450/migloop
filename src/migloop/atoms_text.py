@@ -733,9 +733,15 @@ def render_action(ledger: atoms.Ledger, agent_id: str, seq: int, max_chars: int 
     raw = atoms.action_raw(ledger, agent_id, seq)
     if raw is None:
         return f"没有这个动作: {agent_id} #{seq}(或它没有原始记录指针)"
+    links = atoms.action_links(ledger, agent_id, seq)
+    if links.get("ver") is not None:
+        version_note = f"效应 v{links['ver']}" if raw["ver"] is not None else f"喂 v{links['ver']}"
+    else:
+        tail = "收尾后" if links.get("after_last_effect") and links.get("n_versions") else "未形成效应版本"
+        version_note = f"{tail}(喂养槽 {raw['at']};已记录 {links.get('n_versions', 0)} 个效应版本,无可导航版本)"
     head = (f"# 动作 #{raw['seq']} · {raw['tool']} · {raw['ts'][:19]} · "
             + ("成功" if raw["ok"] else "失败" if raw["ok"] is False else "无结果")
-            + (f" · 效应 v{raw['ver']}" if raw["ver"] is not None else f" · 喂 v{raw['at']}"))
+            + " · " + version_note)
     inp = raw["input"]
     inp_text = inp if isinstance(inp, str) else json.dumps(inp, ensure_ascii=False, indent=1)
     if part not in (None, "input", "output"):
@@ -765,16 +771,20 @@ def render_action(ledger: atoms.Ledger, agent_id: str, seq: int, max_chars: int 
         note += ";part=output 单独展开/翻页"
     owner = atoms.resolve_agent(ledger, agent_id)
     out += _scan_note(ledger, owner.id if owner else agent_id, seq)
+    loc = ledger.locs.get(seq)
+    out.append("原文引用: " + (_core(seq, loc) if loc else "未知(未记录转录定位,不能拼造引用)"))
     eid = atoms.event_id(ledger, agent_id, seq)
     if eid:
-        out.append(f"事件 id {eid}(会话:转录:原始事件ID或行/块;#n 只是本次建账的句柄)")
+        out.append(f"事件 id {eid}(会话:转录:原始事件ID或行/块;用于事件识别,不是上行的原文引用)")
     if raw.get("claim_note"):
         out.append("证据类别: " + str(raw["claim_note"]) + (f" · 来源 {raw['sender']}" if raw.get("sender") else ""))
-    links = atoms.action_links(ledger, agent_id, seq)
     if links:
-        out.append(f"发自 {links['label']} (id={links['agent']}) v{links['ver']}"
-                   + ("(这次调用就是这一版的效应)" if links["is_effect"] else "(喂这一版)")
-                   + f" → agent({links['agent']}, v={links['ver']})")
+        if links["ver"] is not None:
+            out.append(f"发自 {links['label']} (id={links['agent']}) v{links['ver']}"
+                       + ("(这次调用就是这一版的效应)" if links["is_effect"] else "(喂这一版)")
+                       + f" → agent({links['agent']}, v={links['ver']})")
+        else:
+            out.append(f"发自 {links['label']} (id={links['agent']}) · {version_note}")
         if links["files"]:
             out.append("## 账本记到的读写 → file(path, v)")
             for f in links["files"]:
