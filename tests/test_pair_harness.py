@@ -219,10 +219,16 @@ def test_codex_configuration_uses_readonly_sandbox_and_one_mcp(frozen_case: Path
         command, config = pair.build_codex_command(case, arm, frozen_case / "run", "gpt-5.6-sol", "medium", "codex.exe")
         assert command[:6] == ["codex.exe", "-a", "never", "exec", "--ignore-user-config", "--ignore-rules"]
         assert command[command.index("--sandbox") + 1] == "read-only"
+        assert command[command.index("-C") + 1] == case["pool"]
         assert command[command.index("-m") + 1] == "gpt-5.6-sol"
         assert not any("auth" in arg or "bypass" in arg for arg in command)
         assert config["settings"]["features.shell_tool"] is (arm == "raw")
         assert config["settings"]["features.multi_agent"] is False and config["settings"]["web_search"] == "disabled"
+        if os.name == "nt":
+            assert config["settings"]["windows.sandbox"] == "elevated"
+            assert 'windows.sandbox="elevated"' in command
+        else:
+            assert "windows.sandbox" not in config["settings"]
         disabled = {command[i + 1] for i, arg in enumerate(command[:-1]) if arg == "--disable"}
         enabled = {command[i + 1] for i, arg in enumerate(command[:-1]) if arg == "--enable"}
         common_disabled = {"plugins", "browser_use", "computer_use", "image_generation", "memories", "hooks", "apps", "multi_agent", "code_mode"}
@@ -429,3 +435,40 @@ def test_same_explicit_call_id_deduplicates_native_and_response_views(tmp_path: 
     leaf = parsed["seq"][0]
     assert leaf["call_id"] == "call_real" and leaf["response_use_line"] == 1 and leaf["response_result_line"] == 2
     assert leaf["source_id_type"] == "codex_mcp_item_id" and leaf["result_line"] == 3
+
+
+@pytest.mark.parametrize("variant,passed", [("success", True), ("no_execution", False), ("blocked", False),
+                                          ("missing_exit", False), ("wrong_command", False)])
+def test_raw_smoke_requires_actual_successful_listing_event(tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+                                                          variant: str, passed: bool) -> None:
+    source = tmp_path / "source"
+    (source / "src/migloop").mkdir(parents=True)
+    (source / "src/migloop/mcp_server.py").write_text("# source\n", encoding="utf-8")
+    listing = "Get-ChildItem -Force -LiteralPath ." if os.name == "nt" else "ls -a ."
+    item = {"id": "shell_item", "type": "command_execution", "command": listing if variant != "wrong_command" else "echo SOL_RAW_SMOKE_OK"}
+    events: list[dict[str, Any]] = [{"type": "thread.started", "thread_id": "12345678-1234-1234-1234-123456789abc"}, {"type": "turn.started"}]
+    if variant != "no_execution":
+        events.extend([{"type": "item.started", "item": item},
+                       {"type": "item.completed", "item": {**item, "status": "failed" if variant == "blocked" else "completed",
+                            "aggregated_output": "blocked by policy" if variant == "blocked" else "",
+                            "exit_code": None if variant == "missing_exit" else 1 if variant == "blocked" else 0}}])
+    events.extend([{"type": "item.completed", "item": {"id": "answer", "type": "agent_message", "text": "SOL_RAW_SMOKE_OK"}},
+                   {"type": "turn.completed", "usage": {"input_tokens": 10, "cached_input_tokens": 0, "output_tokens": 3}}])
+    launches = fake_process(monkeypatch, "\n".join(json.dumps(row) for row in events) + "\n")
+    rollout = tmp_path / "raw-rollout.jsonl"
+    write_records(rollout, [{"type": "turn_context", "payload": {"model": "gpt-5.6-sol", "effort": "medium"}}])
+    monkeypatch.setattr(pair, "find_codex_transcript", lambda thread_id: rollout)
+    monkeypatch.setattr(pair, "collect_verdict", lambda *args: pytest.fail("raw smoke must not build ledger/verdict"))
+    store = tmp_path / "raw-smoke"
+    result = pair.run_smoke(source, store, arm="raw")
+    assert result["smoke_passed"] is passed and result["connection_verified"] is passed
+    assert result["sentinel_verified"] is True
+    assert result["status"] == ("completed" if passed else "smoke_failed")
+    assert result["include_in_pairs"] is False and result["arm"] == "raw"
+    assert len(launches) == 1
+    config = pair.read_json(store / "mcp.json")
+    assert config["mcp_servers"] == {} and config["settings"]["features.shell_tool"] is True
+    command = pair.read_json(store / "command.json")["argv"]
+    assert command[command.index("-C") + 1] == str(store / "empty-pool")
+    assert "SOL_RAW_SMOKE_OK" in (store / "prompt.md").read_text(encoding="utf-8")
+    assert (store / "transcript.jsonl").read_bytes() == rollout.read_bytes()

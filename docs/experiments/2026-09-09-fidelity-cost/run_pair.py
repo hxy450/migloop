@@ -207,6 +207,10 @@ def build_codex_command(case: dict[str, Any], arm: str, run_dir: Path, model: st
                         executable: str) -> tuple[list[str], dict[str, Any]]:
     settings: dict[str, Any] = {"model_reasoning_effort": effort, "web_search": "disabled",
                               "features.shell_tool": arm == "raw"}
+    if os.name == "nt":
+        # --ignore-user-config must not erase the installed native Windows sandbox implementation.
+        # This selects its implementation, while the execution policy remains read-only / never.
+        settings["windows.sandbox"] = "elevated"
     for feature in ("plugins", "browser_use", "computer_use", "image_generation", "memories", "hooks", "apps", "multi_agent", "code_mode"):
         settings["features." + feature] = False
     settings["features.code_mode_host"] = True
@@ -222,7 +226,10 @@ def build_codex_command(case: dict[str, Any], arm: str, run_dir: Path, model: st
             command.extend(["--enable" if value else "--disable", key.removeprefix("features.")])
         else:
             command.extend(["-c", key + "=" + toml_value(value)])
-    command.extend(["-C", str(run_dir), "-"])
+    # The read-only executor grants access to its workspace. A sibling run directory
+    # does not grant raw-arm reads of the pool; use the exact same pool workspace
+    # for both arms, and let the parent harness archive outside that workspace.
+    command.extend(["-C", str(case["pool"]), "-"])
     return command, {"mcp_servers": mcp, "settings": settings}
 
 
@@ -782,27 +789,38 @@ def run_one(case_dir: Path, arm: str, rep: int, model: str | None = "gpt-5.6-sol
 
 
 def run_smoke(source: Path, store: Path, model: str = "gpt-5.6-sol", effort: str = "medium",
-              timeout_s: float = 300) -> dict[str, Any]:
+              timeout_s: float = 300, arm: str = "tools") -> dict[str, Any]:
     """One independent connectivity check; never builds a ledger or contributes a pair row."""
     source, store = source.resolve(), store.resolve()
     if not (source / "src/migloop/mcp_server.py").is_file():
         raise ValueError("source must contain src/migloop/mcp_server.py")
     if timeout_s <= 0:
         raise ValueError("timeout must be positive")
+    if arm not in ("raw", "tools"):
+        raise ValueError("arm must be raw or tools")
     store.mkdir(parents=True, exist_ok=False)
     pool = store / "empty-pool"
     pool.mkdir()
     case = {"source": str(source), "pool": str(pool)}
-    command, mcp = build_codex_command(case, "tools", store, model, effort, shutil.which("codex") or "codex")
-    prompt = ("这是独立的 MCP 连通性检查，不是调查实验。只调用本次 migloop MCP 的 guide 一次，"
-              "在 code-mode 中直接调用 tools.mcp__migloop__guide({}) 并输出返回文本；"
-              "若需发现工具，只按 name 精确匹配 mcp__migloop__guide，不按 description 搜索 guide。"
-              "不传 sid，不调用 sessions 或其他工具，不读取文件、不构建账本、不分析数据池。"
-              "guide 成功返回之后，最后仅回复 SOL_MCP_SMOKE_OK。若失败，如实报告，不重试。\n")
+    command, mcp = build_codex_command(case, arm, store, model, effort, shutil.which("codex") or "codex")
+    expected_command = ("Get-ChildItem -Force -LiteralPath ." if os.name == "nt" else "ls -a .") if arm == "raw" else None
+    expected_sentinel = "SOL_RAW_SMOKE_OK" if arm == "raw" else "SOL_MCP_SMOKE_OK"
+    if arm == "raw":
+        prompt = ("这是独立的只读 shell 连通性检查，不是调查实验。当前工作目录是空 pool。"
+                  f"只执行一次以下 shell 命令列出当前目录：{expected_command}\n"
+                  "不读取文件内容或其他目录、不修改文件、不调用 MCP 或其他调查工具。"
+                  "确认该命令实际执行成功之后，最后仅回复 SOL_RAW_SMOKE_OK。若启动被策略阻止或执行失败，如实报告，不重试。\n")
+    else:
+        prompt = ("这是独立的 MCP 连通性检查，不是调查实验。只调用本次 migloop MCP 的 guide 一次，"
+                  "在 code-mode 中直接调用 tools.mcp__migloop__guide({}) 并输出返回文本；"
+                  "若需发现工具，只按 name 精确匹配 mcp__migloop__guide，不按 description 搜索 guide。"
+                  "不传 sid，不调用 sessions 或其他工具，不读取文件、不构建账本、不分析数据池。"
+                  "guide 成功返回之后，最后仅回复 SOL_MCP_SMOKE_OK。若失败，如实报告，不重试。\n")
     (store / "prompt.md").write_text(prompt, encoding="utf-8")
     write_json(store / "mcp.json", mcp)
     config = {"schema": "migloop-connectivity-smoke/1", "experiment_kind": "connectivity_smoke", "include_in_pairs": False,
-              "backend": "codex", "model_requested": model, "effort": effort, "source": str(source), "empty_pool": str(pool),
+              "backend": "codex", "arm": arm, "model_requested": model, "effort": effort, "source": str(source), "empty_pool": str(pool),
+              "expected_command": expected_command, "expected_sentinel": expected_sentinel,
               "timeout_s": timeout_s, "runner_sha256": sha256(Path(__file__)), "prompt_sha256": sha256(store / "prompt.md")}
     write_json(store / "config.json", config)
     write_json(store / "command.json", {"argv": command, "cwd": str(store), "stdin": "prompt.md", "mcp_config": mcp})
@@ -847,8 +865,12 @@ def run_smoke(source: Path, store: Path, model: str = "gpt-5.6-sol", effort: str
         recording["error"] = type(exc).__name__ + ": " + str(exc)
     write_json(store / "transcript-status.json", recording)
     calls = result["calls"]["seq"]
-    connected = len(calls) == 1 and calls[0]["tool"] in ("guide", "mcp__migloop__guide") and calls[0]["status"] == "returned"
-    sentinel = str(result.get("response_text") or "").strip() == "SOL_MCP_SMOKE_OK"
+    if arm == "raw":
+        connected = (len(calls) == 1 and calls[0]["tool"] == "command_execution" and calls[0]["status"] == "returned"
+                     and calls[0].get("exit_code") == 0 and str(expected_command).casefold() in str(calls[0].get("input") or "").casefold())
+    else:
+        connected = len(calls) == 1 and calls[0]["tool"] in ("guide", "mcp__migloop__guide") and calls[0]["status"] == "returned"
+    sentinel = str(result.get("response_text") or "").strip() == expected_sentinel
     recorded = bool(recording["copied"] and metrics["transcript"] is not None)
     passed = connected and sentinel and recorded and result["final_status"] == "completed" and not result["malformed_lines"]
     metrics.update(connection_verified=connected, sentinel_verified=sentinel, recording_complete=recorded, smoke_passed=passed,
@@ -870,9 +892,10 @@ def main(argv: list[str] | None = None) -> int:
         prep.add_argument("--" + name, required=True)
     prep.add_argument("--store", type=Path, required=True)
     prep.add_argument("--source", type=Path, required=True)
-    smoke = sub.add_parser("smoke", help="One paid guide-only MCP connectivity check, excluded from formal pairs")
+    smoke = sub.add_parser("smoke", help="One paid MCP or raw-shell connectivity check, excluded from formal pairs")
     smoke.add_argument("--source", type=Path, required=True)
     smoke.add_argument("--store", type=Path, required=True, help="New unique directory; never overwritten")
+    smoke.add_argument("--arm", choices=("tools", "raw"), default="tools")
     smoke.add_argument("--model", default="gpt-5.6-sol")
     smoke.add_argument("--effort", default="medium")
     smoke.add_argument("--timeout-seconds", type=float, default=300)
@@ -893,7 +916,7 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps({"case_dir": str(folder), "case": read_json(folder / "case.json")}, ensure_ascii=False))
             return 0
         if args.command == "smoke":
-            metrics = run_smoke(args.source, args.store, args.model, args.effort, args.timeout_seconds)
+            metrics = run_smoke(args.source, args.store, args.model, args.effort, args.timeout_seconds, args.arm)
         else:
             metrics = run_one(args.case_dir, args.arm, args.rep, args.model, args.effort, args.max_turns, args.max_budget_usd, args.timeout_seconds, args.backend)
         print(json.dumps({key: metrics.get(key) for key in
