@@ -50,6 +50,7 @@ const probe={run:'fixture',root:file,cost:0,steps,links:[],legacy:false,roles:{'
  trajectory:{mode:'via',root,nodes,edges:[],visits,transitions,declared:[],side_title:'未查询 · 结论提及'}};
 const candidateOne='candidate:'+'a'.repeat(20), candidateTwo='candidate:'+'b'.repeat(20);
 function coverageFixture(body){
+  body.repair_manifest_origin={source:'recorded',bound:true,policy:'legacy',current_policy:'execution-candidates/2',policy_changed:true};
   const item=v=>({node:fid+'@v'+v,v,writer:{id:'agent-a',v:1},event:{status:'recorded',seq:100+v,ref:'#a:'+(100+v)+'@L'+v},change:{text:'变化摘录',semantic_checked:false}});
   const candidate=(id,seq)=>({id,agent:'agent-b',file,seq,reason:'精确提及，执行效应未确认',ctx:'shell 候选命令，不据此认定写者',repair_confirmed:false,writer_confirmed:false,
     event:{status:'recorded',seq,ref:'#b:'+seq+'@L10',use_line:10,result_line:11,tool_use_id:'candidate-tool-'+seq}});
@@ -223,6 +224,7 @@ async function main(){
     await evaluate("__mig.load('coverage')");
     await until("__mig.xt() && __mig.xt().walk && document.querySelectorAll('.wire.route').length===5");
     await check('coverage distinguishes accounted items, missing versions and unconfirmed candidates',"document.querySelector('.coverage-summary').textContent==='已交代 3/5 项 · 尚未有效交代 2 项' && document.querySelector('.repair-coverage').textContent.includes('记录版本 3 个 · 未确认候选 2 个（候选不等于修复）') && document.querySelector('.repair-coverage').textContent.includes('尚未登记：记录版本 1 个、候选 1 个')");
+    await check('historical denominator remains visible after candidate policy changes',"document.querySelector('.repair-coverage').textContent.includes('按运行时保存的清单对账') && document.querySelector('.repair-coverage').textContent.includes('未改写历史分母')");
     await check('registered unknown and not-repair declarations are not presented as verified conclusions',"[...document.querySelectorAll('.coverage-item')].some(n=>n.dataset.state==='unresolved' && n.textContent.includes('已登记 · 仍未知（未查清）')) && [...document.querySelectorAll('.coverage-item')].some(n=>n.dataset.state==='not_repair' && n.textContent.includes('声明非修复（未验证）')) && document.querySelector('.repair-coverage').textContent.includes('解释与证据语义未核验')");
     await evaluate("window.coverageTreeIds=JSON.stringify(Object.keys(__mig.xt().byId));[...document.querySelectorAll('.coverage-item')].find(n=>n.dataset.target.endsWith('@v2')).querySelector('.coverage-file').click()");
     await until("document.querySelector('#side .vrow.anchor .vn')?.textContent==='v2'");

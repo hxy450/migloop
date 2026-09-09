@@ -1400,6 +1400,12 @@
       var m = PROBE.repair_manifest, c = PROBE.coverage;
       var box = el("section", "repair-coverage");
       box.appendChild(el("div", "sub", "修复事项交代 · 全清单"));
+      var origin = PROBE.repair_manifest_origin || {};
+      if (origin.source === "recorded") box.appendChild(el("div", "coverage-note",
+        "按运行时保存的清单对账。" + (origin.policy_changed ? "当前筛选规则已有变化，未改写历史分母。" : "")));
+      else if (origin.source === "invalid") box.appendChild(el("div", "warn", "运行时清单无法核回，不能认证当前覆盖。"));
+      else if (origin.status === "runtime_manifest_unrecorded") box.appendChild(el("div", "coverage-note",
+        "未保存运行时清单；以下是当前规则下的对账，不证明模型当时收到过相同清单。"));
       if (!m) {
         box.appendChild(el("div", "coverage-note", "本次未提供修复事项清单，无法统计覆盖；不能按缺陷数或查询次数代替。"));
         host.appendChild(box); return;
@@ -1478,6 +1484,9 @@
       var scope = el("details", "coverage-scope"); scope.appendChild(el("summary", null, "清单范围与对账诊断"));
       scope.appendChild(el("div", null, m.scope || (c || {}).scope || "当前账本提供的版本及候选清单，不保证覆盖全部真实修复。"));
       if (m.candidate_scope && m.candidate_scope.window_scope) scope.appendChild(el("div", null, m.candidate_scope.window_scope));
+      if (m.candidate_scope && m.candidate_scope.excluded_nonexecution) scope.appendChild(el("div", null,
+        "纯文本事件未列入执行候选：" + JSON.stringify(m.candidate_scope.excluded_nonexecution)
+        + "。仍在提及/原文索引中；不证明其中自述的外部改动没有发生。"));
       ((c || {}).errors || m.errors || []).forEach(function (e) { scope.appendChild(el("div", null, e.message || JSON.stringify(e))); });
       box.appendChild(scope); host.appendChild(box);
     }

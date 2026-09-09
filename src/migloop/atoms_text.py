@@ -622,6 +622,10 @@ def render_repair_manifest(ledger: atoms.Ledger, payload: dict[str, Any], hint: 
         return "\n".join(out + ["清单无法确定: " + "; ".join(str(x) for x in doc["errors"])])
     out.append(f"共 {len(doc['items'])} 个返修阶段记录版本 + {len(doc['candidates'])} 个待核候选。每项须在 coverage 单独交代;repair.before/after 区间不能代替中间项。")
     out.append("可标 explained / unresolved / not_repair;阶段后新增不自动是生成错误,写了理由不等于理由已证实。")
+    excluded = (doc.get("candidate_scope") or {}).get("excluded_nonexecution") or {}
+    if excluded:
+        out.append("未列入执行候选的纯文本记录: " + ", ".join(f"{kind}={count}" for kind, count in sorted(excluded.items()))
+                   + "。仍可通过提及/search/action 查原文;不证明其中自述的外部修改没有发生。")
     for item in doc["items"]:
         node = f"file:{rel(str(doc['file']), root)}@v{item['v']}"
         event = item.get("event") or {}

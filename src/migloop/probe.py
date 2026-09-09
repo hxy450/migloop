@@ -246,19 +246,24 @@ def probe_payload(ledger: atoms.Ledger, run_dir: str, chain_payload: dict[str, A
         sr = structured.get("root")
         if sr and sr.get("ok") and sr.get("kind") == "file":
             root = sr["key"]
-    repair_manifest = coverage_report = None
+    repair_manifest = coverage_report = manifest_origin = None
     if chain_payload is not None and root:
         from . import coverage as repair_coverage
-        repair_manifest = repair_coverage.manifest(ledger, chain_payload, root)
+        from .coverage_snapshot import select_manifest
+        current_manifest = repair_coverage.manifest(ledger, chain_payload, root)
+        repair_manifest, manifest_origin = select_manifest(
+            ledger, current_manifest, (structured or {}).get("recorded_repair_manifest"))
         coverage_report = repair_coverage.reconcile(
             ledger, repair_manifest, (structured or {}).get("coverage_rows"),
             (structured or {}).get("defects") or [],
-            identity_bound=(structured or {}).get("identity", {}).get("bound") is True)
+            identity_bound=((structured or {}).get("identity", {}).get("bound") is True
+                            and manifest_origin.get("bound") is True))
     return {"run": os.path.basename(os.path.dirname(os.path.abspath(run_dir))), "cost": m.get("cost_usd"), "turns": m.get("num_turns"),
             "root": root, "steps": steps, "links": links, "entry": entry_no, "entries": entries, "verdicts": verdicts,
             "bad_refs": sum(len(lk["bad_refs"]) for lk in links), "defects": defects, "report": report,
             "legacy": structured is None, "structured": structured,
             "trace_identity": trace_identity, "repair_manifest": repair_manifest, "coverage": coverage_report,
+            "repair_manifest_origin": manifest_origin,
             "roles": (structured or {}).get("roles") or {}, "fixed": (structured or {}).get("fixed") or [],
              "trajectory": _trajectory(ledger, run_dir, steps, root, structured, verdicts, calls)}
 
@@ -288,6 +293,7 @@ def _structured(ledger: atoms.Ledger, run_dir: str, report: str,
             return None
         meta = {"kind": vj.get("kind"), "raw": vj.get("raw"), "repaired": vj.get("repaired"),
                 "harness_identity": vj.get("harness_identity"),
+                "recorded_repair_manifest": vj.get("repair_manifest"),
                 "trace_identity": trace_identity,
                 "revalidated": revalidated, "previous_errors": previous_errors if revalidated else []}
         return verdict.build(ledger, data, errors, meta)

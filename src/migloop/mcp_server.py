@@ -193,6 +193,7 @@ def build_server(backend: Any | None = None) -> Any:
     默认用 service.McpBackend(与 ``migloop serve`` 共用账本缓存);别的宿主注入自己的服务层。"""
     from mcp.server.fastmcp import FastMCP
     from mcp.types import ToolAnnotations
+    import inspect
 
     # Queries do not modify source transcripts/project files or contact external services.
     # Navigation state and caches are local bookkeeping, not edits to the evidence.
@@ -203,6 +204,13 @@ def build_server(backend: Any | None = None) -> Any:
                   # Repeating another tool's name here makes description-based discovery ambiguous.
                   instructions="MigLoop 只读返修调查工具。节点为版本文件与版本 agent;"
                                "索引与模型主张不等于已经核实的原文事实。")
+    # These tools return rendered text, not a second structured data interface.
+    # New FastMCP versions otherwise emit the SAME string in content AND
+    # structuredContent.result. A client forwarding the envelope pays twice.
+    # Older SDKs without structured output keep their native text-only contract.
+    text_options: dict[str, Any] = {"annotations": readonly}
+    if "structured_output" in inspect.signature(srv.tool).parameters:
+        text_options["structured_output"] = False
     # 一个服务器实例承载一次调查;同一本账的 sid 前缀/全号/路径共用状态。
     # 新实例、或同一 raw sid 解析到另一账本时不会继承旧节点。
     via_states: dict[str, via_mod.ViaState] = {}
@@ -217,12 +225,12 @@ def build_server(backend: Any | None = None) -> Any:
         rt = _be()
         return await rt.get_ledger(sid), await rt.get_session_cwd(sid)
 
-    @srv.tool(annotations=readonly)
+    @srv.tool(**text_options)
     def guide() -> str:
         """两原子模型、标签含义、建议的调查路径与结论要求。第一次用之前先读。"""
         return GUIDE
 
-    @srv.tool(annotations=readonly)
+    @srv.tool(**text_options)
     async def sessions(sid: str, file: str | None = None) -> str:
         """返修链总览:被修文件 × 修复方、被修行数与 ★ 原作者、修因、跨会话接力。sid = 会话 id 或 8 位前缀。
         file 给了(文件名 / 相对路径)只回那条链 —— 查一条链就带 file,别把全部链拉回来。"""
@@ -235,7 +243,7 @@ def build_server(backend: Any | None = None) -> Any:
             out += "\n\n" + atoms_text.render_repair_manifest(ledger, payload, file, root=cwd)
         return out
 
-    @srv.tool(annotations=readonly)
+    @srv.tool(**text_options)
     async def index(sid: str, kind: str | None = None, query: str | None = None,
                     limit: int = 0) -> str:
         """账本目录:agent 与文件各一行。kind = agent | ets | spec | src | other | scan(扫描缺口);空=全部;query 子串过滤。
@@ -243,7 +251,7 @@ def build_server(backend: Any | None = None) -> Any:
         ledger, cwd = await _ctx(sid)
         return atoms_text.render_index(ledger, kind, query, root=cwd, limit=limit or (300 if query else 80))
 
-    @srv.tool(annotations=readonly)
+    @srv.tool(**text_options)
     async def file(sid: str, path: str, v: int, content: bool = False,
                    diff: bool = False, start: int | None = None, n: int | None = None,
                    readers: bool = False, v_from: int | None = None, v_to: int | None = None,
@@ -272,7 +280,7 @@ def build_server(backend: Any | None = None) -> Any:
         st.open(node)
         return out
 
-    @srv.tool(annotations=readonly)
+    @srv.tool(**text_options)
     async def agent(sid: str, id: str, v: int, since: int | None = None,
                     reads: bool = True, seen: bool = False, until: int | None = None, via: str = "") -> str:
         """版本 agent 原子(索引):身份、派发者与派发词全文、收件箱一行一条、≤v 逐版的效应与输入。
@@ -297,7 +305,7 @@ def build_server(backend: Any | None = None) -> Any:
         st.open(node)
         return out
 
-    @srv.tool(annotations=readonly)
+    @srv.tool(**text_options)
     async def blame(sid: str, path: str, v: int | None = None, start: int | None = None,
                     n: int | None = None, changed: bool = False) -> str:
         """逐行归属:文件@v 每一行是谁在哪一版写的(确定性逐行签名)。start/n 裁窗口,汇总按全文。
@@ -306,13 +314,13 @@ def build_server(backend: Any | None = None) -> Any:
         ledger, cwd = await _ctx(sid)
         return atoms_text.render_blame(ledger, path, v, start, n, root=cwd, changed=changed)
 
-    @srv.tool(annotations=readonly)
+    @srv.tool(**text_options)
     async def diff(sid: str, path: str, v: int) -> str:
         """某一版的 unified diff(相对前一已知版)。"""
         ledger, cwd = await _ctx(sid)
         return atoms_text.render_diff(ledger, path, v, root=cwd)
 
-    @srv.tool(annotations=readonly)
+    @srv.tool(**text_options)
     async def search(sid: str, q: str = "", agent: str | None = None, v: int | None = None,
                      since: int | None = None, file: str | None = None, after: bool = False,
                      since_ts: str | None = None, until_ts: str | None = None, kind: str | None = None) -> str:
@@ -328,7 +336,7 @@ def build_server(backend: Any | None = None) -> Any:
         return atoms_text.render_search(ledger, q, agent=agent, v=v, since=since, file=file, after=after,
                                         since_ts=since_ts, until_ts=until_ts, root=cwd, kind=kind)
 
-    @srv.tool(annotations=readonly)
+    @srv.tool(**text_options)
     async def action(sid: str, id: str, seq: int, max_chars: int = 20000, offset: int = 0, find: str = "",
                      part: str | None = None, m_n: int = 0, m_from: int = 1) -> str:
         """展开 agent 某一次工具调用的完整原始输入与输出(agent 工具时间线里的 #n 就是 seq)。

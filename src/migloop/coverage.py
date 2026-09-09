@@ -10,6 +10,7 @@ from . import atoms
 from .filestory import ts_norm
 
 SCHEMA = "migloop-repair-manifest/1"
+POLICY = "execution-candidates/2"
 STATUSES = ("explained", "unresolved", "not_repair")
 MAX_ROWS = 20_000
 DIFF_LINES = 8
@@ -20,6 +21,10 @@ SCOPE = ("仅列当前账本返修链 fix_versions 中的记录版本及同链�
 _NODE = re.compile(r"^file:(.+)@v([1-9]\d*)$")
 _CANDIDATE = re.compile(r"^candidate:[0-9a-f]{20}$")
 _ROW_KEYS = {"node", "candidate", "status", "defects", "reason", "evidence"}
+NON_EXEC_TEXT = frozenset({"think", "say", "inbox", "instruction", "inject", "system", "notify", "interrupt"})
+_EFFECT_RISKS = ("touched", "conditional", "conditional_reads", "write_capable", "unfinished", "unresolved")
+_NONEXECUTION_BOUNDARY = ("仅按采集器的非执行文本事件种类排除强制修复对账,原始提及与全文索引保留。"
+                        "排除不证明其自述或报告的修复没有发生,也不自动判为 not_repair。")
 
 
 def _path(ledger: atoms.Ledger, hint: Any) -> tuple[str | None, str | None]:
@@ -61,8 +66,17 @@ def _action_event(ledger: atoms.Ledger, agent_id: str, seq: int | None) -> dict[
     return result
 
 
+def _nonexecution_text(action: atoms.Action) -> bool:
+    """只认采集器自产的文本 Action;不依据正文、命令摘要或“已修改”等自述判断效应。"""
+    return (action.tool == action.kind and action.kind in NON_EXEC_TEXT and action.tuid is None
+            and action.ok is True and all(ref.op == "read" for ref in action.files)
+            and not any(action.detail.get(key) for key in _EFFECT_RISKS))
+
+
 def _excluded_action(action: atoms.Action, path: str) -> bool:
-    """只排除确定的只读和原生工具的其它目标;Bash 写了脚本不证明它没动目标文件。"""
+    """排除非执行文本、确定只读和原生工具的其它目标;Bash 写脚本不证明它没动目标。"""
+    if _nonexecution_text(action):
+        return True
     if action.tool in {"Read", "Grep", "Glob", "LS"}:
         return True
     changes = [ref for ref in action.files if ref.op != "read"]
@@ -87,6 +101,7 @@ def _candidates(ledger: atoms.Ledger, path: str, actors: set[str]) -> tuple[list
               if ledger.fix_after else "无明确阶段时间边界:同链 fixers_all 参与者的全动作窗口,不保证动作属于修复阶段")
     scope: dict[str, Any] = {"actors": sorted(actors), "fix_after": ledger.fix_after,
                              "window_scope": window, "unlinked_sources": 0,
+                             "excluded_nonexecution": {}, "nonexecution_boundary": _NONEXECUTION_BOUNDARY,
                              "selection": "target.touches + exact unrecorded non-readonly mentions"}
     if not actors:
         return [], scope
@@ -95,6 +110,7 @@ def _candidates(ledger: atoms.Ledger, path: str, actors: set[str]) -> tuple[list
     represented = {atoms.event_id(ledger, version.by, version.act_seq) for version in ledger.stories[path].versions
                    if version.act_seq is not None}
     candidates: dict[str, dict[str, Any]] = {}
+    excluded_events: set[str] = set()
     boundary = ts_norm(ledger.fix_after) if ledger.fix_after else None
 
     def add(row: dict[str, Any], source: str) -> None:
@@ -105,12 +121,18 @@ def _candidates(ledger: atoms.Ledger, path: str, actors: set[str]) -> tuple[list
             return
         if boundary is not None and ts_norm(action.ts) < boundary:
             return
-        if _excluded_action(action, path):
-            return
         if source == "mention" and not _exact_mention(ledger, path, row, action):
             return
         eid = atoms.event_id(ledger, row["by"], action.seq)
         if eid is None or eid in represented:
+            return
+        if _nonexecution_text(action):
+            if eid not in excluded_events:
+                excluded_events.add(eid)
+                counts = scope["excluded_nonexecution"]
+                counts[action.kind] = counts.get(action.kind, 0) + 1
+            return
+        if _excluded_action(action, path):
             return
         key = "candidate:" + hashlib.sha256((eid + "\0" + path).encode("utf-8")).hexdigest()[:20]
         if key in candidates:
@@ -162,7 +184,7 @@ def _change(version: Any) -> dict[str, Any]:
 def manifest(ledger: atoms.Ledger, chains_or_payload: Any, file_hint: str) -> dict[str, Any]:
     """复用服务端返修链的 fix_versions,不自行重判阶段、写者、修复类型或版本区间。"""
     path, error = _path(ledger, file_hint)
-    out: dict[str, Any] = {"schema": SCHEMA, "ledger": atoms.ledger_identity(ledger), "file": path,
+    out: dict[str, Any] = {"schema": SCHEMA, "policy": POLICY, "ledger": atoms.ledger_identity(ledger), "file": path,
                            "scope": SCOPE, "selection": "chains.fix_versions", "items": [], "candidates": [], "errors": []}
     if error:
         out["errors"].append({"code": "invalid_file", "message": error})

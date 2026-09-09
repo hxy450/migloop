@@ -2,7 +2,10 @@
 from __future__ import annotations
 
 import hashlib
+from copy import deepcopy
 from typing import Any
+
+import pytest
 
 from migloop import atoms, coverage, filestory
 
@@ -295,3 +298,93 @@ def test_candidate_rows_use_same_validation_and_exactly_one_target_key() -> None
     assert result["invalid_status"] and result["empty_reason"] and result["unknown_defects"]
     assert len(result["out_of_scope"]) == 3 and len(result["invalid_rows"]) == 2
     assert result["counts"]["accounted"] == 0 and len(result["missing_versions"]) == 3
+
+
+def text_candidate(ledger: atoms.Ledger, seq: int, kind: str = "say", **kwargs: Any) -> atoms.Action:
+    action = candidate_action(ledger, seq, tool=kind, kind=kind, cls="text", **kwargs)
+    action.tuid = None
+    action.detail = {"text": "我已经在外部手工修改了这个文件;这里只是一条待查的主张"}
+    return action
+
+
+def test_nonexecution_text_excluded_by_event_type_but_claims_and_mentions_remain() -> None:
+    ledger, chains = splash_ledger()
+    kinds = ("think", "say", "inbox", "instruction", "inject", "system", "notify", "interrupt")
+    for seq, kind in enumerate(kinds, 100):
+        action = text_candidate(ledger, seq, kind)
+        if kind == "inject":
+            source = "/project/.claude/skills/demo/SKILL.md"
+            action.files = [atoms.FileRef("read", source, filestory.Ev(action.ts, 200, "read", source, "agent-fix"))]
+    # 同一事件多条提及只能排除计数一次,并且不得从原提及索引删除任何一条。
+    ledger.mentions[PATH].append(deepcopy(ledger.mentions[PATH][0]))
+    mentions_before = deepcopy(ledger.mentions)
+    manifest = coverage.manifest(ledger, chains, PATH)
+    assert manifest["candidates"] == []
+    assert manifest["policy"] == "execution-candidates/2"
+    assert manifest["candidate_scope"]["excluded_nonexecution"] == {kind: 1 for kind in kinds}
+    assert "不证明" in manifest["candidate_scope"]["nonexecution_boundary"]
+    assert ledger.mentions == mentions_before
+    assert all(action.detail.get("text") for action in ledger.agents["agent-fix"].actions if action.seq >= 100)
+
+
+@pytest.mark.parametrize("risk", ["tuid", "kind", "write", "delete", "touched", "conditional",
+                                 "conditional_reads", "write_capable", "unfinished", "unresolved", "failed", "pending"])
+def test_nonexecution_exclusion_keeps_event_with_conflicting_effect_or_risk_marker(risk: str) -> None:
+    ledger, chains = splash_ledger()
+    action = text_candidate(ledger, 100)
+    if risk == "tuid":
+        action.tuid = "actual-tool-call"
+    elif risk == "kind":
+        action.kind = "other"
+    elif risk in {"write", "delete"}:
+        action.files = [atoms.FileRef(risk, PATH, filestory.Ev(action.ts, 101, "wopaque", PATH, "agent-fix"))]
+    elif risk in {"failed", "pending"}:
+        action.ok = False if risk == "failed" else None
+    else:
+        action.detail[risk] = [PATH] if risk in {"touched", "conditional", "conditional_reads"} else True
+    manifest = coverage.manifest(ledger, chains, PATH)
+    assert [candidate["seq"] for candidate in manifest["candidates"]] == [100]
+    assert manifest["candidate_scope"]["excluded_nonexecution"] == {}
+
+
+@pytest.mark.parametrize("tool,kind", [("Bash", "other"), ("PowerShell", "other"), ("exec", "other"),
+                                      ("Skill", "skill"), ("SendMessage", "message"),
+                                      ("Agent", "dispatch"), ("Task", "dispatch")])
+def test_execution_calls_are_not_removed_even_when_their_text_is_a_plan_or_summary(tool: str, kind: str) -> None:
+    ledger, chains = splash_ledger()
+    action = candidate_action(ledger, 100, tool=tool, kind=kind, cls="out", touch=True)
+    action.detail = {"text": "计划和收尾文字不会把真实工具调用变成非执行记录", "conditional": [PATH]}
+    action.ok = False
+    manifest = coverage.manifest(ledger, chains, PATH)
+    assert [candidate["seq"] for candidate in manifest["candidates"]] == [100]
+    assert manifest["candidate_scope"]["excluded_nonexecution"] == {}
+
+
+def test_nonexecution_counts_only_exact_eligible_actor_window_and_does_not_drop_mixed_tool_block() -> None:
+    ledger, chains = splash_ledger()
+    ledger.fix_after = "2026-01-01T00:00:50Z"
+    text_candidate(ledger, 100, ts="2026-01-01T00:00:10Z")
+    text_candidate(ledger, 101, by="outside-actor")
+    text_candidate(ledger, 102, ambiguous=True)
+    thought = text_candidate(ledger, 103, "think")
+    write = candidate_action(ledger, 104, tool="Edit", kind="write", touch=True)
+    write.src = (thought.src[0], thought.src[1], thought.src[1] + 1)
+    write.blk = 1  # 同一物理消息中的第二块是真实工具调用,不能随第一块 think 删除。
+    manifest = coverage.manifest(ledger, chains, PATH)
+    assert [candidate["seq"] for candidate in manifest["candidates"]] == [104]
+    assert manifest["candidate_scope"]["excluded_nonexecution"] == {"think": 1}
+
+
+def test_legacy_manifest_without_policy_keeps_its_saved_denominator() -> None:
+    ledger, chains = splash_ledger()
+    action = candidate_action(ledger, 100)
+    action.tuid = None
+    legacy = coverage.manifest(ledger, chains, PATH)
+    legacy.pop("policy", None)
+    action.tool = action.kind = "say"
+    fresh = coverage.manifest(ledger, chains, PATH)
+    assert fresh["policy"] == "execution-candidates/2" and fresh["candidates"] == []
+    rows = [declaration(v) for v in (52, 53, 54)]
+    checked = coverage.reconcile(ledger, legacy, rows, ["A"], identity_bound=True)
+    assert checked["missing_candidates"] == [legacy["candidates"][0]["id"]]
+    assert not checked["complete"]  # 不因新策略从旧清单里删掉一项或自动补 not_repair。

@@ -547,6 +547,8 @@ def build(ledger: atoms.Ledger, data: dict[str, Any] | None, errors: list[str],
                   else (data or {}).get("notes")),
         "revalidated": bool(meta.get("revalidated")), "previous_errors": list(meta.get("previous_errors") or []),
         "coverage_rows": (data or {}).get("coverage"),
+        # This is harness metadata, never a field supplied by the model's YAML.
+        "recorded_repair_manifest": meta.get("recorded_repair_manifest"),
     }
     if data is None:
         return out

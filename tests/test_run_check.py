@@ -85,7 +85,7 @@ def frozen_case(tmp_path: Path) -> tuple[Path, Path]:
     (package / "probe.py").write_text("# synthetic snapshot\n", encoding="utf-8")
     (case_dir / "common-task.md").write_text("task", encoding="utf-8")
     case = {"schema": "migloop-pair-case/1", "read_only_snapshot": True, "source": str(source),
-            "pool": str(pool), "current_root": str(current), "source_digest": check.inventory_digest(package),
+            "pool": str(pool), "current_root": str(current), "roots": [str(current)], "source_digest": check.inventory_digest(package),
             "pool_digest": check.inventory_digest(pool), "common_task_sha256": check.sha256(case_dir / "common-task.md")}
     (case_dir / "case.json").write_text(json.dumps(case), encoding="utf-8")
     return case_dir, run_dir
@@ -275,3 +275,121 @@ def test_new_probe_internal_typeerror_is_not_retried_as_legacy_signature() -> No
                                   SimpleNamespace(probe_payload=broken_probe), object(), Path("run"), "frozen-root",
                                   coverage_module_available=True)
     assert attempts == [{}]
+
+
+def variant_case(tmp_path: Path, parent: Path, name: str = "variant") -> tuple[Path, Path]:
+    case_dir = tmp_path / name
+    run_dir = case_dir / "runs/tools/rep1"
+    run_dir.mkdir(parents=True)
+    document = check.read_json(parent / "case.json")
+    document["parent_case"] = {"case_dir": str(parent), "case_sha256": check.sha256(parent / "case.json")}
+    (case_dir / "common-task.md").write_bytes((parent / "common-task.md").read_bytes())
+    (case_dir / "case.json").write_text(json.dumps(document), encoding="utf-8")
+    return case_dir, run_dir
+
+
+def replace_case(case_dir: Path, **fields: Any) -> dict[str, Any]:
+    document = {**check.read_json(case_dir / "case.json"), **fields}
+    (case_dir / "case.json").write_text(json.dumps(document), encoding="utf-8")
+    return document
+
+
+def refresh_parent_hash(child: Path, parent: Path) -> dict[str, Any]:
+    return replace_case(child, parent_case={"case_dir": str(parent), "case_sha256": check.sha256(parent / "case.json")})
+
+
+@pytest.mark.parametrize("depth", [0, 1, 2])
+def test_owned_pool_and_hash_verified_variant_chains_preserve_integrity_checks(tmp_path: Path, monkeypatch: Any, depth: int) -> None:
+    owner, run_dir = frozen_case(tmp_path)
+    case_dir = owner
+    for number in range(depth):
+        case_dir, run_dir = variant_case(tmp_path, case_dir, "variant-" + str(number))
+    calls = []
+
+    def normalize(case: dict[str, Any], run: Path) -> tuple[dict[str, Any], str]:
+        calls.append((case["pool"], run))
+        return payload(), "frozen-identity"
+
+    monkeypatch.setattr(check, "normalized_payload", normalize)
+    result = check.check_run(run_dir, case_dir)
+    assert result["normalization_succeeded"] is True
+    assert all(result["snapshot_integrity"][field] for field in ("source_unchanged", "pool_unchanged", "task_unchanged"))
+    authorization = result["pool_authorization"]
+    assert authorization["shared"] is bool(depth)
+    assert authorization["owner_case_dir"] == str(owner.resolve())
+    assert len(authorization["parent_chain"]) == depth
+    assert calls == [(str(owner / "pool"), run_dir.resolve())]
+
+
+@pytest.mark.parametrize("tamper_parent_file", [False, True])
+def test_shared_pool_rejects_tampered_parent_file_or_recorded_hash(tmp_path: Path, tamper_parent_file: bool) -> None:
+    parent, _ = frozen_case(tmp_path)
+    child, run = variant_case(tmp_path, parent)
+    if tamper_parent_file:
+        replace_case(parent, changed="parent contents changed after linking")
+    else:
+        replace_case(child, parent_case={"case_dir": str(parent), "case_sha256": "0" * 64})
+    with pytest.raises(ValueError, match="SHA-256"):
+        check.check_run(run, child)
+    assert not (run / "check.json").exists()
+
+
+def test_parent_hash_alone_does_not_authorize_an_unrelated_pool(tmp_path: Path) -> None:
+    parent, _ = frozen_case(tmp_path)
+    child, run = variant_case(tmp_path, parent)
+    unrelated, _ = frozen_case(tmp_path / "unrelated")
+    refresh_parent_hash(child, unrelated)
+    with pytest.raises(ValueError, match="pool does not match"):
+        check.check_run(run, child)
+
+
+def test_shared_pool_requires_same_digest_in_parent_and_child(tmp_path: Path) -> None:
+    parent, _ = frozen_case(tmp_path)
+    child, run = variant_case(tmp_path, parent)
+    replace_case(parent, pool_digest="0" * 64)
+    refresh_parent_hash(child, parent)
+    with pytest.raises(ValueError, match="pool_digest does not match"):
+        check.check_run(run, child)
+
+
+@pytest.mark.parametrize("cut_at", ["child", "intermediate"])
+def test_external_pool_without_a_complete_explicit_sharing_chain_is_rejected(tmp_path: Path, cut_at: str) -> None:
+    parent, _ = frozen_case(tmp_path)
+    intermediate, _ = variant_case(tmp_path, parent, "intermediate")
+    child, run = variant_case(tmp_path, intermediate, "child")
+    replace_case(child if cut_at == "child" else intermediate, parent_case=None)
+    if cut_at == "intermediate":
+        refresh_parent_hash(child, intermediate)
+    with pytest.raises(ValueError, match="explicit parent_case"):
+        check.check_run(run, child)
+
+
+@pytest.mark.parametrize("which", ["current_root", "roots", "parent_roots"])
+def test_all_roots_remain_inside_the_declared_pool_even_for_variants(tmp_path: Path, which: str) -> None:
+    parent, _ = frozen_case(tmp_path)
+    child, run = variant_case(tmp_path, parent)
+    outside = tmp_path / "outside.jsonl"
+    outside.write_text("{}\n", encoding="utf-8")
+    if which == "parent_roots":
+        replace_case(parent, roots=[str(outside)])
+        refresh_parent_hash(child, parent)
+    else:
+        replace_case(child, **{which: str(outside) if which == "current_root" else [str(outside)]})
+    with pytest.raises(ValueError, match="all roots must be files directly inside"):
+        check.check_run(run, child)
+
+
+def test_shared_pool_content_tampering_still_blocks_normalization(tmp_path: Path, monkeypatch: Any) -> None:
+    parent, _ = frozen_case(tmp_path)
+    child, run = variant_case(tmp_path, parent)
+    (parent / "pool/root.jsonl").write_text('{"tampered":true}\n', encoding="utf-8")
+
+    def forbidden(*args: Any) -> None:
+        raise AssertionError("A changed shared pool must not be normalized")
+
+    monkeypatch.setattr(check, "normalized_payload", forbidden)
+    result = check.check_run(run, child)
+    assert result["pool_authorization"]["shared"] is True
+    assert result["snapshot_integrity"]["pool_unchanged"] is False
+    assert result["normalization_succeeded"] is False
+    assert "integrity changed" in result["check_error"]["message"]

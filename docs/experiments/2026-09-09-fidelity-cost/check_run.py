@@ -53,6 +53,51 @@ def snapshot_integrity(case_dir: Path, case: dict[str, Any]) -> dict[str, Any]:
             "task_unchanged": task == case["common_task_sha256"], "source_digest": source, "pool_digest": pool}
 
 
+def validate_case_pool(case_dir: Path, case: dict[str, Any]) -> dict[str, Any]:
+    """An external pool requires a hash-verified sharing chain ending at its owning case."""
+    def pool_and_roots(document: dict[str, Any]) -> Path:
+        if document.get("schema") != "migloop-pair-case/1" or document.get("read_only_snapshot") is not True:
+            raise ValueError("A read-only migloop-pair-case/1 snapshot is required for every parent case")
+        pool = Path(document["pool"]).resolve(strict=True)
+        roots = document.get("roots", [])
+        if not isinstance(roots, list) or any(not isinstance(root, str) or not root for root in roots):
+            raise ValueError("Case roots must be a list of frozen root paths")
+        for hint in [document["current_root"], *roots]:
+            root = Path(hint).resolve(strict=True)
+            if root.parent != pool or not root.is_file():
+                raise ValueError("Case current_root and all roots must be files directly inside case.pool")
+        return pool
+
+    pool = pool_and_roots(case)
+    owner, document, chain, seen = case_dir.resolve(strict=True), case, [], set()
+    while not pool.is_relative_to(owner):
+        seen.add(owner)
+        parent = document.get("parent_case")
+        if not isinstance(parent, dict) or not isinstance(parent.get("case_dir"), str) or not parent["case_dir"] \
+                or not isinstance(parent.get("case_sha256"), str):
+            raise ValueError("External case pool requires an explicit parent_case sharing chain with case_sha256")
+        parent_dir = Path(parent["case_dir"])
+        parent_dir = (owner / parent_dir).resolve(strict=True) if not parent_dir.is_absolute() else parent_dir.resolve(strict=True)
+        if parent_dir in seen or len(chain) >= 64:
+            raise ValueError("Parent case sharing chain is cyclic or exceeds 64 links")
+        # Hash and parse the same bytes, so the verified parent cannot change between two reads.
+        raw = (parent_dir / "case.json").read_bytes()
+        digest = hashlib.sha256(raw).hexdigest()
+        if digest != parent["case_sha256"]:
+            raise ValueError("Parent case.json SHA-256 does not match the recorded parent_case hash")
+        parent_doc = json.loads(raw)
+        if not isinstance(parent_doc, dict):
+            raise ValueError("Parent case.json must be an object")
+        if pool_and_roots(parent_doc) != pool:
+            raise ValueError("Parent case pool does not match the shared case.pool")
+        if parent_doc.get("pool_digest") != document.get("pool_digest"):
+            raise ValueError("Parent case pool_digest does not match the shared pool_digest")
+        chain.append({"case_dir": str(parent_dir), "case_sha256": digest,
+                      "pool": str(pool), "pool_digest": parent_doc.get("pool_digest")})
+        owner, document = parent_dir, parent_doc
+    return {"pool": str(pool), "shared": bool(chain), "owner_case_dir": str(owner), "parent_chain": chain}
+
+
 def normalized_payload(case: dict[str, Any], run_dir: Path) -> tuple[dict[str, Any], str]:
     """Use this case's frozen implementation and pool, never already-loaded live modules."""
     source = (Path(case["source"]) / "src").resolve(strict=True)
@@ -237,13 +282,11 @@ def check_run(run_dir: Path, case_dir: Path) -> dict[str, Any]:
         raise ValueError("A read-only migloop-pair-case/1 snapshot is required")
     if not run_dir.is_relative_to(case_dir / "runs"):
         raise ValueError("run_dir must belong to case_dir/runs")
-    pool = Path(case["pool"]).resolve(strict=True)
-    current = Path(case["current_root"]).resolve(strict=True)
-    if not pool.is_relative_to(case_dir) or current.parent != pool:
-        raise ValueError("Case pool/root is outside the declared frozen case")
+    pool_authorization = validate_case_pool(case_dir, case)
     result: dict[str, Any] = {"schema": "migloop-run-check/1", "checked_at": datetime.now(timezone.utc).isoformat(),
                               "run_dir": str(run_dir), "case_dir": str(case_dir), "source": case["source"],
                               "source_code_id": case.get("source_code_id"), "normalization_succeeded": False,
+                              "pool_authorization": pool_authorization,
                               "assertion_truth_checked": False}
     started = time.perf_counter()
     try:
