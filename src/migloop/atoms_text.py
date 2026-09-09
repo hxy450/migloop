@@ -264,18 +264,22 @@ def render_file(ledger: atoms.Ledger, hint: str, v: int | None = None, root: str
                    + _hops(ledger, ("f", fa["path"], anchor)) + "(累计/窗口口径;每次 agent↔文件转换算一跳,派发算一跳)")
     for b in fa["breaks"]:
         out.append(f"⚠ 断点 {b['kind']} @ {b['ts'][:19]}: {b['detail']}")
-    # file 以索引为主:改动正文只在 diff=1 时给。带 v = 只给第 v 版整段;不带 v = 改动日志,一页最多 40 版
-    log = diff and v is None
+    # v 是查询锚点;v_from/v_to 仅选择锚点以内的 diff 窗口,不能偷偷换锚点。
+    log = diff and (v is None or v_from is not None or v_to is not None)
+    if ((v_from is not None and (v_from < 1 or v_from > anchor))
+            or (v_to is not None and (v_to < 1 or v_to > anchor))
+            or (v_from is not None and v_to is not None and v_from > v_to)):
+        return f"⛔ diff 窗口必须满足 1 ≤ v_from ≤ v_to ≤ 查询锚点 v{anchor};未执行查询。"
     lo_v = max(v_from or 1, 1)
     hi_v = min(v_to or (lo_v + 39), anchor) if log else anchor
     if log:
         out.append(f"## 写者脊柱 + 每版完整 diff(v{lo_v}–v{hi_v} / 共 {anchor} 版;创建版只给行数,content=1 看全文;"
                    "一页 40 版,v_from / v_to 翻页" + (f";每版截 {diff_chars} 字" if diff_chars else "") + ")")
     elif diff:
-        out.append("## 写者脊柱(≤ 这一版)—— 只给第 v 版的 diff(同 diff(path, v));全部版本的改动日志用 file(path, diff=1) 不带 v")
+        out.append("## 写者脊柱(≤ 这一版)—— 只给第 v 版的 diff(同 diff(path, v));区间日志用 file(path, v, diff=1, v_from=…, v_to=…)")
     else:
         out.append("## 写者脊柱(≤ 这一版)—— (#n@L 行) 是写它那次调用的动作号与转录行号,action 展开"
-                   + (";同一写者连续几版折成一行,file(path, v=某版) 单看;diff=1 不带 v 给每版改动" if len(fa["versions"]) > 8 else ""))
+                   + (";同一写者连续几版折成一行,file(path, v=某版) 单看;diff=1 加 v_from/v_to 给区间改动" if len(fa["versions"]) > 8 else ""))
     rows = [r for r in fa["versions"] if lo_v <= r["v"] <= hi_v] if log else fa["versions"]
     for vv in (rows if log else _collapse_spine(ledger, rows, anchor, lines)):
         if vv.get("_run"):
@@ -323,7 +327,7 @@ def render_file(ledger: atoms.Ledger, hint: str, v: int | None = None, root: str
         elif log and not vv.get("content_known"):
             out.append("  (内容未知,没有 diff;action 展开那次调用看命令)")
     if log and hi_v < anchor:
-        out.append(f"…v{hi_v + 1}–v{anchor} 还有 {anchor - hi_v} 版:file(path, diff=1, v_from={hi_v + 1}) 续页")
+        out.append(f"…v{hi_v + 1}–v{anchor} 还有 {anchor - hi_v} 版:file(path, v={anchor}, diff=1, v_from={hi_v + 1}) 续页")
     rlist = [r for r in fa["readers"] if r["v"] == anchor]
     if not readers:
         out.append(f"## 读者 {len(rlist)} 个(下游;readers=1 展开;按词找用 search(file=))")
@@ -368,9 +372,12 @@ def render_file(ledger: atoms.Ledger, hint: str, v: int | None = None, root: str
             out.append("折叠 " + "、".join(f"{k} {n} 条" for k, n in fold_by.items())
                        + "(只读检查 = cat / grep / wc / ls;写入内容 = 别的文件正文里列了它;正文 = 说 / 想 / 收件;m_all=1 铺)")
         lo = max(m_from, 1)
-        page = listed[lo - 1:lo - 1 + max(m_n, 1)]
+        page = listed[lo - 1:lo - 1 + max(m_n, 0)]
         hi = lo - 1 + len(page)
-        if listed:
+        if listed and m_n <= 0:
+            out.append(f"候选仅计数,未展开 {len(listed)} 条;需要时 file(path, v={anchor}, m_n=40, m_from=1) 查看。"
+                       "没有展开不等于没有候选,也不能据此断言无人读写。")
+        elif listed:
             out.append(f"第 {lo}–{hi} 条 / 共 {len(listed)} 条"
                        + (f";剩余 {len(listed) - hi}:file(path, m_from={hi + 1})" if hi < len(listed) else ""))
         for m in page:

@@ -34,8 +34,63 @@ _ATOM_FORMATS = ("claude", "codex")
 
 # ═══════════════ 会话定位 ═══════════════
 
+def _frozen_pool() -> str | None:
+    """显式实验模式;不从 cwd、用户目录或清单 original 字段推断另一个池子。"""
+    value = os.environ.get("MIGLOOP_FROZEN_POOL", "").strip()
+    if not value:
+        return None
+    pool = os.path.realpath(os.path.abspath(value))
+    if not os.path.isdir(pool):
+        raise SessionLookupError(f"冻结池目录不存在: {value}")
+    return pool
+
+
+def _frozen_path(path: str, pool: str) -> str:
+    absolute = os.path.abspath(path)
+    resolved = os.path.realpath(absolute)
+    try:
+        inside = os.path.normcase(os.path.commonpath([pool, resolved])) == os.path.normcase(pool)
+    except ValueError:
+        inside = False
+    if not inside:
+        raise SessionLookupError(f"路径越出冻结池: {path}")
+    if os.path.normcase(absolute) != os.path.normcase(resolved):
+        raise SessionLookupError(f"冻结池不接受符号链接或重解析路径: {path}")
+    return resolved
+
+
+def _frozen_root(path: str, pool: str) -> str:
+    resolved = _frozen_path(path if os.path.isabs(path) else os.path.join(pool, path), pool)
+    if os.path.normcase(os.path.dirname(resolved)) != os.path.normcase(pool) \
+            or not resolved.lower().endswith(".jsonl") or not os.path.isfile(resolved):
+        raise SessionLookupError(f"不是冻结池内的根 JSONL: {path}")
+    return resolved
+
+
+def _frozen_roots(pool: str) -> list[str]:
+    return sorted(_frozen_root(path, pool) for path in glob.glob(os.path.join(pool, "*.jsonl")))
+
+
+def _validate_frozen_tree(pool: str) -> None:
+    """CC 子代理/工作流与 Codex 递归 rollout 扫描均只接触经核验的池内文件。"""
+    for directory, dirs, files in os.walk(pool, followlinks=False):
+        _frozen_path(directory, pool)
+        for name in [*dirs, *files]:
+            _frozen_path(os.path.join(directory, name), pool)
+
+
 def locate_session(target: str, roots: dict[str, str] | None = None) -> str:
     """jsonl 路径 | session-id 前缀 | 项目名片段 → 唯一 root 转录路径(最新者优先)。"""
+    pool = _frozen_pool()
+    if pool is not None:
+        want = str(target or "").strip()
+        if os.path.isabs(want) or "/" in want or "\\" in want or want.lower().endswith(".jsonl"):
+            return _frozen_root(want, pool)
+        hits = [p for p in _frozen_roots(pool) if want and os.path.basename(p)[:-6].startswith(want)]
+        if len(hits) != 1:
+            reason = "前缀有歧义" if hits else "找不到根会话"
+            raise SessionLookupError(f"冻结池{reason}: {target}")
+        return hits[0]
     if os.path.isfile(target):
         return os.path.abspath(target)
     rows = list(adapters.discover(roots or {}))
@@ -61,6 +116,10 @@ def _stat_key(paths: list[str]) -> list[Any]:
 
 def pool_key(roots: list[str]) -> list[Any]:
     """账本缓存键要看整个池子:root 转录 + 各自的 subagents/*.jsonl —— 子代理独立追加时也要失效(评审指出)。"""
+    pool = _frozen_pool()
+    if pool is not None:
+        _validate_frozen_tree(pool)
+        roots = [_frozen_root(path, pool) for path in roots]
     paths = list(roots)
     for r in roots:
         sub = os.path.splitext(r)[0] + "/subagents"
@@ -78,13 +137,21 @@ def _put(cache: dict[str, Any], key: str, value: Any) -> None:
 # ═══════════════ trace(旧提取层:报告页 / 名片 / 兜底修复方映射) ═══════════════
 
 def extract_trace(path: str, storage_root: str | None = None) -> dict[str, Any]:
-    key = _stat_key([path])
+    pool = _frozen_pool()
+    if pool is not None:
+        path = _frozen_root(path, pool)
+        _validate_frozen_tree(pool)
+    key = [*_stat_key([path]), ("frozen_pool", pool)]
     with _LOCK:
         hit = _TRACE_CACHE.get(path)
         if hit is not None and hit[0] == key:
             return hit[1]
         adapter: Any = adapters.detect(path)
-        if adapter.FORMAT == "deveco":                 # 只有 DevEco 需要数据目录定位子代理库
+        if pool is not None and adapter.FORMAT not in _ATOM_FORMATS:
+            raise SessionLookupError(f"冻结池不支持 {adapter.FORMAT} 会话")
+        if pool is not None and adapter.FORMAT == "codex":
+            data = dict(adapter.extract(path, sessions_root=pool))
+        elif adapter.FORMAT == "deveco":                 # 只有 DevEco 需要数据目录定位子代理库
             data = dict(adapter.extract(path, storage_root=storage_root))
         else:
             data = dict(adapter.extract(path))
@@ -99,6 +166,9 @@ def _fmt_of(trace: dict[str, Any]) -> str:
 def prior_roots(fmt: str, path: str, cwd: str) -> list[str]:
     """同工程的前序 root 会话全部入池:一次迁移 run 里 Driver 直接起的会话(reviewer、ECAT 判别器 / 修复方、
     loop engine 续接的 worker)都是 root,DiceRoller 0903 一个 run 就有 17 个,默认只取 3 个会把返修链切断。"""
+    pool = _frozen_pool()
+    if pool is not None:
+        return _frozen_adjacent_roots(pool, path, later=False)
     if fmt == "codex":
         return crosschain.find_prior_codex_roots(path, cwd, limit=64)
     if fmt == "claude":
@@ -107,11 +177,25 @@ def prior_roots(fmt: str, path: str, cwd: str) -> list[str]:
 
 
 def later_roots(fmt: str, path: str, cwd: str) -> list[str]:
+    pool = _frozen_pool()
+    if pool is not None:
+        return _frozen_adjacent_roots(pool, path, later=True)
     if fmt == "codex":
         return crosschain.find_later_codex_roots(path, cwd, 1)
     if fmt == "claude":
         return crosschain.find_later_claude_roots(path, 1)
     return []
+
+
+def _frozen_adjacent_roots(pool: str, path: str, later: bool) -> list[str]:
+    current = _frozen_root(path, pool)
+    current_ts = crosschain._first_record_ts(current)
+    if not current_ts:
+        return []
+    rows = [(crosschain._first_record_ts(p), p) for p in _frozen_roots(pool) if p != current]
+    if later:
+        return [p for ts, p in sorted(rows) if ts and ts > current_ts][:1]
+    return [p for ts, p in sorted(rows) if ts and ts < current_ts][-64:][::-1]
 
 
 def root_sid8(fmt: str, path: str) -> str:
@@ -130,10 +214,17 @@ def run_stage_intervals(path: str, cwd: str) -> list[dict[str, Any]]:
     没有归属戳的会话(ECAT 对抗循环、reviewer、loop engine 续接的 worker)靠它落阶段,execute 结束时刻也从它来。"""
     from .filestory import ts_norm
 
+    pool = _frozen_pool()
     cands: list[str] = []
-    if cwd:
-        cands += glob.glob(os.path.join(cwd, ".migbot", "metrics", "*", "facts", "stage-marks.json"))
-    cands += glob.glob(os.path.join(os.path.dirname(os.path.abspath(path)), "stage-marks.json"))
+    if pool is not None:
+        path = _frozen_root(path, pool)
+        marks = _frozen_path(os.path.join(pool, "stage-marks.json"), pool)
+        if os.path.isfile(marks):
+            cands.append(marks)
+    else:
+        if cwd:
+            cands += glob.glob(os.path.join(cwd, ".migbot", "metrics", "*", "facts", "stage-marks.json"))
+        cands += glob.glob(os.path.join(os.path.dirname(os.path.abspath(path)), "stage-marks.json"))
     first_ts = ts_norm(crosschain._first_record_ts(path))
     best: tuple[str, list[dict[str, Any]]] | None = None
     fallback: tuple[str, list[dict[str, Any]]] | None = None
@@ -156,11 +247,16 @@ def run_stage_intervals(path: str, cwd: str) -> list[dict[str, Any]]:
 
 
 def _collect(fmt: str, roots: list[str], stage_intervals: list[dict[str, Any]] | None = None) -> Any:
+    pool = _frozen_pool()
+    if pool is not None:
+        _validate_frozen_tree(pool)
+        roots = [_frozen_root(path, pool) for path in roots]
     seq = [0]
     agents: dict[str, Any] = {}
     if fmt == "codex":
         for p in roots:
-            agents.update(atoms_collect.collect_codex(p, seq))
+            agents.update(atoms_collect.collect_codex(p, seq, sessions_root=pool) if pool is not None
+                          else atoms_collect.collect_codex(p, seq))
     else:
         agents = atoms_collect.collect_cc_pool(roots, seq, stage_intervals=stage_intervals)
     ledger = atoms.build_ledger(agents)
@@ -170,6 +266,9 @@ def _collect(fmt: str, roots: list[str], stage_intervals: list[dict[str, Any]] |
 
 def session_ledger(path: str) -> Any:
     """当前会话 + 同工程前序会话的账本(跨会话同一本史书)。"""
+    pool = _frozen_pool()
+    if pool is not None:
+        path = _frozen_root(path, pool)
     data = extract_trace(path)
     fmt = _fmt_of(data)
     if fmt not in _ATOM_FORMATS:
@@ -177,7 +276,7 @@ def session_ledger(path: str) -> Any:
     cwd = str((data.get("meta") or {}).get("cwd") or "")
     roots = [*prior_roots(fmt, path, cwd), path]           # 时间正序:前序在前
     intervals = run_stage_intervals(path, cwd)
-    key = [*pool_key(roots), tuple((iv["stage"], iv["start_ts"]) for iv in intervals)]
+    key = [*pool_key(roots), tuple((iv["stage"], iv["start_ts"]) for iv in intervals), ("frozen_pool", pool)]
     with _LOCK:
         hit = _LEDGER_CACHE.get(path)
         if hit is not None and hit[0] == key:
@@ -378,12 +477,15 @@ def attach_fix_basis(chains: list[dict[str, Any]], ledger: Any) -> None:
 
 def fixchain_payload(path: str) -> dict[str, Any]:
     """chains + cross + t0 —— 全部从两原子账本算;修复方判定只在 filestory.build_fix_chains。"""
+    pool = _frozen_pool()
+    if pool is not None:
+        path = _frozen_root(path, pool)
     data = extract_trace(path)
     fmt = _fmt_of(data)
     meta = data.get("meta") or {}
     cwd = str(meta.get("cwd") or "")
     priors = prior_roots(fmt, path, cwd) if fmt in _ATOM_FORMATS else []
-    key = _stat_key([path, *priors])
+    key = [*_stat_key([path, *priors]), ("frozen_pool", pool)]
     with _LOCK:
         hit = _FIXCHAIN_CACHE.get(path)
         if hit is not None and hit[0] == key:
@@ -472,6 +574,9 @@ def report_html(path: str) -> str:
 
 def fixchain_light(path: str) -> dict[str, Any]:
     """链页首屏:入口列表只从链缓存拿(没缓存先空着,页面拿到 fixchain-data 自己填)。"""
+    pool = _frozen_pool()
+    if pool is not None:
+        path = _frozen_root(path, pool)
     data = extract_trace(path)
     meta = data.get("meta") or {}
     fmt = _fmt_of(data)
@@ -483,7 +588,7 @@ def fixchain_light(path: str) -> dict[str, Any]:
     fixers: list[dict[str, Any]] = []
     with _LOCK:
         hit = _FIXCHAIN_CACHE.get(path)
-    if hit is not None:
+    if hit is not None and hit[0] and hit[0][-1] == ("frozen_pool", pool):
         fixes, fixers = filestory.chain_entry_lists(list(hit[1].get("chains") or []))
     later_paths = later_roots(fmt, path, cwd)
     later = None
@@ -579,7 +684,8 @@ def atom_text(path: str, tool: str, args: dict[str, Any]) -> str:
                                       readers=_flag(args, "readers", "0"),
                                       v_from=_opt_int(args, "v_from"), v_to=_opt_int(args, "v_to"),
                                       diff_chars=_opt_int(args, "diff_chars"),
-                                      m_from=_opt_int(args, "m_from") or 1, m_n=_opt_int(args, "m_n") or 40,
+                                      m_from=_opt_int(args, "m_from") or 1,
+                                      m_n=_opt_int(args, "m_n") if args.get("m_n") is not None else 0,
                                       m_all=_flag(args, "m_all", "0"))
     if tool == "agent" and args.get("id"):
         return atoms_text.render_agent(ledger, str(args["id"]), _opt_int(args, "v"), root=cwd,
@@ -601,7 +707,8 @@ def atom_text(path: str, tool: str, args: dict[str, Any]) -> str:
     if tool == "action" and args.get("id") and args.get("seq") is not None:
         return atoms_text.render_action(ledger, str(args["id"]), int(args["seq"]),
                                         max_chars=_opt_int(args, "max_chars") or 20000,
-                                        offset=_opt_int(args, "offset") or 0, find=str(args.get("find") or ""))
+                                        offset=_opt_int(args, "offset") or 0, find=str(args.get("find") or ""),
+                                        part=args.get("part") or None)
     raise ValueError(f"未知工具或缺参数: {tool}")
 
 

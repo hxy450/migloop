@@ -2033,7 +2033,8 @@ def test_guide_carries_the_hands_on_lessons() -> None:
     g = mcp_server.GUIDE
     assert "search(q, agent=主会话" in g and "blame(path, v, start=行号, n=1)" in g
     assert "offset=" in g and "find=" in g and "created 链先问三件事" in g
-    assert "传递 / 错 / 缺" in g and "故障进入点" in g
+    assert all(word in g for word in ("带病传递", "进入·错", "进入·缺", "无法确认", "故障进入点"))
+    assert "零命中不证明需求不存在" in g and "无需再逐环写一份同义散文" in g
 
 
 # ═══════════════ 真会话复核后的四条 ═══════════════

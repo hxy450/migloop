@@ -7,9 +7,23 @@ from migloop import atoms, via
 from tests.test_atoms import MAIN_ID, _call, _ledger, _read_call, _rec
 
 
-def _pool(tmp_path: Any) -> atoms.Ledger:
+def test_mcp_queries_advertise_read_only_evidence_access():
+    import asyncio
+    import pytest
+    pytest.importorskip("mcp")
+    from migloop.mcp_server import build_server
+
+    tools = asyncio.run(build_server().list_tools())
+    assert len(tools) == 9
+    for tool in tools:
+        assert tool.annotations.readOnlyHint is True
+        assert tool.annotations.destructiveHint is False
+        assert tool.annotations.openWorldHint is False
+
+
+def _pool(tmp_path: Any, spec: str = "spec\n") -> atoms.Ledger:
     conv = [_rec("2026-01-01T00:00:00Z", "user", "转换 A"),
-            *_read_call("2026-01-01T00:00:10Z", "c1", "/proj/spec/pages/A.md", "spec\n"),
+            *_read_call("2026-01-01T00:00:10Z", "c1", "/proj/spec/pages/A.md", spec),
             *_call("2026-01-01T00:00:20Z", "c2", "Write", {"file_path": "/proj/entry/A.ets", "content": "a\n"},
                    "File created successfully at: /proj/entry/A.ets")]
     fix = [_rec("2026-01-01T02:00:00Z", "user", "修 A"),
@@ -100,10 +114,76 @@ def test_mcp_tools_enforce_via(tmp_path: Any) -> None:
         assert "只能用于第一次" in out
         out = await call("file", sid="s1", path="spec/pages/A.md", v=1, via="agent:conv-a@v1 读取")
         assert "A.md" in out
-        # 另一个 sid 是另一条路线,状态分开
+        # 同一本账的 sid 别名共用路线,换参数拼法不能重开 sessions 入口。
         out = await call("file", sid="s2", path="A.ets", v=2, via="file:entry/A.ets@v2")
-        assert "不是已打开" in out
+        assert "# 文件" in out
+        out = await call("file", sid="s2", path="A.ets", v=2, via="sessions")
+        assert "只能用于第一次" in out
 
     asyncio.run(run())
-    assert mcp_server.via_state("s1").opened == [("file", "/proj/entry/A.ets", 2), ("agent", "agent-c", 1),
-                                                 ("file", "/proj/spec/pages/A.md", 1)]
+
+
+def test_target_and_returned_node_require_exact_existing_versions(tmp_path: Any) -> None:
+    from migloop import atoms_text
+    led = _pool(tmp_path)
+    for kind, hint in (("file", "A.ets"), ("agent", "fixer")):
+        for v in (None, -1, 0, 999):
+            node, error = via.target(led, kind, hint, v)
+            assert node is None and error and "目标版本不存在" in error
+    assert via.target(led, "file", "missing.ets", 1)[0] is None
+    node = via.returned_node(led, "file", atoms_text.render_file(led, "A.ets", 999))
+    assert node == ("file", "/proj/entry/A.ets", 2)              # 正文核出实际 v2,不能认请求的 v999
+    assert via.returned_node(led, "agent", atoms_text.render_agent(led, "fixer", 999)) == ("agent", "agent-f", 1)
+    assert via.returned_node(led, "file", "账本里没有该文件: A.ets") is None
+
+
+def test_mcp_isolates_servers_and_ledgers_and_never_opens_invalid_targets(tmp_path: Any) -> None:
+    import asyncio
+    import pytest
+    pytest.importorskip("mcp")
+    from migloop import mcp_server, probe
+
+    first_ledger = _pool(tmp_path / "first")
+    second_ledger = _pool(tmp_path / "second", "different spec\n")
+    assert atoms.ledger_identity(first_ledger) != atoms.ledger_identity(second_ledger)
+
+    class Backend:
+        current = first_ledger
+
+        async def get_ledger(self, sid: str) -> Any:
+            return self.current
+
+        async def get_session_cwd(self, sid: str) -> str:
+            return "/proj"
+
+    backend = Backend()
+    srv = mcp_server.build_server(backend)
+    fresh = mcp_server.build_server(backend)
+
+    async def call(server: Any, tool: str, **kw: Any) -> str:
+        res = await server.call_tool(tool, {"sid": "same-raw-sid", **kw})
+        parts = res[0] if isinstance(res, tuple) else res
+        return probe._unwrap_result("".join(getattr(p, "text", "") for p in parts))
+
+    async def run() -> None:
+        for tool, args in (("file", {"path": "A.ets"}), ("agent", {"id": "fixer"})):
+            for v in (0, 999):
+                out = await call(srv, tool, **args, v=v, via="sessions")
+                assert out.startswith("⛔") and "目标版本不存在" in out
+        out = await call(srv, "file", path="A.ets", v=1, diff=True, v_from=2, v_to=2, via="sessions")
+        assert out.startswith("⛔")                              # 区间不许越过锚点,失败不消耗入口
+        out = await call(srv, "file", path="A.ets", v=2, diff=True, v_from=1, v_to=2, via="sessions")
+        assert "@v2" in out.splitlines()[0] and "每版完整 diff" in out
+        out = await call(srv, "agent", id="fixer", v=1, via="file:A.ets@v999")
+        assert out.startswith("⛔") and "不是已打开" in out
+        out = await call(srv, "agent", id="fixer", v=1, via="file:A.ets@v2")
+        assert out.startswith("# agent")
+        out = await call(fresh, "file", path="A.ets", v=2, via="sessions")
+        assert out.startswith("# 文件")                        # 新服务器实例不继承前一条路线
+        backend.current = second_ledger
+        out = await call(srv, "agent", id="fixer", v=1, via="file:A.ets@v2")
+        assert out.startswith("⛔") and "不是已打开" in out       # raw sid 复用到另一账本也不继承
+        out = await call(srv, "file", path="A.ets", v=2, via="sessions")
+        assert out.startswith("# 文件")
+
+    asyncio.run(run())

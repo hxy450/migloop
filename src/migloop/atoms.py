@@ -22,6 +22,7 @@ import os
 import re
 from dataclasses import dataclass, field, replace
 from datetime import datetime
+from functools import cache
 from typing import Any
 
 from migloop.filestory import (
@@ -140,24 +141,68 @@ class Ledger:
     mention_seq: dict[int, list[str]] = field(default_factory=dict)
     #: 全池有写能力的命令 (ts, seq, agent),按时刻排:断点窗口里「谁可能改的」按它数,不解析脚本
     write_cmds: list[tuple[str, int, str]] = field(default_factory=list)
+    #: 建账完成时冻结;查询期间源文件的 mtime / 内容变化不能改写这本内存账本的身份。
+    _identity: str | None = field(default=None, init=False, repr=False)
 
 
-LEDGER_CODE_VERSION = "atoms-2026-09-08"
+LEDGER_CODE_VERSION = "atoms-2026-09-09-snapshot2"
+
+
+@cache
+def _builder_fingerprint() -> str:
+    """构建器代码内容摘要,进程内一次;换机器或换行格式不改变它。"""
+    h = hashlib.sha256()
+    for name in ("atoms.py", "atoms_collect.py", "filestory.py", "filestory_collect.py", "shellparse.py", "audit.py"):
+        h.update(name.encode("ascii"))
+        path = os.path.join(os.path.dirname(__file__), name)
+        with open(path, "rb") as fh:
+            h.update(fh.read().replace(b"\r\n", b"\n"))
+    return h.hexdigest()
 
 
 def ledger_identity(ledger: Ledger) -> str:
-    """账本身份 = 工具代码版本 + 原始数据池清单摘要(每份转录的标识、文件名、大小、修改时刻)。
-    结论块里的 vN / #n 都是对这一本账说的:身份不一致时页面告警,不把旧坐标当现在的节点。"""
-    h = hashlib.sha1()
-    for tag, path in sorted(ledger.tag_paths.items()):
-        try:
-            st = os.stat(path)
-            sig = f"{tag}:{os.path.basename(path)}:{st.st_size}:{st.st_mtime_ns}"
-        except OSError:
-            sig = f"{tag}:{os.path.basename(path)}:missing"
-        h.update(sig.encode("utf-8"))
+    """冻结的建账摘要:构建器 + 转录内容 + 实际节点/动作映射,不使用活源 mtime。
+
+    build_ledger 完成时调用一次;直接构造的 Ledger 首次调用时冻结。逐文件 / 逐条流式摘要,
+    不保存第二份账本,不重放历史。后续修改源文件需要重新建账才能得到新身份。
+    """
+    if ledger._identity is not None:
+        return ledger._identity
+    h = hashlib.sha256(_builder_fingerprint().encode("ascii"))
+
+    def add(value: Any) -> None:
+        h.update(json.dumps(value, ensure_ascii=True, sort_keys=True, separators=(",", ":")).encode("ascii"))
         h.update(b"\n")
-    return f"{LEDGER_CODE_VERSION}:{len(ledger.tag_paths)}:{h.hexdigest()[:16]}"
+
+    def digest(text: str | None) -> str | None:
+        return hashlib.sha256(text.encode("utf-8", errors="surrogatepass")).hexdigest() if text is not None else None
+
+    for tag, path in sorted(ledger.tag_paths.items()):
+        source = hashlib.sha256()
+        try:
+            with open(path, "rb") as fh:
+                for chunk in iter(lambda: fh.read(1024 * 1024), b""):
+                    source.update(chunk)
+            signature = source.hexdigest()
+        except OSError:
+            signature = "missing"
+        add(["source", tag, os.path.basename(path), signature])
+    for aid, agent in sorted(ledger.agents.items()):
+        add(["agent", aid, agent.session, agent.name, agent.parent, agent.parent_ver,
+             digest(agent.prompt), digest(agent.result)])
+        for act in agent.actions:
+            add(["action", act.seq, act.ver, act.at, act.ts, act.done_ts, act.kind, act.tool, act.ok,
+                 act.tuid, act.blk, ledger.locs.get(act.seq), act.detail])
+            for ref in act.files:
+                add(["ref", ref.op, ref.path, ref.v, ref.certain, ref.ev.dep, ref.ev.conditional,
+                     ref.ev.start, ref.ev.n, ref.ev.full, ref.ev.seen, digest(ref.ev.content)])
+    for path, story in sorted(ledger.stories.items()):
+        add(["file", path])
+        for ver in story.versions:
+            add(["version", ver.v, ver.ts, ver.seq, ver.by, ver.by_ver, ver.act_seq, ver.source, ver.via,
+                 ver.conditional, ver.state_gap, digest(ver.content), digest(ver.partial), digest(ver.diff)])
+    ledger._identity = f"{LEDGER_CODE_VERSION}:{len(ledger.tag_paths)}:{h.hexdigest()[:24]}"
+    return ledger._identity
 
 
 def resolve_agent(ledger: Ledger, hint: str) -> AgentRec | None:
@@ -474,7 +519,7 @@ def build_ledger(agents: dict[str, AgentRec]) -> Ledger:
             old = stem[6:14] if stem.startswith("agent-") else stem[:8]
             if old != tag:
                 legacy[old] = None if (old in legacy and legacy[old] != tag) else tag
-    return Ledger(stories, agents, feeds, t0, lines=lines, read_act=read_act, depth_max=dmax, depth_win=dwin,
+    ledger = Ledger(stories, agents, feeds, t0, lines=lines, read_act=read_act, depth_max=dmax, depth_win=dwin,
                   mentions=mentions, mention_seq=mention_seq, write_cmds=_write_capable_cmds(agents),
                   locs=locs, by_loc=by_loc, loc_ambiguous=loc_ambiguous, line_blocks=line_blocks,
                   tag_paths=tag_paths, legacy_tags=legacy,
@@ -483,7 +528,9 @@ def build_ledger(agents: dict[str, AgentRec]) -> Ledger:
                               "mentions": act.detail.get("mentions_truncated", 0),
                               "sources": act.detail.get("mentions_scan_sources", [])}
                              for a in agents.values() for act in a.actions
-                             if act.detail.get("mentions_scan_truncated") or act.detail.get("mentions_truncated")])
+                              if act.detail.get("mentions_scan_truncated") or act.detail.get("mentions_truncated")])
+    ledger_identity(ledger)
+    return ledger
 
 
 REF_RE = re.compile(r"#(?:([\w-]+):)?(\d+)@L(\d+)(?:/(\d+))?(?:·([\w-]+))?")

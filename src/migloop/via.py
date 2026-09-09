@@ -30,6 +30,34 @@ class ViaState:
             self.opened.append(node)
 
 
+def target(ledger: atoms.Ledger, kind: str, hint: str, v: int | None) -> tuple[Node | None, str | None]:
+    """精确目标校验:渲染层会裁到最后一版,移动不能把这种裁剪登记成请求的版本。"""
+    key = resolve_key(ledger, kind, hint)
+    if key is None:
+        return None, f"{REJECT} 目标不在账本: {kind}:{hint}"
+    count = len(ledger.stories[key].versions) if kind == "file" else ledger.agents[key].n_versions
+    if v is None or v < 1 or v > count:
+        return None, f"{REJECT} 目标版本不存在: {kind}:{hint}@v{v};账本共 {count} 版,未打开。"
+    return (kind, key, v), None
+
+
+def returned_node(ledger: atoms.Ledger, kind: str, text: str) -> Node | None:
+    """从模型收到的正文头核实际坐标;不从调用参数推定成功,正文无坐标就不能核验。"""
+    lines = text.lstrip().splitlines()
+    if not lines:
+        return None
+    if kind == "file":
+        m = re.match(r"^# (?:文件 )?(.+?)\s*@v(\d+)\b", lines[0])
+        if m is None:
+            return None
+        hint = next((ln[len("完整路径: "):] for ln in lines[1:3] if ln.startswith("完整路径: ")), m.group(1))
+        return target(ledger, kind, hint, int(m.group(2)))[0]
+    m = re.match(r"^# agent .*?\bid=(\S+)\s+v(\d+)\b", lines[0])
+    if m is None:
+        m = re.match(r"^# (\S+)\s+v(\d+)\b", lines[0])
+    return target(ledger, kind, m.group(1), int(m.group(2)))[0] if m else None
+
+
 def _main_agent(ledger: atoms.Ledger, sid: str) -> atoms.AgentRec | None:
     mains = [k for k in ledger.agents if k.startswith("__main__")]
     hit = [k for k in mains if k.split(":", 1)[-1].startswith(sid) or (sid and sid.startswith(k.split(":", 1)[-1]))]
@@ -83,8 +111,8 @@ def check(ledger: atoms.Ledger, state: ViaState, via: str) -> str | None:
     pv = parse(ledger, via)
     opened = describe(ledger, state)
     if not pv["text"]:
-        return ("⛔ via 缺失:file / agent 是移动,必须带 via=你现在站的节点(已打开的那个,逐字照抄:打开索引时不带版本,"
-                f"打开某一版时带 @vN)。第一次可写 via=sessions。已打开:{opened}")
+        return ("⛔ via 缺失:file / agent 是移动,必须带 via=已打开的版本节点(file:<路径>@vN / agent:<id>@vK)。"
+                f"第一次可写 via=sessions。已打开:{opened}")
     if pv["first"]:
         if state.opened:
             return f"⛔ via=sessions/task 只能用于第一次 file / agent;之后必须从已打开的节点跳。已打开:{opened}"

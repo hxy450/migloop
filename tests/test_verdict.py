@@ -63,6 +63,10 @@ def _block(body: str) -> str:
     return "散文报告在前。\n\n```yaml\n" + body + "```\n"
 
 
+def _build(led: atoms.Ledger, data: dict[str, Any]) -> dict[str, Any]:
+    return verdict.build(led, {**data, "ledger": atoms.ledger_identity(led)}, [], {})
+
+
 # ═══════════════ 解析:严格 schema,重复键与无效类型拒绝 ═══════════════
 
 def test_extract_and_parse_reject_bad_blocks() -> None:
@@ -106,6 +110,39 @@ def test_yaml_duplicate_keys_rejected() -> None:
     assert data is None and errs
 
 
+@pytest.mark.parametrize("tail", ["1: x\n", "? [x, y]\n: z\n", "notes: &cycle [*cycle]\n",
+                                 "notes: !!python/object/apply:os.system ['echo invalid']\n"])
+def test_unsafe_or_non_string_yaml_keys_are_diagnostic(tail: str) -> None:
+    pytest.importorskip("yaml")
+    raw = "schema: migloop-verdict/1\ndefects: []\n" + tail
+    loaded = verdict.load_block(_block(raw))
+    assert loaded["found"] and loaded["data"] is None and loaded["errors"]
+    assert loaded["raw"] == raw
+
+
+def test_parser_limits_nesting_size_and_schema_keys() -> None:
+    pytest.importorskip("yaml")
+    for kind, raw in (("yaml", "x: " + "[" * 80 + "0" + "]" * 80),
+                      ("json", "[" * 2000 + "0" + "]" * 2000),
+                      ("json", " " * (verdict._MAX_BLOCK_CHARS + 1))):
+        data, errors = verdict.parse_block(kind, raw)
+        assert data is None and errors
+    assert verdict.validate({"schema": verdict.SCHEMA, "defects": [], 1: "x"})
+    nested: Any = []
+    nested.append(nested)
+    assert verdict.validate({"schema": verdict.SCHEMA, "defects": nested})
+
+
+@pytest.mark.parametrize("spec", ["file:entry/A.ets", "agent:conv-a"])
+def test_schema_requires_node_versions(spec: str) -> None:
+    data = {"schema": verdict.SCHEMA, "root": spec, "defects": [{"id": "A", "title": "t",
+            "repair": {"before": spec, "after": spec}, "entry": [spec],
+            "nodes": [{"node": spec, "role": "正常", "reason": "r"}],
+            "edges": [{"from": spec, "to": spec}]}]}
+    errors = verdict.validate(data)
+    assert len(errors) == 7 and all("缺版本号" in e for e in errors)
+
+
 def test_load_block_and_repair_prompt() -> None:
     lb = verdict.load_block("只有散文")
     assert lb["found"] is False and lb["data"] is None
@@ -136,10 +173,27 @@ def test_nodes_resolve_with_version_range_and_invalid_subjects_stay_invalid(tmp_
     # 主语无效、证据里有合法节点:主语仍无效,不拿证据节点顶替
     data = {"schema": verdict.SCHEMA, "defects": [{"id": "A", "title": "t", "nodes": [
         {"node": "file:nope.ets@v1", "role": "进入·错", "reason": "r", "evidence": ["file:entry/A.ets@v1"]}]}]}
-    built = verdict.build(led, data, [], {})
+    built = _build(led, data)
     n0 = built["defects"][0]["nodes"][0]
     assert not n0["ok"] and n0["key"] is None and n0["reason"] == "r" and n0["evidence"][0]["status"] == "ok"
     assert built["roles"] == {}
+
+
+def test_ambiguous_file_coordinates_never_bind_to_longest_history(tmp_path: Any) -> None:
+    from migloop.filestory import FileStory
+    led = _pool(tmp_path)
+    original = led.stories["/proj/entry/A.ets"]
+    led.stories["/other/entry/A.ets"] = FileStory("/other/entry/A.ets", original.versions + original.versions)
+    for spec in ("file:A.ets@v1", "file:entry/A.ets@v1"):
+        node = verdict.resolve_node(led, spec)
+        assert not node["ok"] and node["key"] is None and "歧义" in node["diag"]
+        assert verdict.resolve_evidence(led, spec)["status"] == "invalid"
+    exact = verdict.resolve_node(led, "file:/proj/entry/A.ets@v1")
+    assert exact["ok"] and exact["key"] == original.path
+    assert not verdict.resolve_node(led, "file:/entry/A.ets@v1")["ok"]
+    assert not verdict.resolve_node(led, "agent:__main__:@v1")["ok"]
+    assert not verdict.resolve_node(led, "file:/proj/entry/A.ets@v" + "9" * 5000)["ok"]
+    assert verdict.resolve_evidence(led, "#abcd:" + "9" * 5000 + "@L1")["status"] in ("invalid", "missing")
 
 
 # ═══════════════ 证据引用:状态独立保留,不吞 ═══════════════
@@ -152,7 +206,7 @@ def test_evidence_refs_keep_their_own_status(tmp_path: Any) -> None:
     data = {"schema": verdict.SCHEMA, "defects": [{"id": "A", "title": "t", "nodes": [
         {"node": "agent:conv-a@v1", "role": "进入·错", "reason": "r",
          "evidence": [good, forged, f"#{cseq}@L{led.lines[cseq]}", "file:entry/A.ets@v1", "file:entry/A.ets@v7", "见上文"]}]}]}
-    built = verdict.build(led, data, [], {})
+    built = _build(led, data)
     n0 = built["defects"][0]["nodes"][0]
     assert n0["ok"]
     st = [(e["type"], e["status"]) for e in n0["evidence"]]
@@ -177,7 +231,7 @@ def test_edges_checked_against_ledger_not_adjacency(tmp_path: Any) -> None:
                   {"from": "agent:conv-a@v1", "to": "file:entry/A.ets@v1", "relation": "派发"},
                   {"from": f"agent:{MAIN_ID}@v2", "to": "agent:conv-a@v1", "relation": "派发"},
                   {"from": "agent:nobody@v1", "to": "file:entry/A.ets@v1", "relation": "写"}]}]}
-    built = verdict.build(led, data, [], {})
+    built = _build(led, data)
     edges = built["defects"][0]["edges"]
     by = {(e["from"]["spec"], e["to"]["spec"]): e for e in edges}
     # 显式边
@@ -194,7 +248,7 @@ def test_edges_checked_against_ledger_not_adjacency(tmp_path: Any) -> None:
     data2 = {"schema": verdict.SCHEMA, "defects": [{"id": "A", "title": "t", "nodes": [
         {"node": "agent:conv-a@v1", "role": "进入·错", "reason": "r"},
         {"node": "file:entry/A.ets@v1", "role": "带病传递", "reason": "r"}]}]}
-    e0 = verdict.build(led, data2, [], {})["defects"][0]["edges"][0]
+    e0 = _build(led, data2)["defects"][0]["edges"][0]
     assert (e0["relation"], e0["status"], e0["implicit"]) == ("写", "true", True)
 
 
@@ -272,7 +326,7 @@ def test_repair_after_cannot_be_marked_diseased(tmp_path: Any) -> None:
              "repair": {"before": "file:entry/A.ets@v1", "after": "file:entry/A.ets@v2"},
              "nodes": [{"node": "file:entry/A.ets@v2", "role": "带病传递", "reason": "r"},
                        {"node": "file:entry/A.ets@v1", "role": "带病传递", "reason": "r"}]}]}
-    built = verdict.build(led, data, [], {})
+    built = _build(led, data)
     n2, n1 = built["defects"][0]["nodes"]
     assert not n2["ok"] and "修复落点" in str(n2["diag"]) and n1["ok"]
     assert [r["v"] for r in built["roles"]["/proj/entry/A.ets"]] == [1]
@@ -282,20 +336,64 @@ def test_identity_mismatch_and_legacy_are_flagged(tmp_path: Any) -> None:
     led = _pool(tmp_path)
     cur = atoms.ledger_identity(led)
     assert cur.startswith(atoms.LEDGER_CODE_VERSION) and cur == atoms.ledger_identity(led)
-    # harness 落的 verdict.json 身份是旧的:告警,主张仍解析
+    # harness 落的 verdict.json 身份是旧的:主张保留,不绑定当前账本
     vj = {"kind": "json", "raw": "{}", "errors": [], "repaired": True, "harness_identity": "atoms-old:1:deadbeef",
           "data": {"schema": verdict.SCHEMA, "ledger": "atoms-old:1:deadbeef", "defects": [
               {"id": "A", "title": "t", "nodes": [{"node": "agent:conv-a@v1", "role": "进入·缺", "reason": "r"}]}]}}
     p = probe.probe_payload(led, _run_dir(tmp_path, [], "散文", vj))
     s = p["structured"]
     assert s["identity"]["match"] is False and s["identity"]["claimed"] == "atoms-old:1:deadbeef" and s["repaired"] is True
-    assert p["roles"]["agent-c"][0]["role"] == "进入·缺" and p["legacy"] is False
+    assert p["roles"] == {} and p["legacy"] is False
+    assert s["defects"][0]["nodes"][0]["role"] == "进入·缺"
+    assert s["defects"][0]["nodes"][0]["key"] is None
+    assert not s["identity"]["bound"]
     # 没有结论块:legacy,散文环照旧解析
     p2 = probe.probe_payload(led, _run_dir(tmp_path, [], "文件: entry/A.ets\n环 1  conv-a(agent-c)v1 写 A.ets@v1   判定: 错\n故障进入点: 环 1\n", name="legacy"))
     assert p2["legacy"] is True and p2["structured"] is None and p2["verdicts"]["agent-c"][0]["verdict"] == "错"
     # 块存在但校验失败:structured 带 errors、原文保留,roles 空,页面不整体报错
     p3 = probe.probe_payload(led, _run_dir(tmp_path, [], _block("schema: migloop-verdict/1\ndefects: [{id: A}]\n"), name="broken"))
     assert p3["legacy"] is False and p3["structured"]["errors"] and p3["roles"] == {} and "defects" in p3["structured"]["raw"]
+
+
+@pytest.mark.parametrize("model,harness,expected", [
+    ("current", "current", "matched"), ("current", None, "matched"),
+    ("old", "current", "mismatch"), ("current", "old", "mismatch"),
+    ("old", "old", "mismatch"), (None, "current", "missing"), (None, None, "missing"),
+])
+def test_identity_sources_never_override_each_other(tmp_path: Any, model: str | None,
+                                                   harness: str | None, expected: str) -> None:
+    led = _pool(tmp_path)
+    current = atoms.ledger_identity(led)
+    model = current if model == "current" else model
+    harness = current if harness == "current" else harness
+    data = {"schema": verdict.SCHEMA, "ledger": model, "root": "file:entry/A.ets@v2", "defects": [{
+        "id": "A", "title": "t", "repair": {"before": "file:entry/A.ets@v1", "after": "file:entry/A.ets@v2",
+                                              "evidence": ["file:entry/A.ets@v2"]},
+        "entry": ["agent:conv-a@v1"],
+        "nodes": [{"node": "agent:conv-a@v1", "role": "进入·错", "reason": "原始原因",
+                   "evidence": [_ref(led, _seq_of(led, "agent-c", "Write"))],
+                   "checks": [{"claim": "模型说已确认", "result": "true"}]}],
+        "edges": [{"from": "agent:conv-a@v1", "to": "file:entry/A.ets@v1", "relation": "写"}]}]}
+    built = verdict.build(led, data, [], {"harness_identity": harness})
+    identity = built["identity"]
+    assert identity["model"] == model and identity["harness"] == harness and identity["current"] == current
+    assert identity["status"] == expected
+    d = built["defects"][0]
+    node = d["nodes"][0]
+    assert node["reason"] == "原始原因" and node["role"] == "进入·错"
+    assert node["checked"] == "not_checked" and node["checks"][0] == {
+        "claim": "模型说已确认", "result": "true", "source": "model"}
+    if expected == "matched":
+        assert identity["bound"] and built["roles"] and built["fixed"]
+        assert d["edges"][0]["status"] == "true"
+    else:
+        assert not identity["bound"] and built["roles"] == {} and built["fixed"] == []
+        for subject in [built["root"], d["repair"]["before"], d["repair"]["after"], d["entry"][0], node,
+                        d["edges"][0]["from"], d["edges"][0]["to"]]:
+            assert not subject["ok"] and subject["key"] is None and subject["diag"]
+        assert node["evidence"][0]["status"] == "not_checked"
+        assert d["repair"]["evidence"][0]["status"] == "not_checked"
+        assert d["edges"][0]["status"] == "not_checked"
 
 
 def test_guide_and_sessions_carry_the_contract(tmp_path: Any) -> None:

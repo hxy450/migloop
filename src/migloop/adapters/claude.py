@@ -414,8 +414,14 @@ def _shell_bases(command: str | None, cwd: str | None) -> list[str]:
     return list(dict.fromkeys(os.path.abspath(x) for x in bases if x))
 
 
+def _frozen_mode() -> bool:
+    return bool(os.environ.get("MIGLOOP_FROZEN_POOL", "").strip())
+
+
 def _resolve_source_path(raw: str | None, bases: list[str]) -> str | None:
     """把工具输入/输出中的路径解析到本机真实文件；不猜不存在的路径。"""
+    if _frozen_mode():
+        return None                              # 冻结转录中的 cwd/source 路径不是获准补读的实时文件
     value = _drive_path(raw)
     if not value or "$" in value or "%" in value:
         return None
@@ -505,7 +511,7 @@ def _infer_visible_source_lines(
     - `cat file | grep x` 只会匹配最终 grep 输出的行；
     - `grep -l/-c/-q`、存在性检查和路径列表不会被当成源码行。
     """
-    if tool_name not in ("Grep", "Bash", "PowerShell") or not (output or "").strip():
+    if _frozen_mode() or tool_name not in ("Grep", "Bash", "PowerShell") or not (output or "").strip():
         return []
     command = ""
     if isinstance(inp, dict):
@@ -633,6 +639,8 @@ def _find_gradle_root(paths: Any) -> str | None:
     (settings.gradle / gradlew),取得票最多的那个目录。
     不能用读取路径的公共前缀——只要有一次读取落在工程外(如 .gradle/caches),
     公共前缀就会塌到用户主目录,扫描它等于遍历整台机器。"""
+    if _frozen_mode():
+        return None
     ROOT_MARKERS = ("settings.gradle", "settings.gradle.kts", "gradlew")
     votes: dict[str, int] = {}
     for p in paths:
@@ -661,7 +669,7 @@ def _scan_android_total(
     """扫描安卓工程根,算出"分母"——工程一共多少源文件/多少行,
     才能把视野换算成覆盖率。工程不在本机就返回 None(视野仍是绝对值,只是没有百分比)。
     注意:本机这份代码可能与当时跑迁移的版本不同,覆盖率是近似值。"""
-    if not root or not os.path.isdir(root):
+    if _frozen_mode() or not root or not os.path.isdir(root):
         return None
     skip = ("/build/", "/.git/", "/.gradle/", "/spec/", "/test/", "/androidtest/",
             "/.idea/", "/node_modules/")
@@ -700,6 +708,17 @@ def _scan_android_total(
             "code_files": code_files, "code_lines": code_lines,
             "inventory": inventory,          # 全量文件清单:未被读过的也要能画出来
             "root": root.replace(os.sep, "/")} if files else None
+
+
+def _live_source_line_count(path: str) -> int:
+    """普通报告可补实时行数;冻结实验只认转录自带的 numLines/totalLines。"""
+    if _frozen_mode():
+        return 0
+    try:
+        with open(path, encoding="utf-8", errors="ignore") as stream:
+            return sum(1 for _ in stream)
+    except OSError:
+        return 0
 
 
 def _abort_reason(last_rec: Any) -> str | None:
@@ -742,14 +761,14 @@ _SUB_CACHE_MAX = 2048
 
 
 def _sub_sig(jl_path: str, meta_path: str, cwd: str | None) -> tuple[Any, ...] | None:
-    """两个文件的 (mtime_ns, size) + cwd;stat 不到(竞态删除)返回 None 不缓存。"""
+    """两个文件的 (mtime_ns, size) + cwd + 冻结模式;不复用含实时源码补全的普通缓存。"""
     try:
         j = os.stat(jl_path) if os.path.isfile(jl_path) else None
         m = os.stat(meta_path)
     except OSError:
         return None
     return (j.st_mtime_ns if j else 0, j.st_size if j else 0,
-            m.st_mtime_ns, m.st_size, cwd)
+             m.st_mtime_ns, m.st_size, cwd, _frozen_mode())
 
 
 def _merge_prefixed_specs(
@@ -944,11 +963,7 @@ def build_lineage(
             for start, count in event["intervals"]:
                 m["_read_iv"].setdefault(path, []).append((start, count))
                 m["_read_lines"][path] = m["_read_lines"].get(path, 0) + count
-            try:
-                with open(path, encoding="utf-8", errors="ignore") as stream:
-                    total = sum(1 for _ in stream)
-            except OSError:
-                total = 0
+            total = _live_source_line_count(path)
             if total:
                 m["_read_total"][path] = max(m["_read_total"].get(path, 0), total)
     contributors = list(main_by_stage.values()) + agents
@@ -2063,13 +2078,7 @@ def extract(path: str) -> dict[str, Any]:
                                                         entry["_read_lines"][rp] = (
                                                             entry["_read_lines"].get(rp, 0) + count
                                                         )
-                                                    try:
-                                                        with open(
-                                                            rp, encoding="utf-8", errors="ignore"
-                                                        ) as stream:
-                                                            total = sum(1 for _ in stream)
-                                                    except OSError:
-                                                        total = 0
+                                                    total = _live_source_line_count(rp)
                                                     if total:
                                                         entry["_read_total"][rp] = max(
                                                             entry["_read_total"].get(rp, 0), total

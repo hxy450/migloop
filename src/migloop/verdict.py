@@ -15,7 +15,7 @@ import json
 import re
 from typing import Any
 
-from . import atoms, filestory
+from . import atoms
 
 SCHEMA = "migloop-verdict/1"
 ROLES = ("正常", "带病传递", "进入·错", "进入·缺", "无法确认")
@@ -30,6 +30,9 @@ _REPAIR = {"before", "after", "evidence"}
 _CHECK = {"claim", "result"}
 NODE_RE = re.compile(r"^(file|agent):(.+?)(?:@v(\d+))?$")
 _FENCE = re.compile(r"```[ \t]*(yaml|yml|json|verdict)?[^\n]*\n(.*?)```", re.DOTALL)
+_MAX_BLOCK_CHARS = 1_000_000
+_MAX_DEPTH = 32
+_MAX_ITEMS = 20_000
 
 
 # ═══════════════ 抽块 / 解析 / 校验 ═══════════════
@@ -58,12 +61,33 @@ def _no_dup(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
     return out
 
 
+def _structure_error(data: Any) -> str | None:
+    pending = [(data, 0)]
+    count = 0
+    while pending:
+        value, depth = pending.pop()
+        count += 1
+        if depth > _MAX_DEPTH or count > _MAX_ITEMS:
+            return "结论块嵌套过深或项目过多"
+        if isinstance(value, dict):
+            if any(not isinstance(k, str) for k in value):
+                return "映射键必须是字符串"
+            pending.extend((v, depth + 1) for v in value.values())
+        elif isinstance(value, list):
+            pending.extend((v, depth + 1) for v in value)
+    return None
+
+
 def parse_block(kind: str, raw: str) -> tuple[Any, list[str]]:
     """安全解析;重复键、语法错误都报出来,不猜。YAML 需要 PyYAML(没有就只收 JSON)。"""
+    if len(raw) > _MAX_BLOCK_CHARS:
+        return None, [f"结论块过大(最多 {_MAX_BLOCK_CHARS} 字符)"]
     if kind == "json":
         try:
-            return json.loads(raw, object_pairs_hook=_no_dup), []
-        except ValueError as e:
+            data = json.loads(raw, object_pairs_hook=_no_dup)
+            error = _structure_error(data)
+            return (None, [error]) if error else (data, [])
+        except (ValueError, RecursionError) as e:
             return None, [f"JSON 解析失败: {e}"]
     try:
         import yaml
@@ -71,12 +95,29 @@ def parse_block(kind: str, raw: str) -> tuple[Any, list[str]]:
         return None, ["需要 PyYAML 才能解析 YAML 块;改输出 JSON"]
 
     class _Strict(yaml.SafeLoader):
-        pass
+        def __init__(self, stream: str) -> None:
+            super().__init__(stream)
+            self.verdict_depth = 0
+            self.verdict_items = 0
+
+        def compose_node(self, parent: Any, index: Any) -> Any:
+            if self.check_event(yaml.AliasEvent):
+                raise yaml.YAMLError("结论块不允许 YAML 别名")
+            self.verdict_depth += 1
+            self.verdict_items += 1
+            if self.verdict_depth > _MAX_DEPTH or self.verdict_items > _MAX_ITEMS:
+                raise yaml.YAMLError("结论块嵌套过深或项目过多")
+            try:
+                return super().compose_node(parent, index)
+            finally:
+                self.verdict_depth -= 1
 
     def _mapping(loader: Any, node: Any, deep: bool = False) -> dict[Any, Any]:
         seen: set[Any] = set()
         for k_node, _v in node.value:
             key = loader.construct_object(k_node, deep=deep)
+            if not isinstance(key, str):
+                raise yaml.constructor.ConstructorError(None, None, "映射键必须是字符串", k_node.start_mark)
             if key in seen:
                 raise yaml.constructor.ConstructorError(None, None, f"重复键: {key}", k_node.start_mark)
             seen.add(key)
@@ -86,7 +127,7 @@ def parse_block(kind: str, raw: str) -> tuple[Any, list[str]]:
                             lambda loader, node: _mapping(loader, node, True))
     try:
         return yaml.load(raw, Loader=_Strict), []
-    except yaml.YAMLError as e:
+    except (yaml.YAMLError, RecursionError) as e:
         return None, [f"YAML 解析失败: {str(e).splitlines()[0] if str(e) else e}"]
 
 
@@ -95,7 +136,9 @@ def _is_str(x: Any) -> bool:
 
 
 def _check_keys(obj: dict[str, Any], allowed: set[str], where: str, errs: list[str]) -> None:
-    extra = sorted(set(obj) - allowed)
+    if any(not isinstance(k, str) for k in obj):
+        errs.append(f"{where}: 映射键必须是字符串")
+    extra = sorted(k for k in obj if isinstance(k, str) and k not in allowed)
     if extra:
         errs.append(f"{where}: 未知键 {', '.join(extra)}")
 
@@ -103,8 +146,12 @@ def _check_keys(obj: dict[str, Any], allowed: set[str], where: str, errs: list[s
 def _check_node_spec(x: Any, where: str, errs: list[str]) -> None:
     if not _is_str(x):
         errs.append(f"{where}: node 必须是 file:<路径>@v<N> / agent:<id>@v<K> 字符串")
-    elif not NODE_RE.match(x.strip()):
-        errs.append(f"{where}: 坐标格式不对 {x!r}")
+    else:
+        match = NODE_RE.match(x.strip())
+        if match is None:
+            errs.append(f"{where}: 坐标格式不对 {x!r}")
+        elif match.group(3) is None:
+            errs.append(f"{where}: 缺版本号(@v<N>)")
 
 
 def validate(data: Any) -> list[str]:
@@ -112,6 +159,9 @@ def validate(data: Any) -> list[str]:
     errs: list[str] = []
     if not isinstance(data, dict):
         return ["顶层必须是映射"]
+    structure_error = _structure_error(data)
+    if structure_error:
+        return [structure_error]
     _check_keys(data, _TOP, "顶层", errs)
     if data.get("schema") != SCHEMA:
         errs.append(f"schema 必须是 {SCHEMA}(现在是 {data.get('schema')!r})")
@@ -238,6 +288,8 @@ def repair_prompt(lb: dict[str, Any]) -> str:
 # ═══════════════ 节点 / 证据 / 边核回账本 ═══════════════
 
 def _main_agent(ledger: atoms.Ledger, sid: str) -> atoms.AgentRec | None:
+    if not sid:
+        return None
     mains = [k for k in ledger.agents if k.startswith("__main__")]
     hit = [k for k in mains if k.split(":", 1)[-1].startswith(sid) or (sid and sid.startswith(k.split(":", 1)[-1]))]
     return ledger.agents[hit[0]] if len(hit) == 1 else None
@@ -267,10 +319,18 @@ def resolve_node(ledger: atoms.Ledger, spec: Any) -> dict[str, Any]:
     kind, hint, vs = m.group(1), m.group(2).strip(), m.group(3)
     out["kind"] = kind
     if kind == "file":
-        key = filestory.find_story_path(ledger.stories, hint)
-        if not key:
+        normalized = hint.replace("\\", "/")
+        exact = [p for p in ledger.stories if p.replace("\\", "/") == normalized]
+        suffix = "/" + normalized.lstrip("/")
+        absolute = normalized.startswith("/") or re.match(r"^[A-Za-z]:/", normalized)
+        candidates = exact if absolute else exact or [p for p in ledger.stories if p.replace("\\", "/").endswith(suffix)]
+        if len(candidates) > 1:
+            out["diag"] = f"文件坐标有歧义({len(candidates)} 个匹配): {hint};请使用完整路径"
+            return out
+        if not candidates:
             out["diag"] = f"文件不在账本: {hint}"
             return out
+        key = candidates[0]
         label = key.replace("\\", "/").rsplit("/", 1)[-1]
     else:
         a = _agent(ledger, hint)
@@ -283,7 +343,10 @@ def resolve_node(ledger: atoms.Ledger, spec: Any) -> dict[str, Any]:
         out["diag"] = "缺版本号(@v<N>)"
         out["label"] = label
         return out
-    v = int(vs)
+    if len(vs.lstrip("0")) > 12:
+        out["diag"] = "版本越界"
+        return out
+    v = int(vs.lstrip("0") or "0")
     n = _n_versions(ledger, kind, key)
     out["v"] = v
     out["label"] = f"{label}@v{v}" if kind == "file" else f"{label} v{v}"
@@ -309,8 +372,13 @@ def resolve_evidence(ledger: atoms.Ledger, ev: Any) -> dict[str, Any]:
     m = atoms.REF_RE.search(s)
     if m:
         tag = m.group(1) or m.group(5)
-        hit, status = atoms.resolve_ref(ledger, int(m.group(2)), int(m.group(3)),
-                                        int(m.group(4)) if m.group(4) is not None else None, tag)
+        try:
+            no, line = int(m.group(2)), int(m.group(3))
+            block = int(m.group(4)) if m.group(4) is not None else None
+        except ValueError:
+            return {"ref": s, "type": "action", "status": "invalid", "seq": None, "aid": None, "v": None,
+                    "diag": "动作引用数字超出解析范围"}
+        hit, status = atoms.resolve_ref(ledger, no, line, block, tag)
         out: dict[str, Any] = {"ref": s, "type": "action", "status": status, "seq": hit, "aid": None, "v": None}
         if hit is not None:
             out["aid"], out["v"] = _seq_owner(ledger, hit)
@@ -410,7 +478,8 @@ def check_edge(ledger: atoms.Ledger, a: dict[str, Any], b: dict[str, Any],
 def _norm_checks(checks: Any) -> list[dict[str, str]]:
     out: list[dict[str, str]] = []
     for c in checks or []:
-        out.append({"claim": str(c.get("claim") or ""), "result": str(c.get("result") or "not_checked")})
+        out.append({"claim": str(c.get("claim") or ""), "result": str(c.get("result") or "not_checked"),
+                    "source": "model"})
     return out
 
 
@@ -419,30 +488,50 @@ def build(ledger: atoms.Ledger, data: dict[str, Any] | None, errors: list[str],
     """校验过的块 → 页面载荷:defects(节点 / 边 / 修复锚点各带核验结果)+ roles(按 键 → [(缺陷, 版本, 角色)] 摊平,
     只收主语有效的节点)+ fixed(修复落点)。errors 非空时 data 为 None,只回原文与错误。"""
     cur = atoms.ledger_identity(ledger)
-    claimed = meta.get("harness_identity") or (data or {}).get("ledger")
+    model = (data or {}).get("ledger") or None
+    harness = meta.get("harness_identity") or None
+    conflict = any(x != cur for x in (model, harness) if x is not None)
+    bound = bool(model and not conflict)
+    status = "mismatch" if conflict else "matched" if bound else "missing"
+    diag = ("账本身份不匹配,原始主张未绑定当前账本" if conflict else
+            "模型未记录账本身份,原始主张未绑定当前账本" if not bound else None)
     out: dict[str, Any] = {
         "schema": (data or {}).get("schema"), "kind": meta.get("kind"), "raw": meta.get("raw"),
         "errors": list(errors), "repaired": bool(meta.get("repaired")),
-        "identity": {"current": cur, "claimed": claimed, "match": (claimed == cur) if claimed else None},
+        "identity": {"current": cur, "claimed": model or harness, "model": model, "harness": harness,
+                     "match": False if conflict else True if bound else None,
+                     "bound": bound, "status": status, "diag": diag},
         "root": None, "defects": [], "roles": {}, "fixed": [], "notes": (data or {}).get("notes"),
     }
     if data is None:
         return out
+
+    def node(spec: Any) -> dict[str, Any]:
+        if bound:
+            return resolve_node(ledger, spec)
+        return {"spec": str(spec), "kind": None, "key": None, "v": None, "ok": False,
+                "diag": diag, "label": str(spec)}
+
+    def evidence(ref: Any) -> dict[str, Any]:
+        if bound:
+            return resolve_evidence(ledger, ref)
+        return {"ref": str(ref), "type": "text", "status": "not_checked", "diag": diag}
+
     if data.get("root"):
-        out["root"] = resolve_node(ledger, data["root"])
+        out["root"] = node(data["root"])
     roles: dict[str, list[dict[str, Any]]] = {}
     for d in data.get("defects") or []:
         did = str(d.get("id"))
         rep = d.get("repair") or {}
-        before = resolve_node(ledger, rep["before"]) if rep.get("before") else None
-        after = resolve_node(ledger, rep["after"]) if rep.get("after") else None
-        rep_ev = [resolve_evidence(ledger, x) for x in rep.get("evidence") or []]
-        entries = [resolve_node(ledger, x) for x in d.get("entry") or []]
+        before = node(rep["before"]) if rep.get("before") else None
+        after = node(rep["after"]) if rep.get("after") else None
+        rep_ev = [evidence(x) for x in rep.get("evidence") or []]
+        entries = [node(x) for x in d.get("entry") or []]
         entry_keys = {(e["kind"], e["key"], e["v"]) for e in entries if e["ok"]}
         nodes: list[dict[str, Any]] = []
         for n in d.get("nodes") or []:
-            r = resolve_node(ledger, n.get("node"))
-            ev = [resolve_evidence(ledger, x) for x in n.get("evidence") or []]
+            r = node(n.get("node"))
+            ev = [evidence(x) for x in n.get("evidence") or []]
             role = str(n.get("role"))
             if (r["ok"] and after and after["ok"] and role in RED
                     and (r["kind"], r["key"], r["v"]) == (after["kind"], after["key"], after["v"])):
@@ -459,7 +548,7 @@ def build(ledger: atoms.Ledger, data: dict[str, Any] | None, errors: list[str],
         edges: list[dict[str, Any]] = []
         explicit: set[tuple[str, str]] = set()
         for e in d.get("edges") or []:
-            fa, fb = resolve_node(ledger, e.get("from")), resolve_node(ledger, e.get("to"))
+            fa, fb = node(e.get("from")), node(e.get("to"))
             st, rel, note = check_edge(ledger, fa, fb, e.get("relation"))
             edges.append({"from": fa, "to": fb, "relation": rel, "claimed": e.get("relation"), "status": st,
                           "note": note, "implicit": False, "model_note": e.get("note")})

@@ -220,6 +220,12 @@
   .wire.via { stroke: #2b6cb0; stroke-dasharray: 6 3; stroke-width: 1.5; opacity: .8; }
   .wire.via.differ { stroke: #c05621; }
   .wire.extra { opacity: .75; }
+  .wire.route { stroke: #2b6cb0; stroke-width: 1.8; opacity: .9; pointer-events: stroke; }
+  .wire.route.differ { stroke: #c05621; stroke-dasharray: 5 3; }
+  .route-step { fill: #2b6cb0; font: 10px var(--mono); paint-order: stroke; stroke: var(--surface); stroke-width: 4px; cursor: pointer; pointer-events: auto; }
+  .route-step.differ { fill: #c05621; }
+  .pvisit details { margin-top: 4px; }
+  .pvisit pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 11px; }
   .prow { border-left: 3px solid var(--ring); padding: 4px 8px; margin: 6px 0; border-radius: 0 6px 6px 0; background: var(--wash); }
   .prow.r-err, .prow.r-carry { border-left-color: var(--c-fix); } .prow.r-gap { border-left-color: #b8860b; } .prow.r-ok { border-left-color: var(--c-gen); }
   .prow .phd { display: flex; gap: 6px; align-items: baseline; flex-wrap: wrap; margin-bottom: 3px; }
@@ -696,18 +702,18 @@
       Object.keys(extra || {}).forEach(function (k) { props[k] = extra[k]; });
       return xtNode("file", props);
     }
-    // 文件原子 → 写者分组子节点;每组锚在该写者写这个文件的最后一个 agent 版本
+    // 文件原子 → 写者的精确版本;同一个 agent 的不同版本各自成节点。
     function expandFile(node, done) {
       atomFile(node.path, function (fa, err) {
         if (!fa) { node.busy = false; done("(" + (err || "未知") + ")"); return; }
         var groups = [], byA = {};
         (fa.versions || []).forEach(function (vv) {
           if (node.anchorV && vv.v > node.anchorV) return;   // 时间截断:≤v 才有因果
-          var g = byA[vv.by];
-          if (!g) { g = byA[vv.by] = { by: vv.by, name: vv.by_name, vs: [], ver: null, vias: {} }; groups.push(g); }
+          var writerKey = vv.by + "@" + vv.by_ver;
+          var g = byA[writerKey];
+          if (!g) { g = byA[writerKey] = { by: vv.by, name: vv.by_name, vs: [], ver: null, vias: {} }; groups.push(g); }
           g.vs.push(vv.v);
           if (vv.by_ver != null && (g.ver == null || vv.by_ver > g.ver)) g.ver = vv.by_ver;
-          if (vv.by_ver != null && (g.verMin == null || vv.by_ver < g.verMin)) g.verMin = vv.by_ver;
           g.vias[vv.via] = 1;
         });
         var ch = node.isRoot ? chainByFile[node.path] : null;
@@ -724,7 +730,7 @@
           if (g.vias.script) badges.push({ cls: "via", t: "脚本落盘" });
           else if (g.vias.shell) badges.push({ cls: "via", t: "shell" });
           addKid(node, xtNode("agent", {
-            aid: g.by, anchorVer: g.ver, verMin: g.verMin, isWriter: true, sharp: !!sharp[agentKey(g.by)],
+            aid: g.by, anchorVer: g.ver, isWriter: true, sharp: !!sharp[agentKey(g.by)],
             label: (sharp[agentKey(g.by)] ? "★ " : "") + (g.name || agentLabelOf(g.by)) + (g.ver != null ? " v" + g.ver : ""),
             badges: badges
           }));
@@ -804,6 +810,7 @@
       if (node.traj) { renderTree(tid); return; }          // 轨迹树的节点不沿账本展开 / 折叠,点它只看抽屉
       if (node.busy || node.kind === "leaf" || node.isRight || node.possible) { renderTree(tid); return; }
       if (node.expanded) { collapse(node); renderTree(tid); return; }
+      if (node.ledgerKid) { expandLedgerKids(node, null); return; }
       node.busy = true;
       var done = function (err) {
         if (err) { node.label += " " + err; }
@@ -820,6 +827,8 @@
       else return;
       var rs = probeReason(node);
       if (rs) side.insertBefore(rs, side.querySelector(".body"));
+      var visits = probeVisitDetails(node);
+      if (visits) side.insertBefore(visits, side.querySelector(".body:not(.vbody)"));
     }
     function openRoot(spec) {
       if (spec.kind === "file") openFileRoot(spec.path, spec.v || null);
@@ -844,6 +853,7 @@
       autoFloor = MIN_AUTO;
       atomFile(path, function (fa) {
         var anchor = v || (fa ? fa.v : null);
+        root.anchorV = anchor;
         if (!v && fa) root.label = baseName(path) + "@v" + fa.v;
         setRootLabel(baseName(path) + "@v" + anchor, "F:" + path, "file=" + encodeURIComponent(path) + "&v=" + anchor);
         // 下游:读了这一版的 agent(锚在它被喂养的版本);被修文件根再加修复方
@@ -881,6 +891,8 @@
       autoFloor = MIN_AUTO;
       atomAgent(id, function (ag) {
         var anchor = v || (ag ? ag.n_versions : null);
+        root.anchorVer = anchor;
+        if (ag && ag.id) root.aid = ag.id;
         var name = ag ? (ag.label || agentLabelOf(id)) : agentLabelOf(id);
         root.label = name + (anchor ? " v" + anchor : "");
         setRootLabel(name + " v" + anchor, "A:" + (ag ? ag.id : id), "agent=" + encodeURIComponent(ag ? ag.id : id) + "&v=" + anchor);
@@ -921,9 +933,13 @@
     function probeKeyOf(node) { return node.kind === "file" ? node.path : node.kind === "agent" ? node.aid : null; }
     function probeIndex(p) {
       p.byKey = {};
+      p.visitByStep = {};
+      ((p.trajectory || {}).visits || []).forEach(function (v) { p.visitByStep[v.step] = v; });
       (p.steps || []).forEach(function (s) {
         var n = s.node;
         if (!n || s.ok === false) return;          // 失败的调用不算查过
+        if (p.trajectory && p.trajectory.mode === "via" && s.tool !== "file" && s.tool !== "agent") return;
+        if (p.visitByStep[s.i] && p.visitByStep[s.i].status !== "opened") return;
         var k = n.kind === "file" ? n.path : n.kind === "agent" ? n.aid : null;
         if (!k) return;
         (p.byKey[k] = p.byKey[k] || []).push(s);
@@ -964,7 +980,7 @@
       });
       return { vd: hit, other: other };
     }
-    // 角色按 (缺陷, 键, 版本) 落:文件精确到 @v,agent 精确到 v(写者分组节点覆盖 verMin..anchorVer);
+    // 角色按 (缺陷, 键, 版本) 落:文件精确到 @v,agent 精确到 v;
     // 选了缺陷只看那条缺陷的角色 —— 同一节点在 A 下正常、B 下进入错,切换不串色
     function probeRolesFor(node) {
       var k = probeKeyOf(node);
@@ -973,8 +989,7 @@
       var hit = [], other = [];
       (PROBE.roleIdx[k] || []).forEach(function (r) {
         if (PROBE.defect && r.defect !== PROBE.defect) return;
-        var ok = nv == null || r.v === nv
-              || (node.kind === "agent" && node.isWriter && node.verMin != null && r.v >= node.verMin && r.v <= nv);
+        var ok = nv == null || r.v === nv;
         (ok ? hit : other).push(r);
       });
       var fixed = (PROBE.fixIdx[k] || []).filter(function (f) { return (!PROBE.defect || f.defect === PROBE.defect) && (nv == null || f.v === nv); });
@@ -990,6 +1005,14 @@
       var k = probeKeyOf(node);
       var pv = probeVerdictFor(node, k && PROBE.verdicts ? PROBE.verdicts[k] : null);
       return { steps: (k && PROBE.byKey[k]) || [], vd: pv.vd, other: pv.other, mentions: (k && PROBE.mentions[k]) || [] };
+    }
+    function probeStepsFor(node) {
+      if (!PROBE) return [];
+      if (node.traj) return (PROBE.steps || []).filter(function (s) { return (node.trajOpened || []).indexOf(s.i) >= 0; });
+      var k = probeKeyOf(node), v = node.kind === "file" ? node.anchorV : node.anchorVer;
+      return ((k && PROBE.byKey[k]) || []).filter(function (s) {
+        return s.ok !== false && s.node && s.node.kind === node.kind && s.node.v === v;
+      });
     }
     function probeDecorate(d, node) {
       var pm = probeMark(node);
@@ -1025,11 +1048,11 @@
       } else if (pm.mentions.length) {
         d.appendChild(el("span", "badge", "环" + pm.mentions.slice(0, 3).join(",") + " 提到"));
       }
-      var stepsFor = node.traj ? (PROBE.steps || []).filter(function (s) { return (node.trajOpened || []).indexOf(s.i) >= 0; }) : pm.steps;
+      var stepsFor = probeStepsFor(node);
       if (stepsFor.length) {
         d.classList.add("p-seen");
         var stepB = el("span", "badge step", "查 #" + stepsFor.slice(0, 3).map(function (s) { return s.i; }).join(",") + (stepsFor.length > 3 ? "…" : ""));
-        stepB.title = stepsFor.map(function (s) { return "#" + s.i + " " + s.tool + " " + (s.scope || ""); }).join("\n");   // 蓝框只说明查过这个键,范围看这里
+        stepB.title = stepsFor.map(function (s) { return "#" + s.i + " " + s.tool + " " + (s.scope || ""); }).join("\n");
         d.appendChild(stepB);
       } else if (node.kind !== "leaf" && !vd && !pr.hit.length && !pr.fixed.length) {
         d.classList.add("p-dim");
@@ -1054,8 +1077,24 @@
     }
     function openProbeNode(n) {
       if (!n) return;
+      // 图上已有的版本直接定位并打开抽屉,保留调查路线;换根由抽屉的显式按钮执行。
+      if (XT) {
+        var existing = Object.keys(XT.byId).map(function (t) { return XT.byId[t]; }).filter(function (node) {
+          return node.kind === n.kind && probeKeyOf(node) === (n.path || n.aid)
+                 && (node.kind === "file" ? node.anchorV : node.anchorVer) === n.v;
+        })[0];
+        if (existing) { selTid = existing.tid; drawerFor(existing); renderTree(existing.tid); return; }
+      }
       if (n.kind === "file" && n.path) openRoot({ kind: "file", path: n.path, v: n.v || null });
       else if (n.kind === "agent" && n.aid) openRoot({ kind: "agent", id: n.aid, v: n.v || null });
+    }
+    function selectProbeDefect(defect) {
+      PROBE.defect = defect;
+      renderProbe();
+      if (XT) {
+        renderTree(XT.root);
+        if (selTid && XT.byId[selTid]) drawerFor(XT.byId[selTid]);
+      }
     }
     function renderProbe() {
       probeEl.hidden = false;
@@ -1076,21 +1115,24 @@
       if (!PROBE) { probeEl.appendChild(el("div", "sum", "载入一次调查员的跑:树 = 它打开的节点按 via 挂(父 = 它声明的来处),每跳标账本关系;结论按缺陷 × 版本上色,进入点描边;「+N 未查」点开沿账本铺邻居;词法候选看图例开关。")); return; }
       if (PROBE.error) { probeEl.appendChild(el("div", "sum", "载入失败:" + PROBE.error)); return; }
       var sum = el("div", "sum", "");
-      sum.innerHTML = "<b>" + (PROBE.links || []).length + "</b> 环 · 进入点 <b>" + (PROBE.entry != null ? "环 " + (PROBE.entries || [PROBE.entry]).join(" / ") : "未标") + "</b> · 查过 <b>" + Object.keys(PROBE.byKey).length + "</b> 个节点"
+      var queriedCount = PROBE.trajectory ? (PROBE.trajectory.nodes || []).filter(function (n) { return (n.opened || []).length; }).length : Object.keys(PROBE.byKey).length;
+      sum.innerHTML = "<b>" + (PROBE.links || []).length + "</b> 环 · 进入点 <b>" + (PROBE.entry != null ? "环 " + (PROBE.entries || [PROBE.entry]).join(" / ") : "未标") + "</b> · 查过 <b>" + queriedCount + "</b> 个版本节点"
                     + (PROBE.placed != null ? " · 树上 <b>" + PROBE.placed + "</b> · 判定落到树上 <b>"
                         + (PROBE.links || []).filter(function (l) { return l.verdict && l.onTree; }).length + "/"
                         + (PROBE.links || []).filter(function (l) { return l.verdict; }).length + "</b> 环" : "");
       probeEl.appendChild(sum);
       if (PROBE.structured || PROBE.legacy) renderStructuredHead(probeEl);
+      if (PROBE.trajectory && PROBE.trajectory.verification_note) probeEl.appendChild(el("div", "warn", PROBE.trajectory.verification_note));
+      if (PROBE.trajectory && PROBE.trajectory.mode === "via") probeEl.appendChild(el("div", "sum", "箭头 #步号 = 模型声明的查询转移;蓝色为账本有直接关系,橙色虚线为无直接关系。回访与自环全部保留;账本关系只说明记录中的读写或派发。"));
       var dkeys = Object.keys(PROBE.defects || {});
       if (dkeys.length) {
         var chips = el("div", "dchips");
         var all = el("span", PROBE.defect ? "" : "on", "全部");
-        all.addEventListener("click", function () { PROBE.defect = null; renderProbe(); if (XT) renderTree(XT.root); });
+        all.addEventListener("click", function () { selectProbeDefect(null); });
         chips.appendChild(all);
         dkeys.forEach(function (k) {
           var c = el("span", PROBE.defect === k ? "on" : "", k + (PROBE.defects[k] ? " " + PROBE.defects[k] : ""));
-          c.addEventListener("click", function () { PROBE.defect = k; renderProbe(); if (XT) renderTree(XT.root); });
+          c.addEventListener("click", function () { selectProbeDefect(k); });
           chips.appendChild(c);
         });
         probeEl.appendChild(chips);
@@ -1106,7 +1148,7 @@
           probeEl.appendChild(row);
         });
       }
-      probeEl.appendChild(el("div", "sub", "报告的环 · 点一下以它指的节点为根"));
+      probeEl.appendChild(el("div", "sub", "报告的环 · 点一下查看对应版本"));
       (PROBE.links || []).forEach(function (lk) {
         if (PROBE.defect && lk.defect && lk.defect !== PROBE.defect) return;
         var row = el("div", "lk " + (VD_CLS[lk.verdict] || "") + (lk.entry ? " entry" : ""));
@@ -1120,15 +1162,16 @@
         if (first) row.addEventListener("click", function () { openProbeNode(first); });
         probeEl.appendChild(row);
       });
-      probeEl.appendChild(el("div", "sub", "调用步骤 · 点一下以它看的节点为根"));
+      probeEl.appendChild(el("div", "sub", "调用步骤 · 点一下查看对应版本"));
       (PROBE.steps || []).forEach(function (s) {
         var n = s.node, can = !!(n && (n.path || n.aid));
+        var visit = (PROBE.visitByStep || {})[s.i], failed = s.ok === false || (visit && visit.status !== "opened");
         var row = el("div", "st" + (can ? "" : " na"));
-        row.appendChild(el("span", "no", (s.ok === false ? "✗" : "#") + s.i));
+        row.appendChild(el("span", "no", (failed ? "✗" : "#") + s.i));
         var t = el("span", "t", "");
         var tb = el("b", null, s.tool);
         t.appendChild(tb);
-        t.appendChild(document.createTextNode(" " + stepTarget(s) + (s.scope ? " · " + s.scope : "") + (s.ok === false ? " · 失败" : "") + " · " + (Math.round((s.chars || 0) / 100) / 10) + "千字" + (s.via ? " · via " + s.via : "")));
+        t.appendChild(document.createTextNode(" " + stepTarget(s) + (s.scope ? " · " + s.scope : "") + (visit ? " · " + probeVisitStatus(visit.status) : (failed ? " · 失败" : "")) + " · " + (Math.round((s.chars || 0) / 100) / 10) + "千字" + (s.via ? " · via " + s.via : "")));
         t.title = JSON.stringify(s.args);
         row.appendChild(t);
         if (can) row.addEventListener("click", function () { openProbeNode(n); });
@@ -1221,6 +1264,41 @@
       wrap.appendChild(s);
       return wrap;
     }
+    function probeVisitStatus(status) {
+      var labels = { opened: "已打开", rejected: "被拒 · 未打开", error: "失败 · 未打开", pending: "未收到结果 · 未打开", unverified: "返回坐标未验证 · 未计入已打开" };
+      return labels[status] || status;
+    }
+    function probeVisitDetails(node) {
+      if (!PROBE || PROBE.error) return null;
+      var key = probeKeyOf(node), v = node.kind === "file" ? node.anchorV : node.anchorVer;
+      if (!key) return null;
+      var id = node.trajId || node.kind + ":" + key + "@" + (v == null ? "-" : v);
+      var T = PROBE.trajectory || {};
+      var visits = (T.visits || []).filter(function (visit) { return (visit.node || visit.requested_node) === id; });
+      if (!visits.length && !T.visits) {
+        visits = (PROBE.steps || []).filter(function (s) {
+          return s.node && s.node.kind === node.kind && (s.node.path || s.node.aid) === key && s.node.v === v;
+        }).map(function (s) { return { step: s.i, tool: s.tool, scope: s.scope, via: s.via, args: s.args,
+                                      status: s.ok === false ? "error" : "opened" }; });
+      }
+      if (!visits.length) return null;
+      var wrap = el("div", "body vbody pvisits"), block = sec("查询记录 · " + visits.length + " 次");
+      visits.forEach(function (visit) {
+        var row = el("div", "prow pvisit");
+        row.appendChild(el("div", "phd", "#" + visit.step + " " + visit.tool + " · " + probeVisitStatus(visit.status)));
+        if (visit.scope) row.appendChild(el("div", "preason", visit.scope));
+        if (visit.via) row.appendChild(kv("来处", visit.via));
+        if (visit.note) row.appendChild(el("div", "pnote", visit.note));
+        if (visit.result_ref) row.appendChild(kv("转录调用", visit.result_ref));
+        var details = el("details");
+        details.appendChild(el("summary", null, "完整查询参数"));
+        details.appendChild(el("pre", null, JSON.stringify(visit.args || {}, null, 2)));
+        row.appendChild(details);
+        block.appendChild(row);
+      });
+      wrap.appendChild(block);
+      return wrap;
+    }
     function nodeSpecOf(n) {
       if (!n || !n.ok) return null;
       return n.kind === "file" ? { kind: "file", path: n.key, v: n.v } : { kind: "agent", aid: n.key, v: n.v };
@@ -1244,8 +1322,10 @@
       var s = PROBE.structured;
       if (!s) { host.appendChild(el("div", "warn", "legacy:旧式散文报告,按环正则解析,没有新式核验")); return; }
       var idn = s.identity || {};
-      if (idn.match === false) host.appendChild(el("div", "warn", "⚠ 账本身份不匹配:结论是对 " + (idn.claimed || "?") + " 说的,现在是 " + (idn.current || "?") + ";vN / #n 可能已漂,只有按位置对回的引用可信"));
-      else if (idn.match == null) host.appendChild(el("div", "warn", "账本身份未记录(旧 harness 产物),无法确认坐标是否对本账说的"));
+      if (idn.bound === false) host.appendChild(el("div", "warn", (idn.status === "mismatch" ? "⚠ 身份不匹配" : "历史结论 · 身份未验证")
+        + " · 未绑定当前账本。保留结论文字与诊断,不着色、不把引用当作当前证据。" + (idn.diag ? " " + idn.diag : "")));
+      else if (idn.match === false) host.appendChild(el("div", "warn", "⚠ 账本身份不匹配:结论是对 " + (idn.claimed || "?") + " 说的,现在是 " + (idn.current || "?") + ";vN / #n 可能已漂"));
+      else if (idn.match == null) host.appendChild(el("div", "warn", "账本身份未记录,无法确认坐标是否属于当前账本"));
       if (s.repaired) host.appendChild(el("div", "sub", "结论块经过一次 schema 修复重试"));
       if ((s.errors || []).length) {
         host.appendChild(el("div", "bad", "结论块载入失败,主张未上树:\n" + s.errors.slice(0, 8).join("\n") + (s.errors.length > 8 ? "\n…" : "")));
@@ -1334,40 +1414,48 @@
       });
       if (q.probe) loadProbe(q.probe);
     }
-    // ═══════════ 调查树:账本边 + 步号,零推断 ═══════════
-    // 节点只有 agent@版本 / file@版本 两种:模型真的查过的 + 结论块点名的,每个一次。结构只用账本核得出来的边
-    // (写 / 读 / 派发 / 同一文件的前一版);根 = 被修文件的最终版本,生成与修复都在它上游(左);路线只是节点上的步号,
-    // 「出现于 #j」是事实标注不画边;不在根的上下游锥里的(可能有账本边,比如读过链上某一版)单独一列,边照画,不挂人。
-    // 「+N 未查」是账本里这个节点还有几个上游邻居没被查(只按精确版本数),不展开 —— 要看账本邻居,点节点开抽屉。
+    // ═══════════ 调查路线:实体合并,每一次访问与转移都保留 ═══════════
+    // 首访 parent 只负责布局;transitions 负责画完整路线(含回访、自环、多父),账本关系只作每跳标注。
+    // 没有 via 的旧记录仍画账本边;不在根的上下游的结论节点单独放置,不冒充模型打开过。
     function probeBuildTrajectory() {
       var T = PROBE && PROBE.trajectory;
-      if (!T || !T.nodes || !T.nodes.length) return;
+      if (!T || !T.nodes) return;
+      if (!T.nodes.length) {
+        renderEmptyCanvas();
+        document.getElementById("rootlbl").textContent = "本次没有已核验的查询节点";
+        side.innerHTML = "";
+        PROBE.placed = 0; PROBE.rolesOnTree = 0;
+        renderProbe(); return;
+      }
       XT = { byId: {}, seq: 0, root: null, rights: [], rootKind: T.nodes[0].kind, extra: [], unlinkedDepth: null, sideTitle: T.side_title || null, walk: T.mode === "via" };
       var byId = {};
       T.nodes.forEach(function (n) {
         var node = n.kind === "file"
           ? xtNode("file", { path: n.key, anchorV: n.v, label: n.label })
           : xtNode("agent", { aid: n.key, anchorVer: n.v, label: n.label });
-        node.traj = true; node.expanded = true; node.children = [];
+        node.traj = true; node.trajId = n.id; node.expanded = true; node.children = [];
         node.trajOpened = n.opened || []; node.trajSide = n.side; node.edgeRel = n.edge;
+        node.unseenNeighbors = n.unseen_neighbors;
         var b = [];
         if (n.edge) b.push({ cls: "", t: "账本·" + n.edge + (n.skipped ? "·跳过 " + n.skipped + " 版" : "") });
         else if (n.parent && n.side === "up") b.push({ cls: "stale", t: "账本无此边" });
         if (n.note) b.push({ cls: "stale", t: n.note });
         if (n.via && n.side === "up") b.push({ cls: "via", t: "via " + String(n.via).slice(0, 28) });
         if (n.source === "任务") b.push({ cls: "", t: "任务给的" });
-        if (n.source === "结论") b.push({ cls: "via", t: "命中未展开" });
+        if (n.source === "结论" && !node.trajOpened.length) b.push({ cls: "via", t: "结论提及 · 未查询" });
+        if (n.source === "修复落点" && !node.trajOpened.length) b.push({ cls: "via", t: "修复落点 · 未查询" });
         if (n.source === "修复前") b.push({ cls: "stale", t: "修复前" });
         if (n.fixed) b.push({ cls: "", t: "修复后" });
         if (n.appears && n.appears.length) b.push({ cls: "", t: "出现于 #" + n.appears.slice(0, 4).join(",") + (n.appears.length > 4 ? "…" : "") });
         node.badges = b;
         byId[n.id] = node;
       });
-      var root = byId[T.root];
-      root.isRoot = true; root.depth = 0; XT.root = root.tid;
+      var root = byId[T.root] || byId[T.nodes[0].id];
+      root.isRoot = !!T.root; root.depth = 0; XT.root = root.tid;
+      XT.conclusionOnly = !T.root;
       var maxD = 0;
       T.nodes.forEach(function (n) {
-        if (n.id === T.root) return;
+        if (n.id === root.trajId) return;
         var node = byId[n.id];
         if (n.side === "down") { addRight(root, node); return; }
         if (n.side === "root") return;
@@ -1382,9 +1470,17 @@
       // 布局父子之外的账本边也画(同一节点几个上游、同一文件的前一版),不复制节点
       var parentEdge = {};
       T.nodes.forEach(function (n) { if (n.parent && n.side !== "unlinked") parentEdge[n.id + ">" + n.parent] = 1; });
-      (T.edges || []).forEach(function (e) {
-        if (parentEdge[e.from + ">" + e.to] || !byId[e.from] || !byId[e.to]) return;
+      (T.mode === "via" ? [] : (T.edges || [])).forEach(function (e) {
+        if (parentEdge[e.from + ">" + e.to] || parentEdge[e.to + ">" + e.from] || !byId[e.from] || !byId[e.to]) return;
         XT.extra.push({ a: byId[e.from].tid, b: byId[e.to].tid, rel: e.relation });
+      });
+      XT.transitions = [];
+      var transitions = T.transitions || (T.mode === "via" ? T.nodes.filter(function (n) { return n.parent && n.side === "up"; }).map(function (n) {
+        return { from: n.parent, to: n.id, step: (n.opened || [])[0], relation: n.edge, match: n.edge ? "账本有边" : "账本无此边" };
+      }) : []);
+      transitions.forEach(function (tr) {
+        if (!byId[tr.from] || !byId[tr.to]) return;
+        XT.transitions.push({ a: byId[tr.from].tid, b: byId[tr.to].tid, step: tr.step, relation: tr.relation, match: tr.match });
       });
       T.nodes.forEach(function (n) {
         if (n.unseen > 0 && (n.side === "up" || n.side === "root")) addKid(byId[n.id], xtNode("leaf", { label: "+" + n.unseen + " 未查", isLedgerStub: true }));
@@ -1398,8 +1494,9 @@
         tn.badges.push({ cls: d.match === "不重合" ? "stale" : "via", t: "via #" + d.step + " " + mark + (d.match === "跳" ? " " + d.text.slice(0, 16) : "") });
         if (d.from && byId[d.from] && d.match !== "同一节点") XT.via.push({ a: byId[d.from].tid, b: tn.tid, step: d.step, match: d.match });
       });
-      if (root.kind === "file") setRootLabel(root.label, "F:" + root.path, "file=" + encodeURIComponent(root.path) + "&v=" + (root.anchorV || ""));
-      else setRootLabel(root.label, "A:" + root.aid, "agent=" + encodeURIComponent(root.aid) + "&v=" + (root.anchorVer || ""));
+      var rootLabel = (XT.conclusionOnly ? "未查询结论 · " : "") + root.label;
+      if (root.kind === "file") setRootLabel(rootLabel, "F:" + root.path, "file=" + encodeURIComponent(root.path) + "&v=" + (root.anchorV || ""));
+      else setRootLabel(rootLabel, "A:" + root.aid, "agent=" + encodeURIComponent(root.aid) + "&v=" + (root.anchorVer || ""));
       selTid = root.tid;
       drawerFor(root);
       PROBE.placed = Object.keys(PROBE.byKey).length;
@@ -1421,36 +1518,61 @@
       renderTree(XT.root);
       renderProbe();
     }
-    // 路线树上的「+N 未查」:点开沿账本铺出这个节点没在路线上的邻居(普通节点,可继续按账本展开);路线上已有的不重复,不画词法候选
+    // 精确上游邻居:文件只认当前版本的写者,agent 只认截至当前版本的确定读取与派发。
+    function ledgerNeighbors(node, done) {
+      if (Array.isArray(node.unseenNeighbors)) { done(node.unseenNeighbors); return; }
+      if (node.kind === "file") {
+        atomFile(node.path, function (fa, err) {
+          if (!fa) { done(null, err); return; }
+          done((fa.versions || []).filter(function (v) {
+            return (node.anchorV == null || v.v === node.anchorV) && v.by && v.by_ver != null && v.by !== "__external__" && v.by !== "__outband__";
+          }).map(function (v) { return { kind: "agent", key: v.by, v: v.by_ver, relation: "写者 v" + v.v }; }));
+        });
+      } else {
+        atomAgent(node.aid, function (ag, err) {
+          if (!ag) { done(null, err); return; }
+          var out = (ag.reads || []).filter(function (r) {
+            var feed = r.ver != null ? r.ver : r.at;
+            return r.v != null && r.certain !== false && !r.dep && (node.anchorVer == null || feed <= node.anchorVer);
+          }).map(function (r) { return { kind: "file", key: r.path, v: r.v, relation: "读 v" + r.v }; });
+          if (ag.parent && ag.parent.id && ag.parent.ver != null) out.push({ kind: "agent", key: ag.parent.id, v: ag.parent.ver, relation: "派发自 v" + ag.parent.ver });
+          done(out);
+        });
+      }
+    }
+    // 「+N 未查」按服务端同一份精确坐标展开。保留原来的路线孩子,新邻居也不按 writer 版本范围合并。
     function expandLedgerKids(node, stub) {
       if (!node || node.busy) return;
-      var keep = (node.children || []).filter(function (t) { return t !== stub.tid; });
-      delete XT.byId[stub.tid];
-      var route = {};
-      Object.keys(XT.byId).forEach(function (t) {
-        var r = XT.byId[t];
-        if (!r.traj) return;
-        var k = probeKeyOf(r);
-        if (!k) return;
-        var v = r.kind === "file" ? r.anchorV : r.anchorVer;
-        (route[k] = route[k] || []).push(v == null ? "*" : v);
-      });
-      function onRoute(kid) {
-        var k = probeKeyOf(kid);
-        var vs = k && route[k];
-        if (!vs) return false;
-        if (vs.indexOf("*") >= 0) return true;
-        if (kid.kind === "file") return vs.indexOf(kid.anchorV) >= 0;
-        return vs.some(function (v) { return v === kid.anchorVer || (kid.verMin != null && v >= kid.verMin && v <= kid.anchorVer); });
-      }
+      var tree = XT;
       node.busy = true;
-      var fin = function () {
-        var added = (node.children || []).filter(function (t) { var kid = XT.byId[t]; if (!kid) return false; if (onRoute(kid)) { delete XT.byId[t]; return false; } kid.ledgerKid = true; return true; });
-        node.children = keep.concat(added);
+      ledgerNeighbors(node, function (neighbors, err) {
+        if (XT !== tree || XT.byId[node.tid] !== node) return;
+        node.busy = false;
+        if (!neighbors) {
+          if (stub) stub.label = "加载失败 · 点击重试" + (err ? ": " + err : "");
+          renderTree(node.tid); return;
+        }
+        node.children = (node.children || []).filter(function (t) { return !stub || t !== stub.tid; });
+        if (stub) delete XT.byId[stub.tid];
+        var present = {};
+        Object.keys(XT.byId).forEach(function (t) {
+          var n = XT.byId[t], k = probeKeyOf(n), v = n.kind === "file" ? n.anchorV : n.anchorVer;
+          if (k) present[n.kind + ":" + k + "@" + v] = true;
+        });
+        neighbors.forEach(function (n) {
+          var id = n.kind + ":" + n.key + "@" + n.v;
+          if (present[id] || n.v == null) return;
+          present[id] = true;
+          var kid = n.kind === "file" ? fileKid(n.key, n.v) : xtNode("agent", { aid: n.key, anchorVer: n.v, label: agentLabelOf(n.key) + " v" + n.v });
+          kid.ledgerKid = true;
+          kid.badges.push({ cls: "", t: "账本邻居 · 未查询" });
+          if (n.relation) kid.badges.push({ cls: "", t: n.relation });
+          addKid(node, kid);
+        });
         node.expanded = true;
+        if (stub && selTid === stub.tid) { selTid = node.tid; drawerFor(node); }
         renderTree(node.tid);
-      };
-      if (node.kind === "file") expandFile(node, fin); else expandAgent(node, fin);
+      });
     }
     // 调查树只由服务端给(路线树 / 账本边树);没有转录的 run 只做着色与步号,页面不自己铺树
     function nodeCls(node) {
@@ -1545,6 +1667,7 @@
     function renderTree(focusTid) {
       var root = XT.byId[XT.root];
       markHidden();
+      refreshProbePlacement();
       measure(root);
       var rightsH = XT.rights.length ? XT.rights.length * (NODE_H + GAP_Y) - GAP_Y : 0;
       var top = TOP + Math.max(0, (rightsH - root.ext) / 2);
@@ -1562,7 +1685,7 @@
       svg.setAttribute("width", totalW); svg.setAttribute("height", totalH);
       svg.style.width = totalW + "px"; svg.style.height = totalH + "px";
       for (var d = 0; d <= maxD; d++) {
-        var title = d === 0 ? (root.kind === "file" ? "ROOT · 文件" : "ROOT · agent") : (XT.unlinkedDepth === d ? (XT.sideTitle || "查过 · 不在根的上下游") : (XT.walk ? "第 " + d + " 跳" : "上游 " + d));
+        var title = d === 0 ? (XT.conclusionOnly ? "未查询 · 结论提及" : (root.kind === "file" ? "ROOT · 文件" : "ROOT · agent")) : (XT.unlinkedDepth === d ? (XT.sideTitle || "路线外节点") : (XT.walk ? "首访布局 " + d : "上游 " + d));
         var h = el("div", "colhead" + (d === 0 ? (root.kind === "file" ? " root" : " rootA") : ""), title);
         h.style.left = colX(d) + "px"; h.style.width = NODE_W + "px";
         canvas.appendChild(h);
@@ -1593,6 +1716,27 @@
         if (cy < graphEl.scrollTop + 60 || cy > graphEl.scrollTop + vh - 40) graphEl.scrollTop = Math.max(0, cy - vh / 2);
       }
     }
+    function refreshProbePlacement() {
+      if (!PROBE || PROBE.error) return;
+      var placed = {}, seenRoles = {}, roleCount = 0, on = 0, saved = PROBE.defect;
+      PROBE.defect = null;
+      Object.keys(XT.byId).forEach(function (t) {
+        var n = XT.byId[t];
+        if (n.hidden) return;
+        var key = probeKeyOf(n), v = n.kind === "file" ? n.anchorV : n.anchorVer;
+        if (key && probeStepsFor(n).length) placed[n.kind + ":" + key + "@" + v] = true;
+        probeRolesFor(n).hit.forEach(function (r) { seenRoles[r.defect + "|" + r.key + "|" + r.v] = true; });
+      });
+      PROBE.defect = saved;
+      Object.keys(PROBE.roleIdx || {}).forEach(function (k) { (PROBE.roleIdx[k] || []).forEach(function (r) {
+        roleCount++; if (seenRoles[r.defect + "|" + r.key + "|" + r.v]) on++;
+      }); });
+      var count = Object.keys(placed).length;
+      if (PROBE.placed !== count || PROBE.rolesOnTree !== on || PROBE.rolesTotal !== roleCount) {
+        PROBE.placed = count; PROBE.rolesOnTree = on; PROBE.rolesTotal = roleCount;
+        var scroll = probeEl.scrollTop; renderProbe(); probeEl.scrollTop = scroll;
+      }
+    }
     function addTreeNode(node) {
       var d = el("div", "node " + nodeCls(node) + (node.tid === selTid ? " sel" : ""));
       d.style.left = node.x + "px"; d.style.top = node.y + "px"; d.style.width = NODE_W + "px";
@@ -1614,11 +1758,23 @@
       svg.innerHTML = "";
       wireByTid = {};
       var frag = document.createDocumentFragment();
+      var defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
+      [false, true].forEach(function (differ) {
+        var marker = document.createElementNS("http://www.w3.org/2000/svg", "marker");
+        marker.setAttribute("id", differ ? "route-arrow-differ" : "route-arrow");
+        marker.setAttribute("viewBox", "0 0 10 10"); marker.setAttribute("refX", "9"); marker.setAttribute("refY", "5");
+        marker.setAttribute("markerWidth", "6"); marker.setAttribute("markerHeight", "6"); marker.setAttribute("orient", "auto-start-reverse");
+        var tip = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        tip.setAttribute("d", "M 0 0 L 10 5 L 0 10 z"); tip.setAttribute("fill", differ ? "#c05621" : "#2b6cb0");
+        marker.appendChild(tip); defs.appendChild(marker);
+      });
+      frag.appendChild(defs);
       Object.keys(XT.byId).forEach(function (tid) {
         var n = XT.byId[tid];
         if (!n.parent || n.unlinked || n.hidden) return;
         var p = XT.byId[n.parent];
         if (!p || p.hidden) return;
+        if (XT.walk && n.traj && p.traj) return;  // 首访父子线由完整声明转移统一绘制,不重复画成账本结构边
         var a, b;
         if (n.x < p.x) { a = n; b = p; } else { a = p; b = n; }
         var x1 = a.x + NODE_W, y1 = a.y + NODE_H / 2, x2 = b.x, y2 = b.y + NODE_H / 2;
@@ -1631,6 +1787,50 @@
         frag.appendChild(path);
         (wireByTid[tid] = wireByTid[tid] || []).push(path);
         (wireByTid[n.parent] = wireByTid[n.parent] || []).push(path);
+      });
+      var pairCounts = {}, pairUsed = {};
+      (XT.transitions || []).forEach(function (e) {
+        var key = [e.a, e.b].sort().join("|"); pairCounts[key] = (pairCounts[key] || 0) + 1;
+      });
+      (XT.transitions || []).forEach(function (e) {
+        var from = XT.byId[e.a], to = XT.byId[e.b];
+        if (!from || !to || from.hidden || to.hidden) return;
+        var key = [e.a, e.b].sort().join("|"), lane = pairUsed[key] || 0;
+        pairUsed[key] = lane + 1;
+        var offset = (lane - (pairCounts[key] - 1) / 2) * 9;
+        var pathData, tx, ty;
+        if (from === to) {
+          var right = from.x + NODE_W, reach = right + 28 + lane * 15;
+          pathData = "M" + right + "," + (from.y + 6) + " C" + reach + "," + (from.y - 22) + " " + reach + "," + (from.y + NODE_H + 22) + " " + right + "," + (from.y + NODE_H - 5);
+          tx = reach - 3; ty = from.y + NODE_H / 2;
+        } else if (from.x === to.x) {
+          var bend = from.x - 24 - lane * 14;
+          pathData = "M" + from.x + "," + (from.y + NODE_H / 2) + " C" + bend + "," + (from.y + NODE_H / 2) + " " + bend + "," + (to.y + NODE_H / 2) + " " + to.x + "," + (to.y + NODE_H / 2);
+          tx = bend; ty = (from.y + to.y + NODE_H) / 2;
+        } else {
+          var rightward = to.x > from.x;
+          var x1 = from.x + (rightward ? NODE_W : 0), x2 = to.x + (rightward ? 0 : NODE_W);
+          var y1 = from.y + NODE_H / 2, y2 = to.y + NODE_H / 2, mx = (x1 + x2) / 2;
+          pathData = "M" + x1 + "," + y1 + " C" + mx + "," + (y1 + offset) + " " + mx + "," + (y2 + offset) + " " + x2 + "," + y2;
+          tx = mx; ty = (y1 + y2) / 2 + offset * .75 - 4;
+        }
+        var differ = e.match === "账本无此边";
+        var path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        path.setAttribute("d", pathData); path.setAttribute("class", "wire route" + (differ ? " differ" : ""));
+        path.setAttribute("marker-end", differ ? "url(#route-arrow-differ)" : "url(#route-arrow)");
+        path.setAttribute("data-step", e.step);
+        var title = "声明转移 #" + e.step + " · " + from.label + " → " + to.label + " · " + (e.relation || e.match || "账本关系未核验");
+        var pt = document.createElementNS("http://www.w3.org/2000/svg", "title"); pt.textContent = title; path.appendChild(pt);
+        frag.appendChild(path);
+        var label = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        label.setAttribute("x", tx); label.setAttribute("y", ty); label.setAttribute("text-anchor", "middle");
+        label.setAttribute("class", "route-step" + (differ ? " differ" : "")); label.setAttribute("data-step", e.step);
+        label.textContent = "#" + e.step;
+        var lt = document.createElementNS("http://www.w3.org/2000/svg", "title"); lt.textContent = title; label.appendChild(lt);
+        label.addEventListener("click", function (ev) { ev.stopPropagation(); onNode(to.tid); });
+        frag.appendChild(label);
+        (wireByTid[e.a] = wireByTid[e.a] || []).push(path);
+        if (e.a !== e.b) (wireByTid[e.b] = wireByTid[e.b] || []).push(path);
       });
       (XT.via || []).forEach(function (e) {
         var n = XT.byId[e.a], p = XT.byId[e.b];

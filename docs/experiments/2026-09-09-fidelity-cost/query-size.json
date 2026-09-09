@@ -1,0 +1,2041 @@
+{
+  "title": "文本体量消融，不是LLM token/准确率试验",
+  "measurement_status": "completed_with_exclusions",
+  "generated_at": "2026-09-09T05:03:34.664987+00:00",
+  "method": "Current render_file and the same cached ledger per sid; only m_n changes from 40 to 0 in the paired text-size comparison.",
+  "limitations": [
+    "Character counts are Python len(str), not bytes or LLM tokens; no model was called and no accuracy was evaluated.",
+    "Historical return character counts are context only; they are not a baseline because tool code and current ledger can differ.",
+    "Saved queries omitting v use current latest in both arms and are labelled explicitly.",
+    "Explicit m_n=40 is a page of up to 40 eligible rows; recovery checks paginate all rows, and folded classes additionally require m_all=True."
+  ],
+  "selection": {
+    "dice": "dice_via3",
+    "0723": "cases_tools4",
+    "fallback_reason": "cases_tools6 is absent from saved repository runs; use clearly labelled cases_tools4"
+  },
+  "git_head": "7a03465e19ed3fc5083f5e888a5d3199ed26da86",
+  "source_sha256": {
+    "atoms.py": "14e8c2a95fb5cbbde0790f43d6ca1463dab5b11534eba854db5e4c3ea1434241",
+    "atoms_collect.py": "697298ae0789c12c693bc3e6641ba98709cb42bba4c231cfc161dcaa94120cf1",
+    "atoms_text.py": "cd7c3c9cc1561d12a7da74ef6daf14d49d7ecb1b7ade80561404e565e8704561",
+    "filestory.py": "a8bf41dae5a4dabb78741bb50d721dc4b937a92d5cff8153edd34fb3f79c9b34",
+    "service.py": "d0f9008b6cb7faf08df51d89d3d1b41d17d39cce96bc67073b967389346a193f",
+    "probe.py": "c42e8b063c6a8d74069140af89b4e22794724d0e050034ce8a6a6c63fc9d3903"
+  },
+  "source_changed_during_run": false,
+  "ledgers": {
+    "49d451b1": {
+      "identity": "atoms-2026-09-09-snapshot2:80:264fecd6b45553972238673d",
+      "session": "C:\\Users\\hongy\\.claude\\projects\\-export-DiceRoller-0903\\49d451b1-f479-4c4e-bb39-9fa0dd06aeb0.jsonl",
+      "build_seconds": 2.37,
+      "agents": 80,
+      "files": 840
+    },
+    "ff019d8a": {
+      "identity": "atoms-2026-09-09-snapshot2:146:9b0344cc1f125c7b04e588f9",
+      "session": "C:\\Users\\hongy\\.claude\\projects\\-Users-chenjiamin-arkTs-arkts-pilot-project-aippt-version-aippt-0723\\ff019d8a-5172-4cdd-8ce3-77a21682c1b6.jsonl",
+      "build_seconds": 11.455,
+      "agents": 146,
+      "files": 3005
+    }
+  },
+  "ledger_builds": 2,
+  "saved_queries_total": {
+    "queries": 14,
+    "chars_m_n_40": 147655,
+    "chars_m_n_0": 53029,
+    "chars_saved": 94626,
+    "reduction_pct": 64.086,
+    "check_failures": 0,
+    "excluded_queries": 2
+  },
+  "supplemental_versions_total": {
+    "queries": 12,
+    "chars_m_n_40": 164886,
+    "chars_m_n_0": 44856,
+    "chars_saved": 120030,
+    "reduction_pct": 72.796,
+    "check_failures": 0,
+    "excluded_queries": 0
+  },
+  "all_queries_total": {
+    "queries": 26,
+    "chars_m_n_40": 312541,
+    "chars_m_n_0": 97885,
+    "chars_saved": 214656,
+    "reduction_pct": 68.681,
+    "check_failures": 0,
+    "excluded_queries": 2
+  },
+  "by_case": {
+    "EntryAbility.ets": {
+      "queries": 6,
+      "chars_m_n_40": 72590,
+      "chars_m_n_0": 14237,
+      "chars_saved": 58353,
+      "reduction_pct": 80.387,
+      "check_failures": 0,
+      "excluded_queries": 0
+    },
+    "SplashPage.ets": {
+      "queries": 5,
+      "chars_m_n_40": 83798,
+      "chars_m_n_0": 33522,
+      "chars_saved": 50276,
+      "reduction_pct": 59.997,
+      "check_failures": 0,
+      "excluded_queries": 0
+    },
+    "MemberCenterPage.ets": {
+      "queries": 7,
+      "chars_m_n_40": 102899,
+      "chars_m_n_0": 31554,
+      "chars_saved": 71345,
+      "reduction_pct": 69.335,
+      "check_failures": 0,
+      "excluded_queries": 2
+    }
+  },
+  "queries": [
+    {
+      "kind": "saved_query",
+      "label": "dice_via3",
+      "sid": "49d451b1",
+      "source": "docs\\experiments\\2026-09-08-verdict-ui\\dice_via3\\chain02-EntryAbility.ets\\rep1",
+      "source_kind": "transcript",
+      "source_step": 5,
+      "source_result_ref": "toolu_01DfRxgjbypUYf9bZQ6knCtw",
+      "source_is_error": false,
+      "saved_input": {
+        "sid": "49d451b1",
+        "path": "entry/src/main/ets/entryability/EntryAbility.ets",
+        "v": 10,
+        "via": "sessions"
+      },
+      "historical_return_chars": 12507,
+      "status": "ok",
+      "current_file": "/private/tmp/claude-502/-Users-fengyi-Workspace-migbot-set-hmigbot-plus/12b07daf-a671-4616-96a1-c214864ee609/scratchpad/dice-hmos/entry/src/main/ets/entryability/EntryAbility.ets",
+      "current_anchor_v": 10,
+      "current_total_versions": 10,
+      "effective_common_args": {
+        "path": "entry/src/main/ets/entryability/EntryAbility.ets",
+        "root": "/private/tmp/claude-502/-Users-fengyi-Workspace-migbot-set-hmigbot-plus/12b07daf-a671-4616-96a1-c214864ee609/scratchpad/dice-hmos",
+        "v": 10
+      },
+      "ignored_navigation_or_treatment_args": {
+        "sid": "49d451b1",
+        "via": "sessions"
+      },
+      "anchor_note": "saved v retained",
+      "chars_m_n_40": 12271,
+      "chars_m_n_0": 2546,
+      "chars_saved": 9725,
+      "reduction_pct": 79.252,
+      "output_sha256": {
+        "40": "2eee06419838fbd41391ba85691b9f3f043f96c4a676ca8c6f36d9898e9441ef",
+        "0": "b7d7027290608dec1adeb4b98c068cfbcec1eee0cf2a970bc1c8078eb22c93cd"
+      },
+      "preserved": {
+        "writer_spine_rows": 8,
+        "unknown_candidate_signal_rows": 2,
+        "signal_lines": [
+          "- v1 ← 外部输入 | 09-03T15:26 T+1:00 | external · 观测·首次读到 · 窗口内提及 6 条(改动类 3),见末尾提及节 · 观测封口 · 34 行",
+          "- 主会话·593d4e86 v23 | 09-03T21:06 T+6:40 | 条件分支,是否执行未知(候选写) | action(#593d4e86:1424@L465)"
+        ],
+        "count_lines": [
+          "## 提到它的命令(273,其中 259 条账本没记到读写)—— 命令行 / heredoc 体 / 跑的脚本正文 / 工具输出里出现这个路径;版本无法复原或实录外修改时先看这里,action 展开命令原文自己判",
+          "已入账的 14 条(读 7 次、碰过(方向不明) 6 次、写 1 次)脊柱与读者里已有,不再铺",
+          "折叠 正文 172 条、写入内容 11 条、只读检查 5 条(只读检查 = cat / grep / wc / ls;写入内容 = 别的文件正文里列了它;正文 = 说 / 想 / 收件;m_all=1 铺)",
+          "候选仅计数,未展开 71 条;需要时 file(path, v=10, m_n=40, m_from=1) 查看。没有展开不等于没有候选,也不能据此断言无人读写。"
+        ]
+      },
+      "candidates": {
+        "all_mentions": 273,
+        "missing_read_write": 259,
+        "eligible_with_same_m_all": 71,
+        "folded_with_same_m_all": 188,
+        "displayed_m_n_40": 40,
+        "displayed_m_n_0": 0,
+        "recovery_m_n_40_pages": 2,
+        "recovered_eligible_rows": 71,
+        "recovered_all_rows_with_explicit_m_all": 259,
+        "recovered_eligible_sha256": "1219cbc22aeb18f818a0f6d74426866de62f02ab48235919710781ecae33ada3"
+      },
+      "checks": {
+        "non_mention_sections_identical": true,
+        "writer_spine_preserved": true,
+        "unknown_and_candidate_signals_preserved": true,
+        "mention_header_count_preserved": true,
+        "zero_mode_has_no_candidate_rows": true,
+        "zero_mode_has_expansion_hint_when_needed": true,
+        "explicit_40_restores_baseline_exactly": true,
+        "explicit_40_pagination_recovers_all_eligible_candidates": true,
+        "explicit_all_with_40_pagination_recovers_all_missing_candidates": true
+      }
+    },
+    {
+      "kind": "saved_query",
+      "label": "dice_via3",
+      "sid": "49d451b1",
+      "source": "docs\\experiments\\2026-09-08-verdict-ui\\dice_via3\\chain02-EntryAbility.ets\\rep1",
+      "source_kind": "transcript",
+      "source_step": 6,
+      "source_result_ref": "toolu_01KMamXoHLHVa7s5o8r3198o",
+      "source_is_error": false,
+      "saved_input": {
+        "sid": "49d451b1",
+        "path": "entry/src/main/ets/entryability/EntryAbility.ets",
+        "v": 10,
+        "via": "file:entry/src/main/ets/entryability/EntryAbility.ets@v10 写者脊柱",
+        "diff": true,
+        "v_from": 4,
+        "v_to": 6
+      },
+      "historical_return_chars": 14042,
+      "status": "ok",
+      "current_file": "/private/tmp/claude-502/-Users-fengyi-Workspace-migbot-set-hmigbot-plus/12b07daf-a671-4616-96a1-c214864ee609/scratchpad/dice-hmos/entry/src/main/ets/entryability/EntryAbility.ets",
+      "current_anchor_v": 10,
+      "current_total_versions": 10,
+      "effective_common_args": {
+        "path": "entry/src/main/ets/entryability/EntryAbility.ets",
+        "root": "/private/tmp/claude-502/-Users-fengyi-Workspace-migbot-set-hmigbot-plus/12b07daf-a671-4616-96a1-c214864ee609/scratchpad/dice-hmos",
+        "v": 10,
+        "diff": true,
+        "v_from": 4,
+        "v_to": 6
+      },
+      "ignored_navigation_or_treatment_args": {
+        "sid": "49d451b1",
+        "via": "file:entry/src/main/ets/entryability/EntryAbility.ets@v10 写者脊柱"
+      },
+      "anchor_note": "saved v retained",
+      "chars_m_n_40": 13743,
+      "chars_m_n_0": 4018,
+      "chars_saved": 9725,
+      "reduction_pct": 70.763,
+      "output_sha256": {
+        "40": "31ad9aa7bc997585c1e6f1fcdff7f47697ec09c118e550c0a6af5f0f1bd3989e",
+        "0": "3a67afa9ace6c16982dc6e3c03792d3ad4cc4446d4d9c860599bb29c83dd1c4e"
+      },
+      "preserved": {
+        "writer_spine_rows": 3,
+        "unknown_candidate_signal_rows": 1,
+        "signal_lines": [
+          "- 主会话·593d4e86 v23 | 09-03T21:06 T+6:40 | 条件分支,是否执行未知(候选写) | action(#593d4e86:1424@L465)"
+        ],
+        "count_lines": [
+          "## 提到它的命令(273,其中 259 条账本没记到读写)—— 命令行 / heredoc 体 / 跑的脚本正文 / 工具输出里出现这个路径;版本无法复原或实录外修改时先看这里,action 展开命令原文自己判",
+          "已入账的 14 条(读 7 次、碰过(方向不明) 6 次、写 1 次)脊柱与读者里已有,不再铺",
+          "折叠 正文 172 条、写入内容 11 条、只读检查 5 条(只读检查 = cat / grep / wc / ls;写入内容 = 别的文件正文里列了它;正文 = 说 / 想 / 收件;m_all=1 铺)",
+          "候选仅计数,未展开 71 条;需要时 file(path, v=10, m_n=40, m_from=1) 查看。没有展开不等于没有候选,也不能据此断言无人读写。"
+        ]
+      },
+      "candidates": {
+        "all_mentions": 273,
+        "missing_read_write": 259,
+        "eligible_with_same_m_all": 71,
+        "folded_with_same_m_all": 188,
+        "displayed_m_n_40": 40,
+        "displayed_m_n_0": 0,
+        "recovery_m_n_40_pages": 2,
+        "recovered_eligible_rows": 71,
+        "recovered_all_rows_with_explicit_m_all": 259,
+        "recovered_eligible_sha256": "1219cbc22aeb18f818a0f6d74426866de62f02ab48235919710781ecae33ada3"
+      },
+      "checks": {
+        "non_mention_sections_identical": true,
+        "writer_spine_preserved": true,
+        "unknown_and_candidate_signals_preserved": true,
+        "mention_header_count_preserved": true,
+        "zero_mode_has_no_candidate_rows": true,
+        "zero_mode_has_expansion_hint_when_needed": true,
+        "explicit_40_restores_baseline_exactly": true,
+        "explicit_40_pagination_recovers_all_eligible_candidates": true,
+        "explicit_all_with_40_pagination_recovers_all_missing_candidates": true
+      }
+    },
+    {
+      "kind": "supplemental_version",
+      "label": "dice_via3",
+      "sid": "49d451b1",
+      "source": "docs\\experiments\\2026-09-08-verdict-ui\\dice_via3\\chain02-EntryAbility.ets\\rep1",
+      "source_kind": "documented_version_sample",
+      "selection": "generation v1, saved repair-window endpoints and latest",
+      "target": "EntryAbility.ets",
+      "saved_input": {
+        "path": "entry/src/main/ets/entryability/EntryAbility.ets",
+        "v": 1
+      },
+      "status": "ok",
+      "current_file": "/private/tmp/claude-502/-Users-fengyi-Workspace-migbot-set-hmigbot-plus/12b07daf-a671-4616-96a1-c214864ee609/scratchpad/dice-hmos/entry/src/main/ets/entryability/EntryAbility.ets",
+      "current_anchor_v": 1,
+      "current_total_versions": 10,
+      "effective_common_args": {
+        "path": "entry/src/main/ets/entryability/EntryAbility.ets",
+        "root": "/private/tmp/claude-502/-Users-fengyi-Workspace-migbot-set-hmigbot-plus/12b07daf-a671-4616-96a1-c214864ee609/scratchpad/dice-hmos",
+        "v": 1
+      },
+      "ignored_navigation_or_treatment_args": {},
+      "anchor_note": "saved v retained",
+      "chars_m_n_40": 11006,
+      "chars_m_n_0": 1280,
+      "chars_saved": 9726,
+      "reduction_pct": 88.37,
+      "output_sha256": {
+        "40": "2c730394ba12138670d78395ac009589812f27797e10cec90876e6b9b686d296",
+        "0": "6dc8f04846bd4f33640e0bf95e0dbb6511a6167d50c4e98f991bf4481884851b"
+      },
+      "preserved": {
+        "writer_spine_rows": 1,
+        "unknown_candidate_signal_rows": 2,
+        "signal_lines": [
+          "- v1 ← 外部输入 | 09-03T15:26 T+1:00 | external · 观测·首次读到 · 窗口内提及 6 条(改动类 3),见末尾提及节 · 观测封口 · 34 行 ◀",
+          "- 主会话·593d4e86 v23 | 09-03T21:06 T+6:40 | 条件分支,是否执行未知(候选写) | action(#593d4e86:1424@L465)"
+        ],
+        "count_lines": [
+          "## 提到它的命令(273,其中 259 条账本没记到读写)—— 命令行 / heredoc 体 / 跑的脚本正文 / 工具输出里出现这个路径;版本无法复原或实录外修改时先看这里,action 展开命令原文自己判",
+          "已入账的 14 条(读 7 次、碰过(方向不明) 6 次、写 1 次)脊柱与读者里已有,不再铺",
+          "折叠 正文 172 条、写入内容 11 条、只读检查 5 条(只读检查 = cat / grep / wc / ls;写入内容 = 别的文件正文里列了它;正文 = 说 / 想 / 收件;m_all=1 铺)",
+          "候选仅计数,未展开 71 条;需要时 file(path, v=1, m_n=40, m_from=1) 查看。没有展开不等于没有候选,也不能据此断言无人读写。"
+        ]
+      },
+      "candidates": {
+        "all_mentions": 273,
+        "missing_read_write": 259,
+        "eligible_with_same_m_all": 71,
+        "folded_with_same_m_all": 188,
+        "displayed_m_n_40": 40,
+        "displayed_m_n_0": 0,
+        "recovery_m_n_40_pages": 2,
+        "recovered_eligible_rows": 71,
+        "recovered_all_rows_with_explicit_m_all": 259,
+        "recovered_eligible_sha256": "1219cbc22aeb18f818a0f6d74426866de62f02ab48235919710781ecae33ada3"
+      },
+      "checks": {
+        "non_mention_sections_identical": true,
+        "writer_spine_preserved": true,
+        "unknown_and_candidate_signals_preserved": true,
+        "mention_header_count_preserved": true,
+        "zero_mode_has_no_candidate_rows": true,
+        "zero_mode_has_expansion_hint_when_needed": true,
+        "explicit_40_restores_baseline_exactly": true,
+        "explicit_40_pagination_recovers_all_eligible_candidates": true,
+        "explicit_all_with_40_pagination_recovers_all_missing_candidates": true
+      }
+    },
+    {
+      "kind": "supplemental_version",
+      "label": "dice_via3",
+      "sid": "49d451b1",
+      "source": "docs\\experiments\\2026-09-08-verdict-ui\\dice_via3\\chain02-EntryAbility.ets\\rep1",
+      "source_kind": "documented_version_sample",
+      "selection": "generation v1, saved repair-window endpoints and latest",
+      "target": "EntryAbility.ets",
+      "saved_input": {
+        "path": "entry/src/main/ets/entryability/EntryAbility.ets",
+        "v": 4
+      },
+      "status": "ok",
+      "current_file": "/private/tmp/claude-502/-Users-fengyi-Workspace-migbot-set-hmigbot-plus/12b07daf-a671-4616-96a1-c214864ee609/scratchpad/dice-hmos/entry/src/main/ets/entryability/EntryAbility.ets",
+      "current_anchor_v": 4,
+      "current_total_versions": 10,
+      "effective_common_args": {
+        "path": "entry/src/main/ets/entryability/EntryAbility.ets",
+        "root": "/private/tmp/claude-502/-Users-fengyi-Workspace-migbot-set-hmigbot-plus/12b07daf-a671-4616-96a1-c214864ee609/scratchpad/dice-hmos",
+        "v": 4
+      },
+      "ignored_navigation_or_treatment_args": {},
+      "anchor_note": "saved v retained",
+      "chars_m_n_40": 11537,
+      "chars_m_n_0": 1811,
+      "chars_saved": 9726,
+      "reduction_pct": 84.303,
+      "output_sha256": {
+        "40": "28b8a6a5e53ed179ce8fc78ac0786caa8dfb20a4b2de339512ea21a0447ec8dd",
+        "0": "5663282701e92992660b60d5f409a15eedbf72bbeed28b7f85ef602fb6dccecd"
+      },
+      "preserved": {
+        "writer_spine_rows": 4,
+        "unknown_candidate_signal_rows": 2,
+        "signal_lines": [
+          "- v1 ← 外部输入 | 09-03T15:26 T+1:00 | external · 观测·首次读到 · 窗口内提及 6 条(改动类 3),见末尾提及节 · 观测封口 · 34 行",
+          "- 主会话·593d4e86 v23 | 09-03T21:06 T+6:40 | 条件分支,是否执行未知(候选写) | action(#593d4e86:1424@L465)"
+        ],
+        "count_lines": [
+          "## 提到它的命令(273,其中 259 条账本没记到读写)—— 命令行 / heredoc 体 / 跑的脚本正文 / 工具输出里出现这个路径;版本无法复原或实录外修改时先看这里,action 展开命令原文自己判",
+          "已入账的 14 条(读 7 次、碰过(方向不明) 6 次、写 1 次)脊柱与读者里已有,不再铺",
+          "折叠 正文 172 条、写入内容 11 条、只读检查 5 条(只读检查 = cat / grep / wc / ls;写入内容 = 别的文件正文里列了它;正文 = 说 / 想 / 收件;m_all=1 铺)",
+          "候选仅计数,未展开 71 条;需要时 file(path, v=4, m_n=40, m_from=1) 查看。没有展开不等于没有候选,也不能据此断言无人读写。"
+        ]
+      },
+      "candidates": {
+        "all_mentions": 273,
+        "missing_read_write": 259,
+        "eligible_with_same_m_all": 71,
+        "folded_with_same_m_all": 188,
+        "displayed_m_n_40": 40,
+        "displayed_m_n_0": 0,
+        "recovery_m_n_40_pages": 2,
+        "recovered_eligible_rows": 71,
+        "recovered_all_rows_with_explicit_m_all": 259,
+        "recovered_eligible_sha256": "1219cbc22aeb18f818a0f6d74426866de62f02ab48235919710781ecae33ada3"
+      },
+      "checks": {
+        "non_mention_sections_identical": true,
+        "writer_spine_preserved": true,
+        "unknown_and_candidate_signals_preserved": true,
+        "mention_header_count_preserved": true,
+        "zero_mode_has_no_candidate_rows": true,
+        "zero_mode_has_expansion_hint_when_needed": true,
+        "explicit_40_restores_baseline_exactly": true,
+        "explicit_40_pagination_recovers_all_eligible_candidates": true,
+        "explicit_all_with_40_pagination_recovers_all_missing_candidates": true
+      }
+    },
+    {
+      "kind": "supplemental_version",
+      "label": "dice_via3",
+      "sid": "49d451b1",
+      "source": "docs\\experiments\\2026-09-08-verdict-ui\\dice_via3\\chain02-EntryAbility.ets\\rep1",
+      "source_kind": "documented_version_sample",
+      "selection": "generation v1, saved repair-window endpoints and latest",
+      "target": "EntryAbility.ets",
+      "saved_input": {
+        "path": "entry/src/main/ets/entryability/EntryAbility.ets",
+        "v": 6
+      },
+      "status": "ok",
+      "current_file": "/private/tmp/claude-502/-Users-fengyi-Workspace-migbot-set-hmigbot-plus/12b07daf-a671-4616-96a1-c214864ee609/scratchpad/dice-hmos/entry/src/main/ets/entryability/EntryAbility.ets",
+      "current_anchor_v": 6,
+      "current_total_versions": 10,
+      "effective_common_args": {
+        "path": "entry/src/main/ets/entryability/EntryAbility.ets",
+        "root": "/private/tmp/claude-502/-Users-fengyi-Workspace-migbot-set-hmigbot-plus/12b07daf-a671-4616-96a1-c214864ee609/scratchpad/dice-hmos",
+        "v": 6
+      },
+      "ignored_navigation_or_treatment_args": {},
+      "anchor_note": "saved v retained",
+      "chars_m_n_40": 11762,
+      "chars_m_n_0": 2036,
+      "chars_saved": 9726,
+      "reduction_pct": 82.69,
+      "output_sha256": {
+        "40": "8356015eb4e89d411291b03a3504398144b3cccfa695cb33f7ee78666513d475",
+        "0": "9c65649c6aa464a5317fcec4cbe7f6a98d42ddd189cf7767c657c0a53f658647"
+      },
+      "preserved": {
+        "writer_spine_rows": 6,
+        "unknown_candidate_signal_rows": 2,
+        "signal_lines": [
+          "- v1 ← 外部输入 | 09-03T15:26 T+1:00 | external · 观测·首次读到 · 窗口内提及 6 条(改动类 3),见末尾提及节 · 观测封口 · 34 行",
+          "- 主会话·593d4e86 v23 | 09-03T21:06 T+6:40 | 条件分支,是否执行未知(候选写) | action(#593d4e86:1424@L465)"
+        ],
+        "count_lines": [
+          "## 提到它的命令(273,其中 259 条账本没记到读写)—— 命令行 / heredoc 体 / 跑的脚本正文 / 工具输出里出现这个路径;版本无法复原或实录外修改时先看这里,action 展开命令原文自己判",
+          "已入账的 14 条(读 7 次、碰过(方向不明) 6 次、写 1 次)脊柱与读者里已有,不再铺",
+          "折叠 正文 172 条、写入内容 11 条、只读检查 5 条(只读检查 = cat / grep / wc / ls;写入内容 = 别的文件正文里列了它;正文 = 说 / 想 / 收件;m_all=1 铺)",
+          "候选仅计数,未展开 71 条;需要时 file(path, v=6, m_n=40, m_from=1) 查看。没有展开不等于没有候选,也不能据此断言无人读写。"
+        ]
+      },
+      "candidates": {
+        "all_mentions": 273,
+        "missing_read_write": 259,
+        "eligible_with_same_m_all": 71,
+        "folded_with_same_m_all": 188,
+        "displayed_m_n_40": 40,
+        "displayed_m_n_0": 0,
+        "recovery_m_n_40_pages": 2,
+        "recovered_eligible_rows": 71,
+        "recovered_all_rows_with_explicit_m_all": 259,
+        "recovered_eligible_sha256": "1219cbc22aeb18f818a0f6d74426866de62f02ab48235919710781ecae33ada3"
+      },
+      "checks": {
+        "non_mention_sections_identical": true,
+        "writer_spine_preserved": true,
+        "unknown_and_candidate_signals_preserved": true,
+        "mention_header_count_preserved": true,
+        "zero_mode_has_no_candidate_rows": true,
+        "zero_mode_has_expansion_hint_when_needed": true,
+        "explicit_40_restores_baseline_exactly": true,
+        "explicit_40_pagination_recovers_all_eligible_candidates": true,
+        "explicit_all_with_40_pagination_recovers_all_missing_candidates": true
+      }
+    },
+    {
+      "kind": "supplemental_version",
+      "label": "dice_via3",
+      "sid": "49d451b1",
+      "source": "docs\\experiments\\2026-09-08-verdict-ui\\dice_via3\\chain02-EntryAbility.ets\\rep1",
+      "source_kind": "documented_version_sample",
+      "selection": "generation v1, saved repair-window endpoints and latest",
+      "target": "EntryAbility.ets",
+      "saved_input": {
+        "path": "entry/src/main/ets/entryability/EntryAbility.ets",
+        "v": 10
+      },
+      "status": "ok",
+      "current_file": "/private/tmp/claude-502/-Users-fengyi-Workspace-migbot-set-hmigbot-plus/12b07daf-a671-4616-96a1-c214864ee609/scratchpad/dice-hmos/entry/src/main/ets/entryability/EntryAbility.ets",
+      "current_anchor_v": 10,
+      "current_total_versions": 10,
+      "effective_common_args": {
+        "path": "entry/src/main/ets/entryability/EntryAbility.ets",
+        "root": "/private/tmp/claude-502/-Users-fengyi-Workspace-migbot-set-hmigbot-plus/12b07daf-a671-4616-96a1-c214864ee609/scratchpad/dice-hmos",
+        "v": 10
+      },
+      "ignored_navigation_or_treatment_args": {},
+      "anchor_note": "saved v retained",
+      "chars_m_n_40": 12271,
+      "chars_m_n_0": 2546,
+      "chars_saved": 9725,
+      "reduction_pct": 79.252,
+      "output_sha256": {
+        "40": "2eee06419838fbd41391ba85691b9f3f043f96c4a676ca8c6f36d9898e9441ef",
+        "0": "b7d7027290608dec1adeb4b98c068cfbcec1eee0cf2a970bc1c8078eb22c93cd"
+      },
+      "preserved": {
+        "writer_spine_rows": 8,
+        "unknown_candidate_signal_rows": 2,
+        "signal_lines": [
+          "- v1 ← 外部输入 | 09-03T15:26 T+1:00 | external · 观测·首次读到 · 窗口内提及 6 条(改动类 3),见末尾提及节 · 观测封口 · 34 行",
+          "- 主会话·593d4e86 v23 | 09-03T21:06 T+6:40 | 条件分支,是否执行未知(候选写) | action(#593d4e86:1424@L465)"
+        ],
+        "count_lines": [
+          "## 提到它的命令(273,其中 259 条账本没记到读写)—— 命令行 / heredoc 体 / 跑的脚本正文 / 工具输出里出现这个路径;版本无法复原或实录外修改时先看这里,action 展开命令原文自己判",
+          "已入账的 14 条(读 7 次、碰过(方向不明) 6 次、写 1 次)脊柱与读者里已有,不再铺",
+          "折叠 正文 172 条、写入内容 11 条、只读检查 5 条(只读检查 = cat / grep / wc / ls;写入内容 = 别的文件正文里列了它;正文 = 说 / 想 / 收件;m_all=1 铺)",
+          "候选仅计数,未展开 71 条;需要时 file(path, v=10, m_n=40, m_from=1) 查看。没有展开不等于没有候选,也不能据此断言无人读写。"
+        ]
+      },
+      "candidates": {
+        "all_mentions": 273,
+        "missing_read_write": 259,
+        "eligible_with_same_m_all": 71,
+        "folded_with_same_m_all": 188,
+        "displayed_m_n_40": 40,
+        "displayed_m_n_0": 0,
+        "recovery_m_n_40_pages": 2,
+        "recovered_eligible_rows": 71,
+        "recovered_all_rows_with_explicit_m_all": 259,
+        "recovered_eligible_sha256": "1219cbc22aeb18f818a0f6d74426866de62f02ab48235919710781ecae33ada3"
+      },
+      "checks": {
+        "non_mention_sections_identical": true,
+        "writer_spine_preserved": true,
+        "unknown_and_candidate_signals_preserved": true,
+        "mention_header_count_preserved": true,
+        "zero_mode_has_no_candidate_rows": true,
+        "zero_mode_has_expansion_hint_when_needed": true,
+        "explicit_40_restores_baseline_exactly": true,
+        "explicit_40_pagination_recovers_all_eligible_candidates": true,
+        "explicit_all_with_40_pagination_recovers_all_missing_candidates": true
+      }
+    },
+    {
+      "kind": "saved_query",
+      "label": "cases_tools4",
+      "sid": "ff019d8a",
+      "source": "docs\\experiments\\2026-09-07-six-cases\\cases_tools4\\chain10-SplashPage.ets",
+      "source_kind": "metrics",
+      "source_step": 5,
+      "source_result_ref": null,
+      "source_is_error": false,
+      "saved_input": {
+        "path": "entry/src/main/ets/pages/SplashPage.ets"
+      },
+      "historical_return_chars": 2622,
+      "status": "ok",
+      "current_file": "/Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723/entry/src/main/ets/pages/SplashPage.ets",
+      "current_anchor_v": 60,
+      "current_total_versions": 60,
+      "effective_common_args": {
+        "path": "entry/src/main/ets/pages/SplashPage.ets",
+        "root": "/Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723"
+      },
+      "ignored_navigation_or_treatment_args": {},
+      "anchor_note": "saved v omitted; both arms use current latest version",
+      "chars_m_n_40": 16489,
+      "chars_m_n_0": 6434,
+      "chars_saved": 10055,
+      "reduction_pct": 60.98,
+      "output_sha256": {
+        "40": "0f2dd5fa8504a0a509883bd0f4cf818094a60c8e9932c63734d00d3615cd4975",
+        "0": "f613dca3b911003ce0e7b244c0e63b0ac60523bc29a1ab0463965f45b3de4fb7"
+      },
+      "preserved": {
+        "writer_spine_rows": 19,
+        "unknown_candidate_signal_rows": 3,
+        "signal_lines": [
+          "这一版内容: 无法复原 —— edit 作用在未知状态上(盲写) · 上游 516/5 跳(累计/窗口口径;每次 agent↔文件转换算一跳,派发算一跳)",
+          "- v52–v59 ← fixer-r1 v28–v40 | 07-26T21:05–21:20 | native ×8(8 版) · 内容未知 (#a68daf720e780b4c2:23753@L346 … #a68daf720e780b4c2:23897@L485)",
+          "- v60 ← fixer-r1 v41 | 07-26T21:20 T+81:17 | native · Edit·报告成功 · 内容未知 (#a68daf720e780b4c2:23903@L488) ◀"
+        ],
+        "count_lines": [
+          "## 提到它的命令(679,其中 477 条账本没记到读写)—— 命令行 / heredoc 体 / 跑的脚本正文 / 工具输出里出现这个路径;版本无法复原或实录外修改时先看这里,action 展开命令原文自己判",
+          "已入账的 202 条(碰过(方向不明) 43 次、读 156 次、写 3 次)脊柱与读者里已有,不再铺",
+          "折叠 写入内容 49 条、正文 71 条、只读检查 9 条(只读检查 = cat / grep / wc / ls;写入内容 = 别的文件正文里列了它;正文 = 说 / 想 / 收件;m_all=1 铺)",
+          "候选仅计数,未展开 348 条;需要时 file(path, v=60, m_n=40, m_from=1) 查看。没有展开不等于没有候选,也不能据此断言无人读写。"
+        ]
+      },
+      "candidates": {
+        "all_mentions": 679,
+        "missing_read_write": 477,
+        "eligible_with_same_m_all": 348,
+        "folded_with_same_m_all": 129,
+        "displayed_m_n_40": 40,
+        "displayed_m_n_0": 0,
+        "recovery_m_n_40_pages": 9,
+        "recovered_eligible_rows": 348,
+        "recovered_all_rows_with_explicit_m_all": 477,
+        "recovered_eligible_sha256": "e18319b2634daa534b8a36140146119cb9d8a7857a8f012572d7e400381ff4e3"
+      },
+      "checks": {
+        "non_mention_sections_identical": true,
+        "writer_spine_preserved": true,
+        "unknown_and_candidate_signals_preserved": true,
+        "mention_header_count_preserved": true,
+        "zero_mode_has_no_candidate_rows": true,
+        "zero_mode_has_expansion_hint_when_needed": true,
+        "explicit_40_restores_baseline_exactly": true,
+        "explicit_40_pagination_recovers_all_eligible_candidates": true,
+        "explicit_all_with_40_pagination_recovers_all_missing_candidates": true
+      }
+    },
+    {
+      "kind": "saved_query",
+      "label": "cases_tools4",
+      "sid": "ff019d8a",
+      "source": "docs\\experiments\\2026-09-07-six-cases\\cases_tools4\\chain10-SplashPage.ets",
+      "source_kind": "metrics",
+      "source_step": 6,
+      "source_result_ref": null,
+      "source_is_error": false,
+      "saved_input": {
+        "path": "entry/src/main/ets/pages/SplashPage.ets",
+        "diff": true,
+        "v_from": 52,
+        "v_to": 60,
+        "diff_chars": 2600
+      },
+      "historical_return_chars": 6862,
+      "status": "ok",
+      "current_file": "/Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723/entry/src/main/ets/pages/SplashPage.ets",
+      "current_anchor_v": 60,
+      "current_total_versions": 60,
+      "effective_common_args": {
+        "path": "entry/src/main/ets/pages/SplashPage.ets",
+        "root": "/Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723",
+        "diff": true,
+        "v_from": 52,
+        "v_to": 60,
+        "diff_chars": 2600
+      },
+      "ignored_navigation_or_treatment_args": {},
+      "anchor_note": "saved v omitted; both arms use current latest version",
+      "chars_m_n_40": 20294,
+      "chars_m_n_0": 10239,
+      "chars_saved": 10055,
+      "reduction_pct": 49.547,
+      "output_sha256": {
+        "40": "e914786fd2f4b7bbaa6475e1ecb75332b61166daaed27d4dd4b8102c5658cd73",
+        "0": "19fb9257693b60b671b0decd9cdbd725d60232a3c06d6c1e76ef2f232d9d60fd"
+      },
+      "preserved": {
+        "writer_spine_rows": 9,
+        "unknown_candidate_signal_rows": 10,
+        "signal_lines": [
+          "这一版内容: 无法复原 —— edit 作用在未知状态上(盲写) · 上游 516/5 跳(累计/窗口口径;每次 agent↔文件转换算一跳,派发算一跳)",
+          "- v52 ← fixer-r1 v28 | 07-26T21:05 T+81:03 | native · 推导·ast 读改写 · 窗口内提及 107 条(改动类 61),见末尾提及节 · 窗口内有写能力的命令 1286 条(全池,不含写它自己的那条):search(q='', kind=write, since_ts=2026-07-24T18:02:34.050Z, until_ts=2026-07-26T21:05:54.915Z) · 内容未知 (#a68daf720e780b4c2:23753@L346)",
+          "- v53 ← fixer-r1 v28 | 07-26T21:05 T+81:03 | native · 推导·ast 读改写 · 内容未知 (#a68daf720e780b4c2:23753@L346)",
+          "- v54 ← fixer-r1 v28 | 07-26T21:05 T+81:03 | native · 推导·ast 读改写 · 内容未知 (#a68daf720e780b4c2:23753@L346)",
+          "- v55 ← fixer-r1 v28 | 07-26T21:05 T+81:03 | native · 推导·ast 读改写 · 内容未知 (#a68daf720e780b4c2:23753@L346)",
+          "- v56 ← fixer-r1 v29 | 07-26T21:06 T+81:03 | native · 推导·ast 读改写 · 内容未知 (#a68daf720e780b4c2:23762@L352)",
+          "- v57 ← fixer-r1 v40 | 07-26T21:20 T+81:17 | native · 推导·ast 读改写 · 窗口内提及 1 条(改动类 1),见末尾提及节 · 窗口内有写能力的命令 19 条(全池,不含写它自己的那条):search(q='', kind=write, since_ts=2026-07-26T21:06:31.863Z, until_ts=2026-07-26T21:20:10.255Z) · 内容未知 (#a68daf720e780b4c2:23897@L485)",
+          "- v58 ← fixer-r1 v40 | 07-26T21:20 T+81:17 | native · 推导·ast 读改写 · 内容未知 (#a68daf720e780b4c2:23897@L485)",
+          "- v59 ← fixer-r1 v40 | 07-26T21:20 T+81:17 | native · 推导·ast 读改写 · 内容未知 (#a68daf720e780b4c2:23897@L485)",
+          "- v60 ← fixer-r1 v41 | 07-26T21:20 T+81:17 | native · Edit·报告成功 · 内容未知 (#a68daf720e780b4c2:23903@L488) ◀"
+        ],
+        "count_lines": [
+          "## 提到它的命令(679,其中 477 条账本没记到读写)—— 命令行 / heredoc 体 / 跑的脚本正文 / 工具输出里出现这个路径;版本无法复原或实录外修改时先看这里,action 展开命令原文自己判",
+          "已入账的 202 条(碰过(方向不明) 43 次、读 156 次、写 3 次)脊柱与读者里已有,不再铺",
+          "折叠 写入内容 49 条、正文 71 条、只读检查 9 条(只读检查 = cat / grep / wc / ls;写入内容 = 别的文件正文里列了它;正文 = 说 / 想 / 收件;m_all=1 铺)",
+          "候选仅计数,未展开 348 条;需要时 file(path, v=60, m_n=40, m_from=1) 查看。没有展开不等于没有候选,也不能据此断言无人读写。"
+        ]
+      },
+      "candidates": {
+        "all_mentions": 679,
+        "missing_read_write": 477,
+        "eligible_with_same_m_all": 348,
+        "folded_with_same_m_all": 129,
+        "displayed_m_n_40": 40,
+        "displayed_m_n_0": 0,
+        "recovery_m_n_40_pages": 9,
+        "recovered_eligible_rows": 348,
+        "recovered_all_rows_with_explicit_m_all": 477,
+        "recovered_eligible_sha256": "e18319b2634daa534b8a36140146119cb9d8a7857a8f012572d7e400381ff4e3"
+      },
+      "checks": {
+        "non_mention_sections_identical": true,
+        "writer_spine_preserved": true,
+        "unknown_and_candidate_signals_preserved": true,
+        "mention_header_count_preserved": true,
+        "zero_mode_has_no_candidate_rows": true,
+        "zero_mode_has_expansion_hint_when_needed": true,
+        "explicit_40_restores_baseline_exactly": true,
+        "explicit_40_pagination_recovers_all_eligible_candidates": true,
+        "explicit_all_with_40_pagination_recovers_all_missing_candidates": true
+      }
+    },
+    {
+      "kind": "saved_query",
+      "label": "cases_tools4",
+      "sid": "ff019d8a",
+      "source": "docs\\experiments\\2026-09-07-six-cases\\cases_tools4\\chain10-SplashPage.ets",
+      "source_kind": "metrics",
+      "source_step": 18,
+      "source_result_ref": null,
+      "source_is_error": false,
+      "saved_input": {
+        "path": "feat/SplashActivity_01_back_key_dismisses_privacy_dialog.md",
+        "content": true
+      },
+      "historical_return_chars": 688,
+      "status": "ok",
+      "current_file": "/Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723/spec/fix/round-1/feat/SplashActivity_01_back_key_dismisses_privacy_dialog.md",
+      "current_anchor_v": 1,
+      "current_total_versions": 1,
+      "effective_common_args": {
+        "path": "feat/SplashActivity_01_back_key_dismisses_privacy_dialog.md",
+        "root": "/Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723",
+        "content": true
+      },
+      "ignored_navigation_or_treatment_args": {},
+      "anchor_note": "saved v omitted; both arms use current latest version",
+      "chars_m_n_40": 6325,
+      "chars_m_n_0": 976,
+      "chars_saved": 5349,
+      "reduction_pct": 84.569,
+      "output_sha256": {
+        "40": "aee8ac47e2133528ad652f5c1c9b14853540450286de1829dde0a5640be8fbb9",
+        "0": "b1125cb25e1957798c590af4db2c4cc725f548e0ffeca3b775add9364b799334"
+      },
+      "preserved": {
+        "writer_spine_rows": 1,
+        "unknown_candidate_signal_rows": 3,
+        "signal_lines": [
+          "这一版内容: 无法复原 —— 外部输入,读取时没带全文快照 · 上游 0/0 跳(累计/窗口口径;每次 agent↔文件转换算一跳,派发算一跳)",
+          "- v1 ← 外部输入 | 07-26T15:42 T+75:39 | external · 首见·内容未进上下文 · 候选生成运行 #22178(目录级线索,未证实;同批 9 个) · 内容未知 ◀",
+          "## 内容: 无法复原"
+        ],
+        "count_lines": [
+          "## 提到它的命令(27,其中 24 条账本没记到读写)—— 命令行 / heredoc 体 / 跑的脚本正文 / 工具输出里出现这个路径;版本无法复原或实录外修改时先看这里,action 展开命令原文自己判",
+          "已入账的 3 条(读 3 次)脊柱与读者里已有,不再铺",
+          "折叠 写入内容 1 条、正文 2 条(只读检查 = cat / grep / wc / ls;写入内容 = 别的文件正文里列了它;正文 = 说 / 想 / 收件;m_all=1 铺)",
+          "候选仅计数,未展开 21 条;需要时 file(path, v=1, m_n=40, m_from=1) 查看。没有展开不等于没有候选,也不能据此断言无人读写。"
+        ]
+      },
+      "candidates": {
+        "all_mentions": 27,
+        "missing_read_write": 24,
+        "eligible_with_same_m_all": 21,
+        "folded_with_same_m_all": 3,
+        "displayed_m_n_40": 21,
+        "displayed_m_n_0": 0,
+        "recovery_m_n_40_pages": 1,
+        "recovered_eligible_rows": 21,
+        "recovered_all_rows_with_explicit_m_all": 24,
+        "recovered_eligible_sha256": "fcbb487004a52c44d5f2ea67c606cbc3e8f9c392264aef36988622fd1d4c798d"
+      },
+      "checks": {
+        "non_mention_sections_identical": true,
+        "writer_spine_preserved": true,
+        "unknown_and_candidate_signals_preserved": true,
+        "mention_header_count_preserved": true,
+        "zero_mode_has_no_candidate_rows": true,
+        "zero_mode_has_expansion_hint_when_needed": true,
+        "explicit_40_restores_baseline_exactly": true,
+        "explicit_40_pagination_recovers_all_eligible_candidates": true,
+        "explicit_all_with_40_pagination_recovers_all_missing_candidates": true
+      }
+    },
+    {
+      "kind": "saved_query",
+      "label": "cases_tools4",
+      "sid": "ff019d8a",
+      "source": "docs\\experiments\\2026-09-07-six-cases\\cases_tools4\\chain10-SplashPage.ets",
+      "source_kind": "metrics",
+      "source_step": 19,
+      "source_result_ref": null,
+      "source_is_error": false,
+      "saved_input": {
+        "path": "feat/SplashActivity_02_splash_progress_bar_missing.md",
+        "content": true
+      },
+      "historical_return_chars": 1877,
+      "status": "ok",
+      "current_file": "/Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723/spec/fix/round-1/feat/SplashActivity_02_splash_progress_bar_missing.md",
+      "current_anchor_v": 1,
+      "current_total_versions": 1,
+      "effective_common_args": {
+        "path": "feat/SplashActivity_02_splash_progress_bar_missing.md",
+        "root": "/Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723",
+        "content": true
+      },
+      "ignored_navigation_or_treatment_args": {},
+      "anchor_note": "saved v omitted; both arms use current latest version",
+      "chars_m_n_40": 7170,
+      "chars_m_n_0": 2086,
+      "chars_saved": 5084,
+      "reduction_pct": 70.907,
+      "output_sha256": {
+        "40": "aa3d1a201c50b2ff8f307666f3fd219b91518f77eae2a6d07e9c069ebb76cf50",
+        "0": "49f2394ab3166c297031f280e2f44651cffb3363e5dd004578824185671d91e1"
+      },
+      "preserved": {
+        "writer_spine_rows": 2,
+        "unknown_candidate_signal_rows": 2,
+        "signal_lines": [
+          "这一版内容: 部分已知(脚本字面量里的正文,不是全文;content=1 看) · 上游 0/0 跳(累计/窗口口径;每次 agent↔文件转换算一跳,派发算一跳)",
+          "- v1 ← vv-t1-A01 v3 | 07-26T21:03 T+81:00 | external · 推导·脚本字面量含正文 · 批量生成(脚本跑出来的,同批 9 个;候选运行 #24841) · 窗口内提及 19 条(改动类 18),见末尾提及节 · 部分已知(脚本字面量) (#aa2d7cdfd6a5cf89f:24841@L227) ◀"
+        ],
+        "count_lines": [
+          "## 提到它的命令(24,其中 21 条账本没记到读写)—— 命令行 / heredoc 体 / 跑的脚本正文 / 工具输出里出现这个路径;版本无法复原或实录外修改时先看这里,action 展开命令原文自己判",
+          "已入账的 3 条(写 2 次、读 1 次)脊柱与读者里已有,不再铺",
+          "折叠 写入内容 1 条(只读检查 = cat / grep / wc / ls;写入内容 = 别的文件正文里列了它;正文 = 说 / 想 / 收件;m_all=1 铺)",
+          "候选仅计数,未展开 20 条;需要时 file(path, v=1, m_n=40, m_from=1) 查看。没有展开不等于没有候选,也不能据此断言无人读写。"
+        ]
+      },
+      "candidates": {
+        "all_mentions": 24,
+        "missing_read_write": 21,
+        "eligible_with_same_m_all": 20,
+        "folded_with_same_m_all": 1,
+        "displayed_m_n_40": 20,
+        "displayed_m_n_0": 0,
+        "recovery_m_n_40_pages": 1,
+        "recovered_eligible_rows": 20,
+        "recovered_all_rows_with_explicit_m_all": 21,
+        "recovered_eligible_sha256": "8ca9426f176feb331a652b84b40f8954b44de5c777aebe6b331bd9d1e9bbb1ed"
+      },
+      "checks": {
+        "non_mention_sections_identical": true,
+        "writer_spine_preserved": true,
+        "unknown_and_candidate_signals_preserved": true,
+        "mention_header_count_preserved": true,
+        "zero_mode_has_no_candidate_rows": true,
+        "zero_mode_has_expansion_hint_when_needed": true,
+        "explicit_40_restores_baseline_exactly": true,
+        "explicit_40_pagination_recovers_all_eligible_candidates": true,
+        "explicit_all_with_40_pagination_recovers_all_missing_candidates": true
+      }
+    },
+    {
+      "kind": "saved_query",
+      "label": "cases_tools4",
+      "sid": "ff019d8a",
+      "source": "docs\\experiments\\2026-09-07-six-cases\\cases_tools4\\chain10-SplashPage.ets",
+      "source_kind": "metrics",
+      "source_step": 22,
+      "source_result_ref": null,
+      "source_is_error": false,
+      "saved_input": {
+        "path": "spec/baseline/features/F001-startup-privacy.md"
+      },
+      "historical_return_chars": 935,
+      "status": "ok",
+      "current_file": "/Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723/spec/baseline/features/F001-startup-privacy.md",
+      "current_anchor_v": 1,
+      "current_total_versions": 1,
+      "effective_common_args": {
+        "path": "spec/baseline/features/F001-startup-privacy.md",
+        "root": "/Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723"
+      },
+      "ignored_navigation_or_treatment_args": {},
+      "anchor_note": "saved v omitted; both arms use current latest version",
+      "chars_m_n_40": 11621,
+      "chars_m_n_0": 1285,
+      "chars_saved": 10336,
+      "reduction_pct": 88.942,
+      "output_sha256": {
+        "40": "a7e1f555c342ac8c98653ff340befcd78be984a204772b13d67db7514e92732f",
+        "0": "d57846576bc859c3b355aaa1fc879158c05916a4abac757759f6854c30a0a732"
+      },
+      "preserved": {
+        "writer_spine_rows": 1,
+        "unknown_candidate_signal_rows": 1,
+        "signal_lines": [
+          "- v1 ← 外部输入 | 07-24T11:10 T+23:07 | external · 观测·首次读到 · 候选生成运行 #620, #647, #672(目录级线索,未证实;同批 17 个) · 窗口内提及 13 条(改动类 13),见末尾提及节 · 观测封口 · 145 行 ◀"
+        ],
+        "count_lines": [
+          "## 提到它的命令(48,其中 43 条账本没记到读写)—— 命令行 / heredoc 体 / 跑的脚本正文 / 工具输出里出现这个路径;版本无法复原或实录外修改时先看这里,action 展开命令原文自己判",
+          "已入账的 5 条(碰过(方向不明) 4 次、读 1 次)脊柱与读者里已有,不再铺",
+          "折叠 写入内容 2 条(只读检查 = cat / grep / wc / ls;写入内容 = 别的文件正文里列了它;正文 = 说 / 想 / 收件;m_all=1 铺)",
+          "候选仅计数,未展开 41 条;需要时 file(path, v=1, m_n=40, m_from=1) 查看。没有展开不等于没有候选,也不能据此断言无人读写。"
+        ]
+      },
+      "candidates": {
+        "all_mentions": 48,
+        "missing_read_write": 43,
+        "eligible_with_same_m_all": 41,
+        "folded_with_same_m_all": 2,
+        "displayed_m_n_40": 40,
+        "displayed_m_n_0": 0,
+        "recovery_m_n_40_pages": 2,
+        "recovered_eligible_rows": 41,
+        "recovered_all_rows_with_explicit_m_all": 43,
+        "recovered_eligible_sha256": "728bfb3c88aef628115748d3603d380e97d4fd6079c9911120aa15773f966571"
+      },
+      "checks": {
+        "non_mention_sections_identical": true,
+        "writer_spine_preserved": true,
+        "unknown_and_candidate_signals_preserved": true,
+        "mention_header_count_preserved": true,
+        "zero_mode_has_no_candidate_rows": true,
+        "zero_mode_has_expansion_hint_when_needed": true,
+        "explicit_40_restores_baseline_exactly": true,
+        "explicit_40_pagination_recovers_all_eligible_candidates": true,
+        "explicit_all_with_40_pagination_recovers_all_missing_candidates": true
+      }
+    },
+    {
+      "kind": "supplemental_version",
+      "label": "cases_tools4",
+      "sid": "ff019d8a",
+      "source": "docs\\experiments\\2026-09-07-six-cases\\cases_tools4\\chain10-SplashPage.ets",
+      "source_kind": "documented_version_sample",
+      "selection": "generation v1, saved repair-window endpoints and latest",
+      "target": "SplashPage.ets",
+      "saved_input": {
+        "path": "entry/src/main/ets/pages/SplashPage.ets",
+        "v": 1
+      },
+      "status": "ok",
+      "current_file": "/Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723/entry/src/main/ets/pages/SplashPage.ets",
+      "current_anchor_v": 1,
+      "current_total_versions": 60,
+      "effective_common_args": {
+        "path": "entry/src/main/ets/pages/SplashPage.ets",
+        "root": "/Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723",
+        "v": 1
+      },
+      "ignored_navigation_or_treatment_args": {},
+      "anchor_note": "saved v retained",
+      "chars_m_n_40": 14013,
+      "chars_m_n_0": 3957,
+      "chars_saved": 10056,
+      "reduction_pct": 71.762,
+      "output_sha256": {
+        "40": "37d18147314cea483adcd962d8c40141b4d7967109905fe770e1ae2065e54b2c",
+        "0": "dcd649d7fddfc0ed7bece4316c0742dcec3c2affda2cf17d64443ca2bf5a003a"
+      },
+      "preserved": {
+        "writer_spine_rows": 1,
+        "unknown_candidate_signal_rows": 0,
+        "signal_lines": [],
+        "count_lines": [
+          "## 提到它的命令(679,其中 477 条账本没记到读写)—— 命令行 / heredoc 体 / 跑的脚本正文 / 工具输出里出现这个路径;版本无法复原或实录外修改时先看这里,action 展开命令原文自己判",
+          "已入账的 202 条(碰过(方向不明) 43 次、读 156 次、写 3 次)脊柱与读者里已有,不再铺",
+          "折叠 写入内容 49 条、正文 71 条、只读检查 9 条(只读检查 = cat / grep / wc / ls;写入内容 = 别的文件正文里列了它;正文 = 说 / 想 / 收件;m_all=1 铺)",
+          "候选仅计数,未展开 348 条;需要时 file(path, v=1, m_n=40, m_from=1) 查看。没有展开不等于没有候选,也不能据此断言无人读写。"
+        ]
+      },
+      "candidates": {
+        "all_mentions": 679,
+        "missing_read_write": 477,
+        "eligible_with_same_m_all": 348,
+        "folded_with_same_m_all": 129,
+        "displayed_m_n_40": 40,
+        "displayed_m_n_0": 0,
+        "recovery_m_n_40_pages": 9,
+        "recovered_eligible_rows": 348,
+        "recovered_all_rows_with_explicit_m_all": 477,
+        "recovered_eligible_sha256": "e18319b2634daa534b8a36140146119cb9d8a7857a8f012572d7e400381ff4e3"
+      },
+      "checks": {
+        "non_mention_sections_identical": true,
+        "writer_spine_preserved": true,
+        "unknown_and_candidate_signals_preserved": true,
+        "mention_header_count_preserved": true,
+        "zero_mode_has_no_candidate_rows": true,
+        "zero_mode_has_expansion_hint_when_needed": true,
+        "explicit_40_restores_baseline_exactly": true,
+        "explicit_40_pagination_recovers_all_eligible_candidates": true,
+        "explicit_all_with_40_pagination_recovers_all_missing_candidates": true
+      }
+    },
+    {
+      "kind": "supplemental_version",
+      "label": "cases_tools4",
+      "sid": "ff019d8a",
+      "source": "docs\\experiments\\2026-09-07-six-cases\\cases_tools4\\chain10-SplashPage.ets",
+      "source_kind": "documented_version_sample",
+      "selection": "generation v1, saved repair-window endpoints and latest",
+      "target": "SplashPage.ets",
+      "saved_input": {
+        "path": "entry/src/main/ets/pages/SplashPage.ets",
+        "v": 52
+      },
+      "status": "ok",
+      "current_file": "/Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723/entry/src/main/ets/pages/SplashPage.ets",
+      "current_anchor_v": 52,
+      "current_total_versions": 60,
+      "effective_common_args": {
+        "path": "entry/src/main/ets/pages/SplashPage.ets",
+        "root": "/Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723",
+        "v": 52
+      },
+      "ignored_navigation_or_treatment_args": {},
+      "anchor_note": "saved v retained",
+      "chars_m_n_40": 16513,
+      "chars_m_n_0": 6458,
+      "chars_saved": 10055,
+      "reduction_pct": 60.891,
+      "output_sha256": {
+        "40": "af50eba8a1f6c796a1972c2040f1afb330bda718a95b094d6e5e405d8eb9f45c",
+        "0": "07291f6cc125fe6dccaaa0332af9fc8d010f04ac4c3b4184e7278ddf3e74113a"
+      },
+      "preserved": {
+        "writer_spine_rows": 18,
+        "unknown_candidate_signal_rows": 2,
+        "signal_lines": [
+          "这一版内容: 无法复原 —— edit 作用在未知状态上(盲写) · 上游 498/119 跳(累计/窗口口径;每次 agent↔文件转换算一跳,派发算一跳)",
+          "- v52 ← fixer-r1 v28 | 07-26T21:05 T+81:03 | native · 推导·ast 读改写 · 窗口内提及 107 条(改动类 61),见末尾提及节 · 窗口内有写能力的命令 1286 条(全池,不含写它自己的那条):search(q='', kind=write, since_ts=2026-07-24T18:02:34.050Z, until_ts=2026-07-26T21:05:54.915Z) · 内容未知 (#a68daf720e780b4c2:23753@L346) ◀"
+        ],
+        "count_lines": [
+          "## 提到它的命令(679,其中 477 条账本没记到读写)—— 命令行 / heredoc 体 / 跑的脚本正文 / 工具输出里出现这个路径;版本无法复原或实录外修改时先看这里,action 展开命令原文自己判",
+          "已入账的 202 条(碰过(方向不明) 43 次、读 156 次、写 3 次)脊柱与读者里已有,不再铺",
+          "折叠 写入内容 49 条、正文 71 条、只读检查 9 条(只读检查 = cat / grep / wc / ls;写入内容 = 别的文件正文里列了它;正文 = 说 / 想 / 收件;m_all=1 铺)",
+          "候选仅计数,未展开 348 条;需要时 file(path, v=52, m_n=40, m_from=1) 查看。没有展开不等于没有候选,也不能据此断言无人读写。"
+        ]
+      },
+      "candidates": {
+        "all_mentions": 679,
+        "missing_read_write": 477,
+        "eligible_with_same_m_all": 348,
+        "folded_with_same_m_all": 129,
+        "displayed_m_n_40": 40,
+        "displayed_m_n_0": 0,
+        "recovery_m_n_40_pages": 9,
+        "recovered_eligible_rows": 348,
+        "recovered_all_rows_with_explicit_m_all": 477,
+        "recovered_eligible_sha256": "e18319b2634daa534b8a36140146119cb9d8a7857a8f012572d7e400381ff4e3"
+      },
+      "checks": {
+        "non_mention_sections_identical": true,
+        "writer_spine_preserved": true,
+        "unknown_and_candidate_signals_preserved": true,
+        "mention_header_count_preserved": true,
+        "zero_mode_has_no_candidate_rows": true,
+        "zero_mode_has_expansion_hint_when_needed": true,
+        "explicit_40_restores_baseline_exactly": true,
+        "explicit_40_pagination_recovers_all_eligible_candidates": true,
+        "explicit_all_with_40_pagination_recovers_all_missing_candidates": true
+      }
+    },
+    {
+      "kind": "supplemental_version",
+      "label": "cases_tools4",
+      "sid": "ff019d8a",
+      "source": "docs\\experiments\\2026-09-07-six-cases\\cases_tools4\\chain10-SplashPage.ets",
+      "source_kind": "documented_version_sample",
+      "selection": "generation v1, saved repair-window endpoints and latest",
+      "target": "SplashPage.ets",
+      "saved_input": {
+        "path": "entry/src/main/ets/pages/SplashPage.ets",
+        "v": 60
+      },
+      "status": "ok",
+      "current_file": "/Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723/entry/src/main/ets/pages/SplashPage.ets",
+      "current_anchor_v": 60,
+      "current_total_versions": 60,
+      "effective_common_args": {
+        "path": "entry/src/main/ets/pages/SplashPage.ets",
+        "root": "/Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723",
+        "v": 60
+      },
+      "ignored_navigation_or_treatment_args": {},
+      "anchor_note": "saved v retained",
+      "chars_m_n_40": 16489,
+      "chars_m_n_0": 6434,
+      "chars_saved": 10055,
+      "reduction_pct": 60.98,
+      "output_sha256": {
+        "40": "0f2dd5fa8504a0a509883bd0f4cf818094a60c8e9932c63734d00d3615cd4975",
+        "0": "f613dca3b911003ce0e7b244c0e63b0ac60523bc29a1ab0463965f45b3de4fb7"
+      },
+      "preserved": {
+        "writer_spine_rows": 19,
+        "unknown_candidate_signal_rows": 3,
+        "signal_lines": [
+          "这一版内容: 无法复原 —— edit 作用在未知状态上(盲写) · 上游 516/5 跳(累计/窗口口径;每次 agent↔文件转换算一跳,派发算一跳)",
+          "- v52–v59 ← fixer-r1 v28–v40 | 07-26T21:05–21:20 | native ×8(8 版) · 内容未知 (#a68daf720e780b4c2:23753@L346 … #a68daf720e780b4c2:23897@L485)",
+          "- v60 ← fixer-r1 v41 | 07-26T21:20 T+81:17 | native · Edit·报告成功 · 内容未知 (#a68daf720e780b4c2:23903@L488) ◀"
+        ],
+        "count_lines": [
+          "## 提到它的命令(679,其中 477 条账本没记到读写)—— 命令行 / heredoc 体 / 跑的脚本正文 / 工具输出里出现这个路径;版本无法复原或实录外修改时先看这里,action 展开命令原文自己判",
+          "已入账的 202 条(碰过(方向不明) 43 次、读 156 次、写 3 次)脊柱与读者里已有,不再铺",
+          "折叠 写入内容 49 条、正文 71 条、只读检查 9 条(只读检查 = cat / grep / wc / ls;写入内容 = 别的文件正文里列了它;正文 = 说 / 想 / 收件;m_all=1 铺)",
+          "候选仅计数,未展开 348 条;需要时 file(path, v=60, m_n=40, m_from=1) 查看。没有展开不等于没有候选,也不能据此断言无人读写。"
+        ]
+      },
+      "candidates": {
+        "all_mentions": 679,
+        "missing_read_write": 477,
+        "eligible_with_same_m_all": 348,
+        "folded_with_same_m_all": 129,
+        "displayed_m_n_40": 40,
+        "displayed_m_n_0": 0,
+        "recovery_m_n_40_pages": 9,
+        "recovered_eligible_rows": 348,
+        "recovered_all_rows_with_explicit_m_all": 477,
+        "recovered_eligible_sha256": "e18319b2634daa534b8a36140146119cb9d8a7857a8f012572d7e400381ff4e3"
+      },
+      "checks": {
+        "non_mention_sections_identical": true,
+        "writer_spine_preserved": true,
+        "unknown_and_candidate_signals_preserved": true,
+        "mention_header_count_preserved": true,
+        "zero_mode_has_no_candidate_rows": true,
+        "zero_mode_has_expansion_hint_when_needed": true,
+        "explicit_40_restores_baseline_exactly": true,
+        "explicit_40_pagination_recovers_all_eligible_candidates": true,
+        "explicit_all_with_40_pagination_recovers_all_missing_candidates": true
+      }
+    },
+    {
+      "kind": "saved_query",
+      "label": "cases_tools4",
+      "sid": "ff019d8a",
+      "source": "docs\\experiments\\2026-09-07-six-cases\\cases_tools4\\chain08-MemberCenterPage.ets",
+      "source_kind": "metrics",
+      "source_step": 5,
+      "source_result_ref": null,
+      "source_is_error": false,
+      "saved_input": {
+        "path": "entry/src/main/ets/pages/MemberCenterPage.ets"
+      },
+      "historical_return_chars": 1691,
+      "status": "ok",
+      "current_file": "/Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723/entry/src/main/ets/pages/MemberCenterPage.ets",
+      "current_anchor_v": 18,
+      "current_total_versions": 18,
+      "effective_common_args": {
+        "path": "entry/src/main/ets/pages/MemberCenterPage.ets",
+        "root": "/Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723"
+      },
+      "ignored_navigation_or_treatment_args": {},
+      "anchor_note": "saved v omitted; both arms use current latest version",
+      "chars_m_n_40": 14657,
+      "chars_m_n_0": 4465,
+      "chars_saved": 10192,
+      "reduction_pct": 69.537,
+      "output_sha256": {
+        "40": "4e84ff633abf8c93738eb1be38d41929d30c56abd1933828d3aa41b3161f3bc9",
+        "0": "c6869a379abfae163722a9b0bcfa3b6dbc4c4c03ae5195c93058aae41cb16a20"
+      },
+      "preserved": {
+        "writer_spine_rows": 9,
+        "unknown_candidate_signal_rows": 7,
+        "signal_lines": [
+          "这一版内容: 无法复原 —— edit 作用在未知状态上(盲写) · 上游 532/2 跳(累计/窗口口径;每次 agent↔文件转换算一跳,派发算一跳)",
+          "- v8 ← group2-closer v43 | 07-24T16:50 T+28:47 | native · Edit·报告成功 · 窗口内提及 23 条(改动类 16),见末尾提及节 · 窗口内有写能力的命令 31 条(全池,不含写它自己的那条):search(q='', kind=write, since_ts=2026-07-24T16:04:37.440Z, until_ts=2026-07-24T16:50:09.283Z) · 内容未知 (#b7ebd5ae592d3c5d:13483@L345)",
+          "- v9 ← group2-closer v44 | 07-24T16:50 T+28:47 | native · Edit·报告成功 · 内容未知 (#b7ebd5ae592d3c5d:13487@L349)",
+          "- v10–v16 ← fixer-r1 v36–v53 | 07-26T21:16–21:30 | native ×7(7 版) · 内容未知 (#a68daf720e780b4c2:23849@L436 … #a68daf720e780b4c2:24028@L592)",
+          "- v17 ← build-verify-r1 v3 | 07-26T21:46 T+81:43 | native · Edit·报告成功 · 窗口内提及 4 条(改动类 4),见末尾提及节 · 窗口内有写能力的命令 15 条(全池,不含写它自己的那条):search(q='', kind=write, since_ts=2026-07-26T21:30:17.239Z, until_ts=2026-07-26T21:46:11.820Z) · 内容未知 (#af0e3d2ae54dbf769:26411@L32)",
+          "- v18 ← build-verify-r1 v4 | 07-26T21:46 T+81:43 | native · Edit·报告成功 · 内容未知 (#af0e3d2ae54dbf769:26413@L34) ◀",
+          "- slice8-pay v16 | 07-24T16:22 T+28:19 | 条件分支,是否执行未知(候选写) | action(#80bbb1f44b77da0f:20882@L383)"
+        ],
+        "count_lines": [
+          "## 提到它的命令(337,其中 196 条账本没记到读写)—— 命令行 / heredoc 体 / 跑的脚本正文 / 工具输出里出现这个路径;版本无法复原或实录外修改时先看这里,action 展开命令原文自己判",
+          "已入账的 141 条(读 113 次、碰过(方向不明) 24 次、写 4 次)脊柱与读者里已有,不再铺",
+          "折叠 写入内容 21 条、正文 18 条、只读检查 2 条(只读检查 = cat / grep / wc / ls;写入内容 = 别的文件正文里列了它;正文 = 说 / 想 / 收件;m_all=1 铺)",
+          "候选仅计数,未展开 155 条;需要时 file(path, v=18, m_n=40, m_from=1) 查看。没有展开不等于没有候选,也不能据此断言无人读写。"
+        ]
+      },
+      "candidates": {
+        "all_mentions": 337,
+        "missing_read_write": 196,
+        "eligible_with_same_m_all": 155,
+        "folded_with_same_m_all": 41,
+        "displayed_m_n_40": 40,
+        "displayed_m_n_0": 0,
+        "recovery_m_n_40_pages": 4,
+        "recovered_eligible_rows": 155,
+        "recovered_all_rows_with_explicit_m_all": 196,
+        "recovered_eligible_sha256": "55c64900e9e005ba19391ad5f1eb7e6ea1bdf6d6788c693b87754f8783e4bce2"
+      },
+      "checks": {
+        "non_mention_sections_identical": true,
+        "writer_spine_preserved": true,
+        "unknown_and_candidate_signals_preserved": true,
+        "mention_header_count_preserved": true,
+        "zero_mode_has_no_candidate_rows": true,
+        "zero_mode_has_expansion_hint_when_needed": true,
+        "explicit_40_restores_baseline_exactly": true,
+        "explicit_40_pagination_recovers_all_eligible_candidates": true,
+        "explicit_all_with_40_pagination_recovers_all_missing_candidates": true
+      }
+    },
+    {
+      "kind": "saved_query",
+      "label": "cases_tools4",
+      "sid": "ff019d8a",
+      "source": "docs\\experiments\\2026-09-07-six-cases\\cases_tools4\\chain08-MemberCenterPage.ets",
+      "source_kind": "metrics",
+      "source_step": 7,
+      "source_result_ref": null,
+      "source_is_error": false,
+      "saved_input": {
+        "path": "entry/src/main/ets/pages/MemberCenterPage.ets",
+        "diff": true,
+        "v_from": 14,
+        "v_to": 16,
+        "diff_chars": 6000
+      },
+      "historical_return_chars": 5311,
+      "status": "ok",
+      "current_file": "/Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723/entry/src/main/ets/pages/MemberCenterPage.ets",
+      "current_anchor_v": 18,
+      "current_total_versions": 18,
+      "effective_common_args": {
+        "path": "entry/src/main/ets/pages/MemberCenterPage.ets",
+        "root": "/Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723",
+        "diff": true,
+        "v_from": 14,
+        "v_to": 16,
+        "diff_chars": 6000
+      },
+      "ignored_navigation_or_treatment_args": {},
+      "anchor_note": "saved v omitted; both arms use current latest version",
+      "chars_m_n_40": 16947,
+      "chars_m_n_0": 6755,
+      "chars_saved": 10192,
+      "reduction_pct": 60.14,
+      "output_sha256": {
+        "40": "e29509788a1addf28d580295963215557779830c471a4cdc75656c6706c38fd6",
+        "0": "3c39a6fe1296fd4893ac75003016751d8cb97c8824077d4b40c24bc0d715c78c"
+      },
+      "preserved": {
+        "writer_spine_rows": 3,
+        "unknown_candidate_signal_rows": 5,
+        "signal_lines": [
+          "这一版内容: 无法复原 —— edit 作用在未知状态上(盲写) · 上游 532/2 跳(累计/窗口口径;每次 agent↔文件转换算一跳,派发算一跳)",
+          "- v14 ← fixer-r1 v46 | 07-26T21:24 T+81:21 | native · 推导·ast 读改写 · 内容未知 (#a68daf720e780b4c2:23961@L532)",
+          "- v15 ← fixer-r1 v53 | 07-26T21:30 T+81:27 | native · 推导·ast 读改写 · 窗口内有写能力的命令 5 条(全池,不含写它自己的那条):search(q='', kind=write, since_ts=2026-07-26T21:24:34.699Z, until_ts=2026-07-26T21:30:17.239Z) · 内容未知 (#a68daf720e780b4c2:24028@L592)",
+          "- v16 ← fixer-r1 v53 | 07-26T21:30 T+81:27 | native · 推导·ast 读改写 · 内容未知 (#a68daf720e780b4c2:24028@L592)",
+          "- slice8-pay v16 | 07-24T16:22 T+28:19 | 条件分支,是否执行未知(候选写) | action(#80bbb1f44b77da0f:20882@L383)"
+        ],
+        "count_lines": [
+          "## 提到它的命令(337,其中 196 条账本没记到读写)—— 命令行 / heredoc 体 / 跑的脚本正文 / 工具输出里出现这个路径;版本无法复原或实录外修改时先看这里,action 展开命令原文自己判",
+          "已入账的 141 条(读 113 次、碰过(方向不明) 24 次、写 4 次)脊柱与读者里已有,不再铺",
+          "折叠 写入内容 21 条、正文 18 条、只读检查 2 条(只读检查 = cat / grep / wc / ls;写入内容 = 别的文件正文里列了它;正文 = 说 / 想 / 收件;m_all=1 铺)",
+          "候选仅计数,未展开 155 条;需要时 file(path, v=18, m_n=40, m_from=1) 查看。没有展开不等于没有候选,也不能据此断言无人读写。"
+        ]
+      },
+      "candidates": {
+        "all_mentions": 337,
+        "missing_read_write": 196,
+        "eligible_with_same_m_all": 155,
+        "folded_with_same_m_all": 41,
+        "displayed_m_n_40": 40,
+        "displayed_m_n_0": 0,
+        "recovery_m_n_40_pages": 4,
+        "recovered_eligible_rows": 155,
+        "recovered_all_rows_with_explicit_m_all": 196,
+        "recovered_eligible_sha256": "55c64900e9e005ba19391ad5f1eb7e6ea1bdf6d6788c693b87754f8783e4bce2"
+      },
+      "checks": {
+        "non_mention_sections_identical": true,
+        "writer_spine_preserved": true,
+        "unknown_and_candidate_signals_preserved": true,
+        "mention_header_count_preserved": true,
+        "zero_mode_has_no_candidate_rows": true,
+        "zero_mode_has_expansion_hint_when_needed": true,
+        "explicit_40_restores_baseline_exactly": true,
+        "explicit_40_pagination_recovers_all_eligible_candidates": true,
+        "explicit_all_with_40_pagination_recovers_all_missing_candidates": true
+      }
+    },
+    {
+      "kind": "saved_query",
+      "label": "cases_tools4",
+      "sid": "ff019d8a",
+      "source": "docs\\experiments\\2026-09-07-six-cases\\cases_tools4\\chain08-MemberCenterPage.ets",
+      "source_kind": "metrics",
+      "source_step": 9,
+      "source_result_ref": null,
+      "source_is_error": false,
+      "saved_input": {
+        "path": "entry/src/main/ets/pages/MemberCenterPage.ets",
+        "diff": true,
+        "v_from": 17,
+        "v_to": 20,
+        "diff_chars": 3000
+      },
+      "historical_return_chars": 5197,
+      "status": "invalid_current_window",
+      "current_file": "/Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723/entry/src/main/ets/pages/MemberCenterPage.ets",
+      "current_anchor_v": 18,
+      "current_total_versions": 18,
+      "return": "⛔ diff 窗口必须满足 1 ≤ v_from ≤ v_to ≤ 查询锚点 v18;未执行查询。",
+      "effective_args": {
+        "diff": true,
+        "v_from": 17,
+        "v_to": 20,
+        "diff_chars": 3000
+      }
+    },
+    {
+      "kind": "saved_query",
+      "label": "cases_tools4",
+      "sid": "ff019d8a",
+      "source": "docs\\experiments\\2026-09-07-six-cases\\cases_tools4\\chain08-MemberCenterPage.ets",
+      "source_kind": "metrics",
+      "source_step": 14,
+      "source_result_ref": null,
+      "source_is_error": false,
+      "saved_input": {
+        "path": "ui/ALIGN_PMemberCenterActivitiy_spacing_drift_bottom-cta.md",
+        "content": true
+      },
+      "historical_return_chars": 875,
+      "status": "ok",
+      "current_file": "/Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723/spec/fix/round-1/ui/ALIGN_PMemberCenterActivitiy_spacing_drift_bottom-cta.md",
+      "current_anchor_v": 1,
+      "current_total_versions": 1,
+      "effective_common_args": {
+        "path": "ui/ALIGN_PMemberCenterActivitiy_spacing_drift_bottom-cta.md",
+        "root": "/Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723",
+        "content": true
+      },
+      "ignored_navigation_or_treatment_args": {},
+      "anchor_note": "saved v omitted; both arms use current latest version",
+      "chars_m_n_40": 3266,
+      "chars_m_n_0": 1301,
+      "chars_saved": 1965,
+      "reduction_pct": 60.165,
+      "output_sha256": {
+        "40": "58e1fda063823b26ade4a4e87dcd0eedb8163dd9fa69556b73a44a5b62d6ecb7",
+        "0": "5f35420c8ee035e8060d2d71a2f182ded789b55b5b093ac375588bac9b3ea38e"
+      },
+      "preserved": {
+        "writer_spine_rows": 2,
+        "unknown_candidate_signal_rows": 3,
+        "signal_lines": [
+          "这一版内容: 无法复原 —— 外部输入,读取时没带全文快照 · 上游 0/0 跳(累计/窗口口径;每次 agent↔文件转换算一跳,派发算一跳)",
+          "- v1 ← 外部输入 | 07-26T21:12 T+81:09 | external · 首见·内容未进上下文 · 候选生成运行 #22516, #22588, #22178(目录级线索,未证实;同批 22 个) · 窗口内提及 8 条(改动类 6),见末尾提及节 · 内容未知 ◀",
+          "## 内容: 无法复原"
+        ],
+        "count_lines": [
+          "## 提到它的命令(13,其中 10 条账本没记到读写)—— 命令行 / heredoc 体 / 跑的脚本正文 / 工具输出里出现这个路径;版本无法复原或实录外修改时先看这里,action 展开命令原文自己判",
+          "已入账的 3 条(碰过(方向不明) 1 次、读 2 次)脊柱与读者里已有,不再铺",
+          "折叠 写入内容 2 条(只读检查 = cat / grep / wc / ls;写入内容 = 别的文件正文里列了它;正文 = 说 / 想 / 收件;m_all=1 铺)",
+          "候选仅计数,未展开 8 条;需要时 file(path, v=1, m_n=40, m_from=1) 查看。没有展开不等于没有候选,也不能据此断言无人读写。"
+        ]
+      },
+      "candidates": {
+        "all_mentions": 13,
+        "missing_read_write": 10,
+        "eligible_with_same_m_all": 8,
+        "folded_with_same_m_all": 2,
+        "displayed_m_n_40": 8,
+        "displayed_m_n_0": 0,
+        "recovery_m_n_40_pages": 1,
+        "recovered_eligible_rows": 8,
+        "recovered_all_rows_with_explicit_m_all": 10,
+        "recovered_eligible_sha256": "c907c62bae00a107ed9fe398168a0e994fe93991a0bdec1862482e4bf0d6ca4b"
+      },
+      "checks": {
+        "non_mention_sections_identical": true,
+        "writer_spine_preserved": true,
+        "unknown_and_candidate_signals_preserved": true,
+        "mention_header_count_preserved": true,
+        "zero_mode_has_no_candidate_rows": true,
+        "zero_mode_has_expansion_hint_when_needed": true,
+        "explicit_40_restores_baseline_exactly": true,
+        "explicit_40_pagination_recovers_all_eligible_candidates": true,
+        "explicit_all_with_40_pagination_recovers_all_missing_candidates": true
+      }
+    },
+    {
+      "kind": "saved_query",
+      "label": "cases_tools4",
+      "sid": "ff019d8a",
+      "source": "docs\\experiments\\2026-09-07-six-cases\\cases_tools4\\chain08-MemberCenterPage.ets",
+      "source_kind": "metrics",
+      "source_step": 17,
+      "source_result_ref": null,
+      "source_is_error": false,
+      "saved_input": {
+        "path": "spec/baseline/ui/page_0028_MemberCenterActivitiy.md"
+      },
+      "historical_return_chars": 793,
+      "status": "ok",
+      "current_file": "/Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723/spec/baseline/ui/page_0028_MemberCenterActivitiy.md",
+      "current_anchor_v": 3,
+      "current_total_versions": 3,
+      "effective_common_args": {
+        "path": "spec/baseline/ui/page_0028_MemberCenterActivitiy.md",
+        "root": "/Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723"
+      },
+      "ignored_navigation_or_treatment_args": {},
+      "anchor_note": "saved v omitted; both arms use current latest version",
+      "chars_m_n_40": 4537,
+      "chars_m_n_0": 1371,
+      "chars_saved": 3166,
+      "reduction_pct": 69.782,
+      "output_sha256": {
+        "40": "68b8ed702cf658ad955b4b23222e1d12459b584335e6adc13d009b233024b315",
+        "0": "b5b7525751e18dc31cb8a6044e6cbad636acbd41394be356f96a0cde0419042c"
+      },
+      "preserved": {
+        "writer_spine_rows": 3,
+        "unknown_candidate_signal_rows": 3,
+        "signal_lines": [
+          "⚠ 断点 outband-change @ 2026-07-24T02:26:19: 观测与已知状态不符 —— 实录外修改",
+          "- v1 ← 外部输入 | 07-23T12:45 T+0:42 | external · 观测·首次读到 · 候选生成运行 #318(目录级线索,未证实;同批 1 个) · 73 行",
+          "- v2 ← 实录外修改 | 07-24T02:26 T+14:23 | true · 观测·内容变了无写者 · 窗口内提及 4 条(改动类 2),见末尾提及节 · 窗口内有写能力的命令 190 条(全池,不含写它自己的那条):search(q='', kind=write, since_ts=2026-07-23T12:45:07.746Z, until_ts=2026-07-24T02:26:19.001Z) · 96 行"
+        ],
+        "count_lines": [
+          "## 提到它的命令(18,其中 16 条账本没记到读写)—— 命令行 / heredoc 体 / 跑的脚本正文 / 工具输出里出现这个路径;版本无法复原或实录外修改时先看这里,action 展开命令原文自己判",
+          "已入账的 2 条(碰过(方向不明) 1 次、读 1 次)脊柱与读者里已有,不再铺",
+          "折叠 正文 2 条、只读检查 1 条(只读检查 = cat / grep / wc / ls;写入内容 = 别的文件正文里列了它;正文 = 说 / 想 / 收件;m_all=1 铺)",
+          "候选仅计数,未展开 13 条;需要时 file(path, v=3, m_n=40, m_from=1) 查看。没有展开不等于没有候选,也不能据此断言无人读写。"
+        ]
+      },
+      "candidates": {
+        "all_mentions": 18,
+        "missing_read_write": 16,
+        "eligible_with_same_m_all": 13,
+        "folded_with_same_m_all": 3,
+        "displayed_m_n_40": 13,
+        "displayed_m_n_0": 0,
+        "recovery_m_n_40_pages": 1,
+        "recovered_eligible_rows": 13,
+        "recovered_all_rows_with_explicit_m_all": 16,
+        "recovered_eligible_sha256": "a29a0401c177000dc1aab6e08a920e77eadf883f0851470ab17e459d05e2d7e5"
+      },
+      "checks": {
+        "non_mention_sections_identical": true,
+        "writer_spine_preserved": true,
+        "unknown_and_candidate_signals_preserved": true,
+        "mention_header_count_preserved": true,
+        "zero_mode_has_no_candidate_rows": true,
+        "zero_mode_has_expansion_hint_when_needed": true,
+        "explicit_40_restores_baseline_exactly": true,
+        "explicit_40_pagination_recovers_all_eligible_candidates": true,
+        "explicit_all_with_40_pagination_recovers_all_missing_candidates": true
+      }
+    },
+    {
+      "kind": "saved_query",
+      "label": "cases_tools4",
+      "sid": "ff019d8a",
+      "source": "docs\\experiments\\2026-09-07-six-cases\\cases_tools4\\chain08-MemberCenterPage.ets",
+      "source_kind": "metrics",
+      "source_step": 18,
+      "source_result_ref": null,
+      "source_is_error": false,
+      "saved_input": {
+        "path": "spec/baseline/ui/page_0028_MemberCenterActivitiy.md",
+        "v": 2,
+        "content": true
+      },
+      "historical_return_chars": 4858,
+      "status": "ok",
+      "current_file": "/Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723/spec/baseline/ui/page_0028_MemberCenterActivitiy.md",
+      "current_anchor_v": 2,
+      "current_total_versions": 3,
+      "effective_common_args": {
+        "path": "spec/baseline/ui/page_0028_MemberCenterActivitiy.md",
+        "root": "/Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723",
+        "v": 2,
+        "content": true
+      },
+      "ignored_navigation_or_treatment_args": {},
+      "anchor_note": "saved v retained",
+      "chars_m_n_40": 8461,
+      "chars_m_n_0": 5295,
+      "chars_saved": 3166,
+      "reduction_pct": 37.419,
+      "output_sha256": {
+        "40": "6b1bd1129c63c95db2c0b8170baa3c3284423bcd4d7e61f20c836b8b9401bf94",
+        "0": "0451207396ddd948967b39fb5e6006eed389200e1567b6ea5284d3a474083c7d"
+      },
+      "preserved": {
+        "writer_spine_rows": 2,
+        "unknown_candidate_signal_rows": 3,
+        "signal_lines": [
+          "⚠ 断点 outband-change @ 2026-07-24T02:26:19: 观测与已知状态不符 —— 实录外修改",
+          "- v1 ← 外部输入 | 07-23T12:45 T+0:42 | external · 观测·首次读到 · 候选生成运行 #318(目录级线索,未证实;同批 1 个) · 73 行",
+          "- v2 ← 实录外修改 | 07-24T02:26 T+14:23 | true · 观测·内容变了无写者 · 窗口内提及 4 条(改动类 2),见末尾提及节 · 窗口内有写能力的命令 190 条(全池,不含写它自己的那条):search(q='', kind=write, since_ts=2026-07-23T12:45:07.746Z, until_ts=2026-07-24T02:26:19.001Z) · 96 行 ◀"
+        ],
+        "count_lines": [
+          "## 提到它的命令(18,其中 16 条账本没记到读写)—— 命令行 / heredoc 体 / 跑的脚本正文 / 工具输出里出现这个路径;版本无法复原或实录外修改时先看这里,action 展开命令原文自己判",
+          "已入账的 2 条(碰过(方向不明) 1 次、读 1 次)脊柱与读者里已有,不再铺",
+          "折叠 正文 2 条、只读检查 1 条(只读检查 = cat / grep / wc / ls;写入内容 = 别的文件正文里列了它;正文 = 说 / 想 / 收件;m_all=1 铺)",
+          "候选仅计数,未展开 13 条;需要时 file(path, v=2, m_n=40, m_from=1) 查看。没有展开不等于没有候选,也不能据此断言无人读写。"
+        ]
+      },
+      "candidates": {
+        "all_mentions": 18,
+        "missing_read_write": 16,
+        "eligible_with_same_m_all": 13,
+        "folded_with_same_m_all": 3,
+        "displayed_m_n_40": 13,
+        "displayed_m_n_0": 0,
+        "recovery_m_n_40_pages": 1,
+        "recovered_eligible_rows": 13,
+        "recovered_all_rows_with_explicit_m_all": 16,
+        "recovered_eligible_sha256": "a29a0401c177000dc1aab6e08a920e77eadf883f0851470ab17e459d05e2d7e5"
+      },
+      "checks": {
+        "non_mention_sections_identical": true,
+        "writer_spine_preserved": true,
+        "unknown_and_candidate_signals_preserved": true,
+        "mention_header_count_preserved": true,
+        "zero_mode_has_no_candidate_rows": true,
+        "zero_mode_has_expansion_hint_when_needed": true,
+        "explicit_40_restores_baseline_exactly": true,
+        "explicit_40_pagination_recovers_all_eligible_candidates": true,
+        "explicit_all_with_40_pagination_recovers_all_missing_candidates": true
+      }
+    },
+    {
+      "kind": "saved_query",
+      "label": "cases_tools4",
+      "sid": "ff019d8a",
+      "source": "docs\\experiments\\2026-09-07-six-cases\\cases_tools4\\chain08-MemberCenterPage.ets",
+      "source_kind": "metrics",
+      "source_step": 21,
+      "source_result_ref": null,
+      "source_is_error": false,
+      "saved_input": {
+        "path": "/Users/chenjiamin/arkTs/android_pilot_project/wf/AIPPT/app/src/main/platform-res/layout/item_product_info.xml",
+        "content": true,
+        "start": 55,
+        "n": 50
+      },
+      "historical_return_chars": 3386,
+      "status": "ok",
+      "current_file": "/Users/chenjiamin/arkTs/android_pilot_project/wf/AIPPT/app/src/main/platform-res/layout/item_product_info.xml",
+      "current_anchor_v": 1,
+      "current_total_versions": 1,
+      "effective_common_args": {
+        "path": "/Users/chenjiamin/arkTs/android_pilot_project/wf/AIPPT/app/src/main/platform-res/layout/item_product_info.xml",
+        "root": "/Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723",
+        "content": true,
+        "start": 55,
+        "n": 50
+      },
+      "ignored_navigation_or_treatment_args": {},
+      "anchor_note": "saved v omitted; both arms use current latest version",
+      "chars_m_n_40": 5867,
+      "chars_m_n_0": 3720,
+      "chars_saved": 2147,
+      "reduction_pct": 36.595,
+      "output_sha256": {
+        "40": "2fb90f4e1679cda84dec4296a3fd3c28a1985e7302f12ad2c305648050460340",
+        "0": "1f0068b4d100878389938a4c284f81d4492f1cdc1d3a88a0095d0a56375cf6f2"
+      },
+      "preserved": {
+        "writer_spine_rows": 1,
+        "unknown_candidate_signal_rows": 1,
+        "signal_lines": [
+          "- v1 ← 外部输入 | 07-24T02:26 T+14:23 | external · 观测·首次读到 · 窗口内提及 4 条(改动类 2),见末尾提及节 · 156 行 ◀"
+        ],
+        "count_lines": [
+          "## 提到它的命令(19,其中 18 条账本没记到读写)—— 命令行 / heredoc 体 / 跑的脚本正文 / 工具输出里出现这个路径;版本无法复原或实录外修改时先看这里,action 展开命令原文自己判",
+          "已入账的 1 条(碰过(方向不明) 1 次)脊柱与读者里已有,不再铺",
+          "折叠 写入内容 7 条、正文 2 条(只读检查 = cat / grep / wc / ls;写入内容 = 别的文件正文里列了它;正文 = 说 / 想 / 收件;m_all=1 铺)",
+          "候选仅计数,未展开 9 条;需要时 file(path, v=1, m_n=40, m_from=1) 查看。没有展开不等于没有候选,也不能据此断言无人读写。"
+        ]
+      },
+      "candidates": {
+        "all_mentions": 19,
+        "missing_read_write": 18,
+        "eligible_with_same_m_all": 9,
+        "folded_with_same_m_all": 9,
+        "displayed_m_n_40": 9,
+        "displayed_m_n_0": 0,
+        "recovery_m_n_40_pages": 1,
+        "recovered_eligible_rows": 9,
+        "recovered_all_rows_with_explicit_m_all": 18,
+        "recovered_eligible_sha256": "880a24161165c13883ec8f0c2075004f77414f90c93c5ea15c9296e8ec0e19de"
+      },
+      "checks": {
+        "non_mention_sections_identical": true,
+        "writer_spine_preserved": true,
+        "unknown_and_candidate_signals_preserved": true,
+        "mention_header_count_preserved": true,
+        "zero_mode_has_no_candidate_rows": true,
+        "zero_mode_has_expansion_hint_when_needed": true,
+        "explicit_40_restores_baseline_exactly": true,
+        "explicit_40_pagination_recovers_all_eligible_candidates": true,
+        "explicit_all_with_40_pagination_recovers_all_missing_candidates": true
+      }
+    },
+    {
+      "kind": "saved_query",
+      "label": "cases_tools4",
+      "sid": "ff019d8a",
+      "source": "docs\\experiments\\2026-09-07-six-cases\\cases_tools4\\chain08-MemberCenterPage.ets",
+      "source_kind": "metrics",
+      "source_step": 23,
+      "source_result_ref": null,
+      "source_is_error": false,
+      "saved_input": {
+        "path": "/Users/chenjiamin/arkTs/android_pilot_project/wf/AIPPT/app/src/main/platform-res/layout/activity_member_center.xml",
+        "content": true,
+        "start": 180,
+        "n": 30
+      },
+      "historical_return_chars": 2125,
+      "status": "ok",
+      "current_file": "/Users/chenjiamin/arkTs/android_pilot_project/wf/AIPPT/app/src/main/platform-res/layout/activity_member_center.xml",
+      "current_anchor_v": 1,
+      "current_total_versions": 1,
+      "effective_common_args": {
+        "path": "/Users/chenjiamin/arkTs/android_pilot_project/wf/AIPPT/app/src/main/platform-res/layout/activity_member_center.xml",
+        "root": "/Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723",
+        "content": true,
+        "start": 180,
+        "n": 30
+      },
+      "ignored_navigation_or_treatment_args": {},
+      "anchor_note": "saved v omitted; both arms use current latest version",
+      "chars_m_n_40": 6007,
+      "chars_m_n_0": 2538,
+      "chars_saved": 3469,
+      "reduction_pct": 57.749,
+      "output_sha256": {
+        "40": "ecab5a05862616e44777f2f05aa11ae614cf49e871eabf84f58c824cdce73261",
+        "0": "dcd4ca2baba1404c463aa085de79f37f07973f317126fe18d891e7c2fa35e861"
+      },
+      "preserved": {
+        "writer_spine_rows": 1,
+        "unknown_candidate_signal_rows": 1,
+        "signal_lines": [
+          "- v1 ← 外部输入 | 07-24T02:26 T+14:23 | external · 观测·首次读到 · 窗口内提及 4 条(改动类 3),见末尾提及节 · 356 行 ◀"
+        ],
+        "count_lines": [
+          "## 提到它的命令(33,其中 28 条账本没记到读写)—— 命令行 / heredoc 体 / 跑的脚本正文 / 工具输出里出现这个路径;版本无法复原或实录外修改时先看这里,action 展开命令原文自己判",
+          "已入账的 5 条(读 4 次、碰过(方向不明) 1 次)脊柱与读者里已有,不再铺",
+          "折叠 写入内容 11 条、正文 2 条、只读检查 1 条(只读检查 = cat / grep / wc / ls;写入内容 = 别的文件正文里列了它;正文 = 说 / 想 / 收件;m_all=1 铺)",
+          "候选仅计数,未展开 14 条;需要时 file(path, v=1, m_n=40, m_from=1) 查看。没有展开不等于没有候选,也不能据此断言无人读写。"
+        ]
+      },
+      "candidates": {
+        "all_mentions": 33,
+        "missing_read_write": 28,
+        "eligible_with_same_m_all": 14,
+        "folded_with_same_m_all": 14,
+        "displayed_m_n_40": 14,
+        "displayed_m_n_0": 0,
+        "recovery_m_n_40_pages": 1,
+        "recovered_eligible_rows": 14,
+        "recovered_all_rows_with_explicit_m_all": 28,
+        "recovered_eligible_sha256": "63395b509db7f81caac80faeaebc579d775c4904969cc1805ba2ca80ebc71350"
+      },
+      "checks": {
+        "non_mention_sections_identical": true,
+        "writer_spine_preserved": true,
+        "unknown_and_candidate_signals_preserved": true,
+        "mention_header_count_preserved": true,
+        "zero_mode_has_no_candidate_rows": true,
+        "zero_mode_has_expansion_hint_when_needed": true,
+        "explicit_40_restores_baseline_exactly": true,
+        "explicit_40_pagination_recovers_all_eligible_candidates": true,
+        "explicit_all_with_40_pagination_recovers_all_missing_candidates": true
+      }
+    },
+    {
+      "kind": "saved_query",
+      "label": "cases_tools4",
+      "sid": "ff019d8a",
+      "source": "docs\\experiments\\2026-09-07-six-cases\\cases_tools4\\chain08-MemberCenterPage.ets",
+      "source_kind": "metrics",
+      "source_step": 31,
+      "source_result_ref": null,
+      "source_is_error": false,
+      "saved_input": {
+        "path": "entry/src/main/ets/pages/MemberCenterPage.ets",
+        "diff": true,
+        "v_from": 21,
+        "diff_chars": 1500
+      },
+      "historical_return_chars": 1255,
+      "status": "invalid_current_window",
+      "current_file": "/Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723/entry/src/main/ets/pages/MemberCenterPage.ets",
+      "current_anchor_v": 18,
+      "current_total_versions": 18,
+      "return": "⛔ diff 窗口必须满足 1 ≤ v_from ≤ v_to ≤ 查询锚点 v18;未执行查询。",
+      "effective_args": {
+        "diff": true,
+        "v_from": 21,
+        "diff_chars": 1500
+      }
+    },
+    {
+      "kind": "supplemental_version",
+      "label": "cases_tools4",
+      "sid": "ff019d8a",
+      "source": "docs\\experiments\\2026-09-07-six-cases\\cases_tools4\\chain08-MemberCenterPage.ets",
+      "source_kind": "documented_version_sample",
+      "selection": "generation v1, saved repair-window endpoints and latest",
+      "target": "MemberCenterPage.ets",
+      "saved_input": {
+        "path": "entry/src/main/ets/pages/MemberCenterPage.ets",
+        "v": 1
+      },
+      "status": "ok",
+      "current_file": "/Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723/entry/src/main/ets/pages/MemberCenterPage.ets",
+      "current_anchor_v": 1,
+      "current_total_versions": 18,
+      "effective_common_args": {
+        "path": "entry/src/main/ets/pages/MemberCenterPage.ets",
+        "root": "/Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723",
+        "v": 1
+      },
+      "ignored_navigation_or_treatment_args": {},
+      "anchor_note": "saved v retained",
+      "chars_m_n_40": 13304,
+      "chars_m_n_0": 3111,
+      "chars_saved": 10193,
+      "reduction_pct": 76.616,
+      "output_sha256": {
+        "40": "e05fd36cda7c7dfe3a658b19cca59f06aac16704496dbe8d76c1d653cac18f77",
+        "0": "8529a8aa4932ddc25812e665538eaaccc4654eb5a63c7a2904a6951d901b9c85"
+      },
+      "preserved": {
+        "writer_spine_rows": 1,
+        "unknown_candidate_signal_rows": 1,
+        "signal_lines": [
+          "- slice8-pay v16 | 07-24T16:22 T+28:19 | 条件分支,是否执行未知(候选写) | action(#80bbb1f44b77da0f:20882@L383)"
+        ],
+        "count_lines": [
+          "## 提到它的命令(337,其中 196 条账本没记到读写)—— 命令行 / heredoc 体 / 跑的脚本正文 / 工具输出里出现这个路径;版本无法复原或实录外修改时先看这里,action 展开命令原文自己判",
+          "已入账的 141 条(读 113 次、碰过(方向不明) 24 次、写 4 次)脊柱与读者里已有,不再铺",
+          "折叠 写入内容 21 条、正文 18 条、只读检查 2 条(只读检查 = cat / grep / wc / ls;写入内容 = 别的文件正文里列了它;正文 = 说 / 想 / 收件;m_all=1 铺)",
+          "候选仅计数,未展开 155 条;需要时 file(path, v=1, m_n=40, m_from=1) 查看。没有展开不等于没有候选,也不能据此断言无人读写。"
+        ]
+      },
+      "candidates": {
+        "all_mentions": 337,
+        "missing_read_write": 196,
+        "eligible_with_same_m_all": 155,
+        "folded_with_same_m_all": 41,
+        "displayed_m_n_40": 40,
+        "displayed_m_n_0": 0,
+        "recovery_m_n_40_pages": 4,
+        "recovered_eligible_rows": 155,
+        "recovered_all_rows_with_explicit_m_all": 196,
+        "recovered_eligible_sha256": "55c64900e9e005ba19391ad5f1eb7e6ea1bdf6d6788c693b87754f8783e4bce2"
+      },
+      "checks": {
+        "non_mention_sections_identical": true,
+        "writer_spine_preserved": true,
+        "unknown_and_candidate_signals_preserved": true,
+        "mention_header_count_preserved": true,
+        "zero_mode_has_no_candidate_rows": true,
+        "zero_mode_has_expansion_hint_when_needed": true,
+        "explicit_40_restores_baseline_exactly": true,
+        "explicit_40_pagination_recovers_all_eligible_candidates": true,
+        "explicit_all_with_40_pagination_recovers_all_missing_candidates": true
+      }
+    },
+    {
+      "kind": "supplemental_version",
+      "label": "cases_tools4",
+      "sid": "ff019d8a",
+      "source": "docs\\experiments\\2026-09-07-six-cases\\cases_tools4\\chain08-MemberCenterPage.ets",
+      "source_kind": "documented_version_sample",
+      "selection": "generation v1, saved repair-window endpoints and latest",
+      "target": "MemberCenterPage.ets",
+      "saved_input": {
+        "path": "entry/src/main/ets/pages/MemberCenterPage.ets",
+        "v": 14
+      },
+      "status": "ok",
+      "current_file": "/Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723/entry/src/main/ets/pages/MemberCenterPage.ets",
+      "current_anchor_v": 14,
+      "current_total_versions": 18,
+      "effective_common_args": {
+        "path": "entry/src/main/ets/pages/MemberCenterPage.ets",
+        "root": "/Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723",
+        "v": 14
+      },
+      "ignored_navigation_or_treatment_args": {},
+      "anchor_note": "saved v retained",
+      "chars_m_n_40": 14393,
+      "chars_m_n_0": 4201,
+      "chars_saved": 10192,
+      "reduction_pct": 70.812,
+      "output_sha256": {
+        "40": "7fa3fd73ed08f078527563152782c5fca7c570d76d2e80ce92254d15dbc7ad4e",
+        "0": "7bd73795cedd7b6a99d1fc5e72c881194a4ed24ae431c33a230daa9c97cf5d7c"
+      },
+      "preserved": {
+        "writer_spine_rows": 8,
+        "unknown_candidate_signal_rows": 6,
+        "signal_lines": [
+          "这一版内容: 无法复原 —— edit 作用在未知状态上(盲写) · 上游 524/74 跳(累计/窗口口径;每次 agent↔文件转换算一跳,派发算一跳)",
+          "- v8 ← group2-closer v43 | 07-24T16:50 T+28:47 | native · Edit·报告成功 · 窗口内提及 23 条(改动类 16),见末尾提及节 · 窗口内有写能力的命令 31 条(全池,不含写它自己的那条):search(q='', kind=write, since_ts=2026-07-24T16:04:37.440Z, until_ts=2026-07-24T16:50:09.283Z) · 内容未知 (#b7ebd5ae592d3c5d:13483@L345)",
+          "- v9 ← group2-closer v44 | 07-24T16:50 T+28:47 | native · Edit·报告成功 · 内容未知 (#b7ebd5ae592d3c5d:13487@L349)",
+          "- v10–v13 ← fixer-r1 v36–v45 | 07-26T21:16–21:24 | native ×4(4 版) · 内容未知 (#a68daf720e780b4c2:23849@L436 … #a68daf720e780b4c2:23954@L528)",
+          "- v14 ← fixer-r1 v46 | 07-26T21:24 T+81:21 | native · 推导·ast 读改写 · 内容未知 (#a68daf720e780b4c2:23961@L532) ◀",
+          "- slice8-pay v16 | 07-24T16:22 T+28:19 | 条件分支,是否执行未知(候选写) | action(#80bbb1f44b77da0f:20882@L383)"
+        ],
+        "count_lines": [
+          "## 提到它的命令(337,其中 196 条账本没记到读写)—— 命令行 / heredoc 体 / 跑的脚本正文 / 工具输出里出现这个路径;版本无法复原或实录外修改时先看这里,action 展开命令原文自己判",
+          "已入账的 141 条(读 113 次、碰过(方向不明) 24 次、写 4 次)脊柱与读者里已有,不再铺",
+          "折叠 写入内容 21 条、正文 18 条、只读检查 2 条(只读检查 = cat / grep / wc / ls;写入内容 = 别的文件正文里列了它;正文 = 说 / 想 / 收件;m_all=1 铺)",
+          "候选仅计数,未展开 155 条;需要时 file(path, v=14, m_n=40, m_from=1) 查看。没有展开不等于没有候选,也不能据此断言无人读写。"
+        ]
+      },
+      "candidates": {
+        "all_mentions": 337,
+        "missing_read_write": 196,
+        "eligible_with_same_m_all": 155,
+        "folded_with_same_m_all": 41,
+        "displayed_m_n_40": 40,
+        "displayed_m_n_0": 0,
+        "recovery_m_n_40_pages": 4,
+        "recovered_eligible_rows": 155,
+        "recovered_all_rows_with_explicit_m_all": 196,
+        "recovered_eligible_sha256": "55c64900e9e005ba19391ad5f1eb7e6ea1bdf6d6788c693b87754f8783e4bce2"
+      },
+      "checks": {
+        "non_mention_sections_identical": true,
+        "writer_spine_preserved": true,
+        "unknown_and_candidate_signals_preserved": true,
+        "mention_header_count_preserved": true,
+        "zero_mode_has_no_candidate_rows": true,
+        "zero_mode_has_expansion_hint_when_needed": true,
+        "explicit_40_restores_baseline_exactly": true,
+        "explicit_40_pagination_recovers_all_eligible_candidates": true,
+        "explicit_all_with_40_pagination_recovers_all_missing_candidates": true
+      }
+    },
+    {
+      "kind": "supplemental_version",
+      "label": "cases_tools4",
+      "sid": "ff019d8a",
+      "source": "docs\\experiments\\2026-09-07-six-cases\\cases_tools4\\chain08-MemberCenterPage.ets",
+      "source_kind": "documented_version_sample",
+      "selection": "generation v1, saved repair-window endpoints and latest",
+      "target": "MemberCenterPage.ets",
+      "saved_input": {
+        "path": "entry/src/main/ets/pages/MemberCenterPage.ets",
+        "v": 16
+      },
+      "status": "ok",
+      "current_file": "/Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723/entry/src/main/ets/pages/MemberCenterPage.ets",
+      "current_anchor_v": 16,
+      "current_total_versions": 18,
+      "effective_common_args": {
+        "path": "entry/src/main/ets/pages/MemberCenterPage.ets",
+        "root": "/Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723",
+        "v": 16
+      },
+      "ignored_navigation_or_treatment_args": {},
+      "anchor_note": "saved v retained",
+      "chars_m_n_40": 14392,
+      "chars_m_n_0": 4200,
+      "chars_saved": 10192,
+      "reduction_pct": 70.817,
+      "output_sha256": {
+        "40": "b7afd598c27a361d22c8af5a8cb15f0f9fa6991287647a0cb738f7613d3d0c6b",
+        "0": "7d5323cecbad64a474793d75c1f3aa89d63c41067ad035f9e280ab9f6c66c85c"
+      },
+      "preserved": {
+        "writer_spine_rows": 8,
+        "unknown_candidate_signal_rows": 6,
+        "signal_lines": [
+          "这一版内容: 无法复原 —— edit 作用在未知状态上(盲写) · 上游 530/5 跳(累计/窗口口径;每次 agent↔文件转换算一跳,派发算一跳)",
+          "- v8 ← group2-closer v43 | 07-24T16:50 T+28:47 | native · Edit·报告成功 · 窗口内提及 23 条(改动类 16),见末尾提及节 · 窗口内有写能力的命令 31 条(全池,不含写它自己的那条):search(q='', kind=write, since_ts=2026-07-24T16:04:37.440Z, until_ts=2026-07-24T16:50:09.283Z) · 内容未知 (#b7ebd5ae592d3c5d:13483@L345)",
+          "- v9 ← group2-closer v44 | 07-24T16:50 T+28:47 | native · Edit·报告成功 · 内容未知 (#b7ebd5ae592d3c5d:13487@L349)",
+          "- v10–v15 ← fixer-r1 v36–v53 | 07-26T21:16–21:30 | native ×6(6 版) · 内容未知 (#a68daf720e780b4c2:23849@L436 … #a68daf720e780b4c2:24028@L592)",
+          "- v16 ← fixer-r1 v53 | 07-26T21:30 T+81:27 | native · 推导·ast 读改写 · 内容未知 (#a68daf720e780b4c2:24028@L592) ◀",
+          "- slice8-pay v16 | 07-24T16:22 T+28:19 | 条件分支,是否执行未知(候选写) | action(#80bbb1f44b77da0f:20882@L383)"
+        ],
+        "count_lines": [
+          "## 提到它的命令(337,其中 196 条账本没记到读写)—— 命令行 / heredoc 体 / 跑的脚本正文 / 工具输出里出现这个路径;版本无法复原或实录外修改时先看这里,action 展开命令原文自己判",
+          "已入账的 141 条(读 113 次、碰过(方向不明) 24 次、写 4 次)脊柱与读者里已有,不再铺",
+          "折叠 写入内容 21 条、正文 18 条、只读检查 2 条(只读检查 = cat / grep / wc / ls;写入内容 = 别的文件正文里列了它;正文 = 说 / 想 / 收件;m_all=1 铺)",
+          "候选仅计数,未展开 155 条;需要时 file(path, v=16, m_n=40, m_from=1) 查看。没有展开不等于没有候选,也不能据此断言无人读写。"
+        ]
+      },
+      "candidates": {
+        "all_mentions": 337,
+        "missing_read_write": 196,
+        "eligible_with_same_m_all": 155,
+        "folded_with_same_m_all": 41,
+        "displayed_m_n_40": 40,
+        "displayed_m_n_0": 0,
+        "recovery_m_n_40_pages": 4,
+        "recovered_eligible_rows": 155,
+        "recovered_all_rows_with_explicit_m_all": 196,
+        "recovered_eligible_sha256": "55c64900e9e005ba19391ad5f1eb7e6ea1bdf6d6788c693b87754f8783e4bce2"
+      },
+      "checks": {
+        "non_mention_sections_identical": true,
+        "writer_spine_preserved": true,
+        "unknown_and_candidate_signals_preserved": true,
+        "mention_header_count_preserved": true,
+        "zero_mode_has_no_candidate_rows": true,
+        "zero_mode_has_expansion_hint_when_needed": true,
+        "explicit_40_restores_baseline_exactly": true,
+        "explicit_40_pagination_recovers_all_eligible_candidates": true,
+        "explicit_all_with_40_pagination_recovers_all_missing_candidates": true
+      }
+    },
+    {
+      "kind": "supplemental_version",
+      "label": "cases_tools4",
+      "sid": "ff019d8a",
+      "source": "docs\\experiments\\2026-09-07-six-cases\\cases_tools4\\chain08-MemberCenterPage.ets",
+      "source_kind": "documented_version_sample",
+      "selection": "generation v1, saved repair-window endpoints and latest",
+      "target": "MemberCenterPage.ets",
+      "saved_input": {
+        "path": "entry/src/main/ets/pages/MemberCenterPage.ets",
+        "v": 17
+      },
+      "status": "ok",
+      "current_file": "/Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723/entry/src/main/ets/pages/MemberCenterPage.ets",
+      "current_anchor_v": 17,
+      "current_total_versions": 18,
+      "effective_common_args": {
+        "path": "entry/src/main/ets/pages/MemberCenterPage.ets",
+        "root": "/Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723",
+        "v": 17
+      },
+      "ignored_navigation_or_treatment_args": {},
+      "anchor_note": "saved v retained",
+      "chars_m_n_40": 14549,
+      "chars_m_n_0": 4357,
+      "chars_saved": 10192,
+      "reduction_pct": 70.053,
+      "output_sha256": {
+        "40": "25788b5a4e66835d44449a03f65e3bb30ac849acc7abedb7a7aba1967b2b617b",
+        "0": "8e4ce7ad7250c3244341ee7064a7248a09e4d0a668845bc8b5cd156e0d937067"
+      },
+      "preserved": {
+        "writer_spine_rows": 8,
+        "unknown_candidate_signal_rows": 6,
+        "signal_lines": [
+          "这一版内容: 无法复原 —— edit 作用在未知状态上(盲写) · 上游 532/7 跳(累计/窗口口径;每次 agent↔文件转换算一跳,派发算一跳)",
+          "- v8 ← group2-closer v43 | 07-24T16:50 T+28:47 | native · Edit·报告成功 · 窗口内提及 23 条(改动类 16),见末尾提及节 · 窗口内有写能力的命令 31 条(全池,不含写它自己的那条):search(q='', kind=write, since_ts=2026-07-24T16:04:37.440Z, until_ts=2026-07-24T16:50:09.283Z) · 内容未知 (#b7ebd5ae592d3c5d:13483@L345)",
+          "- v9 ← group2-closer v44 | 07-24T16:50 T+28:47 | native · Edit·报告成功 · 内容未知 (#b7ebd5ae592d3c5d:13487@L349)",
+          "- v10–v16 ← fixer-r1 v36–v53 | 07-26T21:16–21:30 | native ×7(7 版) · 内容未知 (#a68daf720e780b4c2:23849@L436 … #a68daf720e780b4c2:24028@L592)",
+          "- v17 ← build-verify-r1 v3 | 07-26T21:46 T+81:43 | native · Edit·报告成功 · 窗口内提及 4 条(改动类 4),见末尾提及节 · 窗口内有写能力的命令 15 条(全池,不含写它自己的那条):search(q='', kind=write, since_ts=2026-07-26T21:30:17.239Z, until_ts=2026-07-26T21:46:11.820Z) · 内容未知 (#af0e3d2ae54dbf769:26411@L32) ◀",
+          "- slice8-pay v16 | 07-24T16:22 T+28:19 | 条件分支,是否执行未知(候选写) | action(#80bbb1f44b77da0f:20882@L383)"
+        ],
+        "count_lines": [
+          "## 提到它的命令(337,其中 196 条账本没记到读写)—— 命令行 / heredoc 体 / 跑的脚本正文 / 工具输出里出现这个路径;版本无法复原或实录外修改时先看这里,action 展开命令原文自己判",
+          "已入账的 141 条(读 113 次、碰过(方向不明) 24 次、写 4 次)脊柱与读者里已有,不再铺",
+          "折叠 写入内容 21 条、正文 18 条、只读检查 2 条(只读检查 = cat / grep / wc / ls;写入内容 = 别的文件正文里列了它;正文 = 说 / 想 / 收件;m_all=1 铺)",
+          "候选仅计数,未展开 155 条;需要时 file(path, v=17, m_n=40, m_from=1) 查看。没有展开不等于没有候选,也不能据此断言无人读写。"
+        ]
+      },
+      "candidates": {
+        "all_mentions": 337,
+        "missing_read_write": 196,
+        "eligible_with_same_m_all": 155,
+        "folded_with_same_m_all": 41,
+        "displayed_m_n_40": 40,
+        "displayed_m_n_0": 0,
+        "recovery_m_n_40_pages": 4,
+        "recovered_eligible_rows": 155,
+        "recovered_all_rows_with_explicit_m_all": 196,
+        "recovered_eligible_sha256": "55c64900e9e005ba19391ad5f1eb7e6ea1bdf6d6788c693b87754f8783e4bce2"
+      },
+      "checks": {
+        "non_mention_sections_identical": true,
+        "writer_spine_preserved": true,
+        "unknown_and_candidate_signals_preserved": true,
+        "mention_header_count_preserved": true,
+        "zero_mode_has_no_candidate_rows": true,
+        "zero_mode_has_expansion_hint_when_needed": true,
+        "explicit_40_restores_baseline_exactly": true,
+        "explicit_40_pagination_recovers_all_eligible_candidates": true,
+        "explicit_all_with_40_pagination_recovers_all_missing_candidates": true
+      }
+    },
+    {
+      "kind": "supplemental_version",
+      "label": "cases_tools4",
+      "sid": "ff019d8a",
+      "source": "docs\\experiments\\2026-09-07-six-cases\\cases_tools4\\chain08-MemberCenterPage.ets",
+      "source_kind": "documented_version_sample",
+      "selection": "generation v1, saved repair-window endpoints and latest",
+      "target": "MemberCenterPage.ets",
+      "saved_input": {
+        "path": "entry/src/main/ets/pages/MemberCenterPage.ets",
+        "v": 18
+      },
+      "status": "ok",
+      "current_file": "/Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723/entry/src/main/ets/pages/MemberCenterPage.ets",
+      "current_anchor_v": 18,
+      "current_total_versions": 18,
+      "effective_common_args": {
+        "path": "entry/src/main/ets/pages/MemberCenterPage.ets",
+        "root": "/Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723",
+        "v": 18
+      },
+      "ignored_navigation_or_treatment_args": {},
+      "anchor_note": "saved v retained",
+      "chars_m_n_40": 14657,
+      "chars_m_n_0": 4465,
+      "chars_saved": 10192,
+      "reduction_pct": 69.537,
+      "output_sha256": {
+        "40": "4e84ff633abf8c93738eb1be38d41929d30c56abd1933828d3aa41b3161f3bc9",
+        "0": "c6869a379abfae163722a9b0bcfa3b6dbc4c4c03ae5195c93058aae41cb16a20"
+      },
+      "preserved": {
+        "writer_spine_rows": 9,
+        "unknown_candidate_signal_rows": 7,
+        "signal_lines": [
+          "这一版内容: 无法复原 —— edit 作用在未知状态上(盲写) · 上游 532/2 跳(累计/窗口口径;每次 agent↔文件转换算一跳,派发算一跳)",
+          "- v8 ← group2-closer v43 | 07-24T16:50 T+28:47 | native · Edit·报告成功 · 窗口内提及 23 条(改动类 16),见末尾提及节 · 窗口内有写能力的命令 31 条(全池,不含写它自己的那条):search(q='', kind=write, since_ts=2026-07-24T16:04:37.440Z, until_ts=2026-07-24T16:50:09.283Z) · 内容未知 (#b7ebd5ae592d3c5d:13483@L345)",
+          "- v9 ← group2-closer v44 | 07-24T16:50 T+28:47 | native · Edit·报告成功 · 内容未知 (#b7ebd5ae592d3c5d:13487@L349)",
+          "- v10–v16 ← fixer-r1 v36–v53 | 07-26T21:16–21:30 | native ×7(7 版) · 内容未知 (#a68daf720e780b4c2:23849@L436 … #a68daf720e780b4c2:24028@L592)",
+          "- v17 ← build-verify-r1 v3 | 07-26T21:46 T+81:43 | native · Edit·报告成功 · 窗口内提及 4 条(改动类 4),见末尾提及节 · 窗口内有写能力的命令 15 条(全池,不含写它自己的那条):search(q='', kind=write, since_ts=2026-07-26T21:30:17.239Z, until_ts=2026-07-26T21:46:11.820Z) · 内容未知 (#af0e3d2ae54dbf769:26411@L32)",
+          "- v18 ← build-verify-r1 v4 | 07-26T21:46 T+81:43 | native · Edit·报告成功 · 内容未知 (#af0e3d2ae54dbf769:26413@L34) ◀",
+          "- slice8-pay v16 | 07-24T16:22 T+28:19 | 条件分支,是否执行未知(候选写) | action(#80bbb1f44b77da0f:20882@L383)"
+        ],
+        "count_lines": [
+          "## 提到它的命令(337,其中 196 条账本没记到读写)—— 命令行 / heredoc 体 / 跑的脚本正文 / 工具输出里出现这个路径;版本无法复原或实录外修改时先看这里,action 展开命令原文自己判",
+          "已入账的 141 条(读 113 次、碰过(方向不明) 24 次、写 4 次)脊柱与读者里已有,不再铺",
+          "折叠 写入内容 21 条、正文 18 条、只读检查 2 条(只读检查 = cat / grep / wc / ls;写入内容 = 别的文件正文里列了它;正文 = 说 / 想 / 收件;m_all=1 铺)",
+          "候选仅计数,未展开 155 条;需要时 file(path, v=18, m_n=40, m_from=1) 查看。没有展开不等于没有候选,也不能据此断言无人读写。"
+        ]
+      },
+      "candidates": {
+        "all_mentions": 337,
+        "missing_read_write": 196,
+        "eligible_with_same_m_all": 155,
+        "folded_with_same_m_all": 41,
+        "displayed_m_n_40": 40,
+        "displayed_m_n_0": 0,
+        "recovery_m_n_40_pages": 4,
+        "recovered_eligible_rows": 155,
+        "recovered_all_rows_with_explicit_m_all": 196,
+        "recovered_eligible_sha256": "55c64900e9e005ba19391ad5f1eb7e6ea1bdf6d6788c693b87754f8783e4bce2"
+      },
+      "checks": {
+        "non_mention_sections_identical": true,
+        "writer_spine_preserved": true,
+        "unknown_and_candidate_signals_preserved": true,
+        "mention_header_count_preserved": true,
+        "zero_mode_has_no_candidate_rows": true,
+        "zero_mode_has_expansion_hint_when_needed": true,
+        "explicit_40_restores_baseline_exactly": true,
+        "explicit_40_pagination_recovers_all_eligible_candidates": true,
+        "explicit_all_with_40_pagination_recovers_all_missing_candidates": true
+      }
+    }
+  ]
+}
