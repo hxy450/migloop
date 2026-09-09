@@ -719,8 +719,15 @@ def render_repair_manifest(ledger: atoms.Ledger, payload: dict[str, Any], hint: 
     out = ["## 版本与候选对账清单（记录内范围，不等于真实缺陷总数）"]
     if doc.get("errors"):
         return "\n".join(out + ["清单无法确定: " + "; ".join(str(x) for x in doc["errors"])])
-    out.append(f"共 {len(doc['items'])} 个返修阶段记录版本 + {len(doc['candidates'])} 个待核候选。每项须在 coverage 单独交代;repair.before/after 区间不能代替中间项。")
-    out.append("可标 explained / unresolved / out_of_scope / not_repair。out_of_scope=本题未调查，仍留在分母；"
+    from .guidance import verdict_version
+    compact = verdict_version() == "2"
+    out.append(f"共 {len(doc['items'])} 个返修阶段记录版本 + {len(doc['candidates'])} 个待核候选。"
+               + ("有具体判断的项写coverage.reviewed，其余系统标未调查；清单凭据见末尾。" if compact else
+                  "每项须在 coverage 单独交代;repair.before/after 区间不能代替中间项。"))
+    out.append("可标 explained / unresolved / out_of_scope / not_repair。"
+               + ("out_of_scope=有依据的题外判断；没调查的直接留在系统补集，仍留在分母；" if compact else
+                  "out_of_scope=本题未调查，仍留在分母；")
+               +
                "not_repair=有依据认为非修复，不能仅因为不在题目内。阶段后新增不自动是生成错误，写了理由不等于理由已证实。")
     excluded = (doc.get("candidate_scope") or {}).get("excluded_nonexecution") or {}
     if excluded:
@@ -741,12 +748,17 @@ def render_repair_manifest(ledger: atoms.Ledger, payload: dict[str, Any], hint: 
         out.append("### 待核候选（不是已确认修复，不新增作者或版本）")
         out.append("来源为修复参与者窗口内的方向不明触碰及精确路径提及；窗口: " + str(scope.get("window_scope")))
         out.append("同一动作仅列一次；用 action 核对 input/output 的真实目标和效应。已核明未影响目标/只读可记 not_repair；"
-                   "本题不调查记 out_of_scope，调查后证据不足记 unresolved，确认修复后关联 defect。"
+                   + ("本题不调查留系统补集，调查后证据不足记 unresolved，确认修复后关联 defect。" if compact else
+                      "本题不调查记 out_of_scope，调查后证据不足记 unresolved，确认修复后关联 defect。") +
                    "未立正式版本不等于未写入：脚本执行及输出也可作为效应证据，须说明证据强度。")
         for item in doc["candidates"]:
             out.append(f"- {item['id']} · {item['ref'] or '原始调用指针未知'} · agent:{item['agent']} · {item['ts']}")
             out.append("  线索（不是事实）: " + str(item.get("reason") or "效应待核") + " · " + str(item.get("ctx") or ""))
     out.append("此清单不覆盖索引之外的真实写入,也不证明一个版本内每个语义修改均已解释;已交代不等于已查清,候选不等于修复。")
+    if compact:
+        from .coverage_receipt import receipt
+        import json
+        out.append("MIGLOOP_COVERAGE_RECEIPT " + json.dumps(receipt(doc), ensure_ascii=False, separators=(",", ":")))
     return "\n".join(out)
 
 

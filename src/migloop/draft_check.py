@@ -100,6 +100,24 @@ def evaluate(ledger: atoms.Ledger, draft: str, chain_payload: dict[str, Any] | N
             if n.get("basis"):
                 for side in ("expected_evidence", "actual_evidence"):
                     refs(n["basis"][side], at + ".basis." + side)
+        target_binding = d.get("target_binding")
+        if target_binding and target_binding.get("status") != "matched":
+            add("target_scope_unlocated", target_binding.get("diag") or "文件范围未解析；不创建版本或repair",
+                prefix + ".target_file", "warning")
+        for i, event in enumerate(d.get("event_claims") or []):
+            at = prefix + f".event_claims[{i}]"
+            binding = event["binding"]
+            if binding.get("ok") is not True:
+                add("invalid_event", binding.get("diag") or "事件原文不可唯一定位", at + ".event")
+            elif binding.get("status") == "drifted":
+                add("event_reference_drift", "按原始位置定位到动作，旧#n已漂移；未变更模型事件声明",
+                    at + ".event", "warning")
+            refs(event["evidence"], at + ".evidence")
+            if event.get("basis"):
+                for side in ("expected_evidence", "actual_evidence"):
+                    refs(event["basis"][side], at + ".basis." + side)
+            if event.get("entry") and event["role"] not in ("进入·错", "进入·缺", "无法确认"):
+                add("event_entry_role_conflict", "事件进入点与角色声明不一致；不自动改变角色或节点", at, "warning")
         for i, edge in enumerate(d["edges"]):
             if edge.get("implicit"):
                 continue  # Automatically adjacent items are not model edge claims.
@@ -117,9 +135,14 @@ def evaluate(ledger: atoms.Ledger, draft: str, chain_payload: dict[str, Any] | N
             add("coverage_scope_unknown", "未提供链清单或目标文件，未认证对账；草稿 root 不等于用户任务范围。", severity="warning")
         else:
             manifest = coverage.manifest(ledger, chain_payload, target)
-            reconciliation = coverage.reconcile(ledger, manifest, data.get("coverage"), data["defects"], identity_bound=True)
+            reconciliation = coverage.reconcile_document(ledger, manifest, data.get("coverage"), data["defects"],
+                                                        identity_bound=True, schema=data.get("schema"))
             out["coverage"] = {"checked": True, "target": target, "counts": reconciliation.get("counts"),
                                "accounted": reconciliation.get("complete"), "semantic_checked": False}
+            if reconciliation.get("mode") == "manifest_complement":
+                out["coverage"].update(mode="manifest_complement",
+                    manifest_identity_valid=reconciliation["manifest_identity_valid"],
+                    declarations_complete=reconciliation["declarations_complete"])
             if not reconciliation.get("complete"):
                 add("coverage_incomplete", "清单仍有未交代或无效项: " + json.dumps(reconciliation.get("counts"), ensure_ascii=False), "coverage")
             for issue in reconciliation.get("errors") or []:
@@ -127,7 +150,7 @@ def evaluate(ledger: atoms.Ledger, draft: str, chain_payload: dict[str, Any] | N
             for advice in reconciliation.get("advisories") or []:
                 add(advice["code"], advice["message"], "coverage", "warning", advice.get("target"))
             # Position-check coverage citations too; this does not validate the reason.
-            for i, row in enumerate(data.get("coverage") or []):
+            for i, row in enumerate(coverage.declared_rows(data.get("coverage"), data.get("schema")) or []):
                 refs([verdict.resolve_evidence(ledger, ref) for ref in row["evidence"]], f"coverage[{i}].evidence")
     return finish()
 

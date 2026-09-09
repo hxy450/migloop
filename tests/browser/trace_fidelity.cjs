@@ -271,6 +271,69 @@ const server=http.createServer((req,res)=>{
       if(run==='checked-model-unknown')body.evidence_graph.edges.forEach(e=>e.status='unknown');
       if(run==='checked-model-no-identity')body.structured.identity.bound=null;
     }
+    if(run.startsWith('v2-')){
+      const row=coverageFixture(body),scopePath='/fixture/ReportedOnly.ets';
+      body.structured.schema='migloop-verdict/2';body.structured.document_sha256='v2-document';
+      body.structured.document_source={kind:'checked_draft_ref',verified:true,semantic_checked:false};
+      body.structured.defects.forEach(d=>{
+        d.target_binding={declared_path:'ReportedOnly.ets',canonical_path:scopePath,status:'matched',source:'model',creates_node:false,semantic_checked:false};
+        if(d.id==='A')d.recommendation='  MODEL_RECOMMENDATION <img src=x onerror="window.recommendationXss=1">\nDo not infer implementation success.';
+        d.event_claims=[{id:'event-'+d.id,event:'  #a:43@L43  ',role:d.id==='A'?'进入·错':'正常',reason:'EVENT_'+d.id+' <img src=x onerror="window.eventXss=1">',entry:d.id==='A',
+          evidence:[{type:'action',ref:'#a:43@L43',original_ref:'  #a:43@L43  ',status:'ok',aid:'agent-a',v:3,seq:43},
+            {type:'text',ref:'missing-event-ref <script>window.eventXss=2</script>',status:'missing'}],
+          basis:{expected:'EVENT_EXPECTED_'+d.id,actual:'EVENT_ACTUAL_'+d.id,counterevidence:'EVENT_BOUNDARY_'+d.id,
+            expected_evidence:[],actual_evidence:[],source:'model',semantic_checked:false},
+          binding:{status:'not_checked',diag:'Event binding fields intentionally unavailable'},source:'model',semantic_checked:false}];
+      });
+      if(run.startsWith('v2-events')){
+        body.structured.defects.forEach(d=>{
+          const e=d.event_claims[0];
+          e.binding={status:'ok',ok:true,ref:'#a:43@L43',original_ref:e.event,owner_agent:'agent-a',seq:43,use_line:43,result_line:44,
+            tool_use_id:'original-action-43',kind:d.id==='A'?'Bash':'say',action_ok:d.id!=='A',textual_only:d.id==='B',effect_version:d.id==='A'?null:1,
+            context_anchor:{kind:'agent',aid:'agent-a',v:2},temporal_relation:'tail_after_anchor',creates_node:false,creates_edge:false,semantic_checked:false,
+            paired_result:d.id==='A',context_available_before_event:d.id==='A'?false:null,context_timing_note:'SYSTEM_CONTEXT_TIMING_'+d.id};
+          e.basis.expected_evidence=[structuredClone(e.evidence[0])];
+          e.basis.actual_evidence=[{type:'node',ref:'file:/fixture/A.ets@v1',status:'ok',node:{kind:'file',key:file,v:1,ok:true}}];
+          if(run==='v2-events-unlocated'){e.binding.status='ambiguous';e.binding.ok=false;}
+          if(run==='v2-events-bad-anchor')e.binding.context_anchor.v=99;
+          if(run==='v2-events-pending'){e.binding.paired_result=false;e.binding.action_ok=null;e.binding.result_line=null;}
+        });
+      }
+      const item=d=>({id:'v2-document:'+d.id,defect:d.id,title:d.title,repair:null,causes:d.nodes,
+        target_binding:structuredClone(d.target_binding),event_claims:structuredClone(d.event_claims),recommendation:d.recommendation,
+        recommendation_status:d.recommendation?'model_claim':'not_provided',source:'model',audit:{semantic_checked:false}});
+      body.findings={schema:'migloop-findings/1',source_schema:'migloop-verdict/2',document_sha256:'v2-document',identity:{bound:true},files:[],
+        scope_files:[{path:scopePath,item_ids:['v2-document:A','v2-document:B'],source:'model',kind:'task_scope',
+          associations:body.structured.defects.map(d=>({item_id:'v2-document:'+d.id,declared_path:'ReportedOnly.ets',source:'model',kind:'task_scope',creates_node:false,semantic_checked:false}))}],
+        unbound_items:['v2-document:A','v2-document:B'],unbound_scope_items:[],items:Object.fromEntries(body.structured.defects.map(d=>['v2-document:'+d.id,item(d)]))};
+      body.coverage.rows=[row(fid+'@v1','explained','Explicit model explanation <img src=x>'),row(candidateOne,'not_repair','Explicit model nonrepair claim')];
+      Object.assign(body.coverage,{mode:'manifest_complement',manifest_identity_valid:true,reviewed_rows:body.coverage.rows,complete:true,declarations_complete:false,status:'accounted_with_uninvestigated',
+        missing:[],missing_versions:[],missing_candidates:[],unresolved:[],not_investigated:[fid+'@v2',fid+'@v3',candidateTwo]});
+      body.coverage.complement_rows=body.coverage.not_investigated.map(target=>({target,status:'not_investigated',source:'system_manifest',model_claim:false,semantic_checked:false}));
+      Object.assign(body.coverage.counts,{reviewed:2,not_investigated:3,accounted:5,provided:2,missing:0,missing_versions:0,missing_candidates:0,unresolved:0});
+      if(run==='v2-fully-declared'){
+        body.coverage.rows.push(row(fid+'@v2','explained','explicit v2'),row(fid+'@v3','explained','explicit v3'),row(candidateTwo,'unresolved','explicit unknown'));
+        Object.assign(body.coverage,{not_investigated:[],complement_rows:[],declarations_complete:true});
+        Object.assign(body.coverage.counts,{reviewed:5,not_investigated:0,provided:5});
+      }
+      if(run==='v2-overlap-complement'){
+        body.coverage.not_investigated.push(fid+'@v1');
+        body.coverage.complement_rows.push({target:fid+'@v1',status:'not_investigated',source:'system_manifest',model_claim:false,semantic_checked:false});
+      }
+      if(run==='v2-invalid-receipt')Object.assign(body.coverage,{manifest_identity_valid:false,complete:false,status:'invalid_receipt',errors:[{code:'receipt_mismatch',message:'Receipt does not match current manifest'}]});
+      if(run==='v2-unbound'||run==='v2-events-unbound'){
+        body.structured.identity.bound=false;body.findings.identity.bound=false;body.findings.scope_files=[];
+        body.coverage.identity_bound=false;body.coverage.manifest_identity_valid=false;
+      }
+      if(run==='v2-unlocated-target'){
+        body.structured.defects.forEach(d=>d.target_binding.status='unlocated');
+        Object.values(body.findings.items).forEach(i=>i.target_binding.status='unlocated');body.findings.scope_files=[];
+        body.findings.unbound_scope_items=['v2-document:A','v2-document:B'];
+      }
+      if(run==='v2-fields-on-v1'){
+        body.structured.schema='migloop-verdict/1';body.findings.source_schema='migloop-verdict/1';delete body.coverage.mode;
+      }
+    }
     if(run==='forest-layout'){
       // Same structural cause as real C4: a search-entry ancestor is moved to a
       // separate column, while its ordinary descendant has an upstream stub.
@@ -665,6 +728,57 @@ async function main(){
       if(kind==='legacy_saved'||kind==='saved_schema_repair') await check(kind+' is readable as a saved claim, never a verified final submission',"document.querySelector('.document-source').dataset.verified==='false' && document.querySelector('.document-source').textContent.includes('未认证为最终原文') && document.querySelector('#probe').textContent.includes('A 独有原因')");
       if(kind==='invalid_saved') await check('invalid saved document does not color claims while authenticated visits remain',"document.querySelectorAll('#canvas .node.p-chain').length===0 && document.querySelectorAll('#canvas .node.p-seen').length>0 && document.querySelector('#probe').textContent.includes('保存稿 raw 与 data 不一致')");
     }
+    await evaluate("__mig.load('fixture')");
+    await until("__mig.probe().runDir==='fixture' && __mig.xt()?.evidenceMode");
+    await evaluate("window.v2OriginalTrajectory=JSON.stringify(__mig.probe().trajectory);window.v2OriginalIds=JSON.stringify(Object.keys(__mig.xt().byId));window.v2OriginalPaint=[...document.querySelectorAll('#canvas .node')].map(n=>n.className.replace(/ sel/g,'')).join('|');__mig.load('v2-scope')");
+    await until("__mig.probe().runDir==='v2-scope' && document.querySelector('.target-binding')");
+    await check('v2 task scope is independent of repair buckets and never creates a file version',"document.querySelectorAll('.finding-scope-file').length===1&&document.querySelector('.finding-scope-file').dataset.path==='/fixture/ReportedOnly.ets'&&document.querySelectorAll('.finding-file').length===0&&document.querySelectorAll('.finding-unbound .finding-item').length===2&&document.querySelector('.target-binding').textContent.includes('不代表修复锚点')&&!document.querySelector('.target-binding button,.target-binding .lnk')&&!Object.values(__mig.xt().byId).some(n=>n.path==='/fixture/ReportedOnly.ets')&&JSON.stringify(__mig.probe().trajectory)===window.v2OriginalTrajectory");
+    await check('v2 recommendations are collapsed per-item model text with no inferred recommendations for omissions',"document.querySelectorAll('.finding-recommendation').length===2&&[...document.querySelectorAll('.finding-recommendation')].every(n=>!n.open&&n.dataset.semanticChecked==='false'&&n.querySelector('.finding-reason').textContent===__mig.probe().structured.defects[0].recommendation)&&!document.querySelector('.finding-item[data-defect=B] .finding-recommendation')&&!document.querySelector('.finding-recommendation img')&&!window.recommendationXss");
+    await check('manifest complement distinguishes model declarations from system uninvestigated identities',"document.querySelector('.coverage-summary').textContent.includes('模型逐项交代 2')&&document.querySelector('.coverage-summary').textContent.includes('系统标未调查 3')&&document.querySelectorAll('.coverage-item[data-source=\"system_manifest\"]').length===3&&[...document.querySelectorAll('.coverage-item[data-source=\"system_manifest\"]')].every(n=>n.dataset.state==='not_investigated'&&n.dataset.modelClaim==='false'&&!n.textContent.includes('给出解释')&&!n.textContent.includes('报告交代：'))&&document.querySelector('.repair-coverage').textContent.includes('机械交代齐全，不代表已调查')");
+    await evaluate("window.v2GraphSnapshot=JSON.stringify({trace:__mig.probe().trajectory,steps:__mig.probe().steps,graph:__mig.probe().evidence_graph});document.querySelectorAll('.coverage-complement-group,.finding-scope-file').forEach(n=>n.open=true)");
+    await check('opening scope or system complement changes no graph nodes, visits, or original declarations',"JSON.stringify({trace:__mig.probe().trajectory,steps:__mig.probe().steps,graph:__mig.probe().evidence_graph})===window.v2GraphSnapshot&&JSON.stringify(Object.keys(__mig.xt().byId))===window.v2OriginalIds&&__mig.probe().coverage.rows.length===2&&__mig.probe().coverage.not_investigated.length===3");
+    await evaluate("__mig.load('v2-fully-declared')");
+    await until("__mig.probe().runDir==='v2-fully-declared'");
+    await check('zero complement does not imply actual reading or invent remaining system items',"document.querySelector('.coverage-summary').textContent.includes('模型逐项交代 5')&&document.querySelector('.coverage-summary').textContent.includes('系统标未调查 0')&&document.querySelector('.repair-coverage').textContent.includes('逐项声明齐全也不证明实际阅读')&&!document.querySelector('.repair-coverage').textContent.includes('系统补集仍待调查')&&document.querySelectorAll('.coverage-item[data-source=\"system_manifest\"]').length===0");
+    await evaluate("__mig.load('v2-overlap-complement')");
+    await until("__mig.probe().runDir==='v2-overlap-complement'");
+    await check('system complement cannot hide or relabel a supplied model declaration',"document.querySelector('.coverage-item[data-target=\"file:/fixture/A.ets@v1\"]').dataset.source==='model'&&document.querySelector('.coverage-item[data-target=\"file:/fixture/A.ets@v1\"]').textContent.includes('Explicit model explanation')&&document.querySelectorAll('.coverage-item[data-source=\"system_manifest\"]').length===3");
+    await evaluate("__mig.load('v2-invalid-receipt')");
+    await until("__mig.probe().runDir==='v2-invalid-receipt'");
+    await check('unmatched receipt does not expand a supplied complement or claim mechanical completeness',"document.querySelectorAll('.coverage-item[data-source=\"system_manifest\"]').length===0&&document.querySelector('.repair-coverage').textContent.includes('清单摘要未认证')&&!document.querySelector('.repair-coverage').textContent.includes('机械交代齐全，不代表已调查')");
+    await evaluate("__mig.load('v2-unlocated-target')");
+    await until("__mig.probe().runDir==='v2-unlocated-target'");
+    await check('unlocated v2 scope remains a declared path without root or file fallback',"document.querySelectorAll('.finding-scope-file').length===0&&document.querySelector('.target-binding').dataset.status==='unlocated'&&document.querySelector('.target-binding').textContent.includes('ReportedOnly.ets')&&document.querySelectorAll('.finding-unbound .finding-item').length===2&&!Object.values(__mig.xt().byId).some(n=>n.path==='/fixture/ReportedOnly.ets')");
+    await evaluate("__mig.load('v2-unbound')");
+    await until("__mig.probe().runDir==='v2-unbound'");
+    await check('unbound v2 identity keeps text but does not authenticate scope or complement navigation',"document.querySelector('.target-binding').textContent.includes('历史作用域未绑定')&&document.querySelectorAll('.finding-scope-file').length===0&&!document.querySelector('.coverage-file,.coverage-action')&&document.querySelectorAll('.coverage-item[data-source=\"system_manifest\"]').length===0");
+    await evaluate("__mig.load('v2-events')");
+    await until("__mig.probe().runDir==='v2-events' && document.querySelector('.event-claims[data-origin=structured] .event-open-original')");
+    await evaluate("window.eventSnapshot=JSON.stringify({trajectory:__mig.probe().trajectory,steps:__mig.probe().steps,graph:__mig.probe().evidence_graph,root:__mig.xt().root,ids:Object.keys(__mig.xt().byId)});document.querySelectorAll('.event-claim').forEach(n=>n.open=true)");
+    await check('event claims are a separate model layer with no inherited version color or graph objects',"document.querySelectorAll('.event-claims[data-origin=structured] .event-claim').length===2&&document.querySelectorAll('.event-claims[data-origin=structured] .event-red').length===1&&[...document.querySelectorAll('.event-claim')].every(n=>n.dataset.source==='model'&&n.dataset.semanticChecked==='false'&&n.textContent.includes('事件主张，不是版本状态'))&&[...document.querySelectorAll('#canvas .node')].map(n=>n.className.replace(/ sel/g,'')).join('|')===window.v2OriginalPaint&&JSON.stringify(Object.keys(__mig.xt().byId))===window.v2OriginalIds&&document.querySelectorAll('.wire.evidence').length===0&&document.querySelector('#probe-chip').textContent.includes('事件进入声明 A:event-A')");
+    await check('event reasons, basis and invalid references remain exact text without executable model HTML',"document.querySelector('.event-claims[data-origin=structured] .event-reason').textContent==='EVENT_A <img src=x onerror=\"window.eventXss=1\">'&&document.querySelector('.event-ref').textContent==='  #a:43@L43  '&&document.querySelector('.event-claims .verow.bad').textContent.includes('missing-event-ref <script>')&&!document.querySelector('.event-claims img,.event-claims script,.event-claims .lnk')&&!window.eventXss&&document.querySelector('.event-claims .basis-expected').textContent.includes('EVENT_EXPECTED_A')");
+    await check('a failed action remains locatable while a textual record never becomes execution confirmation',"document.querySelector('.event-claims[data-origin=structured][data-defect=A] .event-open-original')!==null&&document.querySelector('.event-claims[data-origin=structured][data-defect=A]').textContent.includes('原动作记录返回失败')&&document.querySelector('.event-claims[data-origin=structured][data-defect=B] .event-textual').textContent.includes('纯文本记录，不是执行确认')");
+    await check('system context timing keeps overlapping and unknown availability separate from a usable input window',"document.querySelector('.event-claims[data-origin=structured][data-defect=A] .event-context-timing').textContent.includes('未在事件前完成')&&document.querySelector('.event-claims[data-origin=structured][data-defect=B] .event-context-timing').textContent.includes('时序未知')&&document.querySelector('.event-context-timing-note').textContent==='SYSTEM_CONTEXT_TIMING_A'");
+    await evaluate("document.querySelector('.event-claims[data-origin=structured][data-defect=A] .event-open-original').click()");
+    await until("document.querySelector('.event-claims[data-origin=structured][data-defect=A] .event-original')?.textContent.includes('EVIDENCE 43')");
+    await check('event original opens by resolved owner/action without an event visit or graph relation',"JSON.stringify({trajectory:__mig.probe().trajectory,steps:__mig.probe().steps,graph:__mig.probe().evidence_graph,root:__mig.xt().root,ids:Object.keys(__mig.xt().byId)})===window.eventSnapshot&&document.querySelector('.event-original').textContent.includes('ACTION 43')");
+    await evaluate("document.querySelector('.event-claims[data-origin=structured][data-defect=A] .event-context').click()");
+    await until("document.querySelector('#side .event-context-note')&&document.querySelector('#side .tag')?.textContent.includes('v2')&&!document.querySelector('#side').textContent.includes('账本装配中')");
+    await check('system prior-effect context opens a drawer only and is not an event state or input window',"document.querySelector('#side .event-context-note').textContent.includes('不是事件发生版本，也不是可见输入窗口')&&!document.querySelector('#side .pwhy,#side .pvisits')&&!Object.values(__mig.xt().byId).some(n=>n.aid==='agent-a'&&n.anchorVer===2)&&JSON.stringify({trajectory:__mig.probe().trajectory,steps:__mig.probe().steps,graph:__mig.probe().evidence_graph,root:__mig.xt().root,ids:Object.keys(__mig.xt().byId)})===window.eventSnapshot");
+    await evaluate("[...document.querySelectorAll('.dchips span')].find(n=>n.textContent.startsWith('B ')).click()");
+    await check('events follow the selected defect without mixing other reasons or coloring their anchors',"document.querySelectorAll('.event-claims[data-origin=structured] .event-claim').length===1&&document.querySelector('.event-claims[data-origin=structured] .event-reason').textContent.startsWith('EVENT_B')&&![...document.querySelectorAll('.event-reason')].some(n=>n.textContent.startsWith('EVENT_A'))&&document.querySelectorAll('.event-red').length===0&&__mig.probe().roles['agent-a'][0].reason==='A 独有原因'");
+    await evaluate("__mig.load('v2-events-pending')");
+    await until("__mig.probe().runDir==='v2-events-pending'");
+    await check('located pending event can open original input without certifying a completed result',"document.querySelector('.event-claims[data-origin=structured][data-defect=A] .event-open-original')!==null&&document.querySelector('.event-claims[data-origin=structured][data-defect=A] .event-pending').textContent.includes('未记录成对返回，不认定动作已完成')");
+    for(const run of ['v2-events-unlocated','v2-events-bad-anchor','v2-events-unbound']){
+      await evaluate('__mig.load('+JSON.stringify(run)+')');await until('__mig.probe().runDir==='+JSON.stringify(run));
+      await check(run+' does not guess a system context version or an event original location',"!document.querySelector('.event-context')&&!Object.values(__mig.xt().byId).some(n=>n.anchorVer===99)&&document.querySelector('.event-reason').textContent.includes('EVENT_A')");
+      if(run!=='v2-events-bad-anchor')await check(run+' has no event-original navigation',"!document.querySelector('.event-open-original')");
+      if(run==='v2-events-unbound')await check('unbound event basis and references are preserved without fresh source navigation',"!document.querySelector('.event-claims .more,.event-claims .lnk')&&document.querySelector('.event-basis-unbound').textContent.includes('EVENT_EXPECTED_A')&&document.querySelector('.event-binding-state').textContent.includes('历史事件身份未绑定')");
+    }
+    await evaluate("__mig.load('v2-fields-on-v1')");
+    await until("__mig.probe().runDir==='v2-fields-on-v1'");
+    await check('v1 does not activate v2-only scope event recommendation or complement presentation',"!document.querySelector('.target-binding,.finding-scope-file,.event-claims,.finding-recommendation,.coverage-complement-group')&&JSON.stringify(__mig.probe().trajectory)===window.v2OriginalTrajectory");
     await evaluate("__mig.load('forest-layout')");
     await until("__mig.probe().runDir==='forest-layout' && __mig.xt()?.walk && Object.values(__mig.xt().byId).filter(n=>n.traj).length===6");
     await evaluate("window.forestTrace=JSON.stringify(__mig.probe().trajectory);window.forestEdges=JSON.stringify(__mig.probe().evidence_graph);window.forestIds=Object.values(__mig.xt().byId).filter(n=>n.traj).map(n=>n.trajId).join('|')");

@@ -515,7 +515,7 @@ def test_native_transport_keeps_mcp_and_sandbox_without_forcing_code_host(frozen
     assert set(config["mcp_servers"]) == {"migloop"} and config["mcp_servers"]["migloop"]["required"] is True
     prompt = pair.build_prompt(frozen_case, case, "tools", tool_transport="native")
     assert "mcp__migloop__guide" in prompt and "code-mode" not in prompt and "tools.mcp__" not in prompt
-    assert "migloop-verdict/1" in prompt and "reason/evidence/notes" in prompt
+    assert "当前 GUIDE 要求的 migloop-verdict YAML" in prompt and "reason/evidence/notes" in prompt
     default_command, default_config = pair.build_codex_command(case, "tools", frozen_case / "run", "model", "medium", "codex.exe")
     assert default_config["tool_transport"] == "code-host"
     assert default_config["settings"]["features.code_mode_host"] is True

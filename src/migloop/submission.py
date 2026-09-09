@@ -91,7 +91,7 @@ def load_submission(report: str, ledger: atoms.Ledger, calls: list[dict[str, Any
                               final_ref_raw=ref_raw)
         loaded = verdict.load_block(report or "")
         return {**loaded, "submission": _metadata("inline", status="accepted" if not loaded["errors"] else "rejected")}
-    if isinstance(candidate, dict) and candidate.get("schema") == verdict.SCHEMA:
+    if isinstance(candidate, dict) and candidate.get("schema") in (verdict.SCHEMA, "migloop-verdict/2"):
         loaded = verdict.load_block(report or "")
         return {**loaded, "submission": _metadata("inline", status="accepted" if not loaded["errors"] else "rejected")}
     if not isinstance(candidate, dict) or candidate.get("schema") != SCHEMA:

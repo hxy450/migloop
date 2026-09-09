@@ -295,6 +295,12 @@
   .finding-file, .finding-item, .finding-cause { margin: 5px 0 5px 5px; padding-left: 5px; border-left: 1px solid var(--ring); }
   .finding-note { color: var(--ink-3); margin: 4px 0; }
   .finding-reason, .finding-boundary { white-space: pre-wrap; }
+  .target-binding, .scope-findings { margin: 7px 0; padding: 6px 8px; border: 1px solid var(--ring); border-radius: 6px; font-size: 11.5px; overflow-wrap: anywhere; }
+  .finding-scope-file { margin: 5px 0; } .finding-scope-file summary { cursor: pointer; }
+  .event-claims { margin: 8px 0; padding: 6px; border: 1px solid var(--ring); border-radius: 6px; font-size: 11.5px; overflow-wrap: anywhere; }
+  .event-claim { margin: 5px 0; padding: 5px 7px; border-left: 3px solid #c3c8d4; background: var(--wash); }
+  .event-claim summary { cursor: pointer; } .event-claim.event-red { border-left-color: #dc5263; background: #fff4f5; }
+  .event-reason { white-space: pre-wrap; margin: 5px 0; } .event-claim button { margin: 4px 6px 4px 0; }
   .finding-locate { border: 0; background: none; color: var(--c-spec); padding: 3px 0; cursor: pointer; }
   .probe .sub { font-size: 10.5px; color: var(--ink-3); margin: 6px 0 2px; letter-spacing: .08em; text-transform: uppercase; }
   .probe .repair-coverage { margin: 8px 0; padding: 7px; border: 1px solid var(--ring); border-radius: 8px; background: var(--wash); }
@@ -954,6 +960,7 @@
       else if (node.kind === "agent") drawerAgent(node);
       else if (node.kind === "action") { drawerAction(node); return; }
       else return;
+      if (node.eventContext) return; // Context is not a claim subject or an investigator visit.
       var rs = probeReason(node);
       if (rs) side.insertBefore(rs, side.querySelector(".body"));
       var visits = probeVisitDetails(node);
@@ -1248,6 +1255,7 @@
       return "other";
     }
     function probeDraftCheck(s) { return /^(?:mcp__migloop__)?check$/.test(String(s.tool || "")); }
+    function probeV2() { return !!(PROBE && PROBE.structured && PROBE.structured.schema === "migloop-verdict/2"); }
     function probeActionStep(s) { return /^(?:mcp__migloop__)?action$/.test(String(s.tool || "")); }
     function probeActionAddress(s) {
       if (!PROBE || !probeActionStep(s) || probeTraceUnbound(PROBE) || s.identity_unbound || s.ok === false) return null;
@@ -1436,7 +1444,7 @@
         .catch(function (e) { pre.textContent = "加载失败: " + e; });
     }
     var EV_DIAG = { missing: "位置不存在", untagged: "无转录标识,核不回去", ambiguous: "歧义(多动作同行缺块号)", invalid: "节点无效", unparsed: "不是坐标", drifted: "#n 漂了,按位置对回", not_checked: "未核验" };
-    function evidenceRow(e) {
+    function evidenceRow(e, rawOnly) {
       if (!probeClaimsBound(PROBE)) return el("div", "verow unbound", "— " + e.ref + " · 历史引用未绑定，不能作为当前证据打开");
       var good = e.status === "ok" || e.status === "drifted";
       var row = el("div", "verow " + (good ? "ok" : "bad"));
@@ -1456,8 +1464,8 @@
           loadActionInto(pre, e.aid, e.seq);
         });
         row.appendChild(lk);
-        if (anchor.v != null) row.appendChild(lnk(" 到 agent", "", function () { openRoot({ kind: "agent", id: e.aid, v: anchor.v }); }));
-      } else if (e.type === "node" && e.node && e.node.ok) {
+        if (anchor.v != null && !rawOnly) row.appendChild(lnk(" 到 agent", "", function () { openRoot({ kind: "agent", id: e.aid, v: anchor.v }); }));
+      } else if (!rawOnly && e.type === "node" && e.node && e.node.ok) {
         row.appendChild(lnk(" 打开", "", function () {
           openProbeNode(e.node.kind === "file" ? { kind: "file", path: e.node.key, v: e.node.v } : { kind: "agent", aid: e.node.key, v: e.node.v });
         }));
@@ -1466,7 +1474,7 @@
       else if (e.status === "drifted") row.appendChild(el("span", "vdiag", EV_DIAG.drifted));
       return row;
     }
-    function attributionBasis(node) {
+    function attributionBasis(node, rawOnly) {
       var basis = node.basis;
       if (!basis || typeof basis !== "object" || Array.isArray(basis)) return null;
       var bound = probeClaimsBound(PROBE), box = el("details", "attribution-basis");
@@ -1492,7 +1500,7 @@
           // Preserve the original spelling/whitespace without changing the
           // resolver's action/node coordinates used by evidenceRow.
           var display = typeof e.original_ref === "string" ? Object.assign({}, e, { ref: e.original_ref }) : e;
-          group.appendChild(evidenceRow(display));
+          group.appendChild(evidenceRow(display, rawOnly));
         });
         if (!items.length) group.appendChild(el("div", "basis-note", "未列引用"));
         box.appendChild(group);
@@ -1639,6 +1647,7 @@
     }
     function renderRepairCoverage(host) {
       var m = PROBE.repair_manifest, c = PROBE.coverage;
+      var complementMode = probeV2() && c && c.mode === "manifest_complement";
       var box = el("section", "repair-coverage");
       box.appendChild(el("div", "sub", "修复事项交代 · 全清单"));
       var origin = PROBE.repair_manifest_origin || {};
@@ -1656,10 +1665,15 @@
       var counts = (c || {}).counts || {}, rows = (c || {}).rows || [];
       var blocked = probeTraceUnbound(PROBE) || !!(c && c.identity_bound !== true);
       var invalidManifest = (m.errors || []).length || (c && c.status === "invalid_manifest");
+      var invalidReceipt = complementMode && c.manifest_identity_valid !== true;
       function count(name, fallback) { return typeof counts[name] === "number" ? counts[name] : fallback; }
       items.forEach(function (entry) {
         entry.rows = rows.filter(function (r) { return (r.canonical_target || r.canonical_node || r.canonical_candidate) === entry.id; });
         entry.accounted = entry.rows.length === 1 && entry.rows[0].valid === true;
+        entry.system = !!(complementMode && !entry.rows.length && !blocked && !invalidManifest && !invalidReceipt
+          && (c.not_investigated || []).indexOf(entry.id) >= 0 && (c.complement_rows || []).some(function (r) {
+            return r.target === entry.id && r.status === "not_investigated" && r.source === "system_manifest" && r.model_claim === false;
+          }));
       });
       var expected = count("expected", items.length), accounted = count("accounted", items.filter(function (i) { return i.accounted; }).length);
       var pending = Math.max(0, expected - accounted), summary = el("div", "sum coverage-summary");
@@ -1667,6 +1681,9 @@
       summary.dataset.accounted = accounted; summary.dataset.pending = pending;
       summary.textContent = blocked ? "历史报告登记 " + accounted + "/" + expected + " 项 · 未绑定，不计为当前覆盖"
         : invalidManifest ? "清单存在异常，暂不能确认当前覆盖"
+        : invalidReceipt ? "清单摘要未认证，未调查补集未展开"
+        : complementMode ? "机械交代 " + accounted + "/" + expected + " 项 · 模型逐项交代 " + count("reviewed", 0)
+          + "；系统标未调查 " + count("not_investigated", 0)
         : "已交代 " + accounted + "/" + expected + " 项 · 尚未有效交代 " + pending + " 项";
       box.appendChild(summary);
       box.appendChild(el("div", "coverage-note", "记录版本 " + count("expected_versions", (m.items || []).length)
@@ -1677,7 +1694,11 @@
       var excluded = count("not_repair", (c && c.not_repair || []).length);
       var deferred = count("deferred", (c && c.deferred || []).length);
       var unconfirmed = count("unconfirmed", unresolved + deferred);
-      var stateCounts = el("div", "coverage-note coverage-state-counts", "其中 " + unresolved + " 项登记为仍未知，"
+      var stateCounts = el("div", "coverage-note coverage-state-counts", complementMode
+        ? "模型逐项交代只是有效声明数，不证明实际阅读或调查；系统补集不是模型解释，也不计查询访问。"
+          + (invalidReceipt || blocked ? " 清单摘要未认证，补集不绑定当前账本。" : " 系统标未调查 " + count("not_investigated", 0) + " 项。")
+          + " 逐项声明中仍未知 " + unresolved + " 项、模型声明题外 " + deferred + " 项；机械交代不等于查清或语义正确。"
+        : "其中 " + unresolved + " 项登记为仍未知，"
         + deferred + " 项本题未调查，" + excluded + " 项声明不属于修复。已交代中的未确认项合计 " + unconfirmed
         + "；缺项与无效声明另列。已登记不等于查清；解释与证据语义未核验。");
       stateCounts.dataset.deferred = deferred; stateCounts.dataset.unconfirmed = unconfirmed; box.appendChild(stateCounts);
@@ -1688,27 +1709,31 @@
           + "不改变原状态或清单是否交代齐全，不判断真实缺陷或修复。");
         adviceSummary.dataset.rows = adviceCount; box.appendChild(adviceSummary);
       }
-      if (c && c.complete && !blocked && !invalidManifest) box.appendChild(el("div", "coverage-note", "清单交代齐全，不代表调查完整或全部修复已确认。"));
+      if (c && c.complete && !blocked && !invalidManifest && !invalidReceipt) box.appendChild(el("div", "coverage-note",
+        complementMode ? "机械交代齐全，不代表已调查；" + (count("not_investigated", 0) ? "系统补集仍待调查" : "逐项声明齐全也不证明实际阅读")
+          + "，字段覆盖不认证语义。" : "清单交代齐全，不代表调查完整或全部修复已确认。"));
       if (!c || !c.provided) box.appendChild(el("div", "coverage-note", "报告未提供逐项交代；不从散文或其他引用推测覆盖。"));
-      var groups = [{ title: "尚未交代或声明待改正", rows: items.filter(function (i) { return !i.accounted; }), open: true },
-                    { title: blocked ? "历史登记（未绑定）" : "已交代（不等于查清）", rows: items.filter(function (i) { return i.accounted; }), open: false }];
+      var groups = [{ title: "尚未交代或声明待改正", rows: items.filter(function (i) { return !i.accounted && !i.system; }), open: true },
+                    { title: blocked ? "历史登记（未绑定）" : complementMode ? "模型逐项交代（未核真实阅读）" : "已交代（不等于查清）", rows: items.filter(function (i) { return i.accounted; }), open: false }];
+      if (complementMode) groups.push({title:"系统补集 · 未调查（不是模型解释）",rows:items.filter(function (i) { return i.system; }),open:false,system:true});
       groups.forEach(function (group) {
         if (!group.rows.length) return;
-        var details = el("details", "coverage-group"); details.open = group.open;
+        var details = el("details", "coverage-group" + (group.system ? " coverage-complement-group" : "")); details.open = group.open;
         details.appendChild(el("summary", null, group.title + " · " + group.rows.length + " 项"));
         group.rows.forEach(function (entry) {
           var item = entry.item, row = el("div", "coverage-item"); row.dataset.target = entry.id; row.dataset.kind = entry.kind;
-          var claim = entry.rows[0], state = !entry.rows.length ? "尚未交代" : !entry.accounted ? "声明待改正（重复或无效，不计已交代）"
+          if (complementMode) { row.dataset.source = entry.system ? "system_manifest" : entry.rows.length ? "model" : "unrecorded"; row.dataset.modelClaim = String(!entry.system && !!entry.rows.length); }
+          var claim = entry.rows[0], state = entry.system ? "系统补集 · 未调查（不是模型解释）" : !entry.rows.length ? "尚未交代" : !entry.accounted ? "声明待改正（重复或无效，不计已交代）"
             : claim.status === "unresolved" ? "已登记 · 仍未知（未查清）" : claim.status === "out_of_scope" ? "已登记 · 本题未调查（保留分母，不判非修复）"
             : claim.status === "not_repair" ? "已登记 · 声明非修复（未验证）" : "已登记 · 给出解释（未核验）";
           if (blocked && entry.rows.length) state = "历史声明未绑定 · " + state;
-          row.dataset.state = entry.accounted ? claim.status : entry.rows.length ? "invalid" : "missing";
+          row.dataset.state = entry.system ? "not_investigated" : entry.accounted ? claim.status : entry.rows.length ? "invalid" : "missing";
           var node = coverageFileNode(item.node), label = entry.kind === "version" ? "记录版本 · " + (node ? baseName(node.path) + " @v" + node.v : item.node)
             : "待核候选 · " + agentLabelOf(item.agent || "?") + " #" + (item.seq == null ? "?" : item.seq);
           var title = el("div", "coverage-title", label); title.title = entry.id; row.appendChild(title);
           row.appendChild(el("span", "coverage-state", state));
           var note = el("div", "coverage-note");
-          if (entry.kind === "version" && node && !blocked && !invalidManifest) {
+          if (entry.kind === "version" && node && !blocked && !invalidManifest && !invalidReceipt) {
             var go = el("button", "coverage-file", "查看此文件版本");
             go.addEventListener("click", function () { openCoverageFile(entry.id, note); }); row.appendChild(go);
           }
@@ -1718,7 +1743,7 @@
             if (item.ctx) row.appendChild(el("div", "coverage-note", item.ctx));
             var event = item.event || {};
             if (event.ref || item.ref) row.appendChild(el("div", "coverage-note", "动作位置：" + (event.ref || item.ref)));
-            if (!blocked && !invalidManifest && event.status === "recorded" && item.agent && event.seq != null) {
+            if (!blocked && !invalidManifest && !invalidReceipt && event.status === "recorded" && item.agent && event.seq != null) {
               var action = el("button", "coverage-action", "查看候选动作原文"), pre = null;
               action.addEventListener("click", function () {
                 if (pre) { pre.remove(); pre = null; action.textContent = "查看候选动作原文"; return; }
@@ -1786,6 +1811,112 @@
         + " · 最终正文与显示文档：" + state(source.final_matches_document)));
       host.appendChild(box);
     }
+    function renderTargetBinding(host, target) {
+      if (!probeV2() || !target || typeof target !== "object") return;
+      var bound = !probeTraceUnbound(PROBE) && (PROBE.structured.identity || {}).bound === true;
+      var box = el("div", "target-binding"); box.dataset.status = target.status || "unrecorded";
+      box.dataset.source = "model"; box.dataset.createsNode = "false"; box.dataset.semanticChecked = "false";
+      box.appendChild(el("div", null, "调查目标 · 模型作用域声明（不代表修复锚点或版本节点）"));
+      box.appendChild(el("div", "scope-declared", target.declared_path || "未提供（不猜测）"));
+      box.appendChild(el("div", "finding-note", !bound ? "历史作用域未绑定；只保留目标文字。"
+        : target.status === "matched" ? "路径作用域已对应，不证明文件内容、修复归属或版本状态。"
+          : target.status === "ambiguous" ? "目标路径有歧义，不借根节点猜补。" : "目标路径未定位，不借根节点猜补。"));
+      if (target.canonical_path) box.appendChild(el("div", "scope-canonical", target.canonical_path));
+      host.appendChild(box);
+    }
+    function eventIdentityBound() {
+      return probeV2() && !probeTraceUnbound(PROBE) && (PROBE.structured.identity || {}).bound === true;
+    }
+    function eventLocated(event) {
+      var b = event.binding || {};
+      return eventIdentityBound() && b.ok === true && ["ok", "drifted"].indexOf(b.status) >= 0
+        && typeof b.owner_agent === "string" && !!b.owner_agent && Number.isInteger(b.seq) && b.seq > 0;
+    }
+    function eventContextVersion(event) {
+      if (!eventLocated(event)) return null;
+      var anchor = (event.binding || {}).context_anchor;
+      if (!anchor || anchor.kind !== "agent" || !Number.isInteger(anchor.v) || anchor.v < 1) return null;
+      return readerAnchor({by:anchor.aid,at:anchor.v}).v === anchor.v ? anchor : null;
+    }
+    function openEventContext(event, note) {
+      var anchor = eventContextVersion(event), loadedProbe = PROBE;
+      if (!anchor) return;
+      atomAgent(anchor.aid, function (agent, error) {
+        if (PROBE !== loadedProbe || !eventContextVersion(event)) return;
+        if (!agent || !Number.isInteger(agent.n_versions) || anchor.v > agent.n_versions) {
+          note.textContent = "上下文锚点无法定位：" + (error || "未提供该效应版本"); return;
+        }
+        // The previous effect is context only, not this event's state or its
+        // visibility window. Show an atom drawer without adding it to XT.
+        drawerFor({kind:"agent",aid:anchor.aid,anchorVer:anchor.v,eventContext:true,contextEventId:event.id});
+      });
+    }
+    function renderEventClaims(host, defect, origin) {
+      if (!probeV2()) return;
+      var events = defect.event_claims || [];
+      if (!events.length) return;
+      var section = el("section", "event-claims"); section.dataset.defect = defect.id; section.dataset.origin = origin;
+      section.appendChild(el("div", "finding-note", "事件主张 · " + events.length + " 条（独立于版本节点角色）"));
+      section.appendChild(el("div", "finding-note", "红色仅标模型的事件主张，不把上下文版本标红，不生成读写边或调查访问。"));
+      events.forEach(function (event) {
+        var binding = event.binding || {}, located = eventLocated(event), bound = eventIdentityBound();
+        var row = el("details", "event-claim" + (ROLE_RED[event.role] ? " event-red" : ""));
+        row.dataset.eventId = event.id; row.dataset.defect = defect.id; row.dataset.source = "model";
+        row.dataset.semanticChecked = "false"; row.dataset.bindingStatus = binding.status || "unrecorded";
+        row.appendChild(el("summary", null, (event.entry ? "★ 事件进入声明 · " : "") + event.id + " · " + event.role));
+        row.appendChild(el("div", "finding-note event-state-note", "事件主张，不是版本状态 · 来源：model · 语义未核验"));
+        row.appendChild(el("div", "mono event-ref", event.event));
+        row.appendChild(el("div", "event-reason", event.reason == null ? "未提供（不推测）" : event.reason));
+        row.appendChild(el("div", "finding-note event-binding-state", !bound ? "历史事件身份未绑定，保留主张与引用文字。"
+          : located ? "原始位置可核，不认证事件执行或归因。" : "事件位置未核回，保留诊断，不按动作号猜测归属。"));
+        if (binding.textual_only) row.appendChild(el("div", "finding-note event-textual", "纯文本记录，不是执行确认；自述成功不能升级为执行事实。"));
+        else if (binding.action_ok === false) row.appendChild(el("div", "finding-note", "原动作记录返回失败；位置可核不等于执行成功。"));
+        if (binding.paired_result === false && !binding.textual_only) row.appendChild(el("div", "finding-note event-pending", "未记录成对返回，不认定动作已完成。"));
+        if (binding.temporal_relation) row.appendChild(el("div", "finding-note", "系统时序关系：" + binding.temporal_relation));
+        var note = el("div", "finding-note");
+        if (located) {
+          var open = el("button", "event-open-original", "查看事件原文"), pre = null;
+          open.addEventListener("click", function () {
+            if (!eventLocated(event)) return;
+            if (pre) { pre.remove(); pre = null; open.textContent = "查看事件原文"; return; }
+            pre = el("pre", "diffblock event-original", "加载原文…"); row.appendChild(pre); open.textContent = "收起事件原文";
+            loadActionInto(pre, binding.owner_agent, binding.seq);
+          }); row.appendChild(open);
+        }
+        if (binding.context_anchor) {
+          var anchor = binding.context_anchor;
+          row.appendChild(el("div", "finding-note event-context-note", "系统前一效应上下文：" + (anchor.aid || "未知")
+            + (anchor.v == null ? "（版本未知）" : " @v" + anchor.v) + "；不是本事件发生版本，也不是可见输入窗口，不继承事件角色。"));
+          if (Object.prototype.hasOwnProperty.call(binding, "context_available_before_event")) row.appendChild(el("div", "finding-note event-context-timing",
+            binding.context_available_before_event === true ? "上下文效应在事件前完成（不证明模型读取）。"
+              : binding.context_available_before_event === false ? "上下文效应未在事件前完成/存在重叠，不证明当时可用。" : "上下文完成时序未知，不证明当时可用。"));
+          if (binding.context_timing_note) row.appendChild(el("div", "finding-note event-context-timing-note", binding.context_timing_note));
+          if (eventContextVersion(event)) {
+            var context = el("button", "event-context", "查看系统上下文（不新增节点）");
+            context.addEventListener("click", function () { openEventContext(event, note); }); row.appendChild(context);
+          }
+        }
+        row.appendChild(note);
+        (event.evidence || []).forEach(function (ref) {
+          var display = typeof ref.original_ref === "string" ? Object.assign({}, ref, {ref:ref.original_ref}) : ref;
+          row.appendChild(bound ? evidenceRow(display, true) : el("div", "verow unbound", display.ref + " · 历史引用未绑定 · " + display.status));
+        });
+        if (event.basis) {
+          if (bound) { var basis = attributionBasis(event, true); if (basis) row.appendChild(basis); }
+          else row.appendChild(el("pre", "diffblock event-basis-unbound", "历史归因对照（身份未绑定）：\n" + JSON.stringify(event.basis, null, 2)));
+        }
+        var proof = el("details", "event-binding-proof"); proof.appendChild(el("summary", null, "系统定位信息（不是模型主张真值）"));
+        proof.appendChild(el("pre", "diffblock", JSON.stringify(binding, null, 2))); row.appendChild(proof);
+        section.appendChild(row);
+      });
+      host.appendChild(section);
+    }
+    function renderRecommendation(host, value) {
+      if (!probeV2() || typeof value !== "string" || !value) return;
+      var box = el("details", "finding-recommendation"); box.dataset.source = "model"; box.dataset.semanticChecked = "false";
+      box.appendChild(el("summary", null, "修复建议（模型主张，未验证）"));
+      box.appendChild(el("div", "finding-reason", value)); host.appendChild(box);
+    }
     function renderFindings(host) {
       var findings = PROBE.findings;
       if (!findings || findings.schema !== "migloop-findings/1") return;
@@ -1804,6 +1935,8 @@
         row.dataset.fileAssociated = String(fileAssociated); row.dataset.referencesBound = String(claimsBound);
         row.appendChild(el("summary", null, item.defect + " · " + (item.title || "未提供标题") + " · " + (item.causes || []).length + " 条节点主张"));
         row.appendChild(el("div", "finding-note", "来源：model · 语义未核验"));
+        renderTargetBinding(row, item.target_binding);
+        renderEventClaims(row, {id:item.defect,event_claims:item.event_claims}, "findings");
         if (!fileAssociated) row.appendChild(el("div", "finding-note finding-association-status",
           "文件关联未绑定；" + (claimsBound ? "文档/引用身份已绑定，引用位置可另查，不补造修复锚点。" : "文档/引用身份未绑定，保留历史文字。")));
         if (item.boundary != null) {
@@ -1843,7 +1976,10 @@
           }
           row.appendChild(detail);
         });
-        row.appendChild(el("div", "finding-note", "当前源 schema 未提供独立修复建议，不从原因文字推测补写。"));
+        if (probeV2()) {
+          renderRecommendation(row, item.recommendation);
+          if (!item.recommendation) row.appendChild(el("div", "finding-note", "未提供独立修复建议，不从备注或原因推测补写。"));
+        } else row.appendChild(el("div", "finding-note", "当前源 schema 未提供独立修复建议，不从原因文字推测补写。"));
         host.appendChild(row);
       }
       files.forEach(function (file) {
@@ -1857,6 +1993,21 @@
       if (unbound.length) {
         var group = el("details", "finding-unbound"); group.appendChild(el("summary", null, "未绑定文件的事项（" + unbound.length + "）· 不以 root 猜补"));
         unbound.forEach(function (id) { appendItem(group, id, false); }); box.appendChild(group);
+      }
+      if (probeV2()) {
+        var scopes = el("details", "scope-findings");
+        scopes.appendChild(el("summary", null, "按声明调查目标归集 · " + (findings.scope_files || []).length + " 个作用域（独立于修复分桶）"));
+        scopes.appendChild(el("div", "finding-note", "作用域关联来自模型声明；不生成节点、repair 或访问，无修复锚点的事项仍保留在原未关联分桶。"));
+        (claimsBound ? findings.scope_files || [] : []).forEach(function (scope) {
+          var members = (scope.item_ids || []).filter(function (id) { return items[id] && (!PROBE.defect || items[id].defect === PROBE.defect); });
+          if (!members.length) return;
+          var group = el("details", "finding-scope-file"); group.dataset.path = scope.path;
+          group.dataset.source = "model"; group.dataset.kind = "task_scope";
+          group.appendChild(el("summary", null, scope.path + " · " + members.length + " 项"));
+          members.forEach(function (id) { group.appendChild(el("div", "finding-scope-item", items[id].defect + " · " + items[id].title)); });
+          scopes.appendChild(group);
+        });
+        box.appendChild(scopes);
       }
       host.appendChild(box);
     }
@@ -1969,6 +2120,9 @@
       (s.defects || []).forEach(function (d) {
         if (PROBE.defect && d.id !== PROBE.defect) return;
         host.appendChild(el("div", "sub", "缺陷 " + d.id + " · " + d.title));
+        renderTargetBinding(host, d.target_binding);
+        renderEventClaims(host, d, "structured");
+        renderRecommendation(host, d.recommendation);
         renderConsistency(host, s, d, claimsBound);
         var rep = d.repair || {};
         [["修复前", rep.before], ["修复后", rep.after]].forEach(function (pair) {
@@ -2025,9 +2179,16 @@
             var ents = [];
             (p.structured.defects || []).forEach(function (d) { (d.entry || []).forEach(function (n) { ents.push(d.id + ":" + n.label + (n.ok ? "" : "(无效)")); }); });
             entryTxt = ents.length ? "进入点 " + ents.join(" / ") : "进入点未标";
+            if (probeV2()) {
+              var eventEntries = [];
+              (p.structured.defects || []).forEach(function (d) { (d.event_claims || []).forEach(function (e) { if (e.entry) eventEntries.push(d.id + ":" + e.id); }); });
+              entryTxt = (ents.length ? "版本进入点 " + ents.join(" / ") : "版本进入点未标")
+                + " · " + (eventEntries.length ? "事件进入声明 " + eventEntries.join(" / ") : "事件进入声明未标");
+            }
           } else if (p.structured) entryTxt = "结论块载入失败";
           else entryTxt = (p.entry != null ? "进入点 环 " + (p.entries || [p.entry]).join(" / ") : "进入点未标") + " · legacy";
-          chip("调查 <b>" + p.run + "</b> · " + entryTxt, "probe-chip");
+          if (probeV2()) chip("", "probe-chip").textContent = "调查 " + p.run + " · " + entryTxt;
+          else chip("调查 <b>" + p.run + "</b> · " + entryTxt, "probe-chip");
           var go = function () {
             if (!dataReady) { setTimeout(go, 400); return; }
             if (probeTraceUnbound(p)) { probeBuildTrajectory(); return; }
@@ -3003,6 +3164,8 @@
       var rootSpec = node.isRoot ? null : { kind: "agent", id: node.aid, v: node.anchorVer };
       var hd = head(isFix ? "fix" : "gen", "Agent 原子" + (node.anchorVer != null ? " · 截至 v" + node.anchorVer : " · 全程"), agentLabelOf(node.aid), agentKey(node.aid), rootSpec);
       side.appendChild(hd);
+      if (node.eventContext) side.appendChild(el("div", "pnote event-context-note", "事件 " + node.contextEventId
+        + " 的系统前一效应上下文；不是事件发生版本，也不是可见输入窗口，不继承事件角色，不新增调查访问。"));
       var body = el("div", "body");
       side.appendChild(body);
       var meta = G.nodes[agentKey(node.aid)] || {};

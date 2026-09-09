@@ -271,11 +271,12 @@ def probe_payload(ledger: atoms.Ledger, run_dir: str, chain_payload: dict[str, A
         current_manifest = repair_coverage.manifest(ledger, chain_payload, root)
         repair_manifest, manifest_origin = select_manifest(
             ledger, current_manifest, (structured or {}).get("recorded_repair_manifest"))
-        coverage_report = repair_coverage.reconcile(
+        coverage_report = repair_coverage.reconcile_document(
             ledger, repair_manifest, (structured or {}).get("coverage_rows"),
             (structured or {}).get("defects") or [],
             identity_bound=((structured or {}).get("identity", {}).get("bound") is True
-                            and manifest_origin.get("bound") is True))
+                            and manifest_origin.get("bound") is True),
+            schema=(structured or {}).get("schema"))
     trajectory = _trajectory(ledger, run_dir, steps, root, structured, verdicts, calls, trace_identity)
     return {"run": os.path.basename(os.path.dirname(os.path.abspath(run_dir))), "cost": m.get("cost_usd"), "turns": m.get("num_turns"),
             "root": root, "steps": steps, "links": links, "entry": entry_no, "entries": entries, "verdicts": verdicts,

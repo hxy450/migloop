@@ -184,6 +184,9 @@ def validate(data: Any) -> list[str]:
     structure_error = _structure_error(data)
     if structure_error:
         return [structure_error]
+    if data.get("schema") == "migloop-verdict/2":
+        from . import verdict_v2
+        return verdict_v2.validate(data)
     _check_keys(data, _TOP, "顶层", errs)
     if data.get("schema") != SCHEMA:
         errs.append(f"schema 必须是 {SCHEMA}(现在是 {data.get('schema')!r})")
@@ -330,7 +333,7 @@ def load_block(text: str) -> dict[str, Any]:
     """报告正文 → {found, kind, raw, data, errors}:抽块、解析、校验一步到位;任何一步失败都保留原文与错误。"""
     blk = extract_block(text)
     if blk is None:
-        return {"found": False, "kind": None, "raw": None, "data": None, "errors": ["报告里没有 migloop-verdict/1 结论块"]}
+        return {"found": False, "kind": None, "raw": None, "data": None, "errors": ["报告里没有 migloop-verdict 结论块"]}
     kind, raw = blk
     data, errs = parse_block(kind, raw)
     if data is not None:
@@ -341,7 +344,12 @@ def load_block(text: str) -> dict[str, Any]:
 def repair_prompt(lb: dict[str, Any]) -> str:
     """一次 schema 修复重试的提示:只让模型重发结论块,不许再调查。"""
     why = "\n".join(f"- {e}" for e in lb.get("errors") or ["缺结论块"])
-    return ("你上一条回复末尾的结构化结论块(schema: migloop-verdict/1)无法载入:\n" + why +
+    requested = "migloop-verdict"
+    if isinstance(lb.get("raw"), str) and lb.get("kind") in ("yaml", "json"):
+        source, _ = parse_block(lb["kind"], lb["raw"])
+        if isinstance(source, dict) and source.get("schema") in (SCHEMA, "migloop-verdict/2"):
+            requested = source["schema"]
+    return (f"你上一条回复末尾的结构化结论块({requested})无法载入:\n" + why +
             "\n\n请只重新输出一个完整的 ```yaml 围栏块(guide 里「结构化结论」一节的格式),内容与你已得出的结论一致;"
             "不要再调用工具,不要输出别的文字。")
 
@@ -748,4 +756,7 @@ def build(ledger: atoms.Ledger, data: dict[str, Any] | None, errors: list[str],
         built["advisories"] = _consistency(built, ledger) if bound else []
         out["consistency"]["advisories"].extend(built["advisories"])
     out["roles"] = roles
+    if data.get("schema") == "migloop-verdict/2":
+        from . import verdict_v2
+        verdict_v2.extend(ledger, data, out)
     return out

@@ -280,10 +280,10 @@ def build_prompt(case_dir: Path, case: dict[str, Any], arm: str, tool_transport:
     common = (case_dir / "common-task.md").read_text(encoding="utf-8")
     if arm == "tools":
         final_instruction = (
-            "正式产出使用当前 GUIDE 要求的 migloop-verdict/1 YAML，将共同任务的全部语义要求"
+            "正式产出使用当前 GUIDE 要求的 migloop-verdict YAML，将共同任务的全部语义要求"
             "写进 GUIDE 允许的 reason/evidence/notes 等字段；只可附一小段中文摘要，不另写重复的完整散文报告。"
             if final_mode == "document" else
-            "调查结论仍先写成当前 GUIDE 要求的完整 migloop-verdict/1 草稿并调用 check；"
+            "调查结论仍先写成当前 GUIDE 要求的完整 migloop-verdict 草稿并调用 check；"
             "最终回复严格按 GUIDE 的 reference 模式显式提交最后一次草稿的双哈希引用，不再重写全文。")
         extra = ("调查方式：仅使用本次配置的 migloop MCP。先读取当前 guide 并按当前 GUIDE 调查；"
                  + guide_instruction(tool_transport) +
@@ -865,11 +865,11 @@ def collect_verdict(case: dict[str, Any], result: dict[str, Any], arm: str,
         elif final_mode == "document" and submission_mode == "checked_draft_ref":
             loaded["data"] = None
             loaded["errors"] = list(loaded.get("errors") or []) + [
-                "document final mode requires an inline migloop-verdict/1 document"]
+                "document final mode requires an inline migloop-verdict document"]
         if not loaded.get("found"):
             loaded["errors"] = list(loaded.get("errors") or []) + ["Required YAML verdict block was not found"]
         out = {**loaded, "required": True, "harness_identity": identity, "repaired": False, "repair": None,
-               "schema": "migloop-verdict/1"}
+               "schema": (loaded.get("data") or {}).get("schema")}
         if supports_coverage:
             coverage = importlib.import_module("migloop.coverage")
             bound = verdict.build(ledger, loaded.get("data"), loaded.get("errors") or [],
@@ -885,9 +885,14 @@ def collect_verdict(case: dict[str, Any], result: dict[str, Any], arm: str,
                 out["findings"] = findings.project(bound)
             manifest = coverage.manifest(ledger, service.fixchain_payload(case["current_root"]), case["file"])
             out.update(trace_identity=trace, repair_manifest=manifest,
-                       coverage=coverage.reconcile(ledger, manifest, (loaded.get("data") or {}).get("coverage"),
+                       coverage=(coverage.reconcile_document(ledger, manifest, (loaded.get("data") or {}).get("coverage"),
                                                    (loaded.get("data") or {}).get("defects") or [],
-                                                   identity_bound=bound.get("identity", {}).get("bound") is True))
+                                                   identity_bound=bound.get("identity", {}).get("bound") is True,
+                                                   schema=(loaded.get("data") or {}).get("schema"))
+                                 if hasattr(coverage, "reconcile_document") else
+                                 coverage.reconcile(ledger, manifest, (loaded.get("data") or {}).get("coverage"),
+                                                   (loaded.get("data") or {}).get("defects") or [],
+                                                   identity_bound=bound.get("identity", {}).get("bound") is True)))
             if (Path(case["source"]) / "src/migloop/draft_check.py").is_file():
                 check = importlib.import_module("migloop.draft_check")
                 out["draft_check"] = check.final_binding(ledger, calls, loaded.get("data"),

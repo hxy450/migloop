@@ -50,6 +50,7 @@ def test_saved_reference_cannot_hide_a_broken_authentication_chain(tmp_path, fai
 
 
 def test_final_mode_is_explicit_and_keeps_the_full_reference_available(monkeypatch):
+    monkeypatch.setenv("MIGLOOP_VERDICT_VERSION", "1")
     assert mcp_server.guide_text("document", topic="full") == mcp_server.GUIDE
     assert mcp_server.guide_text("reference", topic="full").startswith(mcp_server.GUIDE)
     with pytest.raises(ValueError): mcp_server.guide_text("typo")

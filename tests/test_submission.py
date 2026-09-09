@@ -227,7 +227,7 @@ def test_final_mode_is_explicit_in_prompt_and_mcp_environment(tmp_path):
     document = pair.build_prompt(case_dir, case, "tools", "native", "document")
     ref_prompt = pair.build_prompt(case_dir, case, "tools", "native", "reference")
     assert document.startswith("same task\n") and ref_prompt.startswith("same task\n")
-    assert "migloop-verdict/1 YAML" in document
+    assert "当前 GUIDE 要求的 migloop-verdict YAML" in document
     assert "最终回复严格按 GUIDE 的 reference 模式" in ref_prompt and "双哈希引用" in ref_prompt
     assert "不再重写全文" in ref_prompt
     assert pair.mcp_server_config(case, "document")["env"]["MIGLOOP_FINAL_MODE"] == "document"

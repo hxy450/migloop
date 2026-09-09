@@ -1,6 +1,6 @@
 """Lossless per-file projection of attributed findings, never a truth promotion.
 
-The author document remains migloop-verdict/1. This system-owned read model
+The author document remains versioned migloop-verdict. This system-owned read model
 groups that document's claims for UI/archive consumers without requiring the
 model to repeat coordinates, audits or the recorded investigation trajectory.
 """
@@ -35,6 +35,7 @@ def project(structured: dict[str, Any] | None) -> dict[str, Any]:
     document = structured or {}
     identity = document.get("identity") or {}
     digest = document.get("document_sha256")
+    v2 = document.get("schema") == "migloop-verdict/2"
     out: dict[str, Any] = {
         "schema": SCHEMA, "document_sha256": digest, "identity": deepcopy(identity),
         "document_source": deepcopy(document.get("document_source") or {
@@ -45,9 +46,14 @@ def project(structured: dict[str, Any] | None) -> dict[str, Any]:
         "audit": {"semantic_checked": False, "scope_complete": False,
                   "note": "按模型声明的修复锚点归集；节点存在、引用可定位和机械边检查不证明归因正确。"},
     }
+    if v2:
+        # A task target may have no known version or repair anchor. Keep its
+        # scope association separate from the historical repair-file buckets.
+        out.update(scope_files=[], unbound_scope_items=[])
     if not digest or out["errors"]:
         return out
     files: dict[str, dict[str, Any]] = {}
+    scope_files: dict[str, dict[str, Any]] = {}
     for defect in document.get("defects") or []:
         did = str(defect["id"])
         item_id = f"{digest}:{did}"
@@ -66,6 +72,25 @@ def project(structured: dict[str, Any] | None) -> dict[str, Any]:
             "audit": {"semantic_checked": False,
                       "advisories": deepcopy(defect.get("advisories") or [])},
         }
+        if v2:
+            item["target_binding"] = deepcopy(defect.get("target_binding"))
+            item["event_claims"] = deepcopy(defect.get("event_claims") or [])
+            item["recommendation"] = deepcopy(defect.get("recommendation"))
+            item["recommendation_status"] = "model_claim" if item["recommendation"] else "not_provided"
+            target = defect.get("target_binding")
+            if (identity.get("bound") is True and isinstance(target, dict)
+                    and target.get("status") == "matched" and target.get("creates_node") is False
+                    and isinstance(target.get("canonical_path"), str) and target["canonical_path"].strip()):
+                path = target["canonical_path"]
+                scope = scope_files.setdefault(path, {"path": path, "item_ids": [], "associations": [],
+                                                     "source": "model", "kind": "task_scope"})
+                if item_id not in scope["item_ids"]:
+                    scope["item_ids"].append(item_id)
+                scope["associations"].append({"item_id": item_id, "declared_path": target.get("declared_path"),
+                                              "source": "model", "kind": "task_scope", "creates_node": False,
+                                              "semantic_checked": False})
+            else:
+                out["unbound_scope_items"].append(item_id)
         out["items"][item_id] = item
         bound = False
         repair = defect.get("repair") or {}
@@ -91,4 +116,6 @@ def project(structured: dict[str, Any] | None) -> dict[str, Any]:
     for bucket in files.values():
         bucket["versions"].sort()
     out["files"] = list(files.values())
+    if v2:
+        out["scope_files"] = list(scope_files.values())
     return out

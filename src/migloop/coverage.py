@@ -244,6 +244,22 @@ def _defect_ids(defects: Any) -> set[str]:
             if (isinstance(d, dict) and isinstance(d.get("id"), str)) or isinstance(d, str)}
 
 
+def declared_rows(value: Any, schema: str | None = None) -> Any:
+    """Only model-written rows, never a synthesized complement claim."""
+    if schema == "migloop-verdict/2":
+        return value.get("reviewed") if isinstance(value, dict) else None
+    return value
+
+
+def reconcile_document(ledger: atoms.Ledger, manifest_doc: dict[str, Any], rows: Any,
+                       defects: Any, *, identity_bound: bool = False,
+                       schema: str | None = None) -> dict[str, Any]:
+    if schema == "migloop-verdict/2":
+        from . import coverage_receipt
+        return coverage_receipt.reconcile(ledger, manifest_doc, rows, defects, identity_bound=identity_bound)
+    return reconcile(ledger, manifest_doc, rows, defects, identity_bound=identity_bound)
+
+
 def _recorded_changed_lines(item: dict[str, Any]) -> int | None:
     """只用冻结清单的明确字面差分元数据;旧清单缺字段时不从正文补事实。"""
     change = item.get("change")

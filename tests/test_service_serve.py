@@ -120,7 +120,7 @@ def test_pages_and_atoms(session: tuple[str, dict[str, str]]) -> None:
         service.atom_json(path, "nosuch", {})
 
     assert service.atom_text(path, "guide", {}) == guide_text()
-    assert service.atom_text(path, "guide", {"topic": "full"}) == GUIDE
+    assert service.atom_text(path, "guide", {"topic": "full"}) == guide_text(topic="full")
     assert "A.ets" in service.atom_text(path, "sessions", {})
     agent_txt = service.atom_text(path, "agent", {"id": MAIN_ID})
     assert "T+0:00" in agent_txt and "arkts-visual-verify" in agent_txt
@@ -162,7 +162,7 @@ def test_serve_routes(session: tuple[str, dict[str, str]]) -> None:
         st, body, _ = _get(base, "/api/insight1/atom/abcdef12/text/guide")
         assert st == 200 and body.decode("utf-8") == guide_text()
         st, body, _ = _get(base, "/api/insight1/atom/abcdef12/text/guide?topic=full")
-        assert st == 200 and body.decode("utf-8") == GUIDE
+        assert st == 200 and body.decode("utf-8") == guide_text(topic="full")
         st, body, _ = _get(base, "/api/insight1/atom/abcdef12/text/guide?topic=typo")
         assert st == 400
         st, body, _ = _get(base, "/api/insight1/atom/abcdef12/index")

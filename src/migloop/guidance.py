@@ -280,6 +280,14 @@ def _reference_topic(topic: str) -> str:
     return "\n\n".join("## " + block.rstrip() for block in selected) + "\n"
 
 
+def verdict_version() -> str:
+    import os
+    version = os.environ.get("MIGLOOP_VERDICT_VERSION", "2")
+    if version not in ("1", "2"):
+        raise ValueError("MIGLOOP_VERDICT_VERSION must be 1 or 2")
+    return version
+
+
 def guide_text(final_mode: str | None = None, topic: str = "core") -> str:
     """Short default entry; full evidence rules and schema expand on demand."""
     import os
@@ -289,6 +297,15 @@ def guide_text(final_mode: str | None = None, topic: str = "core") -> str:
     if not isinstance(topic, str) or topic not in TOPICS:
         raise ValueError("guide topic must be one of: " + ", ".join(TOPICS))
     text = CORE if topic == "core" else _reference_topic(topic)
+    version = verdict_version()
+    if version == "2":
+        from .guidance_v2 import VERDICT, CORE_ADDENDUM
+        if topic == "core":
+            text = text.replace("migloop-verdict/1", "migloop-verdict/2") + CORE_ADDENDUM
+        elif topic == "verdict":
+            text = VERDICT
+        elif topic == "full":
+            text = GUIDE.split("\n## 结构化结论", 1)[0] + "\n\n" + VERDICT
     if topic == "core":
         delivery = ("本次最终交付：document。check 后原样提交完整 YAML；改过须重新 check。"
                     if mode == "document" else
@@ -297,5 +314,5 @@ def guide_text(final_mode: str | None = None, topic: str = "core") -> str:
                     "完整模板见 guide(topic=verdict)。")
         return text + "\n\n" + delivery + "\n"
     if mode == "reference" and topic in ("verdict", "full"):
-        text += REFERENCE_DELIVERY
+        text += REFERENCE_DELIVERY.replace("migloop-verdict/1", "migloop-verdict/" + version)
     return text
