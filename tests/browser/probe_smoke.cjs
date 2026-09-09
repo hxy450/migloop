@@ -4,6 +4,7 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const {readLayoutGeometry} = require('./layout_geometry.cjs');
 
 async function main() {
   const [url, output, endpoint = 'http://127.0.0.1:19652', mode = 'bound'] = process.argv.slice(2);
@@ -43,6 +44,10 @@ async function main() {
       await new Promise(resolve => setTimeout(resolve, 300));
     }
     assert(ready, 'real probe loaded');
+    await evaluate('new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))');
+    const geometry = await evaluate('(' + readLayoutGeometry.toString() + ')()');
+    assert.deepEqual(geometry.overlaps, [], 'all atom/stub boxes are non-overlapping');
+    assert.deepEqual(geometry.outside, [], 'default fit keeps every atom/stub in the canvas viewport');
     const state = await evaluate(`(() => {
       const p=__mig.probe(), x=__mig.xt();
       return {bound:p.structured?.identity?.bound, errors:p.structured?.errors,
@@ -93,7 +98,7 @@ async function main() {
     fs.mkdirSync(path.dirname(output), {recursive: true});
     const shot = await send('Page.captureScreenshot', {format: 'png', captureBeyondViewport: false});
     fs.writeFileSync(output, Buffer.from(shot.data, 'base64'), {flag: 'wx'});
-    console.log(JSON.stringify({page:url, mode, ...state, reasonShown, screenshot:output}));
+    console.log(JSON.stringify({page:url, mode, ...state, geometry, reasonShown, screenshot:output}));
   } finally {
     ws.close(); await fetch(endpoint + '/json/close/' + target.id).catch(() => {});
   }

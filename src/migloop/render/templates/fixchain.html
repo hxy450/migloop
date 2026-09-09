@@ -2084,7 +2084,6 @@
       var root = byId[T.root] || byId[T.nodes[0].id];
       root.isRoot = !!T.root; root.depth = 0; XT.root = root.tid;
       XT.conclusionOnly = !T.root;
-      var maxD = 0;
       T.nodes.forEach(function (n) {
         if (n.id === root.trajId) return;
         var node = byId[n.id];
@@ -2092,11 +2091,6 @@
         if (n.side === "root") return;
         addKid(byId[n.parent] || root, node);
         if (n.side === "unlinked") node.unlinked = true;
-        else if (node.depth > maxD) maxD = node.depth;
-      });
-      T.nodes.forEach(function (n) {
-        var node = byId[n.id];
-        if (node.unlinked) { node.depth = maxD + 1; XT.unlinkedDepth = maxD + 1; }
       });
       XT.transitions = [];
       var transitions = T.transitions || [];
@@ -2219,8 +2213,8 @@
       return c;
     }
 
-    // ---- 布局:整齐树。纵向占位 = max(自身, 子树占位之和),子节点在父占位内连续堆叠、父居中;
-    // 展开谁,谁的子树把兄弟推开,边呈扇形不打结。横向:深度即列,上游在左、根居中偏右、下游最右。----
+    // ---- 布局森林：搜索/未连接入口单独分带，每棵树（含stub）一起计算深度与占位。
+    // 原parent/children仅作为布局输入，不改查询记录或读写图；局部移列不能留下后代的旧深度。----
     var NODE_W = 196, NODE_H = 30, GAP_Y = 8, GAP_X = 74, TOP = 34;
     // 词法候选层:开关关着时候选节点(⋯ 可能写 / 只读提及桩)和它们的子树不参与布局、不画;载入调查默认关,纯探索默认开
     var showCand = true;
@@ -2241,8 +2235,33 @@
     window.__mig = { xt: function () { return XT; }, probe: function () { return PROBE; }, load: function (run) { loadProbe(run); },
                      setCand: function (on) { showCand = !!on; document.getElementById("cand").checked = !!on; if (XT) renderTree(XT.root); },
                      expandStub: function (tid) { var s = XT.byId[tid]; if (s) expandLedgerKids(XT.byId[s.parent], s); } };
+    function layoutForest(root) {
+      var assigned = {}, forest = [], children = {};
+      function collect(n, depth) {
+        assigned[n.tid] = true; n.depth = depth; children[n.tid] = [];
+        kidsOf(n).forEach(function (kid) {
+          if (kid.unlinked || kid.isRight || assigned[kid.tid]) return;
+          children[n.tid].push(kid.tid); collect(kid, depth + 1);
+        });
+      }
+      collect(root, 0); forest.push(root);
+      var mainDepth = 0;
+      Object.keys(assigned).forEach(function (tid) { mainDepth = Math.max(mainDepth, XT.byId[tid].depth); });
+      function component(n) {
+        if (n.hidden || n.isRight || assigned[n.tid]) return;
+        collect(n, mainDepth + 1); forest.push(n);
+      }
+      // Preserve declared independent entries even if another component names
+      // them; never reconnect a search result as a fictitious parent relation.
+      Object.keys(XT.byId).forEach(function (tid) { var n = XT.byId[tid]; if (n.unlinked) component(n); });
+      Object.keys(XT.byId).forEach(function (tid) { component(XT.byId[tid]); });
+      XT.layoutChildren = children;
+      XT.unlinkedDepth = forest.length > 1 ? mainDepth + 1 : null;
+      return forest;
+    }
+    function layoutKidsOf(n) { return (XT.layoutChildren[n.tid] || []).map(function (tid) { return XT.byId[tid]; }); }
     function measure(n) {
-      var kids = kidsOf(n);
+      var kids = layoutKidsOf(n);
       if (!kids.length) { n.ext = NODE_H; return n.ext; }
       var total = 0;
       kids.forEach(function (k) { total += measure(k); });
@@ -2252,7 +2271,7 @@
     }
     function place(n, y0) {
       n.y = y0 + (n.ext - NODE_H) / 2;
-      var kids = kidsOf(n);
+      var kids = layoutKidsOf(n);
       if (!kids.length) return;
       var total = 0;
       kids.forEach(function (k) { total += k.ext; });
@@ -2300,16 +2319,23 @@
       var root = XT.byId[XT.root];
       markHidden();
       refreshProbePlacement();
-      measure(root);
-      var rightsH = XT.rights.length ? XT.rights.length * (NODE_H + GAP_Y) - GAP_Y : 0;
-      var top = TOP + Math.max(0, (rightsH - root.ext) / 2);
-      place(root, top);
+      var forest = layoutForest(root);
+      forest.forEach(function (n) { measure(n); });
+      var rights = XT.rights.map(function (tid) { return XT.byId[tid]; }).filter(function (n) { return n && !n.hidden; });
+      var rightsH = rights.length ? rights.length * (NODE_H + GAP_Y) - GAP_Y : 0;
+      var occupiedH = Math.max(root.ext, rightsH);
+      place(root, TOP + (occupiedH - root.ext) / 2);
+      forest.slice(1).forEach(function (n) {
+        occupiedH += 2 * GAP_Y;
+        place(n, TOP + occupiedH);
+        occupiedH += n.ext;
+      });
       var maxD = 0;
       Object.keys(XT.byId).forEach(function (tid) { var n = XT.byId[tid]; if (!n.hidden && n.depth > maxD) maxD = n.depth; });
       var colX = function (d) { return 24 + (maxD - d) * (NODE_W + GAP_X); };
       var rightsX = colX(0) + NODE_W + GAP_X;
-      var totalH = Math.max(root.ext, rightsH) + TOP + 40;
-      var totalW = (XT.rights.length ? rightsX + NODE_W : colX(0) + NODE_W) + 30;
+      var totalH = occupiedH + TOP + 40;
+      var totalW = (rights.length ? rightsX + NODE_W : colX(0) + NODE_W) + 30;
       layoutSize = { w: totalW, h: totalH };
       nodeEls = {};
       canvas.innerHTML = "";
@@ -2322,12 +2348,12 @@
         h.style.left = colX(d) + "px"; h.style.width = NODE_W + "px";
         canvas.appendChild(h);
       }
-      if (XT.rights.length) {
+      if (rights.length) {
         var hf = el("div", "colhead down", root.kind === "file" ? "下游 · 读者" + (XT.rights.some(function (t) { return XT.byId[t].isFixer; }) ? " / 修复方" : "") : "下游 · 产出");
         hf.style.left = rightsX + "px"; hf.style.width = NODE_W + "px";
         canvas.appendChild(hf);
         var ry = root.y + NODE_H / 2 - rightsH / 2;
-        XT.rights.forEach(function (tid) { var n = XT.byId[tid]; n.x = rightsX; n.y = Math.max(TOP, ry); ry += NODE_H + GAP_Y; });
+        rights.forEach(function (n) { n.depth = -1; n.x = rightsX; n.y = Math.max(TOP, ry); ry += NODE_H + GAP_Y; });
       }
       Object.keys(XT.byId).forEach(function (tid) {
         var n = XT.byId[tid];
@@ -2371,6 +2397,7 @@
     }
     function addTreeNode(node) {
       var d = el("div", "node " + nodeCls(node) + (node.tid === selTid ? " sel" : ""));
+      d.dataset.tid = node.tid;
       d.style.left = node.x + "px"; d.style.top = node.y + "px"; d.style.width = NODE_W + "px";
       d.appendChild(document.createTextNode(node.label));
       (node.badges || []).forEach(function (b) { var badge = el("span", "badge " + (b.cls || ""), b.t); if (b.title) badge.title = b.title; d.appendChild(badge); });

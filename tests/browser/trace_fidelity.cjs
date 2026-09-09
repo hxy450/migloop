@@ -6,6 +6,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const http = require('node:http');
 const path = require('node:path');
+const {readLayoutGeometry} = require('./layout_geometry.cjs');
 
 const repo = path.resolve(__dirname, '../..');
 const file = '/fixture/A.ets';
@@ -234,6 +235,22 @@ const server=http.createServer((req,res)=>{
       if(run==='relations-claim-only'){
         body.evidence_graph.edges[0].source_of_claim='model';
         body.evidence_graph.edges[1].evidence=[];
+      }
+    }
+    if(run==='forest-layout'){
+      // Same structural cause as real C4: a search-entry ancestor is moved to a
+      // separate column, while its ordinary descendant has an upstream stub.
+      const b=body.trajectory.nodes.find(n=>n.id===bid);
+      Object.assign(b,{side:'unlinked',search_source:{step:8,hit:1},opened:[9]});
+      const leaf=body.trajectory.nodes.find(n=>n.id===fid+'@1');
+      Object.assign(leaf,{source:'查过',search_source:{step:10,hit:1},opened:[11]});
+      const child={id:'agent:agent-a@2',kind:'agent',key:'agent-a',v:2,label:'Agent A v2',parent:bid,side:'up',source:'查过',opened:[12],unseen:2,unseen_neighbors:[{kind:'file',key:file,v:2}]};
+      const unrelated={id:fid+'@2',kind:'file',key:file,v:2,label:'A.ets@v2',parent:root,side:'unlinked',source:'查过',search_source:{step:13,hit:1},opened:[14],unseen:0};
+      body.trajectory.nodes.push(child,unrelated);
+      for(const [step,from,to,source] of [[9,null,bid,'search'],[11,null,leaf.id,'search'],[12,bid,child.id,'declared'],[14,null,unrelated.id,'search']]){
+        const n=body.trajectory.nodes.find(n=>n.id===to),search_source=n.search_source;
+        body.trajectory.transitions.push({step,from,to,source,search_source,relation_status:'not_checked'});
+        body.trajectory.visits.push({step,tool:n.kind,node:to,requested_node:to,status:'opened',verified:true,search_source});
       }
     }
     if(run==='navigation'){
@@ -556,6 +573,27 @@ async function main(){
       if(kind==='legacy_saved'||kind==='saved_schema_repair') await check(kind+' is readable as a saved claim, never a verified final submission',"document.querySelector('.document-source').dataset.verified==='false' && document.querySelector('.document-source').textContent.includes('未认证为最终原文') && document.querySelector('#probe').textContent.includes('A 独有原因')");
       if(kind==='invalid_saved') await check('invalid saved document does not color claims while authenticated visits remain',"document.querySelectorAll('#canvas .node.p-chain').length===0 && document.querySelectorAll('#canvas .node.p-seen').length>0 && document.querySelector('#probe').textContent.includes('保存稿 raw 与 data 不一致')");
     }
+    await evaluate("__mig.load('forest-layout')");
+    await until("__mig.probe().runDir==='forest-layout' && __mig.xt()?.walk && Object.values(__mig.xt().byId).filter(n=>n.traj).length===6");
+    await evaluate("window.forestTrace=JSON.stringify(__mig.probe().trajectory);window.forestEdges=JSON.stringify(__mig.probe().evidence_graph);window.forestIds=Object.values(__mig.xt().byId).filter(n=>n.traj).map(n=>n.trajId).join('|')");
+    async function checkGeometry(label) {
+      const geometry=await evaluate('('+readLayoutGeometry.toString()+')()');
+      assert.deepEqual(geometry.overlaps,[],label+' non-overlap');
+      assert.deepEqual(geometry.outside,[],label+' whole graph fitted');
+      console.log('PASS '+label+' all atom/stub boxes separate and inside viewport');
+    }
+    await checkGeometry('independent search forest with descendant stubs');
+    for(const width of [1200,2100,1600]){
+      await send('Emulation.setDeviceMetricsOverride',{width,height:1100,deviceScaleFactor:1,mobile:false});
+      await evaluate('new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))');
+      await checkGeometry('search forest resized to '+width);
+    }
+    await evaluate("__mig.setCand(true);__mig.setCand(false);[...document.querySelectorAll('.dchips span')].find(n=>n.textContent.startsWith('B ')).click()");
+    await checkGeometry('search forest after redraw and defect filter');
+    await check('forest layout never changes semantic coordinates, visits, transitions or evidence graph',"JSON.stringify(__mig.probe().trajectory)===window.forestTrace && JSON.stringify(__mig.probe().evidence_graph)===window.forestEdges && Object.values(__mig.xt().byId).filter(n=>n.traj).map(n=>n.trajId).join('|')===window.forestIds && document.querySelectorAll('.navigation-event').length===9 && document.querySelectorAll('.wire.evidence').length===0");
+    await evaluate("(()=>{const parent=Object.values(__mig.xt().byId).find(n=>n.trajId==='agent:agent-a@2'),stub=parent.children.map(t=>__mig.xt().byId[t]).find(n=>n.isLedgerStub);__mig.expandStub(stub.tid)})()");
+    await checkGeometry('search-component stub expanded without positional aliasing');
+    await check('expanding a search component does not mutate recorded investigation identities',"JSON.stringify(__mig.probe().trajectory)===window.forestTrace && JSON.stringify(__mig.probe().evidence_graph)===window.forestEdges && Object.values(__mig.xt().byId).filter(n=>n.traj).map(n=>n.trajId).join('|')===window.forestIds");
     // Atom caches are deliberately immutable within one page's ledger. Use a
     // fresh page when the synthetic ledger itself changes proof records.
     await send('Page.navigate',{url:origin+'/?probe=read-proof'});
