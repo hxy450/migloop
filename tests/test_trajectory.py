@@ -152,45 +152,41 @@ def test_sighting_rules() -> None:
 
 
 def test_walk_tree_follows_via_and_labels_ledger_relations(tmp_path: Any) -> None:
-    """有 via 的 run:树 = 打开的节点按 via 挂(打开索引 = 整个,打开某版 = 那一版);每跳按账本标关系;via 不合规的进侧列。"""
+    """有 via 的 run:树 = 打开的节点(都带版本)按 via 挂;每跳按账本标关系;via 不合规的进侧列;被拒的不算打开。"""
     led = _pool(tmp_path)
     calls = [
         ("sessions", {"file": "A.ets"}, "# 返修链(1)\n"),
-        ("file", {"path": "A.ets", "via": "sessions"}, "# entry/A.ets 2 版\n- v1 agent-c v1\n- v2 agent-f v1\n"),
-        ("agent", {"id": "conv-a", "v": 1, "via": "file:entry/A.ets 写者"}, "# agent-c v1\n读 spec/pages/A.md@v1\n"),
+        ("file", {"path": "A.ets", "v": 2, "via": "sessions"}, "# entry/A.ets@v2\n- v1 agent-c v1\n- v2 agent-f v1\n"),
+        ("agent", {"id": "fixer", "v": 1, "via": "file:entry/A.ets@v2 写者"}, "# agent-f v1\n读 entry/A.ets@v1\n"),
+        ("file", {"path": "A.ets", "v": 1, "via": "agent:fixer@v1 读取"}, "# entry/A.ets@v1\n- v1 agent-c v1\n"),
+        ("agent", {"id": "conv-a", "v": 1, "via": "file:entry/A.ets@v1 写者"}, "# agent-c v1\n读 spec/pages/A.md@v1\n"),
         ("file", {"path": "spec/pages/A.md", "v": 1, "via": "agent:conv-a@v1 读取"}, "# spec/pages/A.md@v1\n"),
-        ("agent", {"id": "fixer", "via": "file:entry/A.ets@v2 写者"}, "# agent-f\n"),         # v2 没打开过:老 run 才会出现,进侧列
-        ("agent", {"id": "fixer", "v": 1, "via": "file:entry/A.ets@v1"}, '{"result": "⛔ via 不是已打开的节点"}'),   # 服务端拒了(客户端包成 JSON 落盘):不算打开
         ("agent", {"id": MAIN_ID, "v": 1, "via": "agent:conv-a@v1 派发"}, "# 主会话 v1\n"),
-        ("file", {"path": "A.ets", "v": 2, "via": "agent:fixer 写"}, "# entry/A.ets@v2\n"),
+        ("agent", {"id": MAIN_ID, "v": 2, "via": "file:entry/A.ets@v9"}, '{"result": "⛔ via 不是已打开的节点"}'),   # 服务端拒了:不算打开
         ("blame", {"path": "A.ets", "v": 2}, "# blame\n"),                                       # 不移动
-        ("file", {"path": "A.ets", "via": "agent:conv-a@v1"}, "# 再看索引\n"),                  # 再次打开同一节点:只加步号
+        ("file", {"path": "A.ets", "v": 2, "via": "agent:conv-a@v1"}, "# 再看 v2\n"),           # 再次打开同一节点:只加步号
     ]
     p = probe.probe_payload(led, _run_dir(tmp_path, calls, _block(led), name="walk"))
     T = p["trajectory"]
     assert T["mode"] == "via"
     by = {n["id"]: n for n in T["nodes"]}
     root = by[T["root"]]
-    assert root["id"] == "file:/proj/entry/A.ets@-" and root["label"] == "A.ets(索引)" and root["side"] == "root"
-    assert root["opened"] == [2, 10] and root["via"] == "sessions"
+    assert root["id"] == "file:/proj/entry/A.ets@2" and root["label"] == "A.ets@v2" and root["side"] == "root"
+    assert root["opened"] == [2, 10] and root["via"] == "sessions" and root["fixed"]
+    f = by["agent:agent-f@1"]
+    assert f["parent"] == root["id"] and f["edge"] == "写者 v2" and f["depth"] == 1
+    a1 = by["file:/proj/entry/A.ets@1"]
+    assert a1["parent"] == f["id"] and a1["edge"] == "读 v1" and a1["depth"] == 2
     c = by["agent:agent-c@1"]
-    assert c["parent"] == root["id"] and c["side"] == "up" and c["edge"] == "写者 v1" and c["depth"] == 1
+    assert c["parent"] == a1["id"] and c["edge"] == "写者 v1" and c["depth"] == 3
     a = by["file:/proj/spec/pages/A.md@1"]
-    assert a["parent"] == c["id"] and a["edge"] == "读 v1" and a["depth"] == 2
+    assert a["parent"] == c["id"] and a["edge"] == "读 v1"
     m = by[f"agent:{MAIN_ID}@1"]
     assert m["parent"] == c["id"] and m["edge"] == "派发自 v1"
-    f = by["agent:agent-f@-"]
-    assert f["side"] == "unlinked" and f["note"] == "via 指向没打开过的节点" and f["parent"] == root["id"]
-    a2 = by["file:/proj/entry/A.ets@2"]
-    assert a2["parent"] == f["id"] and a2["edge"] == "写 v2" and a2["fixed"]                     # 从整个 fixer 跳到它写的 v2
-    # 被拒的那一步没打开 fixer v1;结论点名的 A.ets@v1 同键已在路线上(索引 / v2),不另列侧列,角色落在那些节点上
-    assert "agent:agent-f@1" not in by and "file:/proj/entry/A.ets@1" not in by
+    assert f"agent:{MAIN_ID}@2" not in by                                     # 被拒的那一步没打开
+    assert all(n["v"] is not None for n in T["nodes"])                        # 树上没有不带版本的节点
     d = {x["step"]: x["match"] for x in T["declared"]}
-    assert d == {2: "入口", 3: "账本有边", 4: "账本有边", 5: "via 指向没打开过的节点", 6: "被拒(via 不合规,没打开)",
-                 7: "账本有边", 8: "账本有边"}
-    assert p["steps"][2]["via"] == "file:entry/A.ets 写者"
-    # 整个文件 = 最新版视图:上游邻居按全部版本算(写 v1 的 conv-a v1、写 v2 的 fixer v1);在场的整个 fixer 覆盖它所有版本 → 未查 0
-    assert root["unseen"] == 0
-    assert by["agent:agent-c@1"]["unseen"] == 0                    # conv-a v1 的上游:读的 A.md@v1 在场,派发它的主会话 v1 在场
+    assert d == {2: "入口", 3: "账本有边", 4: "账本有边", 5: "账本有边", 6: "账本有边", 7: "账本有边", 8: "被拒(via 不合规,没打开)"}
+    assert p["steps"][2]["via"] == "file:entry/A.ets@v2 写者"
     # 没有 via 的老 run 仍走账本树
     assert probe.probe_payload(led, _run_dir(tmp_path, [("file", {"path": "A.ets"}, "x")], _block(led), name="noVia"))["trajectory"]["mode"] == "ledger"

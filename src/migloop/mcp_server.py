@@ -92,8 +92,8 @@ spec 时凭什么」用 search(q, agent=主会话, v=那一版) 按词切,不要
    用 search(q=文件名, since_ts=修复开始时刻, until_ts=结束) 全池查修复期谁提到过它,再 file(那张单, content=1) 看正文。
 2. diff(path, v_fix) 看修复到底改了什么;blame(path, v_fix, changed=True) 直接列出修复版替换/删除的
    那些行及其引入者(owner@since_v)—— 不必对整个文件做 blame。某一行是谁写的用 blame(path, v, start=行号, n=1)。
-   file 三种口径:file(path) 索引;file(path, v, diff=1) 或 diff(path, v) 看某一版;file(path, diff=1) 不带 v 每版完整 diff,
-   一页 40 版、v_from/v_to 翻页 —— 问「一个文件为什么被改了几十次」才用它。
+   file(path, v) 是这一版的视图:脊柱截到 ≤v(要看全部版本就开最后一版);file(path, v, diff=1) 或 diff(path, v) 看某一版改动;
+   file(path, v, diff=1, v_from=, v_to=) 区间每版完整 diff,一页 40 版 —— 问「一个文件为什么被改了几十次」才用它。
 3. agent(owner_id, since_v) 看引入者写那一版时手里有什么:派发词、读过哪些 spec/源码(版本、
    行段、是否旧版)、收件箱有没有改指令。对比修复方 agent 的读取集,找"该读没读"。
 4. 顺着 file(读到的 spec@v) 往上游走,直到找到最早出问题的环节。
@@ -113,11 +113,10 @@ closer 或后续写者破坏 / 源码没读全。每条证据带 `path@v` 或 `a
 版本内容可能未知,如实说"无法确认"。
 
 ## 位置与来处(via):打开了什么,只能从什么跳
-你任一时刻站在一个节点上。节点只有两种:file(path) / file(path, v) 打开的文件节点,agent(id) / agent(id, v) 打开的 agent 节点;
-不带 v 打开的是「整个」,带 v 打开的是那一版。
-- file / agent 是移动:必须带 via=你现在站的节点,逐字照抄你打开它时的样子 —— 打开索引 file(path) 后 via 写 `file:<路径>`(不带版本);
-  要从某一版出发先 file(path, v=N),via 才能写 `file:<路径>@vN`;agent 同理(`agent:<id>` / `agent:<id>@vK`)。后面可以跟几个字说凭哪一行
-  (例:`file:entry/…/EntryAbility.ets@v8 写者`)。via 不对,调用不执行,会回给你已打开的列表。
+节点只有两种,都带版本:file(path, v) 打开的 file@vN,agent(id, v) 打开的 agent@vK。v 必填 —— 被修文件的版本号看 sessions 摘要,
+写者的版本号看文件脊柱那一行(`v8 ← fix-errobserver v1` 就是 agent(fix-errobserver, v=1)),文件的版本号看 agent 时间线里的读写行。
+- file / agent 是移动:必须带 via=你现在站的节点,逐字等于你打开过的某个节点:`file:<路径>@vN` / `agent:<id>@vK`,后面可以跟几个字
+  说凭哪一行(例:`file:entry/…/EntryAbility.ets@v8 写者`)。不带版本、没打开过、版本对不上,调用都不执行,会回给你已打开的列表。
 - 第一次 file / agent 写 via=sessions(从返修链摘要进被修文件或修复方),之后不能再用。
 - blame / diff / action / search 不移动、不开节点、不带 via:它们是站在节点上看东西。全池 search 的命中不能当来处 ——
   要打开命中的节点,得从已打开的节点沿一条边跳过去(先打开那个文件的那一版 / 那个 agent 的那一版)。
@@ -204,15 +203,16 @@ def build_server(backend: Any | None = None) -> Any:
         return atoms_text.render_index(ledger, kind, query, root=cwd, limit=limit or (300 if query else 80))
 
     @srv.tool()
-    async def file(sid: str, path: str, v: int | None = None, content: bool = False,
+    async def file(sid: str, path: str, v: int, content: bool = False,
                    diff: bool = False, start: int | None = None, n: int | None = None,
                    readers: bool = False, v_from: int | None = None, v_to: int | None = None,
                    diff_chars: int | None = None, m_from: int = 1, m_n: int = 40, m_all: bool = False, via: str = "") -> str:
         """版本文件原子:≤v 的写者脊柱(写者 agent 版本/来路/证据标签)、读了这一版的 agent、复原全文。
-        via=你现在站的节点(已打开的,逐字照抄:打开索引不带版本,打开某版带 @vN;第一次可写 sessions),不对不执行。
-        path 可给文件名、相对路径或绝对路径;v 空 = 最新版;content=True 给全文(start/n 裁行窗口)。
-        三种口径:不带 diff = 索引;diff=True 带 v = 只看第 v 版的 diff;diff=True 不带 v = 每版完整 diff,一页 40 版,
-        v_from / v_to 翻页(创建版只给行数;diff_chars 只在你明确给时才截)。
+        v 必填(打开的节点就是 file@v;要看整条脊柱就开最后一版,版本数 sessions 摘要和任何一版的头一行都有);
+        via=你现在站的节点(已打开的,逐字照抄 file:<路径>@vN / agent:<id>@vK;第一次可写 sessions),不对不执行。
+        path 可给文件名、相对路径或绝对路径;content=True 给这一版全文(start/n 裁行窗口)。
+        不带 diff = 这一版的脊柱(≤v)与读者;diff=True = 第 v 版相对前一版的 diff;diff=True 加 v_from / v_to = 区间每版完整 diff,
+        一页 40 版(创建版只给行数;diff_chars 只在你明确给时才截)。
         末尾「提到它的命令」= 按文件名 grep 全部命令行 / heredoc / 脚本正文 / 工具输出:没记到读写的按分档逐条列
         (改动类 / 正文提到 / 输出里 / 其他),只读检查折叠(m_all=True 铺),一页 m_n 条,m_from 翻页;每条标它落在哪一版的窗口。"""
         ledger, cwd = await _ctx(sid)
@@ -220,7 +220,8 @@ def build_server(backend: Any | None = None) -> Any:
         err = via_mod.check(ledger, st, via)
         if err:
             return err
-        out = atoms_text.render_file(ledger, path, v, root=cwd, content=content, diff=diff,
+        render_v = None if (diff and (v_from is not None or v_to is not None)) else v   # 区间 diff 走多版口径
+        out = atoms_text.render_file(ledger, path, render_v, root=cwd, content=content, diff=diff,
                                      start=start, n=n, readers=readers, v_from=v_from, v_to=v_to,
                                      diff_chars=diff_chars, m_from=m_from, m_n=m_n, m_all=m_all)
         key = via_mod.resolve_key(ledger, "file", path)
@@ -229,13 +230,14 @@ def build_server(backend: Any | None = None) -> Any:
         return out
 
     @srv.tool()
-    async def agent(sid: str, id: str, v: int | None = None, since: int | None = None,
+    async def agent(sid: str, id: str, v: int, since: int | None = None,
                     reads: bool = True, seen: bool = False, until: int | None = None, via: str = "") -> str:
         """版本 agent 原子(索引):身份、派发者与派发词全文、收件箱一行一条、≤v 逐版的效应与输入。
-        via=你现在站的节点(已打开的,逐字照抄;第一次可写 sessions),不对不执行。
+        v 必填(打开的节点就是 agent@v;它一共几版看任何一次返回的头一行);
+        via=你现在站的节点(已打开的,逐字照抄 file:<路径>@vN / agent:<id>@vK;第一次可写 sessions),不对不执行。
         (读按调用合行,绑文件版本,▲旧版/行段/命中行号/写前读等标)、它中途说的话一行一条、收尾输出。
         每条记录带 (#n@L行):action(id, n) 展开原文。id 可带或不带 agent- 前缀,名字唯一也认;
-        v 空 = 整个生命周期;since 给了只看 (since, v] 这段版本 —— 主会话动辄几百次调用,查它必须带窗口。
+        since 给了只看 (since, v] 这段版本 —— 主会话动辄几百次调用,查它必须带窗口。
         seen=True 把命中读看见的原文行铺出来;reads=False 只给每版读的条数。解不出效应的命令直接带「可能碰了 X@v」。
         until=#n:槽截到那条命令为止,之后的输入不算这一版的依据(从一条命令进来只看它之前有什么)。"""
         ledger, cwd = await _ctx(sid)

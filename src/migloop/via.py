@@ -1,7 +1,7 @@
 """来处(via):模型任一时刻站在一个节点上,只能从已打开的节点跳。
 
-节点只有两种:file(path[, v]) 打开的文件节点、agent(id[, v]) 打开的 agent 节点;打开索引(不带 v)时节点就是「整个」,
-via 必须逐字对上打开它时的样子 —— 打开了什么,只能从什么跳。blame / diff / action / search 不移动、不开节点。
+节点只有两种,都带版本:file(path, v) 打开的 file@vN、agent(id, v) 打开的 agent@vK(v 必填,schema 里就是 required)。
+via 必须带版本且逐字等于打开过的某个节点 —— 打开了什么,只能从什么跳。blame / diff / action / search 不移动、不开节点。
 第一次 file / agent 允许 via=sessions / task(从返修链摘要进来),之后不允许。校验在服务端做:不对就不执行。
 """
 from __future__ import annotations
@@ -61,7 +61,7 @@ def parse(ledger: atoms.Ledger, text: str) -> dict[str, Any]:
     kind, hint, vs = m.group(1), m.group(2), m.group(3)
     key = resolve_key(ledger, kind, hint)
     out.update(kind=kind, key=key, v=int(vs) if vs is not None else None)
-    out["ok"] = key is not None
+    out["ok"] = key is not None and vs is not None          # 节点永远带版本:没版本的坐标不是合法来处
     return out
 
 
@@ -89,15 +89,13 @@ def check(ledger: atoms.Ledger, state: ViaState, via: str) -> str | None:
         if state.opened:
             return f"⛔ via=sessions/task 只能用于第一次 file / agent;之后必须从已打开的节点跳。已打开:{opened}"
         return None
+    if pv["key"] is not None and pv["v"] is None:
+        return f"⛔ via 要带版本:{pv['text'][:80]}。节点永远是 file:<路径>@vN / agent:<id>@vK,逐字照抄你打开过的那个。已打开:{opened}"
     if not pv["ok"]:
         return f"⛔ via 解析不了或不在账本:{pv['text'][:80]}。via 必须是已打开的节点之一:{opened}"
     node: Node = (str(pv["kind"]), str(pv["key"]), pv["v"])
     if state.has(node):
         return None
     same_key = [n for n in state.opened if n[0] == node[0] and n[1] == node[1]]
-    hint = ""
-    if same_key and node[2] is not None and any(n[2] is None for n in same_key):
-        hint = f"你打开的是它的索引(整个),没打开 v{node[2]};要从 v{node[2]} 出发先 file/agent(…, v={node[2]}),或者 via 不带版本。"
-    elif same_key:
-        hint = f"你打开的是 {'、'.join(label(ledger, n) for n in same_key)},版本对不上。"
+    hint = f"你打开的是 {'、'.join(label(ledger, n) for n in same_key)},版本对不上。" if same_key else ""
     return f"⛔ via 不是已打开的节点:{pv['text'][:80]}。{hint}打开了什么只能从什么跳。已打开:{opened}"

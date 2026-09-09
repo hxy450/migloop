@@ -27,15 +27,14 @@ def test_first_move_only_from_sessions_then_only_from_opened_nodes(tmp_path: Any
     st = via.ViaState()
     assert "缺失" in str(via.check(led, st, ""))
     assert via.check(led, st, "sessions") is None                       # 第一跳
-    st.open(("file", "/proj/entry/A.ets", None))                        # file(A.ets) 索引:打开的是「整个」
+    st.open(("file", "/proj/entry/A.ets", 2))                           # file(A.ets, v=2)
     assert "只能用于第一次" in str(via.check(led, st, "sessions"))
-    assert via.check(led, st, "file:entry/A.ets") is None               # 逐字对上:不带版本
-    assert via.check(led, st, "file:A.ets 写者行") is None               # 文件名也解析到同一个键
-    err = via.check(led, st, "file:entry/A.ets@v1 写者")                 # 没打开 v1,只打开了索引
-    assert err and "没打开 v1" in err and "file:A.ets(整个)" in err
+    assert "要带版本" in str(via.check(led, st, "file:entry/A.ets"))     # via 不带版本一律拒
+    assert via.check(led, st, "file:entry/A.ets@v2 写者行") is None       # 逐字对上
+    assert via.check(led, st, "file:A.ets@v2") is None                   # 文件名也解析到同一个键
+    assert "版本对不上" in str(via.check(led, st, "file:entry/A.ets@v1 写者"))   # 打开的是 v2,不是 v1
     st.open(("file", "/proj/entry/A.ets", 1))
     assert via.check(led, st, "file:entry/A.ets@v1 写者") is None
-    assert "没打开 v2" in str(via.check(led, st, "file:entry/A.ets@v2"))
     assert "解析不了" in str(via.check(led, st, "凭感觉"))
     assert "解析不了" in str(via.check(led, st, "file:nope.ets@v1"))
     assert "不是已打开" in str(via.check(led, st, "agent:conv-a@v1"))
@@ -43,7 +42,7 @@ def test_first_move_only_from_sessions_then_only_from_opened_nodes(tmp_path: Any
     assert via.check(led, st, "agent:conv-a@v1 读取") is None           # 名字解析到 id
     assert via.check(led, st, "agent:agent-c@v1") is None
     assert via.check(led, st, f"agent:{MAIN_ID}") is not None            # 主会话没打开
-    assert via.describe(led, st) == "file:A.ets(整个)、file:A.ets@v1、agent:conv-a@v1"
+    assert via.describe(led, st) == "file:A.ets@v2、file:A.ets@v1、agent:conv-a@v1"
 
 
 def test_parse_resolves_main_session_and_keeps_version_as_written(tmp_path: Any) -> None:
@@ -51,7 +50,7 @@ def test_parse_resolves_main_session_and_keeps_version_as_written(tmp_path: Any)
     p = via.parse(led, f"agent:{MAIN_ID}@v2 派发")
     assert p["ok"] and p["key"] == MAIN_ID and p["v"] == 2
     p = via.parse(led, "agent:__main__:abcd")
-    assert p["ok"] and p["key"] == MAIN_ID and p["v"] is None
+    assert p["key"] == MAIN_ID and p["v"] is None and not p["ok"]        # 没带版本:能解析到键,但不算合法来处
     assert via.parse(led, "task:被修文件")["first"]
     assert not via.parse(led, "search:x")["first"] and not via.parse(led, "search:x")["ok"]
 
@@ -79,6 +78,7 @@ def test_mcp_tools_enforce_via(tmp_path: Any) -> None:
     srv = mcp_server.build_server(Backend())
     tools = {t.name: t for t in asyncio.run(srv.list_tools())}
     assert "via" in tools["file"].inputSchema["properties"] and "via" in tools["agent"].inputSchema["properties"]
+    assert "v" in tools["file"].inputSchema["required"] and "v" in tools["agent"].inputSchema["required"]   # 版本必填
     for name in ("blame", "diff", "action", "search"):
         assert "via" not in tools[name].inputSchema["properties"], name
 
@@ -88,22 +88,22 @@ def test_mcp_tools_enforce_via(tmp_path: Any) -> None:
         return "".join(getattr(p, "text", "") for p in parts)
 
     async def run() -> None:
-        out = await call("file", sid="s1", path="A.ets")
+        out = await call("file", sid="s1", path="A.ets", v=2)
         assert "via 缺失" in out
-        out = await call("file", sid="s1", path="A.ets", via="sessions")
+        out = await call("file", sid="s1", path="A.ets", v=2, via="sessions")
         assert "写者脊柱" in out or "文件" in out
         out = await call("agent", sid="s1", id="conv-a", v=1, via="file:entry/A.ets@v1")
-        assert "没打开 v1" in out                                        # 只打开了索引
-        out = await call("agent", sid="s1", id="conv-a", v=1, via="file:entry/A.ets 写者")
+        assert "版本对不上" in out                                       # 打开的是 v2
+        out = await call("agent", sid="s1", id="conv-a", v=1, via="file:entry/A.ets@v2 写者")
         assert "agent-c" in out or "conv-a" in out
         out = await call("file", sid="s1", path="spec/pages/A.md", v=1, via="sessions")
         assert "只能用于第一次" in out
         out = await call("file", sid="s1", path="spec/pages/A.md", v=1, via="agent:conv-a@v1 读取")
         assert "A.md" in out
         # 另一个 sid 是另一条路线,状态分开
-        out = await call("file", sid="s2", path="A.ets", via="file:entry/A.ets")
+        out = await call("file", sid="s2", path="A.ets", v=2, via="file:entry/A.ets@v2")
         assert "不是已打开" in out
 
     asyncio.run(run())
-    assert mcp_server.via_state("s1").opened == [("file", "/proj/entry/A.ets", None), ("agent", "agent-c", 1),
+    assert mcp_server.via_state("s1").opened == [("file", "/proj/entry/A.ets", 2), ("agent", "agent-c", 1),
                                                  ("file", "/proj/spec/pages/A.md", 1)]
