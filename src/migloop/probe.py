@@ -269,7 +269,7 @@ def probe_payload(ledger: atoms.Ledger, run_dir: str, chain_payload: dict[str, A
             "trace_identity": trace_identity, "repair_manifest": repair_manifest, "coverage": coverage_report,
             "repair_manifest_origin": manifest_origin,
             "roles": (structured or {}).get("roles") or {}, "fixed": (structured or {}).get("fixed") or [],
-             "trajectory": _trajectory(ledger, run_dir, steps, root, structured, verdicts, calls)}
+             "trajectory": _trajectory(ledger, run_dir, steps, root, structured, verdicts, calls, trace_identity)}
 
 
 def _structured(ledger: atoms.Ledger, run_dir: str, report: str,
@@ -1084,7 +1084,8 @@ def _rejected(text: str) -> bool:
 
 
 def _trajectory_walk(ledger: atoms.Ledger, steps: list[dict[str, Any]], texts: list[str],
-                     structured: dict[str, Any] | None, verdicts: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
+                     structured: dict[str, Any] | None, verdicts: dict[str, list[dict[str, Any]]],
+                     trace_identity: dict[str, Any] | None = None) -> dict[str, Any]:
     nodes: dict[str, dict[str, Any]] = {}
     order: list[dict[str, Any]] = []
 
@@ -1301,17 +1302,21 @@ def _trajectory_walk(ledger: atoms.Ledger, steps: list[dict[str, Any]], texts: l
         n["unseen"] = len(n["unseen_neighbors"])
     edges = [{"from": n["parent"], "to": n["id"], "relation": n["edge"] or "无", "skipped": 0}
              for n in order if n["parent"] and n["side"] == "up"]
+    trace_bound = (trace_identity or {}).get("bound")
+    verification_note = ("访问按各自返回坐标与状态核验;转移记录声明的 via,账本关系另行标注。" if trace_bound is True else
+                         "历史调用的账本身份未绑定;保留返回记录,当前账本坐标与关系未验证。" if trace_bound is False else
+                         "查询轨迹身份未记录;按返回坐标保留访问状态,未认证当前账本身份。")
     return {"mode": "via", "root": root["id"] if root else None, "nodes": order, "edges": edges,
             "declared": declared, "visits": visits, "transitions": transitions, "searches": searches,
-            "verification": "returned_coordinates" if bound else "unverified",
-            "verification_note": ("访问按工具返回的实际坐标核验;转移记录声明的 via,账本关系另行标注。" if bound else
-                                  "历史调用的账本身份未绑定;保留返回记录,当前账本坐标与关系未验证。"),
+            "verification": "returned_coordinates" if trace_bound is True else "unverified",
+            "verification_note": verification_note,
             "side_title": "搜索入口 / 路线外节点（查询状态见节点）" if any(n.get("search_source") for n in order) else "未接入路线"}
 
 
 def _trajectory(ledger: atoms.Ledger, run_dir: str, steps: list[dict[str, Any]], root: str | None,
                 structured: dict[str, Any] | None, verdicts: dict[str, list[dict[str, Any]]],
-                calls: list[dict[str, Any]] | None = None) -> dict[str, Any] | None:
+                calls: list[dict[str, Any]] | None = None,
+                trace_identity: dict[str, Any] | None = None) -> dict[str, Any] | None:
     """有 via 的 run:按 via 走的树;没有的老 run:账本边树;没有转录:None。"""
     if calls is None:
         calls = _transcript_calls(run_dir)
@@ -1319,23 +1324,23 @@ def _trajectory(ledger: atoms.Ledger, run_dir: str, steps: list[dict[str, Any]],
         return None
     texts = [c["text"] for c in calls]
     if any((c.get("provenance") or {}).get("degraded") for c in calls):
-        tree = _trajectory_walk(ledger, steps, texts, structured, verdicts)
+        tree = _trajectory_walk(ledger, steps, texts, structured, verdicts, trace_identity)
         tree.update(trace_source="codex_exec_events", source_path="events.jsonl")
         tree["verification_note"] += " 原始 rollout 缺失;完整 stdout 开始/完成事件按 item_id 配对,不冒充 call_id。"
         return tree
     if any((s.get("provenance") or {}).get("origin_unverified") for s in steps):
-        return _trajectory_walk(ledger, steps, texts, structured, verdicts)
+        return _trajectory_walk(ledger, steps, texts, structured, verdicts, trace_identity)
     if any(s.get("via") or (int(s["i"]) <= len(texts) and _rejected(texts[int(s["i"]) - 1]))
            for s in steps if s.get("tool") in ("file", "agent")):
-        return _trajectory_walk(ledger, steps, texts, structured, verdicts)
+        return _trajectory_walk(ledger, steps, texts, structured, verdicts, trace_identity)
     if any(s.get("identity_unbound") for s in steps):
         # Legacy reports have no structured.identity to consult. Do not first bind
         # old handles to today's ledger and merely add an unverified label.
-        return _trajectory_walk(ledger, steps, texts, structured, {})
+        return _trajectory_walk(ledger, steps, texts, structured, {}, trace_identity)
     bound = not structured or (structured.get("identity") or {}).get("bound") is not False
     tree = _trajectory_ledger(ledger, run_dir, steps, root if bound else None, structured if bound else None,
                               verdicts if not structured else {})
-    walk = _trajectory_walk(ledger, steps, texts, None, {})
+    walk = _trajectory_walk(ledger, steps, texts, None, {}, trace_identity)
     if tree is None and walk["visits"]:
         tree = walk
     if tree is not None:

@@ -1,0 +1,272 @@
+{
+  "schema": "migloop-formal-adjudication/1",
+  "suite": "attribution10/formal-v1",
+  "scope": "legacy D1,D2,S1,S2,S3,S4; tools rep1 only",
+  "audited_at": "2026-09-09T12:53:41Z",
+  "audit_mode": "read-only source/run/reference inspection; one frozen-ledger blame diagnostic; no model or historical command execution",
+  "experiment_root": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10",
+  "reference": {
+    "path": "reference-v1/legacy-reference.json",
+    "sha256": "2c015536094fff1e42bb3b6b5cc2dce743c0f2a0f6924254027f7f8a5faac927",
+    "status": "bounded reference, key disputes checked against raw events; not independent causal-truth certification"
+  },
+  "source": {
+    "path": "C:/Users/hongy/projects/_migloop-eval-20260909/source-b197227",
+    "code_id": "b197227",
+    "digest": "00a2f176879d94bd540bf8272f7e372fa68b154a92d7a8dcb7f16392266bb6fd"
+  },
+  "conventions": {
+    "call_step": "1-based primary transcript order from frozen probe._transcript_calls, not native stdout event order",
+    "call_line": "physical line in run transcript.jsonl",
+    "raw_line": "physical line in named frozen pool JSONL",
+    "pass": "bounded core question supported, not all claims independently proven",
+    "coverage": "accounting of versions and candidates, not repair fact count or semantic truth",
+    "cost": "cache_read is included in input_total; output includes reported reasoning; null USD is not estimated"
+  },
+  "runs": [
+    {
+      "case": "member-center",
+      "question_ids": ["S3", "S4"],
+      "path": "formal-v1/member-center/runs/tools/rep1",
+      "run_id": "7653bf63-2c9a-4475-a5f7-e05b16232947",
+      "status": "completed",
+      "started_at": "2026-09-09T12:31:29.960646+00:00",
+      "ended_at": "2026-09-09T12:36:54.403557+00:00",
+      "model": "gpt-5.5",
+      "effort": "medium",
+      "wall_s": 324.4501355,
+      "end_to_end_wall_s": 337.4488191000419,
+      "tool_calls": 55,
+      "tool_counts": {"guide": 1, "sessions": 1, "file": 1, "action": 31, "agent": 3, "search": 12, "diff": 6},
+      "tool_chars": 238198,
+      "rejected_calls": 0,
+      "blame_calls": 0,
+      "usage": {"input_total": 1723544, "cache_read": 1595904, "input_uncached": 127640, "output": 13948},
+      "cost_usd": null,
+      "verdict_ok": true,
+      "coverage_complete": true,
+      "coverage": {"expected": 22, "accounted": 22, "versions": 9, "candidates": 13, "unresolved": 9},
+      "pool_digest": "a78b1373045f7558d6da3b76123e30d032635a2a0b4cdd665e7f80c0bdf8b337",
+      "ledger": "atoms-2026-09-09-observation4:146:4886b8384a15114e1dce3c0d",
+      "artifact_sha256": {
+        "result.json": "2c2c778acccd1b72aeecea3784075be93a385f080c272754da825cbef8d94547",
+        "metrics.json": "376d53dc233d264005d0af66d4124b6bc214026d37bb62e4fa8298f1323a21a7",
+        "transcript.jsonl": "18ae4d6b3dfa8be27a8d10053c21504677c108b1b0327cc7a8ca6e5c7976e62e"
+      }
+    },
+    {
+      "case": "dice-entry",
+      "question_ids": ["D1", "D2"],
+      "path": "formal-v1/dice-entry/runs/tools/rep1",
+      "run_id": "d2af2737-1765-4e07-acf4-dca012e9b6c3",
+      "status": "completed",
+      "started_at": "2026-09-09T12:34:54.574999+00:00",
+      "ended_at": "2026-09-09T12:38:39.225782+00:00",
+      "model": "gpt-5.5",
+      "effort": "medium",
+      "wall_s": 224.65536560001783,
+      "end_to_end_wall_s": 228.112822300056,
+      "tool_calls": 43,
+      "tool_counts": {"guide": 1, "sessions": 1, "file": 8, "agent": 10, "search": 17, "diff": 6},
+      "tool_chars": 161618,
+      "rejected_calls": 3,
+      "rejection_detail": "2 non-first via=sessions calls and 1 nonexistent agent@v1 (agent has zero recorded versions)",
+      "blame_calls": 0,
+      "usage": {"input_total": 769067, "cache_read": 637952, "input_uncached": 131115, "output": 9932},
+      "cost_usd": null,
+      "verdict_ok": true,
+      "coverage_complete": true,
+      "coverage": {"expected": 8, "accounted": 8, "versions": 7, "candidates": 1, "unresolved": 2},
+      "pool_digest": "653db4192d47366e8ca099e59ef2679e929056f18320d081768539b2f5b7443e",
+      "ledger": "atoms-2026-09-09-observation4:80:9e91bbe343cdb7e7484c4bb4",
+      "artifact_sha256": {
+        "result.json": "27a86f3d0201ddea3842334a8159b0ef1208a614a50e582ffa55fa4ad495f465",
+        "metrics.json": "148dfc8259f68fd2e055a4543812efe3e4c0135b66103d5a4ada93d13388a98b",
+        "transcript.jsonl": "6efe3c7c1e28038c20268a7cc65b8ba29220de438116fbe673eb4af8c8d3b87d"
+      }
+    },
+    {
+      "case": "splash",
+      "question_ids": ["S1", "S2"],
+      "path": "formal-v1/splash/runs/tools/rep1",
+      "run_id": "2fcbef8a-c5de-4d47-80c7-f8e9a601b7a1",
+      "status": "completed",
+      "started_at": "2026-09-09T12:38:57.423235+00:00",
+      "ended_at": "2026-09-09T12:44:09.210109+00:00",
+      "model": "gpt-5.5",
+      "effort": "medium",
+      "wall_s": 311.7935236999765,
+      "end_to_end_wall_s": 325.0312806000002,
+      "tool_calls": 56,
+      "tool_counts": {"guide": 1, "sessions": 1, "file": 7, "agent": 7, "search": 23, "diff": 10, "action": 5, "index": 2},
+      "tool_chars": 240675,
+      "rejected_calls": 1,
+      "blame_calls": 0,
+      "usage": {"input_total": 1329480, "cache_read": 1198080, "input_uncached": 131400, "output": 13206},
+      "cost_usd": null,
+      "verdict_ok": false,
+      "verdict_errors": ["YAML block line 116 column 13: unquoted leading backtick cannot start a token"],
+      "coverage_complete": false,
+      "coverage": {"expected": 24, "provided": 0, "accounted": 0, "versions": 9, "candidates": 15, "missing_versions": 9, "missing_candidates": 15},
+      "semantic_reading_note": "Human-readable coverage prose exists. This audit does not repair/reparse it or replace the failed machine metric.",
+      "pool_digest": "a78b1373045f7558d6da3b76123e30d032635a2a0b4cdd665e7f80c0bdf8b337",
+      "ledger": "atoms-2026-09-09-observation4:146:4886b8384a15114e1dce3c0d",
+      "artifact_sha256": {
+        "result.json": "a7abba59e47e247f59ffca601b7a165fc328033855f9dac8515de2e5f3b772b0",
+        "metrics.json": "3d318581d5ba3a167af3566c3e442a3a484c05458d189349f7acd9c347cf17e6",
+        "transcript.jsonl": "2b23b12663a035a43b178c5966bfac03060245b3fc86d2becc77ad50cb8ebd1c"
+      }
+    }
+  ],
+  "items": [
+    {
+      "id": "D1",
+      "run": "dice-entry",
+      "fact_status": "pass_core",
+      "attribution_status": "pass_bounded",
+      "validation_status": "historical_summary_claim_with_correct_AppStorage_boundary",
+      "repair_anchor_status": "supported_v3_to_v6",
+      "entry_role_status": "empty_entry_appropriate_for_unproven_initial_fault",
+      "findings": [
+        "Stage1 recorded inputs versus later testing-template/design/dispatch bridge requirement are distinguished.",
+        "Pre-generation zero search hits are scoped, not treated as proof that all prior requirements lacked the bridge.",
+        "10/10 and onNewWant x3 are quoted from a generated final-summary, not individually reverified runtime events in this investigation.",
+        "AppStorage direct observation remains unavailable; the report does not claim full bridge-state readback."
+      ],
+      "minimal_correction": "Use historical report records rather than proves for final-summary validation; do not require a full device-evidence reinvestigation to pass the bounded core question.",
+      "evidence": [
+        {"type": "run_call", "step": 26, "call_id": "call_BAYgG7iQb5kGboMYPYdTbBLk", "result_line": 147, "tool": "file", "target": "spec/verify/ui/round-1/final-summary.md@v1", "returned_lines": "1-66", "basis": "generated historical report; includes canonical DEFERRED and 7 UNOBSERVABLE probes"},
+        {"type": "raw", "path": "formal-v1/dice-entry/pool/593d4e86-a947-4e62-8027-013014c2bafc.jsonl", "lines": [291], "ref": "#593d4e86:1350@L291", "basis": "summary Write pointer supplied by the actual file response"}
+      ],
+      "reference_ids": ["D01", "D03", "D04", "D05", "D06", "D07", "D08", "D09", "D10", "D13", "D15", "D16", "D17"]
+    },
+    {
+      "id": "D2",
+      "run": "dice-entry",
+      "fact_status": "pass_core",
+      "attribution_status": "pass_bounded",
+      "validation_status": "compile_confirmed_runtime_callback_unproven",
+      "repair_anchor_status": "supported_v7_to_v10",
+      "entry_role_status": "empty_entry_appropriate_for_unproven_initial_fault",
+      "findings": [
+        "ECAT dispatch and SDK evidence support the three successful edits.",
+        "Opened builder@v2 includes original ohosTest SUCCESS/EXIT0 output; main build is summarized there and independently confirmed in frozen raw results.",
+        "Report correctly distinguishes compile success from an actually triggered uncaught-exception callback.",
+        "May-throw WARN is omitted, but the report claims 0 ERROR rather than 0 WARN."
+      ],
+      "minimal_correction": "Mention remaining WARN and keep compile/runtime boundaries; omission does not reverse the core result.",
+      "evidence": [
+        {"type": "run_call", "step": 24, "call_id": "call_k6Bl25eEyXaZd9G6k8KMTsC7", "result_line": 133, "tool": "agent", "target": "agent-a635575c78cd15ff6@v2"},
+        {"type": "raw", "path": "formal-v1/dice-entry/pool/2f01bcdc-0a92-4961-a64d-5b181f03b3d3/subagents/agent-a635575c78cd15ff6.jsonl", "lines": [44, 48, 52, 64, 68], "basis": "default success/exit0, may-throw WARN, ohosTest success and real compilation"}
+      ],
+      "reference_ids": ["D06", "D18", "D19", "D20", "D21", "D22", "D24", "D25", "D26", "D-build", "D-warn"]
+    },
+    {
+      "id": "S3",
+      "run": "member-center",
+      "fact_status": "pass_core_minor_H5_omission",
+      "attribution_status": "original_fault_unproven",
+      "validation_status": "appropriately_limited_script_plus_partial_readback",
+      "repair_anchor_status": "unsupported_semantic_window_existing_nodes",
+      "entry_role_status": "inconsistent_normal_fixer_in_fault_entry",
+      "findings": [
+        "Correctly identifies 3 total modified sites: AppLoad Transparent, PayAgreement and RenewRule DIALOG_MASK #8C000000.",
+        "H5 was already transparent and skipped; report does not explicitly finish this part of the reference.",
+        "v9-to-v10 is admitted to be an adjacent-known-version window; v10 is actually a bottom CTA width/margin edit, not mask.",
+        "Coordinates exist; the problem is semantic repair anchoring, not fabricated version existence.",
+        "S3 entry selects fixer@v5 although the same node is normal and described as a correct repair."
+      ],
+      "minimal_correction": "Anchor the mask work to its candidate/action, not a fabricated version-to-repair mapping; keep original responsibility unresolved.",
+      "evidence": [
+        {"type": "run_call", "step": 7, "call_id": "call_KEaI9q1J4XnmHceRUdZDpGSF", "result_line": 56, "tool": "action", "seq": 23502},
+        {"type": "raw", "path": "formal-v1/member-center/pool/ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl", "lines": [81, 103, 436], "basis": "mask scan, conditional branch/skip script, actual non-mask v10 edit"},
+        {"type": "report", "location": "defects[S3].repair, defects[S3].entry, coverage[node=MemberCenterPage@v10]", "basis": "report itself classifies v10 as unrelated CTA change"}
+      ],
+      "reference_ids": ["M-mask-scan", "S29", "S30", "M-before"]
+    },
+    {
+      "id": "S4",
+      "run": "member-center",
+      "fact_status": "pass_repair_sequence",
+      "attribution_status": "partial_missing_nearest_full_rewrite_and_its_input",
+      "validation_status": "compile_confirmed_not_visual_or_all_formats",
+      "repair_anchor_status": "broad_v10_to_v18_with_individually_disclosed_unrelated_versions",
+      "entry_role_status": "inconsistent_normal_builder_in_entry_and_unexplained_carry_role",
+      "findings": [
+        "Correct intermediate ForEach then final two Span structure; private helper error is attributed to repair, not initial generation.",
+        "No Slice8 agent/action/file@v7 opened despite the first file response listing that full rewrite.",
+        "Only initial conv-member investigated for source requirements; its scoped zero-hit boundary is honest but does not answer the nearest writer question.",
+        "Normal builder@v3 appears in entry; fixer@v45 carry role reason describes fixing price rather than identifying what erroneous condition it carries."
+      ],
+      "minimal_correction": "Follow nearest recorded full rewrite and its before-write input; do not assign exact old-line continuity across unknown versions.",
+      "evidence": [
+        {"type": "run_call", "step": 3, "call_id": "call_DGlWrFamEB7uy12vIumXCfH7", "result_line": 38, "tool": "file", "basis": "untruncated v7 <- Slice8@v13, #20723@L264 full-write backbone"},
+        {"type": "run_call", "step": 20, "call_id": "call_hlwFy4DyUQQPvUHMMTr0iPke", "result_line": 134, "tool": "diff", "target": "MemberCenterPage.ets@v11", "basis": "native old literal Text(animatedPrice-or-item.priceText).fontSize(30)"},
+        {"type": "run_calls", "steps": [48, 49, 50, 51, 52, 53, 54, 55], "result_lines": [262, 266, 267, 268, 275, 284, 291, 298], "basis": "initial converter only; last two find terms miss and return recoverable pagination"},
+        {"type": "raw", "path": "formal-v1/member-center/pool/9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aslice8-pay-80bbb1f44b77da0f.jsonl", "lines": [24, 264], "timestamps": ["2026-07-24T15:33:51.671Z", "2026-07-24T16:04:37.440Z"], "basis": "actual Kotlin replaceSpan input precedes exact-target full rewrite with whole price at 30vp"},
+        {"type": "diagnostic", "call": "atoms.blame(frozen_ledger, MemberCenterPage.ets, 11, changed=True)", "result": {"known": false, "comparison_basis": "unavailable", "prev_v": 10}, "basis": "v10 and v11 unknown; last full known baseline v7, not a proven continuous line owner"}
+      ],
+      "reference_ids": ["M-price-source", "M-before", "M-price-first", "M-price-last", "M-build-error", "M-private-digits", "M-private-suffix", "M-build-ok"]
+    },
+    {
+      "id": "S1",
+      "run": "splash",
+      "machine_schema": "invalid_original_YAML",
+      "fact_status": "mostly_pass_static_history",
+      "attribution_status": "partial_D020_origin_untraced_disclosed",
+      "validation_status": "initial_callback_usable_overclaim_and_later_build_omitted",
+      "repair_anchor_status": "v51_to_v56_includes_one_explicitly_unresolved_unrelated_version",
+      "entry_role_status": "Slice11_entry_supported_by_false_explanation; deletion_actor_carry_label_imprecise",
+      "findings": [
+        "Initial callback existence, entry-setup deletion, Slice11 D020/isModal explanation, onWillDismiss and dialog restoration are supported.",
+        "Usable callback is stronger than static implementation evidence; no initial device behavior certification was opened.",
+        "D020 author not traced is expressly disclosed.",
+        "Independent builder success is omitted, but report does not explicitly claim the whole pool lacked a build.",
+        "Keyword absence for two expected behavior strings supports only no hit, not complete validation coverage."
+      ],
+      "minimal_correction": "Say callback existed, add later build success while keeping device behavior unverified, and distinguish deletion introduction from later propagation.",
+      "evidence": [
+        {"type": "run_call", "step": 53, "call_id": "call_fhfVi4E7jZMT41f4UhPwWFjA", "result_line": 258, "tool": "diff", "target": "SplashPage.ets@v6", "basis": "entry-setup deletes onBackPressed callback and records follow-up API caveat"},
+        {"type": "run_calls", "steps": [20, 21, 26, 35], "result_lines": [118, 120, 145, 182], "basis": "D020 dispatch, Slice11 explanation, actual historical finding"},
+        {"type": "raw", "path": "formal-v1/splash/pool/ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-af0e3d2ae54dbf769.jsonl", "lines": [37], "timestamp": "2026-07-26T21:46:28.608Z", "basis": "EXIT=0 and BUILD SUCCESSFUL inside report's later-search time window"}
+      ],
+      "reference_ids": ["S01", "S02", "S04", "S05", "S07", "S08", "S09", "S10", "S11", "S13", "S15", "S16", "S17", "S18", "S19", "S20", "M-build-ok"]
+    },
+    {
+      "id": "S2",
+      "run": "splash",
+      "machine_schema": "invalid_original_YAML",
+      "fact_status": "mostly_pass_early_requirement_and_later_repair",
+      "attribution_status": "partial_input_absence_overstated",
+      "validation_status": "device_behavior_unproven",
+      "repair_anchor_status": "before_v57_already_contains_this_repair_import",
+      "entry_role_status": "missing-input_fault_roles_stronger_than_established_delivery_evidence",
+      "findings": [
+        "Jul26 search cutoff is later than generation, but actual returned earliest hits are T+0:33/T+0:59 before generation T+14:04, so early requirement is supported by the response itself.",
+        "Raw root L404 confirms windowFullscreen=true on Jul23, before initial Write Jul24.",
+        "Two zero keywords in agent and spec do not prove all actual input lacked equivalent system-bar requirements; opened spec itself contains page_type=full_screen_page.",
+        "Report discloses incomplete spec-generation tracing, but summary states actual input only immersive/safe-area and requirement not delivered too categorically.",
+        "coverage attributes v57 window import to S2, contradicting use of v57 as pre-whole-repair anchor."
+      ],
+      "minimal_correction": "Use no established explicit-theme-to-generation delivery evidence; for the whole import/hide/restore repair use before v56, or explicitly narrow the repair to post-v57 work.",
+      "evidence": [
+        {"type": "run_call", "step": 30, "call_id": "call_nv6nTnMb9ZNtzJ3D3dzC1rwP", "result_line": 161, "tool": "search", "basis": "actual early main/theme and design hits with T+ times"},
+        {"type": "run_call", "step": 50, "call_id": "call_2V8fhL8zabUiHaktnKu6L9MV", "result_line": 245, "tool": "file", "target": "page_0001_SplashActivity.md@v1", "basis": "lines 67-69 include full_screen_page and immersive skill reference"},
+        {"type": "raw", "path": "formal-v1/splash/pool/9b3105a2-85ec-4889-9786-b3c220f06754.jsonl", "lines": [404], "timestamp": "2026-07-23T12:36:37.214Z", "basis": "Launch theme original output with android:windowFullscreen=true"},
+        {"type": "raw", "path": "formal-v1/splash/pool/9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aconv-splash-9d5902d803bbcde6.jsonl", "lines": [71], "timestamp": "2026-07-24T02:07:13.800Z", "basis": "later initial Splash Write"}
+      ],
+      "reference_ids": ["S-theme-earlier", "S01", "S02", "S05", "S23", "S24", "S25", "S26"]
+    }
+  ],
+  "generic_diagnostic_proposal": {
+    "implemented": false,
+    "hypothesis": "Bounded old-side source navigation appended to diff may reduce initial-writer anchoring bias.",
+    "known_endpoints": "Reuse blame(changed=True) owner groups and source actions for changed old lines only.",
+    "unknown_endpoints": "Return no confirmed line owner; nearest known baseline and intervening unknown versions may be shown only as investigation candidates.",
+    "specific_observation": "Member v7 <- Slice8@v13 was already returned in first file backbone; v10/v11 are unknown and changed blame refuses attribution.",
+    "source_locations": ["src/migloop/atoms.py:905", "src/migloop/atoms_text.py:796"],
+    "risk_guard": "No causal upgrade from navigation; no continuity inferred across gaps; preserve original action and pagination recovery.",
+    "evaluation_limit": "Single observed run, no claim of improvement; no source or GUIDE change performed in this audit."
+  },
+  "comparison_limit": "No paired baseline here; no n=1 quality/cost win claim. All run/reference/frozen-source artifacts left unchanged."
+}

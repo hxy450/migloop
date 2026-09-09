@@ -447,6 +447,27 @@ def test_partial_search_retains_delivered_text_and_cannot_authenticate_full_rece
     assert via.trace_identity(led, [parsed], {})["bound"] is None
 
 
+@pytest.mark.parametrize("trace_matches", [True, False])
+def test_schema_failure_does_not_relabel_authenticated_trace_identity(tmp_path: Path, trace_matches: bool) -> None:
+    led = _pool(tmp_path)
+    identity = atoms.ledger_identity(led) if trace_matches else "different-ledger"
+    malformed = "```yaml\nschema: migloop-verdict/1\nnotes: reason: invalid\n```"
+    run = _run(tmp_path, [_call("s", "sessions", {}), _result("s", "账本身份: " + identity + "\n# chains"),
+                          _call("f", "file", {"path": "A.ets", "v": 2, "via": "sessions"}),
+                          _result("f", "# entry/A.ets@v2")], malformed)
+    payload = probe.probe_payload(led, run)
+    assert payload["structured"]["errors"] and payload["structured"]["identity"]["bound"] is False
+    assert payload["trace_identity"]["bound"] is trace_matches
+    tree = payload["trajectory"]
+    if trace_matches:
+        assert tree["verification"] == "returned_coordinates"
+        assert "身份未绑定" not in tree["verification_note"]
+        assert tree["visits"][0]["status"] == "opened" and len(tree["nodes"]) == 1
+    else:
+        assert tree["verification"] == "unverified" and "身份未绑定" in tree["verification_note"]
+        assert tree["visits"][0]["status"] == "unverified" and tree["nodes"] == []
+
+
 def test_observed_nested_mcp_rollout_runtime_items_keep_real_item_id_and_times(tmp_path: Path) -> None:
     led = _pool(tmp_path)
     records = [

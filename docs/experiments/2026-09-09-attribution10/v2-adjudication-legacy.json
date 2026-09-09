@@ -1,0 +1,172 @@
+{
+  "schema": "migloop-paired-adjudication/1",
+  "audited_at": "2026-09-09T13:07:17Z",
+  "scope": "MemberCenter S3/S4 only; formal-v1 and formal-v2 tools/rep1",
+  "mode": "read-only frozen evidence audit; no model calls, source edits, reference edits, or run artifact writes",
+  "experiment_root": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10",
+  "reference": {
+    "path": "reference-v1/legacy-reference.json",
+    "sha256": "2c015536094fff1e42bb3b6b5cc2dce743c0f2a0f6924254027f7f8a5faac927",
+    "ids": ["S3", "S4"],
+    "status": "bounded reference; critical claims checked against original events"
+  },
+  "pair": {
+    "question_ids": ["S3", "S4"],
+    "same_common_task_bytes": true,
+    "common_task_sha256": "e60ad7491cd5991a948f8c7128432feca230a59bee208640ca5b90a44d68dec1",
+    "prompt_sha256": "c875ecdd81e7155b15575d74cbe20045e0595fafbb070396e5ba77a97c89e6f3",
+    "pool": "formal-v1/member-center/pool",
+    "pool_digest": "a78b1373045f7558d6da3b76123e30d032635a2a0b4cdd665e7f80c0bdf8b337",
+    "ledger": "atoms-2026-09-09-observation4:146:4886b8384a15114e1dce3c0d",
+    "model": "gpt-5.5",
+    "effort": "medium",
+    "transport": "native MCP",
+    "intervention": "Generic model-facing GUIDE revisions; no case answers injected. Commit additionally changes probe/viewer/audit scripts and tests, not new raw investigation evidence.",
+    "limit": "One paired observation; cannot assign the entire effect to one sentence or extrapolate general accuracy/cost wins."
+  },
+  "runs": [
+    {
+      "variant": "formal-v1",
+      "path": "formal-v1/member-center/runs/tools/rep1",
+      "run_id": "7653bf63-2c9a-4475-a5f7-e05b16232947",
+      "source_code_id": "b197227",
+      "source_digest": "00a2f176879d94bd540bf8272f7e372fa68b154a92d7a8dcb7f16392266bb6fd",
+      "status": "completed",
+      "wall_s": 324.4501355000539,
+      "end_to_end_wall_s": 337.4488191000419,
+      "tool_calls": 55,
+      "tool_chars": 238198,
+      "rejected_calls": 0,
+      "blame_calls": 0,
+      "usage": {"input_total": 1723544, "cache_read": 1595904, "input_uncached": 127640, "output": 13948},
+      "cost_usd": null,
+      "verdict_ok": true,
+      "coverage_complete": true,
+      "coverage_counts": {"expected": 22, "accounted": 22, "expected_versions": 9, "expected_candidates": 13, "unresolved": 9, "not_repair": 0},
+      "artifact_sha256": {
+        "result.json": "2c2c778acccd1b72aeecea3784075be93a385f080c272754da825cbef8d94547",
+        "metrics.json": "376d53dc233d264005d0af66d4124b6bc214026d37bb62e4fa8298f1323a21a7",
+        "transcript.jsonl": "18ae4d6b3dfa8be27a8d10053c21504677c108b1b0327cc7a8ca6e5c7976e62e"
+      }
+    },
+    {
+      "variant": "formal-v2",
+      "path": "formal-v2/member-center/runs/tools/rep1",
+      "run_id": "7450547a-e797-45de-8ab8-ea836b3f1e22",
+      "source_code_id": "733c526",
+      "source_digest": "0d00097a4508abb43acdb72d36a3c1633885bd7ff187001c8c350ed7a0d2ba26",
+      "status": "completed",
+      "started_at": "2026-09-09T12:55:39.713330+00:00",
+      "ended_at": "2026-09-09T13:01:21.051546+00:00",
+      "wall_s": 341.34104700002354,
+      "end_to_end_wall_s": 366.03627669997513,
+      "tool_calls": 53,
+      "tool_chars": 200620,
+      "tool_counts": {"guide": 1, "sessions": 1, "diff": 6, "action": 24, "file": 4, "blame": 2, "agent": 6, "search": 9},
+      "rejected_calls": 4,
+      "rejection_detail": ["two non-first via=sessions", "file search receipt reused for agent target", "agent id absent from ledger"],
+      "usage": {"input_total": 1937108, "cache_read": 1821184, "input_uncached": 115924, "output": 12748},
+      "cost_usd": null,
+      "verdict_ok": true,
+      "coverage_complete": true,
+      "coverage_counts": {"expected": 22, "accounted": 22, "expected_versions": 9, "expected_candidates": 13, "unresolved": 5, "not_repair": 10},
+      "artifact_sha256": {
+        "result.json": "354c6d765cea5c57c098f77d1a8028b8c210eb3b1a710bab20fd49b8417568b1",
+        "metrics.json": "18a5cd3677a6e488c5ff6fc7aea74da6950f86d50feea011365fde50b40a9c47",
+        "transcript.jsonl": "11d1f28416a1ea975f49126320712e06b9afa31add9c1a9230f065527fb8c421"
+      }
+    }
+  ],
+  "items": [
+    {
+      "id": "S3",
+      "v1": {"site_value_mapping": "pass_core", "repair_anchor": "unsupported_v9_to_v10_time_window", "entry": "normal_fixer_in_fault_entry"},
+      "v2": {
+        "site_value_mapping": "pass_core_minor_H5_omission",
+        "execution_fact_conclusion": "partial_underclaim",
+        "repair_anchor": "correctly_omitted_without_recorded_version",
+        "entry": "appropriately_empty",
+        "validation_boundary": "correctly_separates_one_independent_readback_and_unknown_device_behavior"
+      },
+      "improvements": ["No fake adjacent-version mask repair anchor", "No normal repairer in fault entry"],
+      "remaining_issue": "The lack of a ledger file version is incorrectly used to weaken actual successful script execution into only intent/reported planning.",
+      "evidence_logic": {
+        "input": "Exact script writes open(path,'w').write(new) before report.append; all printed site reports occur after the write loop.",
+        "output": "Successful tool result names target MemberCenterPage.ets and 3 sites import=+; stderr empty and interrupted false.",
+        "scope": "Recorded cwd resolves relative target to the same full MemberCenter path.",
+        "supports": "Recorded successful script execution supports three target modifications with inspected branch values.",
+        "does_not_support": "A synthesized formal version, complete restorable file snapshot, all-site independent readback, device verification, or final persistent state at later times."
+      },
+      "recommended_wording": "Successful execution records support three writes: one Transparent and two DIALOG_MASK; full state is not reconstructed, only PayAgreement independently read back, device behavior unknown.",
+      "evidence": [
+        {"type": "v2_call", "step": 9, "call_id": "call_ZnFiLqUZqGXL8ds9hdzXSngB", "result_line": 71, "tool": "action", "seq": 23502, "basis": "complete command and successful output"},
+        {"type": "v2_call", "step": 43, "call_id": "call_hHVVxCOytnHGgLJVvWatIWRF", "result_line": 252, "tool": "action", "seq": 23504, "basis": "PayAgreement independent readback"},
+        {"type": "raw", "path": "formal-v1/member-center/pool/ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl", "lines": [103, 104], "tool_use_id": "toolu_01T6WkXMhD7rUsHaSaMPuhgx", "cwd": "/Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723", "timestamps": ["2026-07-26T20:41:07.872Z", "2026-07-26T20:41:10.739Z"]}
+      ]
+    },
+    {
+      "id": "S4",
+      "v1": {"repair_facts": "pass", "nearest_writer_and_input": "missing_Slice8", "entry": "includes_normal_builder", "intermediate_role": "unsupported_carry"},
+      "v2": {
+        "repair_facts": "pass",
+        "nearest_writer_and_input": "pass_bounded_core",
+        "entry": "supported_Slice8_and_final_private_helper_introducer",
+        "intermediate_role": "unsupported_carry_remains",
+        "validation_boundary": "compile_pass_not_device_or_all_price_formats"
+      },
+      "improvements": [
+        "Actual changed blame attempts return unknown and report preserves this gap.",
+        "Exact old literal search leads to file@v7, Slice8@v13 write, and Slice8@v1 input.",
+        "Original Kotlin replaceSpan Read is opened, not merely search result treated as historical reading.",
+        "Normal builder removed from entry; actual private helper compiler cause retained."
+      ],
+      "remaining_issue": "fixer@v45 role carry is justified only by fixing the price then later replacing ForEach. Later rewriting alone does not show an upstream defect retained/transmitted.",
+      "boundaries": ["No continuous old-line blame across unknown v8-v10", "No all-price-format/device proof", "Search first known match is not historical first occurrence"],
+      "evidence": [
+        {"type": "v2_calls", "steps": [16, 17], "result_lines": [95, 96], "tool": "blame", "basis": "v11/v15 changed blame cannot attribute unknown endpoint content"},
+        {"type": "v2_call", "step": 29, "call_id": "call_bs8RdGTwb3LiasDi1okfI08W", "result_line": 158, "tool": "search", "basis": "old expression exact known v7 match"},
+        {"type": "v2_call", "step": 31, "call_id": "call_2LsbESbjvkbFxHCZ0lfLEz2S", "result_line": 172, "tool": "file", "target": "MemberCenterPage.ets@v7", "returned_lines": "1135-1159"},
+        {"type": "v2_calls", "steps": [33, 34], "result_lines": [186, 193], "tool": "agent", "basis": "Slice8@v13 write and @v1 input"},
+        {"type": "v2_call", "step": 36, "call_id": "call_mRWuykqREGq6ovQ9v2DmGmOH", "result_line": 205, "tool": "action", "seq": 20509, "basis": "original successful Kotlin Read result with replaceSpan and AbsoluteSizeSpan"},
+        {"type": "raw", "path": "formal-v1/member-center/pool/9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aslice8-pay-80bbb1f44b77da0f.jsonl", "lines": [24, 264], "basis": "actual before-write input then full target rewrite"}
+      ]
+    }
+  ],
+  "coverage_semantics": {
+    "machine_complete_preserved": true,
+    "machine_complete_not_semantic_pass": true,
+    "status": "fails_explicit_common_task_rule",
+    "confirmed_wrong_not_repair_lower_bound": 4,
+    "prompt_rule": "Out-of-question versions/candidates may remain unresolved; do not mark not_repair merely to avoid investigation.",
+    "wrong_rows": [
+      {"node": "file:entry/src/main/ets/pages/MemberCenterPage.ets@v10", "actual_status": "not_repair", "reason_basis": "CTA width/margin edit not investigated; outside S3/S4", "correct_minimum": "unresolved", "ref": "#a68daf720e780b4c2:23849@L436"},
+      {"node": "file:entry/src/main/ets/pages/MemberCenterPage.ets@v13", "actual_status": "not_repair", "reason_basis": "Swiper indicator color/position repair outside S3/S4", "correct_minimum": "unresolved", "ref": "#a68daf720e780b4c2:23954@L528"},
+      {"node": "file:entry/src/main/ets/pages/MemberCenterPage.ets@v14", "actual_status": "not_repair", "reason_basis": "banner indicator constants/comment repair outside S3/S4", "correct_minimum": "unresolved", "ref": "#a68daf720e780b4c2:23961@L532"},
+      {"candidate": "candidate:87dd5a4b1ea9aaf30258", "actual_status": "not_repair", "reason_basis": "Two target image size/aspect ratio fixes, not mask or price", "correct_minimum": "unresolved", "ref": "#a68daf720e780b4c2:23624@L233", "run_call": {"step": 10, "call_id": "call_mjtXOhZAwlDdI0ncBu63iZM8", "result_line": 73}}
+    ],
+    "image_raw_evidence": {
+      "path": "formal-v1/member-center/pool/ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+      "lines": [233, 234],
+      "tool_use_id": "toolu_01DeqiV3n9uPH5cLqUA6a8Yn",
+      "basis": "write before ok output; exact MemberCenter target appears twice in successful output"
+    },
+    "not_all_not_repair_rows_rejected": "The three explicitly opened read-only scans have different positive non-write evidence. Other report/status candidates not exhaustively re-adjudicated here.",
+    "no_forced_extra_defects": "unresolved plus outside-question reason is sufficient; need not expand unrelated fixes into new defect reports.",
+    "interpretation_warning": "Unresolved 9 to 5 is not evidence that four unknowns were resolved correctly."
+  },
+  "observed_deltas": {
+    "wall_s": {"absolute": 16.89091149996966, "percent": 5.206},
+    "tool_calls": {"absolute": -2, "percent": -3.636},
+    "tool_chars": {"absolute": -37578, "percent": -15.776},
+    "input_total": {"absolute": 213564, "percent": 12.391},
+    "input_uncached": {"absolute": -11716, "percent": -9.179},
+    "output": {"absolute": -1200, "percent": -8.603},
+    "semantics": "cached already included in input; reasoning already included in output; leaf output chars do not imply cumulative input or wall-time reduction; no USD estimate"
+  },
+  "overall": {
+    "core_answer": "material S4 improvement, S3 coordinate/entry repair but execution underclaim",
+    "full_annotation": "not_pass: at least four coverage status violations and one unsupported carry label remain",
+    "not_a_full_success": true,
+    "no_source_fix_implemented": true
+  }
+}

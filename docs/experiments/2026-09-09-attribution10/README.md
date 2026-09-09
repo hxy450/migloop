@@ -1,6 +1,6 @@
 # Attribution-10：归因正确性与可审计性
 
-状态：10 题参考包已冻结（55 条 legacy + 26 条 Codex 见证校验通过），准备 GPT-5.5 正式首轮。先验证历史归因与审计链，不重跑真实迁移。成本是次级指标，不用便宜或 schema 通过代替正确。
+状态：10 题参考包已冻结（55 条 legacy + 26 条 Codex 见证校验通过）；完成 7 次正式首轮及 3 次针对性迭代，均为 GPT-5.5/medium。见 [结果总览](results.md)：已有具体改善，但完整标注仍未达到全部可原样采信。未重跑真实迁移，成本仍是次级指标。
 
 参考包：`C:\Users\hongy\projects\_migloop-eval-20260909\attribution10\reference-v1`。
 问题、判定和重复运行规则见 [协议](protocol.md)。三次旧任务试跑的结果见 [pilot 裁决](pilot-adjudication.md)，不算正式同题结果。

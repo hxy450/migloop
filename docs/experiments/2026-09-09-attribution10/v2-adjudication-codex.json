@@ -1,0 +1,170 @@
+{
+  "schema": "migloop-attribution-v2-paired-adjudication/1",
+  "status": "complete",
+  "protocol": {
+    "suite": "formal-v2",
+    "pairing": "same pointed questions and frozen pools as formal-v1 C2/C4",
+    "change": "generic GUIDE only (733c526 family); no reference answers supplied",
+    "rule": "Semantic quality is judged from raw evidence; formatting or newer GUIDE provenance is not itself evidence of improvement."
+  },
+  "cases": [
+    {
+      "id": "C2_works_facade_conflicting_claims",
+      "v2_report": "_migloop-eval-20260909/attribution10/formal-v2/codex-c2/runs/tools/rep1/result.json:5",
+      "paired_v1_report": "_migloop-eval-20260909/attribution10/formal-v1/codex-c2/runs/tools/rep1/result.json:5",
+      "v2_overall": "core_correct_full_annotation_needs_minor_bounded_corrections",
+      "paired_change": "material_semantic_improvement",
+      "core": {
+        "grade": "correct",
+        "confidence": "high",
+        "finding": "V2 consistently treats the fixer summary, reviewer response, and later summary patch as source claims that conflict. Because the target source/diff and Works-specific runtime verification are absent, it concludes that neither behavioural equivalence nor repair of the missing-work symptom is established."
+      },
+      "supported": [
+        {
+          "confidence": "high",
+          "finding": "Generation-time F006 requirements predate Round 2, but their presence does not prove the implementation was correct.",
+          "locators": [
+            "R1 rollout:752 and :754",
+            "v2 result.json:5 main@v22 node"
+          ]
+        },
+        {
+          "confidence": "high",
+          "finding": "The fixer and reviewer assertions are correctly kept at claim level; same DAO/event is not used to decide transaction, timing, failure handling, extra effects, or the actual Works breakpoint.",
+          "locators": [
+            "R2 rollout:7680 reviewer message",
+            "R2 rollout:7682/7683 persisted fixer-summary output",
+            "R2 rollout:7686 report-only patch",
+            "v2 result.json:5 main@v226 and summary-file nodes"
+          ]
+        },
+        {
+          "confidence": "high",
+          "finding": "Later build/install is acknowledged but not substituted for Works generation/list behaviour verification.",
+          "locators": [
+            "v2 result.json:5 main@v231 node",
+            "R2 rollout:7694 build/install output"
+          ]
+        }
+      ],
+      "omissions": [
+        {
+          "confidence": "medium",
+          "finding": "The report could have cited the contaminated Round-2 Works canonical explicitly. Its conclusion already rests on the stronger absence of source and Works-specific runtime evidence, so this is recoverable rather than core-changing.",
+          "counterevidence": [
+            "R2 rollout:7574 call_rHkspr6Fzhub0xEU83VOrdsF says the Works canonical captured system contacts"
+          ]
+        }
+      ],
+      "unsupported": [],
+      "yaml_semantics": [
+        {
+          "grade": "mostly_sound",
+          "confidence": "high",
+          "finding": "Empty entry and neutral/unknown roles match the unresolved source and competing claims. Empty coverage avoids inventing a candidate hash for a target absent from the ledger."
+        },
+        {
+          "grade": "weak_unnecessary_edge",
+          "confidence": "medium",
+          "finding": "The candidate edge from main@v22 to main@v242 is not directly established as a causal/dispatch edge. The raw records show an earlier requirement and a much later same-session completion claim, but not that exact lineage. `候选` hedges the edge, so this is an annotation weakness rather than a core attribution error."
+        },
+        {
+          "grade": "ambiguous_repair_object",
+          "confidence": "medium",
+          "finding": "A repair object containing only competing-summary evidence can be read as asserting a product repair even though the report says the product change is unrecoverable. It should be labeled as a claimed repair or omitted."
+        }
+      ],
+      "must_reject_check": {
+        "passed": true,
+        "details": "V2 claims neither that WorksService fixed the page nor that same DAO/event proves complete equivalence, and it does not use build success as behavioural proof."
+      },
+      "v1_to_v2": {
+        "core": "V1 materially adopted the reviewer's equivalence/no-real-cause conclusion; V2 correctly leaves both sides unresolved.",
+        "roles": "V1 encoded the reviewer opinion as red fault roles; V2 uses neutral/unknown roles.",
+        "coverage": "V1 invented a path-shaped candidate; V2 uses an empty list. The harness can still label the target manifest invalid because the file is absent, but that is an underlying ledger/target condition rather than renewed candidate fabrication."
+      }
+    },
+    {
+      "id": "C4_dialog_hit_test_patch_boundary",
+      "v2_report": "_migloop-eval-20260909/attribution10/formal-v2/codex-c4/runs/tools/rep1/result.json:5",
+      "paired_v1_report": "_migloop-eval-20260909/attribution10/formal-v1/codex-c4/runs/tools/rep1/result.json:5",
+      "v2_overall": "core_correct_but_full_annotation_retains_material_verification_window_error",
+      "paired_change": "no_material_improvement_on_key_error",
+      "core": {
+        "grade": "correct",
+        "confidence": "high",
+        "finding": "V2 again closes the code-level chain: four clickable descendants, visible outer Stack using Block, SDK semantics, exact Block-to-Default patch, and readback. It correctly does not claim that the four interactions were tested successfully on a device."
+      },
+      "supported": [
+        {
+          "confidence": "high",
+          "finding": "The static near-cause candidate and exact source change are strongly evidenced.",
+          "locators": [
+            "R1 rollout:8027 call_7fkY9pgpk0sNPDyhCFcX0npm",
+            "R1 rollout:8048 call_P25PVpQdj6880uvIX5rXeevD",
+            "R1 rollout:8066 call_sOYpciVhfgk1glebywbIbHAY",
+            "R1 rollout:8110 call_qMphaUcIWYqr2IY7APprp85k"
+          ]
+        },
+        {
+          "confidence": "high",
+          "finding": "The immediate R1 toolchain attempt was blocked and the then-inspected HAP predated the patch.",
+          "locators": [
+            "R1 rollout:8110",
+            "R1 rollout:8115"
+          ],
+          "boundary": "Only the immediate R1 window is established."
+        }
+      ],
+      "omissions": [
+        {
+          "confidence": "high",
+          "finding": "V2 again omits the later R2 BUILD SUCCESSFUL and HAP installed evidence. That result cannot be uniquely bound to the C4 patch and contains no four-click replay, but it must be reported as a distinct later verification window.",
+          "counterevidence": [
+            "R2 rollout:7694 call_dacW1PmSvf6UGEA9wFwJcdnz"
+          ]
+        }
+      ],
+      "unsupported": [
+        {
+          "confidence": "high",
+          "finding": "The boundary says `没有新 HAP、安装`, notes say there was no new HAP/install, and the summary says validation stopped at source readback and build-entry failure. Across the allowed two-root pool this is false/overbroad: a later build/install exists. The defensible statement is that the later artifact is not cryptographically or behaviourally bound to C4.",
+          "report_locator": "v2 codex-c4 result.json:5 boundary, notes, and summary",
+          "counterevidence": [
+            "R2 rollout:7694 BUILD SUCCESSFUL and HAP installed",
+            "reference-v1 C4 explicitly distinguishes later build existence from patch-to-artifact identity"
+          ],
+          "impact": "material full-annotation error; does not negate the static diagnosis"
+        }
+      ],
+      "yaml_semantics": [
+        {
+          "grade": "mostly_sound",
+          "confidence": "high",
+          "finding": "The v1→v2 repair, patch evidence, empty origin entry, and empty coverage are self-consistent with the known change and unknown original writer."
+        },
+        {
+          "grade": "fixer_role_too_uncertain",
+          "confidence": "medium_high",
+          "finding": "main@v252 is marked `无法确认` even though its reading, SDK lookup, exact edit, and source readback are directly evidenced. The behavioural result is unknown, but the actor's role as the code-level fixer is known; `正常` with a device-validation boundary would be clearer."
+        }
+      ],
+      "must_reject_check": {
+        "passed": false,
+        "details": "It passes the direct-source/patch and no-device-click requirements but repeats the prohibited pool-wide implication that no later successful build/install existed."
+      },
+      "v1_to_v2": {
+        "core": "Unchanged and correct.",
+        "later_verification_window": "Unchanged and materially wrong/omitted despite the V2 GUIDE reminder.",
+        "roles": "The correcting agent moved from `正常` in V1 to `无法确认` in V2, which is less precise because action is known even though behaviour is not."
+      }
+    }
+  ],
+  "summary": {
+    "core_accept": ["C2_works_facade_conflicting_claims", "C4_dialog_hit_test_patch_boundary"],
+    "full_annotation_unconditional_accept": [],
+    "full_annotation_accept_after_minor_correction": ["C2_works_facade_conflicting_claims"],
+    "full_annotation_accept_after_material_correction": ["C4_dialog_hit_test_patch_boundary"],
+    "paired_result": "C2 shows a material semantic improvement from V1; C4 does not improve the key later-window error. Therefore the GUIDE-only V2 change is promising but not uniformly effective on this n=2 paired subset."
+  }
+}

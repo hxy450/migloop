@@ -377,7 +377,7 @@ def test_unbound_conclusions_do_not_add_nodes_to_the_call_route(tmp_path: Any) -
     report = _block(led).replace(atoms.ledger_identity(led), "another-ledger")
     tree = probe.probe_payload(led, _run_dir(tmp_path, calls, report, "unbound"))["trajectory"]
     assert [n["id"] for n in tree["nodes"]] == ["file:/proj/entry/A.ets@2"]
-    assert tree["verification"] == "unverified" and "身份未绑定" in tree["verification_note"]
+    assert tree["verification"] == "unverified" and "身份未记录" in tree["verification_note"]
     assert tree["nodes"][0]["fixed"] is False
 
 

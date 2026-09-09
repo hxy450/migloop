@@ -1,0 +1,363 @@
+{
+  "schema": "migloop-attribution-formal-adjudication/1",
+  "status": "complete",
+  "protocol": {
+    "suite": "formal-v1",
+    "prompt_mode": "explicit pointed question",
+    "reference": "_migloop-eval-20260909/attribution10/reference-v1/codex-reference.json",
+    "semantic_grading_independent_of_transport_audit": true,
+    "grading_rule": "Core causal/behaviour answer, recoverable omissions, and YAML role/entry semantics are assessed separately; full reference recitation is not required."
+  },
+  "cases": [
+    {
+      "id": "C1_event_noop_static_gate",
+      "report": "_migloop-eval-20260909/attribution10/formal-v1/codex-c1/runs/tools/rep1/result.json:5",
+      "overall": "core_correct_with_recoverable_evidence_and_yaml_semantic_errors",
+      "core": {
+        "grade": "correct",
+        "confidence": "high",
+        "finding": "The answer correctly identifies an in-generation static placeholder-gate correction, not a compiler or post-execute repair, and correctly concludes that the default callback remains a no-op. It also preserves the unknown of whether a parent supplies a real callback and does not treat closer PASS as runtime validation.",
+        "support": [
+          "reference-v1/codex-reference.json C1 facts/inferences/unknown/must_reject",
+          "codex-c1 result.json:5 defect reason and notes"
+        ]
+      },
+      "facts": [
+        {
+          "grade": "supported",
+          "confidence": "high",
+          "claim": "The applicable rule rejected unregistered empty callbacks; closer reported BLOCKED, the patch changed only `() => {}` to `(): void => { return }`, and a later closer reported PASS with build_run:false.",
+          "locators": [
+            "rollout-2026-08-16T17-54-23-01a009fe-68e3-7f42-b76b-5e863c555976.jsonl:224 call_l2FJxo9zP3XjiBLPDHKO0HsI",
+            "same rollout:3029",
+            "same rollout:3037 call_S2DOREu8NlaqtS123olwx41i",
+            "same rollout:3065"
+          ]
+        },
+        {
+          "grade": "unsupported_or_false",
+          "confidence": "high",
+          "claim": "The v1 source content/target line was unrecoverable and known only through the closer message.",
+          "report_locator": "codex-c1 result.json:5, v1 node reason and coverage row",
+          "counterevidence": [
+            "rollout-2026-08-16T17-54-23-01a009fe-68e3-7f42-b76b-5e863c555976.jsonl:3034 call_cITFznZwW17SBIwTS2wQhbj0 directly returns the pre-patch source line `@Event onAnswer ... = () => {}`"
+          ],
+          "impact": "recoverable_evidence_characterization_error; does not reverse the core behaviour conclusion"
+        }
+      ],
+      "omissions": [
+        {
+          "confidence": "medium",
+          "finding": "The report should have cited the direct pre-patch read at physical line 3034. It instead cited the closer report and a v2 file node for the v1 claim."
+        }
+      ],
+      "yaml_semantics": [
+        {
+          "grade": "misleading",
+          "confidence": "medium_high",
+          "finding": "`entry` points to main@v108, while that same agent is marked `正常` and is the correcting writer. For a defect-origin field, the known faulty state is the v1 empty callback; the original writer is unknown. The current entry therefore reads as a fault-location error even though the prose attribution is correct."
+        },
+        {
+          "grade": "overly_uncertain_role",
+          "confidence": "medium",
+          "finding": "The v1 node is marked `无法确认`, but the target line and its gate violation are directly observable at raw line 3034. What is unknown is the original writer/full context, not the existence of the empty default callback."
+        },
+        {
+          "grade": "mechanically_invalid_coverage",
+          "confidence": "high",
+          "finding": "The structural audit marks both v1/v2 coverage rows out of scope because this in-generation correction has no repair-manifest versions. This is a YAML/manifest mismatch, separate from the correct semantic answer."
+        }
+      ],
+      "must_reject_check": {
+        "passed": true,
+        "details": "The answer does not call this a compiler fix, does not say the event became mandatory, and does not claim closer PASS proves interaction behaviour."
+      },
+      "mechanical": {
+        "artifact": "_migloop-eval-20260909/attribution10/audits/formal-v1-codex-c1.json",
+        "source_code_id": "b197227",
+        "integrity": "pool/source/task unchanged; trace and conclusion identities matched",
+        "nodes": "3/3 resolved",
+        "evidence_refs": "10 ok",
+        "coverage": "invalid: two out-of-scope rows",
+        "trajectory": "native visits remain unverified and root unpainted",
+        "interpretation": "The visit result diagnoses the native transport envelope/parser, not semantic answer quality."
+      }
+    },
+    {
+      "id": "C2_works_facade_conflicting_claims",
+      "report": "_migloop-eval-20260909/attribution10/formal-v1/codex-c2/runs/tools/rep1/result.json:5",
+      "overall": "partial_with_material_over_attribution",
+      "core": {
+        "grade": "partially_correct",
+        "confidence": "high",
+        "finding": "The answer correctly says the target source/diff is unavailable and that the WorksService change is not proved to fix the Works page. But it then elevates the reviewer's same-DAO/same-event assertion into a conclusion that the change did not alter behaviour or touch the real breakpoint. The bounded evidence supports a conflict of claims and an unknown result, not that negative conclusion."
+      },
+      "facts": [
+        {
+          "grade": "supported",
+          "confidence": "high",
+          "claim": "The frozen ledger cannot directly recover PptGenerationViewModel.ets before/after source, while persisted fixer and reviewer summaries make conflicting claims.",
+          "locators": [
+            "rollout-2026-08-21T09-18-20-01a021e5-c150-7b12-a610-d40c07816b98.jsonl:7683 call_rHkspr6Fzhub0xEU83VOrdsF",
+            "same rollout:7680 reviewer message",
+            "same rollout:7686 call_XHYFotPT6f6XWmbIyXSilnMV"
+          ]
+        },
+        {
+          "grade": "unsupported",
+          "confidence": "high",
+          "claim": "Existing evidence can determine that the WorksService replacement did not change actual persistence/event behaviour and did not touch the real cause.",
+          "report_locator": "codex-c2 result.json:5 opening summary; visual-fixer-summary node; main@v227 node",
+          "counterevidence": [
+            "reference-v1 C2: the root rollout does not show complete relevant class source",
+            "rollout line 7680 is explicitly a reviewer claim not independently reproduced",
+            "rollout line 7683 is a fixer summary, also not product-source proof",
+            "same DAO and same-named event do not establish transaction, error handling, timing, or all side effects"
+          ],
+          "impact": "material_core_boundary_error"
+        },
+        {
+          "grade": "unsupported_or_overstated",
+          "confidence": "medium_high",
+          "claim": "Round-2 summary shows a valid later observation that generated works were missing.",
+          "report_locator": "codex-c2 result.json:5 `_summary.md@v1` node",
+          "counterevidence": [
+            "rollout-2026-08-21T09-18-20-01a021e5-c150-7b12-a610-d40c07816b98.jsonl:7574 call_rHkspr6Fzhub0xEU83VOrdsF says the Round-2 Works canonical captured system contacts"
+          ],
+          "impact": "The finding index exists, but its observation cannot be treated as clean behavioural validation."
+        }
+      ],
+      "omissions": [
+        {
+          "confidence": "high",
+          "finding": "The report omits the canonical-contamination evidence, which is central to why neither the fix nor the reviewer's negative diagnosis has a valid page retest."
+        },
+        {
+          "confidence": "medium",
+          "finding": "It does not clearly preserve the unknowns for insert reachability, actual record persistence, Works loading/subscription, transaction/error/timing differences, despite recommending these checks at the end."
+        }
+      ],
+      "yaml_semantics": [
+        {
+          "grade": "reviewer_claim_encoded_as_fault",
+          "confidence": "high",
+          "finding": "`visual-fixer-summary.md@v2` is marked `进入·错` and main@v227 `带病传递`. Those red roles treat the reviewer's unverified wrong_edit opinion as adjudicated truth. A neutral representation would mark the fixer/reviewer claims as conflicting/unconfirmed."
+        },
+        {
+          "grade": "invalid_coverage_candidate",
+          "confidence": "high",
+          "finding": "The coverage candidate uses `candidate:entry/src/...` rather than a candidate hash from the manifest, making the YAML coverage invalid. This mechanical error is independent of semantic grading."
+        },
+        {
+          "grade": "empty_entry_acceptable_under_unknown_origin",
+          "confidence": "medium",
+          "finding": "An empty `entry` is preferable to inventing an origin because the target source and real breakpoint are unresolved; the later red roles nevertheless undermine that restraint."
+        }
+      ],
+      "must_reject_check": {
+        "passed": false,
+        "details": "It avoids claiming the change fixed Works, but effectively accepts the prohibited inference that same DAO/event establishes behavioural equivalence and that the real cause was untouched."
+      },
+      "mechanical": {
+        "artifact": "formal-v1/codex-c2/runs/tools/rep1/verdict.json",
+        "coverage": "invalid_manifest: target file absent and coverage candidate malformed",
+        "interpretation": "Kept separate from the semantic failure above."
+      }
+    },
+    {
+      "id": "C3_guide_init_competing_hypotheses",
+      "report": "_migloop-eval-20260909/attribution10/formal-v1/codex-c3/runs/tools/rep1/result.json:5",
+      "overall": "core_correct_with_recoverable_history_omissions_and_repair_field_error",
+      "core": {
+        "grade": "correct",
+        "confidence": "high",
+        "finding": "The answer keeps the Monitor/visibility attempt, the reviewer's objection, and the currentStep===5 independent-mount attempt as competing hypotheses. It explicitly refuses to infer true cause or repaired visual outcome from reviewer opinion, self-report, a build-like gate, or an SBS path, and calls for source diff plus fresh capture/compile/retest."
+      },
+      "facts": [
+        {
+          "grade": "supported",
+          "confidence": "high",
+          "claim": "Round-0 summarized an initial-true/Monitor hypothesis; Round-1 reviewer challenged it without independently reproduced source; Round-2 reported an independent conditional mount but explicitly did not compile or retest.",
+          "locators": [
+            "rollout-2026-08-21T09-18-20-01a021e5-c150-7b12-a610-d40c07816b98.jsonl:7219",
+            "same rollout:6957 reviewer message",
+            "same rollout:7653 fixer message"
+          ]
+        },
+        {
+          "grade": "supported_with_boundary",
+          "confidence": "high",
+          "claim": "The three-stage visual message supports an observation of flow progression but cannot identify which attempted repair caused it.",
+          "report_locator": "codex-c3 result.json:5 main@v208 node",
+          "boundary": "The report correctly labels this as a message-level causal claim and notes that the sender did not judge, fix, or edit ETS."
+        }
+      ],
+      "omissions": [
+        {
+          "confidence": "medium_high",
+          "finding": "The answer does not recover the early positive baseline: GuideInit Kotlin/layout/snapshot input existed during generation and the generator reported the 5110ms progress flow implemented. This matters because it directly rules out treating GuideInit as a requirement invented only during verification, although the report itself never makes that prohibited claim.",
+          "counterevidence": [
+            "rollout-2026-08-16T17-54-23-01a009fe-68e3-7f42-b76b-5e863c555976.jsonl:2013 call_b5NIkmLWkXtjLgHjdKGnc9WQ",
+            "same rollout:2781 generator message"
+          ]
+        },
+        {
+          "confidence": "medium",
+          "finding": "It describes not_found as non-authoritative and mentions fresh-capture unknowns, but does not clearly consolidate that the Round-0/1 tickets were low-confidence/transient-capture debt and that the final report still retained two manual-review debts.",
+          "counterevidence": [
+            "rollout-2026-08-21T09-18-20-01a021e5-c150-7b12-a610-d40c07816b98.jsonl:5879 call_8PsHI1kc3azM3FxOJBhI8I0j",
+            "same rollout:7825 final report"
+          ]
+        },
+        {
+          "confidence": "medium_high",
+          "finding": "It omits the later rollout-wide BUILD SUCCESSFUL/install evidence. That evidence still cannot bind the build to the GuideInit patch or prove visual behaviour, but it must be distinguished from the fixer's narrower statement that its own step did not compile/retest.",
+          "counterevidence": [
+            "rollout-2026-08-21T09-18-20-01a021e5-c150-7b12-a610-d40c07816b98.jsonl:7694 contains later BUILD SUCCESSFUL/install evidence"
+          ]
+        }
+      ],
+      "unsupported": [
+        {
+          "confidence": "medium",
+          "finding": "The v225 node carefully scopes `未编译、未复测` to the fixer reply and is supported. The final notes repeat `未编译、未复测` without that scope; read pool-wide, this is overbroad because a later build/install exists. The accurate boundary is: no compile/retest in that fixer step, later build/install exists, and no fresh-capture visual closure binds either to the GuideInit patch.",
+          "report_locator": "codex-c3 result.json:5 v225 reason versus final notes",
+          "counterevidence": [
+            "same R2 rollout:7653 fixer message",
+            "same R2 rollout:7694 later builder output"
+          ]
+        }
+      ],
+      "yaml_semantics": [
+        {
+          "grade": "misleading_repair_object",
+          "confidence": "high",
+          "finding": "The defect declares `repair.before` and `repair.after` as the same external-input `GuidePage.ets@v1`. No recorded file version or diff proves that this node is both sides of a repair. The semantic answer correctly says the repair is unrecoverable, so the repair object should have been omitted/unknown rather than encoded as v1→v1."
+        },
+        {
+          "grade": "appropriately_conservative_roles",
+          "confidence": "high",
+          "finding": "Empty `entry` and `无法确认` roles avoid assigning fault to either fixer or reviewer. This is consistent with the unresolved cause, unlike C2's red-role over-attribution."
+        },
+        {
+          "grade": "coverage_reasonable",
+          "confidence": "medium_high",
+          "finding": "The single v1 coverage row is unresolved rather than mislabeled as explained/not_repair; this accurately reflects the missing repair versions, notwithstanding the contradictory repair object."
+        }
+      ],
+      "must_reject_check": {
+        "passed": true,
+        "details": "It does not say the requirement first appeared during verification, does not treat reviewer opinion as proof, and does not treat paths/gates as visual closure."
+      },
+      "mechanical": {
+        "artifact": "formal-v1/codex-c3/runs/tools/rep1/verdict.json",
+        "schema": "valid",
+        "interpretation": "Mechanical validity does not cure the semantically misleading v1→v1 repair object."
+      }
+    },
+    {
+      "id": "C4_dialog_hit_test_patch_boundary",
+      "report": "_migloop-eval-20260909/attribution10/formal-v1/codex-c4/runs/tools/rep1/result.json:5",
+      "overall": "core_correct_with_material_later_verification_window_omission",
+      "core": {
+        "grade": "correct",
+        "confidence": "high",
+        "finding": "The report establishes a strong code-level near-cause candidate from the pre-patch source, four event bindings, and the SDK definitions of Block versus Default; it then verifies the exact patch and source readback. It correctly stops short of claiming that four click paths passed on-device."
+      },
+      "facts": [
+        {
+          "grade": "supported",
+          "confidence": "high",
+          "claim": "The pre-patch visible Stack used HitTestMode.Block, SDK text says Block prevents child responses while Default permits self/children and blocks siblings, and the applied/read-back line changed to Default.",
+          "locators": [
+            "rollout-2026-08-16T17-54-23-01a009fe-68e3-7f42-b76b-5e863c555976.jsonl:8027 call_7fkY9pgpk0sNPDyhCFcX0npm",
+            "same rollout:8048 call_P25PVpQdj6880uvIX5rXeevD",
+            "same rollout:8066 call_sOYpciVhfgk1glebywbIbHAY",
+            "same rollout:8110 call_qMphaUcIWYqr2IY7APprp85k"
+          ]
+        },
+        {
+          "grade": "supported_with_R1_scope",
+          "confidence": "high",
+          "claim": "In the immediate R1 closing window, validation was blocked by missing .migbot/config.json and the inspected HAP predated the patch.",
+          "locators": [
+            "same R1 rollout:8110",
+            "same R1 rollout:8115 final report"
+          ],
+          "boundary": "This proves the R1 artifact was pre-fix; it does not prove the entire two-rollout pool had no later build/install."
+        }
+      ],
+      "omissions": [
+        {
+          "confidence": "high",
+          "finding": "The report does not mention the later 2026-08-21 BUILD SUCCESSFUL and HAP installed output. That later artifact cannot be uniquely bound to the C4 source state because no source/artifact hash or C4 click replay is shown, but it is still required to answer the rollout-wide validation window accurately.",
+          "counterevidence": [
+            "rollout-2026-08-21T09-18-20-01a021e5-c150-7b12-a610-d40c07816b98.jsonl:7694 call_dacW1PmSvf6UGEA9wFwJcdnz"
+          ]
+        }
+      ],
+      "unsupported": [
+        {
+          "confidence": "medium_high",
+          "finding": "Statements such as `未核到设备点击验证或修复后新 HAP`, `因此未生成新 HAP，未安装`, and the final `后续 HAP、安装...均未验证` are correct only if explicitly scoped to the immediate R1 attempt or to C4-specific binding. Read across the allowed two-root pool, they are overbroad because a later build/install exists.",
+          "report_locator": "codex-c4 result.json:5 boundary, notes, and final summary",
+          "counterevidence": [
+            "R2 rollout:7694 BUILD SUCCESSFUL and HAP installed",
+            "reference C4 explicitly preserves uncertainty about patch-to-artifact identity"
+          ],
+          "impact": "validation-window factual error; core static diagnosis remains intact"
+        },
+        {
+          "confidence": "medium",
+          "finding": "The v1 node says the file content cannot be recovered even while citing a direct pre-patch source read. It is fair to say the ledger file atom lacks full content or the original writer is unknown, but the observed target line and event bindings are recoverable from the raw rollout.",
+          "report_locator": "codex-c4 result.json:5 boundary and v1 node",
+          "counterevidence": [
+            "R1 rollout:8027 direct pre-patch source output"
+          ]
+        }
+      ],
+      "yaml_semantics": [
+        {
+          "grade": "mostly_sound",
+          "confidence": "high",
+          "finding": "The v1→v2 repair object, correcting agent role, SDK node, source-readback node, and write edge align with direct evidence. Empty `entry` is defensible because the original writer is unknown."
+        },
+        {
+          "grade": "slightly_overconfident_fault_role",
+          "confidence": "medium",
+          "finding": "Marking v1 `带病传递` is stronger than the reason's own `direct candidate` wording. The SDK semantics make Block a very strong near-cause, but absent device replay it remains possible that overlays, callbacks, or state-machine faults also contributed."
+        }
+      ],
+      "must_reject_check": {
+        "passed": false,
+        "details": "It passes the source/patch and no-device-click boundaries, and correctly identifies the immediate HAP as pre-fix. It fails the pool-wide build boundary by omitting the later successful build/install and using unqualified no-new-HAP/no-install language."
+      },
+      "mechanical": {
+        "artifact": "formal-v1/codex-c4/runs/tools/rep1/verdict.json",
+        "schema": "valid",
+        "interpretation": "Valid YAML does not validate the later-verification-window semantics."
+      }
+    }
+  ],
+  "pending": [],
+  "summary": {
+    "core_question_accept": [
+      "C1_event_noop_static_gate",
+      "C3_guide_init_competing_hypotheses",
+      "C4_dialog_hit_test_patch_boundary"
+    ],
+    "core_question_not_accept": [
+      "C2_works_facade_conflicting_claims"
+    ],
+    "full_annotation_unconditional_accept": [],
+    "full_annotation_accept_after_bounded_correction": [
+      "C1_event_noop_static_gate",
+      "C3_guide_init_competing_hypotheses",
+      "C4_dialog_hit_test_patch_boundary"
+    ],
+    "full_annotation_reject": [
+      "C2_works_facade_conflicting_claims"
+    ],
+    "interpretation": "Three of four reports answer the pointed core question correctly, but none is clean enough for unconditional full-annotation acceptance. C1 misstates direct source availability and entry semantics; C3 omits chronology/later build and encodes a v1→v1 repair; C4 omits the later verification window. C2 materially over-attributes the reviewer claim as truth."
+  }
+}

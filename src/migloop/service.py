@@ -13,6 +13,7 @@ from __future__ import annotations
 import glob
 import json
 import os
+import re
 import threading
 from typing import Any
 
@@ -71,6 +72,27 @@ def _frozen_roots(pool: str) -> list[str]:
     return sorted(_frozen_root(path, pool) for path in glob.glob(os.path.join(pool, "*.jsonl")))
 
 
+_UUID = r"[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}"
+
+
+def _frozen_codex_id(path: str) -> str | None:
+    """Alias only an already-validated pool root, never discover another file."""
+    stem = os.path.splitext(os.path.basename(path))[0]
+    match = re.search(r"(" + _UUID + r")$", stem, re.I) if stem.lower().startswith("rollout-") else None
+    if match:
+        return match[1].lower()
+    # Nonstandard root filenames may still carry an explicit canonical session ID.
+    # Read only the bounded first record, not messages or nested/subagent paths.
+    try:
+        with open(path, encoding="utf-8-sig") as stream:
+            record = json.loads(stream.readline(1024 * 1024))
+    except (OSError, ValueError):
+        return None
+    payload = record.get("payload") if isinstance(record, dict) and record.get("type") == "session_meta" else None
+    sid = payload.get("id") or payload.get("session_id") if isinstance(payload, dict) else None
+    return sid.lower() if isinstance(sid, str) and re.fullmatch(_UUID, sid, re.I) else None
+
+
 def _validate_frozen_tree(pool: str) -> None:
     """CC 子代理/工作流与 Codex 递归 rollout 扫描均只接触经核验的池内文件。"""
     for directory, dirs, files in os.walk(pool, followlinks=False):
@@ -86,11 +108,17 @@ def locate_session(target: str, roots: dict[str, str] | None = None) -> str:
         want = str(target or "").strip()
         if os.path.isabs(want) or "/" in want or "\\" in want or want.lower().endswith(".jsonl"):
             return _frozen_root(want, pool)
-        hits = [p for p in _frozen_roots(pool) if want and os.path.basename(p)[:-6].startswith(want)]
+        known_roots = _frozen_roots(pool)
+        hits = {p for p in known_roots if want and os.path.basename(p)[:-6].startswith(want)}
+        if re.fullmatch(r"[0-9a-f-]+", want, re.I):
+            for path in known_roots:
+                sid = _frozen_codex_id(path)
+                if sid and sid.startswith(want.lower()):
+                    hits.add(path)
         if len(hits) != 1:
             reason = "前缀有歧义" if hits else "找不到根会话"
             raise SessionLookupError(f"冻结池{reason}: {target}")
-        return hits[0]
+        return next(iter(hits))
     if os.path.isfile(target):
         return os.path.abspath(target)
     rows = list(adapters.discover(roots or {}))
