@@ -1,0 +1,155 @@
+{
+  "schema": "migloop-v9-codex-adjudication/1",
+  "status": "complete",
+  "scope": {
+    "source_code_id": "0be4164",
+    "model": "gpt-5.5",
+    "effort": "medium",
+    "transport": "native_tools",
+    "reference": "_migloop-eval-20260909/attribution10/reference-v1/codex-reference.json",
+    "semantic_checked_by_mechanical_check": false
+  },
+  "runs": [
+    {
+      "case": "C1",
+      "rep": 1,
+      "core": "accepted",
+      "full": "accepted_with_recoverable_omissions_and_minor_overreach",
+      "facts": ["partial", "omitted", "partial"],
+      "major_errors": [],
+      "minor_issues": [
+        "遗漏先前 closer 因目标空回调 BLOCKED，且没有完整交代 BLOCKED/PASS 两次 closer 都 build_run=false",
+        "将已证实的空回调词法门扩写为隐式返回类型和同类组件不一致风险；后两项没有同等直接证据",
+        "后续全工程构建可证明后来有成功构建，但缺目标源码/产物哈希，不能唯一证明构建包含该具体形态"
+      ],
+      "binding": {"target": "matched", "event_claims": 5, "all_events_resolved": true, "invented_effect_versions": false, "owner_mismatch": false},
+      "delivery": {"submission": "accepted_checked_draft_ref", "verdict_ok": true, "coverage_complete": true},
+      "metrics": {"input_total": 1225459, "cache_read": 1113600, "input_uncached": 111859, "output": 13504, "calls": 51, "tool_return_chars": 199870, "wall_s": 285.554, "end_to_end_wall_s": 288.316}
+    },
+    {
+      "case": "C2",
+      "rep": 1,
+      "core": "accepted",
+      "full": "accepted_with_recoverable_omissions",
+      "facts": ["partial", "supported", "supported", "omitted"],
+      "major_errors": [],
+      "minor_issues": [
+        "没有明确复述历史执行摘要关于 PptRecordRepository 是唯一 post-insert CREATED publisher 的主张",
+        "遗漏 Round 2 Works canonical 被系统联系人污染",
+        "正确将 fixer 与 reviewer 内容都降为冲突主张，未把同 DAO/同事件升级成行为等价事实"
+      ],
+      "binding": {"target": "unlocated_and_explicitly_disclosed", "event_claims": 5, "all_events_resolved": true, "invented_effect_versions": false, "owner_mismatch": false},
+      "delivery": {"submission": "accepted_checked_draft_ref_needs_review", "verdict_ok": true, "coverage_complete": false, "note": "目标文件不在账本导致 coverage 无法认证；与语义核心分开"},
+      "metrics": {"input_total": 957449, "cache_read": 880128, "input_uncached": 77321, "output": 11148, "calls": 41, "tool_return_chars": 112602, "wall_s": 259.031, "end_to_end_wall_s": 261.789}
+    },
+    {
+      "case": "C3",
+      "rep": 1,
+      "core": "accepted",
+      "full": "accepted_with_recoverable_omissions",
+      "facts": ["omitted", "partial", "supported", "supported"],
+      "major_errors": [],
+      "minor_issues": [
+        "遗漏初始阶段已有 GuideInit Kotlin/layout/snapshot 输入及生成报告声称实现进度流",
+        "对 low_confidence/transient_capture_debt 仅以覆盖债、manual review 和 fresh capture 债近似交代",
+        "正确指出 Round 2 之前的 capture 不能验证其后的独立挂载补丁"
+      ],
+      "binding": {"target": "unlocated_and_explicitly_disclosed", "event_claims": 5, "all_events_resolved": true, "invented_effect_versions": false, "owner_mismatch": false},
+      "delivery": {"submission": "accepted_checked_draft_ref", "verdict_ok": true, "coverage_complete": true},
+      "metrics": {"input_total": 2300034, "cache_read": 2189312, "input_uncached": 110722, "output": 13161, "calls": 73, "tool_return_chars": 163180, "wall_s": 307.406, "end_to_end_wall_s": 310.177}
+    },
+    {
+      "case": "C4",
+      "rep": 1,
+      "core": "accepted",
+      "full": "accepted_with_minor_evidence_level_overstatement",
+      "facts": ["partial", "supported", "supported", "supported", "supported"],
+      "major_errors": [],
+      "minor_issues": [
+        "未枚举四个 Event 名称，但明确了外层 Block 阻断子节点的代码级近因及四类点击未闭环，按既定标准不升格失败",
+        "capture_manifest 原生读取可证明清单记录一次同意按钮转场；称为新包运行点击已验证略强，未独立复查设备执行或补丁绑定",
+        "后续 build/install 是真实后置过程证据；同池且未见后写只提供包含补丁的有限支持，不能替代源码/产物哈希"
+      ],
+      "binding": {"target": "matched", "event_claims": 6, "all_events_resolved": true, "invented_effect_versions": false, "owner_mismatch": false, "tail_events_create_nodes": false},
+      "delivery": {"submission": "accepted_checked_draft_ref", "verdict_ok": true, "coverage_complete": true},
+      "metrics": {"input_total": 1704423, "cache_read": 1578496, "input_uncached": 125927, "output": 14895, "calls": 62, "tool_return_chars": 222050, "wall_s": 344.092, "end_to_end_wall_s": 346.806}
+    },
+    {
+      "case": "C4",
+      "rep": 2,
+      "core": "accepted",
+      "full": "accepted_with_recoverable_omission_and_minor_evidence_boundary",
+      "facts": ["partial", "supported", "supported", "supported", "omitted"],
+      "major_errors": [],
+      "minor_issues": [
+        "未枚举四个 Event 名称，但正确识别外层 Block→Default 静态近因并拒绝声称四类点击闭环",
+        "完全遗漏后续 native BUILD SUCCESSFUL 与 HAP installed；edgewalk/replay 行为记录不能替代这条构建事实",
+        "#2788 是读取 walk report，#3670 是读取 checkpoint/capture_manifest；可支持保存记录中的一次同意转场，不能当本次独立设备复测",
+        "明确后置链路不证明 v249 补丁进入该 HAP，也未把 judge 消息当独立事实"
+      ],
+      "binding": {"target": "matched", "event_claims": 5, "all_events_resolved": true, "invented_effect_versions": false, "owner_mismatch": false, "tail_events_create_nodes": false, "textual_judge_marked_textual_only": true},
+      "delivery": {"submission": "accepted_checked_draft_ref", "verdict_ok": true, "coverage_complete": true},
+      "metrics": {"input_total": 918576, "cache_read": 811520, "input_uncached": 107056, "output": 12534, "calls": 35, "tool_return_chars": 245343, "wall_s": 260.997, "end_to_end_wall_s": 263.835}
+    },
+    {
+      "case": "C1",
+      "rep": 2,
+      "core": "accepted",
+      "full": "accepted_with_recoverable_omission",
+      "facts": ["supported", "partial", "supported"],
+      "major_errors": [],
+      "minor_issues": [
+        "准确恢复主会话所称硬门、真实patch和静态PASS，但未直接引用/明确写出先前 closer 的 BLOCKED 报告",
+        "正确指出当时声称要移除默认值/改成父必传，与实际仍保留no-op默认函数相冲突",
+        "后续构建只作为背景且明确未验证onAnswer行为，没有误称设备闭环"
+      ],
+      "binding": {"target": "matched", "event_claims": 6, "all_events_resolved": true, "invented_effect_versions": false, "owner_mismatch": false, "textual_events_marked_textual_only": true},
+      "delivery": {"submission": "accepted_checked_draft_ref", "verdict_ok": true, "coverage_complete": true},
+      "metrics": {"input_total": 677179, "cache_read": 591872, "input_uncached": 85307, "output": 10632, "calls": 29, "tool_return_chars": 130512, "wall_s": 228.590, "end_to_end_wall_s": 231.331}
+    },
+    {
+      "case": "C2",
+      "rep": 2,
+      "core": "not_scored_no_authenticated_document",
+      "full": "not_scored_no_authenticated_document",
+      "facts": ["not_scored", "not_scored", "not_scored", "not_scored"],
+      "major_errors": [],
+      "minor_issues": [],
+      "binding": {"status": "unverifiable", "check_calls": 4, "matched_check": null, "final_reference_rejected": true},
+      "delivery": {"submission": "rejected", "verdict_ok": false, "coverage_complete": false, "document_artifact": null, "note": "最终ref指向的四次check均无法认证；不以任何check草稿替代最终交付，也不对其语义评分"},
+      "metrics": {"input_total": 1673242, "cache_read": 1500672, "input_uncached": 172570, "output": 17284, "calls": 58, "tool_return_chars": 224340, "wall_s": 374.659, "end_to_end_wall_s": 377.354}
+    },
+    {
+      "case": "C3",
+      "rep": 2,
+      "core": "accepted",
+      "full": "accepted_with_recoverable_omissions",
+      "facts": ["partial", "partial", "supported", "omitted"],
+      "major_errors": [],
+      "minor_issues": [
+        "用早期initStep代码形态和后续覆盖清单替代了初始Kotlin/layout/snapshot输入及生成报告声称已实现进度流，fact1仅部分覆盖",
+        "恢复weak identity/覆盖债但未完整交代Round0/1一直low_confidence/transient_capture_debt",
+        "没有明确恢复最终 manual review / fresh capture 债仍保留，虽总体结论正确认为验证未闭环"
+      ],
+      "binding": {"target": "matched_metadata_without_file_version", "event_claims": 6, "all_events_resolved": true, "invented_effect_versions": false, "owner_mismatch": false, "tail_events_create_nodes": false},
+      "delivery": {"submission": "accepted_checked_draft_ref", "verdict_ok": true, "coverage_complete": true},
+      "metrics": {"input_total": 1080594, "cache_read": 996352, "input_uncached": 84242, "output": 11748, "calls": 63, "tool_return_chars": 115735, "wall_s": 270.022, "end_to_end_wall_s": 272.906}
+    }
+  ],
+  "rep1_summary": {
+    "core_acceptance": "4/4",
+    "full_without_omission_or_minor_issue": "0/4",
+    "major_false_causal_or_closure_claims": 0,
+    "delivery_failures": 0,
+    "coverage_complete": "3/4",
+    "notes": "这是完成最终稿的逐原文裁决；check 只认证结构和引用外壳，不认证语义。"
+  },
+  "overall": {
+    "authenticated_semantic_runs": 7,
+    "core_acceptance": "7/7 authenticated documents",
+    "delivery_failures": "1/8 (C2 rep2)",
+    "major_false_causal_or_closure_claims": 0,
+    "full_without_omission_or_minor_issue": "0/7 authenticated documents",
+    "general_efficacy_claim_supported": false
+  }
+}
