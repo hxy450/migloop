@@ -8,6 +8,7 @@ from migloop import atom_queries, atoms_text, mcp_server, service, via
 from tests.test_draft_check import data
 from tests.test_verdict import _pool
 from tests.test_atom_scope import AID, action, fixture, ref
+from tests.test_atoms import MAIN_ID
 
 
 @pytest.mark.parametrize("value", [False, 0, "0", "false", "False", " FALSE ", ""])
@@ -34,6 +35,15 @@ def test_aliases_are_explicit_and_conflicting_targets_fail():
         atom_queries.parameters("search", {"path": "A.ets", "file": "B.ets"})
     with pytest.raises(ValueError, match="未知查询参数"):
         atom_queries.parameters("agent", {"id": "agent-c", "untill": 12})
+
+
+def test_validated_agent_alias_is_canonicalized_for_both_projections(tmp_path):
+    ledger = _pool(tmp_path)
+    alias = MAIN_ID[:-2]
+    assert via.target(ledger, "agent", alias, 1)[0] == ("agent", MAIN_ID, 1)
+    canonical = atom_queries.render_text(ledger, "/proj", "agent", {"id": MAIN_ID, "v": 1})
+    assert atom_queries.render_text(ledger, "/proj", "agent", {"id": alias, "v": 1}) == canonical
+    assert atom_queries.json_data(ledger, "agent", {"id": alias, "v": 1})["id"] == MAIN_ID
 
 
 def test_json_file_is_compact_by_default_and_expansion_is_explicit(tmp_path):

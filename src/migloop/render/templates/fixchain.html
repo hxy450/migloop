@@ -933,7 +933,7 @@
       selTid = tid;
       drawerFor(node);
       if (node.kind === "leaf" && node.isLedgerStub) { expandLedgerKids(XT.byId[node.parent], node); return; }
-      if (node.traj) { renderTree(tid); return; }          // 轨迹树的节点不沿账本展开 / 折叠,点它只看抽屉
+      if (node.traj || node.claimEndpoint) { renderTree(tid); return; } // 图投影节点只看抽屉，不补造调查导航
       if (node.busy || node.kind === "leaf" || node.isRight || node.possible) { renderTree(tid); return; }
       if (node.expanded) { collapse(node); renderTree(tid); return; }
       if (node.ledgerKid) { expandLedgerKids(node, null); return; }
@@ -1148,6 +1148,7 @@
     }
     function probeStepsFor(node) {
       if (!PROBE || probeTraceUnbound(PROBE)) return [];
+      if (node.claimEndpoint) return []; // A model-selected endpoint is not an investigator visit.
       if (node.traj) return (PROBE.steps || []).filter(function (s) { return (node.trajOpened || []).indexOf(s.i) >= 0; });
       var k = probeKeyOf(node), v = node.kind === "file" ? node.anchorV : node.anchorVer;
       return ((k && PROBE.byKey[k]) || []).filter(function (s) {
@@ -1253,6 +1254,7 @@
       box.textContent = graph ? "读写主图 · 确定读 " + (counts.confirmed_read || 0) + " / 写 " + (counts.confirmed_write || 0)
         + " · 候选读 " + (counts.candidate_read || 0) + " / 写 " + (counts.candidate_write || 0)
         + " · 导航转移 " + (T.transitions || []).length + " 次（另列时间线）"
+        + " · 已记录转移投影 " + (counts.projected_transitions || 0) + " / 显式模型选边已定位 " + (counts.projected_model_edges || 0)
         : "旧查看数据未提供读写投影；保留节点与查询时间线，不从导航或布局补画关系。";
       host.appendChild(box);
       host.appendChild(el("div", "sum", graph ? graph.note : "不是全账本图或完整根因图。"));
@@ -1315,6 +1317,8 @@
                           + (visits.length > opened ? " · 未打开 " + (visits.length - opened) + " 次" : "") + " · " : "")
                       + "去重已查版本节点 <b>" + queriedCount + "</b> 个"
                       + (trajectory ? " · 图中版本节点 <b>" + (trajectory.nodes || []).length + "</b> 个" : "");
+        var extraNodes = XT ? Object.keys(XT.byId).filter(function (tid) { return XT.byId[tid].claimEndpoint; }).length : 0;
+        if (extraNodes) sum.innerHTML += " · 模型选边额外展示 <b>" + extraNodes + "</b> 个未查询端点";
         sum.title = "访问按每次实际返回计数(含回访);版本节点按精确实体与版本去重。结论提及但未查询的节点只计入图中,不计入成功访问。";
       } else sum.innerHTML = "<b>" + (PROBE.links || []).length + "</b> 环 · 进入点 <b>" + (PROBE.entry != null ? "环 " + (PROBE.entries || [PROBE.entry]).join(" / ") : "未标") + "</b> · 查过 <b>" + queriedCount + "</b> 个版本节点"
                     + (PROBE.placed != null ? " · 树上 <b>" + PROBE.placed + "</b> · 判定落到树上 <b>"
@@ -1777,11 +1781,14 @@
       if (!Object.keys(items).length) box.appendChild(el("div", "finding-note", "当前没有可归集的结构化事项，不等于没有缺陷。"));
       if (!claimsBound) box.appendChild(el("div", "finding-note", "归集身份未绑定：保留原文，不以根节点代替未知文件或生成导航。"));
       (findings.errors || []).forEach(function (error) { box.appendChild(el("div", "finding-note", String(error))); });
-      function appendItem(host, id, canBind) {
+      function appendItem(host, id, fileAssociated) {
         var item = items[id]; if (!item || PROBE.defect && item.defect !== PROBE.defect) return;
         var row = el("details", "finding-item"); row.dataset.itemId = id; row.dataset.defect = item.defect;
+        row.dataset.fileAssociated = String(fileAssociated); row.dataset.referencesBound = String(claimsBound);
         row.appendChild(el("summary", null, item.defect + " · " + (item.title || "未提供标题") + " · " + (item.causes || []).length + " 条节点主张"));
         row.appendChild(el("div", "finding-note", "来源：model · 语义未核验"));
+        if (!fileAssociated) row.appendChild(el("div", "finding-note finding-association-status",
+          "文件关联未绑定；" + (claimsBound ? "文档/引用身份已绑定，引用位置可另查，不补造修复锚点。" : "文档/引用身份未绑定，保留历史文字。")));
         if (item.boundary != null) {
           row.appendChild(el("div", "finding-note", "边界（模型原文）"));
           row.appendChild(el("div", "finding-boundary", item.boundary));
@@ -1790,7 +1797,7 @@
         ["before", "after"].forEach(function (side) {
           var n = repair[side]; if (!n) return;
           row.appendChild(el("div", "finding-note", (side === "before" ? "修复前：" : "修复后：") + (n.spec || n.label || "坐标未提供")
-            + (canBind && n.ok ? " · 节点存在已核，修复语义未核" : " · 历史/无效坐标，未绑定") + (n.diag ? " · " + n.diag : "")));
+            + (claimsBound && n.ok ? " · 节点存在已核，修复语义未核" : " · 历史/无效坐标，未绑定") + (n.diag ? " · " + n.diag : "")));
         });
         (item.causes || []).forEach(function (cause) {
           var detail = el("details", "finding-cause"); detail.dataset.basisStatus = cause.basis_status || "unrecorded";
@@ -1801,7 +1808,7 @@
           if (cause.diag) detail.appendChild(el("div", "finding-note", cause.diag));
           detail.appendChild(el("div", "finding-note", "原因（模型原文）"));
           detail.appendChild(el("div", "finding-reason", cause.reason == null ? "未提供（不推测）" : cause.reason));
-          var existing = canBind && cause.ok && XT && Object.keys(XT.byId).some(function (tid) {
+          var existing = claimsBound && cause.ok && XT && Object.keys(XT.byId).some(function (tid) {
             var n = XT.byId[tid]; return n.kind === cause.kind && probeKeyOf(n) === cause.key
               && (n.kind === "file" ? n.anchorV : n.anchorVer) === cause.v;
           });
@@ -1811,10 +1818,10 @@
           }
           (cause.evidence || []).forEach(function (ref) {
             var display = typeof ref.original_ref === "string" ? Object.assign({}, ref, {ref:ref.original_ref}) : ref;
-            detail.appendChild(canBind ? evidenceRow(display) : el("div", "verow unbound", display.ref + " · 历史引用未绑定 · " + display.status));
+            detail.appendChild(claimsBound ? evidenceRow(display) : el("div", "verow unbound", display.ref + " · 历史引用未绑定 · " + display.status));
           });
           if (cause.basis) {
-            if (canBind) { var basis = attributionBasis(cause); if (basis) detail.appendChild(basis); }
+            if (claimsBound) { var basis = attributionBasis(cause); if (basis) detail.appendChild(basis); }
             else detail.appendChild(el("pre", "finding-note", JSON.stringify(cause.basis, null, 2)));
           }
           row.appendChild(detail);
@@ -1828,7 +1835,7 @@
         (file.associations || []).forEach(function (a) { group.appendChild(el("div", "finding-note",
           a.node + " · " + a.anchor + " · 文件归属/修复关联：模型声明；"
           + (claimsBound && a.node_checked ? "版本坐标已核" : "版本坐标未绑定") + "，修复语义未核验")); });
-        (file.item_ids || []).forEach(function (id) { appendItem(group, id, claimsBound); }); box.appendChild(group);
+        (file.item_ids || []).forEach(function (id) { appendItem(group, id, true); }); box.appendChild(group);
       });
       if (unbound.length) {
         var group = el("details", "finding-unbound"); group.appendChild(el("summary", null, "未绑定文件的事项（" + unbound.length + "）· 不以 root 猜补"));
@@ -2007,7 +2014,7 @@
           var go = function () {
             if (!dataReady) { setTimeout(go, 400); return; }
             if (probeTraceUnbound(p)) { probeBuildTrajectory(); return; }
-            if (p.trajectory) probeBuildTrajectory();
+            if (p.trajectory || ((p.evidence_graph || {}).additional_nodes || []).length) probeBuildTrajectory();
             else if (!XT && p.root) openRoot({ kind: "file", path: p.root, v: null });
           };
           go();
@@ -2036,8 +2043,25 @@
     function probeRelationStatus(tr) {
       return tr.relation_status || (tr.match === "账本有边" ? "true" : tr.match === "账本无此边" ? "false" : "not_checked");
     }
+    function probeGraphEdgeAllowed(e) {
+      if (["read", "write"].indexOf(e.kind) < 0 || ["true", "unknown"].indexOf(e.status) < 0 || !(e.evidence || []).length) return false;
+      // Keep the old authenticated trace projection readable; new model sources
+      // need explicit origin metadata and the authenticated current document.
+      if (e.source_of_claim === "ledger") return !(e.origins || []).some(function (o) { return o.source_of_claim !== "ledger"; });
+      var doc = PROBE.structured || {}, origins = e.origins || [];
+      if (["model", "mixed"].indexOf(e.source_of_claim) < 0 || e.relation_source !== "ledger" || e.status !== "true"
+          || !probeClaimsBound(PROBE) || (doc.identity || {}).bound !== true || (doc.document_source || {}).verified !== true
+          || (doc.errors || []).length || !doc.document_sha256 || !origins.length) return false;
+      var model = false, recorded = false;
+      var valid = origins.every(function (o) {
+        if (o.selection_source === "recorded_transition" && o.source_of_claim === "ledger") { recorded = true; return true; }
+        if (o.selection_source === "checked_model_edge" && o.source_of_claim === "model" && o.document_sha256 === doc.document_sha256) { model = true; return true; }
+        return false;
+      });
+      return valid && model && (e.source_of_claim === "mixed" ? recorded : !recorded);
+    }
     function probeBuildTrajectory() {
-      var T = PROBE && PROBE.trajectory;
+      var T = PROBE && PROBE.trajectory || {nodes:[],transitions:[],visits:[]};
       if (probeTraceUnbound(PROBE)) {
         renderEmptyCanvas(); activeDrawerNode = null; selTid = null;
         document.getElementById("rootlbl").textContent = "当前账本不匹配 · 历史调查未绑定";
@@ -2045,8 +2069,19 @@
         side.appendChild(el("div", "placeholder", "保留左侧全部历史调用与结论诊断；不把旧坐标投到当前树上。可从账本入口独立探索当前版本。"));
         PROBE.placed = 0; PROBE.rolesOnTree = 0; renderProbe(); return;
       }
-      if (!T || !T.nodes) return;
-      if (!T.nodes.length) {
+      var graph = PROBE.evidence_graph, graphBound = graph && graph.schema === "migloop-evidence-graph/1"
+        && graph.identity_bound === true && (PROBE.trace_identity || {}).bound === true;
+      var graphEdges = graphBound ? (graph.edges || []).filter(probeGraphEdgeAllowed) : [];
+      var displayNodes = (T.nodes || []).slice(), displayIds = {};
+      displayNodes.forEach(function (n) { displayIds[n.id] = true; });
+      (graphBound ? graph.additional_nodes || [] : []).forEach(function (n) {
+        if (displayIds[n.id] || n.source !== "checked_model_edge" || !Number.isInteger(n.v) || n.v < 1
+            || ["file", "agent"].indexOf(n.kind) < 0 || n.id !== n.kind + ":" + n.key + "@" + n.v
+            || !graphEdges.some(function (e) { return e.from === n.id || e.to === n.id; })) return;
+        displayIds[n.id] = true;
+        displayNodes.push(Object.assign({}, n, {opened:[],side:"unlinked",parent:null,unseen:0}));
+      });
+      if (!displayNodes.length) {
         renderEmptyCanvas();
         document.getElementById("rootlbl").textContent = "本次没有已核验的查询节点";
         side.innerHTML = "";
@@ -2054,14 +2089,15 @@
         PROBE.placed = 0; PROBE.rolesOnTree = 0;
         renderProbe(); return;
       }
-      XT = { byId: {}, seq: 0, root: null, rights: [], rootKind: T.nodes[0].kind, extra: [], unlinkedDepth: null, sideTitle: T.side_title || null, walk: T.mode === "via", evidenceMode: true };
+      XT = { byId: {}, seq: 0, root: null, rights: [], rootKind: displayNodes[0].kind, extra: [], unlinkedDepth: null, sideTitle: T.side_title || null, walk: T.mode === "via", evidenceMode: true };
       var byId = {}, sourceById = {};
-      T.nodes.forEach(function (n) { sourceById[n.id] = n; });
-      T.nodes.forEach(function (n) {
+      displayNodes.forEach(function (n) { sourceById[n.id] = n; });
+      displayNodes.forEach(function (n) {
         var node = n.kind === "file"
           ? xtNode("file", { path: n.key, anchorV: n.v, label: n.label })
           : xtNode("agent", { aid: n.key, anchorVer: n.v, label: n.label });
-        node.traj = true; node.trajId = n.id; node.expanded = true; node.children = [];
+        node.claimEndpoint = n.source === "checked_model_edge";
+        node.traj = !node.claimEndpoint; node.trajId = n.id; node.expanded = true; node.children = [];
         node.trajOpened = n.opened || []; node.trajSide = n.side; node.edgeRel = n.edge;
         node.unseenNeighbors = n.unseen_neighbors;
         var b = [];
@@ -2074,6 +2110,7 @@
         if (n.via && n.side === "up") b.push({ cls: "via", t: "via " + String(n.via).slice(0, 28) });
         if (n.source === "任务") b.push({ cls: "", t: "任务给的" });
         if (n.source === "结论" && !node.trajOpened.length) b.push({ cls: "via", t: "结论提及 · 未查询" });
+        if (node.claimEndpoint) b.push({ cls: "via", t: "模型显式选边端点 · 未查询", title: "节点与关系可定位，不证明模型已打开或归因正确。" });
         if (n.source === "修复落点" && !node.trajOpened.length) b.push({ cls: "via", t: "修复落点 · 未查询" });
         if (n.source === "修复前") b.push({ cls: "stale", t: "修复前" });
         if (n.fixed) b.push({ cls: "", t: "修复后" });
@@ -2081,10 +2118,10 @@
         node.badges = b;
         byId[n.id] = node;
       });
-      var root = byId[T.root] || byId[T.nodes[0].id];
+      var root = byId[T.root] || byId[displayNodes[0].id];
       root.isRoot = !!T.root; root.depth = 0; XT.root = root.tid;
       XT.conclusionOnly = !T.root;
-      T.nodes.forEach(function (n) {
+      displayNodes.forEach(function (n) {
         if (n.id === root.trajId) return;
         var node = byId[n.id];
         if (n.side === "down") { addRight(root, node); return; }
@@ -2103,19 +2140,18 @@
                               navigation: probeNavigationLabel(sourceById[tr.from], sourceById[tr.to]) });
       });
       XT.evidenceEdges = [];
-      var graph = PROBE.evidence_graph;
-      if (graph && graph.schema === "migloop-evidence-graph/1" && graph.identity_bound === true && (PROBE.trace_identity || {}).bound === true) {
-        (graph.edges || []).forEach(function (e) {
-          if (!byId[e.from] || !byId[e.to] || e.from === e.to || ["read", "write"].indexOf(e.kind) < 0
-              || ["true", "unknown"].indexOf(e.status) < 0 || e.source_of_claim !== "ledger" || !(e.evidence || []).length) return;
+      if (graphBound) {
+        graphEdges.forEach(function (e) {
+          if (!byId[e.from] || !byId[e.to] || e.from === e.to) return;
           var source = sourceById[e.from], target = sourceById[e.to];
           if (source.kind !== (e.kind === "read" ? "file" : "agent") || target.kind !== (e.kind === "read" ? "agent" : "file")) return;
-          XT.evidenceEdges.push({a:byId[e.from].tid,b:byId[e.to].tid,from:e.from,to:e.to,id:e.id,steps:e.steps || [],
-            step:(e.steps || [])[0],relation_status:e.status,relation_label:e.label,relation_note:(e.notes || []).join(" · "),
-            relation_evidence:e.evidence,source:e.source_of_claim,kind:e.kind});
+          var querySteps = e.query_steps || e.steps || [];
+          XT.evidenceEdges.push({a:byId[e.from].tid,b:byId[e.to].tid,from:e.from,to:e.to,id:e.id,steps:querySteps,
+            step:querySteps[0],relation_status:e.status,relation_label:e.label,relation_note:(e.notes || []).join(" · "),
+            relation_evidence:e.evidence,source:e.source_of_claim,origins:e.origins || [],kind:e.kind});
         });
       }
-      T.nodes.forEach(function (n) {
+      displayNodes.forEach(function (n) {
         if (n.unseen > 0 && (n.side === "up" || n.side === "root")) addKid(byId[n.id], xtNode("leaf", { label: "+" + n.unseen + " 未查", isLedgerStub: true }));
       });
       // 查询声明只保留在原时间线，不以旧 parent/declared 生成图线。
@@ -2209,7 +2245,7 @@
       if (node.isRoot) c += " root";
       if (node.isRight) c += " down";
       if (node.possible) c += " possible";
-      if (node.ledgerKid) c += " p-dim";
+      if (node.ledgerKid || node.claimEndpoint) c += " p-dim";
       return c;
     }
 
@@ -2475,7 +2511,7 @@
         var path = document.createElementNS("http://www.w3.org/2000/svg", "path");
         path.setAttribute("d", pathData); path.setAttribute("class", "wire route evidence" + routeClass);
         path.setAttribute("marker-end", "url(#route-arrow" + (uncertain ? "-uncertain" : differ ? "-differ" : "") + ")");
-        path.setAttribute("data-step", e.step);
+        if (e.step != null) path.setAttribute("data-step", e.step);
         path.setAttribute("data-evidence-id", e.id);
         path.setAttribute("data-steps", e.steps.join(","));
         path.setAttribute("data-from", e.from); path.setAttribute("data-to", e.to);
@@ -2483,15 +2519,16 @@
         path.setAttribute("data-source", e.source);
         path.setAttribute("data-relation-status", e.relation_status);
         var title = "读写关系 · " + from.label + " → " + to.label + " · " + e.relation_label
-                  + " · 来源：账本原始动作；转移 #" + e.steps.join(", #") + (e.relation_note ? " · " + e.relation_note : "")
+                  + " · 关系依据：账本原始动作；选择来源：" + (e.source === "mixed" ? "已记录转移 + 模型显式声明" : e.source === "model" ? "模型显式声明" : "已记录转移")
+                  + (e.steps.length ? "；查询转移 #" + e.steps.join(", #") : "；无对应查询转移，不代表已打开") + (e.relation_note ? " · " + e.relation_note : "")
                   + (uncertain ? " · 候选，不是确定读写边" : " · 只核读写关系，不验证模型根因主张")
-                  + "\n原始证据：" + JSON.stringify(e.relation_evidence);
+                  + "\n来源记录：" + JSON.stringify(e.origins) + "\n原始证据：" + JSON.stringify(e.relation_evidence);
         var pt = document.createElementNS("http://www.w3.org/2000/svg", "title"); pt.textContent = title; path.appendChild(pt);
         frag.appendChild(path);
         var label = document.createElementNS("http://www.w3.org/2000/svg", "text");
         label.setAttribute("x", tx); label.setAttribute("y", ty); label.setAttribute("text-anchor", "middle");
-        label.setAttribute("class", "route-step" + routeClass); label.setAttribute("data-step", e.step);
-        label.textContent = e.relation_label + " #" + e.steps.join(",#");
+        label.setAttribute("class", "route-step" + routeClass); if (e.step != null) label.setAttribute("data-step", e.step);
+        label.textContent = e.relation_label + (e.steps.length ? " #" + e.steps.join(",#") : " · 模型显式选边（非查询）");
         var lt = document.createElementNS("http://www.w3.org/2000/svg", "title"); lt.textContent = title; label.appendChild(lt);
         label.addEventListener("click", function (ev) { ev.stopPropagation(); onNode(to.tid); });
         frag.appendChild(label);

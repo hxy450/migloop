@@ -42,6 +42,8 @@ file 原子末尾还有「提到它的命令」:命令行 / heredoc 体 / 跑的
 从一条命令进来只想看它之前的输入,用 agent(id, v, until=#n)。
 agent 工具给的每条动作/读取后面的 (#n) 是动作号;action(id, n) 返回那次工具调用的完整原始输入与输出
 (命令原文、grep 命中、cat 出来的全文、Read 到的内容)。摘要看不清时直接展开,不要猜。
+推荐直接 action(ref="#转录标识:n@L行[/块]") 照抄完整引用，无需另猜 agent id；ref 与 id/seq 二选一。
+转录标识不是 agent id，确需 id 时复制输出的 id= 字段。action 默认同时给输入和输出，短调用无需分两次；只有按侧定位或翻页时才选 part。
 几万字的 think / 结果超过 max_chars 会截断并说明剩余多少:offset= 从第几字继续,find= 跳到关键词前
 —— 找决策句用它,别拿 search 撞。子 agent 的收尾全文在父会话那条派发调用的结果里(收尾行给了坐标)。
 读记录下的"看见 615: …"是从 stdout 对账出来的行:agent 在那次调用里确实看到了这一行。
@@ -233,7 +235,8 @@ CORE = """\
 
 ## 导航与展开
 file/agent 必填真实 v 和 via：照抄已成功打开的 file:<路径>@vN / agent:<id>@vK；首次可 via=sessions，无文件版本可由真实 agent 进入。search 的精确 hits 凭据可独立进入发现的节点。via 记录导航，不创建历史读写边；无关系的查阅也保留为查阅。
-action/diff/blame/search 不移动；action 的 find/offset 仅作用于所选 part，Write 正文或命令要 part=input，返回原文用 part=output。不要对输出搜写入正文。
+action/diff/blame/search 不移动；action 优先 ref=照抄完整原文引用（与id/seq二选一），转录标识不是agentID，agent查询复制 id= 字段。
+action 默认同时给输入和输出，短调用无需拆两次；find/offset 仅作用于所选 part，Write 正文或命令要 part=input，返回原文用 part=output。不要对输出搜写入正文。
 默认只给索引/计数，content、reads、seen、m_n、分页按需展开；摘要不是全文。已打开的同一来源上的独立查询可以并行，但不能抢先使用尚未返回的 via/坐标。
 详细帮助按需 guide(topic=...)：evidence 证据与原文边界；search 查询范围；investigation 归因准则；navigation 路线；verdict 完整结论/check；full 全部原指南。
 """

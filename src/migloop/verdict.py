@@ -575,7 +575,7 @@ def _norm_checks(checks: Any) -> list[dict[str, str]]:
     return out
 
 
-def _consistency(defect: dict[str, Any]) -> list[dict[str, Any]]:
+def _consistency(defect: dict[str, Any], ledger: atoms.Ledger | None = None) -> list[dict[str, Any]]:
     """Check structured assertions against each other, not the truth of prose reasons.
 
     Coordinate comparisons require resolved coordinates. Causal-side text checks
@@ -625,6 +625,9 @@ def _consistency(defect: dict[str, Any]) -> list[dict[str, Any]]:
         elif basis["expected"].strip() == basis["actual"].strip():
             warn("identical_causal_sides", n, "期望与实际的文字相同，尚未展开支持红色归因的差异；"
                  "请核对或补充描述，不据此认定原因必错。")
+        if ledger is not None and basis is not None and n.get("ok"):
+            from .evidence_boundary import node_advisories
+            warnings.extend(node_advisories(ledger, n, defect["id"]))
     return warnings
 
 
@@ -742,7 +745,7 @@ def build(ledger: atoms.Ledger, data: dict[str, Any] | None, errors: list[str],
                                "repair": {"before": before, "after": after, "evidence": rep_ev},
                                "entry": entries, "nodes": nodes, "edges": edges})
         built = out["defects"][-1]
-        built["advisories"] = _consistency(built) if bound else []
+        built["advisories"] = _consistency(built, ledger) if bound else []
         out["consistency"]["advisories"].extend(built["advisories"])
     out["roles"] = roles
     return out

@@ -163,13 +163,15 @@ def build_server(backend: Any | None = None) -> Any:
         return via_mod.search_return(ledger, via_state(ledger), args, out, hits)
 
     @srv.tool(**text_options)
-    async def action(sid: str, id: str, seq: int, max_chars: int = 20000, offset: int = 0, find: str = "",
-                     part: str | None = None, m_n: int = 0, m_from: int = 1) -> str:
-        """展开某代理 #seq 原始调用。part=input/output 选择原文侧，find/offset 仅在选中侧定位；Write 正文/命令用 input。
+    async def action(sid: str, id: str | None = None, seq: int | None = None, max_chars: int = 20000,
+                     offset: int = 0, find: str = "", part: str | None = None,
+                     m_n: int = 0, m_from: int = 1, ref: str | None = None) -> str:
+        """展开原始事件：优先 ref=照抄完整 #转录标识:n@L行[/块]；或 id=账本agentID+seq，二选一。旧唯一别名会明示解析；转录标识不是agentID。
+        part=input/output 选择原文侧，find/offset 仅在选中侧定位；Write 正文/命令用 input。省略part同时给两侧，短调用不必分两次读。
         max_chars 控制原文窗口，审计指针另列；词法导航默认仅计数，m_n/m_from 按需翻页。不开节点。"""
         ledger, _cwd = await _ctx(sid)
         from . import atom_queries
-        return atom_queries.render_text(ledger, _cwd, "action", dict(id=id, seq=seq, max_chars=max_chars,
+        return atom_queries.render_text(ledger, _cwd, "action", dict(id=id, seq=seq, ref=ref, max_chars=max_chars,
             offset=offset, find=find, part=part, m_n=m_n, m_from=m_from))
 
     @srv.tool(**text_options)

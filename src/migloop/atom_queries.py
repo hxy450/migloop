@@ -27,12 +27,12 @@ _DEFAULTS: dict[str, dict[str, Any]] = {
     "diff": {"path": None, "v": None},
     "search": {"q": "", "agent": None, "v": None, "since": None, "file": None, "after": False,
                "since_ts": None, "until_ts": None, "kind": None},
-    "action": {"id": None, "seq": None, "max_chars": 20000, "offset": 0, "find": "", "part": None,
+    "action": {"id": None, "seq": None, "ref": None, "max_chars": 20000, "offset": 0, "find": "", "part": None,
                "m_n": 0, "m_from": 1},
     "check": {"draft": None, "file": None},
 }
 _REQUIRED = {"file": ("path",), "agent": ("id",), "blame": ("path",),
-             "diff": ("path", "v"), "action": ("id", "seq")}
+             "diff": ("path", "v")}
 
 
 def optional_int(args: dict[str, Any], key: str) -> int | None:
@@ -89,15 +89,29 @@ def parameters(tool: str, supplied: dict[str, Any]) -> dict[str, Any]:
     for key in _REQUIRED.get(tool, ()):
         if out[key] is None or out[key] == "":
             raise ValueError(key)
+    if tool == "action":
+        if out["ref"] is not None:
+            if out["id"] is not None or out["seq"] is not None:
+                raise ValueError("action 的 ref 与 id/seq 必须二选一")
+        elif not out["id"] or out["seq"] is None:
+            raise ValueError("action 需要 ref=完整原文引用，或同时给 id 和 seq")
     return out
 
 
-def validate_target(ledger: atoms.Ledger, tool: str, args: dict[str, Any]) -> None:
+def validate_target(ledger: atoms.Ledger, tool: str, args: dict[str, Any]) -> dict[str, Any]:
+    """Carry the validated canonical key into the renderer, not just validation.
+
+    MCP already supplies the canonical navigation target. HTTP must not accept
+    the same alias and then hand its unresolved spelling to a narrower lookup.
+    """
     if tool in ("file", "agent") and args.get("v") is not None:
         from .via import target
-        _, error = target(ledger, tool, str(args["path" if tool == "file" else "id"]), args["v"])
+        field = "path" if tool == "file" else "id"
+        node, error = target(ledger, tool, str(args[field]), args["v"])
         if error:
             raise ValueError(error)
+        return {**args, field: node[1]}
+    return args
 
 
 def validate_file_window(anchor: int, v_from: int | None, v_to: int | None) -> None:
@@ -165,8 +179,7 @@ def agent_data(ledger: atoms.Ledger, aid: str, v: int | None = None, *,
 def render_text(ledger: atoms.Ledger, root: str, tool: str, supplied: dict[str, Any], *,
                 chains: dict[str, Any] | None = None, navigation_hits: list[dict[str, Any]] | None = None) -> str:
     from . import atoms_text, draft_check
-    args = parameters(tool, supplied)
-    validate_target(ledger, tool, args)
+    args = validate_target(ledger, tool, parameters(tool, supplied))
     if tool == "sessions":
         if chains is None:
             raise ValueError("sessions 需要链清单")
@@ -195,7 +208,14 @@ def render_text(ledger: atoms.Ledger, root: str, tool: str, supplied: dict[str, 
     if tool == "search":
         return atoms_text.render_search(ledger, root=root, navigation_hits=navigation_hits, **args)
     if tool == "action":
-        return atoms_text.render_action(ledger, args.pop("id"), **args)
+        from .action_query import resolve
+        address = resolve(ledger, id=args.pop("id"), seq=args.pop("seq"), ref=args.pop("ref"))
+        text = atoms_text.render_action(ledger, address.agent, address.seq, **args)
+        if address.status == "drifted":
+            text = f"引用序号已漂移；按唯一转录位置定位到 #{address.seq}，未按旧序号猜测。\n" + text
+        elif address.status == "legacy_alias":
+            text = f"旧代理别名 {address.requested_id!r} 唯一解析为 id={address.agent}；只在此代理内定位 #{address.seq}。\n" + text
+        return text
     if tool == "check":
         return draft_check.render(ledger, args["draft"], chains, args["file"])
     raise ValueError(f"未知文本投影: {tool}")
@@ -203,15 +223,14 @@ def render_text(ledger: atoms.Ledger, root: str, tool: str, supplied: dict[str, 
 
 def json_data(ledger: atoms.Ledger, tool: str, supplied: dict[str, Any], *,
               chains: dict[str, Any] | None = None) -> dict[str, Any] | None:
-    args = parameters(tool, supplied)
-    validate_target(ledger, tool, args)
+    args = validate_target(ledger, tool, parameters(tool, supplied))
     # JSON exposes raw structured collections, not text pagination. Never accept
     # a text window and then quietly send a larger raw body to its caller.
     supported = {
         "index": {"kind"}, "file": {"path", "v", "content", "diff", "scope_only"},
         "agent": {"id", "v", "since", "until", "scope_only"},
         "blame": {"path", "v", "start", "n", "changed"},
-        "action": {"id", "seq"}, "check": {"draft", "file"},
+        "action": {"id", "seq", "ref"}, "check": {"draft", "file"},
     }
     unsupported = set(supplied) - supported.get(tool, set())
     if unsupported:
@@ -231,7 +250,16 @@ def json_data(ledger: atoms.Ledger, tool: str, supplied: dict[str, Any], *,
     if tool == "blame":
         return atoms.blame(ledger, args["path"], args["v"], args["start"], args["n"], changed=args["changed"])
     if tool == "action":
-        return atoms.action_raw(ledger, args["id"], args["seq"])
+        from .action_query import resolve
+        address = resolve(ledger, id=args["id"], seq=args["seq"], ref=args["ref"])
+        data = atoms.action_raw(ledger, address.agent, address.seq)
+        if data is not None and address.requested_ref is not None:
+            data = {**data, "query_reference": {"ref": address.requested_ref,
+                    "status": address.status, "agent": address.agent, "seq": address.seq}}
+        elif data is not None and address.status == "legacy_alias":
+            data = {**data, "query_address": {"requested_id": address.requested_id,
+                    "status": address.status, "agent": address.agent, "seq": address.seq}}
+        return data
     if tool == "check":
         from . import draft_check
         return draft_check.evaluate(ledger, args["draft"], chains, args["file"])

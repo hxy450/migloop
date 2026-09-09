@@ -74,8 +74,10 @@ def test_action_candidate_pages_do_not_change_raw_window(tmp_path, monkeypatch):
     assert "超出 15 条" in atoms_text.render_action(led, MAIN_ID, seq, m_n=4, m_from=99, **args)
 
 
-def test_http_action_candidate_defaults_and_explicit_page(monkeypatch):
-    monkeypatch.setattr(service, "session_ledger", lambda _: object())
+def test_http_action_candidate_defaults_and_explicit_page(tmp_path, monkeypatch):
+    led = _ledger(tmp_path, [*_call("2026-01-01T00:00:00Z", "w", "Write", {
+        "file_path": "/proj/A.ets", "content": "a\n"})])
+    monkeypatch.setattr(service, "session_ledger", lambda _: led)
     monkeypatch.setattr(service, "session_cwd", lambda _: "/proj")
     got = {}
     monkeypatch.setattr(atoms_text, "render_action", lambda *args, **kwargs: got.update(kwargs) or "ok")

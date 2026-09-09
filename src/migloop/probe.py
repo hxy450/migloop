@@ -56,7 +56,7 @@ def _step_scope(tool: str, inp: dict[str, Any]) -> str:
     if tool == "search":
         return "搜索窗口" + vs
     if tool == "action":
-        return f"原文 #{inp.get('seq')}" + (f" {inp['part']}" if inp.get("part") else "")
+        return "原文 " + str(inp.get("ref") or f"#{inp.get('seq')}") + (f" {inp['part']}" if inp.get("part") else "")
     if tool == "sessions":
         return "返修链"
     if tool == "check":
@@ -109,9 +109,13 @@ def _step_node(ledger: atoms.Ledger, tool: str, inp: dict[str, Any]) -> dict[str
         a = ak(inp.get("id"))
         return {"kind": "agent", "aid": a.id if a else None, "v": _int(inp.get("v")), "since": _int(inp.get("since"))}
     if tool == "action":
-        a = ak(inp.get("id"))
-        aid, ver = _seq_owner(ledger, _int(inp.get("seq")) or -1, a.id if a else None)
-        return {"kind": "agent", "aid": aid, "v": ver, "action": _int(inp.get("seq"))}
+        from .action_query import resolve, step
+        from .atom_queries import optional_int
+        try:
+            address = resolve(ledger, id=inp.get("id"), seq=optional_int(inp, "seq"), ref=inp.get("ref"))
+        except ValueError:
+            return None
+        return step(ledger, address)
     if tool == "search":
         if inp.get("agent"):
             a = ak(inp.get("agent"))
@@ -280,7 +284,7 @@ def probe_payload(ledger: atoms.Ledger, run_dir: str, chain_payload: dict[str, A
             "trace_identity": trace_identity, "repair_manifest": repair_manifest, "coverage": coverage_report,
             "repair_manifest_origin": manifest_origin, "draft_check": checked_draft,
             "roles": (structured or {}).get("roles") or {}, "fixed": (structured or {}).get("fixed") or [],
-            "trajectory": trajectory, "evidence_graph": _evidence_graph(ledger, trajectory, trace_identity),
+            "trajectory": trajectory, "evidence_graph": _evidence_graph(ledger, trajectory, trace_identity, structured),
             "findings": findings.project(structured)}
 
 
@@ -1181,12 +1185,14 @@ def _relation_any(ledger: atoms.Ledger, a: dict[str, Any], b: dict[str, Any]) ->
 
 
 def _evidence_graph(ledger: atoms.Ledger, trajectory: dict[str, Any] | None,
-                    trace_identity: dict[str, Any] | None) -> dict[str, Any]:
-    """Project already-checked navigation, not all pairs or model relationship claims.
+                    trace_identity: dict[str, Any] | None,
+                    structured: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Project recorded transitions and authenticated, explicitly selected facts.
 
-    Navigation remains untouched in trajectory. Only authenticated visits with
-    exact endpoints and a located underlying read/write observation can produce
-    a line, in dataflow direction. Unknown is never promoted to confirmed.
+    Navigation remains untouched in trajectory. Its edges require authenticated
+    visits, exact endpoints and a located underlying read/write observation.
+    Model declarations independently select dataflow facts and require a
+    confirmed directional fact; they never create a visit or a query step.
     """
     tree = trajectory or {}
     bound = (trace_identity or {}).get("bound")
@@ -1204,17 +1210,19 @@ def _evidence_graph(ledger: atoms.Ledger, trajectory: dict[str, Any] | None,
         "schema": "migloop-evidence-graph/1", "scope": "recorded_transitions", "complete": False,
         "status": "identity_unbound" if bound is not True else
                   "projected" if tree.get("mode") == "via" else "legacy_unrecorded",
-        "identity_bound": bound, "nodes": list(nodes), "edges": [], "model_relations": [],
+        "identity_bound": bound, "nodes": list(nodes), "additional_nodes": [], "edges": [], "model_relations": [],
         "semantic_checked": False,
-        "note": "仅投影本次已记录转移中、原始动作可定位的读写关系，不是全账本图或完整根因图；"
+        "note": "仅投影本次已记录转移及已认证文稿显式选择、账本原始动作支持的读写关系，不是全账本图或完整根因图；"
+                "模型选边不等于模型主张已验证，不增加查询或已读记录；"
                 "候选仍待核，纯搜索/词法提及/派发/版本导航/回访只保留在查询时间线。"
-                + (" 旧跑未记录可投影的转移，不从布局父子线补造关系。" if tree.get("mode") != "via" else "")
+                + (" 未记录可投影的查询转移，不从布局父子线补造关系。" if tree.get("mode") != "via" else "")
                 + (" 调查身份未绑定当前账本，不绘制当前读写关系。" if bound is not True else ""),
         "counts": {"transitions": len(transitions), "visits": len(visits), "searches": len(tree.get("searches") or []),
                    "projected_transitions": 0, "excluded_transitions": 0, "edges": 0,
                    "confirmed_read": 0, "confirmed_write": 0, "candidate_read": 0, "candidate_write": 0,
-                   "model_relations": 0},
-        "relation_counts": {}, "source_counts": {}, "excluded": [],
+                   "model_relations": 0, "model_edges": 0, "projected_model_edges": 0, "excluded_model_edges": 0,
+                   "non_explicit_rows_ignored": 0},
+        "relation_counts": {}, "source_counts": {}, "excluded": [], "excluded_model_edges": [], "excluded_nonclaims": [],
     }
     action_cache: dict[str, dict[int, Any]] = {}
     merged: dict[tuple[str, str, str, str], dict[str, Any]] = {}
@@ -1232,6 +1240,30 @@ def _evidence_graph(ledger: atoms.Ledger, trajectory: dict[str, Any] | None,
         return (e.get("source") == act.src[0] and e.get("use_line") == act.src[1] + 1
                 and e.get("result_line") == (act.src[2] + 1 if act.src[2] is not None else None)
                 and e.get("event_id") == atoms.event_id(ledger, aid, act.seq))
+
+    def merge(left: str, right: str, kind: str, status: str, relation: str,
+              evidence: list[dict[str, Any]], origin: dict[str, Any], notes: list[Any]) -> None:
+        key = (left, right, kind, status)
+        if key not in merged:
+            merged[key] = {"id": "rw-" + str(len(merged) + 1), "from": left, "to": right,
+                           "kind": kind, "status": status, "source_of_claim": origin["source_of_claim"],
+                           "relation_source": "ledger", "origins": [],
+                           "label": ("账本·" if status == "true" else "候选·") + relation,
+                           "notes": [], "evidence": [], "steps": [], "query_steps": [], "semantic_checked": False}
+        edge = merged[key]
+        if origin not in edge["origins"]:
+            edge["origins"].append(deepcopy(origin))
+        sources = {o["source_of_claim"] for o in edge["origins"]}
+        edge["source_of_claim"] = next(iter(sources)) if len(sources) == 1 else "mixed"
+        if origin["selection_source"] == "recorded_transition" and origin["step"] not in edge["steps"]:
+            edge["steps"].append(origin["step"])
+            edge["query_steps"].append(origin["step"])
+        for note in notes:
+            if note and note not in edge["notes"]:
+                edge["notes"].append(note)
+        for e in evidence:
+            if e not in edge["evidence"]:
+                edge["evidence"].append(deepcopy(e))
 
     for tr in transitions:
         relation = str(tr.get("relation_kind") or "unrecorded")
@@ -1273,24 +1305,97 @@ def _evidence_graph(ledger: atoms.Ledger, trajectory: dict[str, Any] | None,
         if reason is not None:
             graph["excluded"].append({"step": tr.get("step"), "from": a, "to": b, "reason": reason})
             continue
-        key = (left, right, kind, status)
-        if key not in merged:
-            merged[key] = {"id": "rw-" + str(len(merged) + 1), "from": left, "to": right,
-                           "kind": kind, "status": status, "source_of_claim": "ledger",
-                           "label": ("账本·" if status == "true" else "候选·") + relation,
-                           "notes": [], "evidence": [], "steps": [], "semantic_checked": False}
-        edge = merged[key]
-        if tr.get("step") not in edge["steps"]:
-            edge["steps"].append(tr.get("step"))
-        for note in (tr.get("relation_label"), tr.get("relation_note")):
-            if note and note not in edge["notes"]:
-                edge["notes"].append(note)
-        for e in evidence:
-            if e not in edge["evidence"]:
-                edge["evidence"].append(deepcopy(e))
+        merge(left, right, kind, status, relation, evidence,
+              {"selection_source": "recorded_transition", "source_of_claim": "ledger", "step": tr.get("step")},
+              [tr.get("relation_label"), tr.get("relation_note")])
         graph["counts"]["projected_transitions"] += 1
+
+    doc = structured or {}
+    identity = doc.get("identity") or {}
+    document_bound = (bound is True and identity.get("bound") is True
+                      and identity.get("current") == atoms.ledger_identity(ledger)
+                      and (doc.get("document_source") or {}).get("verified") is True
+                      and bool(doc.get("document_sha256")) and not doc.get("errors"))
+    for defect in doc.get("defects") or []:
+        for index, claim in enumerate(defect.get("edges") or []):
+            # Adjacencies generated by the legacy projector were never model
+            # declarations. Do not count them as rejected model edge claims.
+            if claim.get("implicit") is not False:
+                graph["counts"]["non_explicit_rows_ignored"] += 1
+                graph["excluded_nonclaims"].append({"defect": defect.get("id"), "edge_index": index,
+                                                   "reason": "not_explicit"})
+                continue
+            graph["counts"]["model_edges"] += 1
+            reason = None
+            endpoints = []
+            if not document_bound:
+                reason = "document_or_identity_unbound"
+            elif claim.get("claimed") not in ("读", "写"):
+                reason = "non_read_write"
+            if reason is None:
+                for side in ("from", "to"):
+                    saved = claim.get(side) or {}
+                    resolved = verdict.resolve_node(ledger, saved.get("spec"))
+                    if not resolved["ok"] or any(resolved.get(k) != saved.get(k) for k in ("kind", "key", "v")):
+                        reason = "invalid_endpoint"
+                        break
+                    endpoints.append(resolved)
+            evidence = []
+            if reason is None:
+                left, right = endpoints
+                status, relation, note = verdict.check_edge(ledger, left, right, claim["claimed"])
+                if status != "true" or relation != claim["claimed"]:
+                    reason = "unconfirmed_directional_relation"
+            if reason is None:
+                from .evidence import read_basis
+                kind = {"读": "read", "写": "write"}[relation]
+                aid = right["key"] if kind == "read" else left["key"]
+                supports = []
+                if kind == "write":
+                    version = ledger.stories[right["key"]].versions[right["v"] - 1]
+                    supports = [(a, None) for a in ledger.agents[aid].actions if a.seq == version.act_seq]
+                else:
+                    supports = [(a, ref) for a in ledger.agents[aid].actions
+                                if (a.ver if a.ver is not None else a.at) <= right["v"]
+                                for ref in a.files if ref.op == "read" and ref.path == left["key"]
+                                and ref.v == left["v"] and read_basis(ref) == "read"]
+                for act, ref in supports:
+                    e = {"aid": aid, "seq": act.seq, "basis": kind,
+                         "event_id": atoms.event_id(ledger, aid, act.seq), "location": ledger.locs.get(act.seq),
+                         "source": act.src[0] if act.src else None, "use_ts": act.ts, "done_ts": act.done_ts,
+                         "observation": atoms.file_ref_payload(ref) if ref is not None else None,
+                         "use_line": act.src[1] + 1 if act.src and act.src[1] is not None else None,
+                         "result_line": act.src[2] + 1 if act.src and act.src[2] is not None else None}
+                    if located(e, aid, kind, status):
+                        evidence.append(e)
+                if not evidence:
+                    reason = "unlocated_evidence"
+            if reason is not None:
+                graph["excluded_model_edges"].append({"defect": defect.get("id"), "edge_index": index, "reason": reason})
+                continue
+            ids = []
+            for endpoint in endpoints:
+                nid = _traj_id(endpoint["kind"], endpoint["key"], endpoint["v"])
+                ids.append(nid)
+                if nid not in nodes:
+                    n = {"id": nid, "kind": endpoint["kind"], "key": endpoint["key"], "v": endpoint["v"],
+                         "label": _traj_label(ledger, endpoint["kind"], endpoint["key"], endpoint["v"]),
+                         "source": "checked_model_edge", "opened": [], "appears": [], "parent": None,
+                         "side": "unlinked", "unseen": 0, "fixed": False}
+                    nodes[nid] = n
+                    graph["additional_nodes"].append(n)
+            merge(*ids, kind, status, relation, evidence,
+                  {"selection_source": "checked_model_edge", "source_of_claim": "model", "defect": defect.get("id"),
+                   "edge_index": index, "document_sha256": doc["document_sha256"], "model_note": claim.get("model_note")},
+                  [note])
+            graph["counts"]["projected_model_edges"] += 1
+    if graph["counts"]["projected_model_edges"]:
+        graph["scope"] = "recorded_transitions_and_checked_model_edges"
+        graph["status"] = "projected"
+    graph["nodes"] = list(nodes)
     graph["edges"] = list(merged.values())
-    graph["counts"].update(edges=len(merged), excluded_transitions=len(graph["excluded"]))
+    graph["counts"].update(edges=len(merged), excluded_transitions=len(graph["excluded"]),
+                           excluded_model_edges=len(graph["excluded_model_edges"]))
     for edge in graph["edges"]:
         graph["counts"][("confirmed_" if edge["status"] == "true" else "candidate_") + edge["kind"]] += 1
     return graph

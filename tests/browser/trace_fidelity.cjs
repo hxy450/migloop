@@ -197,6 +197,7 @@ const server=http.createServer((req,res)=>{
           {item_id:snapshot+'A',anchor:'before',node:'file:'+file+'@v1',source:'model',node_checked:true,repair_semantic_checked:false}]}],
         items:{[snapshot+'A']:item('A','文件事项甲 <b>非HTML</b>',[first,invalid]),[snapshot+'B']:item('B','文件事项乙',[second]),
           [snapshot+'C']:item('C','没有文件归属，不能借 root',[first])},unbound_items:[snapshot+'C'],audit:{semantic_checked:false,scope_complete:false}};
+      body.findings.items[snapshot+'C'].repair={before:null,after:null};
       if(run==='findings-unbound'){
         body.findings.identity.bound=false;body.findings.files=[];
         body.findings.unbound_items=Object.keys(body.findings.items);
@@ -236,6 +237,28 @@ const server=http.createServer((req,res)=>{
         body.evidence_graph.edges[0].source_of_claim='model';
         body.evidence_graph.edges[1].evidence=[];
       }
+    }
+    if(run.startsWith('checked-model')){
+      body.structured.document_sha256='fixture-document';
+      body.structured.document_source={kind:'checked_draft_ref',verified:true,semantic_checked:false};
+      const modelOrigin={selection_source:'checked_model_edge',source_of_claim:'model',defect:'A',edge_index:0,document_sha256:'fixture-document',model_note:'<img src=x onerror="window.edgeXss=1">'};
+      const support={aid:'agent-a',seq:12,basis:'write',source:'/fixture/original.jsonl',use_line:6,result_line:7};
+      body.evidence_graph.additional_nodes=[{id:'agent:agent-a@2',kind:'agent',key:'agent-a',v:2,label:'Agent A v2',source:'checked_model_edge',opened:[],side:'unlinked'}];
+      body.evidence_graph.edges=[{id:'rw-model',from:'agent:agent-a@2',to:root,kind:'write',status:'true',source_of_claim:'model',relation_source:'ledger',
+        origins:[modelOrigin],query_steps:[],steps:[],label:'账本·写',notes:['机械定位，不核模型根因'],evidence:[support]},
+        {id:'rw-mixed',from:bid,to:root,kind:'write',status:'true',source_of_claim:'mixed',relation_source:'ledger',
+         origins:[{selection_source:'recorded_transition',source_of_claim:'ledger',step:3},{...modelOrigin,defect:'B'}],query_steps:[3],steps:[3],label:'账本·写',evidence:[{...support,aid:'agent-b'}]}];
+      body.evidence_graph.counts={confirmed_write:2,projected_model_edges:2,projected_transitions:1};
+      if(run==='checked-model-no-trace'){
+        body.trajectory=null;body.steps=[];
+        body.evidence_graph.edges=body.evidence_graph.edges.slice(0,1);
+        body.evidence_graph.additional_nodes.push({id:root,kind:'file',key:file,v:3,label:'A.ets@v3',source:'checked_model_edge',opened:[]});
+      }
+      if(run==='checked-model-legacy')body.structured.document_source.verified=false;
+      if(run==='checked-model-wrong-document')body.structured.document_sha256='other-document';
+      if(run==='checked-model-no-origins')body.evidence_graph.edges.forEach(e=>e.origins=[]);
+      if(run==='checked-model-unknown')body.evidence_graph.edges.forEach(e=>e.status='unknown');
+      if(run==='checked-model-no-identity')body.structured.identity.bound=null;
     }
     if(run==='forest-layout'){
       // Same structural cause as real C4: a search-entry ancestor is moved to a
@@ -412,6 +435,32 @@ async function main(){
     await evaluate("__mig.load('relations-conflict')");
     await until("__mig.probe().runDir==='relations-conflict' && __mig.xt()===null");
     await check('explicit trace conflict overrides even a supplied bound evidence projection',"document.querySelectorAll('.wire').length===0 && document.querySelectorAll('#canvas .node').length===0 && __mig.probe().trajectory.transitions.length===6");
+    await evaluate("__mig.load('checked-model')");
+    await until("__mig.probe().runDir==='checked-model' && document.querySelectorAll('.wire.evidence').length===2");
+    await evaluate("window.checkedTrace=JSON.stringify(__mig.probe().trajectory);window.checkedSteps=JSON.stringify(__mig.probe().steps);window.checkedGraph=JSON.stringify(__mig.probe().evidence_graph)");
+    await check('checked model selection adds a gray display endpoint but no investigator visit or query node',"(()=>{const n=Object.values(__mig.xt().byId).find(n=>n.claimEndpoint),box=[...document.querySelectorAll('#canvas .node')].find(n=>n.textContent.startsWith('Agent A v2'));return n.trajId==='agent:agent-a@2'&&!n.traj&&n.trajOpened.length===0&&box.classList.contains('p-dim')&&!box.classList.contains('p-seen')&&!box.querySelector('.badge.step')&&box.textContent.includes('模型显式选边端点 · 未查询')&&__mig.probe().trajectory.nodes.length===4&&__mig.probe().trajectory.visits.length===7&&document.querySelectorAll('.navigation-event').length===5&&document.querySelector('.visit-summary').textContent.includes('额外展示 1 个未查询端点')})()");
+    await check('model-only edge has located ledger support and no invented query step',"(()=>{const e=document.querySelector('.wire.evidence[data-source=model]'),t=e.querySelector('title').textContent;return !e.hasAttribute('data-step')&&e.dataset.steps===''&&e.dataset.from==='agent:agent-a@2'&&e.dataset.to==='file:/fixture/A.ets@3'&&t.includes('关系依据：账本原始动作')&&t.includes('选择来源：模型显式声明')&&t.includes('无对应查询转移')&&t.includes('/fixture/original.jsonl')&&t.includes('fixture-document')&&[...document.querySelectorAll('.route-step')].some(n=>!n.hasAttribute('data-step')&&n.textContent.includes('非查询'))})()");
+    await check('merged relation retains both origins without claiming every source is model or ledger',"(()=>{const e=document.querySelector('.wire.evidence[data-source=mixed]'),t=e.querySelector('title').textContent;return e.dataset.steps==='3'&&t.includes('已记录转移 + 模型显式声明')&&t.includes('recorded_transition')&&t.includes('checked_model_edge')&&document.querySelector('.evidence-graph-summary').textContent.includes('已记录转移投影 1 / 显式模型选边已定位 2')})()");
+    await check('model-origin notes remain text, not executable HTML or semantic approval',"document.querySelector('.wire.evidence[data-source=model] title').textContent.includes('<img src=x')&&!document.querySelector('#wires img')&&!window.edgeXss&&document.querySelector('.wire.evidence[data-source=model] title').textContent.includes('不验证模型根因主张')");
+    await evaluate("[...document.querySelectorAll('#canvas .node')].find(n=>n.textContent.startsWith('Agent A v2')).click();__mig.setCand(true);document.querySelector('.navigation-timeline').open=true");
+    await until("document.querySelector('#side .tag')?.textContent.includes('v2')");
+    await check('opening a model-selected endpoint never adds a blue visit, step, or navigation transition',"JSON.stringify(__mig.probe().trajectory)===window.checkedTrace&&JSON.stringify(__mig.probe().steps)===window.checkedSteps&&JSON.stringify(__mig.probe().evidence_graph)===window.checkedGraph&&!document.querySelector('#canvas .node.sel.p-seen')&&document.querySelectorAll('#side .pvisit').length===0");
+    for(const width of [1250,2000]){
+      await send('Emulation.setDeviceMetricsOverride',{width,height:1100,deviceScaleFactor:1,mobile:false});
+      await evaluate('new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))');
+      const geometry=await evaluate('('+readLayoutGeometry.toString()+')()');
+      assert.deepEqual(geometry.overlaps,[],'model endpoints resize non-overlap');assert.deepEqual(geometry.outside,[],'model endpoints fit');
+      console.log('PASS model-selected independent endpoint and stub fit at '+width);
+    }
+    await send('Emulation.setDeviceMetricsOverride',{width:1600,height:1100,deviceScaleFactor:1,mobile:false});
+    for(const run of ['checked-model-legacy','checked-model-wrong-document','checked-model-no-origins','checked-model-unknown','checked-model-no-identity']){
+      await evaluate('__mig.load('+JSON.stringify(run)+')');
+      await until('__mig.probe().runDir==='+JSON.stringify(run)+' && __mig.xt()?.evidenceMode');
+      await check(run+' cannot promote uncertified model sources or add display endpoints',"document.querySelectorAll('.wire.evidence').length===0&&!Object.values(__mig.xt().byId).some(n=>n.claimEndpoint)&&__mig.probe().trajectory.nodes.length===4&&__mig.probe().trajectory.visits.length===7");
+    }
+    await evaluate("__mig.load('checked-model-no-trace')");
+    await until("__mig.probe().runDir==='checked-model-no-trace' && document.querySelectorAll('.wire.evidence').length===1");
+    await check('an authenticated explicit relation is visible without inventing an absent trajectory or query root',"__mig.probe().trajectory===null&&__mig.probe().steps.length===0&&__mig.xt().conclusionOnly&&Object.values(__mig.xt().byId).every(n=>n.claimEndpoint&&!n.traj&&!n.isRoot)&&document.querySelectorAll('#canvas .node.p-seen').length===0&&document.querySelectorAll('.navigation-event').length===0&&!document.querySelector('.wire.evidence').hasAttribute('data-step')");
     await evaluate("__mig.load('coverage')");
     await until("__mig.xt() && __mig.xt().walk && document.querySelectorAll('.wire.route').length===0");
     await check('coverage distinguishes accounted items, missing versions and unconfirmed candidates',"document.querySelector('.coverage-summary').textContent==='已交代 3/5 项 · 尚未有效交代 2 项' && document.querySelector('.repair-coverage').textContent.includes('记录版本 3 个 · 未确认候选 2 个（候选不等于修复）') && document.querySelector('.repair-coverage').textContent.includes('尚未登记：记录版本 1 个、候选 1 个')");
@@ -556,7 +605,10 @@ async function main(){
     await evaluate("window.findingTrace=JSON.stringify(__mig.probe().trajectory);window.findingGraph=JSON.stringify(__mig.probe().evidence_graph);window.findingNodeIds=JSON.stringify(Object.keys(__mig.xt().byId));document.querySelector('.file-findings').open=true;document.querySelectorAll('.file-findings details').forEach(n=>n.open=true)");
     await check('per-file causes preserve exact model reasons, invalid coordinates and evidence diagnostics',"[...document.querySelectorAll('.finding-file .finding-reason')].some(n=>n.textContent===__mig.probe().roles['agent-a'][0].reason) && document.querySelector('.file-findings').textContent.includes('agent:agent-a@v99') && document.querySelector('.file-findings').textContent.includes('版本越界，原坐标保留') && [...document.querySelectorAll('.file-findings .verow.bad')].some(n=>n.textContent.includes('INVALID <img src=x') && n.textContent.includes('位置不存在'))");
     await check('findings render model HTML as text and complete basis never becomes semantic green',"!document.querySelector('.file-findings img,.file-findings script,.file-findings b') && !window.findingXss && document.querySelector('.finding-boundary').textContent==='BOUNDARY <b>只是文本</b>' && document.querySelector('.finding-cause[data-basis-status=\"complete\"]').textContent.includes('字段齐全（语义未验证）') && !document.querySelector('.finding-cause.r-ok,.finding-item.r-ok')");
-    await check('unbound file association remains separate even when its agent coordinate exists',"document.querySelector('.finding-unbound').textContent.includes('不以 root 猜补') && !document.querySelector('.finding-unbound button,.finding-unbound .lnk,.finding-unbound .more') && JSON.stringify(__mig.probe().trajectory)===window.findingTrace && JSON.stringify(__mig.probe().evidence_graph)===window.findingGraph");
+    await check('missing file association does not invalidate independently bound references',"document.querySelector('.finding-unbound').textContent.includes('不以 root 猜补') && document.querySelector('.finding-unbound .finding-item').dataset.fileAssociated==='false' && document.querySelector('.finding-unbound .finding-item').dataset.referencesBound==='true' && document.querySelector('.finding-unbound').textContent.includes('文档/引用身份已绑定') && document.querySelector('.finding-unbound .verow .more') && !document.querySelector('.finding-unbound').textContent.includes('历史引用未绑定') && !document.querySelector('.finding-unbound').textContent.includes('修复前：') && JSON.stringify(__mig.probe().trajectory)===window.findingTrace && JSON.stringify(__mig.probe().evidence_graph)===window.findingGraph");
+    await evaluate("document.querySelector('.finding-unbound .verow .more').click()");
+    await until("document.querySelector('.finding-unbound').textContent.includes('EVIDENCE 1')");
+    await check('unassociated item can open its authentic action without inventing repair anchors or graph nodes',"JSON.stringify(__mig.probe().trajectory)===window.findingTrace && JSON.stringify(__mig.probe().evidence_graph)===window.findingGraph && JSON.stringify(Object.keys(__mig.xt().byId))===window.findingNodeIds && !__mig.probe().findings.items['document-sha:C'].repair.before && !__mig.probe().findings.items['document-sha:C'].repair.after");
     await evaluate("document.querySelector('.finding-file .finding-locate').click()");
     await check('finding locates existing reason drawer without adding a node, edge or visit',"document.querySelector('#side').textContent.includes('A 独有原因') && JSON.stringify(__mig.probe().trajectory)===window.findingTrace && JSON.stringify(__mig.probe().evidence_graph)===window.findingGraph && JSON.stringify(Object.keys(__mig.xt().byId))===window.findingNodeIds");
     await evaluate("[...document.querySelectorAll('.dchips span')].find(n=>n.textContent.startsWith('B ')).click()");

@@ -39,7 +39,7 @@ async function main() {
     for (let i = 0; i < 100; i++) {
       ready = await evaluate(mode === 'unbound'
         ? "!!(window.__mig && __mig.probe() && document.querySelector('.trace-identity'))"
-        : "!!(window.__mig && __mig.probe() && __mig.xt() && __mig.xt().walk)");
+        : "!!(window.__mig && __mig.probe() && __mig.xt() && (__mig.xt().walk || __mig.xt().evidenceMode))");
       if (ready) break;
       await new Promise(resolve => setTimeout(resolve, 300));
     }
@@ -49,26 +49,31 @@ async function main() {
     assert.deepEqual(geometry.overlaps, [], 'all atom/stub boxes are non-overlapping');
     assert.deepEqual(geometry.outside, [], 'default fit keeps every atom/stub in the canvas viewport');
     const state = await evaluate(`(() => {
-      const p=__mig.probe(), x=__mig.xt();
+      const p=__mig.probe(), x=__mig.xt(), trajectory=p.trajectory||{};
       return {bound:p.structured?.identity?.bound, errors:p.structured?.errors,
         traceBound:p.trace_identity?.bound, identityBanner:document.querySelector('.trace-identity')?.dataset.status,
         coverageComplete:p.coverage?.complete, coverageCounts:p.coverage?.counts,
         manifestSource:p.repair_manifest_origin?.source, manifestPolicyChanged:p.repair_manifest_origin?.policy_changed,
         colored:document.querySelectorAll('#canvas .node.p-chain, #canvas .node.p-seen').length,
-        nodes:p.trajectory.nodes.length, displayed:Object.values(x?.byId||{}).filter(n=>n.traj).length,
+        nodes:(trajectory.nodes||[]).length, displayed:Object.values(x?.byId||{}).filter(n=>n.traj).length,
+        additionalExpected:(p.evidence_graph?.additional_nodes||[]).map(n=>n.id).sort(),
+        additionalDisplayed:Object.values(x?.byId||{}).filter(n=>n.claimEndpoint).map(n=>n.trajId).sort(),
+        additionalUnqueried:Object.values(x?.byId||{}).filter(n=>n.claimEndpoint).every(n=>!n.traj&&(n.trajOpened||[]).length===0),
         evidenceMode:!!x?.evidenceMode,
-        expected:x?.evidenceMode ? (p.evidence_graph?.edges||[]).map(e=>e.steps[0]).sort((a,b)=>a-b)
-          : p.trajectory.transitions.map(t=>t.step).sort((a,b)=>a-b),
-        drawn:[...document.querySelectorAll('.wire.route')].map(n=>Number(n.dataset.step)).sort((a,b)=>a-b),
-        expectedEvidence:(p.evidence_graph?.edges||[]).map(e=>({id:e.id,from:e.from,to:e.to,kind:e.kind,status:e.status,steps:e.steps.join(',')})),
-        drawnEvidence:[...document.querySelectorAll('.wire.evidence')].map(n=>({id:n.dataset.evidenceId,from:n.dataset.from,to:n.dataset.to,kind:n.dataset.kind,status:n.dataset.relationStatus,steps:n.dataset.steps})),
-        navigation:p.trajectory.transitions.map(t=>t.step),
+        expected:x?.evidenceMode ? (p.evidence_graph?.edges||[]).map(e=>(e.query_steps||e.steps||[])[0]).filter(s=>s!=null).sort((a,b)=>a-b)
+          : (trajectory.transitions||[]).map(t=>t.step).sort((a,b)=>a-b),
+        drawn:[...document.querySelectorAll('.wire.route[data-step]')].map(n=>Number(n.dataset.step)).sort((a,b)=>a-b),
+        expectedEvidence:(p.evidence_graph?.edges||[]).map(e=>({id:e.id,from:e.from,to:e.to,kind:e.kind,status:e.status,source:e.source_of_claim,steps:(e.query_steps||e.steps||[]).join(',')})),
+        drawnEvidence:[...document.querySelectorAll('.wire.evidence')].map(n=>({id:n.dataset.evidenceId,from:n.dataset.from,to:n.dataset.to,kind:n.dataset.kind,status:n.dataset.relationStatus,source:n.dataset.source,steps:n.dataset.steps})),
+        navigation:(trajectory.transitions||[]).map(t=>t.step),
         timeline:[...document.querySelectorAll('.navigation-event')].map(n=>Number(n.dataset.step)),
-        visits:p.trajectory.visits.length, queries:p.steps.length, defects:Object.keys(p.defects)};
+        visits:(trajectory.visits||[]).length, queries:p.steps.length, defects:Object.keys(p.defects)};
     })()`);
     assert.equal(state.bound, mode === 'bound', 'expected report identity binding');
     assert.deepEqual(state.errors, [], 'structured report schema valid');
     assert.equal(state.displayed, state.nodes, 'all exact entities displayed');
+    assert.deepEqual(state.additionalDisplayed, state.additionalExpected, 'all additional selected endpoints displayed separately');
+    assert.equal(state.additionalUnqueried, true, 'model-selected display endpoints never become recorded visits');
     assert.deepEqual(state.drawn, state.expected, state.evidenceMode ? 'only projected read/write edges drawn' : 'legacy viewer draws every recorded transition');
     if (state.evidenceMode) {
       assert.deepEqual(state.drawnEvidence, state.expectedEvidence, 'read/write kind, certainty, direction and supporting steps preserved');

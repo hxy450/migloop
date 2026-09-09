@@ -141,7 +141,9 @@ def test_fixchain_template_separates_navigation_from_evidence_projection() -> No
     html = load_asset("fixchain.html")
     for needle in ("probeBuildTrajectory(", "PROBE.trajectory", "node.traj", "PROBE.evidence_graph",
                    "XT.evidenceEdges", '"navigation-timeline"', '"navigation-event"',
-                   'e.source_of_claim !== "ledger"', 'graph.identity_bound === true',
+                   'function probeGraphEdgeAllowed(e)', 'graph.identity_bound === true',
+                   'e.relation_source !== "ledger"', 'o.selection_source === "checked_model_edge"',
+                   '(doc.document_source || {}).verified !== true', 'node.claimEndpoint',
                    'path.setAttribute("data-from", e.from)', 'path.setAttribute("data-to", e.to)',
                    "if (XT.evidenceMode) return", "不是全账本图或完整根因图"):
         assert needle in html, needle

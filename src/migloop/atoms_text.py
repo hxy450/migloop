@@ -31,9 +31,10 @@ def _who(ledger: atoms.Ledger, by: str, ver: int | None) -> str:
     if by in _EXT_LABEL:
         return _EXT_LABEL[by]
     owner = ledger.agents.get(by)
+    address = f" (id={by})" if owner else ""
     if owner and ver is not None and ver > owner.n_versions:
-        return atoms.agent_label(ledger, by) + f" 收尾后(喂养槽 {ver}，未形成版本；action 查原文)"
-    return atoms.agent_label(ledger, by) + (f" v{ver}" if ver is not None else "")
+        return atoms.agent_label(ledger, by) + f" 收尾后(喂养槽 {ver}，未形成版本；action 查原文)" + address
+    return atoms.agent_label(ledger, by) + (f" v{ver}" if ver is not None else "") + address
 
 
 def _core(seq: Any, loc: int | str | None) -> str:
