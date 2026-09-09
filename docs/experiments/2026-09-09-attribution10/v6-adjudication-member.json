@@ -1,0 +1,459 @@
+{
+  "schema": "migloop-semantic-adjudication/1",
+  "case": "member-center",
+  "questions": [
+    "S3",
+    "S4"
+  ],
+  "audited_at": "2026-09-09 18:35:24 UTC",
+  "scope": "Independent bounded original-record adjudication of all four V6 tools runs. No new model calls, no run/reference/source modifications; UI visual fidelity not scored here.",
+  "input_identity": {
+    "source_code_id": "4d5db4f",
+    "source_digest": "76a01f4fae7bf0fe142ade7b2a4f6c5cd6842dc9fc9b3f8dbaa60a8ac88b79cb",
+    "pool_digest": "a78b1373045f7558d6da3b76123e30d032635a2a0b4cdd665e7f80c0bdf8b337",
+    "task_sha256": "e60ad7491cd5991a948f8c7128432feca230a59bee208640ca5b90a44d68dec1",
+    "all_four_native_metrics_integrity_unchanged": true
+  },
+  "reference": {
+    "path": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/reference-v1/legacy-reference.json",
+    "sha256": "2c015536094fff1e42bb3b6b5cc2dce743c0f2a0f6924254027f7f8a5faac927",
+    "locator_checks": 55,
+    "member_record_sha_checks_in_actual_pool": 11,
+    "oracle_pool": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v1/member-center/pool",
+    "not_gold": [
+      "tool output",
+      "old V5 reports",
+      "GUIDE",
+      "basis completeness",
+      "draft check mechanical_clear"
+    ]
+  },
+  "raw_oracle": [
+    {
+      "id": "S3-mask",
+      "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+      "lines": [
+        81,
+        103,
+        104,
+        106,
+        107
+      ],
+      "facts": "Classified three sites: AppLoad206,PayAgreement704,RenewRule728. Script writes each file before appending report; same-call successful output reports3. This supports actual script writes1transparent+2Palette, but onlyPayAgreement has adjacentpartialreadback and no all-site deviceverification."
+    },
+    {
+      "id": "S3-H5-S4-rewrite",
+      "file": "9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aslice8-pay-80bbb1f44b77da0f.jsonl",
+      "lines": [
+        21,
+        24,
+        264,
+        265
+      ],
+      "facts": "Read requestedL21/returnedL24 before nativeWriteL264/result265. Kotlin276–282 numeric-onlyAbsoluteSizeSpan30; laternativeWrite wholeText30forpriceText. H5 maskalreadyTransparent, excluded byscript'sexisting-maskskip."
+    },
+    {
+      "id": "S4-stages",
+      "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+      "lines": [
+        528,
+        529,
+        592,
+        593
+      ],
+      "facts": "FirstForEach splitPriceRuns, thenfixedtwoSpan priceDigits/priceSuffix. Laterstepdeclaresprivatestatic helpers andhasok pluscode readback; not a newformalfile/agentversion inV6ledger."
+    },
+    {
+      "id": "S4-compile",
+      "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-af0e3d2ae54dbf769.jsonl",
+      "lines": [
+        24,
+        26,
+        27,
+        32,
+        33,
+        34,
+        35,
+        36,
+        37
+      ],
+      "facts": "Actualcompilerprivateaccesserrors; observedhelpers inlateRead areuncertainnearestv14binding, notv14snapshot. TwoEditsremoveprivate, secondbuildEXIT0/BUILD SUCCESSFUL. Noindependentdeviceproof."
+    },
+    {
+      "id": "initial-style-counterevidence",
+      "file": "9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aconv-member-08b3dcf6deb3c515.jsonl",
+      "lines": [
+        61
+      ],
+      "facts": "OriginalProductItem.priceText documentedrollingdigits,e.g.598;showBottom separately0.01/day. InheritedfontSize30line alone doesnotestablisha priorcausalmistake; judginginitialagentrequiresitsactualinputandtextdatacontract."
+    }
+  ],
+  "runs": [
+    {
+      "run_dir": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v6-document/member-center/runs/tools/rep1",
+      "source": "4d5db4f",
+      "model": "gpt-5.5",
+      "effort": "medium",
+      "final_mode": "document",
+      "metrics": {
+        "wall_s": 481.76131469989195,
+        "end_to_end_s": 494.8010220999131,
+        "tool_calls": 47,
+        "tool_chars": 165980,
+        "input_total": 1572921,
+        "cache_read_included": 1452544,
+        "input_uncached": 120377,
+        "output": 23472,
+        "reasoning_included": 1510,
+        "result_chars": 9117,
+        "until_calls": 0,
+        "blame_calls": 4,
+        "total_input_plus_output": 1596393
+      },
+      "schema": {
+        "valid": true,
+        "nodes_resolved": 12,
+        "nodes_total": 12,
+        "evidence_ok": 33,
+        "explicit_edges_true": 4,
+        "implicit_false": 7,
+        "implicit_unknown": 1
+      },
+      "coverage": {
+        "expected": 38,
+        "versions": 7,
+        "candidates": 31,
+        "provided": 7,
+        "missing_candidates": 31,
+        "deferred": 3,
+        "complete": false,
+        "last_checked_provided": 38,
+        "last_checked_deferred": 22
+      },
+      "binding": {
+        "status": "mismatch",
+        "last_check_document": "720e6d466bac58ab9c9eb28ae5ff335c7d8759524a4bccbd27396b9c81642ec9",
+        "final_document": "cab2b12be8e77aec4a0a427b531e33d3ce4e0f5293a1edf86c15009e44c5424e"
+      },
+      "semantic": {
+        "S3": "Correct AppLoad@206 transparent, PayAgreement@704 and RenewRule@728 Palette; actual patch inferred from classifier+script+same-call stdout and PayAgreement readback. Mentions one preexisting transparent mask but does not identify H5/skipped exception. Does not certify device. Still arbitrary repair v9->v10 (CTA) despite boundary explicitly disavowing mask anchor.",
+        "S4_price": "Correct before singleText30, first ForEach/splitPriceRuns (raw L528/529), second two spans priceDigits/priceSuffix (L592/593). No Slice8 querying, source input L21/24 and rewrite L264/265 omitted; after 4 blame unknowns says cannot identify earliest generator, does not investigate nearest rewrite/input.",
+        "S4_compile": "Correct private helpers introduced by visual fixer, builder fixes visibility only, final compile PASS not visual verification. Uses builder error+Edit+summary; original independent build37 supports PASS. Causal actor correct but attaches post-tail action15731 (feeding41, versions40) to fixer@v40. Main post-tail notification14849 (feeding45,versions44) attached to main@v43.",
+        "annotation": "7 version rows out_of_scope or explained correctly, no not_repair denial; final omitted every candidate row from checked38-row draft. notes falsely says complete candidate checklist/mechanical_clear. Four explicit edges true after check corrected builder v3->v15 to v2->v15; implicit adjacency not claimed causal should not counted as false model assertions."
+      },
+      "locators": {
+        "oracle": {
+          "mask": "fixer L81,103/104,106/107; Slice8 L264/265 H5",
+          "price": "Slice8 Read useL21/resultL24; WriteL264/result265; fixerL528/529 and592/593",
+          "compile": "builderL24,32/33,34/35,36/37; mainL1758 summary"
+        },
+        "transcript": {
+          "action_mask_result": 66,
+          "action_l592_result": 72,
+          "blame_results": [
+            198,
+            200,
+            201,
+            202
+          ],
+          "action_main_notify_result": 241,
+          "checks": [
+            252,
+            261
+          ]
+        },
+        "report": "verdict.yaml; result.json.response_text; final dropped31 candidate rows; notes mechanical_clear"
+      },
+      "rubric": {
+        "run": "document/rep1",
+        "mask_sites_and_values": "pass",
+        "h5_existing_transparent_skip": "missing",
+        "slice8_input_to_bad_rewrite": "missing",
+        "two_price_repair_stages": "pass",
+        "fixer_private_error_and_builder_repair": "pass",
+        "device_not_overclaimed": "pass",
+        "unsupported_red_source": "none_for_initial_price",
+        "version_annotation": "wrong_mask_anchor_and_posttail_bindings"
+      }
+    },
+    {
+      "run_dir": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v6-document/member-center/runs/tools/rep2",
+      "source": "4d5db4f",
+      "model": "gpt-5.5",
+      "effort": "medium",
+      "final_mode": "document",
+      "metrics": {
+        "wall_s": 523.8158729999559,
+        "end_to_end_s": 537.0672881999053,
+        "tool_calls": 80,
+        "tool_chars": 470252,
+        "input_total": 3219866,
+        "cache_read_included": 2995200,
+        "input_uncached": 224666,
+        "output": 24103,
+        "reasoning_included": 2424,
+        "result_chars": 14529,
+        "until_seq_calls": 0,
+        "until_ts_calls": 4,
+        "blame_calls": 4,
+        "total_input_plus_output": 3243969
+      },
+      "coverage": {
+        "expected": 38,
+        "versions": 7,
+        "candidates": 31,
+        "provided": 38,
+        "explained": 14,
+        "deferred": 17,
+        "not_repair": 7,
+        "complete": true,
+        "semantic_caveat": "Seven not_repair rows are actual scan/grep/import checks, not denial of recorded repairs."
+      },
+      "binding": {
+        "status": "mismatch",
+        "submission": "inline accepted",
+        "checks": [
+          {
+            "step": 78,
+            "errors": 3,
+            "warnings": 1
+          }
+        ],
+        "last_check_document": "62e5489a685c75784647e0b06bf5416df71a2d1bd1fcaa6a7a6ce62b58a0cf8d",
+        "final_document": "4b5ae69e8446319095151e6d4aa751ace4cfb9b0e195753386e795f55156d89a"
+      },
+      "semantic": {
+        "S3": "Correct 1 transparent+2Palette and script/partialreadback vsdevice boundary. H5 exception omitted; artificial repair v7->v16 has no corresponding mask target version.",
+        "S4_price": "Core pass: globalsearch beforefirstrepair finds Slice8 fullWrite L264, actual earlyReadL21/result24 confirms numeric-onlyspan input beforebadwholeText rewrite. Two fix stages correct. Earlier converter culpability leftuninvestigated, not markedred.",
+        "S4_compile": "Core pass: laterfixerprivatehelpers causecompiler errors, builderremovesprivate/directbuildsuccess. Preservesuncertainv14binding. Stillposttailaction15731 anchoredfixer@v40 asredcausalentry.",
+        "annotation": "Full38-row coverage, legitimate7notrepairscans, 17deferred. One needs_review check then finalchangedwithno successfulmatchingcheck. No explicit edges in final; not a causal-mechanicalallpass."
+      },
+      "locators": {
+        "transcript": {
+          "failed_blame_results": [
+            268,
+            270,
+            271,
+            272
+          ],
+          "history_search": 288,
+          "slice8_agent": 297,
+          "slice8_write": [
+            304,
+            310
+          ],
+          "slice8_read": 365,
+          "check": 376
+        },
+        "report": "verdict.json.data; repairS3 v7->v16; S4_COMPILE entryv40."
+      },
+      "rubric": {
+        "run": "document/rep2",
+        "mask_sites_and_values": "pass",
+        "h5_existing_transparent_skip": "missing",
+        "slice8_input_to_bad_rewrite": "pass",
+        "two_price_repair_stages": "pass",
+        "fixer_private_error_and_builder_repair": "pass",
+        "device_not_overclaimed": "pass",
+        "unsupported_red_source": "none_for_initial_price",
+        "version_annotation": "wrong_mask_anchor_and_posttail_binding"
+      }
+    },
+    {
+      "run_dir": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v6-reference/member-center/runs/tools/rep1",
+      "source": "4d5db4f",
+      "model": "gpt-5.5",
+      "effort": "medium",
+      "final_mode": "reference",
+      "metrics": {
+        "wall_s": 569.8634679000825,
+        "end_to_end_s": 583.3025366000365,
+        "tool_calls": 61,
+        "tool_chars": 249505,
+        "input_total": 2942494,
+        "cache_read_included": 2780160,
+        "input_uncached": 162334,
+        "output": 26476,
+        "reasoning_included": 2532,
+        "until_seq_calls": 0,
+        "until_ts_calls": 1,
+        "blame_calls": 2,
+        "total_input_plus_output": 2968970
+      },
+      "schema": {
+        "valid": true,
+        "nodes_resolved": 13,
+        "nodes_total": 13,
+        "evidence_ok": 40,
+        "explicit_edges_true": 4,
+        "implicit_true": 1,
+        "implicit_false": 5,
+        "implicit_unknown": 4
+      },
+      "coverage": {
+        "expected": 38,
+        "versions": 7,
+        "candidates": 31,
+        "provided": 38,
+        "explained": 15,
+        "deferred": 23,
+        "not_repair": 0,
+        "complete": true,
+        "semantic_caveat": "candidate d292748... action15670 used price finding in S4 nodes but out_of_scope reason because whole action not single file write; misuses not-investigated status."
+      },
+      "binding": {
+        "status": "matched",
+        "submission": "accepted",
+        "last_check": 61,
+        "draft_sha256": "2ecbd19acc7e02b2f118a2d37c60f9c8cd47d1923958175f780e5e13df231f65",
+        "document_sha256": "5ac47bda8d70fb6c4cef561460bf047395a088093e18ff7b8344a267cd7b64b4",
+        "first_check_errors": 3,
+        "first_check_warnings": 2
+      },
+      "semantic": {
+        "S3": "Core pass: AppLoad transparent, PayAgreement and RenewRule dark Palette#8C000000; H5 already transparent and skipped. Distinguishes script-reported actual writes and partial readback from final state/device. Removes fake mask repair interval. Actual token source opened.",
+        "S4_price": "Core mostly pass: now v7 full snapshot -> ordinary blame -> pre-Write until_ts pool search -> Slice8 Read L21/resultL24. Correct known Kotlin numeric-only30 input and later wholeText30 rewrite, two repair stages. Still red conv-member@v1 merely for inherited30vp styling: original converter WriteL61 priceText documented rolling digits, style alone counterevidence admits not inherently wrong, initial applicable input was not established. Attribution unsupported, not proven never responsible.",
+        "S4_compile": "Correct private helpers introduced by visual fixer, builder removesprivate, direct build EXIT0+SUCCESSFUL, no device proof. But deliberately maps after-final action15731 feeding41/no v41 to last known fixer@v40; annotation semantically wrong even declared boundary.",
+        "annotation": "Reference submission preserves all38 coverage rows and matchedchecked draft; no not_repair denial. 4 explicit edges true after check corrected agent/file version confusion. One coverage out_of_scope used for relevant price finding because not an actual write; accounting complete is not semantic fullpass."
+      },
+      "locators": {
+        "report": "verdict.json.data / saved original checked draft, final ref accepted",
+        "transcript": {
+          "known_file7": 232,
+          "H5_window": 239,
+          "blame_unknown_v11": 288,
+          "blame_known_v7": 296,
+          "until_ts_search": 303,
+          "slice8_action": 310,
+          "checks": [
+            341,
+            365
+          ],
+          "corrected_slice_agent_v12": 354
+        },
+        "raw_initial_converter": "9b310.../subagents/agent-aconv-member-08b3dcf6deb3c515.jsonl L61: ProductItem.priceText comment rollingTextView digits (598); showBottom separately0.01/day; Text(item.priceText).fontSize30."
+      },
+      "rubric": {
+        "run": "reference/rep1",
+        "mask_sites_and_values": "pass",
+        "h5_existing_transparent_skip": "pass",
+        "slice8_input_to_bad_rewrite": "pass",
+        "two_price_repair_stages": "pass",
+        "fixer_private_error_and_builder_repair": "pass",
+        "device_not_overclaimed": "pass",
+        "unsupported_red_source": "conv_member_style_line_not_sufficient_for_red",
+        "version_annotation": "posttail_binding_to_last_known_version"
+      }
+    },
+    {
+      "run_dir": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v6-reference/member-center/runs/tools/rep2",
+      "source": "4d5db4f",
+      "model": "gpt-5.5",
+      "effort": "medium",
+      "final_mode": "reference",
+      "metrics": {
+        "wall_s": 418.2641194999451,
+        "end_to_end_s": 431.128672300023,
+        "tool_calls": 49,
+        "tool_chars": 165721,
+        "input_total": 861314,
+        "cache_read_included": 749568,
+        "input_uncached": 111746,
+        "output": 20069,
+        "reasoning_included": 1283,
+        "until_seq_calls": 0,
+        "until_ts_calls": 0,
+        "blame_calls": 1,
+        "total_input_plus_output": 881383
+      },
+      "coverage": {
+        "expected": 38,
+        "versions": 7,
+        "candidates": 31,
+        "provided": 38,
+        "explained": 17,
+        "deferred": 21,
+        "not_repair": 0,
+        "complete": true,
+        "semantic_caveat": "Same asref1: d292748... pricefinding action15670 used S4 butmarkedout_of_scope because not a filewrite; statusmisuse."
+      },
+      "binding": {
+        "status": "matched",
+        "submission": "accepted",
+        "draft_sha256": "546053754974d6629035ca4bac5d7a4b74e5879b503ab45d317908e3dd8bcec1",
+        "document_sha256": "ca8dda728e8cb9f77193f106370c95974cce3ca157dd033b253f9eb8d8e8f4d9",
+        "checks": [
+          {
+            "step": 48,
+            "errors": 2,
+            "warnings": 1
+          },
+          {
+            "step": 49,
+            "errors": 0,
+            "warnings": 0
+          }
+        ]
+      },
+      "semantic": {
+        "S3": "Correct AppLoad@206 transparent,PayAgreement@704/RenewRule@728 Palette; inference from classifier+scriptstdout vs partialPayreadback/device unknown. Again omits H5 exception/name/skip; coverage only says existingone transparent.",
+        "S4_price": "Partial: confirms original singleText30, fixer reads Android input and first ForEach+secondtwoSpan repairs, but one unknownblame then stops; no Slice8 actor/input/nativefullWrite investigation, no until. More cautious thanreference1 and avoidsconv red unsupported, but causal recall drops.",
+        "S4_compile": "Fact core correct privatehelper introduced by later fixer scheme, builderdirecterrors/Edit/PASS no visualoverclaim. All nodesnormal, laterposttailaction15731 discussed underfixer@v33 incorrectly collocates distinctphase. Model says build-verify read helpers atv14 although actualRead returns v14 nearestversionbinding explicitly uncertain: observedlines not formalv14content.",
+        "annotation": "Reference preserves38 rows/matched; nofalse not_repair; scope statuses needfullreview. Cannot use accounted ormatched asaccuracy."
+      },
+      "locators": {
+        "report": "verdict.json.data.defects S4 nodes[2] says atv14",
+        "transcript": {
+          "blame_unknown": 154,
+          "builder_agent": 169,
+          "builder_action17287": 196,
+          "checks": [
+            230,
+            241
+          ]
+        },
+        "raw_builder": "ff019.../subagents/agent-af0e3d2ae54dbf769.jsonl L26/27 grep seesprivatehelpers aftercandidateL592, not certifiedv14snapshot"
+      },
+      "rubric": {
+        "run": "reference/rep2",
+        "mask_sites_and_values": "pass",
+        "h5_existing_transparent_skip": "missing",
+        "slice8_input_to_bad_rewrite": "missing",
+        "two_price_repair_stages": "pass",
+        "fixer_private_error_and_builder_repair": "pass",
+        "device_not_overclaimed": "pass",
+        "unsupported_red_source": "none",
+        "version_annotation": "uncertain_v14_observation_upgraded_and_posttail_under_v33"
+      }
+    }
+  ],
+  "comparisons": {
+    "scope": "Two runs per submission mode; exploratory observations, not a stable causal estimate or raw-baseline acceptance.",
+    "document_mean": {
+      "total_input_plus_output": 2420181,
+      "tool_chars": 318116,
+      "wall_s": 502.7885938499239,
+      "output": 23787.5
+    },
+    "reference_mean": {
+      "total_input_plus_output": 1925176.5,
+      "tool_chars": 207613,
+      "wall_s": 494.0637937000138,
+      "output": 23272.5
+    },
+    "observed_total_token_reduction_percent": 20.453201640703732,
+    "acceptance_met": false,
+    "acceptance_reason": "Raw baseline comparison not yet adjudicated; semantic improvement is not stable; preserved submitted documents do not certify correctness."
+  },
+  "summary": {
+    "mask_values_correct": 4,
+    "h5_exception_complete": 1,
+    "slice8_input_rewrite_joined": 2,
+    "repair_stages_and_compile_boundary_correct": 4,
+    "reference_mode_final_draft_matched": 2,
+    "document_mode_final_draft_matched": 0,
+    "semantic_success_not_established": true,
+    "pending": "Raw rep1/rep2 must be graded independently against this same raw rubric before tools-vs-raw acceptance."
+  }
+}
+

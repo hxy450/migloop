@@ -1,0 +1,282 @@
+{
+  "schema": "migloop-attribution-v6-c4-adjudication/1",
+  "status": "complete",
+  "scope": {
+    "case": "C4_dialog_hit_test_patch_boundary",
+    "source_code_id": "4d5db4f",
+    "actual_model": "gpt-5.5",
+    "actual_effort": "medium",
+    "transport": "native",
+    "runs": 4,
+    "arms": ["document", "reference"],
+    "repetitions_per_arm": 2,
+    "reference": "_migloop-eval-20260909/attribution10/reference-v1/codex-reference.json",
+    "raw_comparison_in_scope": false,
+    "semantic_check_distinct_from_mechanical_check": true
+  },
+  "oracle": {
+    "r1": {
+      "file": "rollout-2026-08-16T17-54-23-01a009fe-68e3-7f42-b76b-5e863c555976.jsonl",
+      "facts": [
+        {"claim": "User reports a stuck page and consent has no response.", "lines": ["L7997"]},
+        {"claim": "Pre-patch output exposes handlers and visible-state HitTestMode.Block.", "lines": ["L8026-L8027"]},
+        {"claim": "SDK output distinguishes Default self-and-children response from Block child blocking.", "lines": ["L8047-L8048", "L8051-L8052"]},
+        {"claim": "Actual patch changes Block to Default and readback shows Default.", "lines": ["L8066-L8067", "L8109-L8110"]},
+        {"claim": "R1 validation was blocked, produced no new HAP, and the existing HAP predated the patch.", "lines": ["L8115"]}
+      ]
+    },
+    "r2": {
+      "file": "rollout-2026-08-21T09-18-20-01a021e5-c150-7b12-a610-d40c07816b98.jsonl",
+      "facts": [
+        {"claim": "Native output records a later successful HAP build and installation.", "lines": ["L840-L841"]},
+        {"claim": "A native command reads a saved walk ledger recording consent leading into Guide.", "lines": ["L1073-L1074"]},
+        {"claim": "A native command reads saved checkpoint/manifest records of click bounds and arrival at GuideStatusFragment.", "lines": ["L3758-L3759"]},
+        {"claim": "Later judge material has visual/text fail or elements-missing boundaries and does not close all dialog interactions.", "lines": ["L4426-L4430"]}
+      ]
+    },
+    "unknown": [
+      "Whether the later HAP contains this exact patch.",
+      "Whether the patch solely caused the recorded transition.",
+      "An independent evaluator replay of the consent click.",
+      "Behavior of reject and both agreement links after the patch.",
+      "The original introducer and generation-time obligation for the Block line."
+    ]
+  },
+  "runs": [
+    {
+      "id": "document-rep1",
+      "path": "_migloop-eval-20260909/attribution10/formal-v6-document/codex-c4/runs/tools/rep1",
+      "core": "accepted",
+      "full_annotation": "incomplete_recoverable",
+      "correct": [
+        "Static source/SDK/patch/readback chain.",
+        "R1 immediate no-new-HAP boundary.",
+        "No patch-to-device causal binding."
+      ],
+      "omissions": [
+        "Did not open R2 native build/install output at L840-L841.",
+        "Did not open the saved walk/manifest evidence of a recorded consent transition."
+      ],
+      "unsupported": [],
+      "minor_wording": [],
+      "route": {
+        "r2_build_evidence_used": "later assistant/final claims only",
+        "saved_walk_opened": false,
+        "manifest_opened": false
+      },
+      "delivery": {
+        "mode": "inline",
+        "accepted": true,
+        "check_calls": 2,
+        "first_check": "needs_review: two invalid references and duplicate-node role conflict",
+        "final_check": "mechanical_clear",
+        "matched_final_document": true,
+        "semantic_checked": false
+      },
+      "metrics": {
+        "input_total": 1879723,
+        "cache_read": 1686016,
+        "input_uncached": 193707,
+        "output": 15180,
+        "tool_calls": 62,
+        "tool_return_chars": 389622,
+        "result_chars": 3560,
+        "wall_s": 324.684,
+        "end_to_end_wall_s": 327.360,
+        "currency_cost": null
+      }
+    },
+    {
+      "id": "document-rep2",
+      "path": "_migloop-eval-20260909/attribution10/formal-v6-document/codex-c4/runs/tools/rep2",
+      "core": "accepted",
+      "full_annotation": "accepted_with_minor_wording_caution",
+      "correct": [
+        "Static source/SDK/patch/readback chain and R1 boundary.",
+        "Direct R2 native build/install.",
+        "Saved walk/manifest identified as record-layer evidence.",
+        "No source/HAP or patch/behavior binding.",
+        "Visual fail does not prove hit-test persistence; links remain untested."
+      ],
+      "omissions": [],
+      "unsupported": [],
+      "minor_wording": [
+        "The notes summarize the saved record as runtime being able to click into Guide, but surrounding text explicitly discloses the record layer and lack of independent validation."
+      ],
+      "route": {
+        "r2_native_build_opened": true,
+        "saved_walk_opened": true,
+        "manifest_opened": true
+      },
+      "delivery": {
+        "mode": "inline",
+        "accepted": true,
+        "check_calls": 1,
+        "final_check": "mechanical_clear",
+        "matched_final_document": true,
+        "semantic_checked": false
+      },
+      "metrics": {
+        "input_total": 976936,
+        "cache_read": 856576,
+        "input_uncached": 120360,
+        "output": 12725,
+        "tool_calls": 51,
+        "tool_return_chars": 202196,
+        "result_chars": 4288,
+        "wall_s": 275.466,
+        "end_to_end_wall_s": 278.129,
+        "currency_cost": null
+      }
+    },
+    {
+      "id": "reference-rep1",
+      "path": "_migloop-eval-20260909/attribution10/formal-v6-reference/codex-c4/runs/tools/rep1",
+      "core": "accepted",
+      "full_annotation": "requires_minor_evidence_downgrade",
+      "correct": [
+        "Static source/SDK/patch/readback chain and R1 boundary.",
+        "Direct R2 native build/install.",
+        "No fabricated agent@v253.",
+        "No patch-to-device causal binding."
+      ],
+      "omissions": [],
+      "unsupported": [],
+      "minor_wording": [
+        "Upgrades a saved manifest/checkpoint record to device UI being clickable and overcoming the gate; supported wording is that the saved artifact records one click-to-Guide transition."
+      ],
+      "route": {
+        "r2_native_build_opened": true,
+        "saved_walk_or_manifest_opened": true,
+        "child_report_opened": true,
+        "independent_device_replay": false
+      },
+      "delivery": {
+        "mode": "checked_draft_ref",
+        "accepted": true,
+        "check_calls": 1,
+        "final_check": "mechanical_clear",
+        "matched_check_step": 76,
+        "draft_sha256": "8d87130da375e6f8bd84db22ddd4853b764c159e6794b8bae1800838ed8bae13",
+        "document_sha256": "3251273b1be3698d699788f006389b3d0c8a2d2b4974bd825f3ec4aa63f1a88f",
+        "semantic_checked": false
+      },
+      "metrics": {
+        "input_total": 1715048,
+        "cache_read": 1581056,
+        "input_uncached": 133992,
+        "output": 12788,
+        "tool_calls": 76,
+        "tool_return_chars": 240574,
+        "result_chars": 269,
+        "wall_s": 284.256,
+        "end_to_end_wall_s": 286.900,
+        "currency_cost": null
+      }
+    },
+    {
+      "id": "reference-rep2",
+      "path": "_migloop-eval-20260909/attribution10/formal-v6-reference/codex-c4/runs/tools/rep2",
+      "core": "accepted",
+      "full_annotation": "accepted",
+      "correct": [
+        "Static source/SDK/patch/readback chain and R1 boundary.",
+        "Direct R2 native build/install.",
+        "Saved walk/manifest correctly limited to record-layer evidence.",
+        "No source/HAP or patch/behavior binding.",
+        "No four-interaction closure or sole-cause claim."
+      ],
+      "omissions": [],
+      "unsupported": [],
+      "minor_wording": [],
+      "route": {
+        "r2_native_build_opened": true,
+        "saved_walk_opened": true,
+        "manifest_opened": true,
+        "independent_device_replay": false
+      },
+      "delivery": {
+        "mode": "checked_draft_ref",
+        "accepted": true,
+        "check_calls": 2,
+        "first_check": "needs_review: duplicate-role warning",
+        "final_check": "mechanical_clear",
+        "matched_check_step": 44,
+        "draft_sha256": "bf90cba99188f4b2c1c0b30a81efb75b8d67d419cb0f042e07b8b27f9ee73b61",
+        "document_sha256": "dd88529651fd63c63770398e2e92c2575ee0007ed9afbf0f95a9485bfcca8958",
+        "semantic_checked": false
+      },
+      "metrics": {
+        "input_total": 856826,
+        "cache_read": 749568,
+        "input_uncached": 107258,
+        "output": 11721,
+        "tool_calls": 44,
+        "tool_return_chars": 177468,
+        "result_chars": 269,
+        "wall_s": 250.494,
+        "end_to_end_wall_s": 253.162,
+        "currency_cost": null
+      }
+    }
+  ],
+  "arm_totals": {
+    "document": {
+      "input_total": 2856659,
+      "cache_read": 2542592,
+      "input_uncached": 314067,
+      "output": 27905,
+      "tool_calls": 113,
+      "tool_return_chars": 591818,
+      "result_chars": 7848,
+      "checked_draft_chars": 11486,
+      "check_return_chars": 3461,
+      "wall_s": 600.150,
+      "end_to_end_wall_s": 605.489
+    },
+    "reference": {
+      "input_total": 2571874,
+      "cache_read": 2330624,
+      "input_uncached": 241250,
+      "output": 24509,
+      "tool_calls": 120,
+      "tool_return_chars": 418042,
+      "result_chars": 538,
+      "checked_draft_chars": 12204,
+      "check_return_chars": 2991,
+      "wall_s": 534.750,
+      "end_to_end_wall_s": 540.062
+    },
+    "reference_vs_document_pct": {
+      "input_total": -10.0,
+      "cache_read": -8.3,
+      "input_uncached": -23.2,
+      "output": -12.2,
+      "tool_calls": 6.2,
+      "tool_return_chars": -29.4,
+      "result_chars": -93.1,
+      "checked_draft_chars": 6.3,
+      "check_return_chars": -13.6,
+      "wall_s": -10.9,
+      "end_to_end_wall_s": -10.8
+    }
+  },
+  "overall": {
+    "core_acceptance": "4/4",
+    "full_annotation": {
+      "accepted": ["document-rep2", "reference-rep2"],
+      "bounded_correction_or_omission": ["document-rep1", "reference-rep1"]
+    },
+    "delivery": "4/4 accepted and matched; mechanical checks do not certify semantics",
+    "quality_comparison": "No clear semantic arm winner: reference rep1 is more complete than document rep1 but mildly overstates stored behavior evidence; both rep2 reports maintain the essential boundary.",
+    "cost_observation": "Reference mode is lower on token and time metrics in both repetitions, but still generates a full draft and uses no fewer aggregate tool calls.",
+    "limitations": [
+      "Four tools-only developer-set observations.",
+      "No raw arm is adjudicated here.",
+      "Investigation paths and semantic coverage differ.",
+      "Currency cost is unknown.",
+      "input_total already includes cache_read.",
+      "Do not infer end-to-end efficacy or a 20-30 percent raw-versus-tools saving from this comparison."
+    ]
+  }
+}

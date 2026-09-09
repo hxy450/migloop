@@ -1,0 +1,179 @@
+{
+  "schema": "migloop-semantic-adjudication/1",
+  "case": "member-center",
+  "questions": [
+    "S3",
+    "S4"
+  ],
+  "audited_at": "2026-09-09 18:42:33 UTC",
+  "scope": "Two raw runs independently checked against the same original-record rubric used forfourV6toolsruns. Notblinded: adjudicator hadseen toolreports; rubricandraworacle establishedbeforegradedoutputs. No newmodelcalls/run/reference/source edits.",
+  "reference": {
+    "path": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/reference-v1/legacy-reference.json",
+    "sha256": "2c015536094fff1e42bb3b6b5cc2dce743c0f2a0f6924254027f7f8a5faac927",
+    "locator_checks": 55,
+    "member_record_sha_checks_in_actual_pool": 11,
+    "oracle_pool": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v1/member-center/pool",
+    "not_gold": [
+      "tool output",
+      "old V5 reports",
+      "GUIDE",
+      "basis completeness",
+      "draft check mechanical_clear"
+    ]
+  },
+  "input_identity": {
+    "source_code_id": "4d5db4f",
+    "source_digest": "76a01f4fae7bf0fe142ade7b2a4f6c5cd6842dc9fc9b3f8dbaa60a8ac88b79cb",
+    "pool_digest": "a78b1373045f7558d6da3b76123e30d032635a2a0b4cdd665e7f80c0bdf8b337",
+    "task_sha256": "e60ad7491cd5991a948f8c7128432feca230a59bee208640ca5b90a44d68dec1",
+    "all_four_native_metrics_integrity_unchanged": true
+  },
+  "tool_adjudication": "v6-adjudication-member.json",
+  "raw_runs": [
+    {
+      "rep": 1,
+      "run_dir": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v6-document/member-center/runs/raw/rep1",
+      "metrics": {
+        "wall_s": 431.0024165000068,
+        "end_to_end_s": 442.4544522999786,
+        "input_total": 2311821,
+        "cache_read_included": 1960960,
+        "input_uncached": 350861,
+        "output": 14315,
+        "reasoning_included": 2104,
+        "total_input_plus_output": 2326136,
+        "tool_calls": 29,
+        "returned_chars": 8192610,
+        "result_chars": 3966
+      },
+      "locator_checks": {
+        "unique_records": 19,
+        "native_ids": 13,
+        "missing": 0,
+        "meaning_not_authenticated_by_locator_check": true
+      },
+      "rubric": {
+        "mask_sites_and_values": "pass",
+        "h5_existing_transparent_skip": "pass",
+        "slice8_input_to_bad_rewrite": "missing",
+        "two_price_repair_stages": "partial_first_ForEach_stage_missing",
+        "fixer_private_error_and_builder_repair": "pass",
+        "device_not_overclaimed": "pass"
+      },
+      "findings": [
+        {
+          "code": "missing_nearest_input_and_rewrite",
+          "detail": "S4 uses later finding/comment and original converter summary; does not join Slice8 actualReadL21/result24 to WriteL264/result265."
+        },
+        {
+          "code": "missing_intermediate_price_repair",
+          "detail": "Reports fixedtwoSpan and privatevisibility fixes but omits firstForEach/splitPriceRuns repair L528/529."
+        },
+        {
+          "code": "semantically_wrong_citation",
+          "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+          "line": 605,
+          "claim": "twoSpanpriceattempt",
+          "actual": "Only tabbackground/maskattempts in /tmp/att3.json, notprice. Report'sbuilderL29 independentlyshowsdualSpan, so wholeclaimnotfalse, butthiscitationdoesnotsupportit."
+        }
+      ],
+      "validation_boundary": "DirectbuildL37 cited forsecondsuccess; mask24fileclaim frombuilderfinalreportexplicitlynotdeviceproof."
+    },
+    {
+      "rep": 2,
+      "run_dir": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v6-document/member-center/runs/raw/rep2",
+      "metrics": {
+        "wall_s": 493.255498399958,
+        "end_to_end_s": 505.1080770000117,
+        "input_total": 3039282,
+        "cache_read_included": 2730496,
+        "input_uncached": 308786,
+        "output": 16702,
+        "reasoning_included": 1495,
+        "total_input_plus_output": 3055984,
+        "tool_calls": 34,
+        "returned_chars": 8578838,
+        "result_chars": 5117
+      },
+      "locator_checks": {
+        "unique_records": 23,
+        "native_ids": 16,
+        "missing": 0,
+        "meaning_not_authenticated_by_locator_check": true
+      },
+      "rubric": {
+        "mask_sites_and_values": "pass",
+        "h5_existing_transparent_skip": "partial_existing_transparent_excluded_but_H5_not_named",
+        "slice8_input_to_bad_rewrite": "missing",
+        "two_price_repair_stages": "pass",
+        "fixer_private_error_and_builder_repair": "pass",
+        "device_not_overclaimed": "pass"
+      },
+      "findings": [
+        {
+          "code": "missing_nearest_input_and_rewrite",
+          "detail": "OriginalKotlinrule is quoted aslaterfixer'sclaim atL615; nooriginalSlice8inputL21/24 oractualgenerationWriteL264/265."
+        },
+        {
+          "code": "mask_execution_evidence_weaker_than_available",
+          "detail": "Threevaluescorrect, butjustification usesmissinglist+script+finalselfreport+compile; actualsamecall3sites outputL104 exists andisnotcited. Doesnotcertifyallpostpatchdevicebehavior."
+        },
+        {
+          "code": "existing_exception_partially_identified",
+          "detail": "Correctly sayspreexistingTransparentat786cannotbecreditedtobatch, butdoesnotnameH5builder."
+        }
+      ],
+      "additional_claim_checks": [
+        {
+          "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a64594a2e464bd6af.jsonl",
+          "lines": [
+            391,
+            392
+          ],
+          "supported": "A02findinglisting/summarystatesprice suffixfail, maskalpha .20vs.55 andsystemicthreshold; sourceclaim, notindependentpixelretest."
+        },
+        {
+          "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-awalk-t2a-bc54558647f88c4c.jsonl",
+          "lines": [
+            347
+          ],
+          "supported": "RawreturnedUItext containsallfourquotedprices0.01/day,1/day,129,89; notpostrepairvalidation."
+        },
+        {
+          "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+          "lines": [
+            615
+          ],
+          "supported": "UnlikeL605,thisrecordreallycontainsMemberpriceattemptandquotedAndroidrule; itremainsfixer'ssourceclaim."
+        }
+      ],
+      "validation_boundary": "Compileendstatecorrect; finalvalidationreferenceprimarilybuilderL54summary, notindependentdeviceproof."
+    }
+  ],
+  "comparisons": {
+    "raw_mean_total_tokens": 2691060,
+    "reference_mean_total_tokens": 1925176.5,
+    "document_mean_total_tokens": 2420181,
+    "reference_observed_reduction_percent": 28.460290740451722,
+    "document_observed_reduction_percent": 10.065884818621662,
+    "raw_mean_wall_s": 462.1289574499824,
+    "reference_mean_wall_s": 494.0637937000138,
+    "raw_mean_output": 15508.5,
+    "reference_mean_output": 23272.5
+  },
+  "acceptance": {
+    "overall": false,
+    "token_observation_within_20_30_percent_for_reference_mean": true,
+    "token_result_is_not_stability_or_significance_proof": true,
+    "semantic_improvement_stable": false,
+    "ui_visual_fidelity_assessed_here": false,
+    "reason": "Reference mean28.46%belowraw inthis2x2sample, but1of2referencefindsSlice8,1of2misses; extraunsupportedconvred/posttailversionbindingsremain. RawS3exceptionsatleastascomplete; version/coverageUIobligationsnotrequiredofrawmustnotbescoredasrawfailures."
+  },
+  "conclusions": [
+    "Bothrawrunsget1transparent+2Paletteandprivatecompilefixcorrectwithoutdeviceoverclaim.",
+    "NeitherrawjoinsnearestSlice8actualinputandWrite;raw1alsomissesfirstForEachstage.",
+    "Reference contributesonecompleteSlice8chainandtwocompletepricerepairhistories,butisnotconsistentlybetterandaddsunsupportedsource/coordclaims.",
+    "Referencefinaldocumentpreservation2/2matchedistestableprotocolbenefit, notattributiontruth."
+  ]
+}
+

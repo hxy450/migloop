@@ -156,9 +156,19 @@ async function main() {
       assert(switched,'select a real defect without mutating probe data');
       const active=withBasis.filter(item=>item.defect===defect);
       const bound=structured.identity?.bound!==false && structured.identity?.match!==false && payload.trace_identity?.bound!==false;
-      const displayed=await evaluate(`[...document.querySelectorAll('#probe .attribution-basis')].map(${fieldDOM})`);
+      // Findings intentionally repeat a document's claims grouped by file.
+      // Count the canonical per-node panel once; authenticate copies separately.
+      const displayed=await evaluate(`[...document.querySelectorAll('#probe .pn .attribution-basis')].map(${fieldDOM})`);
       assert.equal(displayed.length,active.length,'current defect displays exactly its supplied basis entries');
       displayed.forEach((box,i)=>compareBasis(box,active[i].node,bound));
+      const copies=await evaluate(`[...document.querySelectorAll('#probe .finding-item .attribution-basis')].map(n=>({
+        defect:n.closest('.finding-item').dataset.defect,heading:n.closest('.finding-cause').querySelector('summary').textContent,
+        box:(${fieldDOM})(n)}))`);
+      for(const copy of copies){
+        const item=active.find(item=>item.defect===copy.defect&&copy.heading.startsWith(item.node.spec+' '));
+        assert(item,'file-grouped attribution copy belongs to an actual current-defect node');
+        compareBasis(copy.box,item.node,bound);
+      }
       const raw=parseModelBlock(structured);
       let originalCompared=false;
       if(raw.status==='parsed'){
