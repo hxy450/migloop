@@ -1,0 +1,73 @@
+{
+  "schema": "migloop-paired-metrics-plan/1",
+  "expected": {
+    "backend": "codex",
+    "model": "gpt-5.5",
+    "effort": "medium"
+  },
+  "cases": [
+    {
+      "id": "codex-c3",
+      "tools_case": "../../../../_migloop-eval-20260909/attribution10/formal-v11/codex-c3",
+      "raw_case": "../../../../_migloop-eval-20260909/attribution10/formal-v7/codex-c3",
+      "reps": [
+        1,
+        2
+      ]
+    },
+    {
+      "id": "codex-c2",
+      "tools_case": "../../../../_migloop-eval-20260909/attribution10/formal-v11/codex-c2",
+      "raw_case": "../../../../_migloop-eval-20260909/attribution10/formal-v7/codex-c2",
+      "reps": [
+        1,
+        2
+      ]
+    },
+    {
+      "id": "member-center",
+      "tools_case": "../../../../_migloop-eval-20260909/attribution10/formal-v11/member-center",
+      "raw_case": "../../../../_migloop-eval-20260909/attribution10/formal-v6-document/member-center",
+      "reps": [
+        1,
+        2
+      ]
+    },
+    {
+      "id": "dice-entry",
+      "tools_case": "../../../../_migloop-eval-20260909/attribution10/formal-v11/dice-entry",
+      "raw_case": "../../../../_migloop-eval-20260909/attribution10/formal-v7/dice-entry",
+      "reps": [
+        1,
+        2
+      ]
+    },
+    {
+      "id": "splash",
+      "tools_case": "../../../../_migloop-eval-20260909/attribution10/formal-v11/splash",
+      "raw_case": "../../../../_migloop-eval-20260909/attribution10/formal-v7/splash",
+      "reps": [
+        1,
+        2
+      ]
+    },
+    {
+      "id": "codex-c1",
+      "tools_case": "../../../../_migloop-eval-20260909/attribution10/formal-v11/codex-c1",
+      "raw_case": "../../../../_migloop-eval-20260909/attribution10/formal-v7/codex-c1",
+      "reps": [
+        1,
+        2
+      ]
+    },
+    {
+      "id": "codex-c4",
+      "tools_case": "../../../../_migloop-eval-20260909/attribution10/formal-v11/codex-c4",
+      "raw_case": "../../../../_migloop-eval-20260909/attribution10/formal-v6-document/codex-c4",
+      "reps": [
+        1,
+        2
+      ]
+    }
+  ]
+}
