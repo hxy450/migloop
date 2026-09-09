@@ -1,0 +1,172 @@
+{
+  "schema": "migloop-attribution-v7-c4-adjudication/1",
+  "status": "complete",
+  "scope": {
+    "case": "C4_dialog_hit_test_patch_boundary",
+    "source_code_id": "84bfcf8",
+    "actual_model": "gpt-5.5",
+    "actual_effort": "medium",
+    "transport": "native",
+    "runs": 2,
+    "reference": "_migloop-eval-20260909/attribution10/reference-v1/codex-reference.json"
+  },
+  "raw_boundary": {
+    "r1": {
+      "file": "rollout-2026-08-16T17-54-23-01a009fe-68e3-7f42-b76b-5e863c555976.jsonl",
+      "locators": ["L8026-L8027", "L8047-L8052", "L8066-L8067", "L8109-L8110", "L8115"]
+    },
+    "r2": {
+      "file": "rollout-2026-08-21T09-18-20-01a021e5-c150-7b12-a610-d40c07816b98.jsonl",
+      "locators": ["L840-L841", "L3917-L3918", "L7694"],
+      "boundary": "Later build/install and saved manifest records do not bind the exact patch to the artifact or behavior."
+    }
+  },
+  "runs": [
+    {
+      "id": "rep1",
+      "path": "_migloop-eval-20260909/attribution10/formal-v7/codex-c4/runs/tools/rep1",
+      "core": "accepted",
+      "full_annotation": "requires_material_correction",
+      "facts": [
+        {"index": 1, "grade": "partial", "reason": "Visible Block line supported; four Event callbacks not stated."},
+        {"index": 2, "grade": "supported", "reason": "SDK Default/Block semantics opened and accurate."},
+        {"index": 3, "grade": "supported", "reason": "Actual patch and readback support Block to Default."},
+        {"index": 4, "grade": "supported", "reason": "R1 blocked build and pre-fix HAP correctly bounded."},
+        {"index": 5, "grade": "partial", "reason": "Later build/install found, but same path plus later time is overstated as strong evidence that the patch entered the artifact."}
+      ],
+      "inference": "supported",
+      "unknowns": "mostly_supported",
+      "material_error": {
+        "claim": "补丁进入后续构建/安装产物 has strong process evidence from time ordering and same project path.",
+        "grade": "unsupported",
+        "counterevidence": "No target snapshot, source hash, HAP-source mapping or exact-line build input; the report later calls inclusion unknown.",
+        "internal_contradiction": true
+      },
+      "omissions": [
+        "Did not open saved Harmony walk/manifest records at R2 L1073-L1074 or L3917-L3918."
+      ],
+      "route": {
+        "r2_native_build_opened": true,
+        "harmony_manifest_opened": false,
+        "independent_device_replay": false
+      },
+      "delivery": {
+        "mode": "checked_draft_ref",
+        "accepted": true,
+        "check_calls": 2,
+        "first_check": "needs_review: duplicate-role warning",
+        "final_check": "mechanical_clear",
+        "matched_check_step": 75,
+        "draft_sha256": "1e05d3eab8dc3173b9d3714d0d0db2d498231f9643f3ef8f9be6b648dea93147",
+        "document_sha256": "dbb21269d11f918e3e998d524b1a4ec96d3d05e0f5e0db93d5582e5fe503f319",
+        "semantic_checked": false
+      },
+      "metrics": {
+        "input_total": 1553896,
+        "cache_read": 1439744,
+        "input_uncached": 114152,
+        "output": 15590,
+        "tool_calls": 75,
+        "tool_return_chars": 172087,
+        "result_chars": 269,
+        "wall_s": 349.785,
+        "end_to_end_wall_s": 352.616,
+        "currency_cost": null
+      }
+    },
+    {
+      "id": "rep2",
+      "path": "_migloop-eval-20260909/attribution10/formal-v7/codex-c4/runs/tools/rep2",
+      "core": "accepted",
+      "full_annotation": "accepted_with_recoverable_fact_omission",
+      "facts": [
+        {"index": 1, "grade": "partial", "reason": "Visible Block and wiring supported; four Event callbacks not enumerated."},
+        {"index": 2, "grade": "supported", "reason": "SDK Default/Block semantics opened and accurate."},
+        {"index": 3, "grade": "supported", "reason": "Patch success and readback support Block to Default."},
+        {"index": 4, "grade": "supported", "reason": "R1 blocked build and pre-fix HAP correctly bounded."},
+        {"index": 5, "grade": "supported", "reason": "Later build/install found and exact patch inclusion kept indirect and unknown."}
+      ],
+      "inference": "supported",
+      "unknowns": "supported",
+      "material_error": null,
+      "omissions": [
+        "Does not enumerate all four Event callbacks from the pre-patch source."
+      ],
+      "route": {
+        "r2_native_build_opened": true,
+        "harmony_manifest_opened": true,
+        "manifest_locator": "#01a021e5-c150-7b12-a610-d40c07816b98:3717@L3917",
+        "underlying_screenshot_or_dump_opened": false,
+        "independent_device_replay": false
+      },
+      "delivery": {
+        "mode": "checked_draft_ref",
+        "accepted": true,
+        "check_calls": 2,
+        "first_check": "needs_review: duplicate-role warning",
+        "final_check": "mechanical_clear",
+        "matched_check_step": 82,
+        "draft_sha256": "e56ef32aac1b1274dce7b3a635df96408cfa8687d254ea0f568057d5c7e87232",
+        "document_sha256": "b0e0a1e02af078b2af61b156bbe192b357b2a2bcb953bff024ef36665159cc15",
+        "semantic_checked": false
+      },
+      "metrics": {
+        "input_total": 1624706,
+        "cache_read": 1511424,
+        "input_uncached": 113282,
+        "output": 16278,
+        "tool_calls": 82,
+        "tool_return_chars": 236654,
+        "result_chars": 433,
+        "wall_s": 360.082,
+        "end_to_end_wall_s": 362.794,
+        "currency_cost": null
+      }
+    }
+  ],
+  "comparison": {
+    "v7_mean": {
+      "input_total": 1589301,
+      "cache_read": 1475584,
+      "input_uncached": 113717,
+      "output": 15934,
+      "tool_calls": 78.5,
+      "tool_return_chars": 204370.5,
+      "result_chars": 351,
+      "wall_s": 354.934,
+      "end_to_end_wall_s": 357.705
+    },
+    "v6_reference_mean": {
+      "input_total": 1285937,
+      "cache_read": 1165312,
+      "input_uncached": 120625,
+      "output": 12255,
+      "tool_calls": 60,
+      "tool_return_chars": 209021,
+      "result_chars": 269,
+      "wall_s": 267.375,
+      "end_to_end_wall_s": 270.031
+    },
+    "v7_vs_v6_reference_pct": {
+      "input_total": 23.6,
+      "cache_read": 26.6,
+      "input_uncached": -5.7,
+      "output": 30.0,
+      "tool_calls": 30.8,
+      "tool_return_chars": -2.2,
+      "result_chars": 30.5,
+      "wall_s": 32.8,
+      "end_to_end_wall_s": 32.5
+    },
+    "interpretation": "The shorter default guide did not reduce aggregate cost in this two-run developer slice; route differences and stochastic variance prevent single-factor attribution."
+  },
+  "overall": {
+    "core_acceptance": "2/2",
+    "full_annotation": {
+      "accepted": ["rep2"],
+      "requires_material_correction": ["rep1"]
+    },
+    "semantic_checked_by_mechanical_check": false,
+    "general_efficacy_claim_supported": false
+  }
+}
