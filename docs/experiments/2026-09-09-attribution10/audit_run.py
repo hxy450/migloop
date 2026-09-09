@@ -8,11 +8,46 @@ from __future__ import annotations
 
 import argparse
 from collections import Counter
+import hashlib
 import importlib.util
 import json
 import os
 from pathlib import Path
 import sys
+
+
+def annotation_summary(structure: dict) -> dict:
+    """Count resolved declaration fields separately; counts are not truth rates.
+
+    Coverage citations remain in the detailed coverage/check payload. A location
+    in multiple fields is counted multiple times, never described as unique.
+    """
+    groups = {key: [] for key in ("repair", "node_evidence", "node_basis_expected",
+              "node_basis_actual", "event_evidence", "event_basis_expected", "event_basis_actual")}
+    events, scopes = [], []
+    for defect in structure.get("defects") or []:
+        groups["repair"].extend((defect.get("repair") or {}).get("evidence") or [])
+        for kind, items in (("node", defect.get("nodes") or []), ("event", defect.get("event_claims") or [])):
+            for item in items:
+                groups[kind + "_evidence"].extend(item.get("evidence") or [])
+                basis = item.get("basis") or {}
+                for side in ("expected", "actual"):
+                    groups[kind + "_basis_" + side].extend(basis.get(side + "_evidence") or [])
+                if kind == "event":
+                    events.append({"defect": defect["id"], "id": item.get("id"), "event": item.get("event"),
+                                   "role": item.get("role"), "entry": item.get("entry"),
+                                   "binding": item.get("binding"), "semantic_checked": False})
+        if "target_binding" in defect:
+            scopes.append({"defect": defect["id"], **defect["target_binding"]})
+    return {"source_schema": structure.get("schema"), "semantic_checked": False,
+            "reference_field_counts": {key: dict(Counter(row.get("status", "unrecorded") for row in rows))
+                                       for key, rows in groups.items()},
+            "events": events, "event_binding_status": dict(Counter((row.get("binding") or {}).get("status", "unrecorded")
+                                                                   for row in events)),
+            "event_resolved": sum((row.get("binding") or {}).get("ok") is True for row in events),
+            "target_scopes": scopes,
+            "note": "Reference occurrences by field, not unique locators or semantic precision. "
+                    "Event locations are separate from version nodes; coverage references remain in the check payload."}
 
 
 def main() -> None:
@@ -54,6 +89,7 @@ def main() -> None:
                              [ref for node in defect.get("nodes", []) for ref in node.get("evidence", [])])]
     doc = {
         "schema": "migloop-attribution-run-audit/1", "case": case["case"], "run_dir": str(run),
+        "audit_script_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
         "source_code_id": case["source_code_id"], "task_sha256": case["common_task_sha256"],
         "viewer": {"source": str(viewer), "source_digest": harness.inventory(viewer / "src/migloop")["content_digest"],
                    "same_as_investigator": viewer == Path(case["source"]).resolve()},
@@ -62,6 +98,8 @@ def main() -> None:
         "schema_errors": structure.get("errors", []),
         "nodes": {"total": len(nodes), "resolved": sum(node.get("ok") is True for node in nodes)},
         "evidence_status": dict(Counter(item.get("status") for item in evidence)),
+        "evidence_status_scope": "legacy repair and ordinary node references only; occurrences, not unique locators",
+        "annotation_details": annotation_summary(structure),
         "conclusion_edge_status": dict(Counter(edge.get("status") for edge in edges)),
         "explicit_edge_status": dict(Counter(edge.get("status") for edge in edges if edge.get("implicit") is False)),
         "implicit_adjacency_status": dict(Counter(edge.get("status") for edge in edges if edge.get("implicit") is True)),
