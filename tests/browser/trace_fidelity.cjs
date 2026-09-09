@@ -154,6 +154,17 @@ const server=http.createServer((req,res)=>{
     if(run==='other-calls') body.steps.push({i:8,tool:'Bash',ok:true,args:{command:'read-only'},provenance:{format:'claude_transcript',path:'transcript.jsonl'}});
     if(run==='draft-check') body.steps.push({i:8,tool:'check',ok:true,args:{draft:'schema: migloop-verdict/1'},node:null,
       provenance:{format:'codex_rollout',path:'transcript.jsonl',pairing:'call_id'},call_id:'draft-check-8'});
+    if(run.startsWith('action-steps')){
+      const action=(i,seq,v)=>({i,tool:'action',ok:true,args:{ref:'#a:'+seq+'@L'+seq,part:'input',max_chars:300},
+        scope:'原文 #a:'+seq+'@L'+seq+' input',node:{kind:'agent',aid:'agent-a',v,action:seq},
+        provenance:{format:'codex_rollout',path:'transcript.jsonl',pairing:'call_id'},call_id:'action-'+i,use_line:i*2,result_line:i*2+1});
+      body.steps.push(action(8,41,1),action(9,43,null),{...action(10,45,1),node:null},
+        {...action(11,46,1),identity_unbound:true},action(12,44,1),{...action(13,47,1),ok:false},
+        action(14,0,1),{...action(15,48,1),node:{kind:'file',path:file,action:48}});
+      body.steps.find(s=>s.i===9).args={id:'agent-a',seq:43,part:'output'};
+      body.steps.find(s=>s.i===12).tool='mcp__migloop__action';
+      if(run==='action-steps-conflict')body.trace_identity.bound=false;
+    }
     if(run.startsWith('draft-state-')){
       const status=run.slice('draft-state-'.length), empty=status==='not_checked';
       body.draft_check={status,semantic_checked:false,final_document_sha256:'final-hash',
@@ -316,7 +327,15 @@ const server=http.createServer((req,res)=>{
         {path:file,v:2,at:1,certain:true,dep:false}];
     }
   }
-  else if(url.pathname==='/atom/action')body={input:'ACTION '+url.searchParams.get('seq'),output:'EVIDENCE '+url.searchParams.get('seq')};
+  else if(url.pathname==='/atom/action'){
+    body={input:'ACTION '+url.searchParams.get('seq'),output:'EVIDENCE '+url.searchParams.get('seq')};
+    if(activeFixture.startsWith('action-steps')){
+      body.input+=' <img src=x onerror="window.actionXss=1">';body.output+=' <script>window.actionXss=2</script>';
+      if(url.searchParams.get('seq')==='44'){
+        res.setHeader('Content-Type','application/json; charset=utf-8');setTimeout(()=>res.end(JSON.stringify(body)),300);return;
+      }
+    }
+  }
   else body={};
   res.setHeader('Content-Type','application/json; charset=utf-8');res.end(JSON.stringify(body));
 });
@@ -575,6 +594,27 @@ async function main(){
     await evaluate("__mig.load('with-basis-unbound')");
     await until("__mig.probe().structured.identity.bound===false && document.querySelector('#probe .attribution-basis')");
     await check('unbound attribution retains text without source validation or action links',"document.querySelector('#probe .attribution-basis').textContent.includes('EXPECTED') && document.querySelector('#probe .attribution-basis').textContent.includes('历史引用未绑定') && !document.querySelector('.attribution-basis .lnk,.attribution-basis .more,.attribution-basis .verow.ok') && !document.querySelector('#canvas .node.p-chain')");
+    await evaluate("__mig.load('action-steps')");
+    await until("__mig.probe().runDir==='action-steps' && __mig.xt()?.evidenceMode");
+    await evaluate("window.actionSnapshot=JSON.stringify({trace:__mig.probe().trajectory,steps:__mig.probe().steps,graph:__mig.probe().evidence_graph,root:__mig.xt().root,ids:Object.keys(__mig.xt().byId)});[...document.querySelectorAll('#probe .st')].find(n=>n.querySelector('.no').textContent==='#8').click()");
+    await until("document.querySelector('#side .action-record')?.textContent.includes('EVIDENCE 41')");
+    await check('ordinary action step opens original input and output without rerooting to its agent',"document.querySelector('#side .action-record').textContent.includes('ACTION 41')&&document.querySelector('#side .action-record').textContent.includes('输入')&&document.querySelector('#side .action-record').textContent.includes('输出')&&document.querySelector('#side .action-drawer').dataset.seq==='41'&&document.querySelector('#side .action-drawer').dataset.step==='8'&&!document.querySelector('#side .rootbtn')&&__mig.xt().evidenceMode&&JSON.stringify({trace:__mig.probe().trajectory,steps:__mig.probe().steps,graph:__mig.probe().evidence_graph,root:__mig.xt().root,ids:Object.keys(__mig.xt().byId)})===window.actionSnapshot");
+    await check('action drawer separates original invocation scope from human raw expansion and escapes HTML',"document.querySelector('#side .action-drawer').textContent.includes('max_chars')&&document.querySelector('#side .action-drawer').textContent.includes('不等于当时查询范围')&&document.querySelector('#side .action-record').textContent.includes('<img src=x')&&!document.querySelector('#side .action-drawer img,#side .action-drawer script')&&!window.actionXss");
+    await evaluate("[...document.querySelectorAll('#probe .st')].find(n=>n.querySelector('.no').textContent==='#9').click()");
+    await until("document.querySelector('#side .action-record')?.textContent.includes('EVIDENCE 43')");
+    await check('tail action with a legacy id/seq address stays a raw record, not a whole-agent root',"document.querySelector('#side .action-drawer').dataset.seq==='43'&&__mig.xt().evidenceMode&&__mig.probe().steps.find(s=>s.i===9).node.v===null&&JSON.stringify({trace:__mig.probe().trajectory,steps:__mig.probe().steps,graph:__mig.probe().evidence_graph,root:__mig.xt().root,ids:Object.keys(__mig.xt().byId)})===window.actionSnapshot");
+    await evaluate("[...document.querySelectorAll('.dchips span')].find(n=>n.textContent.startsWith('B ')).click()");
+    await until("document.querySelector('#side .action-record')?.textContent.includes('EVIDENCE 43')");
+    await check('defect filtering preserves the active original action without adding visits or replacing the graph root',"document.querySelector('#side .action-drawer').dataset.seq==='43'&&__mig.xt().evidenceMode&&JSON.stringify({trace:__mig.probe().trajectory,steps:__mig.probe().steps,graph:__mig.probe().evidence_graph,root:__mig.xt().root,ids:Object.keys(__mig.xt().byId)})===window.actionSnapshot");
+    await check('missing, unbound, failed or malformed action coordinates never offer a node fallback',"[10,11,13,14,15].every(i=>[...document.querySelectorAll('#probe .st')].find(n=>Number(n.querySelector('.no').textContent.replace(/[^0-9]/g,''))===i).classList.contains('na'))");
+    await evaluate("[...document.querySelectorAll('#probe .st')].find(n=>n.querySelector('.no').textContent==='#12').click()");
+    await until("document.querySelector('#side .action-drawer')?.dataset.seq==='44'");
+    await evaluate(clickAgent);
+    await evaluate("new Promise(r=>setTimeout(r,450))");
+    await check('late original-action response cannot overwrite a newer node drawer or switch the graph',"!document.querySelector('#side .action-drawer')&&!document.querySelector('#side').textContent.includes('EVIDENCE 44')&&document.querySelector('#side').textContent.includes('B 独有原因')&&__mig.xt().evidenceMode&&JSON.stringify({trace:__mig.probe().trajectory,steps:__mig.probe().steps,graph:__mig.probe().evidence_graph,root:__mig.xt().root,ids:Object.keys(__mig.xt().byId)})===window.actionSnapshot");
+    await evaluate("__mig.load('action-steps-conflict')");
+    await until("__mig.probe().runDir==='action-steps-conflict' && __mig.xt()===null");
+    await check('explicit trace identity conflict blocks every original-action step link',"!document.querySelector('#side .action-drawer')&&[...document.querySelectorAll('#probe .st')].every(n=>n.classList.contains('na'))");
     await evaluate("__mig.load('draft-check')");
     await until("__mig.probe().runDir==='draft-check'");
     await check('draft check is a mechanical MCP event rather than an opened atom or edge',"document.querySelector('.call-summary').dataset.mcp==='8' && [...document.querySelectorAll('#probe .st')].some(n=>n.dataset.callKind==='mcp'&&n.classList.contains('na')&&n.textContent.includes('草稿机械核查事件')) && __mig.probe().trajectory.nodes.length===4 && __mig.probe().trajectory.visits.length===7 && document.querySelectorAll('.wire.route').length===0 && !Object.values(__mig.probe().byKey).flat().some(s=>s.i===8)");

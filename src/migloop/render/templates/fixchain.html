@@ -952,6 +952,7 @@
       activeDrawerNode = node;
       if (node.kind === "file") drawerFile(node);
       else if (node.kind === "agent") drawerAgent(node);
+      else if (node.kind === "action") { drawerAction(node); return; }
       else return;
       var rs = probeReason(node);
       if (rs) side.insertBefore(rs, side.querySelector(".body"));
@@ -1247,6 +1248,21 @@
       return "other";
     }
     function probeDraftCheck(s) { return /^(?:mcp__migloop__)?check$/.test(String(s.tool || "")); }
+    function probeActionStep(s) { return /^(?:mcp__migloop__)?action$/.test(String(s.tool || "")); }
+    function probeActionAddress(s) {
+      if (!PROBE || !probeActionStep(s) || probeTraceUnbound(PROBE) || s.identity_unbound || s.ok === false) return null;
+      var n = s.node;
+      // The backend resolved the owner/action. A transcript tag or a requested
+      // seq alone is not enough to reconstruct a missing or ambiguous address.
+      if (!n || n.kind !== "agent" || typeof n.aid !== "string" || !n.aid.trim()
+          || !Number.isInteger(n.action) || n.action < 1) return null;
+      return {aid:n.aid,seq:n.action};
+    }
+    function openProbeAction(s) {
+      if (!probeActionAddress(s)) return;
+      // A drawer record, not a third graph atom. Never call openRoot here.
+      drawerFor({kind:"action",step:s,probeRun:PROBE});
+    }
     function renderEvidenceGraph(host) {
       var graph = PROBE.evidence_graph, T = PROBE.trajectory || {}, counts = graph && graph.counts || {};
       var box = el("div", "sum evidence-graph-summary");
@@ -1374,7 +1390,8 @@
       probeEl.appendChild(el("div", "sub", "全部调用记录 · 保留原始步号与来源"));
       (PROBE.steps || []).forEach(function (s) {
         var n = s.node, unbound = probeTraceUnbound(PROBE) || s.identity_unbound;
-        var draftCheck = probeDraftCheck(s), can = !!(!draftCheck && !unbound && n && (n.path || n.aid));
+        var draftCheck = probeDraftCheck(s), actionStep = probeActionStep(s);
+        var can = actionStep ? !!probeActionAddress(s) : !!(!draftCheck && !unbound && n && (n.path || n.aid));
         var visit = (PROBE.visitByStep || {})[s.i], failed = s.ok === false || (visit && visit.status !== "opened");
         var row = el("div", "st" + (can ? "" : " na"));
         var callKind = probeCallKind(s);
@@ -1389,7 +1406,7 @@
                 + "\ncall_id: " + (s.call_id || "未记录") + " · item_id: " + (s.item_id || "未记录")
                 + "\n转录行: " + (s.use_line == null ? "?" : s.use_line) + " → " + (s.result_line == null ? "?" : s.result_line);
         row.appendChild(t);
-        if (can) row.addEventListener("click", function () { openProbeNode(n); });
+        if (can) row.addEventListener("click", function () { if (actionStep) openProbeAction(s); else openProbeNode(n); });
         probeEl.appendChild(row);
       });
     }
@@ -2786,6 +2803,32 @@
         container.appendChild(sr);
         if (onLoaded) onLoaded(fa, anchor);
       });
+    }
+    function drawerAction(node) {
+      var step = node.step, address = node.probeRun === PROBE && probeActionAddress(step);
+      side.innerHTML = "";
+      if (!address) {
+        side.appendChild(el("div", "placeholder", "此动作未绑定当前调查记录或无法定位；不按请求文本猜测原文归属。"));
+        return;
+      }
+      side.appendChild(head("action", "原始动作记录 · 调查步骤 #" + step.i,
+        "#" + address.seq + " · " + agentLabelOf(address.aid), address.aid));
+      var body = el("div", "body action-drawer");
+      body.dataset.seq = address.seq; body.dataset.step = step.i; body.dataset.aid = address.aid;
+      side.appendChild(body);
+      var call = sec("调查调用记录（不计版本访问）");
+      call.appendChild(kv("原始引用", (step.args || {}).ref || "id=" + address.aid + ", seq=" + address.seq));
+      call.appendChild(kv("当时查询范围", step.scope || "未记录"));
+      var metadata = el("details", "action-call-meta");
+      metadata.appendChild(el("summary", null, "原参数与转录来源"));
+      metadata.appendChild(el("pre", "diffblock", JSON.stringify({args:step.args,call_id:step.call_id,
+        use_line:step.use_line,result_line:step.result_line,provenance:step.provenance || null}, null, 2)));
+      call.appendChild(metadata); body.appendChild(call);
+      body.appendChild(el("div", "pnote", "以下是当前查看器展开的原始动作输入/输出，不等于当时查询范围或已交付内容；不新增调查访问、节点或图边，不验证主张真假。"));
+      var record = el("pre", "diffblock action-record", "加载原文…"); body.appendChild(record);
+      // loadActionInto owns this element only. A late response updates a
+      // detached element if another drawer has since opened, never the sidebar.
+      loadActionInto(record, address.aid, address.seq);
     }
     function drawerFile(node) {
       side.innerHTML = "";
