@@ -1,0 +1,178 @@
+{
+  "schema": "migloop-action-drawer-replay/1",
+  "date": "2026-09-09",
+  "investigator_source": "b540cb2",
+  "viewer_source": "0a79ade",
+  "page": "http://127.0.0.1:19676/api/insight1/fixchain/ff019d8a?probe=attribution10/formal-v8/member-center/runs/tools/rep1",
+  "server_session": 45787,
+  "status": "passed",
+  "action_steps": [
+    {
+      "step": 6,
+      "ref": "#a68daf720e780b4c2:15406@L103",
+      "action": 15406,
+      "aid": "agent-a68daf720e780b4c2",
+      "v": 5
+    },
+    {
+      "step": 7,
+      "ref": "#a68daf720e780b4c2:15407@L106",
+      "action": 15407,
+      "aid": "agent-a68daf720e780b4c2",
+      "v": 5
+    },
+    {
+      "step": 13,
+      "ref": "#a68daf720e780b4c2:15676@L514",
+      "action": 15676,
+      "aid": "agent-a68daf720e780b4c2",
+      "v": 33
+    },
+    {
+      "step": 14,
+      "ref": "#a68daf720e780b4c2:15677@L516",
+      "action": 15677,
+      "aid": "agent-a68daf720e780b4c2",
+      "v": 33
+    },
+    {
+      "step": 15,
+      "ref": "#a68daf720e780b4c2:15681@L526",
+      "action": 15681,
+      "aid": "agent-a68daf720e780b4c2",
+      "v": 33
+    },
+    {
+      "step": 16,
+      "ref": "#a68daf720e780b4c2:15731@L592",
+      "action": 15731,
+      "aid": "agent-a68daf720e780b4c2",
+      "v": null
+    },
+    {
+      "step": 17,
+      "ref": "#af0e3d2ae54dbf769:17286@L23",
+      "action": 17286,
+      "aid": "agent-af0e3d2ae54dbf769",
+      "v": 2
+    },
+    {
+      "step": 18,
+      "ref": "#af0e3d2ae54dbf769:17292@L32",
+      "action": 17292,
+      "aid": "agent-af0e3d2ae54dbf769",
+      "v": 2
+    },
+    {
+      "step": 19,
+      "ref": "#af0e3d2ae54dbf769:17294@L34",
+      "action": 17294,
+      "aid": "agent-af0e3d2ae54dbf769",
+      "v": 3
+    },
+    {
+      "step": 23,
+      "ref": "#af0e3d2ae54dbf769:17296@L36",
+      "action": 17296,
+      "aid": "agent-af0e3d2ae54dbf769",
+      "v": null
+    },
+    {
+      "step": 24,
+      "ref": "#af0e3d2ae54dbf769:17303@L54",
+      "action": 17303,
+      "aid": "agent-af0e3d2ae54dbf769",
+      "v": null
+    },
+    {
+      "step": 26,
+      "ref": "#a68daf720e780b4c2:15738@L605",
+      "action": 15738,
+      "aid": "agent-a68daf720e780b4c2",
+      "v": null
+    },
+    {
+      "step": 27,
+      "ref": "#a68daf720e780b4c2:15670@L501",
+      "action": 15670,
+      "aid": "agent-a68daf720e780b4c2",
+      "v": 33
+    },
+    {
+      "step": 29,
+      "ref": "#a68daf720e780b4c2:15682@L528",
+      "action": 15682,
+      "aid": "agent-a68daf720e780b4c2",
+      "v": 33
+    },
+    {
+      "step": 30,
+      "ref": "#a68daf720e780b4c2:15394@L71",
+      "action": 15394,
+      "aid": "agent-a68daf720e780b4c2",
+      "v": 5
+    },
+    {
+      "step": 31,
+      "ref": "#a68daf720e780b4c2:15396@L77",
+      "action": 15396,
+      "aid": "agent-a68daf720e780b4c2",
+      "v": 5
+    },
+    {
+      "step": 32,
+      "ref": "#a68daf720e780b4c2:15397@L80",
+      "action": 15397,
+      "aid": "agent-a68daf720e780b4c2",
+      "v": 5
+    },
+    {
+      "step": 33,
+      "ref": "#a68daf720e780b4c2:15401@L91",
+      "action": 15401,
+      "aid": "agent-a68daf720e780b4c2",
+      "v": 5
+    }
+  ],
+  "checked_action_drawers": 18,
+  "tail_drawers": 4,
+  "tail_steps": [
+    16,
+    23,
+    24,
+    26
+  ],
+  "all_action_responses_http_200": true,
+  "input_output_shown": true,
+  "no_reroot_controls": true,
+  "xt_root_unchanged": true,
+  "evidence_mode_unchanged": true,
+  "tree_node_ids_unchanged": true,
+  "trajectory_steps_graph_match_b540": true,
+  "original_run_files_unchanged": true,
+  "model_document_unchanged": true,
+  "raw_document_sha256": "a2eacaa702e45d5ce94e7d29c6d879729b3a500dc6b61fdcb0c2ff8b2f37d7c6",
+  "document_sha256": "d3eff5c2ef999c6f2b7978fc0b6d1c974d0bf8d5b927150aa6b67e646329935c",
+  "model_calls": 0,
+  "frozen_source_edits": 0,
+  "original_run_edits": 0,
+  "current_worktree_used_for_viewer": false,
+  "geometry_stages": [
+    "initial",
+    "all 18 action drawers",
+    "1250px",
+    "2200px",
+    "1600px",
+    "candidate on",
+    "candidate off"
+  ],
+  "geometry_overlaps": 0,
+  "geometry_outside": 0,
+  "js_errors": [],
+  "screenshot": "screenshots/v8-fixed-0a79ade-member-reference-rep1-geometry.png",
+  "screenshot_visually_checked": true,
+  "notes": [
+    "Input/output displayed is a current human expansion of the original action, not a claim that the investigator received both sides.",
+    "Original b540 UI issue audit remains unchanged in v8-member-ui-verification.md/json."
+  ]
+}

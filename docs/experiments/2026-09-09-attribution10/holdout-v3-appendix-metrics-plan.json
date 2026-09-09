@@ -1,0 +1,11 @@
+{
+  "schema": "migloop-paired-metrics-plan/1",
+  "expected": {"backend": "codex", "model": "gpt-5.5", "effort": "medium"},
+  "cases": [
+    {"id": "h3-p1-exposed", "tools_case": "../../../../_migloop-eval-20260909/holdout-v3-eval-0be4164/h3-p1", "raw_case": "../../../../_migloop-eval-20260909/holdout-v3-eval-b540cb2/h3-p1", "reps": [1, 2]},
+    {"id": "h3-p2", "tools_case": "../../../../_migloop-eval-20260909/holdout-v3-eval-0be4164/h3-p2", "raw_case": "../../../../_migloop-eval-20260909/holdout-v3-eval-b540cb2/h3-p2", "reps": [1, 2]},
+    {"id": "h3-d1", "tools_case": "../../../../_migloop-eval-20260909/holdout-v3-eval-0be4164/h3-d1", "raw_case": "../../../../_migloop-eval-20260909/holdout-v3-eval-b540cb2/h3-d1", "reps": [1, 2]},
+    {"id": "h3-c1", "tools_case": "../../../../_migloop-eval-20260909/holdout-v3-eval-0be4164/h3-c1", "raw_case": "../../../../_migloop-eval-20260909/holdout-v3-eval-b540cb2/h3-c1", "reps": [1, 2]},
+    {"id": "h3-c2", "tools_case": "../../../../_migloop-eval-20260909/holdout-v3-eval-0be4164/h3-c2", "raw_case": "../../../../_migloop-eval-20260909/holdout-v3-eval-b540cb2/h3-c2", "reps": [1, 2]}
+  ]
+}

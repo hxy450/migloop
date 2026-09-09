@@ -1,0 +1,765 @@
+{
+  "schema": "migloop-semantic-adjudication/1",
+  "status": "complete_rep2_with_rep1_comparison",
+  "review_date": "2026-09-09",
+  "case": "dice-entry",
+  "rep": 2,
+  "run": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v8/dice-entry/runs/tools/rep2",
+  "reference": {
+    "path": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/reference-v1/legacy-reference.json",
+    "sha256": "2c015536094fff1e42bb3b6b5cc2dce743c0f2a0f6924254027f7f8a5faac927"
+  },
+  "raw_pool": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v1/dice-entry/pool",
+  "scope": "Same existing protocol core and reference facts; Dice10/10 addendum separate; no new model/source/frozen/holdout changes. Rep2 retained with rep1.",
+  "core": {
+    "D1": "pass",
+    "D2": "pass"
+  },
+  "core_does_not_certify_full_annotation": true,
+  "fact_counts": {
+    "supported": 5,
+    "partial": 1,
+    "omitted": 0,
+    "contradicted": 0,
+    "total": 6
+  },
+  "facts": [
+    {
+      "id": "D1.f1",
+      "reference_fact": "生成方实际读取页面/F001/沉浸式输入，已记录的生成 Write 未含后来测试桥。",
+      "status": "supported",
+      "raw": [
+        "81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a349784d2663f1f0a.jsonl:L1,L51-L54,L57-L58,L71-L72"
+      ],
+      "reason": "Actual generator cumulative v2 query at transcript L80 with page/F001/immersive inputs, plus native Write diff; not merely later bridge input."
+    },
+    {
+      "id": "D1.f2",
+      "reference_fact": "UI 测试设计及后续派发明确要求 Want→AppStorage 测试桥，实施方以成功 Edit 加入。",
+      "status": "supported",
+      "raw": [
+        "81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a711c5d09fb676814.jsonl:L1,L7-L8,L11-L12,L17-L18,L35-L40"
+      ],
+      "reason": "Actual Step3 agent v5, template/design/EntryAbility read and three native Edit additions. Final explicit edges corrected to actual agent v2/v3/v4."
+    },
+    {
+      "id": "D1.f3",
+      "reference_fact": "生成时刻与后续测试阶段须分开，不将后置明确要求自动认定为初始生成遗漏。",
+      "status": "supported",
+      "raw": [
+        "81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a349784d2663f1f0a.jsonl:L71",
+        "81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a711c5d09fb676814.jsonl:L1,L35-L40"
+      ],
+      "reason": "Three pre-generation until_ts searches zero; final limits absence and does not retroactively blame initial generator."
+    },
+    {
+      "id": "D2.f1",
+      "reference_fact": "ECAT 修复派发明确要求注册全局未捕获异常观察者。",
+      "status": "supported",
+      "raw": [
+        "2f01bcdc-0a92-4961-a64d-5b181f03b3d3/subagents/agent-a27497cfed8c44856.jsonl:L1",
+        "257fed22-fb0e-48de-bee9-0791c45a90a9.jsonl:L115,L119"
+      ],
+      "reason": "Actual ECAT work list input #2f01bcdc:377@L3 and dispatch #411@L100; distinct from additional incorrect memory timeline exclusion."
+    },
+    {
+      "id": "D2.f2",
+      "reference_fact": "修复方读取入口和 SDK 后，三次成功 Edit 加入 import、注册调用和观察者实现。",
+      "status": "supported",
+      "raw": [
+        "2f01bcdc-0a92-4961-a64d-5b181f03b3d3/subagents/agent-a27497cfed8c44856.jsonl:L23-L24,L29-L30,L35-L38,L41-L46"
+      ],
+      "reason": "Native EntryAbility+SDK reads, three successful Edit changes and actual gate-build readback agree; final effect edges use v1/v2/v3."
+    },
+    {
+      "id": "D2.f3",
+      "reference_fact": "后置 builder 有直接成功构建日志，也有 may-throw 类 WARN。",
+      "status": "partial",
+      "raw": [
+        "2f01bcdc-0a92-4961-a64d-5b181f03b3d3/subagents/agent-a635575c78cd15ff6.jsonl:L33-L34,L43-L44,L47-L48,L51-L52,L67-L68"
+      ],
+      "reason": "Native gate-build success/readback and runtime unknown correct; report omits may-throw WARN, same fixed fact partial as rep1 and minor under original core protocol."
+    }
+  ],
+  "extra_false_claims": [
+    {
+      "code": "memory_feedback_wrong_time_exclusion",
+      "question": "D2",
+      "severity": "material",
+      "report_quote": "后续存在记忆文件反馈，但时间在修复后，不能作为本次修复的先验来源。",
+      "report_location": "D2.boundary",
+      "raw_file": "257fed22-fb0e-48de-bee9-0791c45a90a9.jsonl",
+      "raw_lines": [
+        115,
+        119
+      ],
+      "raw_time": "2026-09-03T21:12:53.922Z",
+      "repair_times": "observer Edit L41-L45 at21:19:24..21:19:39",
+      "record_id": "call_8ce3690fd9384f04ab8d47bb",
+      "record_sha256": "ea3a2df7dc072e047f9541c7f34b93cc7a7a1c44abc9b51f29e66b5ce2f69f9b",
+      "delivered_contrary_evidence": {
+        "step": 37,
+        "result_line": 190,
+        "detail": "search errorManager.on before repair explicitly returns feedback v1 + _index v1 by257fed22 atT+6:46; patch T+6:53."
+      },
+      "why_false": "Later _index v2 also exists but cannot erase earlier feedback v1. Unqualified post-repair timing excludes a genuinely earlier input artifact. Being earlier does not itself prove fixer read it or that it caused the patch.",
+      "required_correction": "Separate earlier feedback v1 from later index/read copies; keep actual fixer-consumption unproven, not disqualify by a false timestamp.",
+      "core_treatment": "Direct work-list->fixer requirement chain remains supported. Not adding memory as a new fixed-oracle mandatory item; full annotation still fails until this explicit wrong exclusion is corrected."
+    }
+  ],
+  "annotation_requires_correction": true,
+  "extra_false_claim_count": 1,
+  "validation_addendum": {
+    "report_quote": "round1 记录宿主侧 aa start --pb __test_mode__ true、dumpLayout/uiInput 等价通道 10/10 PASS",
+    "status": "reported_later_channel_and_bridge_unknown_supported",
+    "opened": [
+      {
+        "step": 28,
+        "result_line": 156,
+        "target": "final-summary.md@v1 all66lines"
+      },
+      {
+        "step": 30,
+        "result_line": 158,
+        "target": "native startup probe #593d4e86:1148@L168"
+      },
+      {
+        "step": 31,
+        "result_line": 160,
+        "target": "final-summary native Write input L291"
+      }
+    ],
+    "not_opened": [
+      "593d4e86 L256/L260 native10case replay",
+      "593d4e86 L265/L267 nativeartifact/hilog readback"
+    ],
+    "boundary": "First clause identifies record/summary; later '较强地证明' should retain source-report qualification. Does not claim direct AppStorage assertion. Raw native addendum corroborates outcome but must not be falsely counted as investigated.",
+    "comparison": "Improves rep1 later-state omission; same scale as raw rep2's reported10/10, this run also opens full historical summary."
+  },
+  "query_audit": {
+    "tools": [
+      {
+        "Name": "guide",
+        "Count": 2
+      },
+      {
+        "Name": "sessions",
+        "Count": 1
+      },
+      {
+        "Name": "file",
+        "Count": 6
+      },
+      {
+        "Name": "agent",
+        "Count": 6
+      },
+      {
+        "Name": "action",
+        "Count": 16
+      },
+      {
+        "Name": "search",
+        "Count": 13
+      },
+      {
+        "Name": "check",
+        "Count": 2
+      }
+    ],
+    "tool_calls": 46,
+    "agent_attempts": 6,
+    "agent_successful": 3,
+    "action_calls": 16,
+    "action_ref_calls": 7,
+    "action_id_seq_calls": 9,
+    "action_successful": 16,
+    "rejected_calls": 4,
+    "rejections": "file via sessions after first open; two agent via sessions; observer v8 out of range",
+    "until_ts_searches": 13,
+    "seq_only_until": 0,
+    "pre_generation_bridge_searches": [
+      39,
+      40,
+      41
+    ],
+    "pre_repair_requirement_searches": [
+      35,
+      36,
+      37
+    ],
+    "no_blame_calls": true
+  },
+  "check": {
+    "first": {
+      "step": 45,
+      "result_line": 240,
+      "errors": 8,
+      "warnings": 0
+    },
+    "final": {
+      "step": 46,
+      "result_line": 248,
+      "status": "mechanical_clear",
+      "errors": 0,
+      "warnings": 0
+    },
+    "changes": "Correct five writer versions; set main dispatch nodev5/remove wrong dispatch edge; replace invalid search receipt with canonical reference; remove impossible zero-effect builderv1 node while preserving real build event refs.",
+    "evidence_calls_between": 0,
+    "meaning": "Valid mechanical corrections from returned locator/version diagnostics, not additional semantic research. Memory time mistake not detected by check; clear does not certify its truth.",
+    "final_binding": "matched"
+  },
+  "coverage": {
+    "expected": 7,
+    "provided": 7,
+    "accounted": 7,
+    "expected_versions": 6,
+    "expected_candidates": 1,
+    "missing_versions": 0,
+    "missing_candidates": 0,
+    "missing": 0,
+    "unresolved": 0,
+    "not_repair": 1,
+    "deferred": 0,
+    "unconfirmed": 0,
+    "advisories": 0,
+    "advisory_rows": 0,
+    "explained": 6,
+    "semantic_checked": false,
+    "detail": "Single candidate L51 is actual gitdiff/grep, bothparts opened; not_repair valid."
+  },
+  "locator_audit": {
+    "references": [
+      {
+        "ref": "#2f01bcdc:377@L3",
+        "relative_file": "2f01bcdc-0a92-4961-a64d-5b181f03b3d3.jsonl",
+        "line": 3,
+        "native_ids": [],
+        "timestamp": "2026-09-03T21:10:29.909Z",
+        "record_sha256": "11843196e5e6f4c0a0ebd95a0e4fee293c48ba76f19c90a4321e230f1186631f",
+        "located": true
+      },
+      {
+        "ref": "#2f01bcdc:411@L100",
+        "relative_file": "2f01bcdc-0a92-4961-a64d-5b181f03b3d3.jsonl",
+        "line": 100,
+        "native_ids": [
+          "call_1c4e6fc7af144f7d94f69fc6"
+        ],
+        "timestamp": "2026-09-03T21:17:54.675Z",
+        "record_sha256": "aa6c7aa3d73364809534a5ce2ded8c7772f7e5644663413caf7c74a8d78b7656",
+        "located": true
+      },
+      {
+        "ref": "#593d4e86:1148@L168",
+        "relative_file": "593d4e86-a947-4e62-8027-013014c2bafc.jsonl",
+        "line": 168,
+        "native_ids": [
+          "call_b3b958f8f11841c38f84351b"
+        ],
+        "timestamp": "2026-09-03T20:57:52.549Z",
+        "record_sha256": "83f23c50d62eedfbc4f6066b14dcb6ea0a217145e45d8ec2253ce1c6d51544a6",
+        "located": true
+      },
+      {
+        "ref": "#593d4e86:1197@L291",
+        "relative_file": "593d4e86-a947-4e62-8027-013014c2bafc.jsonl",
+        "line": 291,
+        "native_ids": [
+          "call_7469782d0bc24095bdbafd3f"
+        ],
+        "timestamp": "2026-09-03T21:02:43.983Z",
+        "record_sha256": "dcfe09f3626bd9ae57966107af280ddd2eac33ef82fa8a77bcea564ed821d716",
+        "located": true
+      },
+      {
+        "ref": "#a27497cfed8c44856:591@L23",
+        "relative_file": "2f01bcdc-0a92-4961-a64d-5b181f03b3d3/subagents/agent-a27497cfed8c44856.jsonl",
+        "line": 23,
+        "native_ids": [
+          "call_17b0486d26f74bf5aa55002e"
+        ],
+        "timestamp": "2026-09-03T21:18:16.787Z",
+        "record_sha256": "5a946162bf02487a6d3f24af4236d4a486ca39e06c423f322f263b28c70011d5",
+        "located": true
+      },
+      {
+        "ref": "#a27497cfed8c44856:596@L29",
+        "relative_file": "2f01bcdc-0a92-4961-a64d-5b181f03b3d3/subagents/agent-a27497cfed8c44856.jsonl",
+        "line": 29,
+        "native_ids": [
+          "call_f3722a2fa80c4d2bbee5b99e"
+        ],
+        "timestamp": "2026-09-03T21:18:25.065Z",
+        "record_sha256": "c048ba117b2188501f7ae03a222bfea4daed5714a00c31bd1b2b9956f936b151",
+        "located": true
+      },
+      {
+        "ref": "#a27497cfed8c44856:601@L35",
+        "relative_file": "2f01bcdc-0a92-4961-a64d-5b181f03b3d3/subagents/agent-a27497cfed8c44856.jsonl",
+        "line": 35,
+        "native_ids": [
+          "call_e6d56b80320d4677b97b915b"
+        ],
+        "timestamp": "2026-09-03T21:18:35.605Z",
+        "record_sha256": "e2c5c2320d2dd8bf89a1b86520e13ccb7a398b88c18a98db2f4a1cd74e1b5b81",
+        "located": true
+      },
+      {
+        "ref": "#a27497cfed8c44856:603@L37",
+        "relative_file": "2f01bcdc-0a92-4961-a64d-5b181f03b3d3/subagents/agent-a27497cfed8c44856.jsonl",
+        "line": 37,
+        "native_ids": [
+          "call_e8130043aeef4043aa0e3ff0"
+        ],
+        "timestamp": "2026-09-03T21:18:36.033Z",
+        "record_sha256": "4429505296278c844975be287c5f763d10b98551f83f0a7fd89e8788c3f61683",
+        "located": true
+      },
+      {
+        "ref": "#a27497cfed8c44856:607@L41",
+        "relative_file": "2f01bcdc-0a92-4961-a64d-5b181f03b3d3/subagents/agent-a27497cfed8c44856.jsonl",
+        "line": 41,
+        "native_ids": [
+          "call_f031a058037c467fb06fc159"
+        ],
+        "timestamp": "2026-09-03T21:19:24.777Z",
+        "record_sha256": "c146cc4cb19f479638b45729b5667285a88aeb8c3b596266d15deae467fc957a",
+        "located": true
+      },
+      {
+        "ref": "#a27497cfed8c44856:609@L43",
+        "relative_file": "2f01bcdc-0a92-4961-a64d-5b181f03b3d3/subagents/agent-a27497cfed8c44856.jsonl",
+        "line": 43,
+        "native_ids": [
+          "call_7013085c03274c8183fdd455"
+        ],
+        "timestamp": "2026-09-03T21:19:31.929Z",
+        "record_sha256": "293cf7298c8f8f33fe2ac946178a36ddcfa2017913007853fb4151575ae62b30",
+        "located": true
+      },
+      {
+        "ref": "#a27497cfed8c44856:611@L45",
+        "relative_file": "2f01bcdc-0a92-4961-a64d-5b181f03b3d3/subagents/agent-a27497cfed8c44856.jsonl",
+        "line": 45,
+        "native_ids": [
+          "call_b6682a6aab774d88b1d1871d"
+        ],
+        "timestamp": "2026-09-03T21:19:39.888Z",
+        "record_sha256": "07b004834076111f9988a5e85040b50e151bb5b965bd6ae26c9e69444858477c",
+        "located": true
+      },
+      {
+        "ref": "#a27497cfed8c44856:616@L51",
+        "relative_file": "2f01bcdc-0a92-4961-a64d-5b181f03b3d3/subagents/agent-a27497cfed8c44856.jsonl",
+        "line": 51,
+        "native_ids": [
+          "call_15935d9b0309404dbcea7817"
+        ],
+        "timestamp": "2026-09-03T21:19:50.307Z",
+        "record_sha256": "10e1437bc0a04dc5c1dc68ef301f3b27233de798eaa00b8eaae794308cdff519",
+        "located": true
+      },
+      {
+        "ref": "#a349784d2663f1f0a:3440@L47",
+        "relative_file": "81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a349784d2663f1f0a.jsonl",
+        "line": 47,
+        "native_ids": [
+          "call_bc17fd91fb594eb8a9997c01"
+        ],
+        "timestamp": "2026-09-03T15:39:05.683Z",
+        "record_sha256": "3a0a8ced9ebadf770ad0a8445e0e0441c22ba0aa8e418e39542c7febd7b07fa1",
+        "located": true
+      },
+      {
+        "ref": "#a349784d2663f1f0a:3450@L57",
+        "relative_file": "81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a349784d2663f1f0a.jsonl",
+        "line": 57,
+        "native_ids": [
+          "call_1488a6869bea4472921ea35f"
+        ],
+        "timestamp": "2026-09-03T15:39:25.327Z",
+        "record_sha256": "cdb66b42d2c8c7c92282446573bd413258abeaec23751fb8ac879dc48d4e6631",
+        "located": true
+      },
+      {
+        "ref": "#a349784d2663f1f0a:3462@L71",
+        "relative_file": "81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a349784d2663f1f0a.jsonl",
+        "line": 71,
+        "native_ids": [
+          "call_459071197f484436b71237e5"
+        ],
+        "timestamp": "2026-09-03T15:51:35.645Z",
+        "record_sha256": "6c12a40f131dafc10e44cc99b27fc6066faeb9ccc0537af7c849a3a8412c27fe",
+        "located": true
+      },
+      {
+        "ref": "#a52d61ac7ab7033ba:3814@L47",
+        "relative_file": "81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a52d61ac7ab7033ba.jsonl",
+        "line": 47,
+        "native_ids": [
+          "call_3feb28436bcb4e228c2353cb"
+        ],
+        "timestamp": "2026-09-03T19:22:27.981Z",
+        "record_sha256": "4419b26b054c780eadd224baad66dd2dee6792728e9b10736edc1598b07df56c",
+        "located": true
+      },
+      {
+        "ref": "#a635575c78cd15ff6:647@L33",
+        "relative_file": "2f01bcdc-0a92-4961-a64d-5b181f03b3d3/subagents/agent-a635575c78cd15ff6.jsonl",
+        "line": 33,
+        "native_ids": [
+          "call_53a6741f92474c9bb9ab039c"
+        ],
+        "timestamp": "2026-09-03T21:23:40.800Z",
+        "record_sha256": "c859439b47a2d1b44527d6c152972a0b847e23319b0703a7491e44399c1e1698",
+        "located": true
+      },
+      {
+        "ref": "#a635575c78cd15ff6:656@L43",
+        "relative_file": "2f01bcdc-0a92-4961-a64d-5b181f03b3d3/subagents/agent-a635575c78cd15ff6.jsonl",
+        "line": 43,
+        "native_ids": [
+          "call_01dfaa766cce469ca64faf64"
+        ],
+        "timestamp": "2026-09-03T21:23:58.751Z",
+        "record_sha256": "1f9fb760c4c8a2cc1fa7a581d2443ef45ec2722c610c3ffba4f5ca3b351139bb",
+        "located": true
+      },
+      {
+        "ref": "#a711c5d09fb676814:4256@L7",
+        "relative_file": "81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a711c5d09fb676814.jsonl",
+        "line": 7,
+        "native_ids": [
+          "call_189b2504fca14e68979322c2"
+        ],
+        "timestamp": "2026-09-03T19:10:15.792Z",
+        "record_sha256": "0bc10163e6eda4ebce91274e887fe7f6924a667893a990dd00533f7d1335d65c",
+        "located": true
+      },
+      {
+        "ref": "#a711c5d09fb676814:4260@L11",
+        "relative_file": "81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a711c5d09fb676814.jsonl",
+        "line": 11,
+        "native_ids": [
+          "call_769beeda1a324d3d95de7251"
+        ],
+        "timestamp": "2026-09-03T19:10:17.886Z",
+        "record_sha256": "028dea57f880deba2fee2260bd5b295f8f77a66348cc26a9d37363355aa6a767",
+        "located": true
+      },
+      {
+        "ref": "#a711c5d09fb676814:4266@L17",
+        "relative_file": "81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a711c5d09fb676814.jsonl",
+        "line": 17,
+        "native_ids": [
+          "call_ad63a77294304198a5c64ece"
+        ],
+        "timestamp": "2026-09-03T19:10:25.612Z",
+        "record_sha256": "0ff32ad35ddd89dbb00d20efbb03ab680080a5364a4b1f632f1b9bf7800788eb",
+        "located": true
+      },
+      {
+        "ref": "#a711c5d09fb676814:4282@L35",
+        "relative_file": "81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a711c5d09fb676814.jsonl",
+        "line": 35,
+        "native_ids": [
+          "call_003bc0a35ce74684a5296325"
+        ],
+        "timestamp": "2026-09-03T19:17:13.810Z",
+        "record_sha256": "ca124a76d4213257ec504a1a8c1f9a88bc24e3064941005916d9f2576a8ba75a",
+        "located": true
+      },
+      {
+        "ref": "#a711c5d09fb676814:4284@L37",
+        "relative_file": "81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a711c5d09fb676814.jsonl",
+        "line": 37,
+        "native_ids": [
+          "call_6c1a4dd0da164350a549d420"
+        ],
+        "timestamp": "2026-09-03T19:17:21.617Z",
+        "record_sha256": "b7197d5f9f4beed5084a5659b86c49f26716aa6f93a0a16a72f58bac5a3dcc90",
+        "located": true
+      },
+      {
+        "ref": "#a711c5d09fb676814:4286@L39",
+        "relative_file": "81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a711c5d09fb676814.jsonl",
+        "line": 39,
+        "native_ids": [
+          "call_04086bf7960b46e7b2a00be4"
+        ],
+        "timestamp": "2026-09-03T19:17:35.691Z",
+        "record_sha256": "9aa5b948a807268d1cf8910068fad64a2c798bab89963eab63d708dc9b44665f",
+        "located": true
+      }
+    ],
+    "verdict_yaml_sha256": "d38e8823ca4409d4058d61b6ad02ee28eeedbc2eda69396e8567e8dffa28f31d",
+    "result_json_sha256": "e19fdf4b43055e59ef5fad42863e1870838c31dc7d8ce213edf92164e6277cea",
+    "located_count": 24,
+    "scope": "Physical source line/nativeID exists; no semantic certification from locator."
+  },
+  "metadata": {
+    "source_code_id": "b540cb2",
+    "actual_models": [
+      "gpt-5.5"
+    ],
+    "actual_effort": "medium",
+    "source_digest": "008bb634b4c614dd480ecdd632f3ae3679e41147dff78160f45631cbe59ad981",
+    "pool_digest": "653db4192d47366e8ca099e59ef2679e929056f18320d081768539b2f5b7443e",
+    "common_task_sha256": "9060a6c160d2a1ac2b893b9f19d12e66a16e6ce1b7d301eacae0abfb9f55eec4",
+    "started_at": "2026-09-09T20:12:31.378679+00:00",
+    "ended_at": "2026-09-09T20:18:02.689623+00:00",
+    "wall_s": 331.3188588001067,
+    "end_to_end_wall_s": 335.10799800010864,
+    "usage": {
+      "input_total": 1595474,
+      "cache_read": 1488384,
+      "cache_creation": 0,
+      "input_uncached": 107090,
+      "output": 14279,
+      "thinking_reported": 1256,
+      "output_includes_thinking": "Codex output_tokens is used once; reasoning is not added",
+      "input_semantics": "Codex input_tokens is the total; reported cache read/write are not added to it. input_uncached means input_tokens minus cached_input_tokens."
+    },
+    "tool_counts": [
+      {
+        "Name": "guide",
+        "Count": 2
+      },
+      {
+        "Name": "sessions",
+        "Count": 1
+      },
+      {
+        "Name": "file",
+        "Count": 6
+      },
+      {
+        "Name": "agent",
+        "Count": 6
+      },
+      {
+        "Name": "action",
+        "Count": 16
+      },
+      {
+        "Name": "search",
+        "Count": 13
+      },
+      {
+        "Name": "check",
+        "Count": 2
+      }
+    ],
+    "tool_calls": 46,
+    "tool_chars": 238949,
+    "repeated_calls": 0,
+    "rejected_calls": 4,
+    "coverage_counts": {
+      "expected": 7,
+      "provided": 7,
+      "accounted": 7,
+      "expected_versions": 6,
+      "expected_candidates": 1,
+      "missing_versions": 0,
+      "missing_candidates": 0,
+      "missing": 0,
+      "unresolved": 0,
+      "not_repair": 1,
+      "deferred": 0,
+      "unconfirmed": 0,
+      "advisories": 0,
+      "advisory_rows": 0
+    },
+    "draft_check": {
+      "status": "matched",
+      "semantic_checked": false,
+      "checks": [
+        {
+          "step": 45,
+          "call_id": "call_fLlb0YZDONp7fygazNCwMotA",
+          "verified": true,
+          "status": "needs_review",
+          "counts": {
+            "errors": 8,
+            "warnings": 0,
+            "total": 8
+          },
+          "draft_sha256": "c4467f8f335f6172bd9a5088842773cdd08aa53aa944dff1576e21d2c403c284",
+          "document_sha256": "423433f2b3e1e1fb378185dfeb5579f59724dc04b4ca02a038b476c0f8872440",
+          "issues": [
+            {
+              "code": "edge_unconfirmed",
+              "severity": "error",
+              "where": "defect:D1.edges[1]",
+              "node": null,
+              "detail": "是它写的,但写者版本是 v2,不是 v5"
+            },
+            {
+              "code": "edge_unconfirmed",
+              "severity": "error",
+              "where": "defect:D1.edges[2]",
+              "node": null,
+              "detail": "是它写的,但写者版本是 v3,不是 v5"
+            },
+            {
+              "code": "edge_unconfirmed",
+              "severity": "error",
+              "where": "defect:D1.edges[3]",
+              "node": null,
+              "detail": "是它写的,但写者版本是 v4,不是 v5"
+            },
+            {
+              "code": "invalid_reference",
+              "severity": "error",
+              "where": "defect:D2.nodes[0].evidence[1]",
+              "node": null,
+              "detail": "search:d0f7402c968ce34e4dd78170:7: unparsed;引用位置可核不代表原文支持断言"
+            },
+            {
+              "code": "invalid_node",
+              "severity": "error",
+              "where": "defect:D2.nodes[3]",
+              "node": "agent:agent-a635575c78cd15ff6@v1",
+              "detail": "版本越界(1..0)"
+            },
+            {
+              "code": "edge_unconfirmed",
+              "severity": "error",
+              "where": "defect:D2.edges[0]",
+              "node": null,
+              "detail": "是它派发的,但派发时在 v5,不是 v1"
+            },
+            {
+              "code": "edge_unconfirmed",
+              "severity": "error",
+              "where": "defect:D2.edges[1]",
+              "node": null,
+              "detail": "是它写的,但写者版本是 v1,不是 v3"
+            },
+            {
+              "code": "edge_unconfirmed",
+              "severity": "error",
+              "where": "defect:D2.edges[2]",
+              "node": null,
+              "detail": "是它写的,但写者版本是 v2,不是 v3"
+            }
+          ],
+          "omitted_issues": 0,
+          "coverage": {
+            "checked": true,
+            "target": "entry/src/main/ets/entryability/EntryAbility.ets",
+            "counts": {
+              "expected": 7,
+              "provided": 7,
+              "accounted": 7,
+              "expected_versions": 6,
+              "expected_candidates": 1,
+              "missing_versions": 0,
+              "missing_candidates": 0,
+              "missing": 0,
+              "unresolved": 0,
+              "not_repair": 1,
+              "deferred": 0,
+              "unconfirmed": 0,
+              "advisories": 0,
+              "advisory_rows": 0
+            },
+            "accounted": true,
+            "semantic_checked": false
+          }
+        },
+        {
+          "step": 46,
+          "call_id": "call_uuAApIBycGfrbYhoQsNVcK2Y",
+          "verified": true,
+          "status": "mechanical_clear",
+          "counts": {
+            "errors": 0,
+            "warnings": 0,
+            "total": 0
+          },
+          "draft_sha256": "d38e8823ca4409d4058d61b6ad02ee28eeedbc2eda69396e8567e8dffa28f31d",
+          "document_sha256": "d2e3757ed632a58f5d0228af63b13497b853595c5286410b2ac60dceffc04aec",
+          "issues": [],
+          "omitted_issues": 0,
+          "coverage": {
+            "checked": true,
+            "target": "entry/src/main/ets/entryability/EntryAbility.ets",
+            "counts": {
+              "expected": 7,
+              "provided": 7,
+              "accounted": 7,
+              "expected_versions": 6,
+              "expected_candidates": 1,
+              "missing_versions": 0,
+              "missing_candidates": 0,
+              "missing": 0,
+              "unresolved": 0,
+              "not_repair": 1,
+              "deferred": 0,
+              "unconfirmed": 0,
+              "advisories": 0,
+              "advisory_rows": 0
+            },
+            "accounted": true,
+            "semantic_checked": false
+          }
+        }
+      ],
+      "check_calls": 2,
+      "draft_chars": 15789,
+      "returned_chars": 2901,
+      "final_document_sha256": "d2e3757ed632a58f5d0228af63b13497b853595c5286410b2ac60dceffc04aec",
+      "matched_check": 46
+    }
+  },
+  "comparison": {
+    "rep1": {
+      "core": {
+        "D1": "pass",
+        "D2": "pass"
+      },
+      "facts": {
+        "supported": 5,
+        "partial": 1
+      },
+      "total_tokens": 1631846,
+      "wall_s": 334.96348549996037,
+      "late10of10": "omitted",
+      "memory_pre_repair": "correctly recognized"
+    },
+    "rep2": {
+      "core": {
+        "D1": "pass",
+        "D2": "pass"
+      },
+      "facts": {
+        "supported": 5,
+        "partial": 1
+      },
+      "total_tokens": 1609753,
+      "wall_s": 331.3188588001067,
+      "late10of10": "reported via summary; not direct native L260/L267",
+      "memory_pre_repair": "wrongly excluded by timing"
+    },
+    "paired_means": {
+      "total_tokens": 1620799.5,
+      "wall_s": 333.1411721500335,
+      "e2e_s": 337.0063290500548
+    },
+    "raw_means": {
+      "input": 1404194.5,
+      "cache_included": 1206784,
+      "output": 9736,
+      "total": 1413930.5,
+      "tool_calls": 18,
+      "tool_chars": 3750566.5,
+      "wall_s": 216.21197095001116,
+      "e2e_s": 219.21012005006196
+    },
+    "total_token_change_percent": 14.630775699371368,
+    "interpretation": "Both tools recover generation inputs absent in both raw; cost rises and extra false chronology appears in rep2. Core count cannot hide full annotation error or certify joint goal."
+  },
+  "conclusion": "D1/D2 bounded core pass, fixed fact5supported1partial preserved. Full annotation requires correction of explicit false memory timeline; not a harmless omission. No joint token-saving+correct-attribution acceptance."
+}

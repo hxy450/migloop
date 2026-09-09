@@ -1,0 +1,959 @@
+{
+  "schema": "migloop-core-rubric-reconciliation/1",
+  "status": "complete_for_all_legacy_raw_and_v8_two_repetitions",
+  "review_date": "2026-09-09",
+  "scope": "Read-only reconciliation of existing protocol, common tasks, reference-v1 and already adjudicated raw/V8 runs. No new question requirements, source edits, model calls, frozen changes or holdout reads.",
+  "protocol": {
+    "file": "protocol.md",
+    "sha256": "19df0bb2ef9dacc62d2b8c1d911cdaf03aa6ec7941889eb78bd135c8403f7afb",
+    "definitions": {
+      "pass": "核心事实/近因与重要反证成立，事实/来源主张/推断/未知分开；不要求逐字复述参考全部细项。",
+      "partial": "无明确关键相反断言，但本题可恢复的必要环节漏核，或决定性原文未处理；不能以未知自动通过。",
+      "fail": "核心变更、责任、时序错误，忽略直接反证，或把未验证行为说成已验证。"
+    }
+  },
+  "reference": {
+    "file": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/reference-v1/legacy-reference.json",
+    "sha256": "2c015536094fff1e42bb3b6b5cc2dce743c0f2a0f6924254027f7f8a5faac927",
+    "unchanged": true
+  },
+  "common_tasks": [
+    {
+      "case": "dice-entry",
+      "path": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v1/dice-entry/common-task.md"
+    },
+    {
+      "case": "splash",
+      "path": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v1/splash/common-task.md"
+    },
+    {
+      "case": "member-center",
+      "path": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v1/member-center/common-task.md"
+    }
+  ],
+  "fixed_interpretations": {
+    "S3_H5": "若三个本轮目标及1透明+2深色正确，未冒称3深色、未把已有H5归本次、验证边界正确，漏点名H5是minor，core可pass；若反说H5新改/三处全暗，则核心错误。",
+    "D2_WARN": "已确认成功构建并限制到编译层时，漏WARN是minor；声称0WARN或WARN=失败另判核心相反事实。",
+    "S4_Slice8": "原实现/为何多次修改要求近因实际输入核查；Slice8正确Kotlin输入及错误整写在允许池内可恢复，未核为mandatory gap。",
+    "S1_delete": "装配变化的作者是中性问题明确询问的责任链；明确错归Slice11不是minor。",
+    "S1_repair": "实际onWillDismiss不能被后面的NavBar复位兜底替代。",
+    "S2_early_source": "不规定必须某一locator；早期可信版本也能支持需求已存在。raw只拿后期主题内容不能自动证明它生成前已进入池/输入。",
+    "S2_hide": "入页隐藏是系统栏修复实质；只恢复未核隐藏为mandatory gap。",
+    "Dice_addendum": "593d4e86 L260/L267单独保留且两组同尺度；未改变旧D1核心分母。10/10不证明AppStorage桥键。",
+    "audit_independence": "YAML/basis/coverage/坐标关系审计与core分开。raw无YAML不扣分，tools corepass仍可能有严重标注错绑。"
+  },
+  "precedent": {
+    "file": "formal-adjudication-legacy.md",
+    "S3": "首轮已经写‘通过核心’及H5 minor，非为V8新增豁免。",
+    "D2": "首轮已经明确may-throw WARN漏报为小缺项。"
+  },
+  "rows": [
+    {
+      "case": "dice-entry",
+      "variant": "formal-v7",
+      "arm": "raw",
+      "rep": 1,
+      "question": "D1",
+      "core": "partial",
+      "basis": "后置 Step3 桥设计/派发/三次 Edit 有据，但未追生成方页面/F001/沉浸式 Read→原始 Write（generator L51–72）。",
+      "minor_omissions": [
+        "后来主机10/10通道未列，按独立addendum记全量缺项，桥键未知仍正确。"
+      ],
+      "mandatory_gaps": [
+        "题目明确询问的生成时实际输入未恢复。"
+      ],
+      "audit_or_full_annotation": "桥键与行为验证未越级；不要求raw提供YAML。",
+      "fact_detail_statuses": [
+        "partial",
+        "supported",
+        "supported"
+      ],
+      "fact_detail_counts": {
+        "supported": 2,
+        "partial": 1,
+        "omitted": 0,
+        "contradicted": 0,
+        "total": 3
+      },
+      "report": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v7/dice-entry/runs/raw/rep1/result.json",
+      "adjudication": "v7-baseline-legacy.md",
+      "extra_false_claims": [],
+      "annotation_requires_correction": false
+    },
+    {
+      "case": "dice-entry",
+      "variant": "formal-v7",
+      "arm": "raw",
+      "rep": 1,
+      "question": "D2",
+      "core": "pass",
+      "basis": "ECAT 派发、SDK适配、import/注册/实现和builder成功/WARN均有原始支持，明确未认证异常回调。",
+      "minor_omissions": [
+        "主要构建引用有总结/task-notification层级，不能包装成已直核每条native stdout。"
+      ],
+      "mandatory_gaps": [],
+      "audit_or_full_annotation": "引用类别需准确；核心构建事实不因此判假。",
+      "fact_detail_statuses": [
+        "supported",
+        "supported",
+        "supported"
+      ],
+      "fact_detail_counts": {
+        "supported": 3,
+        "partial": 0,
+        "omitted": 0,
+        "contradicted": 0,
+        "total": 3
+      },
+      "report": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v7/dice-entry/runs/raw/rep1/result.json",
+      "adjudication": "v7-baseline-legacy.md",
+      "extra_false_claims": [],
+      "annotation_requires_correction": false
+    },
+    {
+      "case": "dice-entry",
+      "variant": "formal-v7",
+      "arm": "raw",
+      "rep": 2,
+      "question": "D1",
+      "core": "partial",
+      "basis": "后置 Step3 桥设计/派发/三次 Edit 有据，但未追生成方页面/F001/沉浸式 Read→原始 Write（generator L51–72）。",
+      "minor_omissions": [
+        "10/10只按转引摘要主张引用，未直核新addendum原生回执。"
+      ],
+      "mandatory_gaps": [
+        "题目明确询问的生成时实际输入未恢复。"
+      ],
+      "audit_or_full_annotation": "桥键与行为验证未越级；不要求raw提供YAML。",
+      "fact_detail_statuses": [
+        "partial",
+        "supported",
+        "supported"
+      ],
+      "fact_detail_counts": {
+        "supported": 2,
+        "partial": 1,
+        "omitted": 0,
+        "contradicted": 0,
+        "total": 3
+      },
+      "report": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v7/dice-entry/runs/raw/rep2/result.json",
+      "adjudication": "v7-baseline-legacy.md",
+      "extra_false_claims": [],
+      "annotation_requires_correction": false
+    },
+    {
+      "case": "dice-entry",
+      "variant": "formal-v7",
+      "arm": "raw",
+      "rep": 2,
+      "question": "D2",
+      "core": "pass",
+      "basis": "ECAT 派发、SDK适配、import/注册/实现和builder成功/WARN均有原始支持，明确未认证异常回调。",
+      "minor_omissions": [
+        "主要构建引用有总结/task-notification层级，不能包装成已直核每条native stdout。"
+      ],
+      "mandatory_gaps": [],
+      "audit_or_full_annotation": "引用类别需准确；核心构建事实不因此判假。",
+      "fact_detail_statuses": [
+        "supported",
+        "supported",
+        "supported"
+      ],
+      "fact_detail_counts": {
+        "supported": 3,
+        "partial": 0,
+        "omitted": 0,
+        "contradicted": 0,
+        "total": 3
+      },
+      "report": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v7/dice-entry/runs/raw/rep2/result.json",
+      "adjudication": "v7-baseline-legacy.md",
+      "extra_false_claims": [],
+      "annotation_requires_correction": false
+    },
+    {
+      "case": "splash",
+      "variant": "formal-v7",
+      "arm": "raw",
+      "rep": 1,
+      "question": "S1",
+      "core": "fail",
+      "basis": "报告将 Navigation 装配/删除 callback 归给 Slice11；实际是 entry-setup L123/L124，直接错在题目要求区分的责任链。",
+      "minor_omissions": [],
+      "mandatory_gaps": [
+        "明确错认核心删除作者。",
+        "漏后置builder成功构建。"
+      ],
+      "audit_or_full_annotation": "纠正旧裁决core=partial的分类不一致；原facts计数不改。",
+      "fact_detail_statuses": [
+        "supported",
+        "contradicted",
+        "supported",
+        "omitted"
+      ],
+      "fact_detail_counts": {
+        "supported": 2,
+        "partial": 0,
+        "omitted": 1,
+        "contradicted": 1,
+        "total": 4
+      },
+      "report": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v7/splash/runs/raw/rep1/result.json",
+      "adjudication": "v7-baseline-legacy.md",
+      "extra_false_claims": [
+        {
+          "code": "wrong_deletion_actor",
+          "message": "Navigation callback删除由entry-setup实施，不能归给Slice11。"
+        }
+      ],
+      "annotation_requires_correction": true
+    },
+    {
+      "case": "splash",
+      "variant": "formal-v7",
+      "arm": "raw",
+      "rep": 1,
+      "question": "S2",
+      "core": "partial",
+      "basis": "后置隐藏/恢复和概括性生成输入正确，但只引07-26 fixer theme读，未证明要求何时已进入早期调查输入。",
+      "minor_omissions": [],
+      "mandatory_gaps": [
+        "题目‘何时已有’缺生成前可恢复证据；root L404实际在07-23已返回主题。"
+      ],
+      "audit_or_full_annotation": "未声称新需求首次出现于finding，方向正确但证据链不足。",
+      "fact_detail_statuses": [
+        "partial",
+        "supported",
+        "supported"
+      ],
+      "fact_detail_counts": {
+        "supported": 2,
+        "partial": 1,
+        "omitted": 0,
+        "contradicted": 0,
+        "total": 3
+      },
+      "report": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v7/splash/runs/raw/rep1/result.json",
+      "adjudication": "v7-baseline-legacy.md",
+      "extra_false_claims": [],
+      "annotation_requires_correction": false
+    },
+    {
+      "case": "splash",
+      "variant": "formal-v7",
+      "arm": "raw",
+      "rep": 2,
+      "question": "S1",
+      "core": "partial",
+      "basis": "初版、isModal错误解释与后置build正确，但entry-setup删除未定位；所引root L897不含onWillDismiss，决定性修复证据未核。",
+      "minor_omissions": [],
+      "mandatory_gaps": [
+        "装配删除环节未恢复。",
+        "核心修复的引用不支持所述原文。"
+      ],
+      "audit_or_full_annotation": "实质错引单列full审计不通过；onWillDismiss修复事实本身真实，不再编一个相反事实。",
+      "fact_detail_statuses": [
+        "supported",
+        "partial",
+        "partial",
+        "supported"
+      ],
+      "fact_detail_counts": {
+        "supported": 2,
+        "partial": 2,
+        "omitted": 0,
+        "contradicted": 0,
+        "total": 4
+      },
+      "report": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v7/splash/runs/raw/rep2/result.json",
+      "adjudication": "v7-baseline-legacy.md",
+      "extra_false_claims": [
+        {
+          "code": "wrong_raw_quote",
+          "message": "root L897实际生成prompt，不包含所引onWillDismiss/D020文字。"
+        }
+      ],
+      "annotation_requires_correction": true
+    },
+    {
+      "case": "splash",
+      "variant": "formal-v7",
+      "arm": "raw",
+      "rep": 2,
+      "question": "S2",
+      "core": "partial",
+      "basis": "已定位root L404的早期主题和生成输入边界，但只确认L488跳转恢复，未定位L485/L486实际入页隐藏。",
+      "minor_omissions": [],
+      "mandatory_gaps": [
+        "真实核心修复‘隐藏’半边未调查。"
+      ],
+      "audit_or_full_annotation": "不是因缺逐字术语或完整设备复跑扣分。",
+      "fact_detail_statuses": [
+        "supported",
+        "supported",
+        "partial"
+      ],
+      "fact_detail_counts": {
+        "supported": 2,
+        "partial": 1,
+        "omitted": 0,
+        "contradicted": 0,
+        "total": 3
+      },
+      "report": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v7/splash/runs/raw/rep2/result.json",
+      "adjudication": "v7-baseline-legacy.md",
+      "extra_false_claims": [],
+      "annotation_requires_correction": false
+    },
+    {
+      "case": "member-center",
+      "variant": "formal-v6-document",
+      "arm": "raw",
+      "rep": 1,
+      "question": "S3",
+      "core": "pass",
+      "basis": "三站点与AppLoad透明、Pay/Renew深色均正确，脚本执行与最终/设备验证分开。",
+      "minor_omissions": [],
+      "mandatory_gaps": [],
+      "audit_or_full_annotation": "raw不要求结构化coverage；未把3sites说成三个深色，也未把构建当三处设备验收。",
+      "fact_detail_statuses": [
+        "supported",
+        "supported",
+        "supported"
+      ],
+      "fact_detail_counts": {
+        "supported": 3,
+        "partial": 0,
+        "omitted": 0,
+        "contradicted": 0,
+        "total": 3
+      },
+      "report": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v6-document/member-center/runs/raw/rep1/result.json",
+      "adjudication": "v6b-adjudication-member-raw.md",
+      "extra_false_claims": [],
+      "annotation_requires_correction": false
+    },
+    {
+      "case": "member-center",
+      "variant": "formal-v6-document",
+      "arm": "raw",
+      "rep": 1,
+      "question": "S4",
+      "core": "partial",
+      "basis": "两稿都未将Slice8 L21/L24正确Kotlin输入接到L264/L265错误整写；private来源与builder修复/构建正确。",
+      "minor_omissions": [],
+      "mandatory_gaps": [
+        "最近原始输入→错误重写链未核。",
+        "为何多次修改中的第一轮ForEach中间态漏掉。"
+      ],
+      "audit_or_full_annotation": "L605价格attempt错引另列；builder原文仍支持双Span事实。",
+      "fact_detail_statuses": [
+        "partial",
+        "partial",
+        "supported"
+      ],
+      "fact_detail_counts": {
+        "supported": 1,
+        "partial": 2,
+        "omitted": 0,
+        "contradicted": 0,
+        "total": 3
+      },
+      "report": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v6-document/member-center/runs/raw/rep1/result.json",
+      "adjudication": "v6b-adjudication-member-raw.md",
+      "extra_false_claims": [
+        {
+          "code": "wrong_price_attempt_quote",
+          "message": "L605只有tab/mask，不支持price双Span attempt；其他原文仍支持真实修复事实。"
+        }
+      ],
+      "annotation_requires_correction": true
+    },
+    {
+      "case": "member-center",
+      "variant": "formal-v6-document",
+      "arm": "raw",
+      "rep": 2,
+      "question": "S3",
+      "core": "pass",
+      "basis": "三站点与AppLoad透明、Pay/Renew深色均正确，脚本执行与最终/设备验证分开。",
+      "minor_omissions": [
+        "正确排除既有透明786行但未点名H5。",
+        "执行依据主要是脚本/报告，未直引现成L104同调用3sites回执。"
+      ],
+      "mandatory_gaps": [],
+      "audit_or_full_annotation": "raw不要求结构化coverage；未把3sites说成三个深色，也未把构建当三处设备验收。",
+      "fact_detail_statuses": [
+        "supported",
+        "supported",
+        "partial"
+      ],
+      "fact_detail_counts": {
+        "supported": 2,
+        "partial": 1,
+        "omitted": 0,
+        "contradicted": 0,
+        "total": 3
+      },
+      "report": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v6-document/member-center/runs/raw/rep2/result.json",
+      "adjudication": "v6b-adjudication-member-raw.md",
+      "extra_false_claims": [],
+      "annotation_requires_correction": false
+    },
+    {
+      "case": "member-center",
+      "variant": "formal-v6-document",
+      "arm": "raw",
+      "rep": 2,
+      "question": "S4",
+      "core": "partial",
+      "basis": "两稿都未将Slice8 L21/L24正确Kotlin输入接到L264/L265错误整写；private来源与builder修复/构建正确。",
+      "minor_omissions": [],
+      "mandatory_gaps": [
+        "最近原始输入→错误重写链未核。"
+      ],
+      "audit_or_full_annotation": "后期fixer所引Android规则不是Slice8当时读取证明。",
+      "fact_detail_statuses": [
+        "partial",
+        "supported",
+        "supported"
+      ],
+      "fact_detail_counts": {
+        "supported": 2,
+        "partial": 1,
+        "omitted": 0,
+        "contradicted": 0,
+        "total": 3
+      },
+      "report": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v6-document/member-center/runs/raw/rep2/result.json",
+      "adjudication": "v6b-adjudication-member-raw.md",
+      "extra_false_claims": [],
+      "annotation_requires_correction": false
+    },
+    {
+      "case": "dice-entry",
+      "variant": "formal-v8",
+      "arm": "tools",
+      "rep": 1,
+      "question": "D1",
+      "core": "pass",
+      "basis": "实际打开generator@v2及输入，核未含桥的Write；后续明确桥要求/成功Edit和运行验证未知区分正确。",
+      "minor_omissions": [
+        "未列后来主机10/10通道，作为既有独立addendum的全量缺项；不改变旧oracle核心分母。"
+      ],
+      "mandatory_gaps": [],
+      "audit_or_full_annotation": "最终已删掉首稿无效receipt引用与错写者边；不把旧Step4真实状态判假。",
+      "fact_detail_statuses": [
+        "supported",
+        "supported",
+        "supported"
+      ],
+      "fact_detail_counts": {
+        "supported": 3,
+        "partial": 0,
+        "omitted": 0,
+        "contradicted": 0,
+        "total": 3
+      },
+      "report": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v8/dice-entry/runs/tools/rep1/verdict.yaml",
+      "adjudication": "v8-adjudication-dice.md",
+      "extra_false_claims": [],
+      "annotation_requires_correction": false
+    },
+    {
+      "case": "dice-entry",
+      "variant": "formal-v8",
+      "arm": "tools",
+      "rep": 1,
+      "question": "D2",
+      "core": "pass",
+      "basis": "ECAT要求→SDK→三次实际Edit→原生成功构建有据，明确不认证回调触发。",
+      "minor_omissions": [
+        "漏may-throw WARN；未宣称0WARN/构建失败。"
+      ],
+      "mandatory_gaps": [],
+      "audit_or_full_annotation": "沿formal-v1既有minor判例；不为V8降门槛。",
+      "fact_detail_statuses": [
+        "supported",
+        "supported",
+        "partial"
+      ],
+      "fact_detail_counts": {
+        "supported": 2,
+        "partial": 1,
+        "omitted": 0,
+        "contradicted": 0,
+        "total": 3
+      },
+      "report": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v8/dice-entry/runs/tools/rep1/verdict.yaml",
+      "adjudication": "v8-adjudication-dice.md",
+      "extra_false_claims": [],
+      "annotation_requires_correction": false
+    },
+    {
+      "case": "splash",
+      "variant": "formal-v8",
+      "arm": "tools",
+      "rep": 1,
+      "question": "S1",
+      "core": "partial",
+      "basis": "找对初版/entry-setup/Slice11/build，但没打开L346已执行onWillDismiss脚本，以L352复位兜底代替核心BACK修复。",
+      "minor_omissions": [],
+      "mandatory_gaps": [
+        "核心onWillDismiss实际修复未调查。"
+      ],
+      "audit_or_full_annotation": "候选explained被关联到另一调用的正式v52，完整标注有实质问题。",
+      "fact_detail_statuses": [
+        "supported",
+        "supported",
+        "partial",
+        "supported"
+      ],
+      "fact_detail_counts": {
+        "supported": 3,
+        "partial": 1,
+        "omitted": 0,
+        "contradicted": 0,
+        "total": 4
+      },
+      "report": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v8/splash/runs/tools/rep1/verdict.yaml",
+      "adjudication": "v8-adjudication-splash.md",
+      "extra_false_claims": [
+        {
+          "code": "candidate_formal_call_conflation",
+          "message": "L346脚本与L352正式v52不是同一次输入/产出版。"
+        }
+      ],
+      "annotation_requires_correction": true
+    },
+    {
+      "case": "splash",
+      "variant": "formal-v8",
+      "arm": "tools",
+      "rep": 1,
+      "question": "S2",
+      "core": "partial",
+      "basis": "实际打开早期ui-manifest可证明要求早已有，生成输入边界正确；L485已执行隐藏未核，只讲L488恢复。",
+      "minor_omissions": [
+        "未回到root L404原始主题回执；已有早期文档可支持核心‘早已有’，此单项不独立降core。"
+      ],
+      "mandatory_gaps": [
+        "实际入页隐藏脚本未调查，修复只答半边。"
+      ],
+      "audit_or_full_annotation": "候选explained不能由后续v53认证；不把search当历史读。",
+      "fact_detail_statuses": [
+        "partial",
+        "supported",
+        "partial"
+      ],
+      "fact_detail_counts": {
+        "supported": 1,
+        "partial": 2,
+        "omitted": 0,
+        "contradicted": 0,
+        "total": 3
+      },
+      "report": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v8/splash/runs/tools/rep1/verdict.yaml",
+      "adjudication": "v8-adjudication-splash.md",
+      "extra_false_claims": [
+        {
+          "code": "candidate_formal_call_conflation",
+          "message": "L485脚本与L488正式v53不是同一次输入/产出版。"
+        }
+      ],
+      "annotation_requires_correction": true
+    },
+    {
+      "case": "member-center",
+      "variant": "formal-v8",
+      "arm": "tools",
+      "rep": 1,
+      "question": "S3",
+      "core": "pass",
+      "basis": "三站点和值明确正确；实际脚本先write后报告，正文/coverage承认执行；最终保留与设备状态未知区分合理。",
+      "minor_omissions": [
+        "H5既有透明/跳过未点名。"
+      ],
+      "mandatory_gaps": [],
+      "audit_or_full_annotation": "核心pass不等于整份归因/审计通过。",
+      "fact_detail_statuses": [
+        "supported",
+        "supported",
+        "partial"
+      ],
+      "fact_detail_counts": {
+        "supported": 2,
+        "partial": 1,
+        "omitted": 0,
+        "contradicted": 0,
+        "total": 3
+      },
+      "report": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v8/member-center/runs/tools/rep1/verdict.yaml",
+      "adjudication": "v8-adjudication-member.md",
+      "extra_false_claims": [],
+      "annotation_requires_correction": false
+    },
+    {
+      "case": "member-center",
+      "variant": "formal-v8",
+      "arm": "tools",
+      "rep": 1,
+      "question": "S4",
+      "core": "partial",
+      "basis": "两阶段价格修复和fixer private→builder修复/编译正确，但可恢复的Slice8早期输入→坏整写未核。",
+      "minor_omissions": [],
+      "mandatory_gaps": [
+        "题目原实现近因/实际输入链未恢复。"
+      ],
+      "audit_or_full_annotation": "未查原始输入却标红Slice8；tail#15731倒挂v40红节点，完整标注不通过。",
+      "fact_detail_statuses": [
+        "partial",
+        "supported",
+        "supported"
+      ],
+      "fact_detail_counts": {
+        "supported": 2,
+        "partial": 1,
+        "omitted": 0,
+        "contradicted": 0,
+        "total": 3
+      },
+      "report": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v8/member-center/runs/tools/rep1/verdict.yaml",
+      "adjudication": "v8-adjudication-member.md",
+      "extra_false_claims": [
+        {
+          "code": "tail_event_rebound_to_last_version",
+          "message": "#15731在v40窗口后却挂为v40错误进入节点。"
+        }
+      ],
+      "annotation_requires_correction": true
+    },
+    {
+      "case": "member-center",
+      "variant": "formal-v8",
+      "arm": "tools",
+      "rep": 2,
+      "question": "S3",
+      "core": "pass",
+      "basis": "三站点和值明确正确；实际脚本先write后报告，正文/coverage承认执行；最终保留与设备状态未知区分合理。",
+      "minor_omissions": [
+        "H5既有透明/跳过未点名。"
+      ],
+      "mandatory_gaps": [],
+      "audit_or_full_annotation": "S3 v9→v16宽repair落点与v5角色冲突单列标注问题；不将正确站点和值改判错。",
+      "fact_detail_statuses": [
+        "supported",
+        "supported",
+        "partial"
+      ],
+      "fact_detail_counts": {
+        "supported": 2,
+        "partial": 1,
+        "omitted": 0,
+        "contradicted": 0,
+        "total": 3
+      },
+      "report": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v8/member-center/runs/tools/rep2/verdict.yaml",
+      "adjudication": "v8-repeat-adjudication-member.md",
+      "extra_false_claims": [
+        {
+          "code": "unsupported_mask_repair_landing",
+          "message": "v16是private可见性Edit，不是已核mask修复落点。"
+        }
+      ],
+      "annotation_requires_correction": true
+    },
+    {
+      "case": "member-center",
+      "variant": "formal-v8",
+      "arm": "tools",
+      "rep": 2,
+      "question": "S4",
+      "core": "partial",
+      "basis": "两阶段价格修复和fixer private→builder修复/编译正确，但可恢复的Slice8早期输入→坏整写未核。",
+      "minor_omissions": [],
+      "mandatory_gaps": [
+        "题目原实现近因/实际输入链未恢复。"
+      ],
+      "audit_or_full_annotation": "明确未知不代表原文不可恢复；tail仍附v40非红节点，不能把它当v40内效应。",
+      "fact_detail_statuses": [
+        "partial",
+        "supported",
+        "supported"
+      ],
+      "fact_detail_counts": {
+        "supported": 2,
+        "partial": 1,
+        "omitted": 0,
+        "contradicted": 0,
+        "total": 3
+      },
+      "report": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v8/member-center/runs/tools/rep2/verdict.yaml",
+      "adjudication": "v8-repeat-adjudication-member.md",
+      "extra_false_claims": [],
+      "annotation_requires_correction": true
+    },
+    {
+      "case": "dice-entry",
+      "variant": "formal-v8",
+      "arm": "tools",
+      "rep": 2,
+      "question": "D1",
+      "core": "pass",
+      "basis": "实际开generator输入与桥设计/三次Edit；后置round1完整总结和AppStorage不可观测边界正确。",
+      "minor_omissions": [
+        "10/10主要据历史总结，未直核L260/L267，不能升级为已重核原生全证据。"
+      ],
+      "mandatory_gaps": [],
+      "audit_or_full_annotation": "最终已纠正首稿错写者边，不把corepass等同原生验证全核。",
+      "fact_detail_statuses": [
+        "supported",
+        "supported",
+        "supported"
+      ],
+      "fact_detail_counts": {
+        "supported": 3,
+        "partial": 0,
+        "omitted": 0,
+        "contradicted": 0,
+        "total": 3
+      },
+      "report": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v8/dice-entry/runs/tools/rep2/verdict.yaml",
+      "adjudication": "v8-repeat-adjudication-dice.md",
+      "extra_false_claims": [],
+      "annotation_requires_correction": false
+    },
+    {
+      "case": "dice-entry",
+      "variant": "formal-v8",
+      "arm": "tools",
+      "rep": 2,
+      "question": "D2",
+      "core": "pass",
+      "basis": "ECAT直接worklist→fixer/SDK→三次Edit与真实build正确；附加memory排除的时序理由错误，单列完整标注。",
+      "minor_omissions": [
+        "漏may-throw WARN；未宣称0WARN/构建失败。"
+      ],
+      "mandatory_gaps": [],
+      "audit_or_full_annotation": "material false claim:反馈v1于21:12已写，报告却称修复后；本次L190已送达相反证据。",
+      "fact_detail_statuses": [
+        "supported",
+        "supported",
+        "partial"
+      ],
+      "fact_detail_counts": {
+        "supported": 2,
+        "partial": 1,
+        "omitted": 0,
+        "contradicted": 0,
+        "total": 3
+      },
+      "report": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v8/dice-entry/runs/tools/rep2/verdict.yaml",
+      "adjudication": "v8-repeat-adjudication-dice.md",
+      "extra_false_claims": [
+        {
+          "code": "memory_feedback_wrong_time_exclusion",
+          "question": "D2",
+          "severity": "material",
+          "report_quote": "后续存在记忆文件反馈，但时间在修复后，不能作为本次修复的先验来源。",
+          "report_location": "D2.boundary",
+          "raw_file": "257fed22-fb0e-48de-bee9-0791c45a90a9.jsonl",
+          "raw_lines": [
+            115,
+            119
+          ],
+          "raw_time": "2026-09-03T21:12:53.922Z",
+          "repair_times": "observer Edit L41-L45 at21:19:24..21:19:39",
+          "record_id": "call_8ce3690fd9384f04ab8d47bb",
+          "record_sha256": "ea3a2df7dc072e047f9541c7f34b93cc7a7a1c44abc9b51f29e66b5ce2f69f9b",
+          "delivered_contrary_evidence": {
+            "step": 37,
+            "result_line": 190,
+            "detail": "search errorManager.on before repair explicitly returns feedback v1 + _index v1 by257fed22 atT+6:46; patch T+6:53."
+          },
+          "why_false": "Later _index v2 also exists but cannot erase earlier feedback v1. Unqualified post-repair timing excludes a genuinely earlier input artifact. Being earlier does not itself prove fixer read it or that it caused the patch.",
+          "required_correction": "Separate earlier feedback v1 from later index/read copies; keep actual fixer-consumption unproven, not disqualify by a false timestamp.",
+          "core_treatment": "Direct work-list->fixer requirement chain remains supported. Not adding memory as a new fixed-oracle mandatory item; full annotation still fails until this explicit wrong exclusion is corrected."
+        }
+      ],
+      "annotation_requires_correction": true
+    },
+    {
+      "case": "splash",
+      "variant": "formal-v8",
+      "arm": "tools",
+      "rep": 2,
+      "question": "S1",
+      "core": "pass",
+      "basis": "已开entry-setup删除diff、Slice11错误决策、L346写后回执和后置build通知；最终写明onWillDismiss候选修复和复位兜底。",
+      "minor_omissions": [
+        "局部‘意图’表述偏弱、来源引用大量删去，但整段未否认脚本执行。"
+      ],
+      "mandatory_gaps": [],
+      "audit_or_full_annotation": "material node_attribution_error：正确Slice11决策挂无关v38(DBPPT import)；原reason未直接声称该import引入isModal。完整归因不通过。",
+      "fact_detail_statuses": [
+        "supported",
+        "supported",
+        "supported",
+        "supported"
+      ],
+      "fact_detail_counts": {
+        "supported": 4,
+        "partial": 0,
+        "omitted": 0,
+        "contradicted": 0,
+        "total": 4
+      },
+      "report": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v8/splash/runs/tools/rep2/verdict.yaml",
+      "adjudication": "v8-repeat-adjudication-splash.md",
+      "extra_false_claims": [
+        {
+          "code": "node_attribution_error",
+          "question": "S1",
+          "severity": "material",
+          "node": "agent:agent-aslice11-startup-50a0622bcfe4a588@v38",
+          "role": "进入·错",
+          "report_quote": "Slice 11 接入隐私弹窗时只配置 autoCancel:false、isModal:true，并在 D-020 注释中认定隐私弹窗会吃 BACK",
+          "actual_event": {
+            "file": "9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aslice11-startup-50a0622bcfe4a588.jsonl",
+            "line": 342,
+            "id": "toolu_01SGxtvNEPX7YfdSJW9eSi7P",
+            "time": "2026-07-24T16:33:44.771Z",
+            "target": "entry/src/main/ets/viewmodels/F001ViewModel.ets",
+            "change": "Add DBPPTFactory import",
+            "agent_version": 38
+          },
+          "correct_records": [
+            {
+              "file": "9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aslice11-startup-50a0622bcfe4a588.jsonl",
+              "line": 236,
+              "agent_v": 22,
+              "file_v": 38,
+              "meaning": "Controller +first isModal explanation"
+            },
+            {
+              "file": "9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aslice11-startup-50a0622bcfe4a588.jsonl",
+              "line": 250,
+              "agent_v": 26,
+              "file_v": 42,
+              "meaning": "D020 comment reaffirmation"
+            }
+          ],
+          "delivered_evidence": "transcriptL102 agentv38 timeline andL104diff clearly distinguishv22/v26/v37/v38",
+          "why_core_not_fail": "Reason says Slice11 phase/actor, not explicitly that DBPPT import action introduced isModal; actor-level main chain correct, exact entering node/effect attribution false. Do not silently treat cumulative endpoint as introduction.",
+          "required_correction": "Bind wrong decision to actual effect/event, not unrelated v38; until corrected full auditable attribution fails."
+        }
+      ],
+      "annotation_requires_correction": true
+    },
+    {
+      "case": "splash",
+      "variant": "formal-v8",
+      "arm": "tools",
+      "rep": 2,
+      "question": "S2",
+      "core": "pass",
+      "basis": "早期design@v1、生成输入和L485完整隐藏/恢复脚本+成功回执均开，另核L488正式恢复；最终主链与行为未知正确。",
+      "minor_omissions": [
+        "root L404原始theme Read未追，早期设计已足够支持核心需求先在。"
+      ],
+      "mandatory_gaps": [],
+      "audit_or_full_annotation": "material wrongcandidate：L481 Splash生命周期grep被说成Android主题复核；需纠正，不能用corepass掩盖。",
+      "fact_detail_statuses": [
+        "partial",
+        "supported",
+        "supported"
+      ],
+      "fact_detail_counts": {
+        "supported": 2,
+        "partial": 1,
+        "omitted": 0,
+        "contradicted": 0,
+        "total": 3
+      },
+      "report": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v8/splash/runs/tools/rep2/verdict.yaml",
+      "adjudication": "v8-repeat-adjudication-splash.md",
+      "extra_false_claims": [
+        {
+          "code": "candidate_evidence_misidentification",
+          "question": "S2",
+          "severity": "material",
+          "candidate": "candidate:b60465cde470e4475666",
+          "report_quote": "S2 Android 主题复核候选，确认 Manifest/themes.xml 中 Launch 主题与 windowFullscreen。",
+          "actual_event": {
+            "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+            "line": 481,
+            "result_line": 482,
+            "id": "toolu_01HS1zwyoVKWev6p7ApLxPqi",
+            "ref": "#a68daf720e780b4c2:15652@L481",
+            "command": "grep lifecycle/window imports and onRoute/vm.navigated in SplashPage.ets",
+            "actual": "No AndroidManifest/themes query or windowFullscreen value in the command/output"
+          },
+          "correct_records": [
+            {
+              "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+              "line": 476,
+              "meaning": "AndroidManifest grep"
+            },
+            {
+              "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+              "line": 478,
+              "meaning": "themes grep"
+            }
+          ],
+          "why_false": "Candidate id locates a different operation. Model actually opened correct theme records elsewhere, but that does not make this per-item claim true.",
+          "required_correction": "Describe actual lifecycle grep, and reference separate theme actions for Android expected values; not a minor omission."
+        }
+      ],
+      "annotation_requires_correction": true
+    }
+  ],
+  "counts": {
+    "raw": {
+      "pass": 4,
+      "partial": 7,
+      "fail": 1,
+      "questions": 12,
+      "runs": 6
+    },
+    "v8_completed": {
+      "pass": 8,
+      "partial": 4,
+      "fail": 0,
+      "questions": 12,
+      "runs": 6
+    },
+    "comparison_warning": "两组各12题次均已裁；这是有界core判定，不是全事实/完整标注准确率。V8额外实质错绑和错误排除输入仍是联合验收否决项。"
+  },
+  "fact_detail_preservation": {
+    "unchanged_existing_counts": true,
+    "member_raw_note": "V6B raw旧JSON存命名rubric而非统一facts数组；本表依据既有观察交叉映射为3+3条，不新加证据或改变原判缺项。原始rubric保留在v6b-adjudication-member-raw.json。",
+    "facts_not_accuracy": true
+  },
+  "explicit_reconciliations": [
+    {
+      "run": "formal-v7/splash/runs/raw/rep1",
+      "question": "S1",
+      "old_label": "partial",
+      "reconciled": "fail",
+      "reason": "旧文自己已认定核心删除作者错归；按既有protocol失败定义改正标签，不暗改旧文/facts。"
+    },
+    {
+      "run": "formal-v8/member-center/runs/tools/rep1",
+      "question": "S3",
+      "old_wording": "事实细项partial/全文不完整，曾泛称核心不完整",
+      "reconciled": "pass_with_minor_H5_omission",
+      "reason": "三站点和值及验证边界正确；独立标注缺陷保留，不将facts未满分误作core partial。"
+    },
+    {
+      "run": "formal-v8/member-center/runs/tools/rep2",
+      "question": "S3",
+      "old_wording": "事实细项partial/全文不完整，曾泛称核心不完整",
+      "reconciled": "pass_with_minor_H5_omission",
+      "reason": "三站点和值及验证边界正确；独立标注缺陷保留，不将facts未满分误作core partial。"
+    }
+  ],
+  "pending_runs": [],
+  "extra_claim_policy": "Explicit false claims are independent from fixed-reference omission counts. New factual exclusion errors must be recorded even when old bounded core passes; not every mechanical warning is a false claim. Array is known audited issues, not an exhaustive all-output truth certification."
+}

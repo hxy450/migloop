@@ -66,6 +66,7 @@ async function main() {
   const snapshot=()=>evaluate(`(() => {
     const p=__mig.probe(),x=__mig.xt();
     return {trajectory:JSON.stringify(p.trajectory || null),steps:JSON.stringify(p.steps || []),
+      evidenceGraph:JSON.stringify(p.evidence_graph || null),root:x?.root,evidenceMode:x?.evidenceMode,
       treeIds:Object.keys(x?.byId || {}).sort(),drawn:[...document.querySelectorAll('#canvas .wire.route')]
         .map(n=>Number(n.dataset.step)).sort((a,b)=>a-b)};
   })()`);
@@ -161,7 +162,7 @@ async function main() {
       const displayed=await evaluate(`[...document.querySelectorAll('#probe .pn .attribution-basis')].map(${fieldDOM})`);
       assert.equal(displayed.length,active.length,'current defect displays exactly its supplied basis entries');
       displayed.forEach((box,i)=>compareBasis(box,active[i].node,bound));
-      const copies=await evaluate(`[...document.querySelectorAll('#probe .finding-item .attribution-basis')].map(n=>({
+      const copies=await evaluate(`[...document.querySelectorAll('#probe .finding-cause .attribution-basis')].map(n=>({
         defect:n.closest('.finding-item').dataset.defect,heading:n.closest('.finding-cause').querySelector('summary').textContent,
         box:(${fieldDOM})(n)}))`);
       for(const copy of copies){
@@ -210,8 +211,69 @@ async function main() {
         nodeCount:active.length,drawer,semanticChecked:false};
     }else{
       missing.push('basis');
-      assert.equal(await evaluate('document.querySelectorAll(".attribution-basis").length'),0,'missing basis remains missing');
+      assert.equal(await evaluate('document.querySelectorAll("#probe .pn .attribution-basis").length'),0,'missing node basis remains missing; events are checked separately');
       if(payload.error) assert(await evaluate(`document.querySelector('#probe').textContent.includes(${JSON.stringify(String(payload.error))})`),'load error is visible');
+    }
+    // V2 event reasons are not node reasons: authenticate their own original
+    // text and binding, and never make a context anchor inherit the event role.
+    const eventDefs=(structured?.schema==='migloop-verdict/2'?structured.defects || []:[])
+      .filter(d=>(d.event_claims || []).length);
+    const eventAudit={declared:0,originalCompared:0,bodyCompared:0,basisCompared:0,openedOriginal:0,
+      unlocated:0,semanticChecked:false,scope:'event claims are not version visits or truth judgments'};
+    if(eventDefs.length){
+      const raw=parseModelBlock(structured);
+      assert.equal(raw.status,'parsed','v2 event author document is parseable');
+      for(const defect of eventDefs){
+        assert(await evaluate(`(() => {const id=${JSON.stringify(defect.id)},p=__mig.probe();if(p.defect===id)return true;
+          const chip=[...document.querySelectorAll('.dchips span')].find(n=>n.textContent.startsWith(id+' '));
+          if(!chip)return false;chip.click();return __mig.probe().defect===id;})()`),'select actual event defect');
+        const originalDefect=raw.data.defects.find(d=>String(d.id)===String(defect.id));
+        assert(originalDefect,'event defect belongs to original document');
+        const selector='.event-claims[data-origin="structured"] .event-claim';
+        const displays=await evaluate(`[...document.querySelectorAll(${JSON.stringify(selector)})].map(row=>{
+          row.open=true;return {id:row.dataset.eventId,defect:row.dataset.defect,source:row.dataset.source,
+            semanticChecked:row.dataset.semanticChecked,reason:row.querySelector('.event-reason')?.textContent,
+            reference:row.querySelector('.event-ref')?.textContent,binding:JSON.parse(row.querySelector('.event-binding-proof pre').textContent),
+            basis:row.querySelector('.attribution-basis')?(${fieldDOM})(row.querySelector('.attribution-basis')):null,
+            openable:!!row.querySelector('.event-open-original'),red:row.classList.contains('event-red')};})`);
+        assert.equal(displays.length,defect.event_claims.length,'each supplied event has exactly one canonical panel');
+        for(let index=0;index<displays.length;index++){
+          const displayed=displays[index],claim=defect.event_claims[index],original=originalDefect.event_claims[index];
+          eventAudit.declared++;
+          assert.equal(displayed.id,claim.id);assert.equal(displayed.defect,defect.id);
+          assert.equal(displayed.source,'model');assert.equal(displayed.semanticChecked,'false');
+          for(const key of ['id','event','role','reason']) assert.equal(claim[key],original[key],'original event '+key+' preserved');
+          assert.equal(displayed.reason,original.reason);assert.equal(displayed.reference,original.event);
+          assert.deepEqual(displayed.binding,claim.binding,'system binding is separately and fully displayed');
+          assert.equal(displayed.red,['进入·错','进入·缺','带病传递'].includes(claim.role),'red is the model event role');
+          eventAudit.originalCompared++;eventAudit.bodyCompared++;
+          const bound=structured.identity?.bound===true&&payload.trace_identity?.bound!==false;
+          if(claim.basis){
+            for(const key of rawFields) assert.equal(claim.basis[key],original.basis[key],'event basis original '+key);
+            if(bound){assert(displayed.basis,'event basis appears in its event panel');compareBasis(displayed.basis,claim,true);}
+            eventAudit.basisCompared++;
+          }else assert.equal(displayed.basis,null,'no invented event basis');
+          if(displayed.openable){
+            assert(bound&&claim.binding?.ok===true,'event original navigation requires identity and exact binding');
+            await evaluate(`document.querySelectorAll(${JSON.stringify(selector)})[${index}].querySelector('.event-open-original').click()`);
+            await until(`(() => {const text=document.querySelectorAll(${JSON.stringify(selector)})[${index}]?.querySelector('.event-original')?.textContent;
+              return !!text&&!text.includes('加载原文');})()`,'actual event original loaded');
+            await evaluate(`document.querySelectorAll(${JSON.stringify(selector)})[${index}].querySelectorAll('.event-original .more').forEach(n=>n.click())`);
+            const text=await evaluate(`document.querySelectorAll(${JSON.stringify(selector)})[${index}].querySelector('.event-original').textContent`);
+            const actionUrl=new URL(url);actionUrl.pathname=actionUrl.pathname.replace('/fixchain/','/atom/')+'/action';
+            actionUrl.search=new URLSearchParams({id:claim.binding.owner_agent,seq:String(claim.binding.seq)}).toString();
+            const originalAction=await (await fetch(actionUrl)).json();
+            assert(!originalAction.error,'exact original action endpoint succeeds');
+            assert.equal(originalAction.seq,claim.binding.seq,'event action identity matches binding');
+            assert.equal(originalAction.src?.use_line+1,claim.binding.use_line,'event physical source line matches binding');
+            assert.equal(originalAction.src?.path,claim.binding.source_path,'event source transcript matches binding');
+            const input=typeof originalAction.input==='string'?originalAction.input:JSON.stringify(originalAction.input,null,1);
+            const expected='── 输入 ──\n'+input+'\n── 输出 ──\n'+(originalAction.output || '(空)')+'\n';
+            assert.equal(text,expected,'expanded UI input/output exactly matches source action, not a reference-shaped guess');
+            eventAudit.openedOriginal++;
+          }else eventAudit.unlocated++;
+        }
+      }
     }
     await evaluate(`document.querySelector('.draft-check-details')?.setAttribute('open','');
       document.querySelector('.draft-check-summary')?.scrollIntoView({block:'start'});`);
@@ -222,7 +284,7 @@ async function main() {
     fs.mkdirSync(path.dirname(output),{recursive:true});
     const shot=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
     fs.writeFileSync(output,Buffer.from(shot.data,'base64'),{flag:'wx'});
-    console.log(JSON.stringify({page:url,uiContractOk:true,missing,draft,basis,
+    console.log(JSON.stringify({page:url,uiContractOk:true,missing,draft,basis,eventAudit,
       reportErrors:structured?.errors || [],loadError:payload.error,checkEvents:checkSteps.map(s=>s.i),
       trace:{present:!!payload.trajectory,nodes:payload.trajectory?.nodes?.length,visits:payload.trajectory?.visits?.length,
         transitions:payload.trajectory?.transitions?.length,sha256Before:sha(before.trajectory),sha256After:sha(after.trajectory),unchanged:true},

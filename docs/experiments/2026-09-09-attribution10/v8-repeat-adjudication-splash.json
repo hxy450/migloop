@@ -1,0 +1,1103 @@
+{
+  "schema": "migloop-semantic-adjudication/1",
+  "status": "complete_rep2_with_rep1_comparison",
+  "review_date": "2026-09-09",
+  "case": "splash",
+  "rep": 2,
+  "run": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v8/splash/runs/tools/rep2",
+  "reference": {
+    "path": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/reference-v1/legacy-reference.json",
+    "sha256": "2c015536094fff1e42bb3b6b5cc2dce743c0f2a0f6924254027f7f8a5faac927",
+    "unchanged": true
+  },
+  "raw_pool": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v1/splash/pool",
+  "scope": "Same fixed raw reference and core protocol. Whole-paragraph meaning, actual queries, and final annotation separately assessed; no new lexical scoring requirement, source/run/reference edits, model calls, or holdout reads.",
+  "core": {
+    "S1": "pass",
+    "S2": "pass"
+  },
+  "core_does_not_certify_full_annotation": true,
+  "facts": [
+    {
+      "id": "S1.f1",
+      "reference_fact": "初版已有 onBackPressed 拦截代码及返回禁用的源要求，不能说初版完全没有实现。",
+      "status": "supported",
+      "report_quote": "最初生成方获得 Android 与 F001 中“启动页禁用返回键”的要求，并在 SplashPage v1 装配 NavDestination().onBackPressed(() => true)。",
+      "raw": [
+        "9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aconv-splash-9d5902d803bbcde6.jsonl:L7,L9,L25,L26,L71-L72"
+      ],
+      "reason": "Actual initial v1 content, source onBackPressed, F001 requirement and converter inputs were opened. Static implementation exists; no initial device certification inferred."
+    },
+    {
+      "id": "S1.f2",
+      "reference_fact": "entry-setup 将页面装配为 Navigation 外壳时删除原拦截，后续 D-020 接受页面外壳的行为差异。",
+      "status": "supported",
+      "report_quote": "entry-setup 将页面置于 Navigation/NavDestination 宿主，并解释 NavigationAttribute 无 onBackPressed API",
+      "raw": [
+        "9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aentry-setup-07108f5df45c357c.jsonl:L123-L124",
+        "9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aslice11-startup-50a0622bcfe4a588.jsonl:L248-L251"
+      ],
+      "reason": "Full v1-v40 diff at transcript L39 includes exact entry-setupv7/filev6 deletion; final identifies entry-setup and changed API environment, not Slice11 as deleter. Word '删除' need not be repeated when before/after and actor are identified; privacy-bug entry is separate."
+    },
+    {
+      "id": "S1.f3",
+      "reference_fact": "Slice 11 为隐私控制器写入 isModal 会吃掉系统返回的解释；历史 finding 反驳该解释，修复追加 onWillDismiss。",
+      "status": "supported",
+      "report_quote": "v52/v候选修复分别覆盖协议页返回重开和弹窗 dismiss 拦截。",
+      "raw": [
+        "9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aslice11-startup-50a0622bcfe4a588.jsonl:L236-L237,L250-L251",
+        "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl:L320-L321,L346-L347,L352-L353"
+      ],
+      "reason": "Unlike rep1, run actually opens L346 whole script and same-ID write-after ok/hilog readback (L283/L295), and names onWillDismiss in final. Whole final paragraph identifies actual candidate repair and later fallback; local '意图' underspecifies execution but does not explicitly deny it. Do not invent requirement to say the four characters 实际执行. Final concrete source citations are weak; separate annotation issue."
+    },
+    {
+      "id": "S1.f4",
+      "reference_fact": "后置另一 builder 成功构建，不能把 fixer 自身不重编扩大成整个池没有构建。",
+      "status": "supported",
+      "report_quote": "后置验证只有编译 PASS 与修复自述，未知行为是否已复测。",
+      "raw": [
+        "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-af0e3d2ae54dbf769.jsonl:L32-L40,L54",
+        "ff019d8a-5172-4cdd-8ce3-77a21682c1b6.jsonl:L1745,L1769"
+      ],
+      "reason": "Actual main task-notification from builder opened at transcript L200, recording PASS and source agent identity; independently established native builder L36/L37 supports it. Source notification is not raw build stdout, and final no device pass claim."
+    },
+    {
+      "id": "S2.f1",
+      "reference_fact": "生成 Write 之前，主会话的原始读取结果已经包含主题 windowFullscreen=true。",
+      "status": "partial",
+      "report_quote": "池内早期参考已经包含 Theme.SeceretBox.Launch，且该主题记录 windowFullscreen=true",
+      "raw": [
+        "9b3105a2-85ec-4889-9786-b3c220f06754.jsonl:L404,L520"
+      ],
+      "reason": "Actual early AIPPT_design v1 at13:02Jul23 and precursor Write opened (L255/L257), proving early demand existence. Exact original main theme receipt L40412:36 is not traced; original detailed fact partial, but this does not by itself downgrade bounded core '何时已有'."
+    },
+    {
+      "id": "S2.f2",
+      "reference_fact": "已核生成输入有 page_type/full_screen、沉浸式和安全区信息，但尚未建立主题细节到页面生成的完整传递证据。",
+      "status": "supported",
+      "report_quote": "本结论只说未能确认生成方获得了具体 Theme.SeceretBox.Launch/windowFullscreen 事实。",
+      "raw": [
+        "9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aconv-splash-9d5902d803bbcde6.jsonl:L1,L7-L9,L15-L16,L19-L20,L25-L26"
+      ],
+      "reason": "Converter/meta/source/F001/dispatch queries and two explicit generator-before-write until searches used; final boundary limits missing-transfer inference, does not say a search hit proves historical read. More sweeping '实际可证只获得' should retain this boundary."
+    },
+    {
+      "id": "S2.f3",
+      "reference_fact": "后续修复增加入页隐藏及离页/跳转时恢复系统栏。",
+      "status": "supported",
+      "report_quote": "v53 修复把已有 Android 主题语义补成 HMOS setWindowSystemBarEnable 隐藏/恢复；未知最终截图/设备行为是否复测通过。",
+      "raw": [
+        "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl:L485-L486,L488-L489"
+      ],
+      "reason": "Actually opened L485 complete script and same-ID postwriteok (L147/L172), plus separate L488 restore Edit. Final names hide/restore and helper; whole answer includes both halves rather than only rep1 restore. Formal v53 alone does not certify preceding script; no full known snapshot inferred."
+    }
+  ],
+  "fact_counts": {
+    "supported": 6,
+    "partial": 1,
+    "omitted": 0,
+    "contradicted": 0,
+    "total": 7
+  },
+  "fact_counts_not_accuracy": true,
+  "extra_false_claims": [
+    {
+      "code": "node_attribution_error",
+      "question": "S1",
+      "severity": "material",
+      "node": "agent:agent-aslice11-startup-50a0622bcfe4a588@v38",
+      "role": "进入·错",
+      "report_quote": "Slice 11 接入隐私弹窗时只配置 autoCancel:false、isModal:true，并在 D-020 注释中认定隐私弹窗会吃 BACK",
+      "actual_event": {
+        "file": "9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aslice11-startup-50a0622bcfe4a588.jsonl",
+        "line": 342,
+        "id": "toolu_01SGxtvNEPX7YfdSJW9eSi7P",
+        "time": "2026-07-24T16:33:44.771Z",
+        "target": "entry/src/main/ets/viewmodels/F001ViewModel.ets",
+        "change": "Add DBPPTFactory import",
+        "agent_version": 38
+      },
+      "correct_records": [
+        {
+          "file": "9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aslice11-startup-50a0622bcfe4a588.jsonl",
+          "line": 236,
+          "agent_v": 22,
+          "file_v": 38,
+          "meaning": "Controller +first isModal explanation"
+        },
+        {
+          "file": "9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aslice11-startup-50a0622bcfe4a588.jsonl",
+          "line": 250,
+          "agent_v": 26,
+          "file_v": 42,
+          "meaning": "D020 comment reaffirmation"
+        }
+      ],
+      "delivered_evidence": "transcriptL102 agentv38 timeline andL104diff clearly distinguishv22/v26/v37/v38",
+      "why_core_not_fail": "Reason says Slice11 phase/actor, not explicitly that DBPPT import action introduced isModal; actor-level main chain correct, exact entering node/effect attribution false. Do not silently treat cumulative endpoint as introduction.",
+      "required_correction": "Bind wrong decision to actual effect/event, not unrelated v38; until corrected full auditable attribution fails."
+    },
+    {
+      "code": "candidate_evidence_misidentification",
+      "question": "S2",
+      "severity": "material",
+      "candidate": "candidate:b60465cde470e4475666",
+      "report_quote": "S2 Android 主题复核候选，确认 Manifest/themes.xml 中 Launch 主题与 windowFullscreen。",
+      "actual_event": {
+        "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+        "line": 481,
+        "result_line": 482,
+        "id": "toolu_01HS1zwyoVKWev6p7ApLxPqi",
+        "ref": "#a68daf720e780b4c2:15652@L481",
+        "command": "grep lifecycle/window imports and onRoute/vm.navigated in SplashPage.ets",
+        "actual": "No AndroidManifest/themes query or windowFullscreen value in the command/output"
+      },
+      "correct_records": [
+        {
+          "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+          "line": 476,
+          "meaning": "AndroidManifest grep"
+        },
+        {
+          "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+          "line": 478,
+          "meaning": "themes grep"
+        }
+      ],
+      "why_false": "Candidate id locates a different operation. Model actually opened correct theme records elsewhere, but that does not make this per-item claim true.",
+      "required_correction": "Describe actual lifecycle grep, and reference separate theme actions for Android expected values; not a minor omission."
+    }
+  ],
+  "extra_false_claim_count": 2,
+  "annotation_requires_correction": true,
+  "other_annotation_gaps": [
+    {
+      "code": "successful_writes_described_as_intent",
+      "detail": "L346/L485 writes succeeded before printed receipts; final local '修复意图/写入意图' should be clarified as recorded execution with unknown final/device state. Whole notes already count the named candidate repairs, so not a magic-phrase core failure."
+    },
+    {
+      "code": "source_refs_removed_during_checks",
+      "detail": "Native source refs41->4 acrossfive drafts; all27candidate evidence lists are empty in final, including6explained. IDs still locate manifest entries, so not completely untraceable, but specific raw support to claims became weaker. No full semantic proof from empty lists or schema validity."
+    },
+    {
+      "code": "expected_navigation_hidden_not_established_by_theme_alone",
+      "report_quote": "开屏不显示系统状态栏/导航栏",
+      "detail": "Opened theme sayswindowFullscreen=true +transparentnavigationbar; transparency alone does not establish navigation-bar-hidden obligation. Original namedquestion concerns system-bar visibility, actual fixer code hides both; do not turn its implementation choice into proven Android requirement without additionalsource. Classified unsupported dimension, not counted as a proved false event."
+    },
+    {
+      "code": "post_anchor_converter_summary",
+      "detail": "S2actualbasis cites converterSendMessageL86 after v1 atfeeding3; it can report earlier work but isn't literally v1 input/event. Finalcheck correctly warns postanchor/window; preserve source-claim status."
+    }
+  ],
+  "raw_script_proof": [
+    {
+      "ref": "#a68daf720e780b4c2:15567@L346",
+      "input_step": 58,
+      "input_result_line": 283,
+      "output_step": 59,
+      "output_result_line": 295,
+      "raw_pair": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl:L346-L347",
+      "proof": "assert replacements thenopen(p,w).write(s), onlythenprint ok SplashPage;grep seesnewhilog221.",
+      "formal_version": false,
+      "execution_supported": true,
+      "final_device_proven": false
+    },
+    {
+      "ref": "#a68daf720e780b4c2:15655@L485",
+      "input_step": 29,
+      "input_result_line": 147,
+      "output_step": 32,
+      "output_result_line": 172,
+      "raw_pair": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl:L485-L486",
+      "proof": "Write helper/appearance hide/disappearancerestore thenprintok;separateL488adds onRouterestore.",
+      "formal_version": false,
+      "execution_supported": true,
+      "final_device_proven": false
+    }
+  ],
+  "query_audit": {
+    "tool_calls": 66,
+    "tools": [
+      {
+        "Name": "guide",
+        "Count": 3
+      },
+      {
+        "Name": "sessions",
+        "Count": 1
+      },
+      {
+        "Name": "file",
+        "Count": 7
+      },
+      {
+        "Name": "diff",
+        "Count": 2
+      },
+      {
+        "Name": "agent",
+        "Count": 6
+      },
+      {
+        "Name": "action",
+        "Count": 31
+      },
+      {
+        "Name": "search",
+        "Count": 10
+      },
+      {
+        "Name": "index",
+        "Count": 1
+      },
+      {
+        "Name": "check",
+        "Count": 5
+      }
+    ],
+    "action_ref_calls": 31,
+    "action_successful": 31,
+    "agent_attempts": 6,
+    "agent_successful": 4,
+    "rejected_calls": 3,
+    "rejection_detail": "filev1 viasessions;converterviasessions;fixerv21viaunopenedfilev52",
+    "searches": 10,
+    "until_ts_searches": 10,
+    "pre_generation_search_steps": [
+      42,
+      43
+    ],
+    "seq_only_until": 0,
+    "blame_calls": 0,
+    "late_build_source": "mainnotify#ff019d8a:14849@L1758 openedstep38/resultL200, not originalbuildstdout",
+    "original_theme_main_receipt_opened": false,
+    "early_design_file_opened": true
+  },
+  "check_audit": {
+    "check_count": 5,
+    "draft_chars": 69154,
+    "returned_chars": 19240,
+    "steps": [
+      {
+        "step": 61,
+        "result_line": 313,
+        "raw_errors": 3,
+        "raw_warnings": 5,
+        "unique_raw_refs": 41
+      },
+      {
+        "step": 62,
+        "result_line": 333,
+        "raw_errors": 201,
+        "raw_warnings": 0,
+        "status": "schema_invalid",
+        "metrics_status": "unverifiable",
+        "unique_raw_refs": 17,
+        "meaning": "Nativecheckreturned201schemaerrors,butno validateddocumenthash; do not call intermediate documentverified."
+      },
+      {
+        "step": 64,
+        "result_line": 351,
+        "raw_errors": 47,
+        "raw_warnings": 14,
+        "omitted_issues": 21,
+        "unique_raw_refs": 39
+      },
+      {
+        "step": 65,
+        "result_line": 360,
+        "raw_errors": 4,
+        "raw_warnings": 2,
+        "unique_raw_refs": 5
+      },
+      {
+        "step": 66,
+        "result_line": 369,
+        "raw_errors": 0,
+        "raw_warnings": 2,
+        "unique_raw_refs": 4
+      }
+    ],
+    "evidence_calls_after_first_check": 0,
+    "other_tool_after_first_check": "guide verdict only",
+    "last_source_result_time": "2026-09-09T20:21:55.463Z",
+    "first_check_time": "2026-09-09T20:24:27.155Z",
+    "last_check_time": "2026-09-09T20:33:25.134Z",
+    "post_last_source_elapsed_s": 696.372825,
+    "final_status": "needs_review",
+    "final_binding": "matched",
+    "not_semantic_pass": true
+  },
+  "coverage": {
+    "expected": 29,
+    "provided": 29,
+    "accounted": 29,
+    "expected_versions": 2,
+    "expected_candidates": 27,
+    "missing_versions": 0,
+    "missing_candidates": 0,
+    "missing": 0,
+    "unresolved": 0,
+    "not_repair": 0,
+    "deferred": 21,
+    "unconfirmed": 21,
+    "advisories": 0,
+    "advisory_rows": 0,
+    "explained": 8,
+    "out_of_scope": 21,
+    "candidates": 27,
+    "formal_versions": 2,
+    "all_candidate_evidence_empty": true,
+    "explained_candidates": 6,
+    "meaning": "29/29 mechanical declarations, not29realrepairs or29verifiedclaims. Material wrongcandidate caption remains."
+  },
+  "metadata": {
+    "source_code_id": "b540cb2",
+    "actual_models": [
+      "gpt-5.5"
+    ],
+    "actual_effort": "medium",
+    "source_digest": "008bb634b4c614dd480ecdd632f3ae3679e41147dff78160f45631cbe59ad981",
+    "pool_digest": "a78b1373045f7558d6da3b76123e30d032635a2a0b4cdd665e7f80c0bdf8b337",
+    "common_task_sha256": "d2f9f03d6b8a4c56e405559fe7160308ecc1d054b877ebf64250dd084ec85134",
+    "started_at": "2026-09-09T20:18:07.107359+00:00",
+    "ended_at": "2026-09-09T20:33:31.835825+00:00",
+    "wall_s": 924.7508939999389,
+    "end_to_end_wall_s": 939.4556928999955,
+    "usage": {
+      "input_total": 3908727,
+      "cache_read": 3612672,
+      "cache_creation": 0,
+      "input_uncached": 296055,
+      "output": 40473,
+      "thinking_reported": 2232,
+      "output_includes_thinking": "Codex output_tokens is used once; reasoning is not added",
+      "input_semantics": "Codex input_tokens is the total; reported cache read/write are not added to it. input_uncached means input_tokens minus cached_input_tokens."
+    },
+    "tool_counts": [
+      {
+        "Name": "guide",
+        "Count": 3
+      },
+      {
+        "Name": "sessions",
+        "Count": 1
+      },
+      {
+        "Name": "file",
+        "Count": 7
+      },
+      {
+        "Name": "diff",
+        "Count": 2
+      },
+      {
+        "Name": "agent",
+        "Count": 6
+      },
+      {
+        "Name": "action",
+        "Count": 31
+      },
+      {
+        "Name": "search",
+        "Count": 10
+      },
+      {
+        "Name": "index",
+        "Count": 1
+      },
+      {
+        "Name": "check",
+        "Count": 5
+      }
+    ],
+    "tool_calls": 66,
+    "tool_chars": 542213,
+    "repeated_calls": 1,
+    "rejected_calls": 3,
+    "coverage_counts": {
+      "expected": 29,
+      "provided": 29,
+      "accounted": 29,
+      "expected_versions": 2,
+      "expected_candidates": 27,
+      "missing_versions": 0,
+      "missing_candidates": 0,
+      "missing": 0,
+      "unresolved": 0,
+      "not_repair": 0,
+      "deferred": 21,
+      "unconfirmed": 21,
+      "advisories": 0,
+      "advisory_rows": 0
+    },
+    "draft_check": {
+      "status": "matched",
+      "semantic_checked": false,
+      "checks": [
+        {
+          "step": 61,
+          "call_id": "call_S9E46g31Eakp2ReGbCyBDdK2",
+          "verified": true,
+          "status": "needs_review",
+          "counts": {
+            "errors": 3,
+            "warnings": 5,
+            "total": 8
+          },
+          "draft_sha256": "edc9e2a235aa0a60ce72ace4826029f4db7b0e3e78305d6ca390d05bd3f2f4d1",
+          "document_sha256": "5c7dca32e3a0bc0e9d892d82d018f4784ee0403b963cf21684d76571ccfa2ae4",
+          "issues": [
+            {
+              "code": "edge_unconfirmed",
+              "severity": "error",
+              "where": "defect:S1.edges[1]",
+              "node": null,
+              "detail": "是它写的,但写者版本是 v37,不是 v38"
+            },
+            {
+              "code": "invalid_reference",
+              "severity": "error",
+              "where": "defect:S2.nodes[1].basis.actual_evidence[2]",
+              "node": null,
+              "detail": "search:8dd33a6654b78db3c0b87070:0: unparsed;引用位置可核不代表原文支持断言"
+            },
+            {
+              "code": "invalid_reference",
+              "severity": "error",
+              "where": "defect:S2.nodes[1].basis.actual_evidence[3]",
+              "node": null,
+              "detail": "search:36a7bbafeee689d3becdea88:0: unparsed;引用位置可核不代表原文支持断言"
+            },
+            {
+              "code": "missing_causal_basis",
+              "severity": "warning",
+              "where": "defect:S1",
+              "node": "file:entry/src/main/ets/pages/SplashPage.ets@v6",
+              "detail": "红色归因节点缺少期望、实际、双方证据与反证的结构化对照；格式仍合法，但论证尚待补充，不代替模型改判。"
+            },
+            {
+              "code": "basis_action_post_anchor",
+              "severity": "warning",
+              "where": "defect:S1",
+              "node": "agent:agent-aslice11-startup-50a0622bcfe4a588@v38",
+              "detail": "#a68daf720e780b4c2:15550@L320：引用动作发起时刻晚于节点记录锚点；后置读回/反证可能合法，但不证明生成前已可用，不判断因果错误。"
+            },
+            {
+              "code": "basis_action_post_anchor",
+              "severity": "warning",
+              "where": "defect:S2",
+              "node": "agent:agent-aconv-splash-9d5902d803bbcde6@v1",
+              "detail": "#9d5902d803bbcde6:7558@L86：引用动作发起时刻晚于节点记录锚点；后置读回/反证可能合法，但不证明生成前已可用，不判断因果错误。"
+            },
+            {
+              "code": "basis_agent_window_boundary",
+              "severity": "warning",
+              "where": "defect:S2",
+              "node": "agent:agent-aconv-splash-9d5902d803bbcde6@v1",
+              "detail": "#9d5902d803bbcde6:7558@L86：同一 agent 的证据事件在节点 v1 窗口之后（喂养槽 3）；不能当作本节点窗口内的事件。后置证据仍可核对，不自动改变原角色。"
+            },
+            {
+              "code": "missing_causal_basis",
+              "severity": "warning",
+              "where": "defect:S2",
+              "node": "file:entry/src/main/ets/pages/SplashPage.ets@v6",
+              "detail": "红色归因节点缺少期望、实际、双方证据与反证的结构化对照；格式仍合法，但论证尚待补充，不代替模型改判。"
+            }
+          ],
+          "omitted_issues": 0,
+          "coverage": {
+            "checked": true,
+            "target": "entry/src/main/ets/pages/SplashPage.ets",
+            "counts": {
+              "expected": 29,
+              "provided": 29,
+              "accounted": 29,
+              "expected_versions": 2,
+              "expected_candidates": 27,
+              "missing_versions": 0,
+              "missing_candidates": 0,
+              "missing": 0,
+              "unresolved": 0,
+              "not_repair": 0,
+              "deferred": 21,
+              "unconfirmed": 21,
+              "advisories": 0,
+              "advisory_rows": 0
+            },
+            "accounted": true,
+            "semantic_checked": false
+          }
+        },
+        {
+          "step": 62,
+          "call_id": "call_Eqm4Ov6NG5t6I7XVy2MT5OIk",
+          "verified": false,
+          "status": "unverifiable",
+          "counts": null,
+          "draft_sha256": null,
+          "document_sha256": null
+        },
+        {
+          "step": 64,
+          "call_id": "call_SfqiEf9gDWDWKVA0ryEpnG4J",
+          "verified": true,
+          "status": "needs_review",
+          "counts": {
+            "errors": 47,
+            "warnings": 14,
+            "total": 61
+          },
+          "draft_sha256": "b521c20669c936d18243657af2a467d3e3cdb07731161e2f9e20e26d5466b206",
+          "document_sha256": "83e9708cf57f5a4a299627621f0d34081b0810ff6322d80d98a1f5d4151c7a13",
+          "issues": [
+            {
+              "code": "invalid_reference",
+              "severity": "error",
+              "where": "defect:S1.repair.evidence[1]",
+              "node": null,
+              "detail": "#a68daf720e780b4c2:15567@L276: missing;引用位置可核不代表原文支持断言"
+            },
+            {
+              "code": "invalid_reference",
+              "severity": "error",
+              "where": "defect:S1.nodes[0].evidence[0]",
+              "node": null,
+              "detail": "#9d5902d803bbcde6:7518@L393: missing;引用位置可核不代表原文支持断言"
+            },
+            {
+              "code": "invalid_reference",
+              "severity": "error",
+              "where": "defect:S1.nodes[0].evidence[1]",
+              "node": null,
+              "detail": "#9d5902d803bbcde6:10587@L128: missing;引用位置可核不代表原文支持断言"
+            },
+            {
+              "code": "invalid_reference",
+              "severity": "error",
+              "where": "defect:S1.nodes[1].evidence[0]",
+              "node": null,
+              "detail": "file:entry/src/main/ets/pages/SplashPage.ets@v1:L159: invalid;引用位置可核不代表原文支持断言"
+            },
+            {
+              "code": "invalid_reference",
+              "severity": "error",
+              "where": "defect:S1.nodes[2].evidence[0]",
+              "node": null,
+              "detail": "#a68daf720e780b4c2:14846@L78: missing;引用位置可核不代表原文支持断言"
+            },
+            {
+              "code": "invalid_reference",
+              "severity": "error",
+              "where": "defect:S1.nodes[3].evidence[0]",
+              "node": null,
+              "detail": "file:entry/src/main/ets/pages/SplashPage.ets@v51:L184: invalid;引用位置可核不代表原文支持断言"
+            },
+            {
+              "code": "invalid_reference",
+              "severity": "error",
+              "where": "defect:S1.nodes[3].evidence[1]",
+              "node": null,
+              "detail": "file:entry/src/main/ets/pages/SplashPage.ets@v51:L516: invalid;引用位置可核不代表原文支持断言"
+            },
+            {
+              "code": "invalid_reference",
+              "severity": "error",
+              "where": "defect:S1.nodes[3].evidence[2]",
+              "node": null,
+              "detail": "#a68daf720e780b4c2:15550@L411: missing;引用位置可核不代表原文支持断言"
+            },
+            {
+              "code": "invalid_reference",
+              "severity": "error",
+              "where": "defect:S1.nodes[3].basis.expected_evidence[0]",
+              "node": null,
+              "detail": "#9d5902d803bbcde6:7518@L393: missing;引用位置可核不代表原文支持断言"
+            },
+            {
+              "code": "invalid_reference",
+              "severity": "error",
+              "where": "defect:S1.nodes[3].basis.expected_evidence[1]",
+              "node": null,
+              "detail": "#9d5902d803bbcde6:10587@L128: missing;引用位置可核不代表原文支持断言"
+            },
+            {
+              "code": "invalid_reference",
+              "severity": "error",
+              "where": "defect:S1.nodes[3].basis.actual_evidence[0]",
+              "node": null,
+              "detail": "file:entry/src/main/ets/pages/SplashPage.ets@v51:L184: invalid;引用位置可核不代表原文支持断言"
+            },
+            {
+              "code": "invalid_reference",
+              "severity": "error",
+              "where": "defect:S1.nodes[3].basis.actual_evidence[1]",
+              "node": null,
+              "detail": "file:entry/src/main/ets/pages/SplashPage.ets@v51:L516: invalid;引用位置可核不代表原文支持断言"
+            },
+            {
+              "code": "invalid_reference",
+              "severity": "error",
+              "where": "defect:S1.nodes[3].basis.actual_evidence[2]",
+              "node": null,
+              "detail": "#a68daf720e780b4c2:15550@L411: missing;引用位置可核不代表原文支持断言"
+            },
+            {
+              "code": "invalid_reference",
+              "severity": "error",
+              "where": "defect:S1.nodes[4].evidence[1]",
+              "node": null,
+              "detail": "#a68daf720e780b4c2:15567@L276: missing;引用位置可核不代表原文支持断言"
+            },
+            {
+              "code": "invalid_node",
+              "severity": "error",
+              "where": "defect:S1.nodes[5]",
+              "node": "agent:agent-main-ff019d8a-5172-4cdd-8ce3-77a21682c1b6@v44",
+              "detail": "agent 不在账本: agent-main-ff019d8a-5172-4cdd-8ce3-77a21682c1b6"
+            },
+            {
+              "code": "invalid_reference",
+              "severity": "error",
+              "where": "defect:S1.nodes[5].evidence[0]",
+              "node": null,
+              "detail": "#a68daf720e780b4c2:14849@L52: missing;引用位置可核不代表原文支持断言"
+            },
+            {
+              "code": "invalid_reference",
+              "severity": "error",
+              "where": "defect:S1.nodes[5].evidence[1]",
+              "node": null,
+              "detail": "#a68daf720e780b4c2:15740@L248: missing;引用位置可核不代表原文支持断言"
+            },
+            {
+              "code": "reference_drift",
+              "severity": "warning",
+              "where": "defect:S2.repair.evidence[1]",
+              "node": null,
+              "detail": "#a68daf720e780b4c2:15655@L464: drifted;引用位置可核不代表原文支持断言"
+            },
+            {
+              "code": "invalid_reference",
+              "severity": "error",
+              "where": "defect:S2.nodes[0].evidence[0]",
+              "node": null,
+              "detail": "#a68daf720e780b4c2:10358@L50: missing;引用位置可核不代表原文支持断言"
+            },
+            {
+              "code": "invalid_reference",
+              "severity": "error",
+              "where": "defect:S2.nodes[0].evidence[1]",
+              "node": null,
+              "detail": "file:spec/ref/AIPPT_design.md@v1:L468: invalid;引用位置可核不代表原文支持断言"
+            },
+            {
+              "code": "invalid_reference",
+              "severity": "error",
+              "where": "defect:S2.nodes[0].evidence[2]",
+              "node": null,
+              "detail": "file:spec/ref/AIPPT_design.md@v1:L471: invalid;引用位置可核不代表原文支持断言"
+            },
+            {
+              "code": "invalid_reference",
+              "severity": "error",
+              "where": "defect:S2.nodes[1].evidence[0]",
+              "node": null,
+              "detail": "#9d5902d803bbcde6:7509@L9: missing;引用位置可核不代表原文支持断言"
+            },
+            {
+              "code": "invalid_reference",
+              "severity": "error",
+              "where": "defect:S2.nodes[1].basis.expected_evidence[0]",
+              "node": null,
+              "detail": "file:spec/ref/AIPPT_design.md@v1:L468: invalid;引用位置可核不代表原文支持断言"
+            },
+            {
+              "code": "invalid_reference",
+              "severity": "error",
+              "where": "defect:S2.nodes[1].basis.expected_evidence[1]",
+              "node": null,
+              "detail": "file:spec/ref/AIPPT_design.md@v1:L471: invalid;引用位置可核不代表原文支持断言"
+            },
+            {
+              "code": "invalid_reference",
+              "severity": "error",
+              "where": "defect:S2.nodes[1].basis.expected_evidence[2]",
+              "node": null,
+              "detail": "#a68daf720e780b4c2:15627@L330: missing;引用位置可核不代表原文支持断言"
+            },
+            {
+              "code": "invalid_reference",
+              "severity": "error",
+              "where": "defect:S2.nodes[1].basis.actual_evidence[0]",
+              "node": null,
+              "detail": "#9d5902d803bbcde6:7509@L9: missing;引用位置可核不代表原文支持断言"
+            },
+            {
+              "code": "invalid_reference",
+              "severity": "error",
+              "where": "defect:S2.nodes[3].evidence[0]",
+              "node": null,
+              "detail": "#a68daf720e780b4c2:15650@L455: missing;引用位置可核不代表原文支持断言"
+            },
+            {
+              "code": "reference_drift",
+              "severity": "warning",
+              "where": "defect:S2.nodes[3].evidence[1]",
+              "node": null,
+              "detail": "#a68daf720e780b4c2:15651@L459: drifted;引用位置可核不代表原文支持断言"
+            },
+            {
+              "code": "reference_drift",
+              "severity": "warning",
+              "where": "defect:S2.nodes[4].evidence[1]",
+              "node": null,
+              "detail": "#a68daf720e780b4c2:15655@L464: drifted;引用位置可核不代表原文支持断言"
+            },
+            {
+              "code": "invalid_node",
+              "severity": "error",
+              "where": "defect:S2.nodes[5]",
+              "node": "agent:agent-main-ff019d8a-5172-4cdd-8ce3-77a21682c1b6@v44",
+              "detail": "agent 不在账本: agent-main-ff019d8a-5172-4cdd-8ce3-77a21682c1b6"
+            },
+            {
+              "code": "invalid_reference",
+              "severity": "error",
+              "where": "defect:S2.nodes[5].evidence[0]",
+              "node": null,
+              "detail": "#a68daf720e780b4c2:14849@L52: missing;引用位置可核不代表原文支持断言"
+            },
+            {
+              "code": "invalid_reference",
+              "severity": "error",
+              "where": "defect:S2.nodes[5].evidence[1]",
+              "node": null,
+              "detail": "#a68daf720e780b4c2:15744@L306: missing;引用位置可核不代表原文支持断言"
+            },
+            {
+              "code": "basis_action_post_anchor",
+              "severity": "warning",
+              "where": "defect:S2",
+              "node": "agent:agent-aconv-splash-9d5902d803bbcde6@v1",
+              "detail": "#9d5902d803bbcde6:7558@L86：引用动作发起时刻晚于节点记录锚点；后置读回/反证可能合法，但不证明生成前已可用，不判断因果错误。"
+            },
+            {
+              "code": "basis_agent_window_boundary",
+              "severity": "warning",
+              "where": "defect:S2",
+              "node": "agent:agent-aconv-splash-9d5902d803bbcde6@v1",
+              "detail": "#9d5902d803bbcde6:7558@L86：同一 agent 的证据事件在节点 v1 窗口之后（喂养槽 3）；不能当作本节点窗口内的事件。后置证据仍可核对，不自动改变原角色。"
+            },
+            {
+              "code": "invalid_reference",
+              "severity": "error",
+              "where": "coverage[2].evidence[0]",
+              "node": null,
+              "detail": "#a68daf720e780b4c2:15363@L123: missing;引用位置可核不代表原文支持断言"
+            },
+            {
+              "code": "reference_drift",
+              "severity": "warning",
+              "where": "coverage[3].evidence[0]",
+              "node": null,
+              "detail": "#a68daf720e780b4c2:15394@L247: drifted;引用位置可核不代表原文支持断言"
+            },
+            {
+              "code": "reference_drift",
+              "severity": "warning",
+              "where": "coverage[4].evidence[0]",
+              "node": null,
+              "detail": "#a68daf720e780b4c2:15396@L249: drifted;引用位置可核不代表原文支持断言"
+            },
+            {
+              "code": "reference_drift",
+              "severity": "warning",
+              "where": "coverage[5].evidence[0]",
+              "node": null,
+              "detail": "#a68daf720e780b4c2:15397@L250: drifted;引用位置可核不代表原文支持断言"
+            },
+            {
+              "code": "invalid_reference",
+              "severity": "error",
+              "where": "coverage[6].evidence[0]",
+              "node": null,
+              "detail": "#a68daf720e780b4c2:15401@L254: missing;引用位置可核不代表原文支持断言"
+            },
+            {
+              "code": "invalid_reference",
+              "severity": "error",
+              "where": "coverage[7].evidence[0]",
+              "node": null,
+              "detail": "#a68daf720e780b4c2:15402@L255: missing;引用位置可核不代表原文支持断言"
+            }
+          ],
+          "omitted_issues": 21,
+          "coverage": {
+            "checked": true,
+            "target": "entry/src/main/ets/pages/SplashPage.ets",
+            "counts": {
+              "expected": 29,
+              "provided": 29,
+              "accounted": 29,
+              "expected_versions": 2,
+              "expected_candidates": 27,
+              "missing_versions": 0,
+              "missing_candidates": 0,
+              "missing": 0,
+              "unresolved": 0,
+              "not_repair": 0,
+              "deferred": 21,
+              "unconfirmed": 21,
+              "advisories": 0,
+              "advisory_rows": 0
+            },
+            "accounted": true,
+            "semantic_checked": false
+          }
+        },
+        {
+          "step": 65,
+          "call_id": "call_Bxw2qw6W3pLaZZQ7emVVKOq1",
+          "verified": true,
+          "status": "needs_review",
+          "counts": {
+            "errors": 4,
+            "warnings": 2,
+            "total": 6
+          },
+          "draft_sha256": "b3a36ab7210aeed55e0d4b4e81760c1b0ed0c31a43a33f108162e55b367a10d8",
+          "document_sha256": "9e5eb080670919bba4b731d45948eb0ea70fb958be919019827e544c11075387",
+          "issues": [
+            {
+              "code": "invalid_reference",
+              "severity": "error",
+              "where": "defect:S1.nodes[3].evidence[1]",
+              "node": null,
+              "detail": "#a68daf720e780b4c2:15550: unparsed;引用位置可核不代表原文支持断言"
+            },
+            {
+              "code": "invalid_reference",
+              "severity": "error",
+              "where": "defect:S1.nodes[3].basis.expected_evidence[0]",
+              "node": null,
+              "detail": "#9d5902d803bbcde4a588:7558@L86: missing;引用位置可核不代表原文支持断言"
+            },
+            {
+              "code": "invalid_reference",
+              "severity": "error",
+              "where": "defect:S1.nodes[3].basis.actual_evidence[1]",
+              "node": null,
+              "detail": "#a68daf720e780b4c2:15550: unparsed;引用位置可核不代表原文支持断言"
+            },
+            {
+              "code": "invalid_reference",
+              "severity": "error",
+              "where": "defect:S2.nodes[1].basis.expected_evidence[1]",
+              "node": null,
+              "detail": "#a68daf720e780b4c2:15627: unparsed;引用位置可核不代表原文支持断言"
+            },
+            {
+              "code": "basis_action_post_anchor",
+              "severity": "warning",
+              "where": "defect:S2",
+              "node": "agent:agent-aconv-splash-9d5902d803bbcde6@v1",
+              "detail": "#9d5902d803bbcde6:7558@L86：引用动作发起时刻晚于节点记录锚点；后置读回/反证可能合法，但不证明生成前已可用，不判断因果错误。"
+            },
+            {
+              "code": "basis_agent_window_boundary",
+              "severity": "warning",
+              "where": "defect:S2",
+              "node": "agent:agent-aconv-splash-9d5902d803bbcde6@v1",
+              "detail": "#9d5902d803bbcde6:7558@L86：同一 agent 的证据事件在节点 v1 窗口之后（喂养槽 3）；不能当作本节点窗口内的事件。后置证据仍可核对，不自动改变原角色。"
+            }
+          ],
+          "omitted_issues": 0,
+          "coverage": {
+            "checked": true,
+            "target": "entry/src/main/ets/pages/SplashPage.ets",
+            "counts": {
+              "expected": 29,
+              "provided": 29,
+              "accounted": 29,
+              "expected_versions": 2,
+              "expected_candidates": 27,
+              "missing_versions": 0,
+              "missing_candidates": 0,
+              "missing": 0,
+              "unresolved": 0,
+              "not_repair": 0,
+              "deferred": 21,
+              "unconfirmed": 21,
+              "advisories": 0,
+              "advisory_rows": 0
+            },
+            "accounted": true,
+            "semantic_checked": false
+          }
+        },
+        {
+          "step": 66,
+          "call_id": "call_23UJ2MaQPJZnoaaZhMsCsKV4",
+          "verified": true,
+          "status": "needs_review",
+          "counts": {
+            "errors": 0,
+            "warnings": 2,
+            "total": 2
+          },
+          "draft_sha256": "52794216b204ee03fde3ebd75dc68e7cf92ea6ac71c684eabcc5b01c07f61594",
+          "document_sha256": "222e9b3807c49ad374e5b05f3e2d3a7f956f6acf10caff94e69a83bf2cca17ae",
+          "issues": [
+            {
+              "code": "basis_action_post_anchor",
+              "severity": "warning",
+              "where": "defect:S2",
+              "node": "agent:agent-aconv-splash-9d5902d803bbcde6@v1",
+              "detail": "#9d5902d803bbcde6:7558@L86：引用动作发起时刻晚于节点记录锚点；后置读回/反证可能合法，但不证明生成前已可用，不判断因果错误。"
+            },
+            {
+              "code": "basis_agent_window_boundary",
+              "severity": "warning",
+              "where": "defect:S2",
+              "node": "agent:agent-aconv-splash-9d5902d803bbcde6@v1",
+              "detail": "#9d5902d803bbcde6:7558@L86：同一 agent 的证据事件在节点 v1 窗口之后（喂养槽 3）；不能当作本节点窗口内的事件。后置证据仍可核对，不自动改变原角色。"
+            }
+          ],
+          "omitted_issues": 0,
+          "coverage": {
+            "checked": true,
+            "target": "entry/src/main/ets/pages/SplashPage.ets",
+            "counts": {
+              "expected": 29,
+              "provided": 29,
+              "accounted": 29,
+              "expected_versions": 2,
+              "expected_candidates": 27,
+              "missing_versions": 0,
+              "missing_candidates": 0,
+              "missing": 0,
+              "unresolved": 0,
+              "not_repair": 0,
+              "deferred": 21,
+              "unconfirmed": 21,
+              "advisories": 0,
+              "advisory_rows": 0
+            },
+            "accounted": true,
+            "semantic_checked": false
+          }
+        }
+      ],
+      "check_calls": 5,
+      "draft_chars": 69154,
+      "returned_chars": 19240,
+      "final_document_sha256": "222e9b3807c49ad374e5b05f3e2d3a7f956f6acf10caff94e69a83bf2cca17ae",
+      "matched_check": 66
+    }
+  },
+  "locator_audit": {
+    "references": [
+      {
+        "ref": "#9d5902d803bbcde6:7548@L71",
+        "relative_file": "9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aconv-splash-9d5902d803bbcde6.jsonl",
+        "line": 71,
+        "native_ids": [
+          "toolu_01Np1dfx5cY3fQ9uZrHBVkbq"
+        ],
+        "timestamp": "2026-07-24T02:07:13.800Z",
+        "record_sha256": "3c9debf2a570b62dc9285fd4f07f4d18087367c552681bc4f4d4eed54c4a9cc9",
+        "located": true
+      },
+      {
+        "ref": "#9d5902d803bbcde6:7558@L86",
+        "relative_file": "9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aconv-splash-9d5902d803bbcde6.jsonl",
+        "line": 86,
+        "native_ids": [
+          "toolu_015zSZ1qD49tWYDia8qVFKQT"
+        ],
+        "timestamp": "2026-07-24T02:10:28.219Z",
+        "record_sha256": "2f8d659c52818661787e459ebde5a7dc8ab0dbd58ca3b5253714606ba6a457a1",
+        "located": true
+      },
+      {
+        "ref": "#a68daf720e780b4c2:15569@L352",
+        "relative_file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+        "line": 352,
+        "native_ids": [
+          "toolu_01TRP8mc5pnikgvEnDDkDRuG"
+        ],
+        "timestamp": "2026-07-26T21:06:31.863Z",
+        "record_sha256": "a40d7bc21827e1c782b40921a135978e92e14a53ef82fe727ebbe3032f6dde42",
+        "located": true
+      },
+      {
+        "ref": "#a68daf720e780b4c2:15656@L488",
+        "relative_file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+        "line": 488,
+        "native_ids": [
+          "toolu_01RknAJc4tUhzwpypigkLeRv"
+        ],
+        "timestamp": "2026-07-26T21:20:24.982Z",
+        "record_sha256": "ae41f9a5b65c7f9101a49c48f25c68ca2d960666571ce87fa5d384d3fe398eea",
+        "located": true
+      }
+    ],
+    "verdict_yaml_sha256": "52794216b204ee03fde3ebd75dc68e7cf92ea6ac71c684eabcc5b01c07f61594",
+    "result_json_sha256": "2c7c3109f8e3f4312b24bb2cfc3f1552c6423b287ea76b7dbc64ce38fc95cd26",
+    "located_count": 4,
+    "scope": "Four remaining originalrefs locate trueevents. File/candidate IDs andsuccessfulqueriesstillprovideindexes; locator count alone neither completeness nor truth."
+  },
+  "comparison": {
+    "rep1": {
+      "core": {
+        "S1": "partial",
+        "S2": "partial"
+      },
+      "facts": {
+        "supported": 4,
+        "partial": 3
+      },
+      "script_raw_pairs_opened": 0,
+      "total_tokens": 1992318,
+      "wall_s": 418.63901069993153,
+      "annotation_requires_correction": true
+    },
+    "rep2": {
+      "core": {
+        "S1": "pass",
+        "S2": "pass"
+      },
+      "facts": {
+        "supported": 6,
+        "partial": 1
+      },
+      "script_raw_pairs_opened": 2,
+      "total_tokens": 3949200,
+      "wall_s": 924.7508939999389,
+      "extra_false_claim_count": 2,
+      "annotation_requires_correction": true
+    },
+    "paired_means": {
+      "total_tokens": 2970759,
+      "wall_s": 671.6949523499352,
+      "e2e_s": 685.7643455999787
+    },
+    "raw_means": {
+      "input": 3289939.5,
+      "cache_included": 3031552,
+      "output": 15630,
+      "total": 3305569.5,
+      "tool_calls": 28.5,
+      "tool_chars": 7060047.5,
+      "wall_s": 484.68639824999264,
+      "e2e_s": 497.09506680001505
+    },
+    "total_token_change_percent": -10.128678280701708,
+    "rep2_token_change_vs_raw_mean_percent": 19.471092651357047,
+    "wall_change_percent": 38.58341285729394,
+    "interpretation": "Rep2 genuinely follows decisive sources missinginrep1. Moretokens/timealone notcredit, andcoregainnotfullannotationacceptance. Pairedsaving10.1%below20-30target, materialfalseclaimsremain."
+  },
+  "conclusion": "Whole report answers bounded S1/S2 main chains, but wrong exact entering node and wrong candidate evidence mapping make full auditable attribution fail. Do not use corepass to claimallcorrect or joint acceptance."
+}

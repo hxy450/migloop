@@ -1,0 +1,1883 @@
+{
+  "schema": "migloop-real-ui-audit/2",
+  "date": "2026-09-09",
+  "case": "member-center",
+  "run": "attribution10/formal-v8/member-center/runs/tools/rep1",
+  "status": "projection_and_provenance_passed_with_action_click_scope_gap",
+  "investigator_source": "b540cb2",
+  "viewer_source": "b540cb2",
+  "viewer_content_digest": "008bb634b4c614dd480ecdd632f3ae3679e41147dff78160f45631cbe59ad981",
+  "page": "http://127.0.0.1:19674/api/insight1/fixchain/ff019d8a?probe=attribution10/formal-v8/member-center/runs/tools/rep1",
+  "completed_before_audit": true,
+  "model_called_by_auditor": false,
+  "integrity": {
+    "source_unchanged": true,
+    "pool_unchanged": true,
+    "task_unchanged": true,
+    "original_run_files_unchanged": true
+  },
+  "summary": {
+    "mcp_steps": 38,
+    "host_wrappers": 0,
+    "action_ref_calls": 18,
+    "explicit_tool_id_matches": 17,
+    "original_text_line_matches": 1,
+    "tail_action_refs": 4,
+    "opened": 2,
+    "rejected": 3,
+    "unverified": 0,
+    "pending": 0,
+    "trajectory_nodes": 8,
+    "additional_unqueried_nodes": 3,
+    "search_transitions": 1,
+    "model_selected_writes": 4,
+    "graph_query_steps": 0,
+    "original_reasons_exact": 8,
+    "original_basis_exact": 2,
+    "final_check_status": "needs_review",
+    "final_check_warnings": 4,
+    "document_binding": "matched",
+    "submission_status": "accepted",
+    "semantic_checked": false,
+    "findings_files": 1,
+    "findings_items": 3,
+    "unassociated_items": 1
+  },
+  "limitations": [
+    {
+      "code": "action_step_reroots_instead_of_raw",
+      "severity": "non_blocking_viewer_scope",
+      "reproduction": {
+        "before": {
+          "node": {
+            "kind": "agent",
+            "aid": "agent-a68daf720e780b4c2",
+            "v": null,
+            "action": 15731
+          },
+          "ref": "#a68daf720e780b4c2:15731@L592",
+          "row": "#16action visual-fixer 修复 round-1 #15731 · 原文 #a68daf720e780b4c2:15731@L592 · 5千字",
+          "classes": "st",
+          "evidenceMode": true
+        },
+        "after": {
+          "root": {
+            "kind": "agent",
+            "aid": "agent-a68daf720e780b4c2",
+            "anchorVer": null,
+            "label": "visual-fixer 修复 round-1"
+          },
+          "nodeCount": 1,
+          "trajectoryUnchanged": true,
+          "drawerTag": "文件原子 · 截至 @v16"
+        }
+      },
+      "recommended": "Route all locatable action steps to an original-action drawer without changing XT root/evidenceMode or recorded trajectory.",
+      "fixed_in_this_source": false
+    },
+    "No causal accuracy or coverage-truth claim is inferred from these UI checks.",
+    "No real ledger expansion stub was present."
+  ],
+  "audit": {
+    "case": "member",
+    "investigator": "b540cb2",
+    "viewer": "b540cb2",
+    "steps": 38,
+    "raw_document_sha256": "a2eacaa702e45d5ce94e7d29c6d879729b3a500dc6b61fdcb0c2ff8b2f37d7c6",
+    "document_sha256": "d3eff5c2ef999c6f2b7978fc0b6d1c974d0bf8d5b927150aa6b67e646329935c",
+    "source": {
+      "kind": "checked_draft_ref",
+      "verified": true,
+      "semantic_checked": false,
+      "raw_matches_data": true,
+      "final_matches_document": null,
+      "note": "引用稿来自同 run 的原始 check 输入，按来源与双哈希认证；不是原因或修复语义验证。"
+    },
+    "identity": {
+      "current": "atoms-2026-09-09-file-evidence5:146:ea78ea16fd4b5a751c914797",
+      "claimed": "atoms-2026-09-09-file-evidence5:146:ea78ea16fd4b5a751c914797",
+      "model": "atoms-2026-09-09-file-evidence5:146:ea78ea16fd4b5a751c914797",
+      "harness": "atoms-2026-09-09-file-evidence5:146:ea78ea16fd4b5a751c914797",
+      "observed": [
+        "atoms-2026-09-09-file-evidence5:146:ea78ea16fd4b5a751c914797"
+      ],
+      "trace_bound": true,
+      "match": true,
+      "bound": true,
+      "status": "matched",
+      "diag": null
+    },
+    "submission": {
+      "mode": "checked_draft_ref",
+      "status": "accepted",
+      "source_check_step": 38,
+      "source_check_call_id": "call_3jFfuAh5rvL8a2vMjtAyWAbo",
+      "draft_sha256": "a2eacaa702e45d5ce94e7d29c6d879729b3a500dc6b61fdcb0c2ff8b2f37d7c6"
+    },
+    "reasons_exact": 8,
+    "bases_exact": 2,
+    "check_steps": [
+      37,
+      38
+    ],
+    "checks": [
+      {
+        "step": 37,
+        "status": "needs_review",
+        "issues": [
+          {
+            "code": "invalid_node",
+            "severity": "error",
+            "where": "defect:S3.nodes[3]",
+            "node": "agent:agent-af0e3d2ae54dbf769@v4",
+            "detail": "版本越界(1..3)"
+          },
+          {
+            "code": "invalid_node",
+            "severity": "error",
+            "where": "defect:S4_COMPILE.entry[0]",
+            "node": "agent:agent-a68daf720e780b4c2@v41",
+            "detail": "版本越界(1..40)"
+          },
+          {
+            "code": "invalid_node",
+            "severity": "error",
+            "where": "defect:S4_COMPILE.nodes[0]",
+            "node": "agent:agent-a68daf720e780b4c2@v41",
+            "detail": "版本越界(1..40)"
+          },
+          {
+            "code": "node_role_conflict",
+            "severity": "warning",
+            "where": "defect:S3",
+            "node": "agent:agent-a68daf720e780b4c2@v5",
+            "detail": "同一缺陷的同一节点版本有不同角色声明，均已保留。"
+          },
+          {
+            "code": "basis_action_post_anchor",
+            "severity": "warning",
+            "where": "defect:S4_PRICE",
+            "node": "agent:agent-aslice8-pay-80bbb1f44b77da0f@v12",
+            "detail": "#a68daf720e780b4c2:15677@L516：引用动作发起时刻晚于节点记录锚点；后置读回/反证可能合法，但不证明生成前已可用，不判断因果错误。"
+          }
+        ],
+        "omitted": 0
+      },
+      {
+        "step": 38,
+        "status": "needs_review",
+        "issues": [
+          {
+            "code": "basis_action_post_anchor",
+            "severity": "warning",
+            "where": "defect:S4_PRICE",
+            "node": "agent:agent-aslice8-pay-80bbb1f44b77da0f@v12",
+            "detail": "#a68daf720e780b4c2:15677@L516：引用动作发起时刻晚于节点记录锚点；后置读回/反证可能合法，但不证明生成前已可用，不判断因果错误。"
+          },
+          {
+            "code": "basis_action_post_anchor",
+            "severity": "warning",
+            "where": "defect:S4_COMPILE",
+            "node": "agent:agent-a68daf720e780b4c2@v40",
+            "detail": "#a68daf720e780b4c2:15731@L592：引用动作发起时刻晚于节点记录锚点；后置读回/反证可能合法，但不证明生成前已可用，不判断因果错误。"
+          },
+          {
+            "code": "basis_agent_window_boundary",
+            "severity": "warning",
+            "where": "defect:S4_COMPILE",
+            "node": "agent:agent-a68daf720e780b4c2@v40",
+            "detail": "#a68daf720e780b4c2:15731@L592：同一 agent 的证据事件在节点 v40 窗口之后（喂养槽 41），没有对应正式效应版本；不重绑到末版，也不制造新版本。后置证据仍可核对，不自动改变原角色。"
+          },
+          {
+            "code": "basis_action_post_anchor",
+            "severity": "warning",
+            "where": "defect:S4_COMPILE",
+            "node": "agent:agent-a68daf720e780b4c2@v40",
+            "detail": "#af0e3d2ae54dbf769:17286@L23：引用动作发起时刻晚于节点记录锚点；后置读回/反证可能合法，但不证明生成前已可用，不判断因果错误。"
+          }
+        ],
+        "omitted": 0
+      }
+    ],
+    "coverage": {
+      "complete": true,
+      "counts": {
+        "expected": 38,
+        "provided": 38,
+        "accounted": 38,
+        "expected_versions": 7,
+        "expected_candidates": 31,
+        "missing_versions": 0,
+        "missing_candidates": 0,
+        "missing": 0,
+        "unresolved": 0,
+        "not_repair": 0,
+        "deferred": 21,
+        "unconfirmed": 21,
+        "advisories": 0,
+        "advisory_rows": 0
+      },
+      "semantic_checked": false
+    },
+    "trajectory": {
+      "nodes": 8,
+      "visits": 5,
+      "statuses": {
+        "rejected": 3,
+        "opened": 2
+      },
+      "transitions": [
+        {
+          "step": 35,
+          "from": null,
+          "to": "file:/Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723/spec/fix/round-1/ui/_systemic/SYSTEMIC_dialog-mask-too-light.md@1",
+          "source": "search",
+          "kind": null,
+          "status": "not_checked",
+          "note": "凭据只证明原生 search 工具返回了命中;不证明外层执行包装完整转交给模型,也不证明历史读取或因果。"
+        }
+      ],
+      "searches": 4,
+      "sha256": "e4a6a428ac3926fc7888fed1ff596b0a5aeb3db833ce86e4f7dfaf76c44d620e"
+    },
+    "graph": {
+      "schema": "migloop-evidence-graph/1",
+      "scope": "recorded_transitions_and_checked_model_edges",
+      "complete": false,
+      "status": "projected",
+      "identity_bound": true,
+      "nodes": [
+        "file:/Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723/entry/src/main/ets/pages/MemberCenterPage.ets@16",
+        "file:/Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723/spec/fix/round-1/ui/_systemic/SYSTEMIC_dialog-mask-too-light.md@1",
+        "agent:agent-a68daf720e780b4c2@5",
+        "agent:agent-a68daf720e780b4c2@33",
+        "agent:agent-a68daf720e780b4c2@40",
+        "agent:agent-af0e3d2ae54dbf769@3",
+        "agent:agent-aslice8-pay-80bbb1f44b77da0f@12",
+        "file:/Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723/entry/src/main/ets/pages/MemberCenterPage.ets@12",
+        "file:/Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723/entry/src/main/ets/pages/MemberCenterPage.ets@11",
+        "agent:agent-af0e3d2ae54dbf769@2",
+        "file:/Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723/entry/src/main/ets/pages/MemberCenterPage.ets@15"
+      ],
+      "additional_nodes": [
+        {
+          "id": "file:/Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723/entry/src/main/ets/pages/MemberCenterPage.ets@11",
+          "kind": "file",
+          "key": "/Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723/entry/src/main/ets/pages/MemberCenterPage.ets",
+          "v": 11,
+          "label": "MemberCenterPage.ets@v11",
+          "source": "checked_model_edge",
+          "opened": [],
+          "appears": [],
+          "parent": null,
+          "side": "unlinked",
+          "unseen": 0,
+          "fixed": false
+        },
+        {
+          "id": "agent:agent-af0e3d2ae54dbf769@2",
+          "kind": "agent",
+          "key": "agent-af0e3d2ae54dbf769",
+          "v": 2,
+          "label": "build-verify-r1 v2",
+          "source": "checked_model_edge",
+          "opened": [],
+          "appears": [],
+          "parent": null,
+          "side": "unlinked",
+          "unseen": 0,
+          "fixed": false
+        },
+        {
+          "id": "file:/Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723/entry/src/main/ets/pages/MemberCenterPage.ets@15",
+          "kind": "file",
+          "key": "/Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723/entry/src/main/ets/pages/MemberCenterPage.ets",
+          "v": 15,
+          "label": "MemberCenterPage.ets@v15",
+          "source": "checked_model_edge",
+          "opened": [],
+          "appears": [],
+          "parent": null,
+          "side": "unlinked",
+          "unseen": 0,
+          "fixed": false
+        }
+      ],
+      "edges": [
+        {
+          "id": "rw-1",
+          "from": "agent:agent-a68daf720e780b4c2@33",
+          "to": "file:/Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723/entry/src/main/ets/pages/MemberCenterPage.ets@11",
+          "kind": "write",
+          "status": "true",
+          "source_of_claim": "model",
+          "relation_source": "ledger",
+          "origins": [
+            {
+              "selection_source": "checked_model_edge",
+              "source_of_claim": "model",
+              "defect": "S4_PRICE",
+              "edge_index": 0,
+              "document_sha256": "d3eff5c2ef999c6f2b7978fc0b6d1c974d0bf8d5b927150aa6b67e646329935c",
+              "model_note": null
+            }
+          ],
+          "label": "账本·写",
+          "notes": [
+            "写于 agent v33(#15682)"
+          ],
+          "evidence": [
+            {
+              "aid": "agent-a68daf720e780b4c2",
+              "seq": 15682,
+              "basis": "write",
+              "event_id": "ff019d8a:agent-a68daf720e780b4c2:toolu_016bvcNnvDn4tHXcYJY7CzLh",
+              "location": "528·a68daf720e780b4c2",
+              "source": "C:\\Users\\hongy\\projects\\_migloop-eval-20260909\\attribution10\\formal-v1\\member-center\\pool\\ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents\\agent-a68daf720e780b4c2.jsonl",
+              "use_ts": "2026-07-26T21:24:15.832Z",
+              "done_ts": "2026-07-26T21:24:18.729Z",
+              "observation": null,
+              "use_line": 528,
+              "result_line": 529
+            }
+          ],
+          "steps": [],
+          "query_steps": [],
+          "semantic_checked": false
+        },
+        {
+          "id": "rw-2",
+          "from": "agent:agent-a68daf720e780b4c2@33",
+          "to": "file:/Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723/entry/src/main/ets/pages/MemberCenterPage.ets@12",
+          "kind": "write",
+          "status": "true",
+          "source_of_claim": "model",
+          "relation_source": "ledger",
+          "origins": [
+            {
+              "selection_source": "checked_model_edge",
+              "source_of_claim": "model",
+              "defect": "S4_PRICE",
+              "edge_index": 1,
+              "document_sha256": "d3eff5c2ef999c6f2b7978fc0b6d1c974d0bf8d5b927150aa6b67e646329935c",
+              "model_note": null
+            }
+          ],
+          "label": "账本·写",
+          "notes": [
+            "写于 agent v33(#15682)"
+          ],
+          "evidence": [
+            {
+              "aid": "agent-a68daf720e780b4c2",
+              "seq": 15682,
+              "basis": "write",
+              "event_id": "ff019d8a:agent-a68daf720e780b4c2:toolu_016bvcNnvDn4tHXcYJY7CzLh",
+              "location": "528·a68daf720e780b4c2",
+              "source": "C:\\Users\\hongy\\projects\\_migloop-eval-20260909\\attribution10\\formal-v1\\member-center\\pool\\ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents\\agent-a68daf720e780b4c2.jsonl",
+              "use_ts": "2026-07-26T21:24:15.832Z",
+              "done_ts": "2026-07-26T21:24:18.729Z",
+              "observation": null,
+              "use_line": 528,
+              "result_line": 529
+            }
+          ],
+          "steps": [],
+          "query_steps": [],
+          "semantic_checked": false
+        },
+        {
+          "id": "rw-3",
+          "from": "agent:agent-af0e3d2ae54dbf769@2",
+          "to": "file:/Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723/entry/src/main/ets/pages/MemberCenterPage.ets@15",
+          "kind": "write",
+          "status": "true",
+          "source_of_claim": "model",
+          "relation_source": "ledger",
+          "origins": [
+            {
+              "selection_source": "checked_model_edge",
+              "source_of_claim": "model",
+              "defect": "S4_COMPILE",
+              "edge_index": 0,
+              "document_sha256": "d3eff5c2ef999c6f2b7978fc0b6d1c974d0bf8d5b927150aa6b67e646329935c",
+              "model_note": null
+            }
+          ],
+          "label": "账本·写",
+          "notes": [
+            "写于 agent v2(#17292)"
+          ],
+          "evidence": [
+            {
+              "aid": "agent-af0e3d2ae54dbf769",
+              "seq": 17292,
+              "basis": "write",
+              "event_id": "ff019d8a:agent-af0e3d2ae54dbf769:toolu_01W4Yg3nfX75u3Yxsk1X4wat",
+              "location": "32·af0e3d2ae54dbf769",
+              "source": "C:\\Users\\hongy\\projects\\_migloop-eval-20260909\\attribution10\\formal-v1\\member-center\\pool\\ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents\\agent-af0e3d2ae54dbf769.jsonl",
+              "use_ts": "2026-07-26T21:46:11.820Z",
+              "done_ts": "2026-07-26T21:46:11.895Z",
+              "observation": null,
+              "use_line": 32,
+              "result_line": 33
+            }
+          ],
+          "steps": [],
+          "query_steps": [],
+          "semantic_checked": false
+        },
+        {
+          "id": "rw-4",
+          "from": "agent:agent-af0e3d2ae54dbf769@3",
+          "to": "file:/Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723/entry/src/main/ets/pages/MemberCenterPage.ets@16",
+          "kind": "write",
+          "status": "true",
+          "source_of_claim": "model",
+          "relation_source": "ledger",
+          "origins": [
+            {
+              "selection_source": "checked_model_edge",
+              "source_of_claim": "model",
+              "defect": "S4_COMPILE",
+              "edge_index": 1,
+              "document_sha256": "d3eff5c2ef999c6f2b7978fc0b6d1c974d0bf8d5b927150aa6b67e646329935c",
+              "model_note": null
+            }
+          ],
+          "label": "账本·写",
+          "notes": [
+            "写于 agent v3(#17294)"
+          ],
+          "evidence": [
+            {
+              "aid": "agent-af0e3d2ae54dbf769",
+              "seq": 17294,
+              "basis": "write",
+              "event_id": "ff019d8a:agent-af0e3d2ae54dbf769:toolu_01YcRVJymkRf9wtm51Pr5qt8",
+              "location": "34·af0e3d2ae54dbf769",
+              "source": "C:\\Users\\hongy\\projects\\_migloop-eval-20260909\\attribution10\\formal-v1\\member-center\\pool\\ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents\\agent-af0e3d2ae54dbf769.jsonl",
+              "use_ts": "2026-07-26T21:46:12.739Z",
+              "done_ts": "2026-07-26T21:46:12.801Z",
+              "observation": null,
+              "use_line": 34,
+              "result_line": 35
+            }
+          ],
+          "steps": [],
+          "query_steps": [],
+          "semantic_checked": false
+        }
+      ],
+      "model_relations": [],
+      "semantic_checked": false,
+      "note": "仅投影本次已记录转移及已认证文稿显式选择、账本原始动作支持的读写关系，不是全账本图或完整根因图；模型选边不等于模型主张已验证，不增加查询或已读记录；候选仍待核，纯搜索/词法提及/派发/版本导航/回访只保留在查询时间线。",
+      "counts": {
+        "transitions": 1,
+        "visits": 5,
+        "searches": 4,
+        "projected_transitions": 0,
+        "excluded_transitions": 1,
+        "edges": 4,
+        "confirmed_read": 0,
+        "confirmed_write": 4,
+        "candidate_read": 0,
+        "candidate_write": 0,
+        "model_relations": 0,
+        "model_edges": 4,
+        "projected_model_edges": 4,
+        "excluded_model_edges": 0,
+        "non_explicit_rows_ignored": 5
+      },
+      "relation_counts": {
+        "unrecorded": 1
+      },
+      "source_counts": {
+        "search": 1
+      },
+      "excluded": [
+        {
+          "step": 35,
+          "from": null,
+          "to": "file:/Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723/spec/fix/round-1/ui/_systemic/SYSTEMIC_dialog-mask-too-light.md@1",
+          "reason": "search"
+        }
+      ],
+      "excluded_model_edges": [],
+      "excluded_nonclaims": [
+        {
+          "defect": "S3",
+          "edge_index": 0,
+          "reason": "not_explicit"
+        },
+        {
+          "defect": "S3",
+          "edge_index": 1,
+          "reason": "not_explicit"
+        },
+        {
+          "defect": "S4_PRICE",
+          "edge_index": 2,
+          "reason": "not_explicit"
+        },
+        {
+          "defect": "S4_PRICE",
+          "edge_index": 3,
+          "reason": "not_explicit"
+        },
+        {
+          "defect": "S4_COMPILE",
+          "edge_index": 2,
+          "reason": "not_explicit"
+        }
+      ]
+    },
+    "action_ref_receipts": [
+      {
+        "step": 6,
+        "ref": "#a68daf720e780b4c2:15406@L103",
+        "node": {
+          "kind": "agent",
+          "aid": "agent-a68daf720e780b4c2",
+          "v": 5,
+          "action": 15406
+        },
+        "source": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v1/member-center/pool/ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+        "source_line": 103,
+        "source_record_sha256": "d3662b808223939b528589cd614033c8b5bffcb83d2cf78c3b5b97c0d395b4ba",
+        "source_basis": "explicit_tool_id",
+        "investigator_use_line": 40,
+        "investigator_result_line": 51,
+        "delivered_body_sha256": "5703c18b0113136205194828120f4d188464564f91d306b21f40c0261fb69056",
+        "header": "# 动作 #15406 · Bash · 2026-07-26T20:41:07 · 成功 · 喂 v5",
+        "delivery_truncated": false,
+        "rendered": "#6action visual-fixer 修复 round-1 v5 #15406 · 原文 #a68daf720e780b4c2:15406@L103 · 5.1千字"
+      },
+      {
+        "step": 7,
+        "ref": "#a68daf720e780b4c2:15407@L106",
+        "node": {
+          "kind": "agent",
+          "aid": "agent-a68daf720e780b4c2",
+          "v": 5,
+          "action": 15407
+        },
+        "source": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v1/member-center/pool/ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+        "source_line": 106,
+        "source_record_sha256": "cb92907b23f9a26e874433f6e41be0ab102c854f2909d65e7ac823bb2a52319e",
+        "source_basis": "explicit_tool_id",
+        "investigator_use_line": 41,
+        "investigator_result_line": 52,
+        "delivered_body_sha256": "32474d233536316ccb0c46f3da198f1ca761fda5c50ed60527aaa6f03478feff",
+        "header": "# 动作 #15407 · Bash · 2026-07-26T20:41:17 · 成功 · 喂 v5",
+        "delivery_truncated": false,
+        "rendered": "#7action visual-fixer 修复 round-1 v5 #15407 · 原文 #a68daf720e780b4c2:15407@L106 · 2.8千字"
+      },
+      {
+        "step": 13,
+        "ref": "#a68daf720e780b4c2:15676@L514",
+        "node": {
+          "kind": "agent",
+          "aid": "agent-a68daf720e780b4c2",
+          "v": 33,
+          "action": 15676
+        },
+        "source": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v1/member-center/pool/ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+        "source_line": 514,
+        "source_record_sha256": "d89bb2679d09c0cb6f8063a454843d5228d2a912e43fa7a161b147c0e106a672",
+        "source_basis": "explicit_tool_id",
+        "investigator_use_line": 83,
+        "investigator_result_line": 90,
+        "delivered_body_sha256": "e3d88f97eaa216c9cfb3240f6c38caf3b7a109b391ad865acdb97051b7fa441d",
+        "header": "# 动作 #15676 · Bash · 2026-07-26T21:22:46 · 成功 · 喂 v33",
+        "delivery_truncated": false,
+        "rendered": "#13action visual-fixer 修复 round-1 v33 #15676 · 原文 #a68daf720e780b4c2:15676@L514 · 1.1千字"
+      },
+      {
+        "step": 14,
+        "ref": "#a68daf720e780b4c2:15677@L516",
+        "node": {
+          "kind": "agent",
+          "aid": "agent-a68daf720e780b4c2",
+          "v": 33,
+          "action": 15677
+        },
+        "source": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v1/member-center/pool/ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+        "source_line": 516,
+        "source_record_sha256": "0842419d54cf337120262ca5ad80a280bc1c0f2b449a17186b855661edfb7ca6",
+        "source_basis": "explicit_tool_id",
+        "investigator_use_line": 84,
+        "investigator_result_line": 92,
+        "delivered_body_sha256": "2744c3f60ecc92c5c61ea7a3e2574de2d8bd409e8efe15fad5af62be31905592",
+        "header": "# 动作 #15677 · Bash · 2026-07-26T21:22:55 · 成功 · 喂 v33",
+        "delivery_truncated": false,
+        "rendered": "#14action visual-fixer 修复 round-1 v33 #15677 · 原文 #a68daf720e780b4c2:15677@L516 · 3.9千字"
+      },
+      {
+        "step": 15,
+        "ref": "#a68daf720e780b4c2:15681@L526",
+        "node": {
+          "kind": "agent",
+          "aid": "agent-a68daf720e780b4c2",
+          "v": 33,
+          "action": 15681
+        },
+        "source": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v1/member-center/pool/ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+        "source_line": 526,
+        "source_record_sha256": "bd088e069c147c83094ed38f227fcd610cb50ea4d719aecfdda17eefe4f613e4",
+        "source_basis": "explicit_tool_id",
+        "investigator_use_line": 85,
+        "investigator_result_line": 96,
+        "delivered_body_sha256": "5d2407bc27a5a47045f2f251ae8f89a7ca6b6efcf4532add14b6953f5dd244d0",
+        "header": "# 动作 #15681 · Bash · 2026-07-26T21:23:48 · 成功 · 喂 v33",
+        "delivery_truncated": false,
+        "rendered": "#15action visual-fixer 修复 round-1 v33 #15681 · 原文 #a68daf720e780b4c2:15681@L526 · 1.2千字"
+      },
+      {
+        "step": 16,
+        "ref": "#a68daf720e780b4c2:15731@L592",
+        "node": {
+          "kind": "agent",
+          "aid": "agent-a68daf720e780b4c2",
+          "v": null,
+          "action": 15731
+        },
+        "source": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v1/member-center/pool/ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+        "source_line": 592,
+        "source_record_sha256": "247880efbf4a79665a1ed0968a3cfa8e7269a991e34aecc0715dedad965642d7",
+        "source_basis": "explicit_tool_id",
+        "investigator_use_line": 86,
+        "investigator_result_line": 97,
+        "delivered_body_sha256": "2e5030146f62683fac01e87d595402f61b67a36bef7b2ca79e09b1c5aa498c76",
+        "header": "# 动作 #15731 · Bash · 2026-07-26T21:30:17 · 成功 · 收尾后(喂养槽 41;已记录 40 个效应版本,无可导航版本)",
+        "delivery_truncated": false,
+        "rendered": "#16action visual-fixer 修复 round-1 #15731 · 原文 #a68daf720e780b4c2:15731@L592 · 5千字"
+      },
+      {
+        "step": 17,
+        "ref": "#af0e3d2ae54dbf769:17286@L23",
+        "node": {
+          "kind": "agent",
+          "aid": "agent-af0e3d2ae54dbf769",
+          "v": 2,
+          "action": 17286
+        },
+        "source": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v1/member-center/pool/ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-af0e3d2ae54dbf769.jsonl",
+        "source_line": 23,
+        "source_record_sha256": "dd5a088044c503af6f19786c8b1c4eb3abbcdfe58c4207eed096bbd08b436a4f",
+        "source_basis": "explicit_tool_id",
+        "investigator_use_line": 87,
+        "investigator_result_line": 98,
+        "delivered_body_sha256": "72042cb15e8a6eeb93a131bf0ecdf2cd4b1b53b447447cf93ca761e139355480",
+        "header": "# 动作 #17286 · Bash · 2026-07-26T21:45:43 · 成功 · 喂 v2",
+        "delivery_truncated": false,
+        "rendered": "#17action 编译验证 fixer 改动 v2 #17286 · 原文 #af0e3d2ae54dbf769:17286@L23 · 1.8千字"
+      },
+      {
+        "step": 18,
+        "ref": "#af0e3d2ae54dbf769:17292@L32",
+        "node": {
+          "kind": "agent",
+          "aid": "agent-af0e3d2ae54dbf769",
+          "v": 2,
+          "action": 17292
+        },
+        "source": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v1/member-center/pool/ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-af0e3d2ae54dbf769.jsonl",
+        "source_line": 32,
+        "source_record_sha256": "94fd77263f2be9dbaff0629cf3399face77ec8c84e9fcba8f0f72a15877eca77",
+        "source_basis": "explicit_tool_id",
+        "investigator_use_line": 104,
+        "investigator_result_line": 111,
+        "delivered_body_sha256": "293c3bfd61b230444ad55bcf88e542e131eec684355ddb8d808a72dfed946e47",
+        "header": "# 动作 #17292 · Edit · 2026-07-26T21:46:11 · 成功 · 效应 v2",
+        "delivery_truncated": false,
+        "rendered": "#18action 编译验证 fixer 改动 v2 #17292 · 原文 #af0e3d2ae54dbf769:17292@L32 · 1.2千字"
+      },
+      {
+        "step": 19,
+        "ref": "#af0e3d2ae54dbf769:17294@L34",
+        "node": {
+          "kind": "agent",
+          "aid": "agent-af0e3d2ae54dbf769",
+          "v": 3,
+          "action": 17294
+        },
+        "source": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v1/member-center/pool/ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-af0e3d2ae54dbf769.jsonl",
+        "source_line": 34,
+        "source_record_sha256": "5dc57be6408fb9395737e8d66e0b239071524e71e5d8329f421483170690c200",
+        "source_basis": "explicit_tool_id",
+        "investigator_use_line": 105,
+        "investigator_result_line": 113,
+        "delivered_body_sha256": "bf77621e5dad42a7315cca04f58a86b80b7230f17648b10e7e76e70d8f0dd6a1",
+        "header": "# 动作 #17294 · Edit · 2026-07-26T21:46:12 · 成功 · 效应 v3",
+        "delivery_truncated": false,
+        "rendered": "#19action 编译验证 fixer 改动 v3 #17294 · 原文 #af0e3d2ae54dbf769:17294@L34 · 1.2千字"
+      },
+      {
+        "step": 23,
+        "ref": "#af0e3d2ae54dbf769:17296@L36",
+        "node": {
+          "kind": "agent",
+          "aid": "agent-af0e3d2ae54dbf769",
+          "v": null,
+          "action": 17296
+        },
+        "source": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v1/member-center/pool/ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-af0e3d2ae54dbf769.jsonl",
+        "source_line": 36,
+        "source_record_sha256": "792568db4539cbb2617c22388993bf80fde9505a8b4b4a3d17ec302c6a8a1075",
+        "source_basis": "explicit_tool_id",
+        "investigator_use_line": 123,
+        "investigator_result_line": 129,
+        "delivered_body_sha256": "91bc17f8c2ebac4e704d275d25bd5479e4a299be48fd65fbdb20fa3cd3f91b7a",
+        "header": "# 动作 #17296 · Bash · 2026-07-26T21:46:18 · 成功 · 收尾后(喂养槽 4;已记录 3 个效应版本,无可导航版本)",
+        "delivery_truncated": false,
+        "rendered": "#23action 编译验证 fixer 改动 #17296 · 原文 #af0e3d2ae54dbf769:17296@L36 · 0.8千字"
+      },
+      {
+        "step": 24,
+        "ref": "#af0e3d2ae54dbf769:17303@L54",
+        "node": {
+          "kind": "agent",
+          "aid": "agent-af0e3d2ae54dbf769",
+          "v": null,
+          "action": 17303
+        },
+        "source": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v1/member-center/pool/ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-af0e3d2ae54dbf769.jsonl",
+        "source_line": 54,
+        "source_record_sha256": "a40cf110905d0bd8bcff42abcfb91f2e260178c0e91c8f976d0e7cbffbf7bf09",
+        "source_basis": "source_line_and_original_text",
+        "investigator_use_line": 124,
+        "investigator_result_line": 133,
+        "delivered_body_sha256": "d664678c1fc1e30b30e9aa634a71b294e526f947e83c31caac7f4633ee049a93",
+        "header": "# 动作 #17303 · say · 2026-07-26T21:47:53 · 成功 · 收尾后(喂养槽 4;已记录 3 个效应版本,无可导航版本)",
+        "delivery_truncated": false,
+        "rendered": "#24action 编译验证 fixer 改动 #17303 · 原文 #af0e3d2ae54dbf769:17303@L54 · 2.4千字"
+      },
+      {
+        "step": 26,
+        "ref": "#a68daf720e780b4c2:15738@L605",
+        "node": {
+          "kind": "agent",
+          "aid": "agent-a68daf720e780b4c2",
+          "v": null,
+          "action": 15738
+        },
+        "source": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v1/member-center/pool/ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+        "source_line": 605,
+        "source_record_sha256": "741d1a7840668827463dcf90559510515e7f1da77ffdf91057d0c4ac44ecd09c",
+        "source_basis": "explicit_tool_id",
+        "investigator_use_line": 126,
+        "investigator_result_line": 135,
+        "delivered_body_sha256": "d456a93064dc3d9147b8d1d4b53217d73fc8528fcec1bce3e1d7433f41a29720",
+        "header": "# 动作 #15738 · Bash · 2026-07-26T21:33:41 · 成功 · 收尾后(喂养槽 41;已记录 40 个效应版本,无可导航版本)",
+        "delivery_truncated": false,
+        "rendered": "#26action visual-fixer 修复 round-1 #15738 · 原文 #a68daf720e780b4c2:15738@L605 · 3.7千字"
+      },
+      {
+        "step": 27,
+        "ref": "#a68daf720e780b4c2:15670@L501",
+        "node": {
+          "kind": "agent",
+          "aid": "agent-a68daf720e780b4c2",
+          "v": 33,
+          "action": 15670
+        },
+        "source": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v1/member-center/pool/ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+        "source_line": 501,
+        "source_record_sha256": "29282cec557a01a6a9c46a8f293d85541d25bd8a98cef9ad2e032b7790c62c8a",
+        "source_basis": "explicit_tool_id",
+        "investigator_use_line": 141,
+        "investigator_result_line": 148,
+        "delivered_body_sha256": "3a9a68c53c0655e4598397320b12250619405f9b9558e4b2f21d2124009d044b",
+        "header": "# 动作 #15670 · Bash · 2026-07-26T21:21:29 · 成功 · 喂 v33",
+        "delivery_truncated": false,
+        "rendered": "#27action visual-fixer 修复 round-1 v33 #15670 · 原文 #a68daf720e780b4c2:15670@L501 · 5.3千字"
+      },
+      {
+        "step": 29,
+        "ref": "#a68daf720e780b4c2:15682@L528",
+        "node": {
+          "kind": "agent",
+          "aid": "agent-a68daf720e780b4c2",
+          "v": 33,
+          "action": 15682
+        },
+        "source": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v1/member-center/pool/ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+        "source_line": 528,
+        "source_record_sha256": "16690e1e9641c1ddf9dee4ca7979c4f3521bb478bc2799bdd0db2ab28f2ff6dc",
+        "source_basis": "explicit_tool_id",
+        "investigator_use_line": 145,
+        "investigator_result_line": 150,
+        "delivered_body_sha256": "6030344d0b80c9849fde5d1d5d2857aa0781cea6f9b459e3f0ebc942bc01e55d",
+        "header": "# 动作 #15682 · Bash · 2026-07-26T21:24:15 · 成功 · 效应 v33",
+        "delivery_truncated": false,
+        "rendered": "#29action visual-fixer 修复 round-1 v33 #15682 · 原文 #a68daf720e780b4c2:15682@L528 · 5.5千字"
+      },
+      {
+        "step": 30,
+        "ref": "#a68daf720e780b4c2:15394@L71",
+        "node": {
+          "kind": "agent",
+          "aid": "agent-a68daf720e780b4c2",
+          "v": 5,
+          "action": 15394
+        },
+        "source": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v1/member-center/pool/ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+        "source_line": 71,
+        "source_record_sha256": "e2eecb8dd559711f201ac6e1ef6875731d840fc7cfe3d94b18e49378fb29d5bd",
+        "source_basis": "explicit_tool_id",
+        "investigator_use_line": 156,
+        "investigator_result_line": 162,
+        "delivered_body_sha256": "058c41fdb9f9d148a37881764154d53bb9d54fa05bf1523e96cb29b4fb112dba",
+        "header": "# 动作 #15394 · Bash · 2026-07-26T20:35:37 · 成功 · 喂 v5",
+        "delivery_truncated": false,
+        "rendered": "#30action visual-fixer 修复 round-1 v5 #15394 · 原文 #a68daf720e780b4c2:15394@L71 · 2.8千字"
+      },
+      {
+        "step": 31,
+        "ref": "#a68daf720e780b4c2:15396@L77",
+        "node": {
+          "kind": "agent",
+          "aid": "agent-a68daf720e780b4c2",
+          "v": 5,
+          "action": 15396
+        },
+        "source": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v1/member-center/pool/ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+        "source_line": 77,
+        "source_record_sha256": "d62980223529c0a245178d6df6bd16ac6bf1024f80651c5e03502496fd40fade",
+        "source_basis": "explicit_tool_id",
+        "investigator_use_line": 157,
+        "investigator_result_line": 164,
+        "delivered_body_sha256": "852218595ea75e069214667e8f606bec233ebfbe2d71dfb97b8b5b172bef4d0f",
+        "header": "# 动作 #15396 · Bash · 2026-07-26T20:36:01 · 成功 · 喂 v5",
+        "delivery_truncated": false,
+        "rendered": "#31action visual-fixer 修复 round-1 v5 #15396 · 原文 #a68daf720e780b4c2:15396@L77 · 8.2千字"
+      },
+      {
+        "step": 32,
+        "ref": "#a68daf720e780b4c2:15397@L80",
+        "node": {
+          "kind": "agent",
+          "aid": "agent-a68daf720e780b4c2",
+          "v": 5,
+          "action": 15397
+        },
+        "source": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v1/member-center/pool/ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+        "source_line": 80,
+        "source_record_sha256": "7c126ee113537ab79cb559e72cae3ce3ecd4d02cd20f81ad3ebeac8af9d46fb5",
+        "source_basis": "explicit_tool_id",
+        "investigator_use_line": 158,
+        "investigator_result_line": 167,
+        "delivered_body_sha256": "8e98a82cd298300bc327fb52ddab87fc6dd390971669c79f2a7d380250edb355",
+        "header": "# 动作 #15397 · Bash · 2026-07-26T20:36:15 · 成功 · 喂 v5",
+        "delivery_truncated": false,
+        "rendered": "#32action visual-fixer 修复 round-1 v5 #15397 · 原文 #a68daf720e780b4c2:15397@L80 · 5.3千字"
+      },
+      {
+        "step": 33,
+        "ref": "#a68daf720e780b4c2:15401@L91",
+        "node": {
+          "kind": "agent",
+          "aid": "agent-a68daf720e780b4c2",
+          "v": 5,
+          "action": 15401
+        },
+        "source": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v1/member-center/pool/ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+        "source_line": 91,
+        "source_record_sha256": "0ae5e70cc50a5bda5d1fe32d4fea2281effe5f1b22e79b5c716e52b2d282102d",
+        "source_basis": "explicit_tool_id",
+        "investigator_use_line": 159,
+        "investigator_result_line": 168,
+        "delivered_body_sha256": "b409d7106ca39ba6584f2c45d81b66c40b7f444659266d7541da828a5612f324",
+        "header": "# 动作 #15401 · Bash · 2026-07-26T20:40:20 · 成功 · 喂 v5",
+        "delivery_truncated": false,
+        "rendered": "#33action visual-fixer 修复 round-1 v5 #15401 · 原文 #a68daf720e780b4c2:15401@L91 · 3千字"
+      }
+    ],
+    "returned_check_receipts": [
+      {
+        "step": 37,
+        "status": "needs_review",
+        "issues": [
+          {
+            "code": "invalid_node",
+            "severity": "error",
+            "where": "defect:S3.nodes[3]",
+            "node": "agent:agent-af0e3d2ae54dbf769@v4",
+            "detail": "版本越界(1..3)"
+          },
+          {
+            "code": "invalid_node",
+            "severity": "error",
+            "where": "defect:S4_COMPILE.entry[0]",
+            "node": "agent:agent-a68daf720e780b4c2@v41",
+            "detail": "版本越界(1..40)"
+          },
+          {
+            "code": "invalid_node",
+            "severity": "error",
+            "where": "defect:S4_COMPILE.nodes[0]",
+            "node": "agent:agent-a68daf720e780b4c2@v41",
+            "detail": "版本越界(1..40)"
+          },
+          {
+            "code": "node_role_conflict",
+            "severity": "warning",
+            "where": "defect:S3",
+            "node": "agent:agent-a68daf720e780b4c2@v5",
+            "detail": "同一缺陷的同一节点版本有不同角色声明，均已保留。"
+          },
+          {
+            "code": "basis_action_post_anchor",
+            "severity": "warning",
+            "where": "defect:S4_PRICE",
+            "node": "agent:agent-aslice8-pay-80bbb1f44b77da0f@v12",
+            "detail": "#a68daf720e780b4c2:15677@L516：引用动作发起时刻晚于节点记录锚点；后置读回/反证可能合法，但不证明生成前已可用，不判断因果错误。"
+          }
+        ],
+        "source_line": 203,
+        "returned_sha256": "fa3c3f7c2493f960f5d8be7d1cfdaa84f06336374e97f9dddb125d06a344030d"
+      },
+      {
+        "step": 38,
+        "status": "needs_review",
+        "issues": [
+          {
+            "code": "basis_action_post_anchor",
+            "severity": "warning",
+            "where": "defect:S4_PRICE",
+            "node": "agent:agent-aslice8-pay-80bbb1f44b77da0f@v12",
+            "detail": "#a68daf720e780b4c2:15677@L516：引用动作发起时刻晚于节点记录锚点；后置读回/反证可能合法，但不证明生成前已可用，不判断因果错误。"
+          },
+          {
+            "code": "basis_action_post_anchor",
+            "severity": "warning",
+            "where": "defect:S4_COMPILE",
+            "node": "agent:agent-a68daf720e780b4c2@v40",
+            "detail": "#a68daf720e780b4c2:15731@L592：引用动作发起时刻晚于节点记录锚点；后置读回/反证可能合法，但不证明生成前已可用，不判断因果错误。"
+          },
+          {
+            "code": "basis_agent_window_boundary",
+            "severity": "warning",
+            "where": "defect:S4_COMPILE",
+            "node": "agent:agent-a68daf720e780b4c2@v40",
+            "detail": "#a68daf720e780b4c2:15731@L592：同一 agent 的证据事件在节点 v40 窗口之后（喂养槽 41），没有对应正式效应版本；不重绑到末版，也不制造新版本。后置证据仍可核对，不自动改变原角色。"
+          },
+          {
+            "code": "basis_action_post_anchor",
+            "severity": "warning",
+            "where": "defect:S4_COMPILE",
+            "node": "agent:agent-a68daf720e780b4c2@v40",
+            "detail": "#af0e3d2ae54dbf769:17286@L23：引用动作发起时刻晚于节点记录锚点；后置读回/反证可能合法，但不证明生成前已可用，不判断因果错误。"
+          }
+        ],
+        "source_line": 212,
+        "returned_sha256": "185e6cadf486e6647ceb4bca3d6eab3102b990e353f1e0f80eb80a29503f273f"
+      }
+    ],
+    "current_boundary": [
+      {
+        "code": "basis_action_post_anchor",
+        "level": "warning",
+        "defect": "S4_PRICE",
+        "node": "agent:agent-aslice8-pay-80bbb1f44b77da0f@v12",
+        "ref": "#a68daf720e780b4c2:15677@L516",
+        "message": "#a68daf720e780b4c2:15677@L516：引用动作发起时刻晚于节点记录锚点；后置读回/反证可能合法，但不证明生成前已可用，不判断因果错误。",
+        "boundary": {
+          "anchor_v": 12,
+          "anchor_ts": "2026-07-24T16:04:37.440Z",
+          "aid": "agent-a68daf720e780b4c2",
+          "seq": 15677,
+          "use_ts": "2026-07-26T21:22:55.328Z",
+          "done_ts": "2026-07-26T21:22:55.404Z",
+          "temporal_basis": "action_use"
+        },
+        "source": "ledger_boundary",
+        "semantic_checked": false
+      },
+      {
+        "code": "basis_action_post_anchor",
+        "level": "warning",
+        "defect": "S4_COMPILE",
+        "node": "agent:agent-a68daf720e780b4c2@v40",
+        "ref": "#a68daf720e780b4c2:15731@L592",
+        "message": "#a68daf720e780b4c2:15731@L592：引用动作发起时刻晚于节点记录锚点；后置读回/反证可能合法，但不证明生成前已可用，不判断因果错误。",
+        "boundary": {
+          "anchor_v": 40,
+          "anchor_ts": "2026-07-26T21:29:04.142Z",
+          "aid": "agent-a68daf720e780b4c2",
+          "seq": 15731,
+          "use_ts": "2026-07-26T21:30:17.239Z",
+          "done_ts": "2026-07-26T21:30:20.292Z",
+          "temporal_basis": "action_use"
+        },
+        "source": "ledger_boundary",
+        "semantic_checked": false
+      },
+      {
+        "code": "basis_agent_window_boundary",
+        "level": "warning",
+        "defect": "S4_COMPILE",
+        "node": "agent:agent-a68daf720e780b4c2@v40",
+        "ref": "#a68daf720e780b4c2:15731@L592",
+        "message": "#a68daf720e780b4c2:15731@L592：同一 agent 的证据事件在节点 v40 窗口之后（喂养槽 41），没有对应正式效应版本；不重绑到末版，也不制造新版本。后置证据仍可核对，不自动改变原角色。",
+        "boundary": {
+          "anchor_v": 40,
+          "anchor_ts": "2026-07-26T21:29:04.142Z",
+          "aid": "agent-a68daf720e780b4c2",
+          "seq": 15731,
+          "use_ts": "2026-07-26T21:30:17.239Z",
+          "done_ts": "2026-07-26T21:30:20.292Z",
+          "feeding_slot": 41,
+          "event_v": null,
+          "n_versions": 40,
+          "after_last_effect": true
+        },
+        "source": "ledger_boundary",
+        "semantic_checked": false
+      },
+      {
+        "code": "basis_action_post_anchor",
+        "level": "warning",
+        "defect": "S4_COMPILE",
+        "node": "agent:agent-a68daf720e780b4c2@v40",
+        "ref": "#af0e3d2ae54dbf769:17286@L23",
+        "message": "#af0e3d2ae54dbf769:17286@L23：引用动作发起时刻晚于节点记录锚点；后置读回/反证可能合法，但不证明生成前已可用，不判断因果错误。",
+        "boundary": {
+          "anchor_v": 40,
+          "anchor_ts": "2026-07-26T21:29:04.142Z",
+          "aid": "agent-af0e3d2ae54dbf769",
+          "seq": 17286,
+          "use_ts": "2026-07-26T21:45:43.448Z",
+          "done_ts": "2026-07-26T21:45:43.530Z",
+          "temporal_basis": "action_use"
+        },
+        "source": "ledger_boundary",
+        "semantic_checked": false
+      }
+    ],
+    "findings": {
+      "file_count": 1,
+      "item_count": 3,
+      "unbound_items": [
+        "d3eff5c2ef999c6f2b7978fc0b6d1c974d0bf8d5b927150aa6b67e646329935c:S3"
+      ],
+      "without_repair": [
+        "S3"
+      ],
+      "dom_rows": [
+        {
+          "id": "d3eff5c2ef999c6f2b7978fc0b6d1c974d0bf8d5b927150aa6b67e646329935c:S4_PRICE",
+          "unbound": false,
+          "causes": 3,
+          "unbound_ref_labels": []
+        },
+        {
+          "id": "d3eff5c2ef999c6f2b7978fc0b6d1c974d0bf8d5b927150aa6b67e646329935c:S4_COMPILE",
+          "unbound": false,
+          "causes": 2,
+          "unbound_ref_labels": []
+        },
+        {
+          "id": "d3eff5c2ef999c6f2b7978fc0b6d1c974d0bf8d5b927150aa6b67e646329935c:S3",
+          "unbound": true,
+          "causes": 3,
+          "unbound_ref_labels": []
+        }
+      ]
+    },
+    "geometry": [
+      {
+        "stage": "initial",
+        "nodeCount": 11,
+        "atomCount": 11,
+        "viewport": {
+          "left": 395,
+          "right": 1417,
+          "top": 198.96875,
+          "bottom": 1244.96875
+        },
+        "overlaps": [],
+        "outside": []
+      },
+      {
+        "stage": "resize 1250",
+        "nodeCount": 11,
+        "atomCount": 11,
+        "viewport": {
+          "left": 330,
+          "right": 817,
+          "top": 293.15625,
+          "bottom": 1278.15625
+        },
+        "overlaps": [],
+        "outside": []
+      },
+      {
+        "stage": "resize 2200",
+        "nodeCount": 11,
+        "atomCount": 11,
+        "viewport": {
+          "left": 545,
+          "right": 1567,
+          "top": 198.96875,
+          "bottom": 1244.96875
+        },
+        "overlaps": [],
+        "outside": []
+      },
+      {
+        "stage": "resize 1600",
+        "nodeCount": 11,
+        "atomCount": 11,
+        "viewport": {
+          "left": 337,
+          "right": 1175,
+          "top": 198.96875,
+          "bottom": 1244.96875
+        },
+        "overlaps": [],
+        "outside": []
+      },
+      {
+        "stage": "candidate on",
+        "nodeCount": 11,
+        "atomCount": 11,
+        "viewport": {
+          "left": 337,
+          "right": 1175,
+          "top": 198.96875,
+          "bottom": 1244.96875
+        },
+        "overlaps": [],
+        "outside": []
+      },
+      {
+        "stage": "candidate off",
+        "nodeCount": 11,
+        "atomCount": 11,
+        "viewport": {
+          "left": 337,
+          "right": 1175,
+          "top": 198.96875,
+          "bottom": 1244.96875
+        },
+        "overlaps": [],
+        "outside": []
+      }
+    ],
+    "stub_test": "not_available_on_this_real_graph",
+    "drawer_loaded": true,
+    "atom_responses": [
+      {
+        "url": "http://127.0.0.1:19674/api/insight1/atom/ff019d8a-5172-4cdd-8ce3-77a21682c1b6/index",
+        "status": 200
+      },
+      {
+        "url": "http://127.0.0.1:19674/api/insight1/atom/ff019d8a-5172-4cdd-8ce3-77a21682c1b6/file?diff=0&content=0&path=%2FUsers%2Fchenjiamin%2FarkTs%2Farkts_pilot_project%2Faippt_version%2Faippt_0723%2Fentry%2Fsrc%2Fmain%2Fets%2Fpages%2FMemberCenterPage.ets",
+        "status": 200
+      },
+      {
+        "url": "http://127.0.0.1:19674/api/insight1/atom/ff019d8a-5172-4cdd-8ce3-77a21682c1b6/file?scope_only=1&path=%2FUsers%2Fchenjiamin%2FarkTs%2Farkts_pilot_project%2Faippt_version%2Faippt_0723%2Fentry%2Fsrc%2Fmain%2Fets%2Fpages%2FMemberCenterPage.ets&v=16",
+        "status": 200
+      }
+    ],
+    "raw_step_pairs": [
+      {
+        "step": 1,
+        "call_id": "call_LHu42o98XpivXlKziWjLZx0J",
+        "use_line": 19,
+        "result_line": 22,
+        "use_type": "function_call",
+        "result_type": "function_call_output",
+        "use_id": "call_LHu42o98XpivXlKziWjLZx0J",
+        "result_id": "call_LHu42o98XpivXlKziWjLZx0J",
+        "origin": true,
+        "use_time_ms": 1788981752780,
+        "result_time_ms": 1788981752922
+      },
+      {
+        "step": 2,
+        "call_id": "call_kuAbbkd18kPHYpAioO4txMc7",
+        "use_line": 28,
+        "result_line": 31,
+        "use_type": "function_call",
+        "result_type": "function_call_output",
+        "use_id": "call_kuAbbkd18kPHYpAioO4txMc7",
+        "result_id": "call_kuAbbkd18kPHYpAioO4txMc7",
+        "origin": true,
+        "use_time_ms": 1788981757095,
+        "result_time_ms": 1788981770317
+      },
+      {
+        "step": 3,
+        "call_id": "call_9Dz91h7HbMcglHXYPaWjmC6z",
+        "use_line": 37,
+        "result_line": 44,
+        "use_type": "function_call",
+        "result_type": "function_call_output",
+        "use_id": "call_9Dz91h7HbMcglHXYPaWjmC6z",
+        "result_id": "call_9Dz91h7HbMcglHXYPaWjmC6z",
+        "origin": true,
+        "use_time_ms": 1788981783811,
+        "result_time_ms": 1788981784132
+      },
+      {
+        "step": 4,
+        "call_id": "call_utOpUhTbf0DRJMGV6y3dqE4p",
+        "use_line": 38,
+        "result_line": 46,
+        "use_type": "function_call",
+        "result_type": "function_call_output",
+        "use_id": "call_utOpUhTbf0DRJMGV6y3dqE4p",
+        "result_id": "call_utOpUhTbf0DRJMGV6y3dqE4p",
+        "origin": true,
+        "use_time_ms": 1788981783824,
+        "result_time_ms": 1788981784400
+      },
+      {
+        "step": 5,
+        "call_id": "call_lQOpiOFriWL7nkTSzmpceH5q",
+        "use_line": 39,
+        "result_line": 50,
+        "use_type": "function_call",
+        "result_type": "function_call_output",
+        "use_id": "call_lQOpiOFriWL7nkTSzmpceH5q",
+        "result_id": "call_lQOpiOFriWL7nkTSzmpceH5q",
+        "origin": true,
+        "use_time_ms": 1788981783842,
+        "result_time_ms": 1788981784522
+      },
+      {
+        "step": 6,
+        "call_id": "call_HmcDxGpbkj44A163D3LM3Bum",
+        "use_line": 40,
+        "result_line": 51,
+        "use_type": "function_call",
+        "result_type": "function_call_output",
+        "use_id": "call_HmcDxGpbkj44A163D3LM3Bum",
+        "result_id": "call_HmcDxGpbkj44A163D3LM3Bum",
+        "origin": true,
+        "use_time_ms": 1788981783861,
+        "result_time_ms": 1788981784528
+      },
+      {
+        "step": 7,
+        "call_id": "call_UNV0uF0IjQ5USzlQLVVn37ew",
+        "use_line": 41,
+        "result_line": 52,
+        "use_type": "function_call",
+        "result_type": "function_call_output",
+        "use_id": "call_UNV0uF0IjQ5USzlQLVVn37ew",
+        "result_id": "call_UNV0uF0IjQ5USzlQLVVn37ew",
+        "origin": true,
+        "use_time_ms": 1788981783876,
+        "result_time_ms": 1788981784540
+      },
+      {
+        "step": 8,
+        "call_id": "call_I7vRLBLlmGV26H90gbdGplDZ",
+        "use_line": 58,
+        "result_line": 64,
+        "use_type": "function_call",
+        "result_type": "function_call_output",
+        "use_id": "call_I7vRLBLlmGV26H90gbdGplDZ",
+        "result_id": "call_I7vRLBLlmGV26H90gbdGplDZ",
+        "origin": true,
+        "use_time_ms": 1788981797017,
+        "result_time_ms": 1788981797251
+      },
+      {
+        "step": 9,
+        "call_id": "call_Mlgf4kvMfW4ctKuXEnfYR76F",
+        "use_line": 59,
+        "result_line": 68,
+        "use_type": "function_call",
+        "result_type": "function_call_output",
+        "use_id": "call_Mlgf4kvMfW4ctKuXEnfYR76F",
+        "result_id": "call_Mlgf4kvMfW4ctKuXEnfYR76F",
+        "origin": true,
+        "use_time_ms": 1788981797033,
+        "result_time_ms": 1788981797601
+      },
+      {
+        "step": 10,
+        "call_id": "call_5ghh8rDrrrR5jXWgvx8oisl5",
+        "use_line": 60,
+        "result_line": 69,
+        "use_type": "function_call",
+        "result_type": "function_call_output",
+        "use_id": "call_5ghh8rDrrrR5jXWgvx8oisl5",
+        "result_id": "call_5ghh8rDrrrR5jXWgvx8oisl5",
+        "origin": true,
+        "use_time_ms": 1788981797051,
+        "result_time_ms": 1788981797607
+      },
+      {
+        "step": 11,
+        "call_id": "call_bfa3nzo9hoWtVHFKyHvaYOGQ",
+        "use_line": 61,
+        "result_line": 70,
+        "use_type": "function_call",
+        "result_type": "function_call_output",
+        "use_id": "call_bfa3nzo9hoWtVHFKyHvaYOGQ",
+        "result_id": "call_bfa3nzo9hoWtVHFKyHvaYOGQ",
+        "origin": true,
+        "use_time_ms": 1788981797070,
+        "result_time_ms": 1788981797620
+      },
+      {
+        "step": 12,
+        "call_id": "call_4a6jdJzWgnoKOULn21ZElJan",
+        "use_line": 76,
+        "result_line": 79,
+        "use_type": "function_call",
+        "result_type": "function_call_output",
+        "use_id": "call_4a6jdJzWgnoKOULn21ZElJan",
+        "result_id": "call_4a6jdJzWgnoKOULn21ZElJan",
+        "origin": true,
+        "use_time_ms": 1788981802595,
+        "result_time_ms": 1788981802737
+      },
+      {
+        "step": 13,
+        "call_id": "call_sJ8w1oj75H6r2PZPODmLr8PC",
+        "use_line": 83,
+        "result_line": 90,
+        "use_type": "function_call",
+        "result_type": "function_call_output",
+        "use_id": "call_sJ8w1oj75H6r2PZPODmLr8PC",
+        "result_id": "call_sJ8w1oj75H6r2PZPODmLr8PC",
+        "origin": true,
+        "use_time_ms": 1788981815431,
+        "result_time_ms": 1788981815678
+      },
+      {
+        "step": 14,
+        "call_id": "call_6UbDZgICec2GYrJJGcSWAjoV",
+        "use_line": 84,
+        "result_line": 92,
+        "use_type": "function_call",
+        "result_type": "function_call_output",
+        "use_id": "call_6UbDZgICec2GYrJJGcSWAjoV",
+        "result_id": "call_6UbDZgICec2GYrJJGcSWAjoV",
+        "origin": true,
+        "use_time_ms": 1788981815446,
+        "result_time_ms": 1788981815854
+      },
+      {
+        "step": 15,
+        "call_id": "call_1wNiJTWzvmehzir0k9hne6Le",
+        "use_line": 85,
+        "result_line": 96,
+        "use_type": "function_call",
+        "result_type": "function_call_output",
+        "use_id": "call_1wNiJTWzvmehzir0k9hne6Le",
+        "result_id": "call_1wNiJTWzvmehzir0k9hne6Le",
+        "origin": true,
+        "use_time_ms": 1788981815463,
+        "result_time_ms": 1788981815952
+      },
+      {
+        "step": 16,
+        "call_id": "call_jPbiNRE8flEneLRyhA26p4vp",
+        "use_line": 86,
+        "result_line": 97,
+        "use_type": "function_call",
+        "result_type": "function_call_output",
+        "use_id": "call_jPbiNRE8flEneLRyhA26p4vp",
+        "result_id": "call_jPbiNRE8flEneLRyhA26p4vp",
+        "origin": true,
+        "use_time_ms": 1788981815483,
+        "result_time_ms": 1788981815970
+      },
+      {
+        "step": 17,
+        "call_id": "call_CafG32XO1llGI6Xmsz4l0JGV",
+        "use_line": 87,
+        "result_line": 98,
+        "use_type": "function_call",
+        "result_type": "function_call_output",
+        "use_id": "call_CafG32XO1llGI6Xmsz4l0JGV",
+        "result_id": "call_CafG32XO1llGI6Xmsz4l0JGV",
+        "origin": true,
+        "use_time_ms": 1788981815501,
+        "result_time_ms": 1788981815985
+      },
+      {
+        "step": 18,
+        "call_id": "call_iYiTkVwu5N7aZ7LsBt5BwzhC",
+        "use_line": 104,
+        "result_line": 111,
+        "use_type": "function_call",
+        "result_type": "function_call_output",
+        "use_id": "call_iYiTkVwu5N7aZ7LsBt5BwzhC",
+        "result_id": "call_iYiTkVwu5N7aZ7LsBt5BwzhC",
+        "origin": true,
+        "use_time_ms": 1788981829409,
+        "result_time_ms": 1788981829683
+      },
+      {
+        "step": 19,
+        "call_id": "call_ZvkWOr2eBXxDpsCe8I89UBOh",
+        "use_line": 105,
+        "result_line": 113,
+        "use_type": "function_call",
+        "result_type": "function_call_output",
+        "use_id": "call_ZvkWOr2eBXxDpsCe8I89UBOh",
+        "result_id": "call_ZvkWOr2eBXxDpsCe8I89UBOh",
+        "origin": true,
+        "use_time_ms": 1788981829422,
+        "result_time_ms": 1788981829995
+      },
+      {
+        "step": 20,
+        "call_id": "call_YEBCt1tl0njXeHrn92qNWVll",
+        "use_line": 106,
+        "result_line": 117,
+        "use_type": "function_call",
+        "result_type": "function_call_output",
+        "use_id": "call_YEBCt1tl0njXeHrn92qNWVll",
+        "result_id": "call_YEBCt1tl0njXeHrn92qNWVll",
+        "origin": true,
+        "use_time_ms": 1788981829438,
+        "result_time_ms": 1788981830086
+      },
+      {
+        "step": 21,
+        "call_id": "call_IR533ZaAsUqVUlorNh0YapgK",
+        "use_line": 107,
+        "result_line": 118,
+        "use_type": "function_call",
+        "result_type": "function_call_output",
+        "use_id": "call_IR533ZaAsUqVUlorNh0YapgK",
+        "result_id": "call_IR533ZaAsUqVUlorNh0YapgK",
+        "origin": true,
+        "use_time_ms": 1788981829453,
+        "result_time_ms": 1788981830091
+      },
+      {
+        "step": 22,
+        "call_id": "call_Gki3YQatJs7FdTER5xtYOLsJ",
+        "use_line": 108,
+        "result_line": 119,
+        "use_type": "function_call",
+        "result_type": "function_call_output",
+        "use_id": "call_Gki3YQatJs7FdTER5xtYOLsJ",
+        "result_id": "call_Gki3YQatJs7FdTER5xtYOLsJ",
+        "origin": true,
+        "use_time_ms": 1788981829461,
+        "result_time_ms": 1788981830097
+      },
+      {
+        "step": 23,
+        "call_id": "call_QcAg5BF1ntERUjA7rYy2a633",
+        "use_line": 123,
+        "result_line": 129,
+        "use_type": "function_call",
+        "result_type": "function_call_output",
+        "use_id": "call_QcAg5BF1ntERUjA7rYy2a633",
+        "result_id": "call_QcAg5BF1ntERUjA7rYy2a633",
+        "origin": true,
+        "use_time_ms": 1788981842281,
+        "result_time_ms": 1788981842521
+      },
+      {
+        "step": 24,
+        "call_id": "call_iQ1AxjM0d4SrD8GXqprgojI1",
+        "use_line": 124,
+        "result_line": 133,
+        "use_type": "function_call",
+        "result_type": "function_call_output",
+        "use_id": "call_iQ1AxjM0d4SrD8GXqprgojI1",
+        "result_id": "call_iQ1AxjM0d4SrD8GXqprgojI1",
+        "origin": true,
+        "use_time_ms": 1788981842296,
+        "result_time_ms": 1788981842728
+      },
+      {
+        "step": 25,
+        "call_id": "call_B9UtOKTq8EnfSpSoGB2S5ha1",
+        "use_line": 125,
+        "result_line": 134,
+        "use_type": "function_call",
+        "result_type": "function_call_output",
+        "use_id": "call_B9UtOKTq8EnfSpSoGB2S5ha1",
+        "result_id": "call_B9UtOKTq8EnfSpSoGB2S5ha1",
+        "origin": true,
+        "use_time_ms": 1788981842313,
+        "result_time_ms": 1788981842733
+      },
+      {
+        "step": 26,
+        "call_id": "call_LGCu3L1I3imzNey60RrMtQij",
+        "use_line": 126,
+        "result_line": 135,
+        "use_type": "function_call",
+        "result_type": "function_call_output",
+        "use_id": "call_LGCu3L1I3imzNey60RrMtQij",
+        "result_id": "call_LGCu3L1I3imzNey60RrMtQij",
+        "origin": true,
+        "use_time_ms": 1788981842328,
+        "result_time_ms": 1788981842748
+      },
+      {
+        "step": 27,
+        "call_id": "call_WaIbOSszUQlzXcgGHhkGL57x",
+        "use_line": 141,
+        "result_line": 148,
+        "use_type": "function_call",
+        "result_type": "function_call_output",
+        "use_id": "call_WaIbOSszUQlzXcgGHhkGL57x",
+        "result_id": "call_WaIbOSszUQlzXcgGHhkGL57x",
+        "origin": true,
+        "use_time_ms": 1788981854393,
+        "result_time_ms": 1788981854894
+      },
+      {
+        "step": 28,
+        "call_id": "call_mGCsv43TxpLdh7IT1Exi3RKG",
+        "use_line": 142,
+        "result_line": 149,
+        "use_type": "function_call",
+        "result_type": "function_call_output",
+        "use_id": "call_mGCsv43TxpLdh7IT1Exi3RKG",
+        "result_id": "call_mGCsv43TxpLdh7IT1Exi3RKG",
+        "origin": true,
+        "use_time_ms": 1788981854406,
+        "result_time_ms": 1788981854914
+      },
+      {
+        "step": 29,
+        "call_id": "call_2RmlOxX68tgtN4lmuilc84Ri",
+        "use_line": 145,
+        "result_line": 150,
+        "use_type": "function_call",
+        "result_type": "function_call_output",
+        "use_id": "call_2RmlOxX68tgtN4lmuilc84Ri",
+        "result_id": "call_2RmlOxX68tgtN4lmuilc84Ri",
+        "origin": true,
+        "use_time_ms": 1788981854646,
+        "result_time_ms": 1788981854926
+      },
+      {
+        "step": 30,
+        "call_id": "call_eTNIIlYcOCspF3jHkAizzcIY",
+        "use_line": 156,
+        "result_line": 162,
+        "use_type": "function_call",
+        "result_type": "function_call_output",
+        "use_id": "call_eTNIIlYcOCspF3jHkAizzcIY",
+        "result_id": "call_eTNIIlYcOCspF3jHkAizzcIY",
+        "origin": true,
+        "use_time_ms": 1788981869357,
+        "result_time_ms": 1788981869592
+      },
+      {
+        "step": 31,
+        "call_id": "call_1VUwlP5xEjUwGsglF1byO7mz",
+        "use_line": 157,
+        "result_line": 164,
+        "use_type": "function_call",
+        "result_type": "function_call_output",
+        "use_id": "call_1VUwlP5xEjUwGsglF1byO7mz",
+        "result_id": "call_1VUwlP5xEjUwGsglF1byO7mz",
+        "origin": true,
+        "use_time_ms": 1788981869372,
+        "result_time_ms": 1788981869684
+      },
+      {
+        "step": 32,
+        "call_id": "call_gZZyV8ZpfFPLPOSUjb0nVnah",
+        "use_line": 158,
+        "result_line": 167,
+        "use_type": "function_call",
+        "result_type": "function_call_output",
+        "use_id": "call_gZZyV8ZpfFPLPOSUjb0nVnah",
+        "result_id": "call_gZZyV8ZpfFPLPOSUjb0nVnah",
+        "origin": true,
+        "use_time_ms": 1788981869395,
+        "result_time_ms": 1788981869793
+      },
+      {
+        "step": 33,
+        "call_id": "call_opipyyMynwhanKY1XClyh9GH",
+        "use_line": 159,
+        "result_line": 168,
+        "use_type": "function_call",
+        "result_type": "function_call_output",
+        "use_id": "call_opipyyMynwhanKY1XClyh9GH",
+        "result_id": "call_opipyyMynwhanKY1XClyh9GH",
+        "origin": true,
+        "use_time_ms": 1788981869413,
+        "result_time_ms": 1788981869807
+      },
+      {
+        "step": 34,
+        "call_id": "call_MW5U23YET88krfj27i4tG7zU",
+        "use_line": 174,
+        "result_line": 177,
+        "use_type": "function_call",
+        "result_type": "function_call_output",
+        "use_id": "call_MW5U23YET88krfj27i4tG7zU",
+        "result_id": "call_MW5U23YET88krfj27i4tG7zU",
+        "origin": true,
+        "use_time_ms": 1788981878010,
+        "result_time_ms": 1788981878407
+      },
+      {
+        "step": 35,
+        "call_id": "call_FtYVuLHgwv6a1tZa9GORpZRw",
+        "use_line": 181,
+        "result_line": 184,
+        "use_type": "function_call",
+        "result_type": "function_call_output",
+        "use_id": "call_FtYVuLHgwv6a1tZa9GORpZRw",
+        "result_id": "call_FtYVuLHgwv6a1tZa9GORpZRw",
+        "origin": true,
+        "use_time_ms": 1788981885091,
+        "result_time_ms": 1788981885237
+      },
+      {
+        "step": 36,
+        "call_id": "call_dZk90jBIXtCpmOocVRMNlzKo",
+        "use_line": 190,
+        "result_line": 193,
+        "use_type": "function_call",
+        "result_type": "function_call_output",
+        "use_id": "call_dZk90jBIXtCpmOocVRMNlzKo",
+        "result_id": "call_dZk90jBIXtCpmOocVRMNlzKo",
+        "origin": true,
+        "use_time_ms": 1788981889443,
+        "result_time_ms": 1788981889577
+      },
+      {
+        "step": 37,
+        "call_id": "call_mdxeycXpg9sN5pX8hn0FxyAe",
+        "use_line": 200,
+        "result_line": 203,
+        "use_type": "function_call",
+        "result_type": "function_call_output",
+        "use_id": "call_mdxeycXpg9sN5pX8hn0FxyAe",
+        "result_id": "call_mdxeycXpg9sN5pX8hn0FxyAe",
+        "origin": true,
+        "use_time_ms": 1788982132163,
+        "result_time_ms": 1788982132382
+      },
+      {
+        "step": 38,
+        "call_id": "call_3jFfuAh5rvL8a2vMjtAyWAbo",
+        "use_line": 209,
+        "result_line": 212,
+        "use_type": "function_call",
+        "result_type": "function_call_output",
+        "use_id": "call_3jFfuAh5rvL8a2vMjtAyWAbo",
+        "result_id": "call_3jFfuAh5rvL8a2vMjtAyWAbo",
+        "origin": true,
+        "use_time_ms": 1788982258636,
+        "result_time_ms": 1788982258838
+      }
+    ],
+    "unchanged_process_snapshot": true,
+    "run_file_sha_unchanged": true,
+    "js_errors": [],
+    "screenshot": "C:/Users/hongy/projects/migloop/docs/experiments/2026-09-09-attribution10/screenshots/v8-real-member-reference-rep1-geometry.png"
+  },
+  "helpers": {
+    "trace": {
+      "page": "http://127.0.0.1:19674/api/insight1/fixchain/ff019d8a?probe=attribution10/formal-v8/member-center/runs/tools/rep1",
+      "mode": "bound",
+      "bound": true,
+      "errors": [],
+      "traceBound": true,
+      "identityBanner": "matched",
+      "coverageComplete": true,
+      "coverageCounts": {
+        "expected": 38,
+        "provided": 38,
+        "accounted": 38,
+        "expected_versions": 7,
+        "expected_candidates": 31,
+        "missing_versions": 0,
+        "missing_candidates": 0,
+        "missing": 0,
+        "unresolved": 0,
+        "not_repair": 0,
+        "deferred": 21,
+        "unconfirmed": 21,
+        "advisories": 0,
+        "advisory_rows": 0
+      },
+      "manifestSource": "recorded",
+      "manifestPolicyChanged": false,
+      "colored": 4,
+      "nodes": 8,
+      "displayed": 8,
+      "additionalExpected": [
+        "agent:agent-af0e3d2ae54dbf769@2",
+        "file:/Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723/entry/src/main/ets/pages/MemberCenterPage.ets@11",
+        "file:/Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723/entry/src/main/ets/pages/MemberCenterPage.ets@15"
+      ],
+      "additionalDisplayed": [
+        "agent:agent-af0e3d2ae54dbf769@2",
+        "file:/Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723/entry/src/main/ets/pages/MemberCenterPage.ets@11",
+        "file:/Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723/entry/src/main/ets/pages/MemberCenterPage.ets@15"
+      ],
+      "additionalUnqueried": true,
+      "evidenceMode": true,
+      "expected": [],
+      "drawn": [],
+      "expectedEvidence": [
+        {
+          "id": "rw-1",
+          "from": "agent:agent-a68daf720e780b4c2@33",
+          "to": "file:/Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723/entry/src/main/ets/pages/MemberCenterPage.ets@11",
+          "kind": "write",
+          "status": "true",
+          "source": "model",
+          "steps": ""
+        },
+        {
+          "id": "rw-2",
+          "from": "agent:agent-a68daf720e780b4c2@33",
+          "to": "file:/Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723/entry/src/main/ets/pages/MemberCenterPage.ets@12",
+          "kind": "write",
+          "status": "true",
+          "source": "model",
+          "steps": ""
+        },
+        {
+          "id": "rw-3",
+          "from": "agent:agent-af0e3d2ae54dbf769@2",
+          "to": "file:/Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723/entry/src/main/ets/pages/MemberCenterPage.ets@15",
+          "kind": "write",
+          "status": "true",
+          "source": "model",
+          "steps": ""
+        },
+        {
+          "id": "rw-4",
+          "from": "agent:agent-af0e3d2ae54dbf769@3",
+          "to": "file:/Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723/entry/src/main/ets/pages/MemberCenterPage.ets@16",
+          "kind": "write",
+          "status": "true",
+          "source": "model",
+          "steps": ""
+        }
+      ],
+      "drawnEvidence": [
+        {
+          "id": "rw-1",
+          "from": "agent:agent-a68daf720e780b4c2@33",
+          "to": "file:/Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723/entry/src/main/ets/pages/MemberCenterPage.ets@11",
+          "kind": "write",
+          "status": "true",
+          "source": "model",
+          "steps": ""
+        },
+        {
+          "id": "rw-2",
+          "from": "agent:agent-a68daf720e780b4c2@33",
+          "to": "file:/Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723/entry/src/main/ets/pages/MemberCenterPage.ets@12",
+          "kind": "write",
+          "status": "true",
+          "source": "model",
+          "steps": ""
+        },
+        {
+          "id": "rw-3",
+          "from": "agent:agent-af0e3d2ae54dbf769@2",
+          "to": "file:/Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723/entry/src/main/ets/pages/MemberCenterPage.ets@15",
+          "kind": "write",
+          "status": "true",
+          "source": "model",
+          "steps": ""
+        },
+        {
+          "id": "rw-4",
+          "from": "agent:agent-af0e3d2ae54dbf769@3",
+          "to": "file:/Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723/entry/src/main/ets/pages/MemberCenterPage.ets@16",
+          "kind": "write",
+          "status": "true",
+          "source": "model",
+          "steps": ""
+        }
+      ],
+      "navigation": [
+        35
+      ],
+      "timeline": [
+        35
+      ],
+      "visits": 5,
+      "queries": 38,
+      "defects": [
+        "S3",
+        "S4_PRICE",
+        "S4_COMPILE"
+      ],
+      "geometry": {
+        "nodeCount": 11,
+        "atomCount": 11,
+        "viewport": {
+          "left": 445,
+          "right": 1467,
+          "top": 198.96875,
+          "bottom": 1244.96875
+        },
+        "overlaps": [],
+        "outside": []
+      },
+      "reasonShown": true,
+      "screenshot": "C:\\Users\\hongy\\projects\\migloop\\docs\\experiments\\2026-09-09-attribution10\\screenshots\\v8-member-reference-rep1-trace.png"
+    },
+    "basis": {
+      "page": "http://127.0.0.1:19674/api/insight1/fixchain/ff019d8a?probe=attribution10/formal-v8/member-center/runs/tools/rep1",
+      "uiContractOk": true,
+      "missing": [],
+      "draft": {
+        "status": "matched",
+        "uiCompared": true,
+        "checkCalls": 2,
+        "records": 2,
+        "issuesProvided": 9,
+        "issuesOmitted": 0,
+        "omissionUnknownRecords": 0,
+        "matchedCheck": 38,
+        "semanticChecked": false
+      },
+      "basis": {
+        "status": "checked_available_basis",
+        "uiCompared": true,
+        "modelOriginalCompared": true,
+        "modelOriginalSource": "p.structured.raw parsed read-only with verdict.parse_block",
+        "defect": "S4_PRICE",
+        "node": "agent:agent-aslice8-pay-80bbb1f44b77da0f@v12",
+        "nodeCount": 1,
+        "drawer": "checked",
+        "semanticChecked": false
+      },
+      "reportErrors": [],
+      "loadError": null,
+      "checkEvents": [
+        37,
+        38
+      ],
+      "trace": {
+        "present": true,
+        "nodes": 8,
+        "visits": 5,
+        "transitions": 1,
+        "sha256Before": "e4a6a428ac3926fc7888fed1ff596b0a5aeb3db833ce86e4f7dfaf76c44d620e",
+        "sha256After": "e4a6a428ac3926fc7888fed1ff596b0a5aeb3db833ce86e4f7dfaf76c44d620e",
+        "unchanged": true
+      },
+      "errors": [],
+      "screenshot": "C:\\Users\\hongy\\projects\\migloop\\docs\\experiments\\2026-09-09-attribution10\\screenshots\\v8-member-reference-rep1-basis.png"
+    }
+  },
+  "viewed_screenshots": [
+    "C:/Users/hongy/projects/migloop/docs/experiments/2026-09-09-attribution10/screenshots/v8-real-member-reference-rep1-geometry.png",
+    "C:\\Users\\hongy\\projects\\migloop\\docs\\experiments\\2026-09-09-attribution10\\screenshots\\v8-member-reference-rep1-basis.png"
+  ]
+}
