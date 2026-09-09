@@ -137,6 +137,74 @@ def test_target_and_returned_node_require_exact_existing_versions(tmp_path: Any)
     assert via.returned_node(led, "file", "账本里没有该文件: A.ets") is None
 
 
+def test_search_receipts_bind_actual_hit_target_instance_and_ledger(tmp_path: Any) -> None:
+    led = _pool(tmp_path)
+    other = _pool(tmp_path / "other", "different spec")
+    state = via.ViaState()
+    args = {"q": "spec", "until_ts": "2026-01-01T01:00:00Z"}
+    dest = ("file", "/proj/spec/pages/A.md", 1)
+    output = via.search_return(led, state, args, "# search\nreal displayed hit", [
+        {"kind": dest[0], "key": dest[1], "v": dest[2], "seq": 2, "field": "content"},
+        {"kind": "file", "key": "/missing", "v": 1},
+        {"kind": "file", "key": dest[1], "v": 99},
+        {"kind": "agent", "key": "agent-c", "v": None}])
+    receipt = via.search_receipt(output, args)
+    assert receipt is not None and len(receipt["hits"]) == 1
+    handle = receipt["hits"][0]["via"]
+    assert via.check(led, state, handle, dest) is None and not state.opened
+    assert via.check(led, state, handle, ("agent", "agent-c", 1)) is not None
+    assert via.check(led, state, handle, ("file", dest[1], 2)) is not None
+    assert via.check(led, state, handle.rsplit(":", 1)[0] + ":2", dest) is not None
+    assert via.check(led, via.ViaState(), handle, dest) is not None
+    assert via.check(other, state, handle, dest) is not None
+    assert via.search_receipt(output.replace("real displayed", "changed displayed"), args) is None
+    assert via.search_receipt(output, {**args, "q": "different"}) is None
+    assert via.search_receipt("# historical search without receipt", args) is None
+    identity = via.trace_identity(led, [{"tool": "search", "input": args, "has_result": True, "text": output}], {})
+    assert identity["bound"] is True and identity["source"] == "search"
+    assert via.trace_identity(other, [{"tool": "search", "input": args, "has_result": True, "text": output}], {})["bound"] is False
+
+
+def test_mcp_search_receipt_opens_only_a_returned_hit_without_a_fake_source_node(tmp_path: Any) -> None:
+    import asyncio
+    import pytest
+    pytest.importorskip("mcp")
+    from migloop import mcp_server, probe
+    led = _pool(tmp_path, "search navigation needle")
+
+    class Backend:
+        async def get_ledger(self, sid: str) -> Any:
+            return led
+
+        async def get_session_cwd(self, sid: str) -> str:
+            return "/proj"
+
+    srv = mcp_server.build_server(Backend())
+    fresh = mcp_server.build_server(Backend())
+
+    async def call(server: Any, tool: str, **args: Any) -> str:
+        response = await server.call_tool(tool, {"sid": "s1", **args})
+        parts = response[0] if isinstance(response, tuple) else response
+        return probe._unwrap_result("".join(getattr(part, "text", "") for part in parts))
+
+    async def run() -> None:
+        args = {"q": "navigation needle", "until_ts": "2026-01-01T01:00:00Z"}
+        out = await call(srv, "search", **args)
+        receipt = via.search_receipt(out, args)
+        assert receipt is not None
+        hit = next(h for h in receipt["hits"] if h["kind"] == "file")
+        assert hit["key"] == "/proj/spec/pages/A.md" and hit["v"] == 1
+        assert (await call(srv, "file", path="A.ets", v=1, via=hit["via"])).startswith("⛔")
+        assert (await call(fresh, "file", path=hit["key"], v=hit["v"], via=hit["via"])).startswith("⛔")
+        opened = await call(srv, "file", path=hit["key"], v=hit["v"], via=hit["via"])
+        assert opened.startswith("# 文件")  # 不需要先打开假的父 agent
+        assert (await call(srv, "agent", id="conv-a", v=1, via="file:spec/pages/A.md@v1")).startswith("# agent")
+        empty = await call(srv, "search", **{**args, "q": "no-such-token"})
+        assert via.search_receipt(empty, {**args, "q": "no-such-token"})["hits"] == []
+
+    asyncio.run(run())
+
+
 def test_mcp_isolates_servers_and_ledgers_and_never_opens_invalid_targets(tmp_path: Any) -> None:
     import asyncio
     import pytest

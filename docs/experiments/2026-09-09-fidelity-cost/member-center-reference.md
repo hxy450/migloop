@@ -2,6 +2,7 @@
 
 ## 口径
 
+- 由独立 GPT-5.6-sol / medium 代理从原始转录整理，供后续逐条核验；不是人工裁定的金标，也未提供给被测调查员。
 - 唯一目标：`entry/src/main/ets/pages/MemberCenterPage.ets`。只使用 `holdout-v2/member-center/pool` 内两个根及其子代理转录；下文均为相对 pool 路径。
 - 这是有限参照集合，不宣称穷尽金标。转录命令仅作为历史数据读取，本次没有执行。
 - `ok`/Write 成功只能证明当时共享工作树发生替换；`BUILD SUCCESSFUL` 只证明 ArkTS 编译/打包/签名通过，均不等于修后设备行为或像素正确。
@@ -62,4 +63,4 @@
 
 ## 最小结论
 
-冻结池可直接核实该文件在修复阶段至少经历：3 个 controller 的 mask 参数补齐、2 张图片尺寸约束、CTA 父 padding 重构、Banner 两色与 left=18、价格后缀 16vp Span 拆分，以及两个 helper 去 private；随后整包构建成功。池内没有修后设备复测，不能升级为“会员中心已达到 Android 视觉/行为一致”。
+冻结池可直接核实该文件在修复阶段至少经历：3 个 controller 的 mask 参数补齐、2 张图片尺寸约束、CTA 父 padding 重构、Banner 两色与 left=18、价格后缀 16vp Span 拆分，以及两个 helper 去 private；随后整包构建成功。本清单尚未核到修后设备复测，不据此证明池内绝无相关记录，也不能升级为“会员中心已达到 Android 视觉/行为一致”。

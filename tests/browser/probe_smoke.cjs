@@ -47,6 +47,8 @@ async function main() {
       const p=__mig.probe(), x=__mig.xt();
       return {bound:p.structured?.identity?.bound, errors:p.structured?.errors,
         traceBound:p.trace_identity?.bound, identityBanner:document.querySelector('.trace-identity')?.dataset.status,
+        coverageComplete:p.coverage?.complete, coverageCounts:p.coverage?.counts,
+        manifestSource:p.repair_manifest_origin?.source, manifestPolicyChanged:p.repair_manifest_origin?.policy_changed,
         colored:document.querySelectorAll('#canvas .node.p-chain, #canvas .node.p-seen').length,
         nodes:p.trajectory.nodes.length, displayed:Object.values(x?.byId||{}).filter(n=>n.traj).length,
         expected:p.trajectory.transitions.map(t=>t.step).sort((a,b)=>a-b),

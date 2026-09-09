@@ -9,6 +9,8 @@ import json
 import os
 from typing import Any
 
+import pytest
+
 from migloop import atoms, probe, verdict
 from tests.test_atoms import MAIN_ID, _call, _ledger, _read_call, _rec
 
@@ -228,6 +230,108 @@ def test_walk_preserves_revisits_self_loops_multiple_parents_and_windows(tmp_pat
     assert tree["visits"][-1]["args"]["since"] == 0 and tree["visits"][-1]["args"]["until"] == 9
     assert tree["visits"][-1]["result_ref"] == "toolu_6"
     assert all(v["verified"] and v["status"] == "opened" for v in tree["visits"])
+
+
+@pytest.mark.parametrize("case,status", [("certain", "true"), ("uncertain", "unknown"),
+                                        ("dependency", "unknown"), ("conditional", "unknown"),
+                                        ("overlap", "unknown"), ("mention", "unknown"), ("absent", "false")])
+def test_route_keeps_read_uncertainty_and_candidate_evidence(tmp_path: Any, case: str, status: str) -> None:
+    from dataclasses import replace
+    led = _pool(tmp_path)
+    path = "/proj/spec/pages/A.md"
+    act = next(a for a in led.agents["agent-c"].actions if any(r.path == path for r in a.files))
+    ref = next(r for r in act.files if r.path == path)
+    if case == "uncertain":
+        ref.certain = False
+    elif case == "overlap":
+        ref.certain = False
+        ref.observation_uncertain = True
+    elif case == "dependency":
+        ref.ev = replace(ref.ev, dep=True)
+    elif case in ("conditional", "mention", "absent"):
+        act.files = []
+        led.mentions[path] = []
+        if case == "conditional":
+            act.detail["conditional_reads"] = [path]
+        elif case == "mention":
+            led.mentions[path] = [atoms.Mention(act.ts, act.seq, "agent-c", 1, path, "only mentioned", cls="out")]
+    calls = [("agent", {"id": "conv-a", "v": 1, "via": "sessions"}, "# agent-c v1"),
+             ("file", {"path": path, "v": 1, "via": "agent:conv-a@v1"}, f"# {path}@v1")]
+    tree = probe.probe_payload(led, _run_dir(tmp_path, calls, "", case))["trajectory"]
+    tr = tree["transitions"][0]
+    assert tr["relation_status"] == status
+    assert tr["relation_note"]
+    assert tr["relation"] == ("读 v1" if status == "true" else None)
+    assert tree["nodes"][1]["edge"] == tr["relation"]  # 候选不升级成真正的读边
+    if status != "false":
+        assert tr["relation_evidence"][0]["seq"] == act.seq
+        assert tr["relation_evidence"][0]["event_id"] == atoms.event_id(led, "agent-c", act.seq)
+    if case in ("certain", "uncertain", "dependency", "conditional"):
+        assert tr["causal_from"] == "file:" + path + "@1" and tr["causal_to"] == "agent:agent-c@1"
+    if status == "unknown":
+        assert tr["match"] == "账本关系待核" and "候选" in tr["relation_label"]
+    if case == "overlap":
+        assert "读取窗口重叠" in tr["relation_label"]
+        assert tr["relation_evidence"][0]["observation"]["observation_uncertain"] is True
+
+
+@pytest.mark.parametrize("case", ["valid", "first", "old", "wrong_target", "failed", "identity", "replayed"])
+def test_search_navigation_is_a_verified_event_not_a_third_atom_or_read_edge(tmp_path: Any, case: str) -> None:
+    from migloop import via
+    led = _pool(tmp_path)
+    args = {"q": "spec", "until_ts": "2026-01-01T01:00:00Z"}
+    state = via.ViaState()
+    output = via.search_return(led, state, args, "# search\nspec hit", [
+        {"kind": "file", "key": "/proj/spec/pages/A.md", "v": 1, "seq": 2, "field": "content"}])
+    receipt = via.search_receipt(output, args)
+    assert receipt
+    handle = receipt["hits"][0]["via"]
+    if case == "identity":
+        receipt["ledger"] = "another-ledger"
+        output = output.rpartition("\n" + via.SEARCH_RECEIPT)[0] + "\n" + via.SEARCH_RECEIPT + json.dumps(receipt)
+    if case == "old":
+        output = "# historical search without receipt"
+    calls = [] if case == "first" else [("agent", {"id": "fixer", "v": 1, "via": "sessions"}, "# agent-f v1")]
+    calls.append(("search", args, {"text": output, "is_error": True} if case == "failed" else output))
+    if case == "replayed":
+        calls.append(("search", args, output))
+    path = "/proj/entry/A.ets" if case == "wrong_target" else "/proj/spec/pages/A.md"
+    calls.append(("file", {"path": path, "v": 1, "via": handle}, f"# {path}@v1"))
+    tree = probe.probe_payload(led, _run_dir(tmp_path, calls, "", "search-" + case))["trajectory"]
+    assert all(n["kind"] in ("file", "agent") for n in tree["nodes"])
+    assert all(n["edge"] is None for n in tree["nodes"])
+    if case in ("valid", "first"):
+        assert len(tree["transitions"]) == 1
+        tr = tree["transitions"][0]
+        assert tr["from"] is None and tr["source"] == "search" and tr["relation"] is None
+        assert tr["relation_status"] == "not_checked" and tr["causal_from"] is None and tr["causal_to"] is None
+        source = tr["search_source"]
+        assert source["call_id"] == f"toolu_{source['step']}" and source["result_line"] == source["step"] * 2
+        assert "不证明外层" in source["note"] and source["target"]["via"] == handle
+        assert tree["visits"][-1]["search_source"] == source
+        if case == "valid":
+            assert tree["nodes"][-1]["side"] == "unlinked"  # 不挂到从未读过它的 fixer 上
+    else:
+        assert tree["transitions"] == []
+    if case == "identity":
+        assert tree["nodes"] == [] and tree["searches"][0]["status"] == "unverified"
+
+
+def test_search_must_finish_before_the_referencing_call(tmp_path: Any) -> None:
+    from migloop import via
+    from tests.test_atoms import _write_jsonl
+    led = _pool(tmp_path)
+    args = {"q": "spec", "until_ts": "2026-01-01T01:00:00Z"}
+    output = via.search_return(led, via.ViaState(), args, "search hit", [
+        {"kind": "file", "key": "/proj/spec/pages/A.md", "v": 1, "field": "content"}])
+    handle = via.search_receipt(output, args)["hits"][0]["via"]
+    calls = [("search", args, output), ("file", {"path": "A.md", "v": 1, "via": handle}, "# spec/pages/A.md@v1")]
+    run = _run_dir(tmp_path, calls, "", "parallel-search")
+    with open(os.path.join(run, "transcript.jsonl"), encoding="utf-8") as fh:
+        rows = [json.loads(line) for line in fh]
+    _write_jsonl(os.path.join(run, "transcript.jsonl"), [rows[0], rows[2], rows[1], rows[3]])
+    tree = probe.probe_payload(led, run)["trajectory"]
+    assert tree["transitions"] == [] and "搜索来处未核验" in tree["visits"][0]["note"]
 
 
 def test_failed_missing_and_mismatched_returns_never_open_nodes(tmp_path: Any) -> None:

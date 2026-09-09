@@ -181,7 +181,8 @@ def probe_payload(ledger: atoms.Ledger, run_dir: str, chain_payload: dict[str, A
     for i, s in enumerate(seq, 1):
         inp = {k: v for k, v in (s.get("input") or {}).items() if k != "sid"}
         steps.append({"i": i, "tool": s.get("tool"), "args": inp, "chars": s.get("chars") or 0,
-                      "node": _step_node(ledger, str(s.get("tool")), inp),
+                      "node": None if (s.get("provenance") or {}).get("origin_unverified") else
+                              _step_node(ledger, str(s.get("tool")), inp),
                       "ok": not s.get("is_error") and (bool(s.get("has_result")) if calls is not None else True),
                       "result_present": s.get("has_result"), "result_ref": s.get("id"),
                       "call_id": s.get("call_id"), "item_id": s.get("item_id"),
@@ -312,6 +313,48 @@ def _structured(ledger: atoms.Ledger, run_dir: str, report: str,
 # 「出现于 #j」只说明第 j 次返回文本含精确坐标,不推出模型为何选择下一跳。
 
 
+_MIGLOOP_TOOLS = frozenset(("guide", "sessions", "index", "file", "agent", "search", "blame", "diff", "action"))
+
+
+def _tool_origin(name: Any, namespace: Any = None, server: Any = None) -> dict[str, Any]:
+    """A bare tool name is not a server identity; preserve every explicit provider."""
+    raw = str(name or "")
+    qualified = re.fullmatch(r"mcp__(.+?)__(.+)", raw)
+    leaf = qualified[2] if qualified else raw.removeprefix("functions.")
+    providers = [qualified[1]] if qualified else []
+    if namespace is not None:
+        providers.append(namespace.removeprefix("mcp__").removesuffix("__")
+                         if isinstance(namespace, str) and namespace.startswith("mcp__") else "namespace:" + str(namespace))
+    if server is not None:
+        providers.append(str(server))
+    errors = ["conflicting explicit tool providers"] if len(set(providers)) > 1 else []
+    provider = providers[0] if providers else None
+    tool = leaf if provider in (None, "migloop") or provider.startswith("namespace:") else f"mcp__{provider}__{leaf}"
+    return {"name": raw, "namespace": namespace, "server": server, "provider": provider, "leaf": leaf,
+            "tool": tool, "verified": provider == "migloop" and not errors, "errors": errors}
+
+
+def _merge_tool_origins(a: dict[str, Any], b: dict[str, Any], left: Any, right: Any) -> dict[str, Any]:
+    errors = list(dict.fromkeys([*a["errors"], *b["errors"]]))
+    if a["provider"] is not None and b["provider"] is not None and a["provider"] != b["provider"]:
+        errors.append("same ID has conflicting tool providers")
+    if a["leaf"] != b["leaf"]:
+        errors.append("same ID has conflicting tool names")
+    if json.dumps(left, sort_keys=True, ensure_ascii=False) != json.dumps(right, sort_keys=True, ensure_ascii=False):
+        errors.append("same ID has conflicting arguments")
+    chosen = b if a["provider"] is None else a
+    return {**chosen, "verified": bool((a["verified"] or b["verified"]) and not errors), "errors": errors,
+            "representations": [a, b]}
+
+
+def _origin_guard(call: dict[str, Any], origin: dict[str, Any]) -> None:
+    call["tool"] = origin["tool"]
+    call["provenance"]["tool_origin"] = origin
+    if origin["errors"] or (origin["leaf"] in _MIGLOOP_TOOLS and not origin["verified"]):
+        call["provenance"]["complete_pair"] = False
+        call["provenance"]["origin_unverified"] = True
+
+
 def _transcript_calls(run_dir: str) -> list[dict[str, Any]] | None:
     """Claude tool_use_id / Codex rollout call_id 配对;缺返回保持 pending。
 
@@ -327,14 +370,15 @@ def _transcript_calls(run_dir: str) -> list[dict[str, Any]] | None:
     record_ms: float | None = None
 
     def call(tid: Any, name: Any, args: Any, line_no: int, fmt: str,
-             parse_error: str | None = None) -> None:
+             parse_error: str | None = None, namespace: Any = None) -> None:
         native_id = tid if isinstance(tid, str) and tid else None
         key = f"{fmt}:{native_id}" if native_id else f"missing-id:{line_no}:{event}"
+        origin = _tool_origin(name, namespace)
         if key in calls:
-            return                                      # 相同 id 的流式重放不新增访问
-        tool = str(name or "")
-        if tool.startswith("mcp__migloop__"):
-            tool = tool[len("mcp__migloop__"):]
+            prior = calls[key]
+            _origin_guard(prior, _merge_tool_origins(prior["provenance"]["tool_origin"], origin, prior["input"], args))
+            return                                      # 相同 id 的一致流式重放不新增访问
+        tool = origin["tool"]
         order.append(key)
         calls[key] = {"id": native_id or key, "call_id": native_id, "item_id": None,
                       "tool": tool, "input": args if isinstance(args, dict) else {},
@@ -344,6 +388,7 @@ def _transcript_calls(run_dir: str) -> list[dict[str, Any]] | None:
                       "result_line": None, "result_event": None,
                       "provenance": {"format": fmt, "path": "transcript.jsonl",
                                      "pairing": "call_id" if fmt == "codex_rollout" else "tool_use_id"}}
+        _origin_guard(calls[key], origin)
 
     def result(tid: Any, output: Any, failed: bool, line_no: int, fmt: str) -> None:
         if not isinstance(tid, str) or not tid:
@@ -379,9 +424,8 @@ def _transcript_calls(run_dir: str) -> list[dict[str, Any]] | None:
                         text, _ = _tool_output({"error": item["error"]})
                     start, end = payload.get("started_at_ms"), payload.get("completed_at_ms")
                     complete = isinstance(start, (int, float)) and isinstance(end, (int, float)) and start <= end
-                    tool = str(item.get("tool") or "McpToolCall")
-                    if item.get("server") != "migloop":
-                        tool = f"mcp__{item.get('server') or 'unknown'}__{tool}"
+                    origin = _tool_origin(item.get("tool") or "McpToolCall", server=item.get("server"))
+                    tool = origin["tool"]
                     calls[key] = {"id": None, "call_id": None, "item_id": item_id, "tool": tool, "input": args,
                                   "has_result": item.get("result") is not None or failed, "text": text,
                                   "chars": len(text), "is_error": bool(error) or failed, "parse_error": error,
@@ -390,7 +434,13 @@ def _transcript_calls(run_dir: str) -> list[dict[str, Any]] | None:
                                   "provenance": {"format": "codex_rollout_event", "path": "transcript.jsonl",
                                                  "pairing": "item_runtime", "complete_pair": bool(item_id and complete),
                                                  "reported_call_id": item.get("call_id")}}
+                    _origin_guard(calls[key], origin)
                     order.append(key)
+                else:
+                    args, _ = _call_arguments(item.get("arguments"))
+                    prior = calls[key]
+                    _origin_guard(prior, _merge_tool_origins(prior["provenance"]["tool_origin"],
+                        _tool_origin(item.get("tool"), server=item.get("server")), prior["input"], args))
                 continue
             if r.get("type") == "response_item" and isinstance(payload, dict):
                 event += 1
@@ -401,7 +451,7 @@ def _transcript_calls(run_dir: str) -> list[dict[str, Any]] | None:
                         args, error = {"input": raw}, None
                     else:
                         args, error = _call_arguments(raw)
-                    call(payload.get("call_id"), payload.get("name"), args, line_no, "codex_rollout", error)
+                    call(payload.get("call_id"), payload.get("name"), args, line_no, "codex_rollout", error, payload.get("namespace"))
                 elif ptype in ("function_call_output", "custom_tool_call_output"):
                     result(payload.get("call_id"), payload.get("output"), bool(payload.get("is_error") or
                            payload.get("isError")), line_no, "codex_rollout")
@@ -442,8 +492,14 @@ def _deduplicate_runtime_calls(rows: list[dict[str, Any]]) -> list[dict[str, Any
             kept.append(row)
             continue
         primary = direct[next(iter(matches))]
+        origin = _merge_tool_origins(primary["provenance"]["tool_origin"], provenance["tool_origin"],
+                                     primary["input"], row["input"])
+        if primary["provenance"].pop("origin_unverified", False) and not origin["errors"] and origin["verified"]:
+            primary["provenance"].pop("complete_pair", None)
+        _origin_guard(primary, origin)
         primary["item_id"] = row["item_id"]
         primary["provenance"]["runtime_item"] = {"item_id": row["item_id"], "line": row["result_line"],
+                                                 "tool_origin": provenance["tool_origin"], "input": row["input"],
                                                  "started_at_ms": row.get("use_time_ms"),
                                                  "completed_at_ms": row.get("result_time_ms")}
         if not primary["has_result"] and row["has_result"]:
@@ -485,9 +541,8 @@ def _codex_event_calls(run_dir: str) -> list[dict[str, Any]] | None:
             if key not in calls:
                 if item["type"] == "mcp_tool_call":
                     args, parse_error = _call_arguments(item.get("arguments"))
-                    tool = str(item.get("tool") or "mcp_tool_call")
-                    if item.get("server") != "migloop":
-                        tool = f"mcp__{item.get('server') or 'unknown'}__{tool}"
+                    origin = _tool_origin(item.get("tool") or "mcp_tool_call", server=item.get("server"))
+                    tool = origin["tool"]
                 else:
                     tool, args, parse_error = str(item["type"]), {"command": item.get("command")}, None
                 calls[key] = {"id": None, "call_id": None, "item_id": item_id, "tool": tool, "input": args,
@@ -498,6 +553,12 @@ def _codex_event_calls(run_dir: str) -> list[dict[str, Any]] | None:
                                              "pairing": "item_id" if item_id else "unpaired_summary", "degraded": True,
                                              "complete_pair": False}}
             call = calls[key]
+            if item["type"] == "mcp_tool_call":
+                origin = _tool_origin(item.get("tool"), server=item.get("server"))
+                if "tool_origin" in call["provenance"]:
+                    current_args, _ = _call_arguments(item.get("arguments"))
+                    origin = _merge_tool_origins(call["provenance"]["tool_origin"], origin, call["input"], current_args)
+                _origin_guard(call, origin)
             if event["type"] == "item.started" and call["use_line"] is None:
                 call.update(use_line=line_no, use_event=line_no)
             if event["type"] != "item.completed" or call["result_line"] is not None:
@@ -510,7 +571,8 @@ def _codex_event_calls(run_dir: str) -> list[dict[str, Any]] | None:
                 text, _ = _tool_output({"error": item["error"]})
             call.update(text=text, chars=len(text), has_result=output is not None or failed,
                         is_error=call["is_error"] or failed, result_line=line_no, result_event=line_no)
-            call["provenance"]["complete_pair"] = bool(item_id and call["use_line"] is not None and call["use_line"] < line_no)
+            call["provenance"]["complete_pair"] = bool(item_id and call["use_line"] is not None and call["use_line"] < line_no
+                                                        and not call["provenance"].get("origin_unverified"))
     return list(calls.values())
 
 
@@ -681,7 +743,7 @@ def _ledger_relation(ledger: atoms.Ledger, a: dict[str, Any], b: dict[str, Any])
 def _trajectory_ledger(ledger: atoms.Ledger, run_dir: str, steps: list[dict[str, Any]], root: str | None,
                 structured: dict[str, Any] | None, verdicts: dict[str, list[dict[str, Any]]]) -> dict[str, Any] | None:
     texts = _transcript_results(run_dir)
-    if texts is None or not root:
+    if texts is None:
         return None
     if len(texts) < len(steps):
         texts = texts + [""] * (len(steps) - len(texts))
@@ -699,9 +761,16 @@ def _trajectory_ledger(ledger: atoms.Ledger, run_dir: str, steps: list[dict[str,
                               "unseen": 0}
         return n
 
-    # 根 = 被修文件的最终版本:一切生成 / 修复都在它上游
+    # A report-only file has no version node. An explicit valid agent claim may
+    # anchor the view, but it is not evidence that the investigator opened it.
     st = ledger.stories.get(root)
-    root_node = add("file", root, len(st.versions) if st and st.versions else None, "任务")
+    claim_root = (structured or {}).get("root") or {}
+    if claim_root.get("ok") and claim_root.get("kind") == "agent":
+        root_node = add("agent", claim_root["key"], claim_root["v"], "结论")
+    elif st and st.versions:
+        root_node = add("file", root, len(st.versions), "任务")
+    else:
+        return None
     # 结论块点名的(精确版本)
     if structured and not structured.get("errors"):
         for key, rows in (structured.get("roles") or {}).items():
@@ -869,40 +938,77 @@ def _agent_versions(ledger: atoms.Ledger, key: str, v: int | None) -> list[int]:
     return [v] if v is not None else sorted({act.ver for act in a.actions if act.ver is not None})
 
 
+def _relation_check(ledger: atoms.Ledger, a: dict[str, Any], b: dict[str, Any]) -> dict[str, Any]:
+    """查询方向可逆,账本关系方向不变;与 verdict 共用 true/unknown/false 语义。"""
+    endpoints = []
+    for n in (a, b):
+        exact, _ = via.target(ledger, n["kind"], n["key"], n.get("v"))
+        endpoints.append({**n, "ok": exact is not None})
+    aa, bb = endpoints
+    checks = [(verdict.check_edge(ledger, left, right, None), left, right)
+              for left, right in ((aa, bb), (bb, aa))]
+    # 确定关系优先;读取未知优先于仅词法提及。不会把 unknown 转成实体读写边。
+    rank = {"true": 0, "unknown": 1, "false": 2, "not_checked": 3}
+    (status, kind, note), left, right = min(checks, key=lambda r: (rank[r[0][0]], r[0][1] == "候选"))
+    evidence: list[dict[str, Any]] = []
+
+    def cite(aid: str, seq: int | None, basis: str, ref: atoms.FileRef | None = None) -> None:
+        if seq is None or any(e["seq"] == seq and e["basis"] == basis for e in evidence):
+            return
+        act = next((x for x in ledger.agents[aid].actions if x.seq == seq), None)
+        evidence.append({"aid": aid, "seq": seq, "basis": basis, "event_id": atoms.event_id(ledger, aid, seq),
+                         "location": ledger.locs.get(seq), "source": act.src[0] if act and act.src else None,
+                         "use_ts": act.ts if act else None, "done_ts": act.done_ts if act else None,
+                         "observation": atoms.file_ref_payload(ref) if ref is not None else None,
+                         "use_line": act.src[1] + 1 if act and act.src and act.src[1] is not None else None,
+                         "result_line": act.src[2] + 1 if act and act.src and act.src[2] is not None else None})
+
+    relation = None
+    if status in ("true", "unknown"):
+        if kind == "写":
+            ver = ledger.stories[right["key"]].versions[right["v"] - 1]
+            cite(left["key"], ver.act_seq, "write")
+            relation = ("写 " if a["kind"] == "agent" else "写者 ") + f"v{right['v']}"
+        elif kind == "读":
+            for act in ledger.agents[right["key"]].actions:
+                if (act.ver if act.ver is not None else act.at) > right["v"]:
+                    continue
+                for ref in act.files:
+                    if ref.op == "read" and ref.path == left["key"] and ref.v == left["v"]:
+                        basis = "overlapping_read" if ref.observation_uncertain else "dependency_read" if ref.ev.dep else "uncertain_version" if not ref.certain else "read"
+                        if (status == "true") == (basis == "read"):
+                            cite(right["key"], act.seq, basis, ref)
+                if status == "unknown" and left["key"] in (act.detail.get("conditional_reads") or []):
+                    cite(right["key"], act.seq, "conditional_read")
+            relation = ("读 " if a["kind"] == "agent" else "读者 ") + f"v{left['v']}"
+        elif kind == "派发":
+            dispatch = next((act for act in ledger.agents[left["key"]].actions if act.ver == left["v"]), None)
+            cite(left["key"], dispatch.seq if dispatch else None, "dispatch")
+            relation = ("派发 " if left["key"] == a["key"] else "派发自 ") + f"v{left['v']}"
+        elif kind == "候选":
+            ag, fl = (aa, bb) if aa["kind"] == "agent" else (bb, aa)
+            for mention in ledger.mentions.get(fl["key"], []):
+                if mention.by == ag["key"] and mention.by_ver == ag["v"]:
+                    cite(ag["key"], mention.seq, "lexical_mention")
+    bases = list(dict.fromkeys(e["basis"] for e in evidence))
+    labels = {"uncertain_version": "读取版本待核", "dependency_read": "依赖读取(内容未进上下文)",
+              "conditional_read": "条件读取待核", "lexical_mention": "仅词法提及", "overlapping_read": "读取窗口重叠(快照时刻待核)"}
+    label = ("账本·" + str(relation) if status == "true" else
+             "候选·" + " / ".join(labels.get(x, x) for x in bases) if status == "unknown" and bases else
+             "候选·关系待核" if status == "unknown" else
+             "查询导航·未核出直接账本边" if status == "false" else "查询导航·账本关系未核验")
+    return {"relation": relation if status == "true" else None, "relation_status": status,
+            "relation_kind": kind, "relation_label": label, "relation_note": note,
+            "relation_evidence": evidence, "relation_source": "ledger",
+            "causal_from": left.get("id") if kind in ("写", "读", "派发") and status in ("true", "unknown") else None,
+            "causal_to": right.get("id") if kind in ("写", "读", "派发") and status in ("true", "unknown") else None,
+            "match": {"true": "账本有边", "unknown": "账本关系待核", "false": "账本无此边",
+                      "not_checked": "账本关系未核验"}[status]}
+
+
 def _relation_any(ledger: atoms.Ledger, a: dict[str, Any], b: dict[str, Any]) -> str | None:
-    """a → b(模型从 a 跳到 b)在账本里对应哪种关系;节点不带版本 = 那个键的全部版本。
-    返回 '写 v8–v10' / '写者 v8' / '读 v7' / '读者 v3' / '派发 v5' / '派发自 v5' / None。"""
-    if a["kind"] == "file" and b["kind"] == "agent":
-        fv, av = set(_file_versions(ledger, a["key"], a["v"])), set(_agent_versions(ledger, b["key"], b["v"]))
-        st = ledger.stories.get(a["key"])
-        wrote = [ver.v for ver in (st.versions if st else []) if ver.by == b["key"] and ver.by_ver in av and ver.v in fv]
-        if wrote:
-            return "写者 " + _vrange(wrote)
-        ag = ledger.agents.get(b["key"])
-        read = [ref.v for act in (ag.actions if ag else []) for ref in act.files
-                if ref.op == "read" and ref.path == a["key"] and ref.v in fv and ref.certain and not ref.ev.dep
-                and (b["v"] is None or (act.ver if act.ver is not None else act.at) <= b["v"])]
-        return ("读者 " + _vrange(read)) if read else None
-    if a["kind"] == "agent" and b["kind"] == "file":
-        av, fv = set(_agent_versions(ledger, a["key"], a["v"])), set(_file_versions(ledger, b["key"], b["v"]))
-        st = ledger.stories.get(b["key"])
-        wrote = [ver.v for ver in (st.versions if st else []) if ver.by == a["key"] and ver.by_ver in av and ver.v in fv]
-        if wrote:
-            return "写 " + _vrange(wrote)
-        ag = ledger.agents.get(a["key"])
-        read = [ref.v for act in (ag.actions if ag else []) for ref in act.files
-                if ref.op == "read" and ref.path == b["key"] and ref.v in fv and ref.certain and not ref.ev.dep
-                and (a["v"] is None or (act.ver if act.ver is not None else act.at) <= a["v"])]
-        return ("读 " + _vrange(read)) if read else None
-    if a["kind"] == "agent" and b["kind"] == "agent":
-        child = ledger.agents.get(b["key"])
-        if child and child.parent == a["key"] and (a["v"] is None or child.parent_ver == a["v"]):
-            return "派发" + (f" v{child.parent_ver}" if child.parent_ver is not None else "")
-        me = ledger.agents.get(a["key"])
-        if me and me.parent == b["key"] and (b["v"] is None or me.parent_ver == b["v"]):
-            return "派发自" + (f" v{me.parent_ver}" if me.parent_ver is not None else "")
-        return None
-    return None
+    """旧内部调用的显示兼容层;unknown 不会冒充确定边。"""
+    return _relation_check(ledger, a, b)["relation"]
 
 
 def _rejected(text: str) -> bool:
@@ -931,9 +1037,32 @@ def _trajectory_walk(ledger: atoms.Ledger, steps: list[dict[str, Any]], texts: l
     declared: list[dict[str, Any]] = []
     visits: list[dict[str, Any]] = []
     transitions: list[dict[str, Any]] = []
+    searches: list[dict[str, Any]] = []
+    search_by_id: dict[str, dict[str, Any] | None] = {}
     received: dict[str, int] = {}
     received_ms: dict[str, float] = {}
     for s in steps:
+        if s.get("tool") == "search":
+            i = int(s["i"])
+            text = texts[i - 1] if i - 1 < len(texts) else ""
+            receipt = via.search_receipt(text, s.get("args") or {})
+            verified = bool(receipt and s.get("ok") and s.get("result_present") and not s.get("identity_unbound")
+                            and (s.get("provenance") or {}).get("complete_pair") is not False
+                            and receipt["ledger"] == atoms.ledger_identity(ledger))
+            event = {"step": i, "id": receipt["id"] if receipt else None, "args": s.get("args") or {},
+                     "status": "verified" if verified else "unverified", "hits": receipt["hits"] if verified else [],
+                     "call_id": s.get("call_id"), "item_id": s.get("item_id"), "result_ref": s.get("result_ref"),
+                     "use_line": s.get("use_line"), "result_line": s.get("result_line"), "provenance": s.get("provenance"),
+                     "result_event": s.get("result_event"), "result_time_ms": s.get("result_time_ms"),
+                     "receipt": receipt if verified else None,
+                     "note": "凭据只证明原生 search 工具返回了命中;不证明外层执行包装完整转交给模型,也不证明历史读取或因果。"
+                             if verified else "搜索返回无有效凭据/身份或调用未核验;保留原始查询,不能充当导航来处。"}
+            searches.append(event)
+            if verified:
+                token = receipt["id"]
+                # 同一 token 若出现在不同原始调用,不能猜用的是哪一次返回。
+                search_by_id[token] = event if token not in search_by_id else None
+            continue
         if s.get("tool") not in ("file", "agent"):
             continue
         land = _step_landing(s)
@@ -959,6 +1088,10 @@ def _trajectory_walk(ledger: atoms.Ledger, steps: list[dict[str, Any]], texts: l
             visit.update(status="rejected", actual_node=None, note=text.strip().splitlines()[0])
         elif s.get("ok") is False:
             visit.update(status="error", actual_node=None, note=text.strip()[:300] or "工具返回错误,未打开")
+        elif (s.get("provenance") or {}).get("origin_unverified"):
+            origin = s["provenance"].get("tool_origin") or {}
+            visit.update(status="unverified", actual_node=None,
+                         note="工具来源未认证或同 ID 表示冲突,不绑定当前节点: " + "; ".join(origin.get("errors") or ["缺少明确 MigLoop 来源"]))
         elif (s.get("provenance") or {}).get("complete_pair") is False:
             visit.update(status="unverified", note="调用事件缺少可配对的开始记录或有效开始/完成时间,未验证")
         elif actual is None:
@@ -984,23 +1117,48 @@ def _trajectory_walk(ledger: atoms.Ledger, steps: list[dict[str, Any]], texts: l
                     src = None
             elif src_id not in received or received[src_id] >= (s.get("use_event") or 0):
                 src = None
+        search_source = search_by_id.get(pv["search"]) if pv["search"] else None
+        if pv["search"]:
+            timing_note = "搜索来处未核验:必须引用此前成功返回的真实命中,且目标坐标完全一致"
+            if search_source:
+                completed = search_source.get("result_time_ms")
+                begun = s.get("use_time_ms")
+                before = (completed < begun if completed is not None and begun is not None else
+                          search_source.get("result_event") is not None and s.get("use_event") is not None
+                          and search_source["result_event"] < s["use_event"])
+                if not before or via.search_target(search_source["receipt"], pv["hit"]) != actual:
+                    search_source = None
         n = add(kind, key, v, "查过")
         first_visit = not n["opened"]
         n["opened"].append(i)
         visit.update(node=n["id"], verified=True)
         row: dict[str, Any] = {"step": i, "text": pv["text"], "from": None, "to": n["id"], "match": None}
-        if src is not None:
-            relation = _relation_any(ledger, src, n)
-            row.update({"from": src["id"], "match": "账本有边" if relation else "账本无此边"})
-            visit["from"] = src["id"]
-            transitions.append({"step": i, "from": src["id"], "to": n["id"], "relation": relation,
-                                "match": row["match"], "source": "declared", "relation_source": "ledger"})
+        if search_source is not None:
+            source = {"id": search_source["id"], "step": search_source["step"], "hit": pv["hit"],
+                      "call_id": search_source["call_id"], "item_id": search_source["item_id"],
+                      "result_line": search_source["result_line"], "provenance": search_source["provenance"],
+                      "target": search_source["hits"][pv["hit"] - 1], "note": search_source["note"]}
+            visit["search_source"] = source
+            row.update(match="搜索命中导航", search_source=source)
+            transitions.append({"step": i, "from": None, "to": n["id"], "source": "search", "search_source": source,
+                                "relation": None, "relation_status": "not_checked", "relation_kind": None,
+                                "relation_label": f"搜索 #{source['step']} 命中 {source['hit']} · 查询导航",
+                                "relation_note": search_source["note"], "relation_evidence": [], "relation_source": None,
+                                "causal_from": None, "causal_to": None, "match": "搜索命中导航"})
             if first_visit:
-                n.update(parent=src["id"], side="up", edge=relation)
+                n.update(parent=root["id"] if root else None, side="unlinked" if root else "root", search_source=source)
+        elif src is not None:
+            checked = _relation_check(ledger, src, n)
+            relation = checked["relation"]
+            row.update({"from": src["id"], "match": checked["match"]})
+            visit["from"] = src["id"]
+            transitions.append({"step": i, "from": src["id"], "to": n["id"], "source": "declared", **checked})
+            if first_visit:
+                n.update(parent=src["id"], side="up", edge=relation, relation_check=checked)
         elif root is None:
             row["match"] = "入口" if pv["first"] else "入口(来处未验证)"
             if not pv["first"]:
-                visit["note"] = "第一跳来处未验证"
+                visit["note"] = timing_note or "第一跳来处未验证"
         else:
             visit["note"] = timing_note or ("sessions 只能当第一跳" if pv["first"] else
                              ("via 解析不了" if not pv["ok"] else "via 指向调用前尚未成功返回的节点"))
@@ -1028,6 +1186,10 @@ def _trajectory_walk(ledger: atoms.Ledger, steps: list[dict[str, Any]], texts: l
 
     bound = not structured or (structured.get("identity") or {}).get("bound") is not False
     if structured and bound and not structured.get("errors"):
+        claim_root = structured.get("root") or {}
+        if root is None and claim_root.get("ok") and claim_root.get("kind") == "agent":
+            root = add("agent", str(claim_root["key"]), claim_root["v"], "结论")
+            root.update(side="root", note="结论指定的真实 agent 根,尚未查询")
         for key, rows in (structured.get("roles") or {}).items():
             for r in rows:
                 side_add(str(r["kind"]), key, r["v"], "结论", "结论点名,没打开")
@@ -1066,11 +1228,11 @@ def _trajectory_walk(ledger: atoms.Ledger, steps: list[dict[str, Any]], texts: l
     edges = [{"from": n["parent"], "to": n["id"], "relation": n["edge"] or "无", "skipped": 0}
              for n in order if n["parent"] and n["side"] == "up"]
     return {"mode": "via", "root": root["id"] if root else None, "nodes": order, "edges": edges,
-            "declared": declared, "visits": visits, "transitions": transitions,
+            "declared": declared, "visits": visits, "transitions": transitions, "searches": searches,
             "verification": "returned_coordinates" if bound else "unverified",
             "verification_note": ("访问按工具返回的实际坐标核验;转移记录声明的 via,账本关系另行标注。" if bound else
                                   "历史调用的账本身份未绑定;保留返回记录,当前账本坐标与关系未验证。"),
-            "side_title": "未接入路线"}
+            "side_title": "搜索入口 / 路线外节点（查询状态见节点）" if any(n.get("search_source") for n in order) else "未接入路线"}
 
 
 def _trajectory(ledger: atoms.Ledger, run_dir: str, steps: list[dict[str, Any]], root: str | None,
@@ -1087,6 +1249,8 @@ def _trajectory(ledger: atoms.Ledger, run_dir: str, steps: list[dict[str, Any]],
         tree.update(trace_source="codex_exec_events", source_path="events.jsonl")
         tree["verification_note"] += " 原始 rollout 缺失;完整 stdout 开始/完成事件按 item_id 配对,不冒充 call_id。"
         return tree
+    if any((s.get("provenance") or {}).get("origin_unverified") for s in steps):
+        return _trajectory_walk(ledger, steps, texts, structured, verdicts)
     if any(s.get("via") or (int(s["i"]) <= len(texts) and _rejected(texts[int(s["i"]) - 1]))
            for s in steps if s.get("tool") in ("file", "agent")):
         return _trajectory_walk(ledger, steps, texts, structured, verdicts)

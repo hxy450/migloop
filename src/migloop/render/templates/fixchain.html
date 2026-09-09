@@ -223,8 +223,12 @@
   .wire.extra { opacity: .75; }
   .wire.route { stroke: #2b6cb0; stroke-width: 1.8; opacity: .9; pointer-events: stroke; }
   .wire.route.differ { stroke: #66788f; stroke-dasharray: 5 3; }
+  .wire.route.uncertain { stroke: #9b741d; stroke-dasharray: 2 4; }
+  .wire.relation-uncertain { stroke: #9b741d; stroke-dasharray: 2 4; }
   .route-step { fill: #2b6cb0; font: 10px var(--mono); paint-order: stroke; stroke: var(--surface); stroke-width: 4px; cursor: pointer; pointer-events: auto; }
   .route-step.differ { fill: #66788f; }
+  .route-step.uncertain { fill: #9b741d; }
+  .badge.relation-candidate, .pill.relation-candidate { background: #faf3db; color: #806019; }
   .pvisit details { margin-top: 4px; }
   .pvisit pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 11px; }
   .prow { border-left: 3px solid var(--ring); padding: 4px 8px; margin: 6px 0; border-radius: 0 6px 6px 0; background: var(--wash); }
@@ -688,11 +692,15 @@
       var b = [];
       if (r.stale) b.push({ cls: "stale", t: "▲v" + r.v + "/" + r.latest_v });
       if (r.start != null && r.n != null && !r.full) b.push({ cls: "", t: r.start + "-" + (r.start + r.n - 1) + "行" });
-      if (r.dep) b.push({ cls: "", t: "依赖" });
+      if (r.dep) b.push({ cls: "relation-candidate", t: "候选·依赖读(未进上下文)" });
+      if (r.observation_uncertain) b.push({ cls: "relation-candidate", t: "候选·读取窗口重叠" });
+      else if (r.certain === false) b.push({ cls: "relation-candidate", t: "候选·读取版本待核" });
+      else if (r.certain == null) b.push({ cls: "relation-candidate", t: "旧记录·读取确定性未记录" });
       if (r.self_written) b.push({ cls: "self", t: "写前读" });
       if (r.via === "script") b.push({ cls: "via", t: "脚本读" });
       return b;
     }
+    function readUncertain(r) { return r.certain !== true || !!r.dep || !!r.observation_uncertain; }
     function addKid(node, kid) {
       kid.parent = node.tid;
       kid.depth = node.depth + 1;
@@ -786,9 +794,13 @@
         (ag.reads || []).forEach(function (r) {
           if (!inCut(r)) return;
           var key = r.path + "@" + r.v;
-          if (seen[key]) return;
-          seen[key] = 1;
-          addKid(node, fileKid(r.path, r.v, readBadges(r), { stale: !!r.stale }));
+          if (seen[key]) {
+            if (!readUncertain(r)) seen[key].relationUncertain = false;
+            return;
+          }
+          var kid = fileKid(r.path, r.v, readBadges(r), { stale: !!r.stale, relationUncertain: readUncertain(r) });
+          seen[key] = kid;
+          addKid(node, kid);
         });
         if (ag.parent && ag.parent.id) {
           var nIn = (ag.inbox || []).filter(function (m) { return inCut(m); }).length;
@@ -872,13 +884,16 @@
         ((fa && fa.readers) || []).forEach(function (r) {
           if (r.v !== anchor) return;
           var key = r.by + "@" + r.at;
-          if (seen[key]) return;
-          seen[key] = 1;
-          var b = [];
+          if (seen[key]) {
+            if (!readUncertain(r)) seen[key].relationUncertain = false;
+            return;
+          }
+          var b = readBadges(r);
           if (r.start != null && r.n != null && !(r.start === 1 && r.n >= (fa.versions[anchor - 1] || {}).lines)) b.push({ cls: "", t: r.start + "-" + (r.start + r.n - 1) + "行" });
-          if (r.dep) b.push({ cls: "", t: "依赖" });
-          addRight(root, xtNode("agent", { aid: r.by, anchorVer: r.at, isReader: true,
-            label: (r.by_name || agentLabelOf(r.by)) + (r.at != null ? " v" + r.at : ""), badges: b }));
+          var reader = xtNode("agent", { aid: r.by, anchorVer: r.at, isReader: true, relationUncertain: readUncertain(r),
+            label: (r.by_name || agentLabelOf(r.by)) + (r.at != null ? " v" + r.at : ""), badges: b });
+          seen[key] = reader;
+          addRight(root, reader);
         });
         var ch = chainByFile[path];
         if (ch && !v) {
@@ -1170,7 +1185,7 @@
       renderRepairCoverage(probeEl);
       if (PROBE.structured || PROBE.legacy) renderStructuredHead(probeEl);
       if (PROBE.trajectory && PROBE.trajectory.verification_note) probeEl.appendChild(el("div", "warn", PROBE.trajectory.verification_note));
-      if (PROBE.trajectory && PROBE.trajectory.mode === "via") probeEl.appendChild(el("div", "sum", "箭头 #步号 = 模型声明的查询转移,不是因果边;蓝色为账本有直接关系,灰蓝虚线为版本导航或探索跳转。回访与自环全部保留;账本关系只说明记录中的读写或派发,红色问题角色是模型主张。"));
+      if (PROBE.trajectory && PROBE.trajectory.mode === "via") probeEl.appendChild(el("div", "sum", "箭头 #步号 = 模型声明的查询转移,不是因果边;蓝色‘账本’为已核关系,黄褐点线‘候选’为读取/提及待核,灰蓝虚线‘导航’为版本或搜索探索。回访与自环全部保留;红色问题角色是模型主张,不会把探索边变成红色因果边。"));
       var dkeys = Object.keys(PROBE.defects || {});
       if (dkeys.length) {
         var chips = el("div", "dchips");
@@ -1341,6 +1356,23 @@
         row.appendChild(el("div", "phd", "#" + visit.step + " " + visit.tool + " · " + probeVisitStatus(visit.status)));
         if (visit.scope) row.appendChild(el("div", "preason", visit.scope));
         if (visit.via) row.appendChild(kv("来处", visit.via));
+        var transition = (T.transitions || []).find(function (tr) { return tr.step === visit.step; });
+        if (transition) {
+          row.appendChild(kv("关系核验", transition.relation_label || transition.relation || transition.match));
+          if (transition.relation_note) row.appendChild(el("div", "pnote", transition.relation_note));
+          if ((transition.relation_evidence || []).length) {
+            var evidence = el("details", "relation-evidence");
+            evidence.appendChild(el("summary", null, "账本关系原始事件"));
+            evidence.appendChild(el("pre", null, JSON.stringify(transition.relation_evidence, null, 2)));
+            row.appendChild(evidence);
+          }
+        }
+        if (visit.search_source) {
+          var source = el("details", "search-source");
+          source.appendChild(el("summary", null, "搜索 #" + visit.search_source.step + " 命中 " + visit.search_source.hit + " · 原始返回凭据"));
+          source.appendChild(el("pre", null, JSON.stringify(visit.search_source, null, 2)));
+          row.appendChild(source);
+        }
         if (visit.note) row.appendChild(el("div", "pnote", visit.note));
         if (visit.result_ref) row.appendChild(kv("转录调用", visit.result_ref));
         var details = el("details");
@@ -1624,6 +1656,9 @@
       }
       return "探索跳转：未核出直接账本边";
     }
+    function probeRelationStatus(tr) {
+      return tr.relation_status || (tr.match === "账本有边" ? "true" : tr.match === "账本无此边" ? "false" : "not_checked");
+    }
     function probeBuildTrajectory() {
       var T = PROBE && PROBE.trajectory;
       if (probeTraceUnbound(PROBE)) {
@@ -1653,9 +1688,12 @@
         node.trajOpened = n.opened || []; node.trajSide = n.side; node.edgeRel = n.edge;
         node.unseenNeighbors = n.unseen_neighbors;
         var b = [];
-        if (n.edge) b.push({ cls: "", t: "账本·" + n.edge + (n.skipped ? "·跳过 " + n.skipped + " 版" : "") });
+        if (n.relation_check && n.relation_check.relation_status === "unknown") b.push({ cls: "relation-candidate", t: n.relation_check.relation_label, title: n.relation_check.relation_note + "；候选不是确定读写边。" });
+        else if (n.edge) b.push({ cls: "", t: "账本·" + n.edge + (n.skipped ? "·跳过 " + n.skipped + " 版" : "") });
         else if (n.parent && n.side === "up") b.push({ cls: "navigation", t: probeNavigationLabel(sourceById[n.parent], n), title: "查询导航,不是因果边;未核出直接账本关系。" });
         if (n.note) b.push({ cls: "stale", t: n.note });
+        if (n.search_source) b.push({ cls: "navigation", t: "搜索 #" + n.search_source.step + " 命中 " + n.search_source.hit,
+                                     title: "由真实搜索返回进入;不是历史读取或因果边。" });
         if (n.via && n.side === "up") b.push({ cls: "via", t: "via " + String(n.via).slice(0, 28) });
         if (n.source === "任务") b.push({ cls: "", t: "任务给的" });
         if (n.source === "结论" && !node.trajOpened.length) b.push({ cls: "via", t: "结论提及 · 未查询" });
@@ -1695,8 +1733,11 @@
         return { from: n.parent, to: n.id, step: (n.opened || [])[0], relation: n.edge, match: n.edge ? "账本有边" : "账本无此边" };
       }) : []);
       transitions.forEach(function (tr) {
-        if (!byId[tr.from] || !byId[tr.to]) return;
-        XT.transitions.push({ a: byId[tr.from].tid, b: byId[tr.to].tid, step: tr.step, relation: tr.relation, match: tr.match,
+        if ((!byId[tr.from] && tr.source !== "search") || !byId[tr.to]) return;
+        XT.transitions.push({ a: byId[tr.from] ? byId[tr.from].tid : null, b: byId[tr.to].tid, step: tr.step, relation: tr.relation, match: tr.match,
+                              source: tr.source, search_source: tr.search_source,
+                              relation_status: probeRelationStatus(tr), relation_label: tr.relation_label, relation_note: tr.relation_note,
+                              relation_evidence: tr.relation_evidence || [], legacy_relation: !tr.relation_status,
                               navigation: probeNavigationLabel(sourceById[tr.from], sourceById[tr.to]) });
       });
       T.nodes.forEach(function (n) {
@@ -1750,7 +1791,7 @@
           if (!ag) { done(null, err); return; }
           var out = (ag.reads || []).filter(function (r) {
             var feed = r.ver != null ? r.ver : r.at;
-            return r.v != null && r.certain !== false && !r.dep && (node.anchorVer == null || feed <= node.anchorVer);
+            return r.v != null && !readUncertain(r) && (node.anchorVer == null || feed <= node.anchorVer);
           }).map(function (r) { return { kind: "file", key: r.path, v: r.v, relation: "读 v" + r.v }; });
           if (ag.parent && ag.parent.id && ag.parent.ver != null) out.push({ kind: "agent", key: ag.parent.id, v: ag.parent.ver, relation: "派发自 v" + ag.parent.ver });
           done(out);
@@ -1976,13 +2017,13 @@
       wireByTid = {};
       var frag = document.createDocumentFragment();
       var defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
-      [false, true].forEach(function (differ) {
+      ["", "-differ", "-uncertain"].forEach(function (suffix) {
         var marker = document.createElementNS("http://www.w3.org/2000/svg", "marker");
-        marker.setAttribute("id", differ ? "route-arrow-differ" : "route-arrow");
+        marker.setAttribute("id", "route-arrow" + suffix);
         marker.setAttribute("viewBox", "0 0 10 10"); marker.setAttribute("refX", "9"); marker.setAttribute("refY", "5");
         marker.setAttribute("markerWidth", "6"); marker.setAttribute("markerHeight", "6"); marker.setAttribute("orient", "auto-start-reverse");
         var tip = document.createElementNS("http://www.w3.org/2000/svg", "path");
-        tip.setAttribute("d", "M 0 0 L 10 5 L 0 10 z"); tip.setAttribute("fill", differ ? "#66788f" : "#2b6cb0");
+        tip.setAttribute("d", "M 0 0 L 10 5 L 0 10 z"); tip.setAttribute("fill", suffix === "-uncertain" ? "#9b741d" : suffix ? "#66788f" : "#2b6cb0");
         marker.appendChild(tip); defs.appendChild(marker);
       });
       frag.appendChild(defs);
@@ -1998,9 +2039,10 @@
         var mx = (x1 + x2) / 2;
         var path = document.createElementNS("http://www.w3.org/2000/svg", "path");
         path.setAttribute("d", "M" + x1 + "," + y1 + " C" + mx + "," + y1 + " " + mx + "," + y2 + " " + x2 + "," + y2);
-        var onChain = PROBE && !PROBE.error && probeOnChain(n) && probeOnChain(p);
+        var onChain = !n.relationUncertain && PROBE && !PROBE.error && probeOnChain(n) && probeOnChain(p);
         path.setAttribute("class", "wire" + (onChain ? (n.possible || p.possible ? " cand" : " chain") : "")
-                                     + (n.possible ? " dashed" : "") + (n.edgeRel === "前一版" ? " succ" : ""));
+                                     + (n.possible ? " dashed" : "") + (n.relationUncertain ? " relation-uncertain" : "") + (n.edgeRel === "前一版" ? " succ" : ""));
+        if (n.relationUncertain) { var rt = document.createElementNS("http://www.w3.org/2000/svg", "title"); rt.textContent = "候选读取关系：版本、依赖或快照时刻未确认，不是确定读边"; path.appendChild(rt); }
         frag.appendChild(path);
         (wireByTid[tid] = wireByTid[tid] || []).push(path);
         (wireByTid[n.parent] = wireByTid[n.parent] || []).push(path);
@@ -2011,6 +2053,9 @@
       });
       (XT.transitions || []).forEach(function (e) {
         var from = XT.byId[e.a], to = XT.byId[e.b];
+        if (!from && to && e.source === "search" && e.search_source) {
+          from = { x: to.x - NODE_W - 95, y: to.y, label: "搜索 #" + e.search_source.step + " 命中 " + e.search_source.hit };
+        }
         if (!from || !to || from.hidden || to.hidden) return;
         var key = [e.a, e.b].sort().join("|"), lane = pairUsed[key] || 0;
         pairUsed[key] = lane + 1;
@@ -2031,22 +2076,27 @@
           pathData = "M" + x1 + "," + y1 + " C" + mx + "," + (y1 + offset) + " " + mx + "," + (y2 + offset) + " " + x2 + "," + y2;
           tx = mx; ty = (y1 + y2) / 2 + offset * .75 - 4;
         }
-        var differ = e.match === "账本无此边";
+        var uncertain = e.relation_status === "unknown", differ = e.relation_status !== "true";
+        var routeClass = uncertain ? " uncertain" : differ ? " differ" : "";
         var path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-        path.setAttribute("d", pathData); path.setAttribute("class", "wire route" + (differ ? " differ" : ""));
-        path.setAttribute("marker-end", differ ? "url(#route-arrow-differ)" : "url(#route-arrow)");
+        path.setAttribute("d", pathData); path.setAttribute("class", "wire route" + routeClass);
+        path.setAttribute("marker-end", "url(#route-arrow" + (uncertain ? "-uncertain" : differ ? "-differ" : "") + ")");
         path.setAttribute("data-step", e.step);
-        var title = "声明转移 #" + e.step + " · " + from.label + " → " + to.label + " · " + (differ ? e.navigation : e.relation || e.match || "账本关系未核验") + " · 查询导航,不是因果边";
+        path.setAttribute("data-source", e.source || "declared");
+        path.setAttribute("data-relation-status", e.relation_status);
+        var title = "声明转移 #" + e.step + " · " + from.label + " → " + to.label + " · " + (e.relation_label || (differ ? e.navigation : e.relation || "账本关系未核验"))
+                  + (e.relation_note ? " · " + e.relation_note : "") + (e.legacy_relation ? " · 旧格式未保留关系核验详情" : "") + " · 查询导航,不是因果边";
         var pt = document.createElementNS("http://www.w3.org/2000/svg", "title"); pt.textContent = title; path.appendChild(pt);
         frag.appendChild(path);
         var label = document.createElementNS("http://www.w3.org/2000/svg", "text");
         label.setAttribute("x", tx); label.setAttribute("y", ty); label.setAttribute("text-anchor", "middle");
-        label.setAttribute("class", "route-step" + (differ ? " differ" : "")); label.setAttribute("data-step", e.step);
-        label.textContent = "#" + e.step;
+        label.setAttribute("class", "route-step" + routeClass); label.setAttribute("data-step", e.step);
+        label.textContent = e.source === "search" ? "搜索 #" + e.search_source.step + " → #" + e.step
+                         : "#" + e.step + (uncertain ? " 候选" : differ ? " 导航" : " 账本");
         var lt = document.createElementNS("http://www.w3.org/2000/svg", "title"); lt.textContent = title; label.appendChild(lt);
         label.addEventListener("click", function (ev) { ev.stopPropagation(); onNode(to.tid); });
         frag.appendChild(label);
-        (wireByTid[e.a] = wireByTid[e.a] || []).push(path);
+        if (e.a) (wireByTid[e.a] = wireByTid[e.a] || []).push(path);
         if (e.a !== e.b) (wireByTid[e.b] = wireByTid[e.b] || []).push(path);
       });
       (XT.via || []).forEach(function (e) {
@@ -2270,8 +2320,11 @@
           var mid = el("span", null, "");
           mid.appendChild(lnk((r.by_name || agentLabelOf(r.by)) + (r.at != null ? " v" + r.at : ""), "who", function () { openRoot({ kind: "agent", id: r.by, v: r.at }); }));
           mid.appendChild(el("span", "meta", String(r.ts).slice(5, 19).replace("T", " ")
-            + (r.start != null && r.n != null ? " · " + r.start + "-" + (r.start + r.n - 1) + " 行" : " · 全文")
-            + (r.dep ? " · 依赖读" : "") + (r.certain ? "" : " · 版本就近绑定(不确定)")));
+            + (r.full === true ? " · 全文" : r.start != null && r.n != null ? " · " + r.start + "-" + (r.start + r.n - 1) + " 行"
+               : r.seen_n ? " · 命中 " + r.seen_n + " 行" : " · 读取范围未记录")
+            + (r.dep ? " · 依赖读(内容未进上下文)" : "") + (r.certain === true ? "" : " · 版本未确认")
+            + (r.observation_uncertain ? " · 调用窗口重叠，快照时刻待核" : "")
+            + (r.use_ts || r.done_ts ? " · 调用 " + (r.use_ts || "?") + " → 返回 " + (r.done_ts || "?") : "")));
           row.appendChild(mid);
           row.appendChild(el("span", null, ""));
           sr.appendChild(row);
@@ -2288,7 +2341,7 @@
       side.appendChild(body);
       if (node.badges && node.badges.length) {
         var s0 = sec("这条边的标签");
-        s0.appendChild(pills(node.badges.map(function (b) { return { cls: b.cls === "stale" ? "warn" : b.cls === "via" ? "via" : b.cls === "navigation" ? "navigation" : "", t: b.t }; })));
+        s0.appendChild(pills(node.badges.map(function (b) { return { cls: b.cls === "stale" ? "warn" : ["via", "navigation", "relation-candidate"].indexOf(b.cls) >= 0 ? b.cls : "", t: b.t }; })));
         if (node.badges.some(function (b) { return b.cls === "navigation"; })) s0.appendChild(el("div", "pnote", "查询导航,不是因果边;未核出直接账本关系。"));
         body.appendChild(s0);
       }

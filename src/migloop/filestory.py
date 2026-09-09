@@ -6,7 +6,8 @@
 
 三层裁定(与用户逐条对齐,见 PR #95 讨论与 0723 复盘):
 
-1. 观测即锚 —— Read/干净 cat 的结果就是该文件那一刻的真实快照。内容失联
+1. 观测可重锚 —— Read/干净 cat 的采集窗口无重叠写时才能用作状态快照;返回
+   时刻只表明输入可用。窗口与写/候选重叠时保留不确定读,不能倒推出回写。内容失联
    (脚本落盘/edit-miss)不再一票断死:下一张快照处重锚,段间续命;快照与
    已知状态不符 = 抓到实录外改动,记断点、立 ``__outband__`` 版本,链照走。
 2. diff 是档位不是有无 —— native(edit 原生)/true(前态已知)/creation(整篇
@@ -24,6 +25,7 @@ from __future__ import annotations
 import difflib
 import heapq
 import re
+from bisect import bisect_right
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
@@ -79,6 +81,8 @@ class Ev:
     created: bool = False           # wfull: 工具结果说 File created —— 写之前文件不存在
     sources: tuple[str, ...] = ()   # wconcat: cat a b > f 的各段路径
     conditional: bool = False       # 命令在 && / || 的条件分支里:前件成败未知,这一步是否执行了也未知
+    use_ts: str | None = None       # 实际调用发起时刻;read 的采集瞬间只能落在调用区间内,不是返回时刻
+    done_ts: str | None = None      # 实际完成时刻;旧事件缺字段时保留原有点事件语义
 
 
 @dataclass
@@ -116,6 +120,8 @@ class ReadRec:
     seen: tuple[tuple[int, str], ...] | None = None   # 看见的行(行号, 原文)
     full: bool = False        # 读到的是全文快照;不是全文、没有行段、没有看见的行 = 范围未知,不许冒充全文
     via: str = "tool"         # 来路:tool | shell | script(字面量推断)—— 幽灵路径清理只看 script 来的读
+    use_ts: str | None = None  # 读取请求发起时刻;ts 仍为结果可用时刻
+    observation_uncertain: bool = False  # 采集窗口与写/候选效应重叠,不允许将返回当作该时刻的状态快照
 
 
 @dataclass
@@ -177,6 +183,44 @@ def build_stories(events: list[Ev]) -> dict[str, FileStory]:
     wderived(cp)因此能查到源文件"那一刻"的状态。"""
     stories: dict[str, FileStory] = {}
     states: dict[str, _State] = {}
+    # 未能绑定确切版本不等于没有看见正文。created 清理假前身时必须保留这些实际观测。
+    observed_reads = {(e.path, e.seq) for e in events if e.kind == "read" and not e.dep
+                      and (e.content is not None or e.seen)}
+    # 单独建区间索引,不改变下面原有的事件排序。候选的起止屏障属于同一次调用,
+    # 不能只把两端当瞬时效应,让中间返回的读穿过屏障封口。
+    intervals: dict[tuple[str, str, int], tuple[str, str]] = {}
+    for event in events:
+        if event.kind not in {"wfull", "edit", "wopaque", "wderived", "wconcat", "delete", "candidate"}:
+            continue
+        start = ts_norm(event.use_ts or event.ts)
+        end = ts_norm(event.done_ts or event.ts)
+        if event.kind == "candidate" and event.use_ts is not None and event.done_ts is None:
+            end = "\uffff"  # 已知发起但未完成的候选效应没有可证明的结束界
+        start, end = min(start, end), max(start, end)
+        key = (event.path, event.agent, event.seq)
+        prior = intervals.get(key)
+        intervals[key] = (min(prior[0], start), max(prior[1], end)) if prior else (start, end)
+    by_path: dict[str, list[tuple[str, str]]] = {}
+    for (path, _agent, _seq), interval in intervals.items():
+        by_path.setdefault(path, []).append(interval)
+    write_windows: dict[str, tuple[list[str], list[str]]] = {}
+    for path, spans in by_path.items():
+        starts, ends, latest = [], [], ""
+        for start, end in sorted(spans):
+            latest = max(latest, end)
+            starts.append(start)
+            ends.append(latest)
+        write_windows[path] = (starts, ends)
+
+    def observation_overlaps(event: Ev, path: str | None = None) -> bool:
+        if event.use_ts is None:
+            return False                           # 旧事件未保存采集区间,不改变旧账本的绑定规则
+        start, end = ts_norm(event.use_ts), ts_norm(event.done_ts or event.ts)
+        if start > end:
+            return True                            # 时间记录矛盾也不能将观测确定落在返回时刻
+        starts, ends = write_windows.get(path or event.path, ([], []))
+        position = bisect_right(starts, end) - 1
+        return position >= 0 and ends[position] >= start
 
     def story(path: str) -> tuple[FileStory, _State]:
         if path not in stories:
@@ -244,11 +288,14 @@ def build_stories(events: list[Ev]) -> dict[str, FileStory]:
         elif e.kind == "wfull":
             creation = e.created
             if e.created and st.versions:
-                if all(v.source == "external" and v.content is None for v in st.versions):
+                observed = any((st.path, r.seq) in observed_reads for r in st.reads)
+                if all(v.source == "external" and v.content is None for v in st.versions) and not observed:
                     demote_unseen(st, s)
                     creation = True
-                elif s.content is not None or any(v.content is not None for v in st.versions):
+                elif s.content is not None or any(v.content is not None for v in st.versions) or observed:
                     st.breaks.append(Break(e.ts, e.seq, e.path, "create-conflict",
+                                           "Write 结果为 created,但已有实际正文观测;窗口重叠时先后未确认,不能作废读取或认定文件原先不存在"
+                                           if observed and any(r.observation_uncertain for r in st.reads) else
                                            "Write 结果为 created,但此前观测到过内容 —— 实录外删除后重建"))
                     creation = True
             write_known(st, s, e, e.content or "", "full", creation=creation)
@@ -258,16 +305,20 @@ def build_stories(events: list[Ev]) -> dict[str, FileStory]:
             src_st, src_s = story(e.src or "")
             if not src_st.versions:
                 add_version(src_st, e, EXTERNAL, "external", None, None, "external")
+            overlap = observation_overlaps(e, e.src)
             src_st.reads.append(ReadRec(e.ts, e.seq, e.agent,
                                         len(src_st.versions), None, None,
-                                        src_s.content is not None, dep=True))
-            if src_s.content is not None:
+                                        src_s.content is not None and not overlap, dep=True,
+                                        use_ts=e.use_ts, observation_uncertain=overlap))
+            if src_s.content is not None and not overlap:
                 write_known(st, s, e, src_s.content, "derived")
             else:
                 write_unknown(st, s, e, "derived")
         elif e.kind == "wconcat":
             # cat a b > f:各段在编年史里此刻的内容都已知就拼出 f(派生);有一段未知就只能记未知
-            parts = [states[q].content if q in states else None for q in e.sources]
+            # 源在整个调用窗口内发生写/候选效应时,复制到的是哪个快照未知。
+            # 目标写动作和作者仍成立,但不能用调用发起时的旧源正文强行复原值。
+            parts = [states[q].content if q in states and not observation_overlaps(e, q) else None for q in e.sources]
             if parts and all(x is not None for x in parts):
                 write_known(st, s, e, "".join(str(x) for x in parts), "derived")
             else:
@@ -308,7 +359,15 @@ def build_stories(events: list[Ev]) -> dict[str, FileStory]:
         elif e.kind == "read":
             self_read_version: int
             certain = True
-            if e.content is not None and e.full:
+            observation_uncertain = observation_overlaps(e)
+            if observation_uncertain:
+                # 正文确实返回了,但它可能在重叠写之前/期间采集。既不能覆盖已知新状态,
+                # 也不能封给 opaque 写者、清除候选屏障或制造实录外回写。
+                if not st.versions:
+                    add_version(st, e, EXTERNAL, "external", None, None, "external")
+                self_read_version = len(st.versions)
+                certain = False
+            elif e.content is not None and e.full:
                 snap = e.content
                 if s.uncertain:
                     if not (st.versions and st.versions[-1].content is not None
@@ -383,7 +442,8 @@ def build_stories(events: list[Ev]) -> dict[str, FileStory]:
                     self_read_version = 1
                     certain = False
             st.reads.append(ReadRec(e.ts, e.seq, e.agent, self_read_version,
-                                    e.start, e.n, certain, e.dep, seen=e.seen, full=e.full, via=e.via))
+                                    e.start, e.n, certain, e.dep, seen=e.seen, full=e.full, via=e.via,
+                                    use_ts=e.use_ts, observation_uncertain=observation_uncertain))
         else:
             raise ValueError(f"未知事件类型: {e.kind}")
     return stories

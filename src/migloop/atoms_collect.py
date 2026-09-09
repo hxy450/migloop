@@ -1386,13 +1386,14 @@ def _kind_of(name: str, ops: list[FileOp]) -> str:
     return "other"
 
 
-def _to_ev(op: FileOp, agent: str, ts: str, seq: int, stage: str | None = None) -> Ev:
+def _to_ev(op: FileOp, agent: str, ts: str, seq: int, stage: str | None = None,
+           *, use_ts: str | None = None, done_ts: str | None = None) -> Ev:
     kind = {"read": "read", "delete": "delete", "edit": "edit",
             "write": "wfull" if op.content is not None else ("wconcat" if op.sources else "wopaque")}[op.op]
     return Ev(ts, seq, kind, op.path, agent, content=op.content, old=op.old, new=op.new,
               replace_all=op.replace_all, start=op.start, n=op.n, full=op.full, dep=op.dep,
               via=op.via, seen=op.seen, stage=stage, created=op.created, sources=op.sources,
-              conditional=op.conditional)
+              conditional=op.conditional, use_ts=use_ts, done_ts=done_ts)
 
 
 #: 管线技能在阶段**收尾**时调 ``a2h mark-stage``:这些 mark 的时刻是该阶段的结束(DiceRoller 0903 实测,
@@ -1558,7 +1559,8 @@ def _walk(path: str, agent_id: str, session: str, seq: list[int],
                                  src=(path, use_line, line_no), tuid=tuid, stage=stage, done_ts=ts, blk=blk)
                     for op in ops:
                         # 写在调用时刻发生,读的内容在结果时刻进上下文
-                        ev = _to_ev(op, agent_id, ts if op.op == "read" else uts, nxt(), stage)
+                        ev = _to_ev(op, agent_id, ts if op.op == "read" else uts, nxt(), stage,
+                                    use_ts=uts, done_ts=ts)
                         act.files.append(FileRef("read" if op.op == "read" else
                                                  "delete" if op.op == "delete" else "write",
                                                  op.path, ev))
@@ -1825,7 +1827,8 @@ def _patch_ops(patch: str, cwd: object) -> list[FileOp]:
 
 
 def _codex_exec_ops(raw_arg: Any, out_text: str, cwd: object,
-                    scripts: dict[str, Any]) -> tuple[list[FileOp], dict[str, Any], bool]:
+                    scripts: dict[str, Any], *, completed: bool = True,
+                    ts: str | None = None) -> tuple[list[FileOp], dict[str, Any], bool]:
     """一次 exec:解 JS → shell 命令(复用 CC 的解析 + stdout 对账)+ apply_patch。返回 (ops, detail, ok)。"""
     from migloop.adapters import codex
 
@@ -1833,7 +1836,7 @@ def _codex_exec_ops(raw_arg: Any, out_text: str, cwd: object,
         js = str(codex._decode_arguments(raw_arg).get("input") or raw_arg)
     else:
         js = str(raw_arg or "")
-    ok, stdout = _codex_stdout(out_text)
+    ok, stdout = _codex_stdout(out_text) if completed else (False, "")
     detail: dict[str, Any] = {}
     ops: list[FileOp] = []
     shell_calls = codex._extract_shell_calls(js, str(cwd) if cwd else None)
@@ -1844,7 +1847,7 @@ def _codex_exec_ops(raw_arg: Any, out_text: str, cwd: object,
         # 单条 shell 调用时 stdout 就是它的:目录 grep / 多文件 head 按 stdout 反证(与 CC 的 Bash 同一套)
         single = len(shell_calls) == 1 and ok
         sub_ops, capable, undetermined, touched, hints = _shell_analyze(cmd, wdir, scripts, stdout if single else "",
-                                                                       success=single)
+                                                                       success=single, ts=ts)
         if capable:
             detail["write_capable"] = True
         if single and not sub_ops:
@@ -1880,7 +1883,7 @@ def _codex_exec_ops(raw_arg: Any, out_text: str, cwd: object,
         ops += _patch_ops(patch, cwd)
     if not ok:
         detail["touched"] = sorted(set(detail.get("touched") or []) | {o.path for o in ops if o.op != "read"})
-        detail["unresolved"] = "调用失败,效应未知(可能已部分执行)"
+        detail["unresolved"] = "调用失败,效应未知(可能已部分执行)" if completed else "调用未完成,效应未知"
     return ops, detail, ok
 
 
@@ -1896,6 +1899,15 @@ def _walk_codex(path: str, agent_id: str, session: str, seq: list[int], scripts:
         seq[0] += 1
         return seq[0]
 
+    def text_action(ts: str, line_no: int, text: str, kind: str, detail: dict[str, Any]) -> None:
+        mentions, trunc = _path_mentions(text, {}, cwd, ts, where="text", cls="text", audit=detail)
+        if mentions:
+            detail["mentions"] = mentions
+        if trunc:
+            detail["mentions_truncated"] = trunc
+        # 原始消息 id 不是 tool_use_id;作者只做来源标签,不制造 sender agent/读写边。
+        rec.actions.append(Action(ts, nxt(), kind, kind, detail=detail, src=(path, line_no, line_no)))
+
     with open(path, encoding="utf-8", errors="ignore") as stream:
         for line_no, line in enumerate(stream):
             try:
@@ -1907,22 +1919,45 @@ def _walk_codex(path: str, agent_id: str, session: str, seq: list[int], scripts:
             if r.get("type") in ("session_meta", "turn_context") and pl.get("cwd"):
                 cwd = pl.get("cwd")
             pid = pl.get("id")
-            if isinstance(pid, str):
+            if r.get("type") == "session_meta":
+                base = pl.get("base_instructions")
+                base_text = base.get("text") if isinstance(base, dict) else None
+                base_id = f"base_instructions:{pid}" if isinstance(pid, str) and pid else None
+                if isinstance(base_text, str) and base_text.strip() and (base_id is None or base_id not in seen_ids):
+                    if base_id:
+                        seen_ids.add(base_id)
+                    text_action(ts, line_no, base_text, "system", {
+                        "from": "session_meta.base_instructions", "text": base_text, "summary": None,
+                        "source_event_type": "base_instructions", "source_event_id": pid if isinstance(pid, str) and pid else None})
+            # event_msg 是运行时镜像,不能重复进账或抢占 canonical response_item 的消息 id。
+            if r.get("type") != "response_item":
+                continue
+            if isinstance(pid, str) and pid:
                 if pid in seen_ids:
                     continue                          # fork 复制来的父记录:不是这个 agent 的动作
                 seen_ids.add(pid)
             t = pl.get("type")
-            if t == "message":
-                text = _text_of(pl.get("content"))
+            if t in ("message", "agent_message"):
+                content = pl.get("content")
+                text = _text_of([content] if isinstance(content, dict) else content)
                 role = pl.get("role")
-                if role == "user" and text.strip():
-                    rec.actions.append(Action(ts, nxt(), "inbox", "inbox",
-                                              detail={"from": "parent" if is_sub else "user",
-                                                      "summary": None, "text": text}))
+                if not text.strip() or (t == "message" and role not in ("user", "assistant", "developer", "system")):
+                    continue
+                kind = ("say" if role == "assistant" else "system" if role in ("developer", "system") else "inbox") if t == "message" else "inbox"
+                detail: dict[str, Any] = {"text": text, "summary": None, "source_event_type": t,
+                                          "source_event_id": pid if isinstance(pid, str) and pid else None}
+                if t == "agent_message":
+                    detail.update({"from": pl.get("author"), "recipient": pl.get("recipient"),
+                                   "claim_note": "发送者消息主张,未独立核验;不证明实际修改、读取或派发"})
+                elif role == "user":
+                    detail["from"] = "parent" if is_sub else "user"
                     if is_sub and rec.prompt is None:
                         rec.prompt = text
-                elif role == "assistant" and text.strip():
+                elif role == "assistant":
                     last_text = text.strip()
+                else:
+                    detail["from"] = role
+                text_action(ts, line_no, text, kind, detail)
             elif t in ("function_call", "custom_tool_call"):
                 raw_arg = pl.get("arguments") if pl.get("arguments") is not None else pl.get("input")
                 pend[str(pl.get("call_id"))] = (ts, str(pl.get("name")), raw_arg, cwd, line_no)
@@ -1969,13 +2004,24 @@ def _walk_codex(path: str, agent_id: str, session: str, seq: list[int], scripts:
                 act = Action(uts, nxt(), name, kind, ok=ok, detail=detail,
                              src=(path, use_line, line_no), tuid=cid, done_ts=ts)
                 for op in ops:
-                    ev = _to_ev(op, agent_id, ts if op.op == "read" else uts, nxt())
+                    ev = _to_ev(op, agent_id, ts if op.op == "read" else uts, nxt(), use_ts=uts, done_ts=ts)
                     act.files.append(FileRef("read" if op.op == "read" else
                                              "delete" if op.op == "delete" else "write", op.path, ev))
                 rec.actions.append(act)
-    for cid, (uts, name, raw_arg, _c, use_line) in pend.items():
+    for cid, (uts, name, raw_arg, ucwd, use_line) in pend.items():
         arg_text = raw_arg if isinstance(raw_arg, str) else json.dumps(raw_arg, ensure_ascii=False)
-        rec.actions.append(Action(uts, nxt(), name, "other", ok=None, detail={"unfinished": True, "args": arg_text[:200]},
+        detail = {"unfinished": True, "args": arg_text[:200]}
+        if name == "exec":
+            # 仅静态提取候选目标;没有结果就不立正式读写,也不把输入脚本认作成功落盘。
+            _possible, hints, _ok = _codex_exec_ops(raw_arg, "", ucwd, scripts, completed=False, ts=uts)
+            detail.update(hints)
+            detail["touched"] = sorted(set(detail.get("touched") or []) | set(detail.get("conditional") or []))
+            mentions, trunc = _path_mentions(arg_text, scripts, ucwd, uts, audit=detail)
+            if mentions:
+                detail["mentions"] = mentions
+            if trunc:
+                detail["mentions_truncated"] = trunc
+        rec.actions.append(Action(uts, nxt(), name, "other", ok=None, detail=detail,
                                   src=(path, use_line, use_line), tuid=cid))
     rec.result = last_text
     return rec

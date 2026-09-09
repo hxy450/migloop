@@ -231,7 +231,14 @@ def test_failed_or_unfinished_tool_write_also_blocks_old_sealing(tmp_path, failu
     ])
     assert led.stories[A].versions[1].content is None
     assert not led.stories[A].versions[1].sealed
-    assert led.stories[A].versions[-1].by == atoms.OUTBAND
+    if failure:
+        assert led.stories[A].versions[-1].by == atoms.OUTBAND
+    else:
+        # An unfinished write can still overlap the read; a late return is not
+        # proof of a separate out-of-band rewrite at the return timestamp.
+        assert len(led.stories[A].versions) == 2
+        assert not led.stories[A].reads[-1].certain
+        assert led.stories[A].reads[-1].observation_uncertain
 
 
 def test_candidate_gap_propagates_to_diff_and_line_origins(tmp_path):

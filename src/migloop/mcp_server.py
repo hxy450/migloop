@@ -38,6 +38,8 @@ GUIDE = """\
 - 外部输入:第一次出现就是被读,没人写过(安卓源码、spec 参考、模板)—— 树的叶子
 - 实录外修改:内容变了但没有记录在案的写(脚本动态目标 / 构建工具 / 人手)
 - 版本就近绑定(不确定):读发生在文件状态未知时,版本号是就近猜的
+- 读取窗口与写入重叠:保留返回原文,但无法确定快照属于哪一版;返回时间只证明此时可用,不证明此时才取样
+- 消息主张:父转录收到的子代理/reviewer 报告可以核回原文,不替代缺失的子转录、实际补丁或行为验证
 
 ## 原文入口与已知边界
 file 原子末尾的「碰过它、方向不明的调用」与 sessions 末尾的「修复期被脚本碰过、方向不明的工程文件」:脚本里出现了
@@ -122,6 +124,9 @@ nodes 只收该项问题段与判定所必需的证据边界;正常上游一句�
 出现「提及索引不完备」时,先 index(kind=scan) 查缺口,再 action(part=input/output, offset=…/find=…) 看原文。
 即使全池零命中也不证明没人见过:查询范围、未知内容、加密/缺失记录和扫描缺口都必须披露。
 条件/失败调用的路径是候选,不代表实际写过或读到过;候选写后的观测重锚不证明发生了实录外修改。
+账本未复原出文件版本不等于原文没有效应证据:展开候选的命令/脚本、执行结果及可用的前后内容,
+分别说明能确认的目标、分支和值与仍未知的归属/版本。成功状态本身也不证明所有分支执行或行为修好。
+批量汇总的总数不证明每个目标采用相同值;核对分支、例外、已存在而跳过的站点,不要把中间态当最终态。
 边界:账本里只有**被读过**的安卓源码,从没人读过的文件不存在;标签是线索,盲写/脚本落盘的
 版本内容可能未知,如实说"无法确认"。
 
@@ -130,15 +135,19 @@ nodes 只收该项问题段与判定所必需的证据边界;正常上游一句�
 写者的版本号看文件脊柱那一行(`v8 ← fix-errobserver v1` 就是 agent(fix-errobserver, v=1)),文件的版本号看 agent 时间线里的读写行。
 - file / agent 是移动:必须带 via=你现在站的节点,逐字等于你打开过的某个节点:`file:<路径>@vN` / `agent:<id>@vK`,后面可以跟几个字
   说凭哪一行(例:`file:entry/…/EntryAbility.ets@v8 写者`)。不带版本、没打开过、版本对不上,调用都不执行,会回给你已打开的列表。
-- 第一次 file / agent 写 via=sessions(从返修链摘要进被修文件或修复方),之后不能再用。
-- blame / diff / action / search 不移动、不开节点、不带 via。全池 search 不是第三种原子,不能直接写成 via 来源;
-  若它发现新线索,可从已打开节点声明探索跳转,在 via 后说明检索线索。此跳转不证明两个节点有因果关系。
+- 第一次 file / agent 写 via=sessions(从返修链摘要进被修文件或修复方),之后不能再用。目标没有文件版本时,
+  可从 index/search 找到真实 agent@v,首次用 via=task 或搜索凭据进入;不为进入页面而捏造文件版本。
+- blame / diff / action / search 不移动、不开节点、不带 via。search 是调查事件,不是第三种原子。
+  search 返回末尾 hits 中的 via=search:<凭据>:<命中号> 可直接打开该命中的精确 kind/key/v,无需强挂已打开节点。
+  凭据必须照抄本次真实返回,不能自造 search# 或换目标/版本;旧搜索无凭据仍可阅读,不能直接充当 via。
+  命中只证明限定范围内发现了文本,不证明历史 agent 读过、版本确定或存在因果关系。
 - 页面保留每次访问与 via 转移,包括重复回访和自环;实体可以合并显示,步骤不能省略。账本关系另行核验。
   via 是你明确声明的导航来源,不是系统推测你的私有思路。失败/未完成/返回坐标不符的调用不算成功打开。
   v 是实际查询锚点;区间 diff 的 v_from/v_to 只能在该锚点内,不能靠窗口偷偷换版本。
 
 ## 结构化结论(正式产出,页面靠它给节点着色、展示原因和证据)
 另起一个 ```yaml 围栏块,严格按这个格式(未知键、词表外的词、缺版本号都载入失败):
+reason / boundary / notes 等自由文本优先用 YAML 块字符串 `|-` 换行缩进,尤其含冒号时;坐标和 evidence 用引号包围。
 ```yaml
 schema: migloop-verdict/1
 ledger: <照抄 sessions 输出首行「账本身份:」后面那一串>
@@ -152,7 +161,8 @@ defects:
     nodes:                                  # 展示顺序;相邻两项不代表因果
       - node: file:<账本路径>@v<N>            # 或 agent:<账本 id>@v<K>;坐标照抄工具输出,版本必填
         role: 正常                            # 正常 / 带病传递 / 进入·错 / 进入·缺 / 无法确认
-        reason: <一到三句>
+        reason: |-
+          <一到三句>
         evidence: ["#标识:n@L行", "file:<路径>@v<N>"]
     edges:                                  # 可省;每条对应账本里的一条 写 / 读 / 派发 边;拿不准写 候选 或 省略
       - {from: agent:<id>@v<K>, to: file:<路径>@v<N>, relation: 写}
@@ -180,6 +190,8 @@ ledger 必须照抄本次 sessions 的身份。身份缺失/冲突时历史主�
 evidence 有效仅表示能定位;节点的 reason 仍是你的主张。无法核实就写无法确认,不能自报“已机检”替代验证。
 coverage 仅保证清单逐项有交代,unresolved 不等于已查清;不能为了交齐把所有候选直接宣称无关或已修复。
 候选里的修复可在对应已打开的 agent 节点写原因,repair.after 未有确定版本时可省略;不得虚构 file@v 来安放它。
+目标没有可核文件版本时,root 可用实际打开的 agent:<id>@v<K>,在 notes 写目标路径与版本缺口;
+未建立文件修复清单就不声称覆盖所有文件版本。只有生成期内部修改也应如实标明,不硬称执行结束后的返修。
 """
 
 
@@ -259,6 +271,7 @@ def build_server(backend: Any | None = None) -> Any:
         """版本文件原子:≤v 的写者脊柱(写者 agent 版本/来路/证据标签)、读了这一版的 agent、复原全文。
         v 必填(打开的节点就是 file@v;要看整条脊柱就开最后一版,版本数 sessions 摘要和任何一版的头一行都有);
         via=你现在站的节点(已打开的,逐字照抄 file:<路径>@vN / agent:<id>@vK;第一次可写 sessions),不对不执行。
+        也可照抄 search 返回 hits 的 via,仅能打开那个命中的精确目标,不认证历史读取。
         path 可给文件名、相对路径或绝对路径;content=True 给这一版全文(start/n 裁行窗口)。
         不带 diff = 这一版的脊柱(≤v)与读者;diff=True = 第 v 版相对前一版的 diff;diff=True 加 v_from / v_to = 区间每版完整 diff,
         一页 40 版(创建版只给行数;diff_chars 只在你明确给时才截)。
@@ -266,12 +279,12 @@ def build_server(backend: Any | None = None) -> Any:
         m_n=40 按分档列未记读写的候选,只读检查折叠(m_all=True 铺),m_from 翻页;每条标版本窗口。"""
         ledger, cwd = await _ctx(sid)
         st = via_state(ledger)
-        err = via_mod.check(ledger, st, via)
+        node, target_error = via_mod.target(ledger, "file", path, v)
+        err = via_mod.check(ledger, st, via, node)
         if err:
             return err
-        node, err = via_mod.target(ledger, "file", path, v)
-        if err or node is None:
-            return err or "⛔ 目标文件无法核验,未打开。"
+        if target_error or node is None:
+            return target_error or "⛔ 目标文件无法核验,未打开。"
         out = atoms_text.render_file(ledger, node[1], v, root=cwd, content=content, diff=diff,
                                      start=start, n=n, readers=readers, v_from=v_from, v_to=v_to,
                                      diff_chars=diff_chars, m_from=m_from, m_n=m_n, m_all=m_all)
@@ -286,6 +299,7 @@ def build_server(backend: Any | None = None) -> Any:
         """版本 agent 原子(索引):身份、派发者与派发词全文、收件箱一行一条、≤v 逐版的效应与输入。
         v 必填(打开的节点就是 agent@v;它一共几版看任何一次返回的头一行);
         via=你现在站的节点(已打开的,逐字照抄 file:<路径>@vN / agent:<id>@vK;第一次可写 sessions),不对不执行。
+        也可照抄 search 返回 hits 的 via,仅能打开那个命中的精确目标,不认证历史读取。
         (读按调用合行,绑文件版本,▲旧版/行段/命中行号/写前读等标)、它中途说的话一行一条、收尾输出。
         每条记录带 (#n@L行):action(id, n) 展开原文。id 可带或不带 agent- 前缀,名字唯一也认;
         since 给了只看 (since, v] 这段版本 —— 主会话动辄几百次调用,查它必须带窗口。
@@ -293,12 +307,12 @@ def build_server(backend: Any | None = None) -> Any:
         until=#n:槽截到那条命令为止,之后的输入不算这一版的依据(从一条命令进来只看它之前有什么)。"""
         ledger, cwd = await _ctx(sid)
         st = via_state(ledger)
-        err = via_mod.check(ledger, st, via)
+        node, target_error = via_mod.target(ledger, "agent", id, v)
+        err = via_mod.check(ledger, st, via, node)
         if err:
             return err
-        node, err = via_mod.target(ledger, "agent", id, v)
-        if err or node is None:
-            return err or "⛔ 目标 agent 无法核验,未打开。"
+        if target_error or node is None:
+            return target_error or "⛔ 目标 agent 无法核验,未打开。"
         out = atoms_text.render_agent(ledger, node[1], v, root=cwd, since=since, reads=reads, seen=seen, until=until)
         if via_mod.returned_node(ledger, "agent", out) != node:
             return "⛔ agent 返回的版本与目标不一致,未打开。\n" + out
@@ -331,10 +345,15 @@ def build_server(backend: Any | None = None) -> Any:
         所有文件的已知内容,可找候选来源或检查限定范围内是否有相关记录。第二行是「范围」,零命中不认证需求不存在。
         kind="write" + since_ts / until_ts:那段时间里全池有写能力的命令(file 里「实录外修改 / 内容未知」的版本行给了这个查法),
         q 可空或做过滤;只按时间圈、不解析脚本,是否真改了要 action 打开自己判。
-        agent 模式下在 Bash 里命中、账本没记读写时,命中行带「可能碰到 X」。"""
+        agent 模式下在 Bash 里命中、账本没记读写时,命中行带「可能碰到 X」。
+        返回末尾 hits 带服务端核验的 via=search:<凭据>:<命中号>,可直接打开其精确 kind/key/v;
+        搜索命中不是历史读取关系,无效/未展示/不带确定版本的目标不发凭据。"""
         ledger, cwd = await _ctx(sid)
-        return atoms_text.render_search(ledger, q, agent=agent, v=v, since=since, file=file, after=after,
-                                        since_ts=since_ts, until_ts=until_ts, root=cwd, kind=kind)
+        args = dict(q=q, agent=agent, v=v, since=since, file=file, after=after,
+                    since_ts=since_ts, until_ts=until_ts, kind=kind)
+        hits: list[dict[str, Any]] = []
+        out = atoms_text.render_search(ledger, root=cwd, navigation_hits=hits, **args)
+        return via_mod.search_return(ledger, via_state(ledger), args, out, hits)
 
     @srv.tool(**text_options)
     async def action(sid: str, id: str, seq: int, max_chars: int = 20000, offset: int = 0, find: str = "",

@@ -1,12 +1,16 @@
-"""来处(via):模型任一时刻站在一个节点上,只能从已打开的节点跳。
+"""来处(via):已打开的版本节点,或真实搜索返回的精确命中。
 
 节点只有两种,都带版本:file(path, v) 打开的 file@vN、agent(id, v) 打开的 agent@vK(v 必填,schema 里就是 required)。
-via 必须带版本且逐字等于打开过的某个节点 —— 打开了什么,只能从什么跳。blame / diff / action / search 不移动、不开节点。
+via 节点来处必须带版本且等于打开过的节点;search:<凭据>:<命中号> 是调查事件来处,不是第三种原子。
+blame / diff / action / search 不移动、不开节点。搜索凭据只允许打开该命中的精确版本,不证明历史读取关系。
 第一次 file / agent 允许 via=sessions / task(从返修链摘要进来),之后不允许。校验在服务端做:不对就不执行。
 """
 from __future__ import annotations
 
+import hashlib
+import json
 import re
+import secrets
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -14,6 +18,11 @@ from . import atoms, filestory
 
 NODE_RE = re.compile(r"^(file|agent):(\S+?)(?:@v(\d+))?(?=\s|$)")
 FIRST_TAGS = ("sessions", "task")
+SEARCH_RE = re.compile(r"^search:([0-9a-f]{24}):(\d+)(?=\s|$)")
+SEARCH_RECEIPT = "MIGLOOP_SEARCH_RECEIPT "
+SEARCH_SCHEMA = "migloop-search/1"
+SEARCH_DEFAULTS: dict[str, Any] = {"q": "", "agent": None, "v": None, "since": None, "file": None,
+                                    "after": False, "since_ts": None, "until_ts": None, "kind": None}
 REJECT = "⛔"
 Node = tuple[str, str, int | None]
 
@@ -30,7 +39,7 @@ def trace_identity(ledger: atoms.Ledger, calls: list[dict[str, Any]] | None,
     observations: list[dict[str, Any]] = []
     ignored: list[dict[str, Any]] = []
     for step, call in enumerate(calls or [], 1):
-        if not isinstance(call, dict) or call.get("tool") not in ("sessions", "mcp__migloop__sessions"):
+        if not isinstance(call, dict) or call.get("tool") not in ("sessions", "mcp__migloop__sessions", "search", "mcp__migloop__search"):
             continue
         text = call.get("text")
         provenance = call.get("provenance")
@@ -50,6 +59,13 @@ def trace_identity(ledger: atoms.Ledger, calls: list[dict[str, Any]] | None,
             ignored.append({"step": step, "reason": reason})
             continue
         assert isinstance(text, str)
+        if str(call.get("tool")).endswith("search"):
+            receipt = search_receipt(text, call.get("input") or {})
+            if receipt:
+                observations.append({"identity": receipt["ledger"], "step": step, "source": "search",
+                                     "search_id": receipt["id"], "call_id": call.get("call_id"), "item_id": call.get("item_id"),
+                                     "result_line": call.get("result_line"), "provenance": provenance})
+            continue
         first = next((line for line in text.removeprefix("\ufeff").splitlines() if line.strip()), "")
         header = re.fullmatch(r"账本身份:[ \t]+(\S+)[ \t]*", first)
         if header is None:
@@ -65,11 +81,13 @@ def trace_identity(ledger: atoms.Ledger, calls: list[dict[str, Any]] | None,
     harness_valid = isinstance(harness, str) and bool(re.fullmatch(r"\S+", harness))
     conflict = any(identity != current for identity in identities) or \
         (harness_present and (not harness_valid or harness != current))
-    source = "sessions+harness" if identities and harness_present else \
-             "sessions" if identities else "harness" if harness_present else None
+    sources = [name for name in ("sessions", "search") if any(row.get("source", "sessions") == name for row in observations)]
+    if harness_present:
+        sources.append("harness")
+    source = "+".join(sources) or None
     bound = False if conflict else True if source else None
     status = "mismatch" if conflict else "matched" if source else "legacy"
-    diag = ("查询轨迹身份冲突:成功 sessions 返回或 harness 明示身份与当前账本不一致,不能绑定当前版本与关系。"
+    diag = ("查询轨迹身份冲突:成功 sessions/search 返回或 harness 明示身份与当前账本不一致,不能绑定当前版本与关系。"
             if conflict else "查询轨迹身份未记录:历史调用未认证,不能据此声称当前账本身份已匹配。"
             if source is None else "查询轨迹身份匹配;只确认账本坐标所属,不验证模型缺陷主张。")
     return {"current": current, "bound": bound, "match": bound, "status": status, "source": source,
@@ -80,6 +98,7 @@ def trace_identity(ledger: atoms.Ledger, calls: list[dict[str, Any]] | None,
 @dataclass
 class ViaState:
     opened: list[Node] = field(default_factory=list)
+    searches: dict[str, dict[str, Any]] = field(default_factory=dict)
 
     def has(self, node: Node) -> bool:
         return node in self.opened
@@ -87,6 +106,63 @@ class ViaState:
     def open(self, node: Node) -> None:
         if node not in self.opened:
             self.opened.append(node)
+
+
+def search_args(args: dict[str, Any]) -> dict[str, Any]:
+    return {key: args.get(key, default) for key, default in SEARCH_DEFAULTS.items()}
+
+
+def search_return(ledger: atoms.Ledger, state: ViaState, args: dict[str, Any], text: str,
+                  hits: list[dict[str, Any]]) -> str:
+    """只给渲染器实际展示的精确命中发导航凭据;不解析片段中的自述坐标。"""
+    token = secrets.token_hex(12)
+    targets: list[dict[str, Any]] = []
+    for hit in hits:
+        kind, key, v = hit.get("kind"), hit.get("key"), hit.get("v")
+        if kind not in ("file", "agent") or not isinstance(key, str) or type(v) is not int:
+            continue
+        node, _ = target(ledger, kind, key, v)
+        if node != (kind, key, v):
+            continue
+        number = len(targets) + 1
+        targets.append({"hit": number, "kind": kind, "key": key, "v": v, "seq": hit.get("seq"),
+                        "field": hit.get("field"), "via": f"search:{token}:{number}"})
+    body = text + "\n搜索导航: 下列 hits 的 via 可直接打开其精确 kind/key/v;只证明本次搜索返回命中,不证明历史读取或因果。"
+    receipt = {"schema": SEARCH_SCHEMA, "id": token, "ledger": atoms.ledger_identity(ledger),
+               "args": search_args(args), "body_sha256": hashlib.sha256(body.encode("utf-8")).hexdigest(), "hits": targets}
+    state.searches[token] = receipt
+    return body + "\n" + SEARCH_RECEIPT + json.dumps(receipt, ensure_ascii=False, separators=(",", ":"))
+
+
+def search_receipt(text: str, args: dict[str, Any]) -> dict[str, Any] | None:
+    """原始成功 search 返回的尾部凭据;正文引用/缺尾/参数串用均不能绑定。"""
+    body, marker, footer = text.rstrip("\r\n").rpartition("\n" + SEARCH_RECEIPT)
+    if not marker:
+        return None
+    try:
+        row = json.loads(footer)
+    except (ValueError, TypeError):
+        return None
+    if not isinstance(row, dict) or row.get("schema") != SEARCH_SCHEMA \
+            or not isinstance(row.get("id"), str) or not re.fullmatch(r"[0-9a-f]{24}", row["id"]) \
+            or row.get("args") != search_args(args) \
+            or row.get("body_sha256") != hashlib.sha256(body.encode("utf-8")).hexdigest() \
+            or not isinstance(row.get("ledger"), str) or not row["ledger"] or not isinstance(row.get("hits"), list):
+        return None
+    for i, hit in enumerate(row["hits"], 1):
+        if not isinstance(hit, dict) or hit.get("hit") != i or hit.get("kind") not in ("file", "agent") \
+                or not isinstance(hit.get("key"), str) or type(hit.get("v")) is not int or hit["v"] < 1 \
+                or hit.get("via") != f"search:{row['id']}:{i}":
+            return None
+    return row
+
+
+def search_target(receipt: dict[str, Any], hit: int) -> Node | None:
+    rows = receipt.get("hits") or []
+    if hit < 1 or hit > len(rows):
+        return None
+    row = rows[hit - 1]
+    return row["kind"], row["key"], row["v"]
 
 
 def target(ledger: atoms.Ledger, kind: str, hint: str, v: int | None) -> tuple[Node | None, str | None]:
@@ -135,8 +211,13 @@ def resolve_key(ledger: atoms.Ledger, kind: str, hint: str) -> str | None:
 def parse(ledger: atoms.Ledger, text: str) -> dict[str, Any]:
     """via 原文 → {text, first, kind, key, v, ok}。first = sessions / task 这类入口标签;坐标解析失败 ok=False。"""
     t = str(text or "").strip()
-    out: dict[str, Any] = {"text": t, "first": False, "kind": None, "key": None, "v": None, "ok": False}
+    out: dict[str, Any] = {"text": t, "first": False, "kind": None, "key": None, "v": None, "ok": False,
+                           "search": None, "hit": None}
     if not t:
+        return out
+    search = SEARCH_RE.match(t)
+    if search:
+        out.update(search=search.group(1), hit=int(search.group(2)))
         return out
     low = t.lower()
     if any(low == tag or low.startswith((tag + ":", tag + " ")) for tag in FIRST_TAGS):
@@ -165,10 +246,18 @@ def describe(ledger: atoms.Ledger, state: ViaState) -> str:
     return "、".join(label(ledger, n) for n in state.opened) or "(还没打开任何节点)"
 
 
-def check(ledger: atoms.Ledger, state: ViaState, via: str) -> str | None:
+def check(ledger: atoms.Ledger, state: ViaState, via: str, destination: Node | None = None) -> str | None:
     """file / agent 调用前校验 via。返回 None = 放行;否则返回给模型看的错误文本(以 ⛔ 开头,调用不执行;probe 按这个前缀识别被拒)。"""
     pv = parse(ledger, via)
     opened = describe(ledger, state)
+    if pv["search"]:
+        receipt = state.searches.get(pv["search"])
+        if receipt is None or receipt.get("ledger") != atoms.ledger_identity(ledger):
+            return "⛔ search 来处未登记于本服务器/账本,必须照抄本次 search 返回命中的 via。"
+        node = search_target(receipt, pv["hit"])
+        if node is None or node != destination:
+            return "⛔ search 命中与目标精确坐标不一致,不得换文件、agent 或版本。"
+        return None
     if not pv["text"]:
         return ("⛔ via 缺失:file / agent 是移动,必须带 via=已打开的版本节点(file:<路径>@vN / agent:<id>@vK)。"
                 f"第一次可写 via=sessions。已打开:{opened}")

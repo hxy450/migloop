@@ -20,6 +20,15 @@ from migloop import atoms, probe, verdict
 from tests.test_atoms import MAIN_ID, _call, _ledger, _read_call, _rec
 
 
+def test_yaml_diagnostic_locates_problem_relative_to_block_without_dumping_body():
+    data, errors = verdict.parse_block("yaml", "schema: migloop-verdict/1\nnotes: reason: explanation\n")
+    assert data is None and len(errors) == 1
+    assert "YAML 块第 2 行" in errors[0] and "第 14 列" in errors[0]
+    assert "mapping values" in errors[0] and "notes: reason" not in errors[0]
+    _, errors = verdict.parse_block("yaml", "!!" + "unknown_tag" * 1000 + " value")
+    assert len(errors[0]) < 400
+
+
 def _pool(tmp_path: Any) -> atoms.Ledger:
     """主会话派发 conv-a(读 spec@v1 → 写 A.ets v1)与 fixer(读 A.ets@v1 → 写 v2)。"""
     conv = [_rec("2026-01-01T00:00:00Z", "user", "转换 A"),

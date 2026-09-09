@@ -2,6 +2,14 @@
 
 背景、目的与结论见 [../fixchain-research.md](../fixchain-research.md)。这里只说每个文件是什么。会话本体不在仓里,位置见那份文档 §3。
 
+## 2026-09-09-attribution10/ —— 历史归因与审计分开验收
+
+- [范围与进度](2026-09-09-attribution10/README.md)、[评测协议](2026-09-09-attribution10/protocol.md)：3 个项目池、10 道题、7 个文件任务，GPT-5.5/medium；不是 10 个独立项目，不重跑迁移。
+- `legacy-reference.json` / `codex-reference.json`：有界参考及反证，55 + 26 条原文见证可机械定位；位置正确不等于参考结论不可修订。
+- [pilot 裁决](2026-09-09-attribution10/pilot-adjudication.md)：旧源码、通用整文件任务的三次试跑，不能与后续指向性问题任务直接算版本提升。
+- `prepare_suite.py` 冻结输入/参考并只将中性问题给模型；`audit_run.py` 按该 run 的冻结源码导出审计，不改旧报告。
+- [实现边界](2026-09-09-attribution10/implementation-notes.md)：共享证据标签、并发读取、Codex 消息、搜索跳转与历史关系分离。
+
 ## 2026-09-08-evidence-contracts/ —— 证据契约机械验收（非模型对照实验）
 
 - [audit-summary.json](2026-09-08-evidence-contracts/audit-summary.json)：`26e65b3` 与接手修复版在 0723 上的引用、记录可达性、候选与版本计数。

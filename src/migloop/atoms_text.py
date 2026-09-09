@@ -88,6 +88,8 @@ def _read_tags(r: dict[str, Any]) -> str:
         t.append("命令输出推出")
     if r.get("certain") is False:
         t.append("版本就近绑定(不确定)")
+    if r.get("observation_uncertain"):
+        t.append("读写窗口重叠,观测时刻未确认")
     return f" [{' '.join(t)}]" if t else ""
 
 
@@ -476,7 +478,7 @@ def render_agent(ledger: atoms.Ledger, agent_id: str, v: int | None = None,
         if ag.get("kind"):
             # 它的类型定义(技能 / agent 说明)由 harness 放进系统提示,转录里没有:conv-mine 的「固有尺寸交
             # icon-sizing 自愈」在它全部记录里找不到来源,就是这一层;search 到不了,别把零命中当「杜撰」
-            out.append(f"定义: 类型 {ag['kind']} 的说明来自系统提示,不在转录里 —— 它写的东西若在其记录里找不到来源,多半出自这里")
+            out.append(f"定义: 类型 {ag['kind']} 不证明具体输入;转录中的系统/注入文本可展开核对,未记录的说明仍未知。")
     if ag["prompt"] and since is not None:
         out.append(f"## 派发指令: 见 agent({ag['id']}, v=1)(窗口查询不重印,{len(ag['prompt'])} 字)")
     elif ag["prompt"]:
@@ -652,7 +654,7 @@ def render_action(ledger: atoms.Ledger, agent_id: str, seq: int, max_chars: int 
                   offset: int = 0, find: str = "", part: str | None = None,
                   m_n: int = 40, m_from: int = 1) -> str:
     """一次工具调用的原始输入输出 —— 账本是实录的索引,这里按指针展开原文,不经摘要。
-    part=input/output 可选择翻页侧;不指定时沿用输出优先、无输出则翻输入。"""
+    part=input/output 可选择翻页侧;不指定时共享正文预算,offset/find仍定位输出侧。"""
     import json
 
     raw = atoms.action_raw(ledger, agent_id, seq)
@@ -665,6 +667,8 @@ def render_action(ledger: atoms.Ledger, agent_id: str, seq: int, max_chars: int 
     inp_text = inp if isinstance(inp, str) else json.dumps(inp, ensure_ascii=False, indent=1)
     if part not in (None, "input", "output"):
         return "part 只能是 input 或 output"
+    if max_chars < 1:
+        return "max_chars 必须大于 0"
     if part == "input":
         in_piece, in_note = _window(inp_text, max_chars, offset, find)
         piece, note = "(未展开;part=output 查看)", ""
@@ -672,18 +676,27 @@ def render_action(ledger: atoms.Ledger, agent_id: str, seq: int, max_chars: int 
         in_piece, in_note = "(未展开;part=input 查看)", ""
         piece, note = _window(raw["output"], max_chars, offset, find)
     elif raw["output"]:
-        in_piece, in_note = _clip(inp_text, max_chars // 3), ""
-        piece, note = _window(raw["output"], max_chars, offset, find)
+        # A short stdout must not force an otherwise-fitting script behind a 1/3 preview.
+        # Both displayed bodies share the cap; details remain available per side.
+        in_cap = min(len(inp_text), max(max_chars // 2, max_chars - len(raw["output"])))
+        in_piece, in_note = _window(inp_text, in_cap)
+        piece, note = _window(raw["output"], max_chars - len(in_piece), offset, find)
     else:
         # think / say / 派发词:正文在输入侧,输出为空 —— offset / find 作用在这一侧
         in_piece, in_note = _window(inp_text, max_chars, offset, find)
         piece, note = "(空)", ""
     out = [head]
+    if in_note:
+        in_note += ";part=input 单独展开/翻页"
+    if note:
+        note += ";part=output 单独展开/翻页"
     owner = atoms.resolve_agent(ledger, agent_id)
     out += _scan_note(ledger, owner.id if owner else agent_id, seq)
     eid = atoms.event_id(ledger, agent_id, seq)
     if eid:
-        out.append(f"事件 id {eid}(会话:转录:tool_use_id;解析升级也不变,#n 只是本次建账的句柄)")
+        out.append(f"事件 id {eid}(会话:转录:原始事件ID或行/块;#n 只是本次建账的句柄)")
+    if raw.get("claim_note"):
+        out.append("证据类别: " + str(raw["claim_note"]) + (f" · 来源 {raw['sender']}" if raw.get("sender") else ""))
     links = atoms.action_links(ledger, agent_id, seq)
     if links:
         out.append(f"发自 {links['label']} (id={links['agent']}) v{links['ver']}"
@@ -693,7 +706,8 @@ def render_action(ledger: atoms.Ledger, agent_id: str, seq: int, max_chars: int 
             out.append("## 账本记到的读写 → file(path, v)")
             for f in links["files"]:
                 op = "读" if f["op"] == "read" else "删" if f["op"] == "delete" else "写"
-                out.append(f"- {op} {f['path']}@v{f['v']} → file({f['path']}, v={f['v']})")
+                flags = _read_tags(f) if f["op"] == "read" else ""
+                out.append(f"- {op} {f['path']}@v{f['v']}{flags} → file({f['path']}, v={f['v']})")
         if links["possible"]:
             total = len(links["possible"])
             size, start = max(0, min(int(m_n), 200)), max(1, int(m_from))
@@ -953,16 +967,36 @@ def _next_hint(h: dict[str, Any], root: str) -> str:
     return f"→ action(#{h['seq']}) 展开原文"
 
 
-def _render_pool_search(ledger: atoms.Ledger, q: str, until_ts: str, since_ts: str | None, root: str) -> str:
+def _navigation_hit(ledger: atoms.Ledger, hits: list[dict[str, Any]] | None,
+                    kind: str, key: str, v: Any, seq: Any, field: str) -> None:
+    """Expose only a displayed hit's exact existing target; not a historical relation."""
+    if hits is None or not isinstance(v, int) or isinstance(v, bool) or v < 1:
+        return
+    if kind == "file":
+        story = ledger.stories.get(key)
+        if story is None or v > len(story.versions):
+            return
+    elif kind == "agent":
+        owner = ledger.agents.get(key)
+        if owner is None or v > owner.n_versions:
+            return
+    else:
+        return
+    hits.append({"kind": kind, "key": key, "v": v, "seq": seq, "field": field})
+
+
+def _render_pool_search(ledger: atoms.Ledger, q: str, until_ts: str, since_ts: str | None, root: str,
+                        navigation_hits: list[dict[str, Any]] | None = None) -> str:
     res = atoms.search_pool(ledger, q, until_ts, since_ts)
     win = f"{since_ts} ~ {until_ts}" if since_ts else f"≤ {until_ts}"
     out = [f"# search 「{q}」 全池 {win}  文件 {len(res['files'])} 个 · agent {len(res['agents'])} 个",
            f"范围: 这一刻之前 {res['n_agents']} 个 agent 的全部记录 + {res['n_files']} 个文件到这一刻为止的已知内容"
            + (f";内容未知 {res['unknown_versions']} 版查不了" if res["unknown_versions"] else "")
-           + " —— 这个范围内的零命中才可以写成「那一刻之前没人见过」,引用时把这一行抄上"]
+           + " —— 零命中只支持「此范围内未检索到」,不证明此前无人见过或要求不存在;引用时把范围抄上"]
     if res["files"]:
         out.append("## 文件里(每个文件只报首次出现)")
         for r in res["files"][:30]:
+            _navigation_hit(ledger, navigation_hits, "file", r["path"], r["v"], r.get("seq"), "content")
             ref = " " + _ref(r["seq"], r.get("t"), r.get("line")) if r.get("seq") else ""
             out.append(f"- {rel(r['path'], root)}@v{r['v']} ← {_who(ledger, r['by'], r['by_ver'])}{ref} · 命中 {r['n']} 行"
                        f"  → search(q, file=) 看逐版;file(path, v={r['v']}) 看写者")
@@ -974,6 +1008,8 @@ def _render_pool_search(ledger: atoms.Ledger, q: str, until_ts: str, since_ts: s
         out.append("## agent 的记录里(每个 agent 只报最早一条)")
         for a in res["agents"][:30]:
             h = a["first"]
+            _navigation_hit(ledger, navigation_hits, "agent", a["agent"],
+                            h.get("ver") if h.get("ver") is not None else h.get("at"), h.get("seq"), h["kind"])
             where = ", ".join(rel(p, root) for p in (h.get("targets") or [])[:2])
             out.append(f"- {a['label']} · 命中 {a['n']} 条 · 最早 {_SEARCH_KIND.get(h['kind'], h['kind'])}"
                        + (f" {where}" if where else "") + " " + _ref(h["seq"], h.get("t"), h.get("line"))
@@ -1009,17 +1045,17 @@ def _render_window_writes(ledger: atoms.Ledger, q: str, since_ts: str | None, un
 def render_search(ledger: atoms.Ledger, q: str, agent: str | None = None, v: int | None = None,
                   since: int | None = None, file: str | None = None, after: bool = False,
                   since_ts: str | None = None, until_ts: str | None = None, root: str = "",
-                  kind: str | None = None) -> str:
+                  kind: str | None = None, navigation_hits: list[dict[str, Any]] | None = None) -> str:
     """带起点的按词查找。agent=:只看它喂养第 v 版及之前的记录(或 since_ts/until_ts 时间区间);
-    file=:只看它到第 v 版为止的内容和读者。没有起点不搜 —— 「提到过」不等于「上游」,每一跳都要有账本里的边。
+    file=:只看它到第 v 版为止的内容和读者。搜索命中可用于调查导航,不证明历史读写或因果关系。
     kind=write:时间窗口里全池有写能力的命令(断点窗口候选),q 可空。"""
     if kind == "write":
         return "\n".join([*_scan_note(ledger), _render_window_writes(ledger, q, since_ts, until_ts, root)])
     if not agent and not file:
         if not until_ts:
             return ("search 要么带起点(agent= 或 file=),要么全池但只允许带时间上限:search(q, until_ts=…)。"
-                    "全池查只用来核否定(「那一刻之前没人见过 X」),找上游仍要顺 agent / file 的边走。")
-        return "\n".join([*_scan_note(ledger), _render_pool_search(ledger, q, until_ts, since_ts, root)])
+                    "全池查可发现上游候选或核限定范围的零命中;搜索跳转不证明历史关系。")
+        return "\n".join([*_scan_note(ledger), _render_pool_search(ledger, q, until_ts, since_ts, root, navigation_hits)])
     if agent:
         res = atoms.search_agent(ledger, agent, q, v, since, after, since_ts, until_ts)
         if res is None:
@@ -1028,7 +1064,7 @@ def render_search(ledger: atoms.Ledger, q: str, agent: str | None = None, v: int
                  else f"≤ v{res['v']}" + (f"(窗口 v{since + 1}–v{res['v']})" if since is not None else ""))
         out = [f"# search 「{q}」 in agent {res['label']}  {scope}  命中 {len(res['hits'])} 条记录",
                "范围: 只有这个 agent 的记录(派发词 / 读到的内容 / 写入 / 命令 / 说 / 想 / 收件 / 注入);别的 agent 和文件内容不在内。"
-               "零命中只能写「它在这个范围内没见过」;要写「那一刻之前没人见过」用 search(q, until_ts=那一刻) 全池查"]
+               "零命中只支持「此范围内未检索到」;可用 search(q, until_ts=那一刻) 扩大全池范围,仍不证明无人见过或要求不存在"]
         groups: dict[str, list[dict[str, Any]]] = {}
         owner = atoms.resolve_agent(ledger, agent)
         out += _scan_note(ledger, owner.id if owner else agent)
@@ -1037,13 +1073,19 @@ def render_search(ledger: atoms.Ledger, q: str, agent: str | None = None, v: int
         for kind, hs in groups.items():
             out.append(f"## {_SEARCH_KIND.get(kind, kind)}({len(hs)})")
             for h in hs[:20]:
+                if owner:
+                    _navigation_hit(ledger, navigation_hits, "agent", owner.id,
+                                    h.get("ver") if h.get("ver") is not None else h.get("at"), h.get("seq"), h["kind"])
                 where = ""
                 if h["kind"] in ("read", "write", "delete") and h.get("target"):
+                    _navigation_hit(ledger, navigation_hits, "file", h["target"], h.get("target_v"), h.get("seq"), h["kind"])
                     where = f" {rel(h['target'], root)}@v{h.get('target_v')}"
                 elif h.get("targets"):
                     where = " " + ", ".join(rel(p, root) for p in h["targets"][:3])
                 if h.get("possible"):
                     where += " · 可能碰到 " + ", ".join(rel(p, root) for p in h["possible"][:3])
+                if h.get("claim_note"):
+                    where += " · 消息主张(未独立核验)" + (" 来自 " + str(h["sender"]) if h.get("sender") else "")
                 fed = "" if h["seq"] is None else (f" 效应 v{h['ver']}" if h["ver"] is not None else f" 喂 v{h['at']}")
                 late = " (锚点之后)" if h.get("after") else ""
                 ref = "" if h["seq"] is None else " " + _ref(h["seq"], h.get("t"), h.get("line"))
@@ -1075,6 +1117,7 @@ def render_search(ledger: atoms.Ledger, q: str, agent: str | None = None, v: int
     i = 0
     while i < len(rows):
         row = rows[i]
+        _navigation_hit(ledger, navigation_hits, "file", res2["path"], row["v"], row.get("seq"), "content")
         ref = " " + _ref(row["seq"], row.get("t"), row.get("line")) if row.get("seq") else ""
         out.append(f"- v{row['v']} ← {_who(ledger, row['by'], row['by_ver'])}{ref} · 命中 {row['n']} 行"
                    + ("(部分内容:脚本字面量)" if row.get("partial") else "")
@@ -1092,6 +1135,7 @@ def render_search(ledger: atoms.Ledger, q: str, agent: str | None = None, v: int
     if res2["readers"]:
         out.append(f"## 读者的读结果里命中过({len(res2['readers'])})")
         for r in res2["readers"]:
+            _navigation_hit(ledger, navigation_hits, "agent", r["by"], r["at"], r.get("seq"), "read")
             ref = " " + _ref(r["seq"], r.get("t"), r.get("line")) if r.get("seq") else ""
             out.append(f"- {_who(ledger, r['by'], r['at'])} 读 @v{r['v']}{ref} · 命中 {r['n']} 行")
             for ln, snip in r["snips"]:

@@ -1,0 +1,236 @@
+{
+  "schema": "migloop-attribution-pilot-adjudication/1",
+  "date": "2026-09-09",
+  "scope": {
+    "kind": "generic-full-file-pilot",
+    "not_formal_same_question_result": true,
+    "reference": "legacy-reference.json",
+    "reference_sha256": "2c015536094fff1e42bb3b6b5cc2dce743c0f2a0f6924254027f7f8a5faac927",
+    "witness_check": "55/55 locators passed; locator authentication is not a truth judgment",
+    "limits": [
+      "The pilot reports answered generic full-file prompts rather than the six pointed reference questions.",
+      "An unmentioned reference fact is recorded as an omission, not converted into a false claim.",
+      "The bounded reference is used with its stated unknowns; build success is not device-behaviour proof."
+    ]
+  },
+  "artifacts": [
+    {
+      "case": "dice-entry",
+      "report": "_migloop-eval-20260909/attribution10/baseline-18ca512/dice-entry/runs/tools/rep1/result.json:5",
+      "final_status": "completed",
+      "reference_cases": ["D1", "D2"]
+    },
+    {
+      "case": "splash",
+      "report": "_migloop-eval-20260909/attribution10/baseline-18ca512/splash/runs/tools/rep1/result.json:5",
+      "final_status": "completed",
+      "reference_cases": ["S1", "S2"]
+    },
+    {
+      "case": "member-center",
+      "report": "_migloop-eval-20260909/attribution10/baseline-18ca512/member-center/runs/tools/rep1/result.json:5",
+      "final_status": "completed",
+      "reference_cases": ["S3", "S4"]
+    }
+  ],
+  "cases": [
+    {
+      "id": "D1",
+      "coverage": "partial",
+      "facts": [
+        {
+          "confidence": "high",
+          "finding": "The report correctly separates the original conversion from the later UI-test phase: the known conversion input covered MainActivity/F001/immersive work, while the later design and Step3 dispatch explicitly introduced the Want-to-AppStorage bridge and v4-v6 edits.",
+          "report_locator": "dice-entry result.json:5; report evidence #a349784d2663f1f0a:4062@L71 and #a711c5d09fb676814:5025/5027/5029",
+          "support": [
+            "dice-entry/pool/81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a70e555065a1dddd1.jsonl:36 tool_use_id=call_f8b1ccd728e44d5fab88531c",
+            "dice-entry/pool/81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a711c5d09fb676814.jsonl:37 tool_use_id=call_6c1a4dd0da164350a549d420",
+            "dice-entry/pool/81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a711c5d09fb676814.jsonl:39 tool_use_id=call_04086bf7960b46e7b2a00be4"
+          ]
+        },
+        {
+          "confidence": "high",
+          "finding": "It properly limits zero-hit searches to known content and does not claim that all unknown or external inputs lacked the requirement.",
+          "report_locator": "dice-entry result.json:5, defect A boundary and notes"
+        }
+      ],
+      "omissions": [
+        {
+          "confidence": "medium",
+          "finding": "The report mentions the later builder touch as a non-repair version but does not clearly state what validation succeeded, nor that compilation would still not establish that the test bridge ran on a device.",
+          "counterevidence": [
+            "legacy-reference.json D1 unknown: build does not prove the device bridge ran",
+            "dice-entry result.json:5 coverage for EntryAbility@v7"
+          ]
+        }
+      ],
+      "unsupported": []
+    },
+    {
+      "id": "D2",
+      "coverage": "partial",
+      "facts": [
+        {
+          "confidence": "high",
+          "finding": "The report correctly identifies the ECAT feedback and targeted dispatch as later requirements, then attributes the import, registration call, and observer implementation to v8-v10 rather than automatically blaming the initial converter.",
+          "report_locator": "dice-entry result.json:5, defect B",
+          "support": [
+            "dice-entry/pool/2f01bcdc-0a92-4961-a64d-5b181f03b3d3/subagents/agent-a27497cfed8c44856.jsonl:41 tool_use_id=call_7013085c03274c8183fdd455",
+            "dice-entry/pool/2f01bcdc-0a92-4961-a64d-5b181f03b3d3/subagents/agent-a27497cfed8c44856.jsonl:45 tool_use_id=call_b6682a6aab774d88b1d1871d"
+          ]
+        }
+      ],
+      "omissions": [
+        {
+          "confidence": "high",
+          "finding": "The report omits the post-repair builder evidence: BUILD_EXIT_CODE=0 and WARN output. It also omits the essential boundary that this build did not actively trigger and observe an uncaught exception callback.",
+          "counterevidence": [
+            "dice-entry/pool/2f01bcdc-0a92-4961-a64d-5b181f03b3d3/subagents/agent-a635575c78cd15ff6.jsonl:48 contains BUILD_EXIT_CODE=0",
+            "dice-entry/pool/2f01bcdc-0a92-4961-a64d-5b181f03b3d3/subagents/agent-a635575c78cd15ff6.jsonl:52 contains WARN",
+            "legacy-reference.json D2 unknown: no active uncaught-exception callback certification"
+          ]
+        }
+      ],
+      "unsupported": []
+    },
+    {
+      "id": "S1",
+      "coverage": "partial",
+      "facts": [
+        {
+          "confidence": "high",
+          "finding": "The report correctly records that the converter received the disabled-BACK contract and wrote an initial NavDestination onBackPressed interception; it also distinguishes the later Slice 11 isModal assumption, the historical finding, and the onWillDismiss patch.",
+          "report_locator": "splash result.json:5, defect A",
+          "support": [
+            "splash/pool/9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aconv-splash-9d5902d803bbcde6.jsonl:71 tool_use_id=toolu_01Np1dfx5cY3fQ9uZrHBVkbq",
+            "splash/pool/9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aslice11-startup-50a0622bcfe4a588.jsonl:236 tool_use_id=toolu_01HK6amCmnLqbfQFefbryS7b",
+            "splash/pool/ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl:346 tool_use_id=toolu_01DzVErQMcevEwF2f5T3E1U8"
+          ]
+        }
+      ],
+      "omissions": [
+        {
+          "confidence": "high",
+          "finding": "The causal middle is missing: entry-setup replaced the page with a Navigation shell, removed the original interception, and documented the D-020 shell compromise. Merely listing entry-setup in entry[] does not explain this transition.",
+          "counterevidence": [
+            "splash/pool/9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aentry-setup-07108f5df45c357c.jsonl:123 tool_use_id=toolu_013Nfm3n767E96Qvd74pqbfv (before interception and after Navigation/D-020 comment)",
+            "same file:124 tool_use_id=toolu_013Nfm3n767E96Qvd74pqbfv confirms successful update"
+          ]
+        },
+        {
+          "confidence": "high",
+          "finding": "It omits the later successful builder and therefore does not separate the fixer's own lack of rebuild from the pool-wide post-fix build evidence; it also does not state that onWillDismiss lacked repaired-device closure.",
+          "counterevidence": [
+            "splash/member shared pool ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-af0e3d2ae54dbf769.jsonl:37 contains EXIT=0 and BUILD SUCCESSFUL",
+            "legacy-reference.json S1 unknown: historical platform explanation is not independent repaired-device verification"
+          ]
+        }
+      ],
+      "unsupported": []
+    },
+    {
+      "id": "S2",
+      "coverage": "partial",
+      "facts": [
+        {
+          "confidence": "high",
+          "finding": "The report does not falsely claim that windowFullscreen first appeared during repair: it says the fact existed in the pre-generation pool and carefully limits the narrower zero-hit statement to conv-splash's own observed range. The later hide/restore edits are also described.",
+          "report_locator": "splash result.json:5, defect D and notes",
+          "support": [
+            "splash/pool/9b3105a2-85ec-4889-9786-b3c220f06754.jsonl:404 contains windowFullscreen",
+            "splash/pool/ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl:485 tool_use_id=toolu_016H83iNne123bAaGFHtEhwF",
+            "same file:488 tool_use_id=toolu_01RknAJc4tUhzwpypigkLeRv"
+          ]
+        }
+      ],
+      "omissions": [
+        {
+          "confidence": "high",
+          "finding": "It fails to identify the strongest pre-generation witness: the main session actually received/read theme content containing windowFullscreen=true before the Splash write. It also does not fully enumerate the page_type/full_screen and safe-area inputs, leaving the transmission boundary less precise than the reference.",
+          "counterevidence": [
+            "splash/pool/9b3105a2-85ec-4889-9786-b3c220f06754.jsonl:404 contains windowFullscreen",
+            "splash/pool/9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aconv-splash-9d5902d803bbcde6.jsonl:1 and :71 bracket dispatch and write"
+          ]
+        }
+      ],
+      "unsupported": []
+    },
+    {
+      "id": "S3",
+      "coverage": "materially_incomplete",
+      "facts": [
+        {
+          "confidence": "high",
+          "finding": "The report at least recognizes the systemic mask script candidate and the outer output saying MemberCenterPage had 3 modified sites with an added import.",
+          "report_locator": "member-center result.json:5, candidate b30f4e449bea2bd6cc42"
+        }
+      ],
+      "omissions": [
+        {
+          "confidence": "high",
+          "finding": "It does not name the three scanned controllers (AppLoadDialog, PayAgreementDialog, RenewRuleDialog), does not distinguish AppLoad's transparent branch from the two Palette.DIALOG_MASK branches, and omits that an already-transparent H5 controller was skipped.",
+          "counterevidence": [
+            "member-center/pool/ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl:81 lists all three builders",
+            "same file:103 tool_use_id=toolu_01T6WkXMhD7rUsHaSaMPuhgx contains the AppLoad Color.Transparent branch, the other-controller Palette.DIALOG_MASK branch, skip-if-maskColor logic, and file write",
+            "same file:104 tool_use_id=toolu_01T6WkXMhD7rUsHaSaMPuhgx reports 3 sites for MemberCenterPage",
+            "member-center/pool/9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aslice8-pay-80bbb1f44b77da0f.jsonl:264 contains h5PayDialog and Color.Transparent"
+          ]
+        }
+      ],
+      "unsupported": [
+        {
+          "confidence": "high",
+          "finding": "The blanket conclusion that only script output/self-report is known and the target's exact changes cannot be reconstructed is too strong. The frozen command input contains the transformation branches and write operation, and its paired native tool result reports successful modification of exactly three MemberCenter sites. What remains unproved is repaired device behaviour, not which values this script applied at those scanned sites.",
+          "report_locator": "member-center result.json:5, candidate b30f4e449bea2bd6cc42 and opening summary",
+          "counterevidence": [
+            "member-center/pool/ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl:81",
+            "same file:103-104 tool_use_id=toolu_01T6WkXMhD7rUsHaSaMPuhgx"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "S4",
+      "coverage": "substantially_complete",
+      "facts": [
+        {
+          "confidence": "high",
+          "finding": "The report correctly traces the pre-write Kotlin numeric-span input to the later all-30vp implementation, distinguishes the intermediate splitPriceRuns approach from the final two fixed Spans, attributes the private-helper compile error to the visual repair, and records the narrow visibility fix plus subsequent successful build.",
+          "report_locator": "member-center result.json:5, defects B and D",
+          "support": [
+            "member-center/pool/9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aslice8-pay-80bbb1f44b77da0f.jsonl:24 contains replaceSpan",
+            "member-center/pool/ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl:528 contains ForEach and splitPriceRuns",
+            "same file:592 contains priceDigits, priceSuffix, and private static",
+            "member-center/pool/ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-af0e3d2ae54dbf769.jsonl:24 contains the private-access compile error",
+            "same file:32 and :34 remove private; :37 contains EXIT=0 and BUILD SUCCESSFUL"
+          ]
+        },
+        {
+          "confidence": "high",
+          "finding": "Its final notes appropriately stop short of claiming that compilation validates all price formats or device visuals.",
+          "report_locator": "member-center result.json:5, notes"
+        }
+      ],
+      "omissions": [],
+      "unsupported": []
+    }
+  ],
+  "mechanical_audit": {
+    "artifact": "_migloop-eval-20260909/attribution10/audits/pilot-member-center.json",
+    "scope": "member-center only",
+    "findings": {
+      "integrity": "pool/source/task unchanged; trace identity matched",
+      "nodes": "8/8 resolved",
+      "evidence_refs": "28 ok",
+      "coverage": "reported complete by the structural parser",
+      "trajectory": "10 visits all unverified; no painted trajectory root"
+    },
+    "interpretation": "The unverified trajectory is a GPT-5.5-native-output parser/transport limitation in the old 18ca512 audit path, not semantic evidence against the model and not evidence of a new-fix effect. Structural verdict_ok/coverage_complete does not override the S3 factual miss."
+  },
+  "summary": {
+    "substantially_complete": ["S4"],
+    "partial_but_no_material_false_claim_found": ["D1", "D2", "S1", "S2"],
+    "materially_incomplete_with_overstrong_unknown_claim": ["S3"],
+    "overall": "The generic pilot recovered the main phase boundaries well. Its largest semantic failure is the MemberCenter mask script; its recurring omission is validation evidence and the build-versus-device distinction."
+  }
+}

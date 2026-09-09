@@ -66,6 +66,11 @@ function coverageFixture(body){
 }
 const versions=[1,2,3].map(v=>({v,by:v===2?'agent-b':'agent-a',by_name:v===2?'Agent B':'Agent A',by_ver:v===3?2:1,ts:'2026-01-01T00:00:0'+v+'Z',lines:1,content_known:false,source:'opaque'}));
 const agents=['agent-a','agent-b'].map(id=>({id,label:id==='agent-a'?'Agent A':'Agent B',n_versions:id==='agent-a'?2:1,kind:'agent',session:'fixture',reads:[],writes:[],actions:[],inbox:[]}));
+agents[0].reads=[
+  {path:file,v:1,at:1,certain:false,dep:false,observation_uncertain:true},
+  {path:file,v:1,at:1,certain:true,dep:false,observation_uncertain:false},
+  {path:file,v:2,at:1,certain:false,dep:true,observation_uncertain:true}
+];
 const data={sid:'fixture',sid8:'fixture',project:'Trace fidelity regression',urls:{data:'/data',atom:'/atom',probe:'/probe',filediff:'/diff',report:null}};
 const html=fs.readFileSync(path.join(repo,'src/migloop/render/templates/fixchain.html'),'utf8').replace('__FIXCHAIN_JSON__',JSON.stringify(data));
 const server=http.createServer((req,res)=>{
@@ -113,6 +118,20 @@ const server=http.createServer((req,res)=>{
     }
     if(run==='other-calls') body.steps.push({i:8,tool:'Bash',ok:true,args:{command:'read-only'},provenance:{format:'claude_transcript',path:'transcript.jsonl'}});
     if(run==='legacy'){body.structured=null;body.legacy=true;delete body.trace_identity;}
+    if(run==='relations'){
+      const red={...legacyRole,v:3,reason:'两端红也不把探索线染红'};
+      body.roles[file].push(red);body.structured.defects[0].nodes.push(claim(red));
+      Object.assign(body.trajectory.transitions[0],{relation_status:'unknown',relation_label:'候选·条件读取待核',relation_note:'条件分支中提到，是否读到未知',relation_evidence:[{seq:11,basis:'conditional_read',source:'/fixture/original.jsonl',use_line:4,result_line:5}]});
+      body.trajectory.nodes[1].relation_check={...body.trajectory.transitions[0]};
+      Object.assign(body.trajectory.transitions[1],{relation_status:'true',relation:'写者 v3',relation_label:'账本·写者 v3',relation_note:'写于 agent v1'});
+      body.trajectory.transitions.slice(2).forEach(t=>Object.assign(t,{relation_status:'false',relation_label:'查询导航·未核出直接账本边'}));
+      const source={id:'abc',step:8,hit:1,call_id:'toolu_search_8',item_id:null,result_line:16,note:'只证明原生 search 返回，不证明外层执行包装完整转交模型'};
+      body.steps.push({i:8,tool:'search',args:{q:'correct spec'},ok:true});
+      body.trajectory.searches=[{...source,status:'verified',hits:[{kind:'file',key:file,v:1}]}];
+      body.trajectory.nodes[3].opened=[9];body.trajectory.nodes[3].source='查过';body.trajectory.nodes[3].search_source=source;
+      body.trajectory.transitions.push({step:9,from:null,to:fid+'@1',source:'search',search_source:source,relation:null,relation_status:'not_checked',relation_label:'搜索 #8 命中 1 · 查询导航',relation_note:source.note});
+      body.trajectory.visits.push({step:9,tool:'file',node:fid+'@1',requested_node:fid+'@1',status:'opened',verified:true,via:'search:abc:1',search_source:source,args:{path:file,v:1}});
+    }
     if(run==='navigation'){
       const added=[
         {id:fid+'@2',kind:'file',key:file,v:2,label:'A.ets@v2',parent:root,side:'up',source:'查过',opened:[8]},
@@ -221,6 +240,21 @@ async function main(){
     await check('identical basenames at different full paths remain exploratory jumps',"__mig.xt().transitions.find(t=>t.step===10).navigation==='探索跳转：未核出直接账本边' && [...document.querySelectorAll('#canvas .node')].some(n=>n.title.startsWith('/else/A.ets'))");
     await evaluate("[...document.querySelectorAll('#canvas .node')].find(n=>n.textContent.startsWith('A.ets@v2')).click()");
     await check('file drawer uses neutral navigation badge and a noncausal note',"document.querySelector('#side .pill.navigation').textContent==='同文件版本导航' && !document.querySelector('#side .pill.navigation').classList.contains('warn') && document.querySelector('#side').textContent.includes('查询导航,不是因果边')");
+    await evaluate("__mig.load('relations')");
+    await until("document.querySelectorAll('.wire.route').length===6");
+    await check('uncertain relation has distinct text, amber dotted stroke and original note',"(()=>{const p=document.querySelector('.wire.route[data-step=\"2\"]');return p.dataset.relationStatus==='unknown' && getComputedStyle(p).stroke==='rgb(155, 116, 29)' && getComputedStyle(p).strokeDasharray==='2px, 4px' && p.querySelector('title').textContent.includes('条件读取待核') && document.querySelector('.route-step[data-step=\"2\"]').textContent.includes('候选') && document.querySelector('.badge.relation-candidate').textContent.includes('条件读取待核')})()");
+    await check('verified relation keeps blue with explicit ledger text',"(()=>{const p=document.querySelector('.wire.route[data-step=\"3\"]');return p.dataset.relationStatus==='true' && getComputedStyle(p).stroke==='rgb(43, 108, 176)' && document.querySelector('.route-step[data-step=\"3\"]').textContent.includes('账本')})()");
+    await check('two red endpoints never turn an exploratory route into a red causal edge',"(()=>{const p=document.querySelector('.wire.route[data-step=\"6\"]');return document.querySelectorAll('#canvas .node.p-chain').length>=2 && !p.classList.contains('chain') && getComputedStyle(p).stroke==='rgb(102, 120, 143)' && getComputedStyle(p).strokeDasharray==='5px, 3px'})()");
+    await check('search event is visible without a third atom or fake parent read',"document.querySelector('.wire.route[data-step=\"9\"]').dataset.source==='search' && document.querySelector('.route-step[data-step=\"9\"]').textContent.includes('搜索 #8 → #9') && __mig.xt().transitions.find(t=>t.step===9).a===null && Object.values(__mig.xt().byId).filter(n=>n.traj).every(n=>['file','agent'].includes(n.kind))");
+    await evaluate(clickAgent);
+    await check('candidate drawer keeps original relation evidence',"document.querySelector('#side .relation-evidence').textContent.includes('/fixture/original.jsonl') && document.querySelector('#side .relation-evidence').textContent.includes('conditional_read')");
+    await evaluate("[...document.querySelectorAll('#canvas .node')].find(n=>n.textContent.startsWith('A.ets@v1')).click()");
+    await check('search navigation drawer retains actual call and forwarding boundary',"document.querySelector('#side .search-source').textContent.includes('toolu_search_8') && document.querySelector('#side .search-source').textContent.includes('不证明外层')");
+    await evaluate(clickAgent+";document.querySelector('#side .rootbtn').click()");
+    await until("__mig.xt().walk!==true && document.querySelectorAll('.wire.relation-uncertain').length===1");
+    await check('manual ledger browsing preserves uncertain read flags without treating them as definite edges',"(()=>{const p=document.querySelector('.wire.relation-uncertain');return !p.classList.contains('chain') && getComputedStyle(p).stroke==='rgb(155, 116, 29)' && document.querySelector('#canvas').textContent.includes('读取窗口重叠') && Object.values(__mig.xt().byId).find(n=>n.kind==='file'&&n.anchorV===1).relationUncertain===false})()");
+    await evaluate("__mig.setCand(false)");
+    await check('uncertain recorded reads are not hidden by the lexical candidate toggle',"Object.values(__mig.xt().byId).filter(n=>n.relationUncertain).every(n=>!n.possible&&!n.hidden) && document.querySelectorAll('.wire.relation-uncertain').length===1");
     await evaluate("__mig.load('coverage')");
     await until("__mig.xt() && __mig.xt().walk && document.querySelectorAll('.wire.route').length===5");
     await check('coverage distinguishes accounted items, missing versions and unconfirmed candidates',"document.querySelector('.coverage-summary').textContent==='已交代 3/5 项 · 尚未有效交代 2 项' && document.querySelector('.repair-coverage').textContent.includes('记录版本 3 个 · 未确认候选 2 个（候选不等于修复）') && document.querySelector('.repair-coverage').textContent.includes('尚未登记：记录版本 1 个、候选 1 个')");

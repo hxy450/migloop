@@ -1,0 +1,90 @@
+{
+  "schema": "migloop-attribution-reference/1",
+  "status": "bounded-reference-requires-source-verification",
+  "cases": [
+    {
+      "id": "D1",
+      "pool": "dice",
+      "target_file": "entry/src/main/ets/entryability/EntryAbility.ets",
+      "question": "EntryAbility 的测试参数桥为何在后续阶段加入？生成时已有输入、后续要求及验证各能确认到什么程度？",
+      "facts": [
+        "生成方实际读取页面/F001/沉浸式输入，已记录的生成 Write 未含后来测试桥。",
+        "UI 测试设计及后续派发明确要求 Want→AppStorage 测试桥，实施方以成功 Edit 加入。",
+        "生成时刻与后续测试阶段须分开，不将后置明确要求自动认定为初始生成遗漏。"
+      ],
+      "inferences": ["已知输入支持阶段性扩展解释；更早的所有隐含规则是否同样要求测试桥尚未证明。"],
+      "unknown": ["未完整记录的系统说明和运行时上下文不能由关键词零命中排除。", "构建不证明设备测试桥实际运行成功。"],
+      "must_reject": ["初始生成者明确违反了早已有证据的测试桥要求。", "池内关键词零命中证明此前绝无这项需求。", "编译通过等于 UI 测试已闭环。"],
+      "evidence_ids": ["D01", "D03", "D04", "D05", "D06", "D07", "D08", "D09", "D10", "D13", "D15", "D16", "D17"]
+    },
+    {
+      "id": "D2",
+      "pool": "dice",
+      "target_file": "entry/src/main/ets/entryability/EntryAbility.ets",
+      "question": "全局异常观察者是何时、基于什么要求加入，后续验证实际证明了什么？",
+      "facts": ["ECAT 修复派发明确要求注册全局未捕获异常观察者。", "修复方读取入口和 SDK 后，三次成功 Edit 加入 import、注册调用和观察者实现。", "后置 builder 有直接成功构建日志，也有 may-throw 类 WARN。"],
+      "inferences": ["可以确认 ECAT 阶段明确扩展门禁，尚不足以归责初始 converter 违反已传入要求。"],
+      "unknown": ["没有以主动触发未捕获异常来认证 observer 回调及日志回收。", "不能由当前已打开输入断言所有早期系统规则均不包含此要求。"],
+      "must_reject": ["后续没有编译。", "新增 WARN 等于构建失败。", "构建成功证明异常回调已触发。"],
+      "evidence_ids": ["D06", "D18", "D19", "D20", "D21", "D22", "D24", "D25", "D26", "D-build", "D-warn"]
+    },
+    {
+      "id": "S1",
+      "pool": "aippt0723",
+      "target_file": "entry/src/main/ets/pages/SplashPage.ets",
+      "question": "隐私启动页返回处理经历了哪些写入和修复，最初实现、装配变化、Slice 11 决策及后置验证应如何分别归因？",
+      "facts": ["初版已有 onBackPressed 拦截代码及返回禁用的源要求，不能说初版完全没有实现。", "entry-setup 将页面装配为 Navigation 外壳时删除原拦截，后续 D-020 接受页面外壳的行为差异。", "Slice 11 为隐私控制器写入 isModal 会吃掉系统返回的解释；历史 finding 反驳该解释，修复追加 onWillDismiss。", "后置另一 builder 成功构建，不能把 fixer 自身不重编扩大成整个池没有构建。"],
+      "inferences": ["已有返回契约在装配/后续接线中未被完整保持；页面外壳的豁免不自动等于隐私弹窗行为也豁免。"],
+      "unknown": ["初版存在拦截代码不认证初版设备行为正确。", "历史 finding 对平台行为的解释与本次独立设备验证不同；没有修后行为闭环证据时须保留。"],
+      "must_reject": ["初版 converter 没有获得返回禁用要求且完全没写拦截。", "fixer 不重编所以后面没有构建。", "onWillDismiss 已由本次调查在设备上验证。"],
+      "evidence_ids": ["S01", "S02", "S04", "S05", "S07", "S08", "S09", "S10", "S11", "S13", "S15", "S16", "S17", "S18", "S19", "S20", "M-build-ok"]
+    },
+    {
+      "id": "S2",
+      "pool": "aippt0723",
+      "target_file": "entry/src/main/ets/pages/SplashPage.ets",
+      "question": "开屏系统栏显隐要求何时已有、生成方实际获得了什么，后续修复是新增要求还是已有信息没有传递？",
+      "facts": ["生成 Write 之前，主会话的原始读取结果已经包含主题 windowFullscreen=true。", "已核生成输入有 page_type/full_screen、沉浸式和安全区信息，但尚未建立主题细节到页面生成的完整传递证据。", "后续修复增加入页隐藏及离页/跳转时恢复系统栏。"],
+      "inferences": ["已有要求的传递/读取存在缺口，比要求直到修复阶段才出现更符合记录。"],
+      "unknown": ["页面 spec 的全部生成来源与责任写入者尚未复原，不能自动指定某一 agent 或 skill 为唯一根因。", "没有某次 Read 记录不证明模型未从任何其他输入得到过相同信息。"],
+      "must_reject": ["windowFullscreen 这一事实直到后置 finding 才在池里第一次出现。", "搜索找到 spec 证明原生成 agent 读过该 spec。", "所有上游节点都缺这条要求。"],
+      "evidence_ids": ["S-theme-earlier", "S01", "S02", "S05", "S23", "S24", "S25", "S26"]
+    },
+    {
+      "id": "S3",
+      "pool": "aippt0723",
+      "target_file": "entry/src/main/ets/pages/MemberCenterPage.ets",
+      "question": "批量 mask 脚本在会员页实际修改了哪些站点、分别是什么值，哪些归因和验证结论有证据？",
+      "facts": ["扫描列出的三处是 AppLoadDialog、PayAgreementDialog、RenewRuleDialog。", "脚本跳过已设 mask 的 controller；AppLoad 分支补 Color.Transparent，其余缺失项补 Palette.DIALOG_MASK。", "3 sites 是总修改数，不是三个深色/non-loading controller。H5 已透明并被跳过。"],
+      "inferences": ["普通弹窗和 loading 例外必须分别说明，不能将统一规则推广到所有站点。"],
+      "unknown": ["脚本成功和部分读回不证明三个弹窗均经过修后设备验证。", "对最初写入者的责任须额外核当时具体输入，不能仅由修复脚本倒推。"],
+      "must_reject": ["三个会员弹窗均被改成深色 0.55 遮罩。", "AppLoad 之外还有三个本次新增深色 controller。", "3 sites 证明三个独立设备 finding 全部关闭。"],
+      "evidence_ids": ["M-mask-scan", "S29", "S30", "M-before"]
+    },
+    {
+      "id": "S4",
+      "pool": "aippt0723",
+      "target_file": "entry/src/main/ets/pages/MemberCenterPage.ets",
+      "question": "价格排版为何经过多次修改，原实现与修复过程中引入的编译问题分别有什么证据？",
+      "facts": ["Slice 8 在整文件写入之前读到 Kotlin replaceSpan 数字段逻辑，后来实现仍把非滚动价格后缀与数字统一使用 30vp。", "修复先采用片段迭代，后改为 priceDigits/priceSuffix 两个固定 Span，不能把中间态当最终态。", "视觉修复新增 private static helper 被兄弟组件调用，后置编译报 private access；两次 Edit 去掉 private，随后构建成功。"],
+      "inferences": ["价格后缀问题支持已有源码逻辑未落实的近因；private access 是后续修复引入，不能归罪初版生成者。"],
+      "unknown": ["编译通过不证明价格在所有后端格式或设备上视觉正确。", "小数点等格式扩展没有穷尽用例证据。"],
+      "must_reject": ["最终实现仍是 ForEach(splitPriceRuns)。", "private helper 编译错误来自初始生成版。", "构建成功证明所有价格格式均显示正确。"],
+      "evidence_ids": ["M-price-source", "M-before", "M-price-first", "M-price-last", "M-build-error", "M-private-digits", "M-private-suffix", "M-build-ok"]
+    }
+  ],
+  "extra_evidence": [
+    {"id":"D-build","pool":"dice","file":"2f01bcdc-0a92-4961-a64d-5b181f03b3d3/subagents/agent-a635575c78cd15ff6.jsonl","line":48,"contains":["BUILD_EXIT_CODE=0"]},
+    {"id":"D-warn","pool":"dice","file":"2f01bcdc-0a92-4961-a64d-5b181f03b3d3/subagents/agent-a635575c78cd15ff6.jsonl","line":52,"contains":["WARN"]},
+    {"id":"S-theme-earlier","pool":"aippt0723","file":"9b3105a2-85ec-4889-9786-b3c220f06754.jsonl","line":404,"contains":["windowFullscreen"]},
+    {"id":"M-mask-scan","pool":"aippt0723","file":"ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl","line":81,"contains":["MemberCenterPage.ets:206","builder=AppLoadDialog","builder=PayAgreementDialog","builder=RenewRuleDialog"]},
+    {"id":"M-before","pool":"aippt0723","file":"9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aslice8-pay-80bbb1f44b77da0f.jsonl","line":264,"contains":["MemberCenterPage.ets","h5PayDialog","Color.Transparent"]},
+    {"id":"M-price-source","pool":"aippt0723","file":"9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aslice8-pay-80bbb1f44b77da0f.jsonl","line":24,"contains":["replaceSpan"]},
+    {"id":"M-price-first","pool":"aippt0723","file":"ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl","line":528,"contains":["ForEach","splitPriceRuns"]},
+    {"id":"M-price-last","pool":"aippt0723","file":"ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl","line":592,"contains":["priceDigits","priceSuffix","private static"]},
+    {"id":"M-build-error","pool":"aippt0723","file":"ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-af0e3d2ae54dbf769.jsonl","line":24,"contains":["priceDigits","priceSuffix","private"]},
+    {"id":"M-private-digits","pool":"aippt0723","file":"ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-af0e3d2ae54dbf769.jsonl","line":32,"contains":["private static priceDigits","  static priceDigits"]},
+    {"id":"M-private-suffix","pool":"aippt0723","file":"ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-af0e3d2ae54dbf769.jsonl","line":34,"contains":["private static priceSuffix","  static priceSuffix"]},
+    {"id":"M-build-ok","pool":"aippt0723","file":"ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-af0e3d2ae54dbf769.jsonl","line":37,"contains":["EXIT=0","BUILD SUCCESSFUL"]}
+  ]
+}

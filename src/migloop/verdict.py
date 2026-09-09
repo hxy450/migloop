@@ -129,7 +129,11 @@ def parse_block(kind: str, raw: str) -> tuple[Any, list[str]]:
     try:
         return yaml.load(raw, Loader=_Strict), []
     except (yaml.YAMLError, RecursionError) as e:
-        return None, [f"YAML 解析失败: {str(e).splitlines()[0] if str(e) else e}"]
+        problem = getattr(e, "problem", None) or str(e) or type(e).__name__
+        message = " ".join(str(problem).split())[:240]
+        mark = getattr(e, "problem_mark", None)
+        location = f"（YAML 块第 {mark.line + 1} 行，第 {mark.column + 1} 列）" if mark is not None else ""
+        return None, [f"YAML 解析失败{location}: {message}"]
 
 
 def _is_str(x: Any) -> bool:
@@ -445,9 +449,11 @@ def _rel_read(ledger: atoms.Ledger, fl: dict[str, Any], ag: dict[str, Any]) -> t
         for ref in act.files:
             if ref.op != "read" or ref.path != fl["key"] or ref.v != fl["v"]:
                 continue
-            if ref.certain and not ref.ev.dep:
+            if ref.certain and not ref.ev.dep and not ref.observation_uncertain:
                 return "true", f"#{act.seq} 读到 v{fl['v']},喂 v{feed}"
-            best, note = "unknown", f"#{act.seq} 读了它但版本是就近绑定或依赖读(内容未进上下文)"
+            best, note = "unknown", (f"#{act.seq} 读写窗口重叠,观测时刻与版本未确认"
+                                     if ref.observation_uncertain else
+                                     f"#{act.seq} 读了它但版本是就近绑定或依赖读(内容未进上下文)")
         if best == "false" and fl["key"] in (act.detail.get("conditional_reads") or []):
             best, note = "unknown", f"#{act.seq} 条件分支里提到,是否读到未知"
     return best, note

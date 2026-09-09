@@ -5,6 +5,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+import pytest
+
 from migloop import atoms, probe
 from tests.test_atoms import _write_jsonl
 from tests.test_trajectory import _block, _pool, _run_dir
@@ -78,7 +80,7 @@ def test_rollout_pairs_native_ids_and_preserves_physical_positions(tmp_path: Pat
     assert calls[1]["text"] == "# agent-f v1" and calls[1]["has_result"]
     assert (calls[1]["use_line"], calls[1]["result_line"]) == (3, 4)
     assert calls[1]["use_event"] < calls[1]["result_event"]
-    assert calls[1]["provenance"] == {
+    assert {k: v for k, v in calls[1]["provenance"].items() if k != "tool_origin"} == {
         "format": "codex_rollout", "path": "transcript.jsonl", "pairing": "call_id"}
 
 
@@ -161,7 +163,7 @@ def test_exec_events_fallback_keeps_item_provenance_without_inventing_call_id(tm
     assert calls[0]["item_id"] == "item_1" and calls[0]["call_id"] is None and calls[0]["id"] is None
     assert (calls[0]["use_line"], calls[0]["result_line"]) == (2, 3)
     assert calls[0]["has_result"] and not calls[1]["has_result"]
-    assert calls[0]["provenance"] == {
+    assert {k: v for k, v in calls[0]["provenance"].items() if k != "tool_origin"} == {
         "format": "codex_exec_events", "path": "events.jsonl", "pairing": "item_id", "degraded": True,
         "complete_pair": True}
     payload = probe.probe_payload(led, run_dir)
@@ -201,6 +203,114 @@ def _runtime_item(item_id: str, tool: str, args: dict[str, Any], text: str,
             "completed_at_ms": end, "item": {"type": "McpToolCall", "id": item_id, "server": "migloop",
             "tool": tool, "arguments": args, "status": "completed",
             "result": {"content": [{"type": "text", "text": text}], "isError": False}}}}
+
+
+@pytest.mark.parametrize("case,verified", [("qualified", True), ("native", True), ("dual", True),
+    ("unknown", False), ("other", False), ("namespace_conflict", False),
+    ("server_conflict", False), ("tool_conflict", False), ("args_conflict", False)])
+def test_mcp_origin_must_be_explicit_and_consistent(tmp_path: Path, case: str, verified: bool) -> None:
+    from migloop import via
+    led = _pool(tmp_path)
+    args = {"q": "spec", "file": "/proj/spec/pages/A.md"}
+    output = via.search_return(led, via.ViaState(), args, "search hit", [
+        {"kind": "file", "key": args["file"], "v": 1}])
+    call = _call("s", "search", args)
+    if case != "qualified":
+        call["payload"]["name"] = "search"
+    if case != "unknown":
+        call["payload"]["namespace"] = "mcp__other" if case == "other" else "mcp__migloop"
+    if case == "namespace_conflict":
+        call["payload"].update(name="mcp__other__search", namespace="mcp__migloop")
+    rows = [call, _result("s", output)]
+    if case in ("dual", "other", "server_conflict", "tool_conflict", "args_conflict"):
+        native = _runtime_item("s", "search", args, output, 100, 200)
+        if case in ("other", "server_conflict"):
+            native["payload"]["item"]["server"] = "other"
+        if case == "tool_conflict":
+            native["payload"]["item"]["tool"] = "guide"
+        if case == "args_conflict":
+            native["payload"]["item"]["arguments"] = {**args, "q": "different"}
+        rows.insert(1, native)
+    run = _run(tmp_path, rows)
+    calls = probe._transcript_calls(run)
+    assert len(calls) == 1
+    assert calls[0]["provenance"]["tool_origin"]["verified"] is verified
+    identity = via.trace_identity(led, calls, {})
+    assert (identity["bound"] is True) is verified
+    if "conflict" in case:
+        assert calls[0]["provenance"]["tool_origin"]["errors"]
+        assert calls[0]["provenance"]["complete_pair"] is False
+
+
+@pytest.mark.parametrize("via_arg", ["sessions", None])
+def test_unqualified_native_file_is_not_an_authenticated_open(tmp_path: Path, via_arg: str | None) -> None:
+    call = _call("f", "file", {"path": "A.ets", "v": 2, "via": "sessions"})
+    if via_arg is None:
+        call["payload"]["arguments"] = json.dumps({"path": "A.ets", "v": 2})
+    call["payload"]["name"] = "file"
+    run = _run(tmp_path, [call, _result("f", "# entry/A.ets@v2")])
+    tree = probe.probe_payload(_pool(tmp_path), run)["trajectory"]
+    assert tree["nodes"] == [] and tree["visits"][0]["status"] == "unverified"
+
+
+@pytest.mark.parametrize("representation", ["direct", "runtime", "stdout"])
+def test_same_id_origin_conflict_on_replay_cannot_open(tmp_path: Path, representation: str) -> None:
+    args = {"path": "A.ets", "v": 2, "via": "sessions"}
+    if representation == "direct":
+        first = _call("same", "file", args)
+        replay = _call("same", "file", {**args, "v": 1})
+        rows = [first, replay, _result("same", "# entry/A.ets@v2")]
+    else:
+        first = _runtime_item("same", "file", args, "# entry/A.ets@v2", 100, 200)
+        replay = _runtime_item("same", "file", args, "# entry/A.ets@v2", 100, 200)
+        replay["payload"]["item"]["server"] = "other"
+        rows = [first, replay]
+    run = _run(tmp_path, rows)
+    if representation == "stdout":
+        Path(run, "transcript.jsonl").unlink()
+        _write_jsonl(str(Path(run, "events.jsonl")), [
+            {"type": "item.started", "item": {**first["payload"]["item"], "type": "mcp_tool_call"}},
+            {"type": "item.completed", "item": {**replay["payload"]["item"], "type": "mcp_tool_call"}}])
+    calls = probe._transcript_calls(run)
+    assert len(calls) == 1 and calls[0]["provenance"]["tool_origin"]["errors"]
+    tree = probe.probe_payload(_pool(tmp_path), run)["trajectory"]
+    assert tree["nodes"] == [] and tree["visits"][0]["status"] == "unverified"
+
+
+@pytest.mark.parametrize("namespace", ["mcp__other", "functions"])
+def test_other_namespace_cannot_supply_current_file_coordinates(tmp_path: Path, namespace: str) -> None:
+    args = {"path": "A.ets", "v": 2, "via": "sessions"}
+    call = _call("same", "file", args)
+    call["payload"].update(name="file", namespace=namespace)
+    runtime = _runtime_item("same", "file", args, "# entry/A.ets@v2", 100, 200)
+    runtime["payload"]["item"]["server"] = "other"
+    run = _run(tmp_path, [call, runtime, _result("same", "# entry/A.ets@v2")])
+    result = probe.probe_payload(_pool(tmp_path), run)
+    assert result["trajectory"]["nodes"] == []
+    assert all(step["node"] is None for step in result["steps"])
+
+
+@pytest.mark.parametrize("dual", [False, True])
+def test_gpt55_native_namespace_file_and_agent_are_authenticated_visits(tmp_path: Path, dual: bool) -> None:
+    led = _pool(tmp_path)
+    rows = []
+    items = [("s", "sessions", {}, "账本身份: " + atoms.ledger_identity(led) + "\n# chains"),
+             ("f", "file", {"path": "A.ets", "v": 2, "via": "sessions"}, "# entry/A.ets@v2"),
+             ("a", "agent", {"id": "fixer", "v": 1, "via": "file:A.ets@v2"}, "# agent-f v1")]
+    for index, (cid, name, args, text) in enumerate(items):
+        call = _call(cid, name, args)
+        call["payload"].update(name=name, namespace="mcp__migloop")
+        rows.append(call)
+        if dual:
+            rows.append(_runtime_item(cid, name, args, text, index * 300 + 100, index * 300 + 200))
+        rows.append(_result(cid, text))
+    payload = probe.probe_payload(led, _run(tmp_path, rows))
+    assert payload["trace_identity"]["bound"] is True and len(payload["steps"]) == 3
+    tree = payload["trajectory"]
+    assert tree["root"] == "file:/proj/entry/A.ets@2"
+    assert [v["status"] for v in tree["visits"]] == ["opened", "opened"]
+    assert all(v["verified"] for v in tree["visits"]) and len(tree["transitions"]) == 1
+    assert [v["call_id"] for v in tree["visits"]] == ["f", "a"]
 
 
 def test_observed_nested_mcp_rollout_runtime_items_keep_real_item_id_and_times(tmp_path: Path) -> None:

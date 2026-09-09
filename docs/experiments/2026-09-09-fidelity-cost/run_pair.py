@@ -227,12 +227,21 @@ def variant(case_dir: Path, source: Path, store: Path, code_id: str, *, refresh_
     return destination
 
 
-def build_prompt(case_dir: Path, case: dict[str, Any], arm: str) -> str:
+def guide_instruction(tool_transport: str, *, smoke: bool = False) -> str:
+    if tool_transport == "code-host":
+        intro = ("在 code-mode 中直接调用 tools.mcp__migloop__guide({}) 并输出返回文本；" if smoke else
+                 "在 code-mode 中可直接调用 tools.mcp__migloop__guide({})，并输出其返回文本供后续调查使用。")
+        return intro + "若需发现工具，只按 name 精确匹配 mcp__migloop__guide，不按 description 搜索 guide。"
+    if tool_transport == "native":
+        return "通过原生 MCP 工具调用接口直接调用 mcp__migloop__guide，参数为空对象，读取其实际返回。"
+    raise ValueError("tool_transport must be native or code-host")
+
+
+def build_prompt(case_dir: Path, case: dict[str, Any], arm: str, tool_transport: str = "code-host") -> str:
     common = (case_dir / "common-task.md").read_text(encoding="utf-8")
     if arm == "tools":
         extra = ("调查方式：仅使用本次配置的 migloop MCP。先读取当前 guide 并按当前 GUIDE 调查；"
-                 "在 code-mode 中可直接调用 tools.mcp__migloop__guide({})，并输出其返回文本供后续调查使用。"
-                 "若需发现工具，只按 name 精确匹配 mcp__migloop__guide，不按 description 搜索 guide。"
+                 + guide_instruction(tool_transport) +
                  "每次工具 sid 使用上述当前根转录的绝对路径。\n"
                  "正式产出使用当前 GUIDE 要求的 migloop-verdict/1 YAML，将共同任务的全部语义要求"
                  "写进 GUIDE 允许的 reason/evidence/notes 等字段；只可附一小段中文摘要，不另写重复的完整散文报告。"
@@ -260,7 +269,8 @@ def toml_value(value: Any) -> str:
 
 
 def build_codex_command(case: dict[str, Any], arm: str, run_dir: Path, model: str, effort: str,
-                        executable: str) -> tuple[list[str], dict[str, Any]]:
+                        executable: str, tool_transport: str = "code-host") -> tuple[list[str], dict[str, Any]]:
+    guide_instruction(tool_transport)  # Validate before constructing a runnable command.
     settings: dict[str, Any] = {"model_reasoning_effort": effort, "web_search": "disabled",
                               "features.shell_tool": arm == "raw"}
     if os.name == "nt":
@@ -269,7 +279,7 @@ def build_codex_command(case: dict[str, Any], arm: str, run_dir: Path, model: st
         settings["windows.sandbox"] = "elevated"
     for feature in ("plugins", "browser_use", "computer_use", "image_generation", "memories", "hooks", "apps", "multi_agent", "code_mode"):
         settings["features." + feature] = False
-    settings["features.code_mode_host"] = True
+    settings["features.code_mode_host"] = tool_transport == "code-host"
     settings["features.skip_host_skill_discovery"] = True
     mcp: dict[str, Any] = {}
     if arm == "tools":
@@ -286,7 +296,7 @@ def build_codex_command(case: dict[str, Any], arm: str, run_dir: Path, model: st
     # does not grant raw-arm reads of the pool; use the exact same pool workspace
     # for both arms, and let the parent harness archive outside that workspace.
     command.extend(["-C", str(case["pool"]), "-"])
-    return command, {"mcp_servers": mcp, "settings": settings}
+    return command, {"mcp_servers": mcp, "settings": settings, "tool_transport": tool_transport}
 
 
 def build_command(case: dict[str, Any], arm: str, run_dir: Path, session_id: str, model: str,
@@ -428,6 +438,55 @@ def find_transcript(session_id: str, wait_s: float = 5.0) -> Path | None:
         time.sleep(0.2)
 
 
+def _tool_origin(name: Any, namespace: Any = None, server: Any = None) -> dict[str, Any]:
+    """Standalone harness mirror of probe's explicit MCP-provider contract."""
+    raw = str(name or "")
+    qualified = re.fullmatch(r"mcp__(.+?)__(.+)", raw)
+    leaf = qualified[2] if qualified else raw.removeprefix("functions.")
+    providers = [qualified[1]] if qualified else []
+    if namespace is not None:
+        providers.append(namespace.removeprefix("mcp__").removesuffix("__")
+                         if isinstance(namespace, str) and namespace.startswith("mcp__") else "namespace:" + str(namespace))
+    if server is not None:
+        providers.append(str(server))
+    errors = ["conflicting explicit tool providers"] if len(set(providers)) > 1 else []
+    provider = providers[0] if providers else None
+    tool = leaf if provider in (None, "migloop") or provider.startswith("namespace:") else f"mcp__{provider}__{leaf}"
+    return {"name": raw, "namespace": namespace, "server": server, "provider": provider, "leaf": leaf,
+            "tool": tool, "verified": provider == "migloop" and not errors, "errors": errors}
+
+
+def _merge_tool_origins(a: dict[str, Any], b: dict[str, Any], left: Any, right: Any) -> dict[str, Any]:
+    errors = list(dict.fromkeys([*a["errors"], *b["errors"]]))
+    if a["provider"] is not None and b["provider"] is not None and a["provider"] != b["provider"]:
+        errors.append("same ID has conflicting tool providers")
+    if a["leaf"] != b["leaf"]:
+        errors.append("same ID has conflicting tool names")
+    if json.dumps(left, sort_keys=True, ensure_ascii=False) != json.dumps(right, sort_keys=True, ensure_ascii=False):
+        errors.append("same ID has conflicting arguments")
+    chosen = b if a["provider"] is None else a
+    return {**chosen, "verified": bool((a["verified"] or b["verified"]) and not errors), "errors": errors,
+            "representations": [a, b]}
+
+
+def _native_arguments(value: Any) -> Any:
+    if isinstance(value, str):
+        try:
+            return json.loads(value)
+        except ValueError:
+            pass
+    return value
+
+
+def _origin_guard(call: dict[str, Any], origin: dict[str, Any]) -> None:
+    call["tool_origin"] = origin
+    call["tool"] = origin["tool"]
+    if origin["errors"] or ("mcp__migloop__" + origin["leaf"] in MCP_TOOLS and not origin["verified"]):
+        call["observed_status"] = call["status"]
+        if call["status"] == "returned":
+            call["status"] = "unverified"
+
+
 def parse_codex_events(path: Path) -> dict[str, Any]:
     """Keep Codex native events distinct from Claude transcripts and usage semantics."""
     thread_id = None
@@ -477,6 +536,12 @@ def parse_codex_events(path: Path) -> dict[str, Any]:
             "use_line": None, "result_line": None, "status": "pending", "chars": None, "is_error": None})
         if kind == "item.started" and call["use_line"] is None:
             call["use_line"] = line_no
+        if typ == "mcp_tool_call":
+            origin = _tool_origin(item.get("tool"), server=item.get("server"))
+            if "tool_origin" in call:
+                origin = _merge_tool_origins(call["tool_origin"], origin,
+                    _native_arguments(call["input"]), _native_arguments(item.get("arguments")))
+            call["tool_origin"] = origin
         if kind != "item.completed":
             continue
         content = item.get("result") if typ == "mcp_tool_call" else item.get("aggregated_output")
@@ -496,6 +561,9 @@ def parse_codex_events(path: Path) -> dict[str, Any]:
              "output_includes_thinking": "Codex output_tokens is used once; reasoning is not added",
              "input_semantics": "Codex input_tokens is the total; reported cache read/write are not added to it. input_uncached means input_tokens minus cached_input_tokens."}
     seq = list(calls.values())
+    for call in seq:
+        if "tool_origin" in call:
+            _origin_guard(call, call["tool_origin"])
     chars = [c["chars"] for c in seq]
     return {"schema": "migloop-codex-result/1", "backend": "codex", "thread_id": thread_id,
             "response_text": messages[-1] if messages else None, "agent_messages": messages, "actual_models": models or None,
@@ -551,6 +619,12 @@ def parse_codex_transcript(path: Path) -> dict[str, Any]:
                 "status": "pending", "is_error": None, "chars": None, "ts": row.get("timestamp"),
                 "started_at_ms": None, "completed_at_ms": None, "is_wrapper": False})
             leaf["event_lines"].append(line_no)
+            if is_mcp:
+                origin = _tool_origin(item.get("tool"), server=item.get("server"))
+                if "tool_origin" in leaf:
+                    origin = _merge_tool_origins(leaf["tool_origin"], origin,
+                        _native_arguments(leaf["input"]), _native_arguments(item.get("arguments")))
+                leaf["tool_origin"] = origin
             for key in ("started_at_ms", "completed_at_ms"):
                 if payload.get(key) is not None:
                     leaf[key] = payload[key]
@@ -596,20 +670,18 @@ def parse_codex_transcript(path: Path) -> dict[str, Any]:
         if not tid:
             continue
         if payload.get("type") in ("function_call", "custom_tool_call"):
+            inp = _native_arguments(payload.get("arguments") if "arguments" in payload else payload.get("input"))
+            origin = _tool_origin(payload.get("name"), payload.get("namespace"))
             if tid in calls:
                 calls[tid]["replay_use_lines"].append(line_no)
+                calls[tid]["tool_origin"] = _merge_tool_origins(calls[tid]["tool_origin"], origin, calls[tid]["input"], inp)
                 continue
-            inp = payload.get("arguments") if "arguments" in payload else payload.get("input")
-            if isinstance(inp, str):
-                try:
-                    inp = json.loads(inp)
-                except ValueError:
-                    pass
             name = str(payload.get("name") or "")
             calls[tid] = {"tool_use_id": tid, "call_id": tid, "tool_name": name,
+                          "tool_origin": origin, "namespace": payload.get("namespace"),
                           "source_id": tid, "source_id_type": "codex_call_id", "source_file": path.name,
                           "is_wrapper": payload.get("type") == "custom_tool_call" and name.removeprefix("functions.") == "exec",
-                          "tool": name.removeprefix("functions.").removeprefix("mcp__migloop__"), "input": inp,
+                          "tool": origin["tool"], "input": inp,
                           "use_line": line_no, "result_line": None, "replay_use_lines": [], "chars": None,
                           "is_error": None, "status": "pending", "ts": row.get("timestamp")}
         elif payload.get("type") in ("function_call_output", "custom_tool_call_output"):
@@ -629,6 +701,11 @@ def parse_codex_transcript(path: Path) -> dict[str, Any]:
         # Only an explicit equal ID can connect two representations. Never infer wrapper parentage from JS text or proximity.
         direct = next((call for call in leaves if call["source_id_type"] == "codex_call_id" and call["call_id"] is not None and call["call_id"] in (leaf.get("call_id"), leaf.get("source_id"))), None)
         if direct is not None:
+            if "tool_origin" in leaf:
+                leaf["tool_origin"] = _merge_tool_origins(direct["tool_origin"], leaf["tool_origin"],
+                    _native_arguments(direct["input"]), _native_arguments(leaf["input"]))
+                leaf["response_tool_origin"] = direct["tool_origin"]
+                leaf["response_input"] = direct["input"]
             leaf["call_id"] = direct["call_id"]
             leaf["tool_use_id"] = direct["call_id"]
             leaf["response_use_line"] = direct["use_line"]
@@ -638,6 +715,9 @@ def parse_codex_transcript(path: Path) -> dict[str, Any]:
             leaves.remove(direct)
         leaves.append(leaf)
     seq = sorted(leaves, key=lambda call: call.get("use_line") or call.get("source_line") or call.get("result_line") or 0)
+    for call in [*seq, *wrappers]:
+        if "tool_origin" in call:
+            _origin_guard(call, call["tool_origin"])
     repeated = revisited = 0
     seen_calls: set[str] = set()
     seen_nodes: set[str] = set()
@@ -752,7 +832,10 @@ def actual_codex_context(result: dict[str, Any], transcript: dict[str, Any] | No
 
 def run_one(case_dir: Path, arm: str, rep: int, model: str | None = "gpt-5.6-sol", effort: str = "medium",
             max_turns: int = 45, max_budget_usd: float = 5.0, timeout_s: float = 3600,
-            backend: str = "codex") -> dict[str, Any]:
+            backend: str = "codex", tool_transport: str = "code-host") -> dict[str, Any]:
+    guide_instruction(tool_transport)
+    if backend != "codex" and tool_transport != "code-host":
+        raise ValueError("Explicit tool_transport selection is supported only by the Codex backend")
     if backend not in ("claude", "codex") or not model:
         raise ValueError("An explicit supported backend and concrete model ID are required")
     if arm not in ("raw", "tools") or rep < 1 or max_turns < 1 or max_budget_usd <= 0 or timeout_s <= 0:
@@ -767,16 +850,17 @@ def run_one(case_dir: Path, arm: str, rep: int, model: str | None = "gpt-5.6-sol
         raise RuntimeError("Frozen pool, source, or task changed; prepare a new case")
     run_dir.mkdir(parents=True, exist_ok=False)
     session_id = str(uuid.uuid4())
-    prompt = build_prompt(case_dir, case, arm)
+    prompt = build_prompt(case_dir, case, arm, tool_transport)
     if backend == "codex":
         prompt += f"\n调查预算提醒：在 {max_turns} 轮以内完成并尽快明确未知项；这是任务约束，不是工具自动截断。\n"
-        cmd, mcp = build_codex_command(case, arm, run_dir, model, effort, shutil.which("codex") or "codex")
+        cmd, mcp = build_codex_command(case, arm, run_dir, model, effort, shutil.which("codex") or "codex", tool_transport)
     else:
         cmd, mcp = build_command(case, arm, run_dir, session_id, model, effort, max_turns, max_budget_usd,
                                  shutil.which("claude") or "claude")
     (run_dir / "prompt.md").write_text(prompt, encoding="utf-8")
     write_json(run_dir / "mcp.json", mcp)
     config = {"case": case["case"], "arm": arm, "rep": rep, "backend": backend, "model_requested": model, "effort": effort,
+              "tool_transport": tool_transport if backend == "codex" else None,
               "max_turns": max_turns, "max_budget_usd": max_budget_usd, "timeout_s": timeout_s,
               "run_id": session_id, "session_id_expected": session_id if backend == "claude" else None,
               "turn_limit_enforced": backend == "claude", "dollar_limit_enforced": backend == "claude",
@@ -889,7 +973,7 @@ def run_one(case_dir: Path, arm: str, rep: int, model: str | None = "gpt-5.6-sol
 
 
 def run_smoke(source: Path, store: Path, model: str = "gpt-5.6-sol", effort: str = "medium",
-              timeout_s: float = 300, arm: str = "tools") -> dict[str, Any]:
+              timeout_s: float = 300, arm: str = "tools", tool_transport: str = "code-host") -> dict[str, Any]:
     """One independent connectivity check; never builds a ledger or contributes a pair row."""
     source, store = source.resolve(), store.resolve()
     if not (source / "src/migloop/mcp_server.py").is_file():
@@ -898,11 +982,12 @@ def run_smoke(source: Path, store: Path, model: str = "gpt-5.6-sol", effort: str
         raise ValueError("timeout must be positive")
     if arm not in ("raw", "tools"):
         raise ValueError("arm must be raw or tools")
+    guide_instruction(tool_transport)
     store.mkdir(parents=True, exist_ok=False)
     pool = store / "empty-pool"
     pool.mkdir()
     case = {"source": str(source), "pool": str(pool)}
-    command, mcp = build_codex_command(case, arm, store, model, effort, shutil.which("codex") or "codex")
+    command, mcp = build_codex_command(case, arm, store, model, effort, shutil.which("codex") or "codex", tool_transport)
     expected_command = ("Get-ChildItem -Force -LiteralPath ." if os.name == "nt" else "ls -a .") if arm == "raw" else None
     expected_sentinel = "SOL_RAW_SMOKE_OK" if arm == "raw" else "SOL_MCP_SMOKE_OK"
     if arm == "raw":
@@ -912,13 +997,13 @@ def run_smoke(source: Path, store: Path, model: str = "gpt-5.6-sol", effort: str
                   "确认该命令实际执行成功之后，最后仅回复 SOL_RAW_SMOKE_OK。若启动被策略阻止或执行失败，如实报告，不重试。\n")
     else:
         prompt = ("这是独立的 MCP 连通性检查，不是调查实验。只调用本次 migloop MCP 的 guide 一次，"
-                  "在 code-mode 中直接调用 tools.mcp__migloop__guide({}) 并输出返回文本；"
-                  "若需发现工具，只按 name 精确匹配 mcp__migloop__guide，不按 description 搜索 guide。"
+                  + guide_instruction(tool_transport, smoke=True) +
                   "不传 sid，不调用 sessions 或其他工具，不读取文件、不构建账本、不分析数据池。"
                   "guide 成功返回之后，最后仅回复 SOL_MCP_SMOKE_OK。若失败，如实报告，不重试。\n")
     (store / "prompt.md").write_text(prompt, encoding="utf-8")
     write_json(store / "mcp.json", mcp)
     config = {"schema": "migloop-connectivity-smoke/1", "experiment_kind": "connectivity_smoke", "include_in_pairs": False,
+              "tool_transport": tool_transport,
               "backend": "codex", "arm": arm, "model_requested": model, "effort": effort, "source": str(source), "empty_pool": str(pool),
               "expected_command": expected_command, "expected_sentinel": expected_sentinel,
               "timeout_s": timeout_s, "runner_sha256": sha256(Path(__file__)), "prompt_sha256": sha256(store / "prompt.md")}
@@ -969,7 +1054,8 @@ def run_smoke(source: Path, store: Path, model: str = "gpt-5.6-sol", effort: str
         connected = (len(calls) == 1 and calls[0]["tool"] == "command_execution" and calls[0]["status"] == "returned"
                      and calls[0].get("exit_code") == 0 and str(expected_command).casefold() in str(calls[0].get("input") or "").casefold())
     else:
-        connected = len(calls) == 1 and calls[0]["tool"] in ("guide", "mcp__migloop__guide") and calls[0]["status"] == "returned"
+        connected = (len(calls) == 1 and calls[0]["tool"] in ("guide", "mcp__migloop__guide")
+                     and calls[0]["status"] == "returned" and (calls[0].get("tool_origin") or {}).get("verified") is True)
     sentinel = str(result.get("response_text") or "").strip() == expected_sentinel
     recorded = bool(recording["copied"] and metrics["transcript"] is not None)
     passed = connected and sentinel and recorded and result["final_status"] == "completed" and not result["malformed_lines"]
@@ -1004,6 +1090,7 @@ def main(argv: list[str] | None = None) -> int:
     smoke.add_argument("--model", default="gpt-5.6-sol")
     smoke.add_argument("--effort", default="medium")
     smoke.add_argument("--timeout-seconds", type=float, default=300)
+    smoke.add_argument("--tool-transport", choices=("native", "code-host"), default="code-host", help="Codex tool transport; default preserves the code-host harness")
     run = sub.add_parser("run", help="Launch one paid investigation; never retry or overwrite")
     run.add_argument("--case-dir", type=Path, required=True)
     run.add_argument("--arm", choices=("raw", "tools"), required=True)
@@ -1014,6 +1101,7 @@ def main(argv: list[str] | None = None) -> int:
     run.add_argument("--max-turns", type=int, default=45, help="Claude CLI cap; Codex prompt constraint only, not enforced")
     run.add_argument("--max-budget-usd", type=float, default=5.0, help="Claude CLI cap; unavailable/unforced for Codex")
     run.add_argument("--timeout-seconds", type=float, default=3600)
+    run.add_argument("--tool-transport", choices=("native", "code-host"), default="code-host", help="Codex tool transport; select explicitly for models without code-host tools")
     args = ap.parse_args(argv)
     try:
         if args.command in ("prepare", "variant"):
@@ -1022,12 +1110,12 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps({"case_dir": str(folder), "case": read_json(folder / "case.json")}, ensure_ascii=False))
             return 0
         if args.command == "smoke":
-            metrics = run_smoke(args.source, args.store, args.model, args.effort, args.timeout_seconds, args.arm)
+            metrics = run_smoke(args.source, args.store, args.model, args.effort, args.timeout_seconds, args.arm, args.tool_transport)
         else:
-            metrics = run_one(args.case_dir, args.arm, args.rep, args.model, args.effort, args.max_turns, args.max_budget_usd, args.timeout_seconds, args.backend)
+            metrics = run_one(args.case_dir, args.arm, args.rep, args.model, args.effort, args.max_turns, args.max_budget_usd, args.timeout_seconds, args.backend, args.tool_transport)
         print(json.dumps({key: metrics.get(key) for key in
                           ("run_dir", "backend", "arm", "rep", "status", "model_requested", "actual_models",
-                           "actual_effort", "cost_usd_total", "wall_s", "end_to_end_wall_s", "recording_complete", "verdict_ok", "smoke_passed")}, ensure_ascii=False))
+                           "actual_effort", "tool_transport", "cost_usd_total", "wall_s", "end_to_end_wall_s", "recording_complete", "verdict_ok", "smoke_passed")}, ensure_ascii=False))
         return 0 if metrics["status"] == "completed" else 1
     except (ValueError, OSError, RuntimeError) as exc:
         print(type(exc).__name__ + ": " + str(exc), file=sys.stderr)

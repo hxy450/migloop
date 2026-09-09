@@ -1,0 +1,425 @@
+{
+  "schema_version": 1,
+  "line_hash_definition": "SHA-256 of the UTF-8 JSONL physical line excluding its newline terminator",
+  "cases": [
+    {
+      "id": "C1_event_noop_static_gate",
+      "case_kind": "in-generation correction / static-gate boundary; not a post-execute repair",
+      "rollout_context": "migration R1 rollout: rollout-2026-08-16T17-54-23-01a009fe-68e3-7f42-b76b-5e863c555976.jsonl",
+      "target_file": "entry/src/main/ets/pages/GuideDifficulty1Component.ets",
+      "question": "onAnswer 默认函数从空块改成显式 return 后，这次修改关闭了什么门，实际运行语义又改变了什么？",
+      "facts": [
+        "当时规则将未登记空回调列为非法形态。",
+        "Batch closer 因 line 3 的空回调返回 BLOCKED。",
+        "实际 patch 只把空表达式体改成显式 return，随后当次 closer 的非法占位检查 PASS；这两个 closer 记录均未构建。"
+      ],
+      "inferences": [
+        "修改直接针对静态扫描形态；在父组件未传回调时，两版默认函数都没有业务副作用。"
+      ],
+      "unknown": [
+        "父组件是否总传真实回调。",
+        "平台上怎样表达真正必传的 @Event。",
+        "改动后的构建和点击行为。",
+        "全管线稍后可能有其他构建；当前 closer 记录不证明全池从未构建。"
+      ],
+      "must_reject": [
+        "这是编译错误修复。",
+        "补丁使 onAnswer 变成必须由父组件传入。",
+        "closer PASS 证明选择事件正常推进。"
+      ],
+      "evidence": [
+        {
+          "file": "rollout-2026-08-16T17-54-23-01a009fe-68e3-7f42-b76b-5e863c555976.jsonl",
+          "line": 224,
+          "call_id": "call_l2FJxo9zP3XjiBLPDHKO0HsI",
+          "record_sha256": "e0165c2c7e59152c81d483ba19a48510dc0bb26efd5bb23a86fcea39725d92d3",
+          "tier": "source_tool_output: rule text",
+          "excerpt_summary": "empty callbacks ... are forbidden",
+          "quote_fragments": [
+            "empty callbacks"
+          ]
+        },
+        {
+          "file": "rollout-2026-08-16T17-54-23-01a009fe-68e3-7f42-b76b-5e863c555976.jsonl",
+          "line": 3029,
+          "call_id": null,
+          "record_sha256": "3cd3288d161f1c585007dada5f30ab863ebcd52bfce43a13480b3e4cba48bd88",
+          "tier": "agent_message: closer report",
+          "excerpt_summary": "status: BLOCKED; 未登记空回调 () => {}; build_run: false",
+          "quote_fragments": [
+            "未登记空回调 `() => {}`",
+            "build_run: false"
+          ]
+        },
+        {
+          "file": "rollout-2026-08-16T17-54-23-01a009fe-68e3-7f42-b76b-5e863c555976.jsonl",
+          "line": 3034,
+          "call_id": "call_cITFznZwW17SBIwTS2wQhbj0",
+          "record_sha256": "ac40969194fd7b7058a9a884e8c496d43c2a20606f0381e5abc004197d12d858",
+          "tier": "source_tool_output: pre-patch source",
+          "excerpt_summary": "line 3: @Event onAnswer ... = () => {}",
+          "quote_fragments": [
+            "@Event onAnswer: (analyticsEvent: string) => void = () => {}"
+          ]
+        },
+        {
+          "file": "rollout-2026-08-16T17-54-23-01a009fe-68e3-7f42-b76b-5e863c555976.jsonl",
+          "line": 3037,
+          "call_id": "call_S2DOREu8NlaqtS123olwx41i",
+          "record_sha256": "5f82277d8c7a34f1261fac95e6a00ac195eea93c905d137e33c126c5bb1465f9",
+          "tier": "actual_patch: source edit request",
+          "excerpt_summary": "() => {} -> (): void => { return }",
+          "quote_fragments": [
+            "-  @Event onAnswer",
+            "+  @Event onAnswer"
+          ]
+        },
+        {
+          "file": "rollout-2026-08-16T17-54-23-01a009fe-68e3-7f42-b76b-5e863c555976.jsonl",
+          "line": 3038,
+          "call_id": null,
+          "record_sha256": "908581ecf63bb5819cf2b55bb5e6c4a4d791008b8e79b5c3c2d0a2306ed0d7ce",
+          "tier": "event_msg: patch_apply_end",
+          "excerpt_summary": "Success. Updated ... GuideDifficulty1Component.ets",
+          "quote_fragments": [
+            "Success. Updated the following files:",
+            "GuideDifficulty1Component.ets"
+          ]
+        },
+        {
+          "file": "rollout-2026-08-16T17-54-23-01a009fe-68e3-7f42-b76b-5e863c555976.jsonl",
+          "line": 3065,
+          "call_id": null,
+          "record_sha256": "081d74503e089828727451283b91058cbcd55feb51d50cd4860593cdd15230ac",
+          "tier": "agent_message: closer report",
+          "excerpt_summary": "status: PASS; illegal_placeholders: []; build_run: false",
+          "quote_fragments": [
+            "illegal_placeholders: []",
+            "build_run: false"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "C2_works_facade_conflicting_claims",
+      "case_kind": "post-generation visual-fixer attribution dispute with insufficient source evidence",
+      "rollout_context": "visual-verify rollout: rollout-2026-08-21T09-18-20-01a021e5-c150-7b12-a610-d40c07816b98.jsonl",
+      "target_file": "entry/src/main/ets/viewmodels/PptGenerationViewModel.ets",
+      "question": "生成入库改经 WorksService 后，现有证据能否判断它改变了哪些行为，以及是否触及作品未呈现的原因？",
+      "facts": [
+        "历史执行摘要声称 PptRecordRepository 是唯一 post-insert CREATED publisher。",
+        "fixer 摘要声称改为统一走 WorksService。",
+        "reviewer 声称两条路径同 DAO、同事件并判 wrong_edit；根 rollout 没展示相关类完整源码。",
+        "Round 2 Works canonical 被系统联系人污染。"
+      ],
+      "inferences": [
+        "fixer 与 reviewer 的根因主张冲突；缺源码和有效页面复测，门面是否行为等价及真实断点均未定。"
+      ],
+      "unknown": [
+        "事务、错误处理、时序和额外副作用是否相同。",
+        "生成是否到达 insert、记录是否落库、Works 是否加载及收事件。"
+      ],
+      "must_reject": [
+        "接入 WorksService 已修复作品列表。",
+        "同 DAO 和同名事件证明全部行为等价。",
+        "build 通过证明数据库与列表行为正确。"
+      ],
+      "evidence": [
+        {
+          "file": "rollout-2026-08-21T09-18-20-01a021e5-c150-7b12-a610-d40c07816b98.jsonl",
+          "line": 4934,
+          "call_id": "call_nfwjmlicObG8LyPwc3f5ZPgb",
+          "record_sha256": "cd082603a39b32f6b07ae0f36e0450169cc7385b6b01203c757352eaac520e41",
+          "tier": "source_tool_output: historical execution summary, not source",
+          "excerpt_summary": "exactly one post-insert WorksLibraryUpdated(CREATED) publisher: PptRecordRepository",
+          "quote_fragments": [
+            "exactly one post-insert `WorksLibraryUpdated(CREATED)` publisher"
+          ]
+        },
+        {
+          "file": "rollout-2026-08-21T09-18-20-01a021e5-c150-7b12-a610-d40c07816b98.jsonl",
+          "line": 7574,
+          "call_id": "call_rHkspr6Fzhub0xEU83VOrdsF",
+          "record_sha256": "918774b14fed7020fbb37af0fd00e20486429eaed2d9eddfe25d03151244f45e",
+          "tier": "source_tool_output: finding index",
+          "excerpt_summary": "BLOCKED_PWorksFragment: canonical 误采集系统联系人; WorksFragment_generated_work_missing",
+          "quote_fragments": [
+            "# [WorksFragment] Round 2 canonical 误采集系统联系人"
+          ]
+        },
+        {
+          "file": "rollout-2026-08-21T09-18-20-01a021e5-c150-7b12-a610-d40c07816b98.jsonl",
+          "line": 7683,
+          "call_id": "call_BYzt9sjwzhzxLipXgCsr6q4Y",
+          "record_sha256": "94a7bd988209de57a26305abe8291093e8ced2f94d5f9c33e9c4e49f22c11905",
+          "tier": "source_tool_output: persisted fixer summary, not source patch",
+          "excerpt_summary": "生成完成统一走 WorksService 入库并发布 CREATED 事件",
+          "quote_fragments": [
+            "生成完成统一走 WorksService 入库并发布 CREATED 事件"
+          ]
+        },
+        {
+          "file": "rollout-2026-08-21T09-18-20-01a021e5-c150-7b12-a610-d40c07816b98.jsonl",
+          "line": 7680,
+          "call_id": null,
+          "record_sha256": "1df29114297de6eacade8f8c2d5df050f6daeedb0df440fd268d21e9967d8ec5",
+          "tier": "agent_message: reviewer claim, not independently reproduced",
+          "excerpt_summary": "reviewer: 同一 DAO 且已发布 CREATED；替换未改变行为",
+          "quote_fragments": [
+            "修改前 PptRecordRepository.insert() 已使用同一 PptCreateDao.getInstance()"
+          ]
+        },
+        {
+          "file": "rollout-2026-08-21T09-18-20-01a021e5-c150-7b12-a610-d40c07816b98.jsonl",
+          "line": 7686,
+          "call_id": "call_XHYFotPT6f6XWmbIyXSilnMV",
+          "record_sha256": "b6ee1caff1d13cd0b1d0639add6b287946f585647d1ca83e6b50f19718c942b2",
+          "tier": "actual_patch: report only, not product source",
+          "excerpt_summary": "写回 Works wrong_edit 到 visual-fixer-summary.md",
+          "quote_fragments": [
+            "`wrong_edit` — `WorksFragment_generated_work_missing`"
+          ]
+        },
+        {
+          "file": "rollout-2026-08-21T09-18-20-01a021e5-c150-7b12-a610-d40c07816b98.jsonl",
+          "line": 7825,
+          "call_id": null,
+          "record_sha256": "1c2b3acc8c1d7b74172365a744efe31fd247cfff30a475c629a0666d6cfae9ef",
+          "tier": "event_msg: final report, no new source/behavior evidence",
+          "excerpt_summary": "最终消息复述 Works 等价门面替换未触及真实根因",
+          "quote_fragments": [
+            "Works 等价门面替换没有触及真实根因"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "C3_guide_init_competing_hypotheses",
+      "case_kind": "cross-round repair hypotheses with incomplete behavioral verification",
+      "rollout_context": "generation evidence in migration R1 rollout (2026-08-16); repair evidence in visual-verify rollout (2026-08-21)",
+      "target_file": "entry/src/main/ets/pages/GuidePage.ets",
+      "question": "GuideInit 的 Monitor/visibility 与独立挂载两种修法分别有什么证据，能否判定真实根因或结果？",
+      "facts": [
+        "初始阶段已有 GuideInit Kotlin/layout/snapshot 输入，生成报告声称实现进度流。",
+        "Round 0/1 工单一直标为 low_confidence/transient_capture_debt。",
+        "Round 1 reviewer 质疑新增 Monitor；Round 2 fixer 改用 currentStep===5 独立挂载。",
+        "最终仍保留 manual review 与 fresh capture 债。"
+      ],
+      "inferences": [
+        "缓存 Swiper 挂载是比继续叠 Monitor 更具体的新假设，但未获 fresh capture 验证。"
+      ],
+      "unknown": [
+        "真实缺失是代码挂载、参数更新还是采样时序。",
+        "Round 2 改动后的瞬态显示结果。"
+      ],
+      "must_reject": [
+        "GuideInit 要求是验证阶段才新增。",
+        "reviewer 意见本身证明 Round 1 无效。",
+        "记录 SBS 路径或 build 成功证明 Round 2 视觉闭环。"
+      ],
+      "evidence": [
+        {
+          "file": "rollout-2026-08-16T17-54-23-01a009fe-68e3-7f42-b76b-5e863c555976.jsonl",
+          "line": 2013,
+          "call_id": "call_b5NIkmLWkXtjLgHjdKGnc9WQ",
+          "record_sha256": "cdeef46698720d67a78d39b99b759d5d09c57a00748f5422538795dd03b470d5",
+          "tier": "source_tool_output: generated spec/source inventory",
+          "excerpt_summary": "GuideInit Kotlin/layout/snapshot; 展示引导加载动画并倒计时进入首页",
+          "quote_fragments": [
+            "展示引导加载动画并倒计时进入首页"
+          ]
+        },
+        {
+          "file": "rollout-2026-08-16T17-54-23-01a009fe-68e3-7f42-b76b-5e863c555976.jsonl",
+          "line": 2781,
+          "call_id": null,
+          "record_sha256": "98995a46b1c3076be3492df5ea4a8d56705221fa8a4a6e342baf625cbca5372b",
+          "tier": "agent_message: generator report",
+          "excerpt_summary": "GuideInitComponent: 5110ms progress flow ... implemented",
+          "quote_fragments": [
+            "5110ms progress flow and panorama auto-scroll implemented"
+          ]
+        },
+        {
+          "file": "rollout-2026-08-21T09-18-20-01a021e5-c150-7b12-a610-d40c07816b98.jsonl",
+          "line": 5879,
+          "call_id": "call_8PsHI1kc3azM3FxOJBhI8I0j",
+          "record_sha256": "949d758d1b5d16612381630563f01555d57ef65ed6f1f6254264c29809832c70",
+          "tier": "source_tool_output: finding metadata",
+          "excerpt_summary": "GuideInit tickets confidence: low_confidence",
+          "quote_fragments": [
+            "GuideInit_01_loading_intro_bubble",
+            "low_confidence"
+          ]
+        },
+        {
+          "file": "rollout-2026-08-21T09-18-20-01a021e5-c150-7b12-a610-d40c07816b98.jsonl",
+          "line": 6957,
+          "call_id": null,
+          "record_sha256": "1d414244dd518fa5fd9665f424e2d43c59bfcea8d363fd59ce9300dfc39a403e",
+          "tier": "agent_message: reviewer claim, source not reproduced",
+          "excerpt_summary": "reviewer: Monitor 未建立新渲染链，progress 已响应式消费",
+          "quote_fragments": [
+            "新增 progressPercent Monitor 和 active visibility 未建立新的机器人/气泡渲染路径"
+          ]
+        },
+        {
+          "file": "rollout-2026-08-21T09-18-20-01a021e5-c150-7b12-a610-d40c07816b98.jsonl",
+          "line": 7683,
+          "call_id": "call_BYzt9sjwzhzxLipXgCsr6q4Y",
+          "record_sha256": "94a7bd988209de57a26305abe8291093e8ced2f94d5f9c33e9c4e49f22c11905",
+          "tier": "source_tool_output: persisted fixer summary, not source patch",
+          "excerpt_summary": "currentStep===5 独立挂载；缓存子树首次 inactive 构建假设",
+          "quote_fragments": [
+            "第 6 步移出缓存 Swiper"
+          ]
+        },
+        {
+          "file": "rollout-2026-08-21T09-18-20-01a021e5-c150-7b12-a610-d40c07816b98.jsonl",
+          "line": 7653,
+          "call_id": null,
+          "record_sha256": "81083e35b516e4bb0bd7d014b1b8526eddc520dcef179f5072839c19ce21f7f5",
+          "tier": "agent_message: fixer report",
+          "excerpt_summary": "need-info: GuideInit fresh capture",
+          "quote_fragments": [
+            "GuideInit fresh capture"
+          ]
+        },
+        {
+          "file": "rollout-2026-08-21T09-18-20-01a021e5-c150-7b12-a610-d40c07816b98.jsonl",
+          "line": 7825,
+          "call_id": null,
+          "record_sha256": "1c2b3acc8c1d7b74172365a744efe31fd247cfff30a475c629a0666d6cfae9ef",
+          "tier": "event_msg: final report",
+          "excerpt_summary": "GuideInit 仍有两项低置信人工复核债",
+          "quote_fragments": [
+            "GuideInit 仍有两项低置信人工复核债"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "C4_dialog_hit_test_patch_boundary",
+      "case_kind": "direct source diagnosis and patch with no post-fix build/device verification",
+      "rollout_context": "migration R1 rollout: rollout-2026-08-16T17-54-23-01a009fe-68e3-7f42-b76b-5e863c555976.jsonl",
+      "target_file": "entry/src/main/ets/pages/LaunchAgreementDialog.ets",
+      "question": "可见态 HitTestMode.Block 改为 Default 的代码近因证据有多强，rollout 实际验证到哪一层？",
+      "facts": [
+        "源码读取显示四个 Event 和可见态 HitTestMode.Block。",
+        "本机 SDK 摘录说明 Default 允许节点与子节点响应且阻挡 sibling。",
+        "实际 patch 与读回确认 Block 改为 Default。",
+        "补丁当次 CLI build 被缺失 .migbot/config.json 阻断，读取到的 HAP 仍是修复前版本。",
+        "08-21 visual-verify rollout 后来有一次 BUILD SUCCESSFUL 与 HAP installed；该行没有给 C4 的补丁哈希或点击回放，不能仅凭时间后置把产物唯一绑定为 C4 验证。"
+      ],
+      "inferences": [
+        "外层 hit-test 设置是很强的代码级近因候选，但四类点击恢复没有设备验证。"
+      ],
+      "unknown": [
+        "修后是否编译、安装及逐项点击成功。",
+        "是否有其他覆盖层、回调或状态机问题。",
+        "08-21 成功构建是否包含完全相同的 C4 源状态，缺少源码/产物对应哈希。"
+      ],
+      "must_reject": [
+        "没有实际源码或 patch 证据。",
+        "四类点击已经设备回归通过。",
+        "现有 HAP 包含修复。",
+        "全池后来没有任何成功构建。"
+      ],
+      "evidence": [
+        {
+          "file": "rollout-2026-08-16T17-54-23-01a009fe-68e3-7f42-b76b-5e863c555976.jsonl",
+          "line": 8027,
+          "call_id": "call_7fkY9pgpk0sNPDyhCFcX0npm",
+          "record_sha256": "7b79a7c1957fafda57b0439e07512238a897a67c453a9ddb8648c6931a8c1968",
+          "tier": "source_tool_output: pre-patch source",
+          "excerpt_summary": "source read: onAccept/onReject/onReadAgreement/onCloseAgreement and outer Stack",
+          "quote_fragments": [
+            "hitTestBehavior(this.visible ? HitTestMode.Block : HitTestMode.None)"
+          ]
+        },
+        {
+          "file": "rollout-2026-08-16T17-54-23-01a009fe-68e3-7f42-b76b-5e863c555976.jsonl",
+          "line": 8048,
+          "call_id": "call_P25PVpQdj6880uvIX5rXeevD",
+          "record_sha256": "1fa8c3405a73d447bb5433de8e8cd20e6086d3f214c669dea84d3f93b093a896",
+          "tier": "source_tool_output: SDK declaration excerpt",
+          "excerpt_summary": "SDK Default: node and child nodes respond; sibling nodes blocked",
+          "quote_fragments": [
+            "Both the node and its child nodes respond to the hit test of a touch event"
+          ]
+        },
+        {
+          "file": "rollout-2026-08-16T17-54-23-01a009fe-68e3-7f42-b76b-5e863c555976.jsonl",
+          "line": 8066,
+          "call_id": "call_sOYpciVhfgk1glebywbIbHAY",
+          "record_sha256": "c214ff7ec31bd232a4d1f1ab5aee892c43e517239996a1189670ed840604f677",
+          "tier": "actual_patch: source edit request",
+          "excerpt_summary": "HitTestMode.Block -> HitTestMode.Default",
+          "quote_fragments": [
+            "-    .hitTestBehavior(this.visible ? HitTestMode.Block : HitTestMode.None)"
+          ]
+        },
+        {
+          "file": "rollout-2026-08-16T17-54-23-01a009fe-68e3-7f42-b76b-5e863c555976.jsonl",
+          "line": 8067,
+          "call_id": null,
+          "record_sha256": "fde44a196809789bce24817c825227a5809b4f3dd08ae7c53f6fd7752fcc7b73",
+          "tier": "event_msg: patch_apply_end",
+          "excerpt_summary": "Success. Updated LaunchAgreementDialog.ets",
+          "quote_fragments": [
+            "Success. Updated the following files:",
+            "LaunchAgreementDialog.ets"
+          ]
+        },
+        {
+          "file": "rollout-2026-08-16T17-54-23-01a009fe-68e3-7f42-b76b-5e863c555976.jsonl",
+          "line": 8110,
+          "call_id": "call_qMphaUcIWYqr2IY7APprp85k",
+          "record_sha256": "dfb45d14319d705635d30175827d1fa002d351381e814408e1821be3e8ede6c5",
+          "tier": "source_tool_output: source readback and artifact metadata",
+          "excerpt_summary": "line 109 is HitTestMode.Default; HAP mtime predates patch",
+          "quote_fragments": [
+            "hitTestBehavior(this.visible ? HitTestMode.Default : HitTestMode.None)"
+          ]
+        },
+        {
+          "file": "rollout-2026-08-16T17-54-23-01a009fe-68e3-7f42-b76b-5e863c555976.jsonl",
+          "line": 8115,
+          "call_id": null,
+          "record_sha256": "5effd2f01f01282392de1454a73ba84eb8c1740f3426d3b5eaf450892d9c0e16",
+          "tier": "response_item: final report",
+          "excerpt_summary": "CLI build blocked; existing HAP is pre-fix",
+          "quote_fragments": [
+            "现有 HAP 仍是修复前版本"
+          ]
+        },
+        {
+          "file": "rollout-2026-08-21T09-18-20-01a021e5-c150-7b12-a610-d40c07816b98.jsonl",
+          "line": 7694,
+          "call_id": "call_dacW1PmSvf6UGEA9wFwJcdnz",
+          "record_sha256": "c19238a84ec6c9222cb7de20430475db108d50717568f340dbae3a53846d9048",
+          "excerpt_summary": "后续 visual-verify rollout 构建并安装 HAP 成功；未显示 C4 源哈希或点击验证",
+          "quote_fragments": [
+            "BUILD SUCCESSFUL in 12 s 22 ms",
+            "HAP installed"
+          ],
+          "tier": "source_tool_output: later build/install, patch-to-artifact identity not established"
+        }
+      ]
+    }
+  ],
+  "discarded_candidates": [
+    {
+      "target_file": "entry/src/main/ets/pages/GuideStatusComponent.ets",
+      "reason": "fixer/reviewer only: root rollout lacks product-source patch and post-fix measurement; reviewer 2vp threshold does not adjudicate simultaneous 64->70 change"
+    },
+    {
+      "target_file": "entry/src/main/ets/pages/MemberCenterActivitiy.ets",
+      "reason": "HomeVip readiness gate appears only in fixer summaries; correct page identity, source patch, and successful catalog behavior remain unavailable"
+    },
+    {
+      "target_file": "entry/src/main/ets/pages/MainPage.ets",
+      "reason": "direct entry-assembly patch exists, but it is an in-generation one-time assembly rather than a clean later repair chain; later compile fixes are only summarized"
+    }
+  ]
+}

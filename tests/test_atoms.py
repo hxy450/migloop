@@ -615,7 +615,7 @@ def test_codex_collector_matches_cc_semantics(tmp_path: Any) -> None:
     main_id, child_id = "__main__:" + CROOT[:8], "agent-" + CCHILD[:12]
     assert set(led.agents) == {main_id, child_id}
     m = led.agents[main_id]
-    assert [(a.kind, a.ver, a.ok) for a in m.actions if a.kind != "inbox"] == [
+    assert [(a.kind, a.ver, a.ok) for a in m.actions if a.kind not in ("inbox", "say")] == [
         ("read", None, True), ("write", 1, True), ("dispatch", 2, True), ("message", 3, True), ("write", None, False)]
     assert m.actions[1].detail["cmd"].startswith("cd /proj && grep")
     rd = led.stories["/proj/spec/a.md"].reads[0]
@@ -1698,7 +1698,8 @@ def test_sub_agent_header_notes_definition_outside_transcript(tmp_path: Any) -> 
                                                             "prompt": "转换"}, "done", toolUseResult={"agentId": "a1"})]
     led = _ledger(tmp_path, main, {"agent-a1": sub})
     text = atoms_text.render_agent(led, "conv-x", root="/proj")
-    assert "a2h-activity-converter" in text and "不在转录里" in text
+    assert "a2h-activity-converter" in text and "未记录的说明仍未知" in text
+    assert "多半出自这里" not in text
 
 
 def test_fix_basis_lists_docs_read_before_first_fix_write(tmp_path: Any) -> None:
@@ -1858,13 +1859,13 @@ def test_action_long_output_is_addressable(tmp_path: Any) -> None:
     main = [*_call("2026-01-01T00:00:00Z", "t1", "Bash", {"command": "echo"}, body)]
     led = _ledger(tmp_path, main)
     seq = led.agents[MAIN_ID].actions[0].seq
-    head = atoms_text.render_action(led, MAIN_ID, seq, max_chars=1000)
+    head = atoms_text.render_action(led, MAIN_ID, seq, max_chars=1000, part="output")
     assert "共 10018 字" in head and "剩余 9018 字" in head and "offset=1000" in head
-    mid = atoms_text.render_action(led, MAIN_ID, seq, max_chars=1000, offset=4900)
+    mid = atoms_text.render_action(led, MAIN_ID, seq, max_chars=1000, offset=4900, part="output")
     assert "DECISION keep Roll" in mid and "第 4901-5900 字" in mid
-    found = atoms_text.render_action(led, MAIN_ID, seq, max_chars=400, find="DECISION")
+    found = atoms_text.render_action(led, MAIN_ID, seq, max_chars=400, find="DECISION", part="output")
     assert "DECISION keep Roll" in found and "offset=" in found
-    miss = atoms_text.render_action(led, MAIN_ID, seq, max_chars=400, find="NOPE")
+    miss = atoms_text.render_action(led, MAIN_ID, seq, max_chars=400, find="NOPE", part="output")
     assert "未命中" in miss
 
 

@@ -34,6 +34,7 @@ from migloop.filestory import (
     build_stories,
     find_story_path,
     line_origins,
+    ts_norm,
 )
 
 #: 让 agent 版本 +1 的动作
@@ -48,6 +49,7 @@ class FileRef:
     ev: Ev                     # 落进编年史的事件;v 在 build 后回填
     v: int | None = None
     certain: bool = True       # 读:版本是实锤还是状态未知时的就近绑定(build 后回填)
+    observation_uncertain: bool = False  # 调用窗口与写入重叠,快照取得时刻无法确定
 
 
 @dataclass
@@ -141,11 +143,13 @@ class Ledger:
     mention_seq: dict[int, list[str]] = field(default_factory=dict)
     #: 全池有写能力的命令 (ts, seq, agent),按时刻排:断点窗口里「谁可能改的」按它数,不解析脚本
     write_cmds: list[tuple[str, int, str]] = field(default_factory=list)
+    #: A tag shared by distinct source paths is ambiguous at every line, not just overlapping lines.
+    tag_conflicts: dict[str, list[str]] = field(default_factory=dict)
     #: 建账完成时冻结;查询期间源文件的 mtime / 内容变化不能改写这本内存账本的身份。
     _identity: str | None = field(default=None, init=False, repr=False)
 
 
-LEDGER_CODE_VERSION = "atoms-2026-09-09-snapshot2"
+LEDGER_CODE_VERSION = "atoms-2026-09-09-observation4"
 
 
 @cache
@@ -177,7 +181,9 @@ def ledger_identity(ledger: Ledger) -> str:
     def digest(text: str | None) -> str | None:
         return hashlib.sha256(text.encode("utf-8", errors="surrogatepass")).hexdigest() if text is not None else None
 
-    for tag, path in sorted(ledger.tag_paths.items()):
+    sources = [(tag, source) for tag, path in ledger.tag_paths.items()
+               for source in ledger.tag_conflicts.get(tag, [path])]
+    for tag, path in sorted(sources):
         source = hashlib.sha256()
         try:
             with open(path, "rb") as fh:
@@ -195,7 +201,8 @@ def ledger_identity(ledger: Ledger) -> str:
                  act.tuid, act.blk, ledger.locs.get(act.seq), act.detail])
             for ref in act.files:
                 add(["ref", ref.op, ref.path, ref.v, ref.certain, ref.ev.dep, ref.ev.conditional,
-                     ref.ev.start, ref.ev.n, ref.ev.full, ref.ev.seen, digest(ref.ev.content)])
+                     ref.ev.start, ref.ev.n, ref.ev.full, ref.ev.seen, digest(ref.ev.content),
+                     ref.ev.use_ts, ref.ev.done_ts, ref.observation_uncertain])
     for path, story in sorted(ledger.stories.items()):
         add(["file", path])
         for ver in story.versions:
@@ -247,7 +254,9 @@ def event_id(ledger: Ledger, agent_id: str, seq: int) -> str | None:
     if a is None or act is None:
         return None
     stem = os.path.splitext(os.path.basename(act.src[0]))[0] if act.src else a.id
-    tail = act.tuid if act.tuid else (f"L{act.src[1] + 1}/{act.blk}" if act.src else f"seq{act.seq}")
+    tail = (act.tuid if act.tuid else
+            f"message:{act.detail['source_event_id']}" if act.detail.get("source_event_id") else
+            f"L{act.src[1] + 1}/{act.blk}" if act.src else f"seq{act.seq}")
     return f"{a.session}:{stem}:{tail}"
 
 
@@ -373,19 +382,23 @@ def build_ledger(agents: dict[str, AgentRec]) -> Ledger:
             # 必须先进入重建引擎,不能 build_stories 后才补一条展示用虚线。
             candidates = set(act.detail.get("conditional") or []) | set(act.detail.get("touched") or [])
             for p in candidates:
-                events.append(Ev(act.ts, act.seq, "candidate", p, a.id, stage=act.stage))
+                events.append(Ev(act.ts, act.seq, "candidate", p, a.id, stage=act.stage,
+                                 use_ts=act.ts, done_ts=act.done_ts))
                 if act.done_ts and act.done_ts != act.ts:
-                    events.append(Ev(act.done_ts, act.seq, "candidate", p, a.id, stage=act.stage))
+                    events.append(Ev(act.done_ts, act.seq, "candidate", p, a.id, stage=act.stage,
+                                     use_ts=act.ts, done_ts=act.done_ts))
     stories = build_stories(events)
     _sweep_phantoms(stories)
     index: dict[tuple[str, int], int] = {}
     certain: dict[tuple[str, int], bool] = {}
+    observation_uncertain: dict[tuple[str, int], bool] = {}
     for path, st in stories.items():
         for ver in st.versions:
             index[(path, ver.seq)] = ver.v
         for r in st.reads:
             index[(path, r.seq)] = r.version
             certain[(path, r.seq)] = r.certain
+            observation_uncertain[(path, r.seq)] = r.observation_uncertain
     feeds: dict[tuple[str, int], int] = {}
     act_seq: dict[tuple[str, int], int] = {}
     read_act: dict[tuple[str, int], int] = {}
@@ -415,6 +428,7 @@ def build_ledger(agents: dict[str, AgentRec]) -> Ledger:
                 if ref.op == "read":
                     feeds[(ref.path, ref.ev.seq)] = act.at
                     ref.certain = certain.get((ref.path, ref.ev.seq), True)
+                    ref.observation_uncertain = observation_uncertain.get((ref.path, ref.ev.seq), False)
                     read_act[(ref.path, ref.ev.seq)] = act.seq
                 else:
                     act_seq[(ref.path, ref.ev.seq)] = act.seq
@@ -508,13 +522,16 @@ def build_ledger(agents: dict[str, AgentRec]) -> Ledger:
         for m in lst:
             mention_seq.setdefault(m.seq, []).append(path)
     tag_paths: dict[str, str] = {}
+    tag_sources: dict[str, dict[str, str]] = {}
     legacy: dict[str, str | None] = {}
     for a in agents.values():
         for act in a.actions:
             if act.src is None:
                 continue
             tag = transcript_tag(act.src[0])
-            tag_paths[tag] = act.src[0]
+            tag_paths.setdefault(tag, act.src[0])
+            source_key = os.path.normcase(os.path.abspath(act.src[0]))
+            tag_sources.setdefault(tag, {}).setdefault(source_key, act.src[0])
             stem = os.path.splitext(os.path.basename(act.src[0]))[0]
             old = stem[6:14] if stem.startswith("agent-") else stem[:8]
             if old != tag:
@@ -523,6 +540,7 @@ def build_ledger(agents: dict[str, AgentRec]) -> Ledger:
                   mentions=mentions, mention_seq=mention_seq, write_cmds=_write_capable_cmds(agents),
                   locs=locs, by_loc=by_loc, loc_ambiguous=loc_ambiguous, line_blocks=line_blocks,
                   tag_paths=tag_paths, legacy_tags=legacy,
+                  tag_conflicts={tag: sorted(paths.values()) for tag, paths in tag_sources.items() if len(paths) > 1},
                   scan_gaps=[{"agent": a.id, "seq": act.seq,
                               "chars": act.detail.get("mentions_scan_truncated", 0),
                               "mentions": act.detail.get("mentions_truncated", 0),
@@ -538,15 +556,17 @@ REF_RE = re.compile(r"#(?:([\w-]+):)?(\d+)@L(\d+)(?:/(\d+))?(?:·([\w-]+))?")
 
 def resolve_tag(ledger: Ledger, tag: str) -> tuple[str | None, bool]:
     """报告里的转录标识 → 账本里的标识。精确 → 旧格式迁移(唯一才认)→ 前缀(≥4 位且唯一)。(None, True) = 歧义。"""
+    if tag in ledger.tag_conflicts:
+        return None, True
     if tag in ledger.tag_paths:
         return tag, False
     if tag in ledger.legacy_tags:
         t = ledger.legacy_tags[tag]
-        return (t, False) if t else (None, True)
+        return (t, False) if t and t not in ledger.tag_conflicts else (None, True)
     if len(tag) >= 4:
         cands = [t for t in ledger.tag_paths if t.startswith(tag)]
         if len(cands) == 1:
-            return cands[0], False
+            return (None, True) if cands[0] in ledger.tag_conflicts else (cands[0], False)
         if cands:
             return None, True
     return None, False
@@ -579,9 +599,18 @@ def resolve_ref(ledger: Ledger, no: int, line: int, blk: int | None, tag: str | 
 
 
 def transcript_tag(path: str) -> str:
-    """转录文件的标识:主会话取会话号前 8 位;子代理取文件名末尾那一整段 hex(agent-aconv-apploaddlg-8ea392b08bb155da →
+    """转录文件的标识:Codex rollout 取末尾完整 UUID/hex;Claude 主会话仍取前 8 位;子代理取末尾整段 hex(agent-aconv-apploaddlg-8ea392b08bb155da →
     8ea392b08bb155da)—— 截 8 位会撞(0723 有 17 个短标识各对两个文件)、带名字的会有非 hex 字符。引用 (#n@L行·标识) 里的那一截。"""
     stem = os.path.splitext(os.path.basename(path))[0]
+    if stem.lower().startswith("rollout-"):
+        # Codex prepends a timestamp; the stable session UUID is at the end.
+        uuid = re.search(r"([0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12})$", stem, re.I)
+        if uuid:
+            return uuid.group(1).lower()
+        hexadecimal = re.search(r"-([0-9a-f]{16,})$", stem, re.I)
+        if hexadecimal:
+            return hexadecimal.group(1).lower()
+        return "rollout-" + hashlib.sha256(stem.encode("utf-8")).hexdigest()[:24]
     if stem.startswith("agent-"):
         m = re.search(r"([0-9a-f]+)$", stem)
         if m and len(m.group(1)) >= 4:
@@ -747,8 +776,10 @@ def agent_label(ledger: Ledger, aid: str) -> str:
 def _text_of(raw: object) -> str:
     if isinstance(raw, str):
         return raw
+    if isinstance(raw, dict) and raw.get("type") in (None, "text", "input_text", "output_text"):
+        return raw["text"] if isinstance(raw.get("text"), str) else ""
     if isinstance(raw, list):
-        return "\n".join(str(x.get("text", "")) for x in raw if isinstance(x, dict))
+        return "\n".join(text for x in raw if (text := _text_of(x)))
     return ""
 
 
@@ -806,6 +837,12 @@ def action_raw(ledger: Ledger, agent_id: str, seq: int) -> dict[str, Any] | None
         texts = ([str(b.get(want_type) or "") for b in blocks if isinstance(b, dict) and b.get("type") == want_type]
                  if isinstance(blocks, list) else [str(blocks or "")])
         inp = "\n".join(t for t in texts if t.strip())
+        payload = use_rec.get("payload")
+        if isinstance(payload, dict) and payload.get("type") in ("message", "agent_message"):
+            inp = _text_of(payload.get("content"))
+        elif isinstance(payload, dict) and act.detail.get("source_event_type") == "base_instructions":
+            base = payload.get("base_instructions")
+            inp = str(base.get("text") or "") if isinstance(base, dict) else ""
     # codex rollout:调用与结果都在 payload 里,按 call_id 对上
     for rec, is_use in ((use_rec, True), (res_rec, False)):
         pl = rec.get("payload") if isinstance(rec, dict) and isinstance(rec.get("payload"), dict) else None
@@ -819,6 +856,8 @@ def action_raw(ledger: Ledger, agent_id: str, seq: int) -> dict[str, Any] | None
         tur = res_rec.get("toolUseResult")
     return {"seq": act.seq, "ts": act.ts, "tool": act.tool, "kind": act.kind, "ok": act.ok,
             "ver": act.ver, "at": act.at, "input": inp, "output": out,
+            "source_event_id": act.detail.get("source_event_id"), "sender": act.detail.get("from"),
+            "recipient": act.detail.get("recipient"), "claim_note": act.detail.get("claim_note"),
             "tool_use_result": tur, "src": {"path": path, "use_line": use_idx, "result_line": res_idx}}
 
 
@@ -945,6 +984,7 @@ def file_atom(ledger: Ledger, hint: str, v: int | None = None,
                 "t": rel_time(r.ts, ledger.t0), "seq": ledger.read_act.get((path, r.seq)), "via": r.via,
                 "v": r.version, "at": ledger.feeds.get((path, r.seq)),
                 "start": r.start, "n": r.n, "dep": r.dep, "certain": r.certain,
+                "use_ts": r.use_ts, "done_ts": r.ts, "observation_uncertain": r.observation_uncertain,
                 "seen": [list(x) for x in r.seen] if r.seen else None,
                 "seen_n": len(r.seen or ()), "full": r.full}
                for r in st.reads]
@@ -1023,6 +1063,16 @@ def _versions_at(st: FileStory, ts: str) -> int:
     return sum(1 for ver in st.versions if ver.ts <= ts)
 
 
+def file_ref_payload(ref: FileRef) -> dict[str, Any]:
+    """One evidence contract for action navigation and agent timelines; never erase uncertainty."""
+    return {"op": ref.op, "path": ref.path, "v": ref.v, "via": ref.ev.via,
+            "certain": ref.certain, "dep": ref.ev.dep, "conditional": ref.ev.conditional,
+            "full": ref.ev.full, "start": ref.ev.start, "n": ref.ev.n,
+            "seen": [list(x) for x in ref.ev.seen] if ref.ev.seen else None,
+            "use_ts": ref.ev.use_ts, "done_ts": ref.ev.done_ts,
+            "observation_uncertain": ref.observation_uncertain}
+
+
 def action_links(ledger: Ledger, agent_id: str, seq: int) -> dict[str, Any]:
     """一次调用两头的坐标:发自哪个 agent 的哪一版;账本记到它读写了哪些文件版本;命令里提到但没记到读写的文件
     当时在第几版(按时刻就近)。action 是两个原子之间的枢纽,file 的虚线行和 agent 槽里的命令都经它跳到对面。"""
@@ -1031,7 +1081,7 @@ def action_links(ledger: Ledger, agent_id: str, seq: int) -> dict[str, Any]:
     if a is None or act is None:
         return {}
     ver = act.ver if act.ver is not None else act.at
-    files = [{"op": f.op, "path": f.path, "v": f.v} for f in act.files]
+    files = [file_ref_payload(f) for f in act.files]
     seen = {f.path for f in act.files}
     possible = []
     for path, lst in ledger.mentions.items():
@@ -1083,13 +1133,14 @@ def agent_atom(ledger: Ledger, agent_id: str, v: int | None = None,
                                "detail": detail, "expandable": act.src is not None,
                                "stage": act.stage}
         for ref in act.files:
-            row["files"].append({"op": ref.op, "path": ref.path, "v": ref.v, "via": ref.ev.via})
+            row["files"].append(file_ref_payload(ref))
             # 被作废的探测读(假前身)不列进读记录;图片读没有版本但要列(via=image)
             if ref.op == "read" and (ref.v is not None or ref.ev.via == "image"):
                 st = ledger.stories.get(ref.path)
                 anchor_ts = effect_ts.get(act.at) or act.ts
                 latest = _versions_at(st, anchor_ts) if st else None
                 reads.append({
+                    **file_ref_payload(ref),
                     "seq": act.seq, "ts": ref.ev.ts, "t": rel_time(ref.ev.ts, ledger.t0),
                     "path": ref.path, "v": ref.v, "via": ref.ev.via,
                     "seen": [list(x) for x in ref.ev.seen] if ref.ev.seen else None,
@@ -1155,6 +1206,39 @@ def _record_texts(rec: dict[str, Any], act: Action) -> dict[str, str]:
     """一条记录里可搜的文本,按字段:input(工具输入)/ output(工具输出,Read 的用边车里的全文按行号排)/
     text(正文、指令、收件、注入…)/ thinking。"""
     out: dict[str, str] = {}
+    payload = rec.get("payload")
+    if isinstance(payload, dict):
+        kind = payload.get("type")
+        if act.tuid is None and act.detail.get("source_event_type") == "base_instructions":
+            base = payload.get("base_instructions")
+            return {"text": str(base.get("text") or "") if isinstance(base, dict) else ""}
+        if act.tuid is None and kind in ("message", "agent_message"):
+            return {"text": _text_of(payload.get("content"))}
+        if act.tuid is not None and str(payload.get("call_id")) == str(act.tuid):
+            if kind in ("function_call", "custom_tool_call"):
+                value = payload.get("arguments") if payload.get("arguments") is not None else payload.get("input")
+                if kind == "function_call":
+                    # Function arguments are JSON-encoded data, not custom code.
+                    # Search decoded values (including paths) like Claude inputs;
+                    # action_raw must continue returning the exact original input.
+                    try:
+                        decoded = json.loads(value) if isinstance(value, str) else value
+                    except (ValueError, RecursionError):
+                        decoded = None
+                    pending, texts = [decoded], []
+                    while pending:
+                        item = pending.pop()
+                        if isinstance(item, str):
+                            texts.append(item)
+                        elif isinstance(item, dict):
+                            pending.extend(reversed(list(item.values())))
+                        elif isinstance(item, list):
+                            pending.extend(reversed(item))
+                    if texts:
+                        return {"input": "\n".join(texts)}
+                return {"input": value if isinstance(value, str) else json.dumps(value, ensure_ascii=False)}
+            if kind in ("function_call_output", "custom_tool_call_output"):
+                return {"output": _text_of(payload.get("output"))}
     msg = rec.get("message") or {}
     content = msg.get("content")
     blocks = content if isinstance(content, list) else (
@@ -1228,7 +1312,9 @@ def search_agent(ledger: Ledger, agent_id: str, q: str, v: int | None = None, si
             continue
         k = act.ver if act.ver is not None else act.at
         if since_ts or until_ts:
-            if (since_ts and act.ts < since_ts) or (until_ts and act.ts > until_ts):
+            start, end = sorted((ts_norm(act.ts), ts_norm(act.done_ts or act.ts)))
+            known_extent = act.done_ts is not None or act.src[1] == act.src[2]
+            if known_extent and ((since_ts and end < ts_norm(since_ts)) or (until_ts and start > ts_norm(until_ts))):
                 continue
             in_window = True
         else:
@@ -1237,20 +1323,20 @@ def search_agent(ledger: Ledger, agent_id: str, q: str, v: int | None = None, si
         path, ui, ri = act.src
         lines = _transcript_lines(path)
         idxs = [ui] + ([ri] if ri is not None and ri != ui else [])
-        if not any(i is not None and i < len(lines) and ql in lines[i].lower() for i in idxs):
-            continue
-        if not in_window and not after:
-            excluded += 1
-            continue
         fields: dict[str, str] = {}
+        field_times: dict[str, str] = {}
         for i in idxs:
-            if i is None or i >= len(lines) or ql not in lines[i].lower():
+            if i is None or i >= len(lines):
                 continue
             try:
                 rec = json.loads(lines[i])
             except Exception:
                 continue
             for fld, text in _record_texts(rec, act).items():
+                field_ts = str(rec.get("timestamp") or (act.done_ts if fld == "output" else act.ts) or act.ts)
+                if ((since_ts and ts_norm(field_ts) < ts_norm(since_ts))
+                        or (until_ts and ts_norm(field_ts) > ts_norm(until_ts))):
+                    continue
                 if act.kind in ("say",) and fld != "text":
                     continue
                 if act.kind == "think" and fld != "thinking":
@@ -1262,6 +1348,10 @@ def search_agent(ledger: Ledger, agent_id: str, q: str, v: int | None = None, si
                     continue
                 if ql in text.lower():
                     fields[fld] = text
+                    field_times[fld] = field_ts
+        if not in_window and not after:
+            excluded += bool(fields)
+            continue
         for fld, text in fields.items():
             snips, cnt = _snips(text, ql)
             target = None
@@ -1272,8 +1362,10 @@ def search_agent(ledger: Ledger, agent_id: str, q: str, v: int | None = None, si
             elif fld == "input" and ws:
                 target = ws[0]
             hits.append({"kind": act.kind, "tool": act.tool, "seq": act.seq, "line": ledger.locs.get(act.seq),
-                         "at": act.at, "ver": act.ver, "ts": act.ts, "t": rel_time(act.ts, ledger.t0),
+                         "at": act.at, "ver": act.ver, "ts": field_times[fld], "t": rel_time(field_times[fld], ledger.t0),
                          "field": fld, "target": target,
+                         "sender": act.detail.get("from"), "claim_note": act.detail.get("claim_note"),
+                         "source_event_id": act.detail.get("source_event_id"),
                          "targets": rs if fld == "output" else ws,
                          "target_v": next((ref.v for ref in act.files if ref.path == target), None),
                          "possible": ([p for p in ledger.mention_seq.get(act.seq, [])

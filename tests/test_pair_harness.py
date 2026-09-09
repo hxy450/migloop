@@ -464,7 +464,8 @@ def test_observed_codex_cache_write_and_reasoning_are_not_added_again(tmp_path: 
     assert usage["output"] == 20 and usage["thinking_reported"] == 9
 
 
-def test_guide_smoke_is_separate_and_never_builds_ledger(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.mark.parametrize("tool_transport", ["code-host", "native"])
+def test_guide_smoke_is_separate_and_never_builds_ledger(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, tool_transport: str) -> None:
     source = tmp_path / "source"
     (source / "src/migloop").mkdir(parents=True)
     (source / "src/migloop/mcp_server.py").write_text("# source\n", encoding="utf-8")
@@ -478,24 +479,69 @@ def test_guide_smoke_is_separate_and_never_builds_ledger(tmp_path: Path, monkeyp
                                                     "output_tokens": 12, "reasoning_output_tokens": 0}}]
     calls = fake_process(monkeypatch, "\n".join(json.dumps(row) for row in events) + "\n")
     rollout = tmp_path / "actual-rollout.jsonl"
-    write_records(rollout, [{"type": "turn_context", "payload": {"model": "gpt-5.6-sol", "effort": "medium"}},
+    model = "gpt-5.5" if tool_transport == "native" else "gpt-5.6-sol"
+    write_records(rollout, [{"type": "turn_context", "payload": {"model": model, "effort": "medium"}},
                             {"type": "response_item", "payload": {"type": "function_call", "call_id": "real_guide", "name": "mcp__migloop__guide", "arguments": "{}"}},
                             {"type": "response_item", "payload": {"type": "function_call_output", "call_id": "real_guide", "output": "GUIDE"}}])
     monkeypatch.setattr(pair, "find_codex_transcript", lambda thread_id: rollout)
     monkeypatch.setattr(pair, "collect_verdict", lambda *args: pytest.fail("Smoke must not build a ledger or verdict"))
     monkeypatch.setattr(pair, "load_modules", lambda *args: pytest.fail("Smoke must not import the data service"))
-    metrics = pair.run_smoke(source, store)
+    metrics = pair.run_smoke(source, store, model=model, tool_transport=tool_transport)
     assert len(calls) == 1 and metrics["smoke_passed"] is True and metrics["connection_verified"] is True
     assert metrics["include_in_pairs"] is False and metrics["experiment_kind"] == "connectivity_smoke"
-    assert metrics["actual_models"] == ["gpt-5.6-sol"] and metrics["actual_effort"] == "medium"
+    assert metrics["actual_models"] == [model] and metrics["actual_effort"] == "medium"
+    assert metrics["tool_transport"] == pair.read_json(store / "config.json")["tool_transport"] == tool_transport
     assert metrics["cost_usd"] is None and metrics["usage"]["input_total"] == 10419
     assert (store / "transcript.jsonl").read_bytes() == rollout.read_bytes()
     assert list((store / "empty-pool").iterdir()) == []
     assert not (store / "case.json").exists() and not (store / "verdict.json").exists()
     assert "不传 sid" in (store / "prompt.md").read_text(encoding="utf-8")
+    assert ("code-mode" in (store / "prompt.md").read_text(encoding="utf-8")) is (tool_transport == "code-host")
     with pytest.raises(FileExistsError):
         pair.run_smoke(source, store)
     assert len(calls) == 1
+
+
+def test_native_transport_keeps_mcp_and_sandbox_without_forcing_code_host(frozen_case: Path) -> None:
+    case = pair.read_json(frozen_case / "case.json")
+    command, config = pair.build_codex_command(case, "tools", frozen_case / "run", "gpt-5.5", "medium", "codex.exe", "native")
+    enabled = {command[i + 1] for i, word in enumerate(command[:-1]) if word == "--enable"}
+    disabled = {command[i + 1] for i, word in enumerate(command[:-1]) if word == "--disable"}
+    assert {"code_mode", "code_mode_host", "shell_tool"} <= disabled
+    assert enabled == {"skip_host_skill_discovery"}
+    assert command[command.index("-m") + 1] == "gpt-5.5"
+    assert command[command.index("--sandbox") + 1] == "read-only"
+    assert command[command.index("-a") + 1] == "never"
+    assert set(config["mcp_servers"]) == {"migloop"} and config["mcp_servers"]["migloop"]["required"] is True
+    prompt = pair.build_prompt(frozen_case, case, "tools", tool_transport="native")
+    assert "mcp__migloop__guide" in prompt and "code-mode" not in prompt and "tools.mcp__" not in prompt
+    assert "migloop-verdict/1" in prompt and "reason/evidence/notes" in prompt
+    default_command, default_config = pair.build_codex_command(case, "tools", frozen_case / "run", "model", "medium", "codex.exe")
+    assert default_config["tool_transport"] == "code-host"
+    assert default_config["settings"]["features.code_mode_host"] is True
+
+
+def test_invalid_transport_is_rejected_before_artifacts_or_cli(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    source = tmp_path / "source"
+    (source / "src/migloop").mkdir(parents=True)
+    (source / "src/migloop/mcp_server.py").write_text("# source\n", encoding="utf-8")
+    monkeypatch.setattr(pair.subprocess, "Popen", lambda *args, **kwargs: pytest.fail("must not launch"))
+    with pytest.raises(ValueError, match="tool_transport"):
+        pair.run_smoke(source, tmp_path / "invalid", tool_transport="guessed")
+    assert not (tmp_path / "invalid").exists()
+
+
+@pytest.mark.parametrize("command", ["smoke", "run"])
+def test_cli_forwards_explicit_native_transport(command: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    received = []
+    def fake(*args: Any, **kwargs: Any) -> dict[str, Any]:
+        received.append((args, kwargs))
+        return {"status": "completed"}
+    monkeypatch.setattr(pair, "run_smoke" if command == "smoke" else "run_one", fake)
+    paths = (["--source", str(tmp_path), "--store", str(tmp_path / "smoke")]
+             if command == "smoke" else ["--case-dir", str(tmp_path), "--arm", "tools", "--rep", "1"])
+    assert pair.main([command, *paths, "--model", "gpt-5.5", "--tool-transport", "native"]) == 0
+    assert received[0][0][-1] == "native" and "gpt-5.5" in received[0][0]
 
 
 def test_host_rollout_preserves_failed_mcp_leaf_and_counts_wrappers_separately(tmp_path: Path) -> None:
@@ -561,6 +607,58 @@ def test_same_explicit_call_id_deduplicates_native_and_response_views(tmp_path: 
     leaf = parsed["seq"][0]
     assert leaf["call_id"] == "call_real" and leaf["response_use_line"] == 1 and leaf["response_result_line"] == 2
     assert leaf["source_id_type"] == "codex_mcp_item_id" and leaf["result_line"] == 3
+
+
+@pytest.mark.parametrize("case,verified", [("native", True), ("qualified", True), ("unknown", False),
+    ("other", False), ("namespace_conflict", False), ("server_conflict", False),
+    ("tool_conflict", False), ("args_conflict", False)])
+def test_native_mcp_origin_cannot_be_replaced_during_dedup(tmp_path: Path, case: str, verified: bool) -> None:
+    path = tmp_path / "origin.jsonl"
+    payload = {"type": "function_call", "call_id": "same", "name": "guide", "arguments": "{}"}
+    if case != "unknown":
+        payload["namespace"] = "mcp__other" if case == "other" else "mcp__migloop"
+    if case == "qualified":
+        payload.pop("namespace")
+        payload["name"] = "mcp__migloop__guide"
+    if case == "namespace_conflict":
+        payload["name"] = "mcp__other__guide"
+    records = [{"type": "response_item", "payload": payload},
+               {"type": "response_item", "payload": {"type": "function_call_output", "call_id": "same", "output": "GUIDE"}}]
+    if case != "unknown":
+        item = {"type": "McpToolCall", "id": "same", "server": "other" if case in ("other", "server_conflict") else "migloop",
+                "tool": "file" if case == "tool_conflict" else "guide", "arguments": {"q": "different"} if case == "args_conflict" else {},
+                "status": "completed", "result": {"content": [{"type": "text", "text": "GUIDE"}]}}
+        records.insert(1, {"type": "event_msg", "payload": {"type": "item_completed", "item": item}})
+    write_records(path, records)
+    parsed = pair.parse_codex_transcript(path)
+    assert parsed["tool_calls"] == 1
+    row = parsed["seq"][0]
+    assert row["tool_origin"]["verified"] is verified
+    if "conflict" in case:
+        assert row["tool_origin"]["errors"] and row["status"] == "unverified"
+    if case == "unknown":
+        assert row["status"] == "unverified"
+
+
+@pytest.mark.parametrize("representation", ["direct", "runtime", "stdout"])
+def test_harness_origin_replay_conflicts_remain_auditable(tmp_path: Path, representation: str) -> None:
+    path = tmp_path / "replay-origin.jsonl"
+    if representation == "direct":
+        rows = [{"type": "response_item", "payload": {"type": "function_call", "call_id": "same",
+                 "name": "guide", "namespace": namespace, "arguments": "{}"}}
+                for namespace in ("mcp__migloop", "mcp__other")]
+        rows.append({"type": "response_item", "payload": {"type": "function_call_output", "call_id": "same", "output": "GUIDE"}})
+    else:
+        items = [{"type": "mcp_tool_call" if representation == "stdout" else "McpToolCall", "id": "same",
+                  "server": server, "tool": "guide", "arguments": {}, "status": "completed",
+                  "result": {"content": [{"type": "text", "text": "GUIDE"}]}} for server in ("migloop", "other")]
+        rows = ([{"type": "item.started" if i == 0 else "item.completed", "item": item} for i, item in enumerate(items)]
+                if representation == "stdout" else [{"type": "event_msg", "payload": {"type": "item_completed", "item": item}} for item in items])
+    write_records(path, rows)
+    parsed = pair.parse_codex_events(path)["calls"] if representation == "stdout" else pair.parse_codex_transcript(path)
+    assert parsed["tool_calls"] == 1
+    row = parsed["seq"][0]
+    assert row["status"] == "unverified" and not row["tool_origin"]["verified"] and row["tool_origin"]["errors"]
 
 
 def test_host_command_leaf_preserves_raw_fields_and_does_not_count_wrapper_output(tmp_path: Path) -> None:
