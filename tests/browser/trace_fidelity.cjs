@@ -48,6 +48,9 @@ function claim(r) { return {...r,ok:true,label:r.kind==='file'?'A.ets@v'+r.v:'Ag
 const probe={run:'fixture',root:file,cost:0,steps,links:[],legacy:false,roles:{'agent-a':roles,[file]:[legacyRole]},fixed:[],defects:{A:'缺陷甲',B:'缺陷乙'},
  trace_identity:{bound:true,status:'matched',current:'fixture-ledger',source:'sessions',source_identities:['fixture-ledger']},
  structured:{identity:{match:true,bound:true,status:'matched'},errors:[],defects:[{id:'A',title:'缺陷甲',nodes:[claim(roles[0]),claim(legacyRole)],edges:[]},{id:'B',title:'缺陷乙',nodes:[claim(roles[1])],edges:[]}]},
+ evidence_graph:{schema:'migloop-evidence-graph/1',scope:'recorded_transitions',complete:false,status:'projected',identity_bound:true,
+   nodes:nodes.map(n=>n.id),edges:[],model_relations:[],counts:{confirmed_read:0,confirmed_write:0,candidate_read:0,candidate_write:0},
+   note:'仅投影已记录关系，不是全账本图或完整根因图。'},
  trajectory:{mode:'via',root,nodes,edges:[],visits,transitions,declared:[],side_title:'未查询 · 结论提及'}};
 const candidateOne='candidate:'+'a'.repeat(20), candidateTwo='candidate:'+'b'.repeat(20);
 function coverageFixture(body){
@@ -72,6 +75,7 @@ agents[0].reads=[
   {path:file,v:1,at:1,certain:true,dep:false,observation_uncertain:false},
   {path:file,v:2,at:1,certain:false,dep:true,observation_uncertain:true}
 ];
+agents[0].reads.forEach(r=>{r.proof={execution:'confirmed',delivery:r.dep?'dependency':'content',operation_basis:'fixture_native_read',snapshot:'reported',rule:'fixture'};});
 const data={sid:'fixture',sid8:'fixture',project:'Trace fidelity regression',urls:{data:'/data',atom:'/atom',probe:'/probe',filediff:'/diff',report:null}};
 const html=fs.readFileSync(path.join(repo,'src/migloop/render/templates/fixchain.html'),'utf8').replace('__FIXCHAIN_JSON__',JSON.stringify(data));
 let activeFixture='fixture';
@@ -97,6 +101,12 @@ const server=http.createServer((req,res)=>{
     body=structuredClone(probe);
     const run=url.searchParams.get('run');
     activeFixture=run;
+    if(run.startsWith('source-')){
+      const kind=run.slice(7), verified=['final_inline','checked_draft_ref'].includes(kind);
+      body.structured.document_source={kind,verified,semantic_checked:false,raw_matches_data:kind==='invalid_saved'?false:true,
+        final_matches_document:kind==='final_inline'?true:kind==='legacy_saved'?false:null,note:'SOURCE_NOTE <img src=x onerror="window.sourceXss=1">'};
+      if(kind==='invalid_saved'){body.structured.identity.bound=false;body.structured.errors=['保存稿 raw 与 data 不一致'];body.roles={};}
+    }
     if(run.startsWith('coverage')||run.startsWith('trace-')){
       const row=coverageFixture(body);
       if(run==='coverage-invalid'){
@@ -172,7 +182,25 @@ const server=http.createServer((req,res)=>{
       }
       if(run==='with-basis-unbound') body.structured.identity={bound:false,match:false,status:'mismatch'};
     }
-    if(run==='legacy'){body.structured=null;body.legacy=true;delete body.trace_identity;}
+    if(run==='legacy'){body.structured=null;body.legacy=true;delete body.trace_identity;delete body.evidence_graph;}
+    if(run.startsWith('findings')){
+      const snapshot='document-sha:', first=claim(structuredClone(roles[0])), second=claim(roles[1]);
+      first.evidence.push({type:'text',ref:'<img src=x onerror="window.findingXss=1">',original_ref:'  INVALID <img src=x onerror="window.findingXss=1">  ',status:'missing'});
+      Object.assign(first,{basis_status:'complete',source:'model',semantic_checked:false});
+      first.basis={expected:'EXPECTED',actual:'ACTUAL',counterevidence:'COUNTER',expected_evidence:[first.evidence[0]],actual_evidence:[first.evidence[1]],source:'model',semantic_checked:false};
+      const invalid={...first,spec:'agent:agent-a@v99',v:99,ok:false,diag:'版本越界，原坐标保留',reason:'INVALID_REASON <script>window.findingXss=2</script>',basis_status:'invalid_legacy'};
+      const item=(id,title,causes)=>({id:snapshot+id,defect:id,title,causes,source:'model',audit:{semantic_checked:false},
+        boundary:'BOUNDARY <b>只是文本</b>',repair:{before:{kind:'file',key:file,v:1,spec:'file:'+file+'@v1',ok:true},after:{kind:'file',key:file,v:3,spec:'file:'+file+'@v3',ok:true}}});
+      body.findings={schema:'migloop-findings/1',document_sha256:'document-sha',identity:{bound:true},errors:[],
+        files:[{path:file,versions:[1,3],item_ids:[snapshot+'A',snapshot+'B'],associations:[
+          {item_id:snapshot+'A',anchor:'before',node:'file:'+file+'@v1',source:'model',node_checked:true,repair_semantic_checked:false}]}],
+        items:{[snapshot+'A']:item('A','文件事项甲 <b>非HTML</b>',[first,invalid]),[snapshot+'B']:item('B','文件事项乙',[second]),
+          [snapshot+'C']:item('C','没有文件归属，不能借 root',[first])},unbound_items:[snapshot+'C'],audit:{semantic_checked:false,scope_complete:false}};
+      if(run==='findings-unbound'){
+        body.findings.identity.bound=false;body.findings.files=[];
+        body.findings.unbound_items=Object.keys(body.findings.items);
+      }
+    }
     if(run.startsWith('consistency')){
       const advice={code:'entry_role_conflict',level:'warning',defect:'A',node:'agent:agent-a@v1',message:'声明间需核对 <b>不判原因真假</b>'};
       body.structured.consistency={checked:true,semantic_checked:false,advisories:[advice]};
@@ -181,7 +209,7 @@ const server=http.createServer((req,res)=>{
         body.structured.identity={bound:false,status:'missing',match:null};body.structured.consistency.checked=false;
       }
     }
-    if(run==='relations'){
+    if(run.startsWith('relations')){
       const red={...legacyRole,v:3,reason:'两端红也不把探索线染红'};
       body.roles[file].push(red);body.structured.defects[0].nodes.push(claim(red));
       Object.assign(body.trajectory.transitions[0],{relation_status:'unknown',relation_label:'候选·条件读取待核',relation_note:'条件分支中提到，是否读到未知',relation_evidence:[{seq:11,basis:'conditional_read',source:'/fixture/original.jsonl',use_line:4,result_line:5}]});
@@ -194,6 +222,19 @@ const server=http.createServer((req,res)=>{
       body.trajectory.nodes[3].opened=[9];body.trajectory.nodes[3].source='查过';body.trajectory.nodes[3].search_source=source;
       body.trajectory.transitions.push({step:9,from:null,to:fid+'@1',source:'search',search_source:source,relation:null,relation_status:'not_checked',relation_label:'搜索 #8 命中 1 · 查询导航',relation_note:source.note});
       body.trajectory.visits.push({step:9,tool:'file',node:fid+'@1',requested_node:fid+'@1',status:'opened',verified:true,via:'search:abc:1',search_source:source,args:{path:file,v:1}});
+      body.evidence_graph.edges=[
+        {id:'rw-1',from:root,to:aid,kind:'read',status:'unknown',source_of_claim:'ledger',label:'候选·读',
+         notes:['条件读取待核'],steps:[2],evidence:body.trajectory.transitions[0].relation_evidence},
+        {id:'rw-2',from:bid,to:root,kind:'write',status:'true',source_of_claim:'ledger',label:'账本·写',
+         notes:['写于 agent v1'],steps:[3],evidence:[{aid:'agent-b',seq:12,basis:'write',source:'/fixture/original.jsonl',use_line:6,result_line:7}]}];
+      body.evidence_graph.counts={confirmed_read:0,confirmed_write:1,candidate_read:1,candidate_write:0};
+      if(run==='relations-unbound'){body.evidence_graph.identity_bound=null;body.trace_identity.bound=null;}
+      if(run==='relations-conflict')body.trace_identity.bound=false;
+      if(run==='relations-missing-trace')delete body.trace_identity;
+      if(run==='relations-claim-only'){
+        body.evidence_graph.edges[0].source_of_claim='model';
+        body.evidence_graph.edges[1].evidence=[];
+      }
     }
     if(run==='navigation'){
       const added=[
@@ -228,7 +269,13 @@ const server=http.createServer((req,res)=>{
     ] : [];
     body={path:file,v:3,versions,readers,mentions:[{by:'agent-b',by_name:'Agent B',by_ver:1,cls:'change',ctx:'lexical candidate',win:1}]};
   }
-  else if(url.pathname==='/atom/agent')body=agents.find(a=>a.id==='agent-'+url.searchParams.get('id'))||agents[0];
+  else if(url.pathname==='/atom/agent'){
+    body=structuredClone(agents.find(a=>a.id==='agent-'+url.searchParams.get('id'))||agents[0]);
+    if(activeFixture==='read-proof'){
+      body.reads=[{path:file,v:1,at:1,certain:true,dep:false,self_written:true,proof:{execution:'unknown',delivery:'metadata',rule:'unsupported'}},
+        {path:file,v:2,at:1,certain:true,dep:false}];
+    }
+  }
   else if(url.pathname==='/atom/action')body={input:'ACTION '+url.searchParams.get('seq'),output:'EVIDENCE '+url.searchParams.get('seq')};
   else body={};
   res.setHeader('Content-Type','application/json; charset=utf-8');res.end(JSON.stringify(body));
@@ -256,18 +303,19 @@ async function main(){
     await send('Runtime.enable');await send('Page.enable');
     await send('Emulation.setDeviceMetricsOverride',{width:1600,height:1100,deviceScaleFactor:1,mobile:false});
     await send('Page.navigate',{url:origin+'/?probe=fixture'});
-    await until("window.__mig && __mig.xt() && __mig.xt().walk && document.querySelectorAll('.wire.route').length === 5");
-    await check('all transitions including revisit, multi-parent and self-loop',"JSON.stringify([...document.querySelectorAll('.wire.route')].map(n=>Number(n.dataset.step))) === '[2,3,4,5,6]'");
+    await until("window.__mig && __mig.xt() && __mig.xt().walk && document.querySelectorAll('.wire.route').length === 0");
+    await check('all transitions including revisit, multi-parent and self-loop remain only in the timeline',"JSON.stringify(__mig.probe().trajectory.transitions.map(n=>n.step))==='[2,3,4,5,6]' && JSON.stringify([...document.querySelectorAll('.navigation-event')].map(n=>Number(n.dataset.step)))==='[2,3,4,5,6]' && document.querySelectorAll('.wire').length===0");
+    await evaluate("window.originalTrajectory=JSON.stringify(__mig.probe().trajectory)");
     await check('one entity per exact version',"Object.values(__mig.xt().byId).filter(n=>n.traj).length === 4");
     await check('unqueried conclusion version has no checked badge',"[...document.querySelectorAll('#canvas .node')].some(n=>n.textContent.startsWith('A.ets@v1') && n.textContent.includes('未查询') && !n.querySelector('.badge.step'))");
     await check('rejected visit overrides successful transport status',"[...document.querySelectorAll('#probe .st')].some(n=>n.textContent.startsWith('✗7') && n.textContent.includes('被拒 · 未打开'))");
     await check('structured summary excludes prose ring metrics',"!document.querySelector('#probe').textContent.includes('判定落到树上') && !document.querySelector('#probe').textContent.includes('报告的环') && document.querySelector('#probe').textContent.includes('结构化结论 2 项')");
     await check('revisits, partial deliveries, unqueried claims and rejected visits counted separately',"document.querySelector('.visit-summary').textContent==='成功版本访问 6 次 · 其中 1 次返回截断／非全文 · 未打开 1 次 · 去重已查版本节点 3 个 · 图中版本节点 4 个'");
     await check('unrelated navigation is neutral and explicitly noncausal',"[...document.querySelectorAll('.badge.navigation')].some(n=>n.textContent==='探索跳转：未核出直接账本边' && n.title.includes('不是因果边') && !n.classList.contains('stale')) && [...document.querySelectorAll('.wire.route title')].every(n=>n.textContent.includes('不是因果边'))");
-    const point=await evaluate("(()=>{const r=document.querySelector('.route-step[data-step=\"4\"]').getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2}})()");
+    const point=await evaluate("(()=>{document.querySelector('.navigation-timeline').open=true;const n=document.querySelector('.navigation-event[data-step=\"4\"]');n.scrollIntoView({block:'center'});const r=n.getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2}})()");
     await send('Input.dispatchMouseEvent',{type:'mousePressed',button:'left',clickCount:1,...point});
     await send('Input.dispatchMouseEvent',{type:'mouseReleased',button:'left',clickCount:1,...point});
-    await check('transition step label responds to a real mouse click',"document.querySelector('#canvas .node.sel').textContent.startsWith('Agent A v1')");
+    await check('timeline transition responds to a real mouse click without inventing an edge',"document.querySelector('#canvas .node.sel').textContent.startsWith('Agent A v1') && document.querySelectorAll('.wire.route').length===0");
     await evaluate(clickAgent);
     await check('all repeated visits and query windows preserved in drawer',"document.querySelectorAll('#side .pvisit').length===3 && document.querySelector('#side .pvisits').textContent.includes('start=2 n=4')");
     await check('partial return is still opened but never labelled as full delivery',"document.querySelectorAll('#side .delivery-truncated').length===1 && document.querySelector('#side .delivery-truncated').parentElement.textContent.includes('已打开') && document.querySelector('#side .pvisits').textContent.includes('不证明全文交付')");
@@ -280,12 +328,12 @@ async function main(){
     await check('node evidence opens correct action',"document.querySelector('#side .verow').textContent.includes('ACTION 2')");
     await evaluate("const stub=Object.values(__mig.xt().byId).find(n=>n.isLedgerStub);__mig.expandStub(stub.tid)");
     await check('exact missing writer version expanded',"Object.values(__mig.xt().byId).some(n=>n.aid==='agent-a' && n.anchorVer===2 && n.ledgerKid) && Object.values(__mig.xt().byId).filter(n=>n.aid==='agent-b').length===1");
-    await check('expansion preserves all transitions',"document.querySelectorAll('.wire.route').length===5");
+    await check('expansion preserves all transitions and does not promote layout parents',"document.querySelectorAll('.wire').length===0 && JSON.stringify(__mig.probe().trajectory)===window.originalTrajectory");
     await evaluate("__mig.setCand(true)");
-    await check('candidate toggle preserves recorded route',"document.querySelectorAll('.wire.route').length===5");
+    await check('candidate toggle preserves recorded route',"document.querySelectorAll('.wire.route').length===0 && JSON.stringify(__mig.probe().trajectory)===window.originalTrajectory");
     await evaluate("__mig.setCand(false)");
     await evaluate("[...document.querySelectorAll('.dchips span')].find(n=>n.textContent==='全部').click(); [...document.querySelectorAll('#probe .pn')].find(n=>n.textContent.includes('A.ets@v1')).click()");
-    await check('clicking conclusion keeps route and exposes rejected visit honestly',"__mig.xt().walk===true && document.querySelectorAll('.wire.route').length===5 && document.querySelector('#side').textContent.includes('被拒 · 未打开')");
+    await check('clicking conclusion keeps route and exposes rejected visit honestly',"__mig.xt().walk===true && document.querySelectorAll('.wire.route').length===0 && document.querySelector('#side').textContent.includes('被拒 · 未打开')");
     await evaluate("document.querySelector('#side .rootbtn').click()");
     await until("__mig.xt().walk!==true && Object.values(__mig.xt().byId).some(n=>n.isRoot && n.anchorV===1)");
     await check('reroot does not claim queried v3 as queried v1',"!document.querySelector('#canvas .node.root .badge.step')");
@@ -302,7 +350,7 @@ async function main(){
     await evaluate("__mig.load('metrics')");
     await until("document.querySelectorAll('#probe .st').length===118 && __mig.xt() && __mig.xt().walk");
     await check('118 native records split into 77 MCP queries and 41 wrappers',"document.querySelector('.call-summary').dataset.mcp==='77' && document.querySelector('.call-summary').dataset.wrapper==='41' && document.querySelector('.call-summary').dataset.other==='0' && document.querySelectorAll('.st[data-call-kind=\"mcp\"]').length===77 && document.querySelectorAll('.st[data-call-kind=\"wrapper\"]').length===41");
-    await check('wrappers retain source, IDs and physical lines without becoming visits',"document.querySelector('.st[data-call-kind=\"wrapper\"] .t').title.includes('codex_rollout') && document.querySelector('.st[data-call-kind=\"wrapper\"] .t').title.includes('host-0') && document.querySelector('.st[data-call-kind=\"wrapper\"] .t').title.includes('100 → 101') && __mig.probe().trajectory.visits.length===7 && document.querySelectorAll('.wire.route').length===5");
+    await check('wrappers retain source, IDs and physical lines without becoming visits',"document.querySelector('.st[data-call-kind=\"wrapper\"] .t').title.includes('codex_rollout') && document.querySelector('.st[data-call-kind=\"wrapper\"] .t').title.includes('host-0') && document.querySelector('.st[data-call-kind=\"wrapper\"] .t').title.includes('100 → 101') && __mig.probe().trajectory.visits.length===7 && document.querySelectorAll('.wire.route').length===0");
     await evaluate("__mig.load('other-calls')");
     await until("document.querySelector('.call-summary').dataset.other==='1'");
     await check('unrecognized host calls are not counted as MCP or wrapper',"document.querySelector('.call-summary').dataset.mcp==='7' && document.querySelector('.call-summary').dataset.wrapper==='0' && document.querySelectorAll('.st[data-call-kind=\"other\"]').length===1");
@@ -310,18 +358,26 @@ async function main(){
     await until("__mig.probe().legacy===true");
     await check('legacy prose ring display remains readable',"document.querySelector('#probe').textContent.includes('报告的环') && document.querySelector('.visit-summary').textContent.includes('0 环')");
     await evaluate("__mig.load('navigation')");
-    await until("document.querySelectorAll('.wire.route').length===8");
-    await check('same file versions labeled as navigation without inventing a relation',"__mig.xt().transitions.find(t=>t.step===8).navigation==='同文件版本导航' && __mig.xt().transitions.find(t=>t.step===8).relation===null && document.querySelector('.wire.route[data-step=\"8\"] title').textContent.includes('同文件版本导航')");
+    await until("__mig.xt().transitions.length===8");
+    await check('same file versions labeled as navigation without inventing a relation',"__mig.xt().transitions.find(t=>t.step===8).navigation==='同文件版本导航' && __mig.xt().transitions.find(t=>t.step===8).relation===null && document.querySelector('.navigation-event[data-step=\"8\"]').textContent.includes('同文件版本导航') && document.querySelectorAll('.wire').length===0");
     await check('same agent versions labeled as navigation without inventing a relation',"__mig.xt().transitions.find(t=>t.step===9).navigation==='同agent版本导航' && __mig.xt().transitions.find(t=>t.step===9).relation===null && [...document.querySelectorAll('.badge.navigation')].some(n=>n.textContent==='同agent版本导航')");
     await check('identical basenames at different full paths remain exploratory jumps',"__mig.xt().transitions.find(t=>t.step===10).navigation==='探索跳转：未核出直接账本边' && [...document.querySelectorAll('#canvas .node')].some(n=>n.title.startsWith('/else/A.ets'))");
     await evaluate("[...document.querySelectorAll('#canvas .node')].find(n=>n.textContent.startsWith('A.ets@v2')).click()");
     await check('file drawer uses neutral navigation badge and a noncausal note',"document.querySelector('#side .pill.navigation').textContent==='同文件版本导航' && !document.querySelector('#side .pill.navigation').classList.contains('warn') && document.querySelector('#side').textContent.includes('查询导航,不是因果边')");
     await evaluate("__mig.load('relations')");
-    await until("document.querySelectorAll('.wire.route').length===6");
+    await until("document.querySelectorAll('.wire.evidence').length===2");
     await check('uncertain relation has distinct text, amber dotted stroke and original note',"(()=>{const p=document.querySelector('.wire.route[data-step=\"2\"]');return p.dataset.relationStatus==='unknown' && getComputedStyle(p).stroke==='rgb(155, 116, 29)' && getComputedStyle(p).strokeDasharray==='2px, 4px' && p.querySelector('title').textContent.includes('条件读取待核') && document.querySelector('.route-step[data-step=\"2\"]').textContent.includes('候选') && document.querySelector('.badge.relation-candidate').textContent.includes('条件读取待核')})()");
     await check('verified relation keeps blue with explicit ledger text',"(()=>{const p=document.querySelector('.wire.route[data-step=\"3\"]');return p.dataset.relationStatus==='true' && getComputedStyle(p).stroke==='rgb(43, 108, 176)' && document.querySelector('.route-step[data-step=\"3\"]').textContent.includes('账本')})()");
-    await check('two red endpoints never turn an exploratory route into a red causal edge',"(()=>{const p=document.querySelector('.wire.route[data-step=\"6\"]');return document.querySelectorAll('#canvas .node.p-chain').length>=2 && !p.classList.contains('chain') && getComputedStyle(p).stroke==='rgb(102, 120, 143)' && getComputedStyle(p).strokeDasharray==='5px, 3px'})()");
-    await check('search event is visible without a third atom or fake parent read',"document.querySelector('.wire.route[data-step=\"9\"]').dataset.source==='search' && document.querySelector('.route-step[data-step=\"9\"]').textContent.includes('搜索 #8 → #9') && __mig.xt().transitions.find(t=>t.step===9).a===null && Object.values(__mig.xt().byId).filter(n=>n.traj).every(n=>['file','agent'].includes(n.kind))");
+    await check('two red endpoints never turn an exploratory route into a red causal edge',"document.querySelectorAll('#canvas .node.p-chain').length>=2 && !document.querySelector('.wire.route[data-step=\"6\"]') && document.querySelector('.navigation-event[data-step=\"6\"]')!==null");
+    await check('search event is visible without a third atom or fake parent read',"!document.querySelector('.wire.route[data-step=\"9\"]') && document.querySelector('.navigation-event[data-step=\"9\"]').textContent.includes('搜索 #8') && __mig.xt().transitions.find(t=>t.step===9).a===null && Object.values(__mig.xt().byId).filter(n=>n.traj).every(n=>['file','agent'].includes(n.kind))");
+    await check('write arrow uses causal direction opposite to query and keeps all query events',"(()=>{const p=document.querySelector('.wire.evidence[data-step=\"3\"]');return p.dataset.from==='agent:agent-b@1' && p.dataset.to==='file:/fixture/A.ets@3' && p.dataset.kind==='write' && __mig.probe().trajectory.transitions[1].from==='file:/fixture/A.ets@3' && document.querySelectorAll('.navigation-event').length===6})()");
+    await check('evidence counts and incomplete scope remain separate from claims and navigation',"document.querySelector('.evidence-graph-summary').textContent.includes('确定读 0 / 写 1 · 候选读 1 / 写 0 · 导航转移 6') && document.querySelector('#probe').textContent.includes('不是全账本图或完整根因图') && __mig.probe().evidence_graph.complete===false");
+    await evaluate("window.relationTrace=JSON.stringify(__mig.probe().trajectory);document.querySelector('.navigation-timeline').open=true;__mig.setCand(true)");
+    await check('expanding timeline or lexical toggle does not alter projection or original trace',"document.querySelectorAll('.wire.evidence').length===2 && JSON.stringify(__mig.probe().trajectory)===window.relationTrace && document.querySelectorAll('.navigation-event').length===6");
+    const writePoint=await evaluate("(()=>{const n=document.querySelector('.route-step[data-step=\"3\"]');const r=n.getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2}})()");
+    await send('Input.dispatchMouseEvent',{type:'mousePressed',button:'left',clickCount:1,...writePoint});
+    await send('Input.dispatchMouseEvent',{type:'mouseReleased',button:'left',clickCount:1,...writePoint});
+    await check('write edge click opens semantic destination not original query target',"document.querySelector('#canvas .node.sel').textContent.startsWith('A.ets@v3')");
     await evaluate(clickAgent);
     await check('candidate drawer keeps original relation evidence',"document.querySelector('#side .relation-evidence').textContent.includes('/fixture/original.jsonl') && document.querySelector('#side .relation-evidence').textContent.includes('conditional_read')");
     await evaluate("[...document.querySelectorAll('#canvas .node')].find(n=>n.textContent.startsWith('A.ets@v1')).click()");
@@ -331,21 +387,29 @@ async function main(){
     await check('manual ledger browsing preserves uncertain read flags without treating them as definite edges',"(()=>{const p=document.querySelector('.wire.relation-uncertain');return !p.classList.contains('chain') && getComputedStyle(p).stroke==='rgb(155, 116, 29)' && document.querySelector('#canvas').textContent.includes('读取窗口重叠') && Object.values(__mig.xt().byId).find(n=>n.kind==='file'&&n.anchorV===1).relationUncertain===false})()");
     await evaluate("__mig.setCand(false)");
     await check('uncertain recorded reads are not hidden by the lexical candidate toggle',"Object.values(__mig.xt().byId).filter(n=>n.relationUncertain).every(n=>!n.possible&&!n.hidden) && document.querySelectorAll('.wire.relation-uncertain').length===1");
+    for(const run of ['relations-unbound','relations-missing-trace','relations-claim-only']){
+      await evaluate('__mig.load('+JSON.stringify(run)+')');
+      await until('__mig.probe().runDir==='+JSON.stringify(run)+' && __mig.xt()?.evidenceMode');
+      await check(run+' cannot promote model/unlocated/unbound relationship lines',"document.querySelectorAll('.wire').length===0 && __mig.probe().trajectory.transitions.length===6 && document.querySelectorAll('.navigation-event').length===6");
+    }
+    await evaluate("__mig.load('relations-conflict')");
+    await until("__mig.probe().runDir==='relations-conflict' && __mig.xt()===null");
+    await check('explicit trace conflict overrides even a supplied bound evidence projection',"document.querySelectorAll('.wire').length===0 && document.querySelectorAll('#canvas .node').length===0 && __mig.probe().trajectory.transitions.length===6");
     await evaluate("__mig.load('coverage')");
-    await until("__mig.xt() && __mig.xt().walk && document.querySelectorAll('.wire.route').length===5");
+    await until("__mig.xt() && __mig.xt().walk && document.querySelectorAll('.wire.route').length===0");
     await check('coverage distinguishes accounted items, missing versions and unconfirmed candidates',"document.querySelector('.coverage-summary').textContent==='已交代 3/5 项 · 尚未有效交代 2 项' && document.querySelector('.repair-coverage').textContent.includes('记录版本 3 个 · 未确认候选 2 个（候选不等于修复）') && document.querySelector('.repair-coverage').textContent.includes('尚未登记：记录版本 1 个、候选 1 个')");
     await check('historical denominator remains visible after candidate policy changes',"document.querySelector('.repair-coverage').textContent.includes('按运行时保存的清单对账') && document.querySelector('.repair-coverage').textContent.includes('未改写历史分母')");
     await check('registered unknown and not-repair declarations are not presented as verified conclusions',"[...document.querySelectorAll('.coverage-item')].some(n=>n.dataset.state==='unresolved' && n.textContent.includes('已登记 · 仍未知（未查清）')) && [...document.querySelectorAll('.coverage-item')].some(n=>n.dataset.state==='not_repair' && n.textContent.includes('声明非修复（未验证）')) && document.querySelector('.repair-coverage').textContent.includes('解释与证据语义未核验')");
     await evaluate("window.coverageTreeIds=JSON.stringify(Object.keys(__mig.xt().byId));[...document.querySelectorAll('.coverage-item')].find(n=>n.dataset.target.endsWith('@v2')).querySelector('.coverage-file').click()");
     await until("document.querySelector('#side .vrow.anchor .vn')?.textContent==='v2'");
-    await check('missing version opens actual ledger drawer without adding a queried node or changing route',"JSON.stringify(Object.keys(__mig.xt().byId))===window.coverageTreeIds && __mig.xt().walk && document.querySelectorAll('.wire.route').length===5 && document.querySelector('#side').textContent.includes('清单定位 · 不计入模型查询') && !Object.values(__mig.xt().byId).some(n=>n.kind==='file' && n.anchorV===2)");
+    await check('missing version opens actual ledger drawer without adding a queried node or changing route',"JSON.stringify(Object.keys(__mig.xt().byId))===window.coverageTreeIds && __mig.xt().walk && document.querySelectorAll('.wire.route').length===0 && document.querySelector('#side').textContent.includes('清单定位 · 不计入模型查询') && !Object.values(__mig.xt().byId).some(n=>n.kind==='file' && n.anchorV===2)");
     await evaluate("[...document.querySelectorAll('.dchips span')].find(n=>n.textContent.startsWith('B ')).click()");
     await check('defect switch retains the missing-version drawer and whole-manifest coverage',"document.querySelector('#side .vrow.anchor .vn').textContent==='v2' && document.querySelectorAll('.coverage-item').length===5 && document.querySelector('.coverage-summary').dataset.accounted==='3'");
     const candidatePoint=await evaluate("(()=>{const b=[...document.querySelectorAll('.coverage-item')].find(n=>n.dataset.target==='"+candidateTwo+"').querySelector('.coverage-action');b.scrollIntoView({block:'center'});const r=b.getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2}})()");
     await send('Input.dispatchMouseEvent',{type:'mousePressed',button:'left',clickCount:1,...candidatePoint});
     await send('Input.dispatchMouseEvent',{type:'mouseReleased',button:'left',clickCount:1,...candidatePoint});
     await until("[...document.querySelectorAll('.coverage-item')].find(n=>n.dataset.target==='"+candidateTwo+"').textContent.includes('EVIDENCE 202')");
-    await check('candidate action click opens original evidence without new versions or problem coloring',"JSON.stringify(Object.keys(__mig.xt().byId))===window.coverageTreeIds && document.querySelectorAll('.wire.route').length===5 && !document.querySelector('.coverage-item .r-err') && !document.querySelector('.coverage-item .r-carry')");
+    await check('candidate action click opens original evidence without new versions or problem coloring',"JSON.stringify(Object.keys(__mig.xt().byId))===window.coverageTreeIds && document.querySelectorAll('.wire.route').length===0 && !document.querySelector('.coverage-item .r-err') && !document.querySelector('.coverage-item .r-carry')");
     await evaluate("document.querySelector('#zf').click()");
     await check('fit still displays the entire recorded tree after coverage navigation',"(()=>{const g=document.querySelector('#graph').getBoundingClientRect(),t=document.querySelector('.toolbar').getBoundingClientRect();return [...document.querySelectorAll('#canvas .node')].every(n=>{const r=n.getBoundingClientRect();return r.left>=g.left-1 && r.right<=g.right+1 && r.top>=t.bottom-1 && r.bottom<=g.bottom+1})})()");
     await evaluate("__mig.load('coverage-invalid')");
@@ -367,7 +431,7 @@ async function main(){
     await check('explicit trace conflict blocks stale bound graph, roles, step links and coverage links',"document.querySelector('#rootlbl').textContent.includes('当前账本不匹配') && document.querySelectorAll('#canvas .node').length===0 && document.querySelectorAll('#probe .st').length===7 && [...document.querySelectorAll('#probe .st')].every(n=>n.classList.contains('na')) && !document.querySelector('#probe .pn.r-err') && !document.querySelector('.coverage-file') && !document.querySelector('.coverage-action') && document.querySelector('.coverage-summary').textContent.includes('未绑定，不计为当前覆盖')");
     await evaluate("__mig.load('trace-legacy')");
     await until("document.querySelector('.trace-identity').dataset.status==='legacy' && __mig.xt() && __mig.xt().walk");
-    await check('legacy identity is explicitly unrecorded without falsely marking verification',"document.querySelector('.trace-identity').textContent.includes('调查身份未记录 · 历史查询未认证') && document.querySelector('.trace-identity').dataset.status!=='matched' && document.querySelectorAll('.wire.route').length===5");
+    await check('legacy identity is explicitly unrecorded without falsely marking verification',"document.querySelector('.trace-identity').textContent.includes('调查身份未记录 · 历史查询未认证') && document.querySelector('.trace-identity').dataset.status!=='matched' && document.querySelectorAll('.wire.route').length===0");
     await evaluate("__mig.load('coverage-compat')");
     await until("document.querySelector('.structured-compat')!==null");
     await check('revalidated historical notes show compatibility warning and preserve text safely',"document.querySelector('.structured-compat').textContent.includes('不是模型重跑') && document.querySelector('.structured-compat').textContent.includes('旧诊断：notes 必须是字符串') && document.querySelector('.structured-notes').textContent.includes('保留备注甲') && document.querySelector('.structured-notes').textContent.includes('<b>备注乙不是HTML</b>') && !document.querySelector('.structured-notes b')");
@@ -380,13 +444,13 @@ async function main(){
     await check('out-of-scope remains in the denominator and separate from not-repair',"document.querySelector('.coverage-summary').dataset.accounted==='5' && document.querySelectorAll('.coverage-item').length===5 && document.querySelectorAll('.coverage-item[data-state=\"out_of_scope\"]').length===2 && [...document.querySelectorAll('.coverage-item[data-state=\"out_of_scope\"]')].every(n=>n.textContent.includes('本题未调查（保留分母，不判非修复）')) && document.querySelector('.coverage-state-counts').dataset.deferred==='2' && document.querySelector('.coverage-state-counts').dataset.unconfirmed==='3'");
     await check('coverage amber advisory preserves original status and complete',"document.querySelector('.coverage-summary').dataset.status==='complete' && document.querySelector('.coverage-row-advisory').closest('.coverage-item').dataset.state==='not_repair' && document.querySelector('.coverage-advisory-summary').dataset.rows==='1' && getComputedStyle(document.querySelector('.coverage-advisory-summary')).color==='rgb(136, 101, 26)' && document.querySelector('.coverage-row-advisory').textContent.includes('#a:101@L1') && !document.querySelector('.coverage-row-advisory b')");
     await evaluate("__mig.load('fixture')");
-    await until("__mig.probe().runDir==='fixture' && document.querySelectorAll('.wire.route').length===5");
+    await until("__mig.probe().runDir==='fixture' && document.querySelectorAll('.wire.route').length===0");
     await evaluate("window.beforeConsistencyColors=[...document.querySelectorAll('#canvas .node')].map(n=>n.className).join('|');window.beforeConsistencyVisits=JSON.stringify(__mig.probe().trajectory.visits)");
     await evaluate("__mig.load('consistency')");
     await until("document.querySelector('.consistency-locate')!==null");
     await check('consistency warnings are not schema failure and never recolor nodes',"document.querySelector('.consistency-advisories').textContent.includes('声明自洽检查，不判断原因真假') && !document.querySelector('#probe .bad') && !document.querySelector('.consistency-advisory b') && [...document.querySelectorAll('#canvas .node')].map(n=>n.className).join('|')===window.beforeConsistencyColors && JSON.stringify(__mig.probe().trajectory.visits)===window.beforeConsistencyVisits");
     await evaluate("document.querySelector('.consistency-advisory').open=true;document.querySelector('.consistency-locate').click()");
-    await check('consistency warning locates only an existing node and preserves raw warning',"document.querySelector('#canvas .node.sel').textContent.startsWith('Agent A v1') && document.querySelector('.consistency-raw').textContent.includes('entry_role_conflict') && Object.values(__mig.xt().byId).filter(n=>n.traj).length===4 && document.querySelectorAll('.wire.route').length===5");
+    await check('consistency warning locates only an existing node and preserves raw warning',"document.querySelector('#canvas .node.sel').textContent.startsWith('Agent A v1') && document.querySelector('.consistency-raw').textContent.includes('entry_role_conflict') && Object.values(__mig.xt().byId).filter(n=>n.traj).length===4 && document.querySelectorAll('.wire.route').length===0");
     await evaluate("[...document.querySelectorAll('.dchips span')].find(n=>n.textContent.startsWith('B ')).click()");
     await check('consistency warning follows its own defect filter',"!document.querySelector('.consistency-advisory')");
     await evaluate("__mig.load('consistency-unbound')");
@@ -399,21 +463,21 @@ async function main(){
     await check('time scope expansion is metadata only with honest missing-root and returned-result labels',"document.querySelectorAll('#side .time-scope-root').length===3 && document.querySelector('#side .time-scope').textContent.includes('__main__:later') && document.querySelector('#side .time-scope').textContent.includes('未记录根 agent，不补造') && document.querySelector('#side .time-scope').textContent.includes('返回不代表成功') && !document.querySelector('#side .time-scope a,#side .time-scope button') && JSON.stringify(Object.keys(__mig.xt().byId))===window.beforeScopeGraph && JSON.stringify(__mig.probe().trajectory.visits)===window.beforeScopeVisits && performance.getEntriesByType('resource').filter(r=>r.name.includes('scope_only=1')).length===window.beforeScopeRequests");
     await evaluate("[...document.querySelectorAll('#canvas .node')].find(n=>n.textContent.startsWith('A.ets@v1')).click()");
     await until("document.querySelector('#side .time-scope')?.dataset.requestedVersion==='1'");
-    await check('older file version never reuses latest-version time anchor',"document.querySelector('#side .time-scope').dataset.anchor==='2026-01-01T00:00:01.000000Z' && document.querySelectorAll('.wire.route').length===5");
+    await check('older file version never reuses latest-version time anchor',"document.querySelector('#side .time-scope').dataset.anchor==='2026-01-01T00:00:01.000000Z' && document.querySelectorAll('.wire.route').length===0");
     await evaluate(clickAgent);
     await until("document.querySelector('#side .time-scope')?.dataset.requestedVersion==='1' && document.querySelector('#side .tag').textContent.includes('Agent')");
     await check('agent drawer requests its own exact anchor without adding visits',"performance.getEntriesByType('resource').some(r=>r.name.includes('/atom/agent?scope_only=1')&&r.name.includes('v=1')) && document.querySelector('#side .time-scope').textContent.includes('后续活动不代表针对本文件的验证') && JSON.stringify(__mig.probe().trajectory.visits)===window.beforeScopeVisits");
     await send('Page.navigate',{url:origin+'/?probe=time-scope-failure'});
     await until("document.querySelector('#side .time-scope')?.textContent.includes('范围未加载')");
-    await check('scope request failure does not imply absent later activity or alter graph',"document.querySelector('#side .time-scope').textContent.includes('fixture scope unavailable') && __mig.xt().walk && document.querySelectorAll('.wire.route').length===5 && !document.querySelector('#side .time-scope-summary')");
+    await check('scope request failure does not imply absent later activity or alter graph',"document.querySelector('#side .time-scope').textContent.includes('fixture scope unavailable') && __mig.xt().walk && document.querySelectorAll('.wire.route').length===0 && !document.querySelector('#side .time-scope-summary')");
     await send('Page.navigate',{url:origin+'/?probe=tail-readers'});
-    await until("__mig.xt()?.walk && document.querySelectorAll('.wire.route').length===5");
+    await until("__mig.xt()?.walk && document.querySelectorAll('.wire.route').length===0");
     await evaluate("[...document.querySelectorAll('#canvas .node')].find(n=>n.textContent.startsWith('A.ets@v1')).click()");
     await until("document.querySelector('#side .vrow.anchor .vn')?.textContent==='v1'");
     await check('tail reads keep evidence but never label feeding slots as agent versions',"document.querySelectorAll('.reader-row').length===7 && document.querySelectorAll('.reader-row[data-anchor-status=tail]').length===2 && document.querySelectorAll('.reader-row[data-anchor-status=unverified]').length===3 && document.querySelectorAll('.reader-version').length===2 && !document.querySelector('.reader-row[data-seq=\"307\"] .reader-version') && document.querySelector('#side').textContent.includes('收尾后读取（未形成v3）') && document.querySelector('#side').textContent.includes('收尾后读取（未形成v2）')");
     await evaluate("window.beforeTailTrace=JSON.stringify(__mig.probe().trajectory);window.beforeTailTree=JSON.stringify(Object.keys(__mig.xt().byId));document.querySelector('.reader-row[data-seq=\"302\"] .reader-action').click()");
     await until("document.querySelector('.reader-row[data-seq=\"302\"]').textContent.includes('EVIDENCE 302')");
-    await check('tail original opens by actual action without fabricating a node or model visit',"JSON.stringify(__mig.probe().trajectory)===window.beforeTailTrace && JSON.stringify(Object.keys(__mig.xt().byId))===window.beforeTailTree && document.querySelectorAll('.wire.route').length===5 && !document.querySelector('.reader-row[data-seq=\"302\"] .reader-version') && performance.getEntriesByType('resource').some(r=>r.name.includes('/atom/action?id=agent-a&seq=302'))");
+    await check('tail original opens by actual action without fabricating a node or model visit',"JSON.stringify(__mig.probe().trajectory)===window.beforeTailTrace && JSON.stringify(Object.keys(__mig.xt().byId))===window.beforeTailTree && document.querySelectorAll('.wire.route').length===0 && !document.querySelector('.reader-row[data-seq=\"302\"] .reader-version') && performance.getEntriesByType('resource').some(r=>r.name.includes('/atom/action?id=agent-a&seq=302'))");
     await evaluate("document.querySelector('.reader-row[data-seq=\"305\"] .reader-action').click()");
     await until("document.querySelector('.reader-row[data-seq=\"305\"]').textContent.includes('EVIDENCE 305')");
     await check('legacy unknown owner remains raw-locatable but cannot navigate an invented version',"!document.querySelector('.reader-row[data-seq=\"305\"] .reader-version') && !performance.getEntriesByType('resource').some(r=>new URL(r.name).pathname==='/atom/agent'&&new URL(r.name).searchParams.get('id')==='agent-missing')");
@@ -424,7 +488,7 @@ async function main(){
     await until("__mig.xt()?.rootKind==='agent' && __mig.xt().byId[__mig.xt().root].anchorVer===1");
     await check('ordinary known reader keeps its exact agent navigation',"__mig.xt().byId[__mig.xt().root].aid==='agent-a' && !performance.getEntriesByType('resource').some(r=>{const u=new URL(r.name);return u.pathname==='/atom/agent'&&['3','8'].includes(u.searchParams.get('v'))})");
     await send('Page.navigate',{url:origin+'/?probe=fixture'});
-    await until("__mig.xt()?.walk && document.querySelectorAll('.wire.route').length===5");
+    await until("__mig.xt()?.walk && document.querySelectorAll('.wire.route').length===0");
     await check('historical reports without basis do not acquire invented attribution fields',"!document.querySelector('.attribution-basis') && __mig.probe().structured.errors.length===0");
     await evaluate("window.beforeBasisColors=[...document.querySelectorAll('#canvas .node')].map(n=>n.className.replace(/ sel/g,'')).join('|');window.beforeBasisVisits=JSON.stringify(__mig.probe().trajectory.visits);__mig.load('with-basis')");
     await until("__mig.probe().runDir==='with-basis' && document.querySelector('#probe .attribution-basis')");
@@ -441,13 +505,13 @@ async function main(){
     await evaluate("[...document.querySelectorAll('.dchips span')].find(n=>n.textContent.startsWith('B ')).click()");
     await check('switching defects isolates both structured and drawer attribution',"document.querySelectorAll('#probe .attribution-basis').length===1 && document.querySelectorAll('#side .attribution-basis').length===1 && document.querySelector('#side .attribution-basis').textContent.includes('B EXPECTED') && !document.querySelector('#side .attribution-basis').textContent.includes('A EXPECTED') && !document.querySelector('#probe .attribution-basis').textContent.includes('A EXPECTED')");
     await evaluate("document.querySelector('#side .attribution-basis').open=true;document.querySelector('#side .basis-actual-evidence .lnk').click()");
-    await check('actual node evidence keeps the existing exact-version navigation mechanism',"document.querySelector('#side .tag').textContent.includes('@v1') && document.querySelectorAll('.wire.route').length===5 && JSON.stringify(__mig.probe().trajectory.visits)===window.beforeBasisVisits");
+    await check('actual node evidence keeps the existing exact-version navigation mechanism',"document.querySelector('#side .tag').textContent.includes('@v1') && document.querySelectorAll('.wire.route').length===0 && JSON.stringify(__mig.probe().trajectory.visits)===window.beforeBasisVisits");
     await evaluate("__mig.load('with-basis-unbound')");
     await until("__mig.probe().structured.identity.bound===false && document.querySelector('#probe .attribution-basis')");
     await check('unbound attribution retains text without source validation or action links',"document.querySelector('#probe .attribution-basis').textContent.includes('EXPECTED') && document.querySelector('#probe .attribution-basis').textContent.includes('历史引用未绑定') && !document.querySelector('.attribution-basis .lnk,.attribution-basis .more,.attribution-basis .verow.ok') && !document.querySelector('#canvas .node.p-chain')");
     await evaluate("__mig.load('draft-check')");
     await until("__mig.probe().runDir==='draft-check'");
-    await check('draft check is a mechanical MCP event rather than an opened atom or edge',"document.querySelector('.call-summary').dataset.mcp==='8' && [...document.querySelectorAll('#probe .st')].some(n=>n.dataset.callKind==='mcp'&&n.classList.contains('na')&&n.textContent.includes('草稿机械核查事件')) && __mig.probe().trajectory.nodes.length===4 && __mig.probe().trajectory.visits.length===7 && document.querySelectorAll('.wire.route').length===5 && !Object.values(__mig.probe().byKey).flat().some(s=>s.i===8)");
+    await check('draft check is a mechanical MCP event rather than an opened atom or edge',"document.querySelector('.call-summary').dataset.mcp==='8' && [...document.querySelectorAll('#probe .st')].some(n=>n.dataset.callKind==='mcp'&&n.classList.contains('na')&&n.textContent.includes('草稿机械核查事件')) && __mig.probe().trajectory.nodes.length===4 && __mig.probe().trajectory.visits.length===7 && document.querySelectorAll('.wire.route').length===0 && !Object.values(__mig.probe().byKey).flat().some(s=>s.i===8)");
     await evaluate("window.beforeDraftGraph=JSON.stringify(__mig.probe().trajectory);window.beforeDraftColors=[...document.querySelectorAll('#canvas .node')].map(n=>n.className.replace(/ sel/g,'')).join('|')");
     const draftLabels={matched:'草稿机检与当前稿一致（语义未核验）',mismatch:'最终稿与最后核查稿不同',
       not_checked:'未核查',unverifiable:'草稿核查不可核',invalid_final:'最终稿无效，无法核对草稿机检'};
@@ -469,6 +533,36 @@ async function main(){
     await evaluate("window.beforeTailEvidence=JSON.stringify(__mig.probe().trajectory);document.querySelector('#probe .attribution-basis').open=true;[...document.querySelectorAll('#probe .basis-expected-evidence .verow')].find(r=>r.textContent.includes('#a:43@L43')).querySelector('.more').click()");
     await until("[...document.querySelectorAll('#probe .basis-expected-evidence .verow')].some(r=>r.textContent.includes('EVIDENCE 43'))");
     await check('tail citation retains exact raw action navigation without inventing an agent version',"JSON.stringify(__mig.probe().trajectory)===window.beforeTailEvidence && !Object.values(__mig.xt().byId).some(n=>n.kind==='agent'&&n.anchorVer===3) && __mig.probe().structured.defects[0].nodes[0].basis.expected_evidence[1].v===3 && __mig.probe().structured.defects[0].nodes[0].basis.expected_evidence[1].status==='ok'");
+    await evaluate("__mig.load('findings')");
+    await until("__mig.probe().runDir==='findings' && document.querySelector('.file-findings')");
+    await check('per-file findings default to compact counts and never certify model associations',"!document.querySelector('.file-findings').open && document.querySelector('.file-findings > summary').textContent.includes('1 个文件 / 3 项 / 未绑定 1 项（模型主张）') && document.querySelector('.file-findings').dataset.semanticChecked==='false' && document.querySelector('.file-findings').textContent.includes('文件归属/修复关联：模型声明；版本坐标已核，修复语义未核验')");
+    await evaluate("window.findingTrace=JSON.stringify(__mig.probe().trajectory);window.findingGraph=JSON.stringify(__mig.probe().evidence_graph);window.findingNodeIds=JSON.stringify(Object.keys(__mig.xt().byId));document.querySelector('.file-findings').open=true;document.querySelectorAll('.file-findings details').forEach(n=>n.open=true)");
+    await check('per-file causes preserve exact model reasons, invalid coordinates and evidence diagnostics',"[...document.querySelectorAll('.finding-file .finding-reason')].some(n=>n.textContent===__mig.probe().roles['agent-a'][0].reason) && document.querySelector('.file-findings').textContent.includes('agent:agent-a@v99') && document.querySelector('.file-findings').textContent.includes('版本越界，原坐标保留') && [...document.querySelectorAll('.file-findings .verow.bad')].some(n=>n.textContent.includes('INVALID <img src=x') && n.textContent.includes('位置不存在'))");
+    await check('findings render model HTML as text and complete basis never becomes semantic green',"!document.querySelector('.file-findings img,.file-findings script,.file-findings b') && !window.findingXss && document.querySelector('.finding-boundary').textContent==='BOUNDARY <b>只是文本</b>' && document.querySelector('.finding-cause[data-basis-status=\"complete\"]').textContent.includes('字段齐全（语义未验证）') && !document.querySelector('.finding-cause.r-ok,.finding-item.r-ok')");
+    await check('unbound file association remains separate even when its agent coordinate exists',"document.querySelector('.finding-unbound').textContent.includes('不以 root 猜补') && !document.querySelector('.finding-unbound button,.finding-unbound .lnk,.finding-unbound .more') && JSON.stringify(__mig.probe().trajectory)===window.findingTrace && JSON.stringify(__mig.probe().evidence_graph)===window.findingGraph");
+    await evaluate("document.querySelector('.finding-file .finding-locate').click()");
+    await check('finding locates existing reason drawer without adding a node, edge or visit',"document.querySelector('#side').textContent.includes('A 独有原因') && JSON.stringify(__mig.probe().trajectory)===window.findingTrace && JSON.stringify(__mig.probe().evidence_graph)===window.findingGraph && JSON.stringify(Object.keys(__mig.xt().byId))===window.findingNodeIds");
+    await evaluate("[...document.querySelectorAll('.dchips span')].find(n=>n.textContent.startsWith('B ')).click()");
+    await check('finding causes follow selected defect without mixing other item reasons',"document.querySelector('.file-findings').textContent.includes('B 独有原因') && !document.querySelector('.file-findings').textContent.includes('A 独有原因') && !document.querySelector('.file-findings .finding-item[data-defect=\"A\"]')");
+    await evaluate("__mig.load('findings-unbound')");
+    await until("__mig.probe().runDir==='findings-unbound' && document.querySelector('.file-findings')");
+    await check('unbound findings keep raw claims and references without borrowing current root or links',"document.querySelectorAll('.finding-file').length===0 && document.querySelectorAll('.finding-unbound .finding-item').length===3 && !document.querySelector('.file-findings button,.file-findings .lnk,.file-findings .more') && document.querySelector('.file-findings').textContent.includes('INVALID <img src=x') && document.querySelector('.file-findings').textContent.includes('不以根节点代替未知文件')");
+    for(const kind of ['final_inline','checked_draft_ref','saved_schema_repair','legacy_saved','invalid_saved']){
+      const run='source-'+kind;
+      await evaluate('__mig.load('+JSON.stringify(run)+')');
+      await until('__mig.probe().runDir==='+JSON.stringify(run)+' && document.querySelector(".document-source")?.dataset.kind==='+JSON.stringify(kind));
+      await evaluate("window.sourceTrajectory=JSON.stringify(__mig.probe().trajectory);document.querySelector('.document-source').open=true");
+      await check('document source '+kind+' preserves provenance without semantic approval or HTML',"document.querySelector('.document-source').dataset.semanticChecked==='false' && !document.querySelector('.document-source img') && !window.sourceXss && document.querySelector('.document-source').textContent.includes('SOURCE_NOTE <img') && document.querySelector('.document-source').textContent.includes('不认证根因') && JSON.stringify(__mig.probe().trajectory)===window.sourceTrajectory");
+      if(kind==='legacy_saved'||kind==='saved_schema_repair') await check(kind+' is readable as a saved claim, never a verified final submission',"document.querySelector('.document-source').dataset.verified==='false' && document.querySelector('.document-source').textContent.includes('未认证为最终原文') && document.querySelector('#probe').textContent.includes('A 独有原因')");
+      if(kind==='invalid_saved') await check('invalid saved document does not color claims while authenticated visits remain',"document.querySelectorAll('#canvas .node.p-chain').length===0 && document.querySelectorAll('#canvas .node.p-seen').length>0 && document.querySelector('#probe').textContent.includes('保存稿 raw 与 data 不一致')");
+    }
+    // Atom caches are deliberately immutable within one page's ledger. Use a
+    // fresh page when the synthetic ledger itself changes proof records.
+    await send('Page.navigate',{url:origin+'/?probe=read-proof'});
+    await until("window.__mig && __mig.probe()?.runDir==='read-proof' && __mig.xt()?.walk");
+    await evaluate(clickAgent+";document.querySelector('#side .rootbtn').click()");
+    await until("__mig.xt().walk!==true && document.querySelectorAll('.wire.relation-uncertain').length===2");
+    await check('read proof and lifetime self-written label do not claim execution, delivery or order',"document.querySelector('#canvas').textContent.includes('执行依据未核') && document.querySelector('#canvas').textContent.includes('正文交付未核') && document.querySelector('#canvas').textContent.includes('旧记录·执行/交付依据未记录') && document.querySelector('#canvas').textContent.includes('同代理也写过') && !document.body.textContent.includes('写前读') && !document.querySelector('.wire.chain')");
     const output=process.env.MIGLOOP_BROWSER_SCREENSHOT_DIR||path.join(repo,'docs/experiments/2026-09-09-trace-fidelity/screenshots');
     fs.mkdirSync(output,{recursive:true});
     const screenshot=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});

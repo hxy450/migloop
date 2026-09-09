@@ -140,8 +140,11 @@ def test_script_mediated_writes_and_reads(tmp_path: Any) -> None:
     led = _ledger(tmp_path, main)
     out = led.stories["/proj/spec/out.md"].versions[0]
     assert (out.source, out.via, out.content) == ("opaque", "script", None)
-    assert [r.by for r in led.stories["/proj/spec/in.json"].reads] == [MAIN_ID]
-    assert led.stories["/proj/spec/cfg.json"].reads[0].by == MAIN_ID
+    for path in ("/proj/spec/in.json", "/proj/spec/cfg.json"):
+        refs = [ref for action in led.agents[MAIN_ID].actions for ref in action.files if ref.path == path]
+        assert refs and all(ref.ev.dep and ref.proof.delivery == "dependency" for ref in refs)
+        assert not led.stories[path].reads  # json.load is an internal dependency, not a body returned to the model.
+        assert led.stories[path].touches
     page = led.stories["/proj/ui/page.md"].versions[0]
     assert (page.via, page.by) == ("script", MAIN_ID)
     # 三次有写能力的脚本调用都留了"目标可能不止字面量"的标记,给窗口归属用
@@ -149,10 +152,10 @@ def test_script_mediated_writes_and_reads(tmp_path: Any) -> None:
     assert len(runs) == 2                        # heredoc 写 + 跑 gen.py(python -c 只读)
 
 
-def test_script_literal_tendency_fallback_only_for_small_scripts(tmp_path: Any) -> None:
+def test_script_literal_mentions_do_not_inherit_other_targets_write_effect(tmp_path: Any) -> None:
     """0723 vv-static-B 的 gen_static.py:只写脚本里一张 24 条 .ets 路径的数据表全被当成写目标,
-    凭空造出 19 条假返修链(34 条里的 56%)。全文倾向兜底只对字面量 ≤ 3 的小脚本生效;
-    多了就放弃这些字面量并在动作上记「脚本字面量方向不明」—— 宁可漏,不许静默。"""
+    凭空造出 19 条假返修链(34 条里的 56%)。无论字面量多少,都只保留提及;
+    可靠 straight-line AST 写仍可入账,数据表路径不造成写屏障。"""
     small = "from pathlib import Path\nOUT = 'ui/page.md'\nPath(OUT).write_text('hi')\n"
     # 紧跟的字段 'wired' 以 w 开头:旧的 open(p,'w') 判据只看引号后一个字母,把它当成了写模式
     table = ("import json\nR = [\n"
@@ -165,14 +168,15 @@ def test_script_literal_tendency_fallback_only_for_small_scripts(tmp_path: Any) 
         *_call("2026-01-01T00:00:30Z", "t4", "Bash", {"command": "cd /proj && python3 /tmp/gen_static.py"}),
     ]
     led = _ledger(tmp_path, main)
-    assert led.stories["/proj/ui/page.md"].versions[0].via == "script"      # 小脚本:倾向兜底照旧
+    assert led.stories["/proj/ui/page.md"].versions[0].via == "script"      # 可靠 AST,不是全文倾向
     assert "/proj/spec/static.json" in led.stories                            # 显式 open(...,'w') 照旧
     ets = {p: st for p, st in led.stories.items() if p.endswith(".ets")}
     assert ets and not any(st.versions for st in ets.values())               # 数据表里的路径不再是写…
-    assert sum(len(st.touches) for st in ets.values()) == 6                   # …只记「碰过、方向不明」
+    assert not any(st.touches for st in ets.values())                       # 纯提及不是候选效应
+    assert all(led.mentions[path] for path in ets)
     runs = [a for a in led.agents[MAIN_ID].actions if a.tool == "Bash"]
     assert runs[0].detail.get("unresolved") is None
-    assert runs[1].detail.get("unresolved") == "脚本字面量方向不明"
+    assert runs[1].detail.get("unresolved") is None
 
 
 def test_read_without_tool_use_result_falls_back_to_numbered_output(tmp_path: Any) -> None:
@@ -939,7 +943,8 @@ def test_agent_atom_since_window_and_seen_summary(tmp_path: Any) -> None:
     full = atoms_text.render_agent(led, MAIN_ID, None, root="/proj", seen=True)
     assert full.count("看见 ") == 3 and "共 5 行" in full and "action(#" in full
     win = atoms_text.render_agent(led, MAIN_ID, 2, root="/proj", since=1)
-    assert "r.md" not in win and "b.md" in win and "窗口 v2" in win
+    assert "早期读 spec/r.md@v1" in win and "b.md" in win and "窗口 v2" in win
+    assert "r.md" not in win.split("## 逐版时间线", 1)[1]  # 旧输入仅索引，不混入本窗口时间线
 
 
 # ═══════════════ 收集层完备性:0723 普查漏网的几类(脚本黑盒除外) ═══════════════
@@ -1071,7 +1076,11 @@ def test_codex_exec_shares_stdout_reconciliation_and_unresolved_marks(tmp_path: 
     led = atoms.build_ledger(agents)
     m = led.agents["__main__:" + CROOT[:8]]
     reads = sorted((ref.path, ref.ev.seen) for act in m.actions for ref in act.files if ref.op == "read")
-    assert reads == [("/proj/app/src/A.kt", ((12, "val mHttpUrl = x"),)), ("/proj/app/src/B.kt", ((40, "mHttpUrl"),))]
+    assert reads == []  # stdout locators remain evidence, not confirmed file-content reads.
+    candidates = [candidate for act in m.actions for candidate in act.detail.get("read_candidates", [])]
+    assert sorted((r["path"], r["seen"]) for r in candidates) == [
+        ("/proj/app/src/A.kt", [[12, "val mHttpUrl = x"]]), ("/proj/app/src/B.kt", [[40, "mHttpUrl"]])]
+    assert all(r["proof"]["operation_basis"] == "output_locator" and r["proof"]["execution"] == "unknown" for r in candidates)
     assert [a.detail.get("unresolved") for a in m.actions if a.tool == "exec"] == [None, "命令替换路径"]
 
 
@@ -1127,7 +1136,8 @@ def test_render_agent_without_window_keeps_early_reads(tmp_path: Any) -> None:
     full = atoms_text.render_agent(led, MAIN_ID, 2, root="/proj")
     assert "读 spec/a.md@v1" in full and "读 src/B.kt@v1" in full and "写 entry/A.ets@v1" in full
     windowed = atoms_text.render_agent(led, MAIN_ID, 2, root="/proj", since=1)
-    assert "读 src/B.kt@v1" in windowed and "读 spec/a.md@v1" not in windowed
+    assert "读 src/B.kt@v1" in windowed and "早期读 spec/a.md@v1" in windowed
+    assert "spec/a.md" not in windowed.split("## 逐版时间线", 1)[1]
 
 
 def test_blame_changed_lists_only_lines_the_fix_replaced(tmp_path: Any) -> None:
@@ -1173,7 +1183,7 @@ def test_grep_hit_reads_are_not_labeled_full_text(tmp_path: Any) -> None:
     assert "全文" in lines[1]
     assert "2-2行" in lines[2]
     agent_txt = atoms_text.render_agent(led, MAIN_ID, None, root="/proj")
-    assert "[命中 1 行 写前读]" in agent_txt and "[2-2行 写前读]" in agent_txt
+    assert "[命中 1 行 同 agent 也写过]" in agent_txt and "[2-2行 同 agent 也写过]" in agent_txt
 
 
 def test_script_touch_shows_on_file_atom_and_index(tmp_path: Any) -> None:
@@ -1218,7 +1228,7 @@ def test_script_literal_used_as_mapping_value_is_not_a_write(tmp_path: Any) -> N
     """DiceRoller 0903 主会话 v55:heredoc python 初始化 progress.json,正文里
     "hmos_page_map": {"MainActivity": "entry/src/main/ets/pages/Index.ets"} 只是数据值,却被全文倾向兜底
     当成写目标,凭空给 Index.ets 造出一版"修复"(链的修复方 / 修复时刻全错)。紧跟在 `:` 后面的字面量是
-    映射的值,不是文件操作的目标 —— 放弃并记「方向不明」;同一脚本里真写的 progress.json 照旧。"""
+    映射的值,不是文件操作的目标 —— 保留纯提及;同一脚本里真写的 progress.json 照旧。"""
     script = ('import json\nfrom pathlib import Path\np = Path("spec/visual-verify/progress.json")\n'
               'prog = {"current_round": 1, "hmos_page_map": {"MainActivity": "entry/src/main/ets/pages/Index.ets"}}\n'
               'p.write_text(json.dumps(prog))\n')
@@ -1227,9 +1237,11 @@ def test_script_literal_used_as_mapping_value_is_not_a_write(tmp_path: Any) -> N
                                + "EOF\nls spec/visual-verify/"})]
     led = _ledger(tmp_path, main)
     assert "/proj/spec/visual-verify/progress.json" in led.stories
-    assert not any(p.endswith(".ets") for p in led.stories)
+    mentioned = [st for path, st in led.stories.items() if path.endswith(".ets")]
+    assert mentioned and not any(st.versions or st.reads or st.touches for st in mentioned)
     run = next(a for a in led.agents[MAIN_ID].actions if a.tool == "Bash")
-    assert run.detail.get("unresolved") == "脚本字面量方向不明"
+    assert "/proj/spec/visual-verify/progress.json" in run.detail["effect_candidates"]
+    assert not led.stories["/proj/spec/visual-verify/progress.json"].versions
 
 
 def test_render_chains_with_file_only_lists_that_files_touches() -> None:
@@ -2251,15 +2263,13 @@ def test_loop_with_echo_separator_attaches_sections_as_seen_lines(tmp_path: Any)
     main = [*_call("2026-01-01T00:00:00Z", "t1", "Bash", {"command": cmd}, out)]
     led = _ledger(tmp_path, main)
     act = led.agents[MAIN_ID].actions[0]
-    seen = {r.path.rsplit("/", 1)[-1]: r.ev.seen for r in act.files if r.op == "read"}
-    assert seen["a.md"] == ((0, "## 2. 期望"), (0, "EntryAbility.ets:unknown 未调用 setWindowSystemBarEnable"))
-    assert seen["b.md"] == ((0, "## 2. 期望"), (0, "无"))
-    res = atoms.search_file(led, "a.md", "EntryAbility")
-    assert res and res["readers"] and res["readers"][0]["n"] == 1
-    text = atoms_text.render_search(led, "EntryAbility", file="a.md", root="/proj")
-    assert "读者的读结果里命中过" in text and "行号未知" in text and "第 0 行" not in text
-    agent_txt = atoms_text.render_agent(led, MAIN_ID, None, root="/proj", seen=True)
-    assert "看见 2 行,行号未知" in agent_txt
+    seen = {r["path"].rsplit("/", 1)[-1]: r["seen"] for r in act.detail["read_candidates"]}
+    assert seen["a.md"] == [[0, "## 2. 期望"], [0, "EntryAbility.ets:unknown 未调用 setWindowSystemBarEnable"]]
+    assert seen["b.md"] == [[0, "## 2. 期望"], [0, "无"]]
+    assert not act.files  # loop/pipe output locator is not an independently confirmed file read
+    assert all(r["proof"]["execution"] == "unknown" for r in act.detail["read_candidates"])
+    assert "EntryAbility" in str(atoms.action_raw(led, MAIN_ID, act.seq)["output"])
+    assert atoms.search_agent(led, MAIN_ID, "EntryAbility")
 
 
 # ═══════════════ 脚本渲染出的文件:字面量正文记成「部分内容」 ═══════════════

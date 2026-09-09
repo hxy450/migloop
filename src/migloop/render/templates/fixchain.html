@@ -285,6 +285,17 @@
   .probe .lk .t, .probe .st .t { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--ink-2); }
   .probe .st .t b { color: var(--ink); font-weight: 600; }
   .probe .st.na { opacity: .55; cursor: default; }
+  .probe .navigation-timeline { margin: 6px 0; font-size: 11px; }
+  .probe .navigation-timeline summary { cursor: pointer; color: var(--ink-2); }
+  .probe .navigation-event { display: grid; grid-template-columns: 36px 1fr; gap: 6px; padding: 4px 6px; cursor: pointer; overflow-wrap: anywhere; }
+  .probe .navigation-event:hover { background: var(--wash); }
+  .probe .navigation-event .no { font-family: var(--mono); color: var(--ink-3); }
+  .file-findings { margin: 7px 0; padding: 6px; border: 1px solid var(--ring); border-radius: 7px; font-size: 11.5px; overflow-wrap: anywhere; }
+  .file-findings summary { cursor: pointer; }
+  .finding-file, .finding-item, .finding-cause { margin: 5px 0 5px 5px; padding-left: 5px; border-left: 1px solid var(--ring); }
+  .finding-note { color: var(--ink-3); margin: 4px 0; }
+  .finding-reason, .finding-boundary { white-space: pre-wrap; }
+  .finding-locate { border: 0; background: none; color: var(--c-spec); padding: 3px 0; cursor: pointer; }
   .probe .sub { font-size: 10.5px; color: var(--ink-3); margin: 6px 0 2px; letter-spacing: .08em; text-transform: uppercase; }
   .probe .repair-coverage { margin: 8px 0; padding: 7px; border: 1px solid var(--ring); border-radius: 8px; background: var(--wash); }
   .probe .repair-coverage summary { cursor: pointer; color: var(--ink-2); font-size: 11.5px; }
@@ -324,7 +335,7 @@
         <i><span class="sw" style="border-color:var(--c-dis); border-style:dashed"></span>派发它的上游</i>
         <i><span class="sw" style="border-color:var(--c-spec); border-style:dotted"></span>下游(读者 / 产出)</i>
         <i><span class="sw" style="border-color:var(--c-fix)"></span>修复方</i>
-        <i>★ 被修行原作者</i><i>▲ 读的是旧版</i><i>行段 · 依赖 · 写前读 · 脚本 = 标签,不裁剪</i>
+        <i>★ 被修行原作者</i><i>▲ 读的是旧版</i><i>行段 · 依赖 · 同代理也写过 · 脚本 = 标签,不裁剪</i>
         <label class="cand" title="词法层沾边的命令:改动类画成「⋯ 可能写」虚线节点,只读检查折成「+N 只读提及」桩;账本没记到读写,只导航不归因"><input type="checkbox" id="cand" checked> 词法候选</label>
       </div>
       <div class="zoomctl"><button id="zo">−</button><button id="zi">+</button><button id="zf">适应</button><button id="z1">1:1</button></div>
@@ -768,11 +779,16 @@
       if (r.observation_uncertain) b.push({ cls: "relation-candidate", t: "候选·读取窗口重叠" });
       else if (r.certain === false) b.push({ cls: "relation-candidate", t: "候选·读取版本待核" });
       else if (r.certain == null) b.push({ cls: "relation-candidate", t: "旧记录·读取确定性未记录" });
-      if (r.self_written) b.push({ cls: "self", t: "写前读" });
+      if (r.self_written) b.push({ cls: "self", t: "同代理也写过", title: "只说明该代理记录中也写过此路径，不证明先后顺序或用途。" });
+      if (r.proof) {
+        if (r.proof.execution !== "confirmed") b.push({ cls: "relation-candidate", t: "执行依据未核", title: JSON.stringify(r.proof) });
+        if (!r.dep && r.proof.delivery !== "content") b.push({ cls: "relation-candidate", t: "正文交付未核", title: JSON.stringify(r.proof) });
+      } else b.push({ cls: "relation-candidate", t: "旧记录·执行/交付依据未记录" });
       if (r.via === "script") b.push({ cls: "via", t: "脚本读" });
       return b;
     }
-    function readUncertain(r) { return r.certain !== true || !!r.dep || !!r.observation_uncertain; }
+    function readUncertain(r) { return r.certain !== true || !!r.dep || !!r.observation_uncertain || !r.proof
+      || r.proof.execution !== "confirmed" || !r.dep && r.proof.delivery !== "content"; }
     function readerAnchor(r) {
       // Feeding slots can extend beyond the final numbered effect. They are
       // useful read metadata, not agent coordinates, even when the read is real.
@@ -1230,6 +1246,35 @@
       return "other";
     }
     function probeDraftCheck(s) { return /^(?:mcp__migloop__)?check$/.test(String(s.tool || "")); }
+    function renderEvidenceGraph(host) {
+      var graph = PROBE.evidence_graph, T = PROBE.trajectory || {}, counts = graph && graph.counts || {};
+      var box = el("div", "sum evidence-graph-summary");
+      box.dataset.status = graph ? graph.status : "unrecorded";
+      box.textContent = graph ? "读写主图 · 确定读 " + (counts.confirmed_read || 0) + " / 写 " + (counts.confirmed_write || 0)
+        + " · 候选读 " + (counts.candidate_read || 0) + " / 写 " + (counts.candidate_write || 0)
+        + " · 导航转移 " + (T.transitions || []).length + " 次（另列时间线）"
+        : "旧查看数据未提供读写投影；保留节点与查询时间线，不从导航或布局补画关系。";
+      host.appendChild(box);
+      host.appendChild(el("div", "sum", graph ? graph.note : "不是全账本图或完整根因图。"));
+      var details = el("details", "navigation-timeline");
+      details.appendChild(el("summary", null, "查询转移时间线（" + (T.transitions || []).length + "）· 含搜索、回访和分页，不作读写边"));
+      var nodes = {};
+      (T.nodes || []).forEach(function (n) { nodes[n.id] = n; });
+      (T.transitions || []).forEach(function (tr) {
+        var row = el("div", "navigation-event"), dest = nodes[tr.to], from = nodes[tr.from];
+        row.dataset.step = tr.step;
+        row.appendChild(el("span", "no", "#" + tr.step));
+        row.appendChild(el("span", "t", (tr.source === "search" ? "搜索 #" + ((tr.search_source || {}).step || "?")
+          : from ? from.label : tr.from || "来处未记录") + " → " + (dest ? dest.label : tr.to || "未落点")
+          + " · " + (tr.relation_label || (probeRelationStatus(tr) === "false" ? probeNavigationLabel(from, dest) : tr.relation || "关系未核验"))));
+        row.title = JSON.stringify(tr, null, 2);
+        if (dest && !probeTraceUnbound(PROBE)) row.addEventListener("click", function () {
+          openProbeNode({kind:dest.kind,path:dest.kind === "file" ? dest.key : null,aid:dest.kind === "agent" ? dest.key : null,v:dest.v});
+        });
+        details.appendChild(row);
+      });
+      host.appendChild(details);
+    }
     function renderProbe() {
       probeEl.hidden = false;
       probeEl.innerHTML = "";
@@ -1246,7 +1291,7 @@
       ld.appendChild(inp);
       ld.appendChild(btn);
       probeEl.appendChild(ld);
-      if (!PROBE) { probeEl.appendChild(el("div", "sum", "载入一次调查员的跑:树 = 它打开的节点按 via 挂(父 = 它声明的来处),每跳标账本关系;结论按缺陷 × 版本上色,进入点描边;「+N 未查」点开沿账本铺邻居;词法候选看图例开关。")); return; }
+      if (!PROBE) { probeEl.appendChild(el("div", "sum", "载入调查记录：所有查询、回访和搜索保留在时间线；读写主图只投影已有原始证据支持的定向读写关系，不是完整根因图。结论按缺陷 × 版本显示模型主张。")); return; }
       if (PROBE.error) { probeEl.appendChild(el("div", "sum", "载入失败:" + PROBE.error)); return; }
       var counts = { mcp: 0, wrapper: 0, other: 0 };
       (PROBE.steps || []).forEach(function (s) { counts[probeCallKind(s)]++; });
@@ -1277,11 +1322,13 @@
                         + (PROBE.links || []).filter(function (l) { return l.verdict; }).length + "</b> 环" : "");
       probeEl.appendChild(sum);
       renderTraceIdentity(probeEl);
+      renderDocumentSource(probeEl);
       renderRepairCoverage(probeEl);
       if (PROBE.structured || PROBE.legacy) renderStructuredHead(probeEl);
       renderDraftCheck(probeEl);
       if (PROBE.trajectory && PROBE.trajectory.verification_note) probeEl.appendChild(el("div", "warn", PROBE.trajectory.verification_note));
-      if (PROBE.trajectory && PROBE.trajectory.mode === "via") probeEl.appendChild(el("div", "sum", "箭头 #步号 = 模型声明的查询转移,不是因果边;蓝色‘账本’为已核关系,黄褐点线‘候选’为读取/提及待核,灰蓝虚线‘导航’为版本或搜索探索。回访与自环全部保留;红色问题角色是模型主张,不会把探索边变成红色因果边。"));
+      renderEvidenceGraph(probeEl);
+      renderFindings(probeEl);
       var dkeys = Object.keys(PROBE.defects || {});
       if (dkeys.length) {
         var chips = el("div", "dchips");
@@ -1701,6 +1748,94 @@
       line.title = "结论按缺陷事项计数;同一节点在不同缺陷下的角色分别计数。关系核验只查账本关系,不验证模型问题主张或缺陷因果。";
       host.appendChild(line);
     }
+    function renderDocumentSource(host) {
+      if (!PROBE.structured) return;
+      var source = PROBE.structured.document_source || {};
+      var labels = {final_inline:"结论来源：最终原文",checked_draft_ref:"结论来源：同 run 核查稿引用",
+        saved_schema_repair:"结论来源：历史 schema 修复稿",legacy_saved:"结论来源：历史保存稿",invalid_saved:"结论来源冲突或不可核"};
+      var box = el("details", "document-source" + (source.verified === true ? "" : " warn"));
+      box.dataset.kind = source.kind || "unrecorded"; box.dataset.verified = String(source.verified === true);
+      box.dataset.semanticChecked = "false";
+      box.appendChild(el("summary", null, (labels[source.kind] || "结论来源未记录")
+        + (source.verified === true ? "（正文出处已核，语义未核验）" : "（未认证为最终原文）")));
+      box.appendChild(el("div", null, source.note || "历史报告未记录文稿来源认证，不将账本身份匹配当作模型最终正文认证。"));
+      box.appendChild(el("div", null, "这里只核正文一致性/原始调用出处；不认证根因、修复效果或模型已阅读反馈。"));
+      function state(value) { return value === true ? "一致" : value === false ? "不一致" : "未核/不适用"; }
+      box.appendChild(el("div", null, "保存原文与解析数据：" + state(source.raw_matches_data)
+        + " · 最终正文与显示文档：" + state(source.final_matches_document)));
+      host.appendChild(box);
+    }
+    function renderFindings(host) {
+      var findings = PROBE.findings;
+      if (!findings || findings.schema !== "migloop-findings/1") return;
+      var files = findings.files || [], items = findings.items || {}, unbound = findings.unbound_items || [];
+      var claimsBound = (findings.identity || {}).bound === true && probeClaimsBound(PROBE);
+      var box = el("details", "file-findings"); box.dataset.source = "model"; box.dataset.semanticChecked = "false";
+      box.appendChild(el("summary", null, "按修复锚点归集 · " + files.length + " 个文件 / " + Object.keys(items).length
+        + " 项 / 未绑定 " + unbound.length + " 项（模型主张）"));
+      box.appendChild(el("div", "finding-note", "文件版本存在由账本核对；缺陷归属、修复意图、原因仍是模型主张，字段齐全不代表归因正确。不是完整根因清单。"));
+      if (!Object.keys(items).length) box.appendChild(el("div", "finding-note", "当前没有可归集的结构化事项，不等于没有缺陷。"));
+      if (!claimsBound) box.appendChild(el("div", "finding-note", "归集身份未绑定：保留原文，不以根节点代替未知文件或生成导航。"));
+      (findings.errors || []).forEach(function (error) { box.appendChild(el("div", "finding-note", String(error))); });
+      function appendItem(host, id, canBind) {
+        var item = items[id]; if (!item || PROBE.defect && item.defect !== PROBE.defect) return;
+        var row = el("details", "finding-item"); row.dataset.itemId = id; row.dataset.defect = item.defect;
+        row.appendChild(el("summary", null, item.defect + " · " + (item.title || "未提供标题") + " · " + (item.causes || []).length + " 条节点主张"));
+        row.appendChild(el("div", "finding-note", "来源：model · 语义未核验"));
+        if (item.boundary != null) {
+          row.appendChild(el("div", "finding-note", "边界（模型原文）"));
+          row.appendChild(el("div", "finding-boundary", item.boundary));
+        }
+        var repair = item.repair || {};
+        ["before", "after"].forEach(function (side) {
+          var n = repair[side]; if (!n) return;
+          row.appendChild(el("div", "finding-note", (side === "before" ? "修复前：" : "修复后：") + (n.spec || n.label || "坐标未提供")
+            + (canBind && n.ok ? " · 节点存在已核，修复语义未核" : " · 历史/无效坐标，未绑定") + (n.diag ? " · " + n.diag : "")));
+        });
+        (item.causes || []).forEach(function (cause) {
+          var detail = el("details", "finding-cause"); detail.dataset.basisStatus = cause.basis_status || "unrecorded";
+          detail.appendChild(el("summary", null, (cause.spec || cause.label || "坐标未提供") + " · " + (cause.role || "角色未提供")));
+          detail.appendChild(el("div", "finding-note", cause.basis_status === "complete" ? "归因对照字段齐全（语义未验证）"
+            : cause.basis_status === "absent_warning" ? "缺少归因对照（保留原主张）" : cause.basis_status === "invalid_legacy"
+              ? "历史归因对照字段不完整（未自动补全）" : "归因对照未要求或未记录；不表示验证通过"));
+          if (cause.diag) detail.appendChild(el("div", "finding-note", cause.diag));
+          detail.appendChild(el("div", "finding-note", "原因（模型原文）"));
+          detail.appendChild(el("div", "finding-reason", cause.reason == null ? "未提供（不推测）" : cause.reason));
+          var existing = canBind && cause.ok && XT && Object.keys(XT.byId).some(function (tid) {
+            var n = XT.byId[tid]; return n.kind === cause.kind && probeKeyOf(n) === cause.key
+              && (n.kind === "file" ? n.anchorV : n.anchorVer) === cause.v;
+          });
+          if (existing) {
+            var button = el("button", "finding-locate", "查看已有节点原因（不新增访问）");
+            button.addEventListener("click", function () { openProbeNode(nodeSpecOf(cause)); }); detail.appendChild(button);
+          }
+          (cause.evidence || []).forEach(function (ref) {
+            var display = typeof ref.original_ref === "string" ? Object.assign({}, ref, {ref:ref.original_ref}) : ref;
+            detail.appendChild(canBind ? evidenceRow(display) : el("div", "verow unbound", display.ref + " · 历史引用未绑定 · " + display.status));
+          });
+          if (cause.basis) {
+            if (canBind) { var basis = attributionBasis(cause); if (basis) detail.appendChild(basis); }
+            else detail.appendChild(el("pre", "finding-note", JSON.stringify(cause.basis, null, 2)));
+          }
+          row.appendChild(detail);
+        });
+        row.appendChild(el("div", "finding-note", "当前源 schema 未提供独立修复建议，不从原因文字推测补写。"));
+        host.appendChild(row);
+      }
+      files.forEach(function (file) {
+        var group = el("details", "finding-file"); group.dataset.path = file.path;
+        group.appendChild(el("summary", null, file.path + " · v" + (file.versions || []).join(", v") + " · " + (file.item_ids || []).length + " 项"));
+        (file.associations || []).forEach(function (a) { group.appendChild(el("div", "finding-note",
+          a.node + " · " + a.anchor + " · 文件归属/修复关联：模型声明；"
+          + (claimsBound && a.node_checked ? "版本坐标已核" : "版本坐标未绑定") + "，修复语义未核验")); });
+        (file.item_ids || []).forEach(function (id) { appendItem(group, id, claimsBound); }); box.appendChild(group);
+      });
+      if (unbound.length) {
+        var group = el("details", "finding-unbound"); group.appendChild(el("summary", null, "未绑定文件的事项（" + unbound.length + "）· 不以 root 猜补"));
+        unbound.forEach(function (id) { appendItem(group, id, false); }); box.appendChild(group);
+      }
+      host.appendChild(box);
+    }
     function renderDraftCheck(host) {
       var report = PROBE.draft_check;
       if (!report || typeof report !== "object") return; // Old reports do not acquire an invented check result.
@@ -1889,8 +2024,8 @@
       if (q.probe) loadProbe(q.probe);
     }
     // ═══════════ 调查路线:实体合并,每一次访问与转移都保留 ═══════════
-    // 首访 parent 只负责布局;transitions 负责画完整路线(含回访、自环、多父),账本关系只作每跳标注。
-    // 没有 via 的旧记录仍画账本边;不在根的上下游的结论节点单独放置,不冒充模型打开过。
+    // 首访 parent 只负责布局；完整 transitions 保留在时间线。读写主图只画独立 evidence_graph。
+    // 没有投影的旧数据只显示节点，不把布局父子线、搜索或结论补成关系。
     function probeNavigationLabel(from, to) {
       if (from && to && from.kind === to.kind && from.key === to.key && from.v != null && to.v != null && from.v !== to.v) {
         if (from.kind === "file") return "同文件版本导航";
@@ -1919,7 +2054,7 @@
         PROBE.placed = 0; PROBE.rolesOnTree = 0;
         renderProbe(); return;
       }
-      XT = { byId: {}, seq: 0, root: null, rights: [], rootKind: T.nodes[0].kind, extra: [], unlinkedDepth: null, sideTitle: T.side_title || null, walk: T.mode === "via" };
+      XT = { byId: {}, seq: 0, root: null, rights: [], rootKind: T.nodes[0].kind, extra: [], unlinkedDepth: null, sideTitle: T.side_title || null, walk: T.mode === "via", evidenceMode: true };
       var byId = {}, sourceById = {};
       T.nodes.forEach(function (n) { sourceById[n.id] = n; });
       T.nodes.forEach(function (n) {
@@ -1963,17 +2098,8 @@
         var node = byId[n.id];
         if (node.unlinked) { node.depth = maxD + 1; XT.unlinkedDepth = maxD + 1; }
       });
-      // 布局父子之外的账本边也画(同一节点几个上游、同一文件的前一版),不复制节点
-      var parentEdge = {};
-      T.nodes.forEach(function (n) { if (n.parent && n.side !== "unlinked") parentEdge[n.id + ">" + n.parent] = 1; });
-      (T.mode === "via" ? [] : (T.edges || [])).forEach(function (e) {
-        if (parentEdge[e.from + ">" + e.to] || parentEdge[e.to + ">" + e.from] || !byId[e.from] || !byId[e.to]) return;
-        XT.extra.push({ a: byId[e.from].tid, b: byId[e.to].tid, rel: e.relation });
-      });
       XT.transitions = [];
-      var transitions = T.transitions || (T.mode === "via" ? T.nodes.filter(function (n) { return n.parent && n.side === "up"; }).map(function (n) {
-        return { from: n.parent, to: n.id, step: (n.opened || [])[0], relation: n.edge, match: n.edge ? "账本有边" : "账本无此边" };
-      }) : []);
+      var transitions = T.transitions || [];
       transitions.forEach(function (tr) {
         if ((!byId[tr.from] && tr.source !== "search") || !byId[tr.to]) return;
         XT.transitions.push({ a: byId[tr.from] ? byId[tr.from].tid : null, b: byId[tr.to].tid, step: tr.step, relation: tr.relation, match: tr.match,
@@ -1982,18 +2108,24 @@
                               relation_evidence: tr.relation_evidence || [], legacy_relation: !tr.relation_status,
                               navigation: probeNavigationLabel(sourceById[tr.from], sourceById[tr.to]) });
       });
+      XT.evidenceEdges = [];
+      var graph = PROBE.evidence_graph;
+      if (graph && graph.schema === "migloop-evidence-graph/1" && graph.identity_bound === true && (PROBE.trace_identity || {}).bound === true) {
+        (graph.edges || []).forEach(function (e) {
+          if (!byId[e.from] || !byId[e.to] || e.from === e.to || ["read", "write"].indexOf(e.kind) < 0
+              || ["true", "unknown"].indexOf(e.status) < 0 || e.source_of_claim !== "ledger" || !(e.evidence || []).length) return;
+          var source = sourceById[e.from], target = sourceById[e.to];
+          if (source.kind !== (e.kind === "read" ? "file" : "agent") || target.kind !== (e.kind === "read" ? "agent" : "file")) return;
+          XT.evidenceEdges.push({a:byId[e.from].tid,b:byId[e.to].tid,from:e.from,to:e.to,id:e.id,steps:e.steps || [],
+            step:(e.steps || [])[0],relation_status:e.status,relation_label:e.label,relation_note:(e.notes || []).join(" · "),
+            relation_evidence:e.evidence,source:e.source_of_claim,kind:e.kind});
+        });
+      }
       T.nodes.forEach(function (n) {
         if (n.unseen > 0 && (n.side === "up" || n.side === "root")) addKid(byId[n.id], xtNode("leaf", { label: "+" + n.unseen + " 未查", isLedgerStub: true }));
       });
-      // 声明边:模型每次查询说的「我从 X 来」,蓝色虚线;和账本边重合 ✓,不重合橙色 ✗;来处不是节点的只在徽标上标
+      // 查询声明只保留在原时间线，不以旧 parent/declared 生成图线。
       XT.via = [];
-      (T.mode === "via" ? [] : (T.declared || [])).forEach(function (d) {
-        var tn = d.to && byId[d.to];
-        if (!tn) return;
-        var mark = d.match === "重合" ? "✓" : d.match === "不重合" ? "✗" : d.match === "跳" ? "跳" : d.match === "同一节点" ? "=" : "?";
-        tn.badges.push({ cls: d.match === "不重合" ? "stale" : "via", t: "via #" + d.step + " " + mark + (d.match === "跳" ? " " + d.text.slice(0, 16) : "") });
-        if (d.from && byId[d.from] && d.match !== "同一节点") XT.via.push({ a: byId[d.from].tid, b: tn.tid, step: d.step, match: d.match });
-      });
       var rootLabel = (XT.conclusionOnly ? "未查询结论 · " : "") + root.label;
       if (root.kind === "file") setRootLabel(rootLabel, "F:" + root.path, "file=" + encodeURIComponent(root.path) + "&v=" + (root.anchorV || ""));
       else setRootLabel(rootLabel, "A:" + root.aid, "agent=" + encodeURIComponent(root.aid) + "&v=" + (root.anchorVer || ""));
@@ -2274,7 +2406,7 @@
         if (!n.parent || n.unlinked || n.hidden) return;
         var p = XT.byId[n.parent];
         if (!p || p.hidden) return;
-        if (XT.walk && n.traj && p.traj) return;  // 首访父子线由完整声明转移统一绘制,不重复画成账本结构边
+        if (XT.evidenceMode) return;  // 布局/展开父子不等于已记录的读写投影
         var a, b;
         if (n.x < p.x) { a = n; b = p; } else { a = p; b = n; }
         var x1 = a.x + NODE_W, y1 = a.y + NODE_H / 2, x2 = b.x, y2 = b.y + NODE_H / 2;
@@ -2290,24 +2422,17 @@
         (wireByTid[n.parent] = wireByTid[n.parent] || []).push(path);
       });
       var pairCounts = {}, pairUsed = {};
-      (XT.transitions || []).forEach(function (e) {
+      (XT.evidenceEdges || []).forEach(function (e) {
         var key = [e.a, e.b].sort().join("|"); pairCounts[key] = (pairCounts[key] || 0) + 1;
       });
-      (XT.transitions || []).forEach(function (e) {
+      (XT.evidenceEdges || []).forEach(function (e) {
         var from = XT.byId[e.a], to = XT.byId[e.b];
-        if (!from && to && e.source === "search" && e.search_source) {
-          from = { x: to.x - NODE_W - 95, y: to.y, label: "搜索 #" + e.search_source.step + " 命中 " + e.search_source.hit };
-        }
-        if (!from || !to || from.hidden || to.hidden) return;
+        if (!from || !to || from === to || from.hidden || to.hidden) return;
         var key = [e.a, e.b].sort().join("|"), lane = pairUsed[key] || 0;
         pairUsed[key] = lane + 1;
         var offset = (lane - (pairCounts[key] - 1) / 2) * 9;
         var pathData, tx, ty;
-        if (from === to) {
-          var right = from.x + NODE_W, reach = right + 28 + lane * 15;
-          pathData = "M" + right + "," + (from.y + 6) + " C" + reach + "," + (from.y - 22) + " " + reach + "," + (from.y + NODE_H + 22) + " " + right + "," + (from.y + NODE_H - 5);
-          tx = reach - 3; ty = from.y + NODE_H / 2;
-        } else if (from.x === to.x) {
+        if (from.x === to.x) {
           var bend = from.x - 24 - lane * 14;
           pathData = "M" + from.x + "," + (from.y + NODE_H / 2) + " C" + bend + "," + (from.y + NODE_H / 2) + " " + bend + "," + (to.y + NODE_H / 2) + " " + to.x + "," + (to.y + NODE_H / 2);
           tx = bend; ty = (from.y + to.y + NODE_H) / 2;
@@ -2321,20 +2446,25 @@
         var uncertain = e.relation_status === "unknown", differ = e.relation_status !== "true";
         var routeClass = uncertain ? " uncertain" : differ ? " differ" : "";
         var path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-        path.setAttribute("d", pathData); path.setAttribute("class", "wire route" + routeClass);
+        path.setAttribute("d", pathData); path.setAttribute("class", "wire route evidence" + routeClass);
         path.setAttribute("marker-end", "url(#route-arrow" + (uncertain ? "-uncertain" : differ ? "-differ" : "") + ")");
         path.setAttribute("data-step", e.step);
-        path.setAttribute("data-source", e.source || "declared");
+        path.setAttribute("data-evidence-id", e.id);
+        path.setAttribute("data-steps", e.steps.join(","));
+        path.setAttribute("data-from", e.from); path.setAttribute("data-to", e.to);
+        path.setAttribute("data-kind", e.kind);
+        path.setAttribute("data-source", e.source);
         path.setAttribute("data-relation-status", e.relation_status);
-        var title = "声明转移 #" + e.step + " · " + from.label + " → " + to.label + " · " + (e.relation_label || (differ ? e.navigation : e.relation || "账本关系未核验"))
-                  + (e.relation_note ? " · " + e.relation_note : "") + (e.legacy_relation ? " · 旧格式未保留关系核验详情" : "") + " · 查询导航,不是因果边";
+        var title = "读写关系 · " + from.label + " → " + to.label + " · " + e.relation_label
+                  + " · 来源：账本原始动作；转移 #" + e.steps.join(", #") + (e.relation_note ? " · " + e.relation_note : "")
+                  + (uncertain ? " · 候选，不是确定读写边" : " · 只核读写关系，不验证模型根因主张")
+                  + "\n原始证据：" + JSON.stringify(e.relation_evidence);
         var pt = document.createElementNS("http://www.w3.org/2000/svg", "title"); pt.textContent = title; path.appendChild(pt);
         frag.appendChild(path);
         var label = document.createElementNS("http://www.w3.org/2000/svg", "text");
         label.setAttribute("x", tx); label.setAttribute("y", ty); label.setAttribute("text-anchor", "middle");
         label.setAttribute("class", "route-step" + routeClass); label.setAttribute("data-step", e.step);
-        label.textContent = e.source === "search" ? "搜索 #" + e.search_source.step + " → #" + e.step
-                         : "#" + e.step + (uncertain ? " 候选" : differ ? " 导航" : " 账本");
+        label.textContent = e.relation_label + " #" + e.steps.join(",#");
         var lt = document.createElementNS("http://www.w3.org/2000/svg", "title"); lt.textContent = title; label.appendChild(lt);
         label.addEventListener("click", function (ev) { ev.stopPropagation(); onNode(to.tid); });
         frag.appendChild(label);
@@ -2783,7 +2913,7 @@
           { t: "读 " + cut.length + (node.anchorVer != null ? " / " + ag.reads.length : "") },
           { t: "写 " + ag.writes.filter(function (w) { return w.ver <= anchor; }).length + (node.anchorVer != null ? " / " + ag.writes.length : "") },
           (function () { var n = cut.filter(function (r) { return r.stale; }).length; return n ? { cls: "warn", t: "▲ 旧版读 " + n } : null; })(),
-          (function () { var n = cut.filter(function (r) { return r.self_written; }).length; return n ? { t: "写前读 " + n } : null; })(),
+          (function () { var n = cut.filter(function (r) { return r.self_written; }).length; return n ? { t: "同代理也写过 " + n } : null; })(),
           (function () { var n = cut.filter(function (r) { return r.via === "script"; }).length; return n ? { cls: "via", t: "脚本读 " + n } : null; })()
         ]));
         body.appendChild(s0);

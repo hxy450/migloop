@@ -51,14 +51,24 @@ async function main() {
         manifestSource:p.repair_manifest_origin?.source, manifestPolicyChanged:p.repair_manifest_origin?.policy_changed,
         colored:document.querySelectorAll('#canvas .node.p-chain, #canvas .node.p-seen').length,
         nodes:p.trajectory.nodes.length, displayed:Object.values(x?.byId||{}).filter(n=>n.traj).length,
-        expected:p.trajectory.transitions.map(t=>t.step).sort((a,b)=>a-b),
+        evidenceMode:!!x?.evidenceMode,
+        expected:x?.evidenceMode ? (p.evidence_graph?.edges||[]).map(e=>e.steps[0]).sort((a,b)=>a-b)
+          : p.trajectory.transitions.map(t=>t.step).sort((a,b)=>a-b),
         drawn:[...document.querySelectorAll('.wire.route')].map(n=>Number(n.dataset.step)).sort((a,b)=>a-b),
+        expectedEvidence:(p.evidence_graph?.edges||[]).map(e=>({id:e.id,from:e.from,to:e.to,kind:e.kind,status:e.status,steps:e.steps.join(',')})),
+        drawnEvidence:[...document.querySelectorAll('.wire.evidence')].map(n=>({id:n.dataset.evidenceId,from:n.dataset.from,to:n.dataset.to,kind:n.dataset.kind,status:n.dataset.relationStatus,steps:n.dataset.steps})),
+        navigation:p.trajectory.transitions.map(t=>t.step),
+        timeline:[...document.querySelectorAll('.navigation-event')].map(n=>Number(n.dataset.step)),
         visits:p.trajectory.visits.length, queries:p.steps.length, defects:Object.keys(p.defects)};
     })()`);
     assert.equal(state.bound, mode === 'bound', 'expected report identity binding');
     assert.deepEqual(state.errors, [], 'structured report schema valid');
     assert.equal(state.displayed, state.nodes, 'all exact entities displayed');
-    assert.deepEqual(state.drawn, state.expected, 'every recorded transition drawn exactly once');
+    assert.deepEqual(state.drawn, state.expected, state.evidenceMode ? 'only projected read/write edges drawn' : 'legacy viewer draws every recorded transition');
+    if (state.evidenceMode) {
+      assert.deepEqual(state.drawnEvidence, state.expectedEvidence, 'read/write kind, certainty, direction and supporting steps preserved');
+      assert.deepEqual(state.timeline, state.navigation, 'all navigation events remain in their separate timeline');
+    }
     if (mode === 'unbound') {
       assert.equal(state.traceBound, false, 'actual historical source mismatch');
       assert.equal(state.identityBanner, 'mismatch', 'mismatch is visible');

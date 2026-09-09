@@ -3,7 +3,7 @@
 与 filestory_collect 的差别就是 0723 普查钉出来的几条:
 - 相对路径按「记录 cwd + 命令内 cd 链」解析;cd 到变量之后的相对路径解析不了就丢,不猜
 - 工具调用先等结果:is_error 的不落账、不占版本号
-- 脚本落盘/脚本读:heredoc 体、会话内落盘的脚本体、python -c 里的文件字面量(via=script)
+- 脚本:有限 straight-line AST 才建立操作;路径字面量仅提及,未知执行单列候选(via=script)
 - rm / git rm / Remove-Item → 删除版本;git checkout/restore <path> → 内容未知的写
 - Grep 工具 content 模式的命中行 → 带行段的读
 - Agent 派发 / SendMessage 是效应;收件箱从自己实录里的 teammate-message 读
@@ -21,12 +21,13 @@ import os
 import posixpath
 import re
 import warnings
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import cache
 from typing import Any
 
 from migloop.atoms import Action, AgentRec, FileRef
 from migloop.audit import stage_order
+from migloop.evidence import CONFIRMED_BASES, FileProof, proof_payload
 from migloop.filestory import Ev, ts_norm
 from migloop.filestory_collect import _clean_single_cat
 from migloop.shellparse import (
@@ -393,6 +394,17 @@ class FileOp:
     created: bool = False          # Write 结果说 File created:写之前文件不存在(假前身作废的依据)
     sources: tuple[str, ...] = ()  # cat a b > f 的各段:内容已知就能拼出 f
     conditional: bool = False      # 在 && / || 的条件分支里,是否执行了未知
+    proof: FileProof | None = None
+
+
+@dataclass
+class ScriptAnalysis:
+    ops: list[FileOp] = field(default_factory=list)
+    effect_candidates: list[str] = field(default_factory=list)
+    mentions: list[str] = field(default_factory=list)
+    probes: list[str] = field(default_factory=list)
+    unsupported: list[str] = field(default_factory=list)
+    write_capable: bool = False
 
 
 # ═══════════════ 路径 ═══════════════
@@ -445,11 +457,6 @@ def _resolve(p: object, base: str | None) -> str | None:
 
 # ═══════════════ 脚本字面量 ═══════════════
 
-#: 全文倾向兜底只对小脚本生效:一张 24 条 .ets 路径的数据表在只写脚本里曾全被当成写目标
-#: (0723 vv-static-B 的 gen_static.py,凭空造出 34 条返修链里的 19 条);字面量多于这个数就不猜方向
-_TENDENCY_MAX_LITERALS = 3
-
-
 def _parse_py(code: str) -> ast.Module | None:
     """脚本正文按 python 解析;解析不了返回 None,脚本里的非法转义(\\`)这类 SyntaxWarning 不往 stderr 刷。"""
     with warnings.catch_warnings():
@@ -460,19 +467,40 @@ def _parse_py(code: str) -> ast.Module | None:
             return None
 
 
-def _py_script_ops(code: str, base: str | None) -> list[FileOp]:
-    """python 正文里规整的读改写按 ast 解成确定的读写,解不出的形状不猜(交给字面量层当「碰过」):
+def _py_script_ops(code: str, base: str | None) -> ScriptAnalysis:
+    """Finite Python operation recognition; process success confirms only the supported execution domain.
     s = open(p).read() → 读;s = s.replace(old, new[, n]) 后 open(p,'w').write(s) → edit;
     open(p,'w').write(常量) / Path(p).write_text(常量) / with open(p,'w') as f: f.write(常量) → 全文写;
-    写回的是算出来的东西(re.sub、拼接)→ 内容未知的写(盲写),不是黑盒。"""
+    Unknown execution stays candidate; an admitted opaque write can have an author but no snapshot.
+    This does not execute code or model arbitrary control flow, aliases or user-defined call semantics."""
     tree = _parse_py(code)
+    analysis = ScriptAnalysis()
+    literals = _literal_ops(code, base)
+    analysis.mentions = literals.mentions
+    analysis.probes = literals.probes
+    analysis.effect_candidates = literals.effect_candidates
     if tree is None:
-        return []
+        analysis.unsupported.append("Python syntax not supported")
+        return analysis
     consts: dict[str, str] = {}
+    path_vars: set[str] = set()
     read_path: dict[str, str] = {}                     # 变量 → 它是哪个文件读出来的内容
     edits: dict[str, list[tuple[str, str, bool]]] = {}  # 变量 → 累计的 replace
     dirty: set[str] = set()                            # 变量被解不出的运算改过:写回只能算内容未知
     ops: list[FileOp] = []
+    replacers: dict[str, bool] = {}
+    shadowed: set[str] = set()
+
+    def invalidate(name: str) -> None:
+        """Every binding replacement expires all capabilities of the old value."""
+        consts.pop(name, None)
+        read_path.pop(name, None)
+        edits.pop(name, None)
+        dirty.discard(name)
+        path_vars.discard(name)
+        replacers.pop(name, None)
+        if name in {"open", "Path", "print", "pathlib", "io", "codecs", "json", "re", "os"}:
+            shadowed.add(name)
 
     def cs(node: ast.AST | None) -> str | None:
         if isinstance(node, ast.Constant) and isinstance(node.value, str):
@@ -482,25 +510,49 @@ def _py_script_ops(code: str, base: str | None) -> list[FileOp]:
         if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add):
             a, b = cs(node.left), cs(node.right)
             return a + b if a is not None and b is not None else None
+        if isinstance(node, ast.Call) and node.args and (
+                isinstance(node.func, ast.Name) and node.func.id == "Path" or
+                isinstance(node.func, ast.Attribute) and node.func.attr == "Path"):
+            return cs(node.args[0])
         return None
 
     def opened(call: ast.AST) -> tuple[str | None, str]:
-        """open(P[, mode]) / Path(P) / pathlib.Path(P) → (路径, 模式)"""
+        """Resolve standard open and Path-instance open without treating mode as a path."""
+        if isinstance(call, ast.Name) and call.id in path_vars:
+            return consts.get(call.id), ""
         if not isinstance(call, ast.Call):
             return None, ""
         f = call.func
         name = f.id if isinstance(f, ast.Name) else f.attr if isinstance(f, ast.Attribute) else ""
-        if name not in ("open", "Path") or not call.args:          # io.open / codecs.open 走 Attribute 分支
+        if name not in ("open", "Path"):
             return None, ""
-        mode = cs(call.args[1]) if name == "open" and len(call.args) > 1 else ""
+        if name == "Path":
+            return (cs(call.args[0]), "") if call.args else (None, "")
+        module_open = (isinstance(f, ast.Name) and f.id == "open" or isinstance(f, ast.Attribute)
+                       and isinstance(f.value, ast.Name) and f.value.id in {"io", "codecs"})
+        if module_open:
+            path = cs(call.args[0]) if call.args else None
+            mode = cs(call.args[1]) if len(call.args) > 1 else "r"
+        else:
+            path, _ = opened(f.value) if isinstance(f, ast.Attribute) else (None, "")
+            mode = cs(call.args[0]) if call.args else "r"
         for kw in call.keywords:
             if kw.arg == "mode":
-                mode = cs(kw.value) or ""
-        return cs(call.args[0]), mode or ""
+                mode = cs(kw.value)
+        return path, mode or "unknown"
 
-    def emit_write(p: str | None, arg: ast.AST) -> None:
+    def replace_count(call: ast.Call) -> bool | None:
+        if len(call.args) < 3:
+            return True
+        count = call.args[2]
+        return False if isinstance(count, ast.Constant) and type(count.value) is int and count.value == 1 else None
+
+    def emit_write(p: str | None, arg: ast.AST, mode: str = "w") -> None:
         rp = _resolve(p, base) if p else None
         if not rp:
+            return
+        if mode not in ("w", "wt", "wb", "w+", "wt+", "w+b", "wb+"):
+            ops.append(FileOp("write", rp, "script"))  # append/r+ payload is not a full file snapshot
             return
         content = cs(arg)
         if content is not None:
@@ -511,10 +563,11 @@ def _py_script_ops(code: str, base: str | None) -> list[FileOp]:
                 and isinstance(arg.func.value, ast.Name) and read_path.get(arg.func.value.id) == rp
                 and arg.func.value.id not in dirty and len(arg.args) >= 2):
             old, new = cs(arg.args[0]), cs(arg.args[1])
-            if old is not None and new is not None:
+            count = replace_count(arg)
+            if old is not None and new is not None and count is not None:
                 for o2, n2, a2 in edits.pop(arg.func.value.id, []):
                     ops.append(FileOp("edit", rp, "script", old=o2, new=n2, replace_all=a2))
-                ops.append(FileOp("edit", rp, "script", old=old, new=new, replace_all=len(arg.args) < 3))
+                ops.append(FileOp("edit", rp, "script", old=old, new=new, replace_all=count))
                 return
         if isinstance(arg, ast.Name) and read_path.get(arg.id) == rp and arg.id not in dirty:
             if edits.get(arg.id):
@@ -526,35 +579,51 @@ def _py_script_ops(code: str, base: str | None) -> list[FileOp]:
     def handle(stmt: ast.stmt) -> None:
         if isinstance(stmt, ast.Assign) and len(stmt.targets) == 1 and isinstance(stmt.targets[0], ast.Name):
             name, val = stmt.targets[0].id, stmt.value
+            # Evaluate the finite RHS abstract value before replacing its target binding (s=s.replace).
             s = cs(val)
+            source = val.func.value.id if (isinstance(val, ast.Call) and isinstance(val.func, ast.Attribute)
+                                          and val.func.attr == "replace" and isinstance(val.func.value, ast.Name)) else None
+            inherited_path = read_path.get(source)
+            inherited_edits = list(edits.get(source, []))
+            inherited_dirty = source in dirty
+            replacement = ((cs(val.args[0]), cs(val.args[1]), replace_count(val))
+                           if source and len(val.args) >= 2 else None)
+            opening = (opened(val.func.value) if isinstance(val, ast.Call) and isinstance(val.func, ast.Attribute)
+                       and val.func.attr in ("read", "read_text") else (None, ""))
+            json_opening = (opened(val.args[0]) if isinstance(val, ast.Call) and isinstance(val.func, ast.Attribute)
+                            and val.func.attr == "load" and val.args else (None, ""))
+            invalidate(name)
             if s is not None:
                 consts[name] = s
+                if isinstance(val, ast.Call) and ((isinstance(val.func, ast.Name) and val.func.id == "Path")
+                                                  or (isinstance(val.func, ast.Attribute) and val.func.attr == "Path")):
+                    path_vars.add(name)
                 return
             if isinstance(val, ast.Call) and isinstance(val.func, ast.Attribute):
+                if val.func.attr == "load" and isinstance(val.func.value, ast.Name) and val.func.value.id == "json" and val.args:
+                    p, _mode = json_opening
+                    rp = _resolve(p, base) if p else None
+                    if rp:
+                        ops.append(FileOp("read", rp, "script", dep=True))
+                    return
                 if val.func.attr in ("read", "read_text"):
-                    p, _mode = opened(val.func.value)
+                    p, _mode = opening
                     rp = _resolve(p, base) if p else None
                     if rp:
                         read_path[name] = rp
-                        dirty.discard(name)
                         ops.append(FileOp("read", rp, "script", dep=True))
                     return
-                if (val.func.attr == "replace" and isinstance(val.func.value, ast.Name)
-                        and val.func.value.id in read_path and len(val.args) >= 2):
-                    src = val.func.value.id
-                    old, new = cs(val.args[0]), cs(val.args[1])
-                    if src != name:                       # s2 = s.replace(...):新变量继承来源文件与已累计的替换
-                        read_path[name] = read_path[src]
-                        edits[name] = list(edits.get(src, []))
-                        if src in dirty:
-                            dirty.add(name)
-                    if old is not None and new is not None:
-                        edits.setdefault(name, []).append((old, new, len(val.args) < 3))
+                if inherited_path and replacement:
+                    read_path[name] = inherited_path
+                    edits[name] = inherited_edits
+                    if inherited_dirty:
+                        dirty.add(name)
+                    old, new, count = replacement
+                    if old is not None and new is not None and count is not None:
+                        edits.setdefault(name, []).append((old, new, count))
                     else:
                         dirty.add(name)
                     return
-            if name in read_path:
-                dirty.add(name)           # s = re.sub(...) / s + x:写回内容算不出
             return
         if isinstance(stmt, ast.Expr) and isinstance(stmt.value, ast.Call):
             call = stmt.value
@@ -562,31 +631,123 @@ def _py_script_ops(code: str, base: str | None) -> list[FileOp]:
             if isinstance(fn, ast.Attribute) and fn.attr in ("write", "write_text") and call.args:
                 p, _mode = opened(fn.value)
                 if p:
-                    emit_write(p, call.args[0])
+                    emit_write(p, call.args[0], "w" if fn.attr == "write_text" else _mode)
+            if isinstance(fn, ast.Attribute) and fn.attr == "dump" and isinstance(fn.value, ast.Name) and fn.value.id == "json" and len(call.args) >= 2:
+                p, _mode = opened(call.args[1])
+                rp = _resolve(p, base) if p else None
+                if rp:
+                    ops.append(FileOp("write", rp, "script"))
+            for nested in ast.walk(call):
+                if (isinstance(nested, ast.Call) and isinstance(nested.func, ast.Attribute) and nested.func.attr == "load"
+                        and isinstance(nested.func.value, ast.Name) and nested.func.value.id == "json" and nested.args):
+                    p, _mode = opened(nested.args[0])
+                    rp = _resolve(p, base) if p else None
+                    if rp and not any(o.path == rp and o.op == "read" for o in ops):
+                        ops.append(FileOp("read", rp, "script", dep=True))
             return
         if isinstance(stmt, ast.With) and len(stmt.items) == 1:
             item = stmt.items[0]
             p, _mode = opened(item.context_expr)
             var = item.optional_vars.id if isinstance(item.optional_vars, ast.Name) else None
             if p and var:
+                invalidate(var)
+                writes = [inner for inner in stmt.body if isinstance(inner, ast.Expr) and isinstance(inner.value, ast.Call)
+                          and isinstance(inner.value.func, ast.Attribute) and inner.value.func.attr == "write"
+                          and isinstance(inner.value.func.value, ast.Name) and inner.value.func.value.id == var]
+                if len(writes) > 1:
+                    rp = _resolve(p, base)
+                    if rp:
+                        ops.append(FileOp("write", rp, "script"))
+                    return  # one open handle's writes accumulate; do not emit independent full snapshots
                 for inner in stmt.body:
                     if (isinstance(inner, ast.Expr) and isinstance(inner.value, ast.Call)
                             and isinstance(inner.value.func, ast.Attribute) and inner.value.func.attr == "write"
                             and isinstance(inner.value.func.value, ast.Name) and inner.value.func.value.id == var
                             and inner.value.args):
-                        emit_write(p, inner.value.args[0])
+                        emit_write(p, inner.value.args[0], _mode)
                     elif (isinstance(inner, ast.Assign) and len(inner.targets) == 1 and isinstance(inner.targets[0], ast.Name)
                           and isinstance(inner.value, ast.Call) and isinstance(inner.value.func, ast.Attribute)
                           and inner.value.func.attr == "read" and isinstance(inner.value.func.value, ast.Name)
                           and inner.value.func.value.id == var):
                         rp = _resolve(p, base)
                         if rp:
+                            invalidate(inner.targets[0].id)
                             read_path[inner.targets[0].id] = rp
                             ops.append(FileOp("read", rp, "script", dep=True))
             return
 
-    replacers = _replace_helpers(tree)
+    supported = True
+    unconfirmed_targets: set[str] = set()
+    pure_names = {"print", "len", "str", "int", "float", "bool", "list", "tuple", "set", "dict",
+                  "range", "enumerate", "sorted", "zip", "min", "max", "open", "Path"}
+    pure_attrs = {"read", "read_text", "write", "write_text", "replace", "count", "strip", "lstrip", "rstrip",
+                  "split", "splitlines", "join", "startswith", "endswith", "format", "encode", "decode",
+                  "exists", "is_file", "is_dir", "stat", "glob", "iterdir", "open", "Path",
+                  "sub", "search", "match", "fullmatch", "findall", "compile", "escape", "load", "loads", "dump", "dumps"}
+
+    def supported_stmt(stmt: ast.stmt) -> bool:
+        local_handles = {item.optional_vars.id for item in stmt.items
+                         if isinstance(item.optional_vars, ast.Name) and opened(item.context_expr)[0]} if isinstance(stmt, ast.With) else set()
+
+        def known_value(value: ast.AST) -> bool:
+            if isinstance(value, ast.Name):
+                return value.id not in shadowed and value.id in set(consts) | set(read_path) | path_vars | local_handles | {"io", "codecs", "pathlib", "json", "re", "os"}
+            if isinstance(value, ast.Constant):
+                return True
+            if isinstance(value, ast.Attribute):
+                return known_value(value.value)
+            if isinstance(value, ast.Call):
+                fn = value.func
+                return (isinstance(fn, ast.Name) and fn.id in pure_names and fn.id not in shadowed
+                        or isinstance(fn, ast.Attribute) and fn.attr in pure_attrs and known_value(fn.value))
+            return False
+        if isinstance(stmt, (ast.Import, ast.ImportFrom)):
+            if isinstance(stmt, ast.ImportFrom):
+                return stmt.module == "pathlib" and all(n.name == "Path" and n.asname is None for n in stmt.names)
+            return all(n.name in {"pathlib", "io", "codecs", "re", "json", "os"} and n.asname is None for n in stmt.names)
+        if isinstance(stmt, ast.FunctionDef):
+            return not stmt.decorator_list and not stmt.args.defaults and not stmt.args.kw_defaults
+        if not isinstance(stmt, (ast.Assign, ast.Expr, ast.Assert, ast.With, ast.Pass)):
+            return False
+        if any(isinstance(n, ast.Assign) and (len(n.targets) != 1 or not isinstance(n.targets[0], ast.Name))
+               for n in ast.walk(stmt)):
+            return False  # unpacking/chained/attribute stores are outside this finite abstract domain
+        if any(isinstance(n, (ast.If, ast.For, ast.While, ast.Try, ast.Raise, ast.Return, ast.Lambda,
+                              ast.ListComp, ast.DictComp, ast.SetComp, ast.GeneratorExp, ast.NamedExpr)) for n in ast.walk(stmt)):
+            return False
+        for node in ast.walk(stmt):
+            if not isinstance(node, ast.Call):
+                continue
+            fn = node.func
+            if isinstance(fn, ast.Name):
+                if fn.id in shadowed or fn.id not in pure_names | set(replacers):
+                    return False
+                if fn.id in replacers and shadowed & {"open", "Path", "io", "codecs", "pathlib"}:
+                    return False
+            elif isinstance(fn, ast.Attribute):
+                if fn.attr not in pure_attrs or not known_value(fn.value):
+                    return False
+                if isinstance(fn.value, ast.Name) and fn.value.id in shadowed:
+                    return False
+            else:
+                return False
+        return True
+
     for stmt in tree.body:
+        supported = supported and supported_stmt(stmt)
+        if isinstance(stmt, (ast.FunctionDef, ast.ClassDef)):
+            invalidate(stmt.name)
+            if supported and isinstance(stmt, ast.FunctionDef):
+                replacers.update(_replace_helpers(ast.Module(body=[stmt], type_ignores=[])))
+        elif isinstance(stmt, ast.Assign) and (len(stmt.targets) != 1 or not isinstance(stmt.targets[0], ast.Name)):
+            for target in stmt.targets:
+                for node in ast.walk(target):
+                    if isinstance(node, ast.Name):
+                        invalidate(node.id)
+        if not supported:
+            analysis.unsupported.append(f"unsupported execution domain at Python line {stmt.lineno}")
+            unconfirmed_targets.update(_literal_ops(ast.get_source_segment(code, stmt) or "", base).effect_candidates)
+        start_ops = len(ops)
         if (isinstance(stmt, ast.Expr) and isinstance(stmt.value, ast.Call) and isinstance(stmt.value.func, ast.Name)
                 and stmt.value.func.id in replacers and len(stmt.value.args) >= 2):
             rp = _resolve(cs(stmt.value.args[0]), base) if cs(stmt.value.args[0]) else None
@@ -602,33 +763,88 @@ def _py_script_ops(code: str, base: str | None) -> list[FileOp]:
                             continue
                     ops.append(FileOp("write", rp, "script"))       # 有一对算不出:写回内容未知
                     break
-            continue
-        handle(stmt)
-    return ops
+        else:
+            handle(stmt)
+        if supported:
+            for op in ops[start_ops:]:
+                op.proof = FileProof("supported_python", "unknown", "dependency" if op.dep else "none",
+                                     "unknown", f"Python straight-line statement L{stmt.lineno}")
+        else:
+            unconfirmed_targets.update(o.path for o in ops[start_ops:] if o.op != "read")
+            del ops[start_ops:]
+    solved = {o.path for o in ops}
+    analysis.ops = ops
+    analysis.effect_candidates = sorted((set(analysis.effect_candidates) - solved) | unconfirmed_targets)
+    # A literal loop binding is enough to locate potential targets, not to assert execution.
+    for loop in (n for n in ast.walk(tree) if isinstance(n, ast.For) and isinstance(n.target, ast.Name)
+                 and isinstance(n.iter, (ast.List, ast.Tuple))):
+        variable = loop.target.id
+        writes_variable = any(isinstance(n, ast.Call) and isinstance(n.func, ast.Name) and n.func.id == "open"
+                              and n.args and isinstance(n.args[0], ast.Name) and n.args[0].id == variable
+                              and len(n.args) > 1 and isinstance(n.args[1], ast.Constant)
+                              and str(n.args[1].value).startswith(("w", "a")) for stmt in loop.body for n in ast.walk(stmt))
+        if writes_variable:
+            analysis.effect_candidates.extend(p for item in loop.iter.elts if (p := _resolve(cs(item), base)))
+    analysis.write_capable = bool(analysis.effect_candidates) or any(o.op != "read" for o in ops)
+    return analysis
 
 
 def _replace_helpers(tree: ast.Module) -> dict[str, bool]:
-    """def f(p, pairs): 读 p → 对 pairs 循环 replace → 写回 p 这种帮助函数:名字 → replace 是否不带 count(全替换)。"""
+    """Only the complete same-file read/replace/write template, not co-occurring keywords."""
     out: dict[str, bool] = {}
     for node in tree.body:
         if not isinstance(node, ast.FunctionDef) or len(node.args.args) < 2:
             continue
-        pairs_name = node.args.args[1].arg
-        has_read = has_write = False
-        loop_replace: bool | None = None
-        for sub in ast.walk(node):
-            if isinstance(sub, ast.Call) and isinstance(sub.func, ast.Attribute):
-                if sub.func.attr in ("read", "read_text"):
-                    has_read = True
-                elif sub.func.attr in ("write", "write_text"):
-                    has_write = True
-            if (isinstance(sub, ast.For) and isinstance(sub.iter, ast.Name) and sub.iter.id == pairs_name
-                    and isinstance(sub.target, (ast.Tuple, ast.List)) and len(sub.target.elts) == 2):
-                for inner in ast.walk(sub):
-                    if isinstance(inner, ast.Call) and isinstance(inner.func, ast.Attribute) and inner.func.attr == "replace":
-                        loop_replace = len(inner.args) < 3
-        if has_read and has_write and loop_replace is not None:
-            out[node.name] = loop_replace
+        path_name, pairs_name = node.args.args[0].arg, node.args.args[1].arg
+
+        def io_call(value: ast.AST, methods: set[str]) -> bool:
+            if not (isinstance(value, ast.Call) and isinstance(value.func, ast.Attribute) and value.func.attr in methods):
+                return False
+            opening = value.func.value
+            return (isinstance(opening, ast.Call) and opening.args and isinstance(opening.args[0], ast.Name)
+                    and opening.args[0].id == path_name and
+                    (isinstance(opening.func, ast.Name) and opening.func.id in {"open", "Path"}
+                     or isinstance(opening.func, ast.Attribute) and opening.func.attr in {"open", "Path"}
+                     and isinstance(opening.func.value, ast.Name) and opening.func.value.id in {"io", "codecs", "pathlib"}))
+
+        phase, text_name, replacement = 0, None, None
+        valid = True
+        for stmt in node.body:
+            if isinstance(stmt, ast.Expr) and (isinstance(stmt.value, ast.Constant) and isinstance(stmt.value.value, str)
+                                               or isinstance(stmt.value, ast.Call) and isinstance(stmt.value.func, ast.Name)
+                                               and stmt.value.func.id == "print" and all(isinstance(a, (ast.Name, ast.Constant)) for a in stmt.value.args)):
+                continue
+            if phase == 0 and isinstance(stmt, ast.Assign) and len(stmt.targets) == 1 and isinstance(stmt.targets[0], ast.Name) and io_call(stmt.value, {"read", "read_text"}):
+                text_name = stmt.targets[0].id
+                valid = text_name != path_name
+                phase = 1
+            elif phase == 1 and isinstance(stmt, ast.For) and isinstance(stmt.iter, ast.Name) and stmt.iter.id == pairs_name and isinstance(stmt.target, (ast.Tuple, ast.List)) and len(stmt.target.elts) == 2 and all(isinstance(e, ast.Name) for e in stmt.target.elts):
+                names = [e.id for e in stmt.target.elts]
+                for inner in stmt.body:
+                    if isinstance(inner, ast.Assert) and not any(isinstance(n, ast.Call) for n in ast.walk(inner)):
+                        continue
+                    call = inner.value if isinstance(inner, ast.Assign) else None
+                    if (not isinstance(inner, ast.Assign) or len(inner.targets) != 1 or not isinstance(inner.targets[0], ast.Name)
+                            or inner.targets[0].id != text_name or not isinstance(call, ast.Call)
+                            or not isinstance(call.func, ast.Attribute) or call.func.attr != "replace"
+                            or not isinstance(call.func.value, ast.Name) or call.func.value.id != text_name
+                            or len(call.args) not in (2, 3) or not all(isinstance(a, ast.Name) and a.id == n for a, n in zip(call.args[:2], names))
+                            or len(call.args) == 3 and not (isinstance(call.args[2], ast.Constant) and type(call.args[2].value) is int and call.args[2].value == 1)):
+                        valid = False
+                        break
+                    replacement = len(call.args) == 2
+                phase = 2
+            elif phase == 2 and isinstance(stmt, ast.Expr) and io_call(stmt.value, {"write", "write_text"}) and len(stmt.value.args) == 1 and isinstance(stmt.value.args[0], ast.Name) and stmt.value.args[0].id == text_name:
+                opening = stmt.value.func.value
+                mode = opening.args[1].value if len(opening.args) > 1 and isinstance(opening.args[1], ast.Constant) else "w"
+                valid = mode == "w"
+                phase = 3
+            else:
+                valid = False
+            if not valid:
+                break
+        if valid and phase == 3 and replacement is not None:
+            out[node.name] = replacement
     return out
 
 
@@ -664,47 +880,27 @@ def _py_partial_writes(code: str) -> list[tuple[str, str]]:
     return out
 
 
-def _literal_ops(code: str, base: str | None) -> tuple[list[FileOp], int, list[str]]:
-    """脚本正文里的文件字面量 → 读/写。按紧邻的调用形态判方向;判不出的只在小脚本里按
-    全文倾向(只写/只读)兜底,其余放弃并计数 —— 宁可漏,但要能报出自己。
-    返回 (ops, 放弃的字面量数, 放弃的那些路径):放弃的不猜方向,记成「碰过」,让 file / sessions 能把指针摆出来。"""
-    body_w, body_r = bool(_WRITEISH.search(code)), bool(_READISH.search(code))
-    lits = list(_LIT.finditer(code))
-    tendency_ok = len(lits) <= _TENDENCY_MAX_LITERALS
-    ops: list[FileOp] = []
-    undetermined = 0
-    touched: list[str] = []
-    for m in lits:
+def _literal_ops(code: str, base: str | None) -> ScriptAnalysis:
+    """Lexical paths are mentions, never formal operations or blanket write barriers."""
+    result = ScriptAnalysis()
+    for m in _LIT.finditer(code):
+        p = _resolve(m.group(1), base)
+        if not p:
+            continue
+        result.mentions.append(p)
         after = code[m.end():m.end() + 40]
         before = code[max(0, m.start() - 40):m.start()]
         # 紧跟在 : 后面的是映射的值("hmos_page_map": {"MainActivity": "…/Index.ets"}),不是文件操作的
         # 目标:DiceRoller 0903 主会话初始化 progress.json 的 heredoc 曾借倾向兜底给 Index.ets 造出一版假修复
         if re.search(r":\s*$", before):
-            undetermined += 1
             continue
         # open(p, 'w') / 'a' / 'wb' / 'w+':模式串必须是完整的短 token,后面紧跟 , 或 ) ——
         # 只看引号后一个字母会把数据表里紧跟的 'wired' 之类字段当成写模式
         if re.match(r"\s*,\s*['\"][wa][bt+]{0,2}['\"]\s*[,)]", after) or re.match(r"\s*\)\s*\.write", after):
-            op = "write"
-        elif re.match(r"\s*\)\s*\.(?:read|open|exists|is_file|iterdir|glob)", after) \
-                or re.search(r"(?:json\.load|read_text|readFile|Get-Content)\s*\(?\s*(?:open\()?$",
-                             before) \
-                or (re.search(r"open\(\s*$", before) and re.match(r"\s*\)", after)):
-            op = "read"
-        elif tendency_ok and body_w and not body_r:
-            op = "write"
-        elif tendency_ok and body_r and not body_w:
-            op = "read"
-        else:
-            undetermined += 1
-            tp = _resolve(m.group(1), base)
-            if tp and tp not in touched:
-                touched.append(tp)
-            continue
-        p = _resolve(m.group(1), base)
-        if p:
-            ops.append(FileOp(op, p, "script"))
-    return ops, undetermined, touched
+            result.effect_candidates.append(p)
+        elif re.match(r"\s*\)\s*\.(?:exists|is_file|is_dir|stat|iterdir|glob)\b", after):
+            result.probes.append(p)
+    return result
 
 
 #: bash 习惯:S=/sdk/api; sed -n '570,625p' $S/x.d.ts —— 同一条命令里赋了字面量的变量可代换;
@@ -925,6 +1121,8 @@ def _shell_analyze(cmd: str, cwd: object, scripts: dict[str, Any],
     mk_dirs: list[str] = []
     ran_script = False
     listing = False
+    script_mentions: list[str] = []
+    script_unsupported: list[str] = []
     text, bodies = _strip_heredocs((cmd or "").replace("\\\n", " "))
     # 同一条命令里赋了字面量的变量代换到引用处(PowerShell / bash 两种写法);静态列表循环展开。
     # 没赋值的($HOME 等)、项带通配的循环照旧放弃
@@ -943,6 +1141,16 @@ def _shell_analyze(cmd: str, cwd: object, scripts: dict[str, Any],
         p = _resolve(raw, base)
         if p:
             ops.append(FileOp(op, p, via, **kw))
+
+    def add_script(code: str, script_base: str | None) -> None:
+        nonlocal capable
+        analysis = _py_script_ops(code, script_base)
+        ops.extend(analysis.ops)
+        touched.extend(analysis.effect_candidates)
+        script_mentions.extend(analysis.mentions)
+        probe_hits.extend(analysis.probes)
+        script_unsupported.extend(analysis.unsupported)
+        capable = capable or analysis.write_capable
 
     unknown_scripts: list[str] = []
     segments = _split_segments_ops(text)
@@ -1042,14 +1250,7 @@ def _shell_analyze(cmd: str, cwd: object, scripts: dict[str, Any],
                 add("delete", p)
         if head in _PY and "-c" in args and args.index("-c") + 1 < len(args):
             code = args[args.index("-c") + 1]
-            py_ops = _py_script_ops(code, base)
-            ops += py_ops
-            lit_ops, und, tch = _literal_ops(code, base)
-            lit_ops = [o for o in lit_ops if o.path not in {o.path for o in py_ops}]
-            ops += lit_ops
-            undetermined += und
-            touched += tch
-            capable = capable or bool(_WRITEISH.search(code))
+            add_script(code, base)
             out_dirs += _dir_hints(code, base)
         if head in _RUNNERS:
             run = next((w for w in args if _SCRIPT_RUN.search(w) and not w.startswith("-")), None)
@@ -1061,15 +1262,7 @@ def _shell_analyze(cmd: str, cwd: object, scripts: dict[str, Any],
                     unknown_scripts.append(run)
                 else:
                     # 跑的 .py 脚本和 heredoc 一样先走 ast:规整的读改写解成 edit,字面量层只补 ast 没解出的路径
-                    py_ops = _py_script_ops(body, base) if run.endswith(".py") else []
-                    ops += py_ops
-                    lit_ops, und, tch = _literal_ops(body, base)
-                    solved = {o.path for o in py_ops}
-                    ops += [o for o in lit_ops if o.path not in solved]
-                    tch = [p for p in tch if p not in solved]
-                    undetermined += len(tch) if py_ops else und
-                    touched += tch
-                    capable = capable or bool(_WRITEISH.search(body))
+                    add_script(body, base)
                     out_dirs += _dir_hints(body, base)
     if seg_cond:
         for o in ops[seg_start:]:
@@ -1091,26 +1284,18 @@ def _shell_analyze(cmd: str, cwd: object, scripts: dict[str, Any],
         conditional, body_base = (heredoc_context[body_index] if body_index < len(heredoc_context)
                                   else (True, None))
         body_start = len(ops)
-        py_ops = _py_script_ops(body, body_base)
-        ops += py_ops
-        lit_ops, und, tch = _literal_ops(body, body_base)
-        solved = {o.path for o in py_ops}
-        ops += [o for o in lit_ops if o.path not in solved]
+        add_script(body, body_base)
         for op in ops[body_start:]:
             op.conditional = conditional
-        # ast 解出了读写的路径,字面量层不再对它「放弃」计数(否则动作仍标黑盒)
-        tch = [p for p in tch if p not in solved]
-        undetermined += sum(1 for p in tch) if py_ops else und
-        touched += tch
-        capable = capable or bool(_WRITEISH.search(body))
         out_dirs += _dir_hints(body, base)
     if ran_script or capable:
         out_dirs += mk_dirs
-    if opaque_control:
+    if opaque_control or any(sep not in ("", "&&") for sep, _ in segments):
         for op in ops:
-            op.conditional = True             # 不支持的控制结构不摊平成无条件事实
+            op.conditional = True             # 复合调用成功不能证明被 || / ; / 管道掩盖的前件成功
     return ops, capable, undetermined, touched, {"probed": probe_hits, "out_dirs": list(dict.fromkeys(out_dirs)),
-                                                 "unknown_scripts": unknown_scripts}
+                                                 "unknown_scripts": unknown_scripts, "script_mentions": script_mentions,
+                                                 "unsupported_execution": script_unsupported}
 
 
 def shell_file_ops(cmd: str, cwd: object, scripts: dict[str, Any], out: str = "") -> list[FileOp]:
@@ -1118,12 +1303,36 @@ def shell_file_ops(cmd: str, cwd: object, scripts: dict[str, Any], out: str = ""
 
 
 def _note_touched(detail: dict[str, Any], touched: list[str], ops: list[FileOp]) -> None:
-    """脚本里出现了路径但方向不明的,记成「碰过」:不立版本、不猜读写,file / sessions 把指针摆出来让人展开。
-    0723 修复方用 python heredoc 读改写 F012ViewModel.ets,既读又写就放弃了,文件那边看不见有人碰过它。"""
-    seen = {o.path for o in ops}
-    tch = sorted({p for p in touched if p not in seen})
+    """Only possible effects enter this compatibility bucket; pure mentions must not be state barriers."""
+    tch = sorted(set(touched))
     if tch:
-        detail["touched"] = tch
+        detail["effect_candidates"] = sorted(set(detail.get("effect_candidates") or []) | set(tch))
+        detail["touched"] = sorted(set(detail.get("touched") or []) | set(tch))
+
+
+def _admit_ops(ops: list[FileOp], detail: dict[str, Any], *, succeeded: bool) -> list[FileOp]:
+    """One admission rule for both transcript formats; binding is not operation proof."""
+    admitted = []
+    for op in ops:
+        basis = op.proof.operation_basis if op.proof else (
+            "native_tool" if op.via in {"tool", "inject", "image"} else
+            "supported_shell" if op.via == "shell" else "output_locator" if op.via == "stdout" else "legacy")
+        established = succeeded and not op.conditional and basis in CONFIRMED_BASES
+        delivery = ("dependency" if op.dep else "content" if op.op == "read" and (op.content is not None or op.seen)
+                    else "unknown" if op.op == "read" else "none")
+        op.proof = FileProof(basis, "confirmed" if established else "unknown", delivery,
+                             "full" if op.content is not None and (op.op != "read" or op.full) else
+                             "partial" if op.content is not None or op.seen else "unknown",
+                             op.proof.rule if op.proof else op.via + ":" + op.op)
+        if established:
+            admitted.append(op)
+        elif op.op == "read":
+            detail.setdefault("read_candidates", []).append({"path": op.path, "via": op.via,
+                "start": op.start, "n": op.n, "seen": [list(row) for row in op.seen] if op.seen else None,
+                "proof": proof_payload(op.proof)})
+        else:
+            _note_touched(detail, [op.path], [])
+    return admitted
 
 
 # ═══════════════ 工具 → 动作 ═══════════════
@@ -1280,14 +1489,16 @@ def _file_ops(name: str, inp: dict[str, Any], out: str, tur: Any, cwd: object,
         else:
             # 没有 toolUseResult 边车(服务端切片、Workflow 子代理转录):从结果正文的 "N\t内容" 行号
             # 前缀还原。DiceRoller 0903 生成方读 MainActivity.kt / activity_main.xml 的两条 Read 曾因此消失,
-            # 调查员只能说"无法确认读过"。没给 offset/limit 就是整份读(Read 默认从头读到底)
+            # 调查员只能说"无法确认读过"。缺边车时仅连续无额外正文的从头默认读可作全文。
             numbered = _numbered_lines(out)
             p = _resolve(inp.get("file_path"), _resolve(cwd, None))
             if p and numbered:
                 start = numbered[0][0]
-                full = start == 1 and not inp.get("offset") and not inp.get("limit")
-                ops.append(FileOp("read", p, "tool", content="\n".join(t for _, t in numbered),
-                                  full=full, start=start, n=len(numbered)))
+                contiguous = [n for n, _ in numbered] == list(range(start, start + len(numbered)))
+                full = (start == 1 and not inp.get("offset") and not inp.get("limit") and contiguous
+                        and all(_NUMBERED.match(line) for line in out.splitlines() if line.strip()))
+                ops.append(FileOp("read", p, "tool", content="\n".join(t for _, t in numbered) if full else None,
+                                  seen=tuple(numbered), full=full, start=start, n=len(numbered)))
     elif name == "Write":
         p = _resolve(inp.get("file_path"), _resolve(cwd, None))
         if p:
@@ -1320,11 +1531,13 @@ def _file_ops(name: str, inp: dict[str, Any], out: str, tur: Any, cwd: object,
             # 条件分支里的效应不进正式状态:只记候选路径(build_ledger 挂成「条件分支,是否执行未知(候选写)」),
             # 评审反例:false && 写 A,文件没变,账本却多出一版 b 和一次「实录外修改」
             detail["conditional"] = sorted({o.path for o in cond_ops})
+            _admit_ops(cond_ops, detail, succeeded=True)
             ops = [o for o in ops if not (o.conditional and o.op != "read")]
         # 通用 stdout 挂接无法区分分支输出和后续 echo/另一路输出,不能给条件读背书。
         uncertain_reads = [o for o in ops if o.conditional and o.op == "read"]
         if uncertain_reads:
             detail["conditional_reads"] = sorted({o.path for o in uncertain_reads})
+            _admit_ops(uncertain_reads, detail, succeeded=True)
             ops = [o for o in ops if o not in uncertain_reads]
         if capable:
             detail["write_capable"] = True
@@ -1341,6 +1554,9 @@ def _file_ops(name: str, inp: dict[str, Any], out: str, tur: Any, cwd: object,
         if undetermined and "unresolved" not in detail:
             detail["unresolved"] = "脚本字面量方向不明"
         _note_touched(detail, touched, ops)
+        for key in ("script_mentions", "unsupported_execution"):
+            if hints.get(key):
+                detail[key] = list(dict.fromkeys(hints[key]))
         if hints["probed"]:
             detail["probed"] = hints["probed"]
         if hints["out_dirs"]:
@@ -1365,6 +1581,7 @@ def _file_ops(name: str, inp: dict[str, Any], out: str, tur: Any, cwd: object,
                        "text": inp.get("message") or inp.get("content")})
     elif name == "Skill":
         detail["skill"] = inp.get("skill")
+    ops = _admit_ops(ops, detail, succeeded=True)
     if update_scripts:
         _update_scripts(scripts, ops + cond_ops, ts)
     return ops, detail
@@ -1393,7 +1610,9 @@ def _to_ev(op: FileOp, agent: str, ts: str, seq: int, stage: str | None = None,
     return Ev(ts, seq, kind, op.path, agent, content=op.content, old=op.old, new=op.new,
               replace_all=op.replace_all, start=op.start, n=op.n, full=op.full, dep=op.dep,
               via=op.via, seen=op.seen, stage=stage, created=op.created, sources=op.sources,
-              conditional=op.conditional, use_ts=use_ts, done_ts=done_ts)
+              conditional=op.conditional, use_ts=use_ts, done_ts=done_ts,
+              proof=op.proof or (FileProof("native_tool", "confirmed", "content" if op.content is not None else "dependency",
+                                          "full" if op.full else "partial", "injected input") if op.via == "inject" else None))
 
 
 #: 管线技能在阶段**收尾**时调 ``a2h mark-stage``:这些 mark 的时刻是该阶段的结束(DiceRoller 0903 实测,
@@ -1850,7 +2069,7 @@ def _codex_exec_ops(raw_arg: Any, out_text: str, cwd: object,
                                                                        success=single, ts=ts)
         if capable:
             detail["write_capable"] = True
-        if single and not sub_ops:
+        if single and not any(not op.conditional for op in sub_ops):
             why = _unresolved_reason(cmd)
             if why:
                 detail["unresolved"] = why      # 不许静默(与 CC 同一条规矩)
@@ -1863,6 +2082,9 @@ def _codex_exec_ops(raw_arg: Any, out_text: str, cwd: object,
         if undetermined and "unresolved" not in detail:
             detail["unresolved"] = "脚本字面量方向不明"
         _note_touched(detail, touched, sub_ops)
+        for key in ("script_mentions", "unsupported_execution"):
+            if hints.get(key):
+                detail[key] = list(dict.fromkeys((detail.get(key) or []) + hints[key]))
         for key in ("probed", "out_dirs"):
             if hints[key]:
                 detail[key] = list(dict.fromkeys((detail.get(key) or []) + hints[key]))
@@ -1877,6 +2099,7 @@ def _codex_exec_ops(raw_arg: Any, out_text: str, cwd: object,
         for key, paths in (("conditional", conditional), ("conditional_reads", conditional_reads)):
             if paths:
                 detail[key] = sorted(set(detail.get(key) or []) | paths)
+        _admit_ops([o for o in sub_ops if o.conditional], detail, succeeded=ok)
         ops += [o for o in sub_ops if not (o.conditional and (o.op != "read" or o.path in conditional_reads))]
     for patch in codex._extract_apply_patches(js):
         detail.setdefault("cmd", "apply_patch")
@@ -1884,6 +2107,7 @@ def _codex_exec_ops(raw_arg: Any, out_text: str, cwd: object,
     if not ok:
         detail["touched"] = sorted(set(detail.get("touched") or []) | {o.path for o in ops if o.op != "read"})
         detail["unresolved"] = "调用失败,效应未知(可能已部分执行)" if completed else "调用未完成,效应未知"
+    ops = _admit_ops(ops, detail, succeeded=ok) if ok else ops  # retain failed operation kind; caller admits no files
     return ops, detail, ok
 
 

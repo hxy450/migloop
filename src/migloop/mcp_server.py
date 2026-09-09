@@ -33,9 +33,9 @@ GUIDE = """\
 ## 标签的含义(标签是证据,不是裁决)
 - ▲旧版 a/b:读的时候绑到第 a 版,但这条读喂养的那笔写发生时文件已是第 b 版 —— "读旧版"候选
 - 行段 (x-y行):记录显示读了这些行;是否全文以 full / seen / 内容未知标签为准,没标范围不自动等于全文
-- 写前读:读自己也写过的文件(Edit 前必 Read / 写后自查),程序性动作,归因时打折
+- 同 agent 也写过:这个 agent 生命周期中也写过同一路径;只说明路径重合,不证明读写顺序或这次读取的目的
 - 依赖读:cp 源 / < 输入,内容没进上下文
-- 脚本读 / 脚本落盘:从脚本字面量推断的读写,置信低于 Read/Write 工具
+- 脚本读 / 脚本落盘:仅受支持的脚本语义与执行证据可入账;单凭路径字面量只是提及,控制流/执行未知是候选
 - 外部输入:第一次出现就是被读,没人写过(安卓源码、spec 参考、模板)—— 树的叶子
 - 实录外修改:内容变了但没有记录在案的写(脚本动态目标 / 构建工具 / 人手)
 - 版本就近绑定(不确定):读发生在文件状态未知时,版本号是就近猜的
@@ -67,6 +67,8 @@ action(id, n) 是模型当时眼睛里看到的原始输出;file(path, v, conten
 agent(id, v, since=v-1),只看喂养第 v 版的输入;子 agent 通常几十次调用,整段给 —— 它早期版本读的
 spec 常常就是后来写错的根源,别只看写那一版的窗口。主会话一版之内也可能读几十个不相干的文件:问「它写这份
 spec 时凭什么」用 search(q, agent=主会话, v=那一版) 按词切,不要用窗口硬看。
+窗口的“早期输入索引”只提示被省略的已有记录,不证明相关性;按需展开。reads 默认自动折叠大 agent 的读清单,
+reads=True 显式铺开索引,seen=True 再展开看见的片段,原始全文仍从 action 获取。
 
 ## search:带起点的按词查找
 `search(sid, q, agent=id或名字, v=, since=)` 只在这个 agent 喂养第 v 版及之前的记录里找:派发词、读到的内容、写入内容、
@@ -226,6 +228,31 @@ check返回draft_sha256只对应这次提交的草稿；改过内容后旧核查
 """
 
 
+def guide_text(final_mode: str | None = None) -> str:
+    """One common investigation guide; only final delivery varies in an ablation."""
+    import os
+    mode = final_mode if final_mode is not None else os.environ.get("MIGLOOP_FINAL_MODE", "document")
+    if mode == "document":
+        return GUIDE
+    if mode != "reference":
+        raise ValueError("MIGLOOP_FINAL_MODE must be document or reference")
+    return GUIDE + """
+
+## 本次最终交付模式：显式引用已核草稿
+上面的 migloop-verdict/1 仍是完整结论格式，必须作为 check 的 draft 参数提交；调查、理由、证据和覆盖要求全部不变。
+最终回复不要再重写一遍完整 YAML，只输出下面的小块（可附一小段摘要），三个值逐字照抄最后一次 check 返回：
+```yaml
+schema: migloop-verdict-ref/1
+ledger: <本次账本身份>
+draft_sha256: <最后一次 check 的 draft_sha256>
+document_sha256: <同一次 check 的 document_sha256>
+```
+系统只从本次录制的最后一次真实 check 取回你实际提交过的原文，并核对双哈希；没有对应调用、缺失/截断返回或不匹配就载入失败。
+要改任何结论，先将完整新稿再交 check，再引用新的哈希。needs_review 可以提交，未解诊断会保留；不能删真实问题来清零。
+这个小块不代替完整草稿，也不证明原因正确。不要自算或猜哈希，不要引用另一次运行。
+"""
+
+
 def _rt() -> Any:
     from migloop import service
     return service.McpBackend()
@@ -271,7 +298,7 @@ def build_server(backend: Any | None = None) -> Any:
     @srv.tool(**text_options)
     def guide() -> str:
         """两原子模型、标签含义、建议的调查路径与结论要求。第一次用之前先读。"""
-        return GUIDE
+        return guide_text()
 
     @srv.tool(**text_options)
     async def sessions(sid: str, file: str | None = None) -> str:
@@ -281,12 +308,8 @@ def build_server(backend: Any | None = None) -> Any:
         payload = await rt.get_fixchain(sid)
         cwd = await rt.get_session_cwd(sid)
         ledger = await rt.get_ledger(sid)
-        out = atoms_text.render_chains(payload, root=cwd, file=file, identity=atoms.ledger_identity(ledger))
-        from . import time_scope
-        out += "\n\n" + atoms_text.render_time_scope(time_scope.overview(ledger))
-        if file:
-            out += "\n\n" + atoms_text.render_repair_manifest(ledger, payload, file, root=cwd)
-        return out
+        from . import atom_queries
+        return atom_queries.render_text(ledger, cwd, "sessions", {"file": file}, chains=payload)
 
     @srv.tool(**text_options)
     async def index(sid: str, kind: str | None = None, query: str | None = None,
@@ -294,7 +317,8 @@ def build_server(backend: Any | None = None) -> Any:
         """账本目录:agent 与文件各一行。kind = agent | ets | spec | src | other | scan(扫描缺口) | time(全池会话时段);空=全部;query 子串过滤。
         不带 query 只给前 80 条(大会话有两百多个 agent,整张表就是三万字),带 query 给到 300。"""
         ledger, cwd = await _ctx(sid)
-        return atoms_text.render_index(ledger, kind, query, root=cwd, limit=limit or (300 if query else 80))
+        from . import atom_queries
+        return atom_queries.render_text(ledger, cwd, "index", dict(kind=kind, query=query, limit=limit))
 
     @srv.tool(**text_options)
     async def file(sid: str, path: str, v: int, content: bool = False,
@@ -318,9 +342,10 @@ def build_server(backend: Any | None = None) -> Any:
             return err
         if target_error or node is None:
             return target_error or "⛔ 目标文件无法核验,未打开。"
-        out = atoms_text.render_file(ledger, node[1], v, root=cwd, content=content, diff=diff,
-                                     start=start, n=n, readers=readers, v_from=v_from, v_to=v_to,
-                                     diff_chars=diff_chars, m_from=m_from, m_n=m_n, m_all=m_all)
+        from . import atom_queries
+        out = atom_queries.render_text(ledger, cwd, "file", dict(path=node[1], v=v, content=content, diff=diff,
+            start=start, n=n, readers=readers, v_from=v_from, v_to=v_to,
+            diff_chars=diff_chars, m_from=m_from, m_n=m_n, m_all=m_all))
         if via_mod.returned_node(ledger, "file", out) != node:
             return "⛔ 文件返回的版本与目标不一致,未打开。\n" + out
         st.open(node)
@@ -328,7 +353,7 @@ def build_server(backend: Any | None = None) -> Any:
 
     @srv.tool(**text_options)
     async def agent(sid: str, id: str, v: int, since: int | None = None,
-                    reads: bool = True, seen: bool = False, until: int | None = None, via: str = "") -> str:
+                    reads: bool | None = None, seen: bool = False, until: int | None = None, via: str = "") -> str:
         """版本 agent 原子(索引):身份、派发者与派发词全文、收件箱一行一条、≤v 逐版的效应与输入。
         v 必填(打开的节点就是 agent@v;它一共几版看任何一次返回的头一行);
         via=你现在站的节点(已打开的,逐字照抄 file:<路径>@vN / agent:<id>@vK;第一次可写 sessions),不对不执行。
@@ -346,7 +371,9 @@ def build_server(backend: Any | None = None) -> Any:
             return err
         if target_error or node is None:
             return target_error or "⛔ 目标 agent 无法核验,未打开。"
-        out = atoms_text.render_agent(ledger, node[1], v, root=cwd, since=since, reads=reads, seen=seen, until=until)
+        from . import atom_queries
+        out = atom_queries.render_text(ledger, cwd, "agent", dict(id=node[1], v=v, since=since, reads=reads,
+                                                                seen=seen, until=until))
         if via_mod.returned_node(ledger, "agent", out) != node:
             return "⛔ agent 返回的版本与目标不一致,未打开。\n" + out
         st.open(node)
@@ -359,13 +386,15 @@ def build_server(backend: Any | None = None) -> Any:
         changed=True 把 v 当修复版:只给它替换/删除掉的前一版那些行及其引入者(owner@since_v)和新增行数
         —— 定位被修行的来源用这个,不必整文件 blame。"""
         ledger, cwd = await _ctx(sid)
-        return atoms_text.render_blame(ledger, path, v, start, n, root=cwd, changed=changed)
+        from . import atom_queries
+        return atom_queries.render_text(ledger, cwd, "blame", dict(path=path, v=v, start=start, n=n, changed=changed))
 
     @srv.tool(**text_options)
     async def diff(sid: str, path: str, v: int) -> str:
         """某一版的 unified diff(相对前一已知版)。"""
         ledger, cwd = await _ctx(sid)
-        return atoms_text.render_diff(ledger, path, v, root=cwd)
+        from . import atom_queries
+        return atom_queries.render_text(ledger, cwd, "diff", dict(path=path, v=v))
 
     @srv.tool(**text_options)
     async def search(sid: str, q: str = "", agent: str | None = None, v: int | None = None,
@@ -386,7 +415,8 @@ def build_server(backend: Any | None = None) -> Any:
         args = dict(q=q, agent=agent, v=v, since=since, file=file, after=after,
                     since_ts=since_ts, until_ts=until_ts, kind=kind)
         hits: list[dict[str, Any]] = []
-        out = atoms_text.render_search(ledger, root=cwd, navigation_hits=hits, **args)
+        from . import atom_queries
+        out = atom_queries.render_text(ledger, cwd, "search", args, navigation_hits=hits)
         return via_mod.search_return(ledger, via_state(ledger), args, out, hits)
 
     @srv.tool(**text_options)
@@ -396,18 +426,19 @@ def build_server(backend: Any | None = None) -> Any:
         max_chars 限制被选中的原文窗口,来源/已确认读写指针另列,不冒充原文。part=input/output 选择翻页侧;
         offset= 从第几字继续,find= 直接跳到关键词前。词法候选导航默认 m_n=0 只给计数,需看时 m_n=40、m_from 翻页。"""
         ledger, _cwd = await _ctx(sid)
-        return atoms_text.render_action(ledger, id, seq, max_chars=max_chars, offset=offset, find=find,
-                                        part=part, m_n=m_n, m_from=m_from)
+        from . import atom_queries
+        return atom_queries.render_text(ledger, _cwd, "action", dict(id=id, seq=seq, max_chars=max_chars,
+            offset=offset, find=find, part=part, m_n=m_n, m_from=m_from))
 
     @srv.tool(**text_options)
     async def check(sid: str, draft: str, file: str | None = None) -> str:
         """提交前只读核查 YAML/JSON 草稿。反馈节点/引用/边/覆盖及红节点论据缺口，不判归因语义、不打开任何节点。
         draft最大120000字符；反馈最多40条并注明省略数量。file为本次要对账的目标，不代表全部用户任务范围。
         输出即使 mechanical_clear 也不证明原因正确或真正读过证据；不会保存、修复或替换正式结论。"""
-        from . import draft_check
+        from . import atom_queries
         ledger, _cwd = await _ctx(sid)
         payload = await _be().get_fixchain(sid)
-        return draft_check.render(ledger, draft, payload, file)
+        return atom_queries.render_text(ledger, _cwd, "check", dict(draft=draft, file=file), chains=payload)
 
     return srv
 

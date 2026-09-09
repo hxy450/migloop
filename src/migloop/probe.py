@@ -12,6 +12,7 @@ import hashlib
 import json
 import os
 import re
+from copy import deepcopy
 from datetime import datetime
 from typing import Any
 
@@ -245,8 +246,8 @@ def probe_payload(ledger: atoms.Ledger, run_dir: str, chain_payload: dict[str, A
     fm = re.search(r"文件[::]\s*([^\s(（]+)", report)
     if not root and fm:
         root = filestory.find_story_path(ledger.stories, fm.group(1))
-    structured = _structured(ledger, run_dir, report, trace_identity=trace_identity)
-    from . import draft_check
+    structured = _structured(ledger, run_dir, report, trace_identity=trace_identity, calls=calls)
+    from . import draft_check, findings
     # Bind the document actually displayed (a saved schema-repair result may
     # differ from the original report), not a second hidden interpretation.
     checked_draft = draft_check.final_binding(ledger, calls, None,
@@ -271,6 +272,7 @@ def probe_payload(ledger: atoms.Ledger, run_dir: str, chain_payload: dict[str, A
             (structured or {}).get("defects") or [],
             identity_bound=((structured or {}).get("identity", {}).get("bound") is True
                             and manifest_origin.get("bound") is True))
+    trajectory = _trajectory(ledger, run_dir, steps, root, structured, verdicts, calls, trace_identity)
     return {"run": os.path.basename(os.path.dirname(os.path.abspath(run_dir))), "cost": m.get("cost_usd"), "turns": m.get("num_turns"),
             "root": root, "steps": steps, "links": links, "entry": entry_no, "entries": entries, "verdicts": verdicts,
             "bad_refs": sum(len(lk["bad_refs"]) for lk in links), "defects": defects, "report": report,
@@ -278,43 +280,117 @@ def probe_payload(ledger: atoms.Ledger, run_dir: str, chain_payload: dict[str, A
             "trace_identity": trace_identity, "repair_manifest": repair_manifest, "coverage": coverage_report,
             "repair_manifest_origin": manifest_origin, "draft_check": checked_draft,
             "roles": (structured or {}).get("roles") or {}, "fixed": (structured or {}).get("fixed") or [],
-             "trajectory": _trajectory(ledger, run_dir, steps, root, structured, verdicts, calls, trace_identity)}
+            "trajectory": trajectory, "evidence_graph": _evidence_graph(ledger, trajectory, trace_identity),
+            "findings": findings.project(structured)}
 
 
 def _structured(ledger: atoms.Ledger, run_dir: str, report: str,
-                trace_identity: dict[str, Any] | None = None) -> dict[str, Any] | None:
-    """harness 落的 verdict.json(带 harness 算的账本身份、修复重试记录)优先;没有就从报告正文里抽结论块。
-    没有结论块 → None(legacy 散文);有块但校验失败 → 只带原文与错误,主张不猜。"""
+                trace_identity: dict[str, Any] | None = None,
+                calls: list[dict[str, Any]] | None = None) -> dict[str, Any] | None:
+    """Load only a document with original text; cached data is not authorship.
+
+    Legacy schema-repair bodies remain readable with explicit saved provenance.
+    A reference submission still requires the same run's authenticated check.
+    """
     vp = os.path.join(run_dir, "verdict.json")
+    vj: dict[str, Any] = {}
     if os.path.isfile(vp):
         with open(vp, encoding="utf-8") as fh:
             vj = json.load(fh)
+    from .submission import load_submission
+    from .draft_check import document_hash
+    loaded = load_submission(report, ledger, calls if calls is not None else _transcript_calls(run_dir),
+                             trace_identity, vj.get("harness_identity"))
+    reference_mode = loaded["submission"]["mode"] == "checked_draft_ref"
+    saved_submission = vj.get("submission") if isinstance(vj.get("submission"), dict) else {}
+    if reference_mode or saved_submission.get("mode") == "checked_draft_ref":
+        # A saved data object is not authentication for a reference submission.
+        # Reopen only the same run's original check; absent/bad final ref fails.
+        errors = list(loaded["errors"])
+        if not reference_mode:
+            errors.append("已保存引用式结论，但最终回复没有对应的显式提交引用")
+        built = verdict.build(ledger, None if errors else loaded["data"], errors, {
+            "kind": loaded["kind"], "raw": loaded["raw"], "trace_identity": trace_identity,
+            "harness_identity": vj.get("harness_identity"),
+            "recorded_repair_manifest": vj.get("repair_manifest")})
+        built["submission"] = loaded["submission"]
+        built["document_source"] = {
+            "kind": "checked_draft_ref", "verified": not errors and loaded["submission"]["status"] == "accepted",
+            "semantic_checked": False, "raw_matches_data": True if not errors else None,
+            "final_matches_document": None,
+            "note": "引用稿来自同 run 的原始 check 输入，按来源与双哈希认证；不是原因或修复语义验证。"
+                    if not errors else "引用提交来源认证失败；保留原文与诊断，不使用保存 data 补救。"}
+        return built
+    if vj:
         data = vj.get("data")
-        errors = list(vj.get("errors") or [])
-        previous_errors = list(errors)
+        raw, kind = vj.get("raw"), vj.get("kind")
+        previous_errors = list(vj.get("errors") or [])
+        errors = verdict.validate(data) if data is not None else []
         revalidated = False
-        if data is None and isinstance(vj.get("raw"), str) and vj.get("kind") in ("yaml", "json"):
-            candidate, parse_errors = verdict.parse_block(vj["kind"], vj["raw"])
-            current_errors = parse_errors or verdict.validate(candidate)
-            if not current_errors:
-                data, errors, revalidated = candidate, [], True
-        if data is not None:
-            errors = verdict.validate(data)                      # 以当前 schema 再核一遍,不信 harness 的旧结论
-            if errors:
-                data = None
-        if data is None and not vj.get("raw") and not vj.get("found", True):
+        raw_matches = None
+        final_valid = loaded["data"] is not None and not loaded["errors"]
+        final_hash = document_hash(loaded["data"]) if final_valid else None
+        data_hash = document_hash(data) if data is not None and not errors else None
+        if raw is not None:
+            if not isinstance(raw, str) or kind not in ("yaml", "json"):
+                errors.append("保存稿 raw 必须有可解析的 yaml/json 原文与格式，不能仅信任 data")
+            else:
+                candidate, parse_errors = verdict.parse_block(kind, raw)
+                current_errors = parse_errors or verdict.validate(candidate)
+                if current_errors:
+                    errors.extend("保存稿 raw 无效: " + error for error in current_errors)
+                elif data is None:
+                    # Preserve the original body of old notes/schema revalidation.
+                    data, data_hash, revalidated = candidate, document_hash(candidate), True
+                elif data_hash is not None:
+                    raw_matches = document_hash(candidate) == data_hash
+                    if not raw_matches:
+                        errors.append("保存稿 raw 与 data 文档不一致；不能将缓存解释标成模型原文")
+        elif final_valid and (data is None or data_hash == final_hash) and not errors:
+            # Missing cached raw may be recovered only from the matching final.
+            data, data_hash, raw, kind = loaded["data"], final_hash, loaded["raw"], loaded["kind"]
+        elif data is not None:
+            errors.append("保存稿没有原文，最终回复也没有与 data 一致的有效文档；主张来源不可核")
+        if data is None and raw is None and not vj.get("found", True) and not loaded["found"]:
             return None
-        meta = {"kind": vj.get("kind"), "raw": vj.get("raw"), "repaired": vj.get("repaired"),
+        if data is None and not errors:
+            errors = list(loaded["errors"] or previous_errors or ["未提供可核验的保存稿原文"])
+        final_matches = (data_hash == final_hash) if data_hash is not None and final_valid else None
+        if saved_submission.get("mode") == "inline" and final_matches is not True:
+            errors.append("显式 inline 提交必须与有效最终正文一致；保存稿不能替代缺失或不同的最终提交")
+        source_kind = "invalid_saved" if errors else "final_inline" if final_matches else (
+            "saved_schema_repair" if vj.get("repaired") else "legacy_saved")
+        if source_kind == "final_inline":
+            # The displayed original is now the actual final body, not a cache's
+            # equivalent formatting. Raw cache artifacts themselves stay intact.
+            raw, kind = loaded["raw"], loaded["kind"]
+        meta = {"kind": kind, "raw": raw, "repaired": vj.get("repaired"),
                 "harness_identity": vj.get("harness_identity"),
                 "recorded_repair_manifest": vj.get("repair_manifest"),
                 "trace_identity": trace_identity,
                 "revalidated": revalidated, "previous_errors": previous_errors if revalidated else []}
-        return verdict.build(ledger, data, errors, meta)
-    lb = verdict.load_block(report)
+        source = {"kind": source_kind, "verified": source_kind == "final_inline", "semantic_checked": False,
+                  "raw_matches_data": raw_matches, "final_matches_document": final_matches,
+                  "note": {"final_inline": "当前文档与最终 inline 原文内容一致；只认证正文来源，不认证归因语义。",
+                           "saved_schema_repair": "显示历史 schema 修复的保存原文，未认证为最终提交；仍是未验证的历史主张。",
+                           "legacy_saved": "显示可解析的历史保存原文，未认证为最终提交；不冒充当前模型最终回复。",
+                           "invalid_saved": "保存稿原文、解释或最终提交不一致/不可核；仅保留诊断，不绑定问题主张。"}[source_kind]}
+        submitted = loaded["submission"] if source_kind == "final_inline" else {
+            "schema": "migloop-submission/1", "mode": "saved_document", "semantic_checked": False,
+            "status": "rejected" if errors else "legacy_unverified",
+            "final_submission_status": loaded["submission"].get("status")}
+        return {**verdict.build(ledger, None if errors else data, errors, meta),
+                "submission": submitted, "document_source": source}
+    lb = loaded
     if not lb["found"]:
         return None
-    return verdict.build(ledger, lb["data"], lb["errors"], {"kind": lb["kind"], "raw": lb["raw"],
-                                                         "trace_identity": trace_identity})
+    return {**verdict.build(ledger, lb["data"], lb["errors"], {"kind": lb["kind"], "raw": lb["raw"],
+                                                            "trace_identity": trace_identity}),
+            "submission": lb["submission"],
+            "document_source": {"kind": "final_inline", "verified": not lb["errors"], "semantic_checked": False,
+                                "raw_matches_data": None, "final_matches_document": not lb["errors"],
+                                "note": "文档来自最终 inline 原文；正文来源核验不等于归因正确。"
+                                        if not lb["errors"] else "最终原文未通过格式核验，主张未绑定。"}}
 
 
 # ═══════════════ 调查路径与账本关系分层 ═══════════════
@@ -1029,6 +1105,7 @@ def _agent_versions(ledger: atoms.Ledger, key: str, v: int | None) -> list[int]:
 
 def _relation_check(ledger: atoms.Ledger, a: dict[str, Any], b: dict[str, Any]) -> dict[str, Any]:
     """查询方向可逆,账本关系方向不变;与 verdict 共用 true/unknown/false 语义。"""
+    from .evidence import read_basis
     endpoints = []
     for n in (a, b):
         exact, _ = via.target(ledger, n["kind"], n["key"], n.get("v"))
@@ -1064,7 +1141,7 @@ def _relation_check(ledger: atoms.Ledger, a: dict[str, Any], b: dict[str, Any]) 
                     continue
                 for ref in act.files:
                     if ref.op == "read" and ref.path == left["key"] and ref.v == left["v"]:
-                        basis = "overlapping_read" if ref.observation_uncertain else "dependency_read" if ref.ev.dep else "uncertain_version" if not ref.certain else "read"
+                        basis = read_basis(ref)
                         if (status == "true") == (basis == "read"):
                             cite(right["key"], act.seq, basis, ref)
                 if status == "unknown" and left["key"] in (act.detail.get("conditional_reads") or []):
@@ -1081,6 +1158,7 @@ def _relation_check(ledger: atoms.Ledger, a: dict[str, Any], b: dict[str, Any]) 
                     cite(ag["key"], mention.seq, "lexical_mention")
     bases = list(dict.fromkeys(e["basis"] for e in evidence))
     labels = {"uncertain_version": "读取版本待核", "dependency_read": "依赖读取(内容未进上下文)",
+              "unverified_read": "读取执行/内容交付依据待核",
               "conditional_read": "条件读取待核", "lexical_mention": "仅词法提及", "overlapping_read": "读取窗口重叠(快照时刻待核)"}
     label = ("账本·" + str(relation) if status == "true" else
              "候选·" + " / ".join(labels.get(x, x) for x in bases) if status == "unknown" and bases else
@@ -1098,6 +1176,122 @@ def _relation_check(ledger: atoms.Ledger, a: dict[str, Any], b: dict[str, Any]) 
 def _relation_any(ledger: atoms.Ledger, a: dict[str, Any], b: dict[str, Any]) -> str | None:
     """旧内部调用的显示兼容层;unknown 不会冒充确定边。"""
     return _relation_check(ledger, a, b)["relation"]
+
+
+def _evidence_graph(ledger: atoms.Ledger, trajectory: dict[str, Any] | None,
+                    trace_identity: dict[str, Any] | None) -> dict[str, Any]:
+    """Project already-checked navigation, not all pairs or model relationship claims.
+
+    Navigation remains untouched in trajectory. Only authenticated visits with
+    exact endpoints and a located underlying read/write observation can produce
+    a line, in dataflow direction. Unknown is never promoted to confirmed.
+    """
+    tree = trajectory or {}
+    bound = (trace_identity or {}).get("bound")
+    nodes = {}
+    for n in tree.get("nodes") or []:
+        exact, _ = via.target(ledger, n.get("kind"), n.get("key"), n.get("v"))
+        if exact is not None and n.get("id") == _traj_id(*exact):
+            nodes[n["id"]] = n
+    transitions = tree.get("transitions") or []
+    visits = tree.get("visits") or []
+    opened = {v.get("node") for v in visits if v.get("status") == "opened" and v.get("verified") is True}
+    opened_steps = {(v.get("step"), v.get("node")) for v in visits
+                    if v.get("status") == "opened" and v.get("verified") is True}
+    graph: dict[str, Any] = {
+        "schema": "migloop-evidence-graph/1", "scope": "recorded_transitions", "complete": False,
+        "status": "identity_unbound" if bound is not True else
+                  "projected" if tree.get("mode") == "via" else "legacy_unrecorded",
+        "identity_bound": bound, "nodes": list(nodes), "edges": [], "model_relations": [],
+        "semantic_checked": False,
+        "note": "仅投影本次已记录转移中、原始动作可定位的读写关系，不是全账本图或完整根因图；"
+                "候选仍待核，纯搜索/词法提及/派发/版本导航/回访只保留在查询时间线。"
+                + (" 旧跑未记录可投影的转移，不从布局父子线补造关系。" if tree.get("mode") != "via" else "")
+                + (" 调查身份未绑定当前账本，不绘制当前读写关系。" if bound is not True else ""),
+        "counts": {"transitions": len(transitions), "visits": len(visits), "searches": len(tree.get("searches") or []),
+                   "projected_transitions": 0, "excluded_transitions": 0, "edges": 0,
+                   "confirmed_read": 0, "confirmed_write": 0, "candidate_read": 0, "candidate_write": 0,
+                   "model_relations": 0},
+        "relation_counts": {}, "source_counts": {}, "excluded": [],
+    }
+    action_cache: dict[str, dict[int, Any]] = {}
+    merged: dict[tuple[str, str, str, str], dict[str, Any]] = {}
+    read_bases = {"read", "uncertain_version", "dependency_read", "conditional_read", "overlapping_read", "unverified_read"}
+
+    def located(e: dict[str, Any], aid: str, kind: str, status: str) -> bool:
+        bases = {"write"} if kind == "write" else {"read"} if status == "true" else read_bases - {"read"}
+        if not isinstance(e, dict) or e.get("aid") != aid or e.get("basis") not in bases:
+            return False
+        if aid not in action_cache:
+            action_cache[aid] = {act.seq: act for act in ledger.agents[aid].actions}
+        act = action_cache[aid].get(e.get("seq"))
+        if act is None or not act.src or not act.src[0] or act.src[1] is None:
+            return False
+        return (e.get("source") == act.src[0] and e.get("use_line") == act.src[1] + 1
+                and e.get("result_line") == (act.src[2] + 1 if act.src[2] is not None else None)
+                and e.get("event_id") == atoms.event_id(ledger, aid, act.seq))
+
+    for tr in transitions:
+        relation = str(tr.get("relation_kind") or "unrecorded")
+        source = str(tr.get("source") or "unrecorded")
+        graph["relation_counts"][relation] = graph["relation_counts"].get(relation, 0) + 1
+        graph["source_counts"][source] = graph["source_counts"].get(source, 0) + 1
+        kind = {"读": "read", "写": "write"}.get(relation)
+        status = tr.get("relation_status")
+        a, b = tr.get("from"), tr.get("to")
+        left, right = tr.get("causal_from"), tr.get("causal_to")
+        reason = None
+        if bound is not True:
+            reason = "identity_unbound"
+        elif tree.get("mode") != "via":
+            reason = "legacy_unrecorded"
+        elif source == "search":
+            reason = "search"
+        elif source != "declared":
+            reason = "unverified_source"
+        elif a == b:
+            reason = "same_node"
+        elif kind is None or status not in ("true", "unknown"):
+            reason = "non_read_write"
+        elif tr.get("relation_source") != "ledger":
+            reason = "non_ledger_source"
+        elif any(nid not in nodes for nid in (a, b, left, right)):
+            reason = "invalid_endpoint"
+        elif {a, b} != {left, right} or (nodes[left]["kind"], nodes[right]["kind"]) != (
+                ("file", "agent") if kind == "read" else ("agent", "file")):
+            reason = "invalid_direction"
+        elif a not in opened or (tr.get("step"), b) not in opened_steps:
+            reason = "unverified_visit"
+        evidence = []
+        if reason is None:
+            aid = nodes[right if kind == "read" else left]["key"]
+            evidence = [e for e in tr.get("relation_evidence") or [] if located(e, aid, kind, status)]
+            if not evidence:
+                reason = "unlocated_evidence"
+        if reason is not None:
+            graph["excluded"].append({"step": tr.get("step"), "from": a, "to": b, "reason": reason})
+            continue
+        key = (left, right, kind, status)
+        if key not in merged:
+            merged[key] = {"id": "rw-" + str(len(merged) + 1), "from": left, "to": right,
+                           "kind": kind, "status": status, "source_of_claim": "ledger",
+                           "label": ("账本·" if status == "true" else "候选·") + relation,
+                           "notes": [], "evidence": [], "steps": [], "semantic_checked": False}
+        edge = merged[key]
+        if tr.get("step") not in edge["steps"]:
+            edge["steps"].append(tr.get("step"))
+        for note in (tr.get("relation_label"), tr.get("relation_note")):
+            if note and note not in edge["notes"]:
+                edge["notes"].append(note)
+        for e in evidence:
+            if e not in edge["evidence"]:
+                edge["evidence"].append(deepcopy(e))
+        graph["counts"]["projected_transitions"] += 1
+    graph["edges"] = list(merged.values())
+    graph["counts"].update(edges=len(merged), excluded_transitions=len(graph["excluded"]))
+    for edge in graph["edges"]:
+        graph["counts"][("confirmed_" if edge["status"] == "true" else "candidate_") + edge["kind"]] += 1
+    return graph
 
 
 def _rejected(text: str) -> bool:

@@ -136,12 +136,17 @@ def test_unlinked_nodes_go_to_their_own_column(tmp_path: Any) -> None:
     assert probe.probe_payload(led, d)["trajectory"] is None
 
 
-def test_fixchain_template_builds_ledger_edge_tree() -> None:
+def test_fixchain_template_separates_navigation_from_evidence_projection() -> None:
     from migloop.service import load_asset
     html = load_asset("fixchain.html")
-    for needle in ("probeBuildTrajectory(", "PROBE.trajectory", "node.traj", "不在根的上下游", "前一版", "XT.extra", "出现于",
-                   "XT.via", "wire via", "T.declared", "账本无此边", "XT.walk"):
+    for needle in ("probeBuildTrajectory(", "PROBE.trajectory", "node.traj", "PROBE.evidence_graph",
+                   "XT.evidenceEdges", '"navigation-timeline"', '"navigation-event"',
+                   'e.source_of_claim !== "ledger"', 'graph.identity_bound === true',
+                   'path.setAttribute("data-from", e.from)', 'path.setAttribute("data-to", e.to)',
+                   "if (XT.evidenceMode) return", "不是全账本图或完整根因图"):
         assert needle in html, needle
+    assert '(XT.transitions || []).forEach(function (e)' not in html
+    assert 'from = { x: to.x - NODE_W' not in html  # no fabricated search graph source
 
 
 def test_sighting_rules() -> None:

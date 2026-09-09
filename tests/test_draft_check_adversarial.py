@@ -26,35 +26,76 @@ def _saved_run(tmp_path, ledger, checked, displayed, *, raw=None, harness=None, 
     return run
 
 
-@pytest.mark.parametrize("raw_matches_display", [False, True])
-def test_final_hash_tracks_displayed_data_not_report_or_saved_raw(tmp_path, raw_matches_display):
+def test_valid_legacy_alternate_source_remains_separate_from_actual_draft_binding(tmp_path):
     ledger = _pool(tmp_path)
     checked = data(ledger)
     displayed = deepcopy(checked)
     displayed["defects"][0]["nodes"][0]["reason"] = "New assertion not submitted to check"
-    raw = json.dumps(displayed if raw_matches_display else checked)
+    raw = json.dumps(displayed)
     run = _saved_run(tmp_path, ledger, checked, displayed, raw=raw)
     payload = probe.probe_payload(ledger, run)
     assert payload["trace_identity"]["bound"] is True
     assert payload["structured"]["defects"][0]["nodes"][0]["reason"] == displayed["defects"][0]["nodes"][0]["reason"]
+    assert payload["structured"]["document_source"]["kind"] == "legacy_saved"
+    assert payload["structured"]["document_source"]["verified"] is False
+    assert payload["structured"]["document_source"]["raw_matches_data"] is True
+    assert payload["structured"]["submission"]["status"] == "legacy_unverified"
     assert payload["draft_check"]["checks"][0]["verified"] is True
     assert payload["draft_check"]["status"] == "mismatch"
     assert payload["draft_check"]["final_document_sha256"] == draft_check.document_hash(displayed)
 
 
-@pytest.mark.parametrize("raw_kind", ["different", "missing", "invalid"])
-def test_actual_displayed_checked_data_can_match_despite_unrelated_saved_raw(tmp_path, raw_kind):
+def test_unchecked_cached_interpretation_cannot_override_matching_raw_and_final(tmp_path):
+    ledger = _pool(tmp_path)
+    checked = data(ledger)
+    displayed = deepcopy(checked)
+    displayed["defects"][0]["nodes"][0]["reason"] = "Unbacked saved assertion"
+    raw = json.dumps(checked)
+    run = _saved_run(tmp_path, ledger, checked, displayed, raw=raw)
+    payload = probe.probe_payload(ledger, run)
+    assert payload["trace_identity"]["bound"] is True
+    assert payload["structured"]["errors"] and not payload["roles"]
+    assert not payload["structured"]["defects"] and payload["structured"]["raw"] == raw
+    assert payload["structured"]["document_source"]["raw_matches_data"] is False
+    assert payload["draft_check"]["status"] == "invalid_final"
+    assert payload["draft_check"]["final_document_sha256"] is None
+
+
+@pytest.mark.parametrize("raw_kind", ["different", "invalid"])
+def test_valid_checked_data_cannot_authenticate_conflicting_or_invalid_saved_raw(tmp_path, raw_kind):
     ledger = _pool(tmp_path)
     checked = data(ledger)
     other = deepcopy(checked)
     other["notes"] = "An older raw block is not the displayed document."
-    raw = {"different": json.dumps(other), "missing": None, "invalid": "{broken"}[raw_kind]
+    raw = {"different": json.dumps(other), "invalid": "{broken"}[raw_kind]
     run = _saved_run(tmp_path, ledger, checked, checked, raw=raw)
     payload = probe.probe_payload(ledger, run)
-    assert not payload["structured"]["errors"]
-    assert payload["draft_check"]["status"] == "matched"
+    assert payload["structured"]["errors"] and not payload["roles"]
+    assert not payload["structured"]["defects"]
+    assert payload["structured"]["document_source"]["kind"] == "invalid_saved"
+    assert payload["structured"]["document_source"]["verified"] is False
+    assert payload["draft_check"]["status"] == "invalid_final"
+    assert payload["draft_check"]["matched_check"] is None
     assert payload["draft_check"]["semantic_checked"] is False
     assert payload["structured"]["raw"] == raw  # No repair or rewriting of saved artifacts.
+
+
+def test_missing_cached_raw_uses_matching_actual_final_without_writing_artifacts(tmp_path):
+    ledger = _pool(tmp_path)
+    checked = data(ledger)
+    run = Path(_saved_run(tmp_path, ledger, checked, checked, raw=None))
+    before = {path.name: path.read_bytes() for path in run.iterdir() if path.is_file()}
+    final = json.loads(before["result.json"])["result"]
+    original = verdict.load_block(final)["raw"]
+    payload = probe.probe_payload(ledger, str(run))
+    assert not payload["structured"]["errors"]
+    assert payload["structured"]["raw"] == original
+    assert payload["structured"]["document_source"]["kind"] == "final_inline"
+    assert payload["structured"]["document_source"]["verified"] is True
+    assert payload["structured"]["document_source"]["semantic_checked"] is False
+    assert payload["draft_check"]["status"] == "matched"
+    assert payload["draft_check"]["checks"][0]["verified"] is True
+    assert {path.name: path.read_bytes() for path in run.iterdir() if path.is_file()} == before
 
 
 def test_saved_harness_identity_conflict_cannot_bind_a_displayed_document(tmp_path):

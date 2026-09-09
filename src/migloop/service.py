@@ -652,134 +652,37 @@ def fixchain_html(path: str) -> str:
 # ═══════════════ 两原子端点(JSON / 文本) ═══════════════
 
 def _opt_int(args: dict[str, Any], key: str) -> int | None:
-    v = args.get(key)
-    if v is None or v == "":
-        return None
-    return int(v)
+    # Kept as a compatibility alias for callers outside the HTTP adapter.
+    from .atom_queries import optional_int
+    return optional_int(args, key)
 
 
 def _flag(args: dict[str, Any], key: str, default: str) -> bool:
-    return str(args.get(key, default)) not in ("0", "false", "")
+    from .atom_queries import boolean
+    return boolean(args.get(key, default), key)
 
 
 def atom_json(path: str, tool: str, args: dict[str, Any]) -> dict[str, Any] | None:
-    """index / file / agent / blame / action 的 JSON 形态。参数缺失抛 ValueError。"""
-    from . import time_scope
-
-    ledger = session_ledger(path)
-    if tool == "check":
-        from . import draft_check
-        return draft_check.evaluate(ledger, args.get("draft"), fixchain_payload(path), args.get("file"))
-    if tool in ("file", "agent") and _opt_int(args, "v") is not None:
-        from .via import target
-        _, error = target(ledger, tool, str(args.get("path" if tool == "file" else "id") or ""), _opt_int(args, "v"))
-        if error:
-            raise ValueError(error)
-    if tool == "index":
-        scope = time_scope.overview(ledger)
-        if args.get("kind") == "time":
-            return {"time_scope": scope}
-        return {**atoms.ledger_index(ledger), "time_scope": scope}
-    if tool == "file":
-        if not args.get("path"):
-            raise ValueError("path")
-        scope_only = _flag(args, "scope_only", "0")
-        result = atoms.file_atom(ledger, str(args["path"]), _opt_int(args, "v"),
-                                with_diff=not scope_only and _flag(args, "diff", "1"),
-                                with_content=not scope_only and _flag(args, "content", "1"))
-        if result is None:
-            return None
-        scope = time_scope.for_atom(ledger, "file", result)
-        return {"time_scope": scope} if scope_only else {**result, "time_scope": scope}
-    if tool == "agent":
-        if not args.get("id"):
-            raise ValueError("id")
-        result = atoms.agent_atom(ledger, str(args["id"]), _opt_int(args, "v"),
-                                  since=_opt_int(args, "since"))
-        if result is None:
-            return None
-        until = _opt_int(args, "until")
-        if until is not None:
-            from .atom_scope import agent_until
-            result = agent_until(ledger, result, until)
-        scope = result.get("time_scope") or time_scope.for_atom(ledger, "agent", result, until=until)
-        return {"time_scope": scope} if _flag(args, "scope_only", "0") else {**result, "time_scope": scope}
-    if tool == "blame":
-        if not args.get("path"):
-            raise ValueError("path")
-        return atoms.blame(ledger, str(args["path"]), _opt_int(args, "v"),
-                           _opt_int(args, "start"), _opt_int(args, "n"))
-    if tool == "action":
-        if not args.get("id") or args.get("seq") is None:
-            raise ValueError("id, seq")
-        return atoms.action_raw(ledger, str(args["id"]), int(args["seq"]))
-    raise ValueError(f"unknown atom tool: {tool}")
+    """Structured projection of the shared atom query; no navigation side effects."""
+    from . import atom_queries
+    return atom_queries.json_data(session_ledger(path), tool, args,
+                                  chains=fixchain_payload(path) if tool == "check" else None)
 
 
 def atom_text(path: str, tool: str, args: dict[str, Any]) -> str:
-    """MCP 工具的 HTTP 化身:同一套 atoms_text 渲染。"""
-    from . import mcp_server
-
+    """HTTP text projection uses the same renderer and parameters as MCP."""
+    from . import atom_queries, mcp_server
     if tool == "guide":
-        return mcp_server.GUIDE
-    cwd = session_cwd(path)
-    if tool == "sessions":
-        hint = args.get("path") or args.get("file") or None
-        ledger, payload = session_ledger(path), fixchain_payload(path)
-        out = atoms_text.render_chains(payload, root=cwd, file=hint, identity=atoms.ledger_identity(ledger))
-        from . import time_scope
-        out += "\n\n" + atoms_text.render_time_scope(time_scope.overview(ledger))
-        if hint:
-            out += "\n\n" + atoms_text.render_repair_manifest(ledger, payload, str(hint), root=cwd)
-        return out
-    ledger = session_ledger(path)
-    if tool == "check":
-        from . import draft_check
-        return draft_check.render(ledger, args.get("draft"), fixchain_payload(path), args.get("file"))
-    if tool in ("file", "agent") and _opt_int(args, "v") is not None:
-        from .via import target
-        _, error = target(ledger, tool, str(args.get("path" if tool == "file" else "id") or ""), _opt_int(args, "v"))
-        if error:
-            return error
-    if tool == "index":
-        return atoms_text.render_index(ledger, args.get("kind") or None, args.get("query") or None,
-                                       root=cwd, limit=_opt_int(args, "limit") or (300 if args.get("query") else 80))
-    if tool == "file" and args.get("path"):
-        return atoms_text.render_file(ledger, str(args["path"]), _opt_int(args, "v"), root=cwd,
-                                      content=_flag(args, "content", "0"),
-                                      diff=_flag(args, "diff", "0"),
-                                      start=_opt_int(args, "start"), n=_opt_int(args, "n"),
-                                      readers=_flag(args, "readers", "0"),
-                                      v_from=_opt_int(args, "v_from"), v_to=_opt_int(args, "v_to"),
-                                      diff_chars=_opt_int(args, "diff_chars"),
-                                      m_from=_opt_int(args, "m_from") or 1,
-                                      m_n=_opt_int(args, "m_n") if args.get("m_n") is not None else 0,
-                                      m_all=_flag(args, "m_all", "0"))
-    if tool == "agent" and args.get("id"):
-        return atoms_text.render_agent(ledger, str(args["id"]), _opt_int(args, "v"), root=cwd,
-                                       since=_opt_int(args, "since"), until=_opt_int(args, "until"),
-                                       reads=_flag(args, "reads", "1"), seen=_flag(args, "seen", "0"))
-    if tool == "blame" and args.get("path"):
-        return atoms_text.render_blame(ledger, str(args["path"]), _opt_int(args, "v"),
-                                       _opt_int(args, "start"), _opt_int(args, "n"), root=cwd,
-                                       changed=_flag(args, "changed", "0"))
-    if tool == "diff" and args.get("path") and args.get("v") is not None:
-        return atoms_text.render_diff(ledger, str(args["path"]), int(args["v"]), root=cwd)
-    if tool == "search" and (args.get("q") or args.get("kind")):
-        return atoms_text.render_search(ledger, str(args.get("q") or ""), agent=args.get("agent") or args.get("id") or None,
-                                        v=_opt_int(args, "v"), since=_opt_int(args, "since"),
-                                        file=args.get("file") or args.get("path") or None,
-                                        after=_flag(args, "after", "0"),
-                                        since_ts=args.get("since_ts") or None, until_ts=args.get("until_ts") or None,
-                                        root=cwd, kind=args.get("kind") or None)
-    if tool == "action" and args.get("id") and args.get("seq") is not None:
-        return atoms_text.render_action(ledger, str(args["id"]), int(args["seq"]),
-                                        max_chars=_opt_int(args, "max_chars") or 20000,
-                                        offset=_opt_int(args, "offset") or 0, find=str(args.get("find") or ""),
-                                        part=args.get("part") or None,
-                                        m_n=_opt_int(args, "m_n") or 0,
-                                        m_from=_opt_int(args, "m_from") or 1)
-    raise ValueError(f"未知工具或缺参数: {tool}")
+        return mcp_server.guide_text()
+    try:
+        return atom_queries.render_text(session_ledger(path), session_cwd(path), tool, args,
+            chains=fixchain_payload(path) if tool in ("sessions", "check") else None)
+    except ValueError as exc:
+        # Preserve explicit coordinate rejection text; malformed HTTP parameters
+        # remain 400 errors at the transport boundary.
+        if str(exc).startswith("⛔"):
+            return str(exc)
+        raise
 
 
 def file_diff(path: str, file: str, v: int) -> dict[str, Any] | None:

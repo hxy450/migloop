@@ -1,0 +1,235 @@
+"""Shared stateless atom queries. Transports own navigation, not evidence semantics.
+
+HTTP and MCP normalize the same query parameters and select the same scoped atom
+data. JSON is the structured projection; text adds presentation budgets. No query
+here opens a node, issues a search receipt, changes the ledger, or writes a report.
+"""
+from __future__ import annotations
+
+import re
+from typing import Any
+
+from . import atoms, time_scope
+
+
+_INTS = frozenset({"v", "since", "until", "start", "n", "v_from", "v_to", "diff_chars",
+                   "m_from", "m_n", "max_chars", "offset", "seq", "limit"})
+_BOOLS = frozenset({"content", "diff", "readers", "m_all", "reads", "seen", "after", "scope_only", "changed"})
+_DEFAULTS: dict[str, dict[str, Any]] = {
+    "sessions": {"file": None},
+    "index": {"kind": None, "query": None, "limit": 0},
+    "file": {"path": None, "v": None, "content": False, "diff": False, "start": None, "n": None,
+             "readers": False, "v_from": None, "v_to": None, "diff_chars": None,
+             "m_from": 1, "m_n": 0, "m_all": False, "scope_only": False},
+    "agent": {"id": None, "v": None, "since": None, "until": None, "reads": None, "seen": False,
+              "scope_only": False},
+    "blame": {"path": None, "v": None, "start": None, "n": None, "changed": False},
+    "diff": {"path": None, "v": None},
+    "search": {"q": "", "agent": None, "v": None, "since": None, "file": None, "after": False,
+               "since_ts": None, "until_ts": None, "kind": None},
+    "action": {"id": None, "seq": None, "max_chars": 20000, "offset": 0, "find": "", "part": None,
+               "m_n": 0, "m_from": 1},
+    "check": {"draft": None, "file": None},
+}
+_REQUIRED = {"file": ("path",), "agent": ("id",), "blame": ("path",),
+             "diff": ("path", "v"), "action": ("id", "seq")}
+
+
+def optional_int(args: dict[str, Any], key: str) -> int | None:
+    value = args.get(key)
+    if value is None or value == "":
+        return None
+    if type(value) is int:
+        return value
+    if isinstance(value, str) and re.fullmatch(r"[+-]?\d+", value.strip()):
+        return int(value)
+    raise ValueError(f"{key} 必须是整数")
+
+
+def boolean(value: Any, key: str) -> bool:
+    if type(value) is bool:
+        return value
+    if type(value) is int and value in (0, 1):
+        return bool(value)
+    if isinstance(value, str):
+        if value.strip().lower() in ("true", "1"):
+            return True
+        if value.strip().lower() in ("false", "0", ""):
+            return False
+    raise ValueError(f"{key} 必须是布尔值(true/false 或 1/0)")
+
+
+def parameters(tool: str, supplied: dict[str, Any]) -> dict[str, Any]:
+    if tool not in _DEFAULTS:
+        raise ValueError(f"未知工具: {tool}")
+    values = dict(supplied)
+    # Retain documented HTTP aliases while the canonical core has one name.
+    aliases = {"sessions": {"path": "file"}, "search": {"id": "agent", "path": "file"}}.get(tool, {})
+    for alias, canonical in aliases.items():
+        if alias in values:
+            if canonical in values and values[canonical] not in (None, "") and values[canonical] != values[alias]:
+                raise ValueError(f"{canonical} 与别名 {alias} 冲突")
+            if values.get(canonical) in (None, ""):
+                values[canonical] = values[alias]
+            del values[alias]
+    unknown = set(values) - set(_DEFAULTS[tool])
+    if unknown:
+        raise ValueError("未知查询参数: " + ", ".join(sorted(unknown)))
+    out = dict(_DEFAULTS[tool])
+    for key, value in values.items():
+        if key in _INTS:
+            parsed = optional_int(values, key)
+            out[key] = out[key] if parsed is None else parsed
+        elif key in _BOOLS:
+            out[key] = None if key == "reads" and value is None else boolean(value, key)
+        else:
+            if value is not None and not isinstance(value, str):
+                raise ValueError(f"{key} 必须是字符串")
+            out[key] = value if value is not None else out[key]
+    for key in _REQUIRED.get(tool, ()):
+        if out[key] is None or out[key] == "":
+            raise ValueError(key)
+    return out
+
+
+def validate_target(ledger: atoms.Ledger, tool: str, args: dict[str, Any]) -> None:
+    if tool in ("file", "agent") and args.get("v") is not None:
+        from .via import target
+        _, error = target(ledger, tool, str(args["path" if tool == "file" else "id"]), args["v"])
+        if error:
+            raise ValueError(error)
+
+
+def validate_file_window(anchor: int, v_from: int | None, v_to: int | None) -> None:
+    if ((v_from is not None and (v_from < 1 or v_from > anchor))
+            or (v_to is not None and (v_to < 1 or v_to > anchor))
+            or (v_from is not None and v_to is not None and v_from > v_to)):
+        raise ValueError(f"⛔ diff 窗口必须满足 1 ≤ v_from ≤ v_to ≤ 查询锚点 v{anchor};未执行查询。")
+
+
+def file_data(ledger: atoms.Ledger, path: str, v: int | None = None, *,
+              content: bool = False, diff: bool = False) -> dict[str, Any] | None:
+    data = atoms.file_atom(ledger, path, v, with_content=content, with_diff=diff)
+    if data is not None:
+        data = {**data, "time_scope": time_scope.for_atom(ledger, "file", data)}
+    return data
+
+
+def agent_data(ledger: atoms.Ledger, aid: str, v: int | None = None, *,
+               since: int | None = None, until: int | None = None) -> dict[str, Any] | None:
+    # Apply the authenticated completion-time boundary before the version-window
+    # projection. Earlier inputs remain an index, not an inference of relevance.
+    data = atoms.agent_atom(ledger, aid, v)
+    if data is None:
+        return None
+    if until is not None:
+        from .atom_scope import agent_until
+        data = agent_until(ledger, data, until)
+    prior = [a for a in data["actions"] if since is not None and
+             (a["ver"] if a["ver"] is not None else a["at"]) <= since]
+    prior_seqs = {a["seq"] for a in prior}
+    prior_reads = [r for r in data["reads"] if r["seq"] in prior_seqs]
+    counts = {"reads": len(prior_reads), "inbox": 0, "inject": 0, "instruction": 0, "other": 0}
+    for action in prior:
+        if action["ver"] is None and action["kind"] != "read":
+            key = action["kind"] if action["kind"] in ("inbox", "inject", "instruction") else "other"
+            counts[key] += 1
+    data["input_scope"] = {
+        "schema": "migloop-input-scope/1", "anchor": f"agent:{data['id']}@v{data['v']}",
+        "since": since, "until": until, "omitted_prior": counts,
+        "prior_read_preview": [
+            {key: r.get(key) for key in ("path", "v", "seq", "at", "via", "dep", "certain", "proof")}
+            for r in prior_reads[:8]],
+        "prior_read_remaining": max(0, len(prior_reads) - 8),
+        "prior_query": {"id": data["id"], "v": min(since, data["v"]), "reads": True}
+                       if since is not None and since > 0 and prior else None,
+        "prompt_chars": len(data.get("prompt") or ""),
+        "prompt_in_body": since is None,
+        "scope_complete": False,
+        "note": "仅索引已记录且通过当前时间截止的输入；早期输入不因本窗口省略而不存在，"
+                "也不因此被证明与当前缺陷有关。展开早期窗口不继承本次 until，须另核完成时刻。",
+    }
+    if since is not None:
+        data = {**data, "since": since,
+                "actions": [a for a in data["actions"] if a["seq"] not in prior_seqs],
+                "reads": [r for r in data["reads"] if r["seq"] not in prior_seqs],
+                "writes": [w for w in data["writes"] if w.get("ver") is None or w["ver"] > since],
+                "children": [c for c in data["children"] if c["ver"] > since],
+                "inbox": [m for m in data["inbox"] if m["seq"] not in prior_seqs]}
+    return {**data, "time_scope": data.get("time_scope") or time_scope.for_atom(ledger, "agent", data, until=until)}
+
+
+def render_text(ledger: atoms.Ledger, root: str, tool: str, supplied: dict[str, Any], *,
+                chains: dict[str, Any] | None = None, navigation_hits: list[dict[str, Any]] | None = None) -> str:
+    from . import atoms_text, draft_check
+    args = parameters(tool, supplied)
+    validate_target(ledger, tool, args)
+    if tool == "sessions":
+        if chains is None:
+            raise ValueError("sessions 需要链清单")
+        out = atoms_text.render_chains(chains, root=root, file=args["file"], identity=atoms.ledger_identity(ledger))
+        out += "\n\n" + atoms_text.render_time_scope(time_scope.overview(ledger))
+        if args["file"]:
+            out += "\n\n" + atoms_text.render_repair_manifest(ledger, chains, args["file"], root=root)
+        return out
+    if tool == "index":
+        return atoms_text.render_index(ledger, args["kind"], args["query"], root=root,
+                                       limit=args["limit"] or (300 if args["query"] else 80))
+    if tool == "file":
+        if args.pop("scope_only"):
+            data = file_data(ledger, args["path"], args["v"])
+            return atoms_text.render_time_scope(data["time_scope"]) if data else "账本里没有该文件"
+        return atoms_text.render_file(ledger, args.pop("path"), root=root, **args)
+    if tool == "agent":
+        if args.pop("scope_only"):
+            data = agent_data(ledger, args["id"], args["v"], since=args["since"], until=args["until"])
+            return atoms_text.render_time_scope(data["time_scope"]) if data else "账本里没有该 agent"
+        return atoms_text.render_agent(ledger, args.pop("id"), root=root, **args)
+    if tool == "blame":
+        return atoms_text.render_blame(ledger, args.pop("path"), root=root, **args)
+    if tool == "diff":
+        return atoms_text.render_diff(ledger, args["path"], args["v"], root=root)
+    if tool == "search":
+        return atoms_text.render_search(ledger, root=root, navigation_hits=navigation_hits, **args)
+    if tool == "action":
+        return atoms_text.render_action(ledger, args.pop("id"), **args)
+    if tool == "check":
+        return draft_check.render(ledger, args["draft"], chains, args["file"])
+    raise ValueError(f"未知文本投影: {tool}")
+
+
+def json_data(ledger: atoms.Ledger, tool: str, supplied: dict[str, Any], *,
+              chains: dict[str, Any] | None = None) -> dict[str, Any] | None:
+    args = parameters(tool, supplied)
+    validate_target(ledger, tool, args)
+    # JSON exposes raw structured collections, not text pagination. Never accept
+    # a text window and then quietly send a larger raw body to its caller.
+    supported = {
+        "index": {"kind"}, "file": {"path", "v", "content", "diff", "scope_only"},
+        "agent": {"id", "v", "since", "until", "scope_only"},
+        "blame": {"path", "v", "start", "n", "changed"},
+        "action": {"id", "seq"}, "check": {"draft", "file"},
+    }
+    unsupported = set(supplied) - supported.get(tool, set())
+    if unsupported:
+        raise ValueError("JSON 投影不支持这些展示参数，请用文本投影: " + ", ".join(sorted(unsupported)))
+    if tool == "index":
+        if args["kind"] not in (None, "", "time"):
+            raise ValueError("JSON index 只支持完整目录或 kind=time，分类/检索请用文本投影")
+        scope = time_scope.overview(ledger)
+        return {"time_scope": scope} if args["kind"] == "time" else {**atoms.ledger_index(ledger), "time_scope": scope}
+    if tool == "file":
+        data = file_data(ledger, args["path"], args["v"], content=args["content"] and not args["scope_only"],
+                         diff=args["diff"] and not args["scope_only"])
+        return {"time_scope": data["time_scope"]} if data and args["scope_only"] else data
+    if tool == "agent":
+        data = agent_data(ledger, args["id"], args["v"], since=args["since"], until=args["until"])
+        return {"time_scope": data["time_scope"]} if data and args["scope_only"] else data
+    if tool == "blame":
+        return atoms.blame(ledger, args["path"], args["v"], args["start"], args["n"], changed=args["changed"])
+    if tool == "action":
+        return atoms.action_raw(ledger, args["id"], args["seq"])
+    if tool == "check":
+        from . import draft_check
+        return draft_check.evaluate(ledger, args["draft"], chains, args["file"])
+    raise ValueError(f"工具无 JSON 投影: {tool}")

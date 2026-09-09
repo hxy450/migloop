@@ -103,7 +103,7 @@ def test_http_and_text_cutoff_do_not_leak_late_read_body(monkeypatch):
     monkeypatch.setattr(service, "session_ledger", lambda _: ledger)
     monkeypatch.setattr(service, "session_cwd", lambda _: "/proj")
     args = {"id": AID, "v": 3, "until": 3, "seen": True}
-    data = service.atom_json("unused", "agent", args)
+    data = service.atom_json("unused", "agent", {k: v for k, v in args.items() if k != "seen"})
     text = service.atom_text("unused", "agent", args)
     assert data["reads"] == [] and data["children"] == []
     assert [r["v"] for r in data["writes"]] == [1]

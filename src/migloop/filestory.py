@@ -22,6 +22,8 @@
 
 from __future__ import annotations
 
+from .evidence import FileProof
+
 import difflib
 import heapq
 import re
@@ -83,6 +85,7 @@ class Ev:
     conditional: bool = False       # 命令在 && / || 的条件分支里:前件成败未知,这一步是否执行了也未知
     use_ts: str | None = None       # 实际调用发起时刻;read 的采集瞬间只能落在调用区间内,不是返回时刻
     done_ts: str | None = None      # 实际完成时刻;旧事件缺字段时保留原有点事件语义
+    proof: FileProof | None = None  # 操作/执行/观测证明,不等于版本绑定 certain
 
 
 @dataclass
@@ -105,6 +108,7 @@ class Version:
     batch: int = 0                  # source=generated:同一批运行生成的文件数
     conditional: bool = False       # 写它的命令在条件分支里(评审反例 false && cp:记了,但不当事实)
     state_gap: bool = False         # 此前有未证实效应,两端同文也只能跨断点推定
+    proof: FileProof | None = None
 
 
 @dataclass
@@ -122,6 +126,7 @@ class ReadRec:
     via: str = "tool"         # 来路:tool | shell | script(字面量推断)—— 幽灵路径清理只看 script 来的读
     use_ts: str | None = None  # 读取请求发起时刻;ts 仍为结果可用时刻
     observation_uncertain: bool = False  # 采集窗口与写/候选效应重叠,不允许将返回当作该时刻的状态快照
+    proof: FileProof | None = None
 
 
 @dataclass
@@ -234,7 +239,7 @@ def build_stories(events: list[Ev]) -> dict[str, FileStory]:
         v = Version(v=len(st.versions) + 1, ts=e.ts, seq=e.seq, by=by,
                     source=source, content=content, diff=diff, diff_kind=diff_kind,
                     by_ver=e.aver if own else None, via=e.via if own else "observe",
-                    stage=e.stage if own else None, conditional=e.conditional if own else False)
+                    stage=e.stage if own else None, conditional=e.conditional if own else False, proof=e.proof)
         st.versions.append(v)
         return v
 
@@ -309,7 +314,7 @@ def build_stories(events: list[Ev]) -> dict[str, FileStory]:
             src_st.reads.append(ReadRec(e.ts, e.seq, e.agent,
                                         len(src_st.versions), None, None,
                                         src_s.content is not None and not overlap, dep=True,
-                                        use_ts=e.use_ts, observation_uncertain=overlap))
+                                        use_ts=e.use_ts, observation_uncertain=overlap, proof=e.proof))
             if src_s.content is not None and not overlap:
                 write_known(st, s, e, src_s.content, "derived")
             else:
@@ -443,7 +448,7 @@ def build_stories(events: list[Ev]) -> dict[str, FileStory]:
                     certain = False
             st.reads.append(ReadRec(e.ts, e.seq, e.agent, self_read_version,
                                     e.start, e.n, certain, e.dep, seen=e.seen, full=e.full, via=e.via,
-                                    use_ts=e.use_ts, observation_uncertain=observation_uncertain))
+                                    use_ts=e.use_ts, observation_uncertain=observation_uncertain, proof=e.proof))
         else:
             raise ValueError(f"未知事件类型: {e.kind}")
     return stories

@@ -24,15 +24,16 @@ def test_script_write_and_unparsed_execution_effects_coexist() -> None:
     assert capable and hints["unknown_scripts"] == ["/tmp/patch_mask.py"]
     assert [(op.op, op.path, op.content) for op in parsed] == [("write", "/tmp/patch_mask.py", BODY)]
     ops, detail = file_ops(WRITE_AND_RUN)
-    assert [(op.op, op.path, op.content) for op in ops] == [("write", "/tmp/patch_mask.py", BODY)]
+    assert ops == [] and detail["effect_candidates"] == ["/tmp/patch_mask.py"]
     assert detail["unknown_scripts"] == ["/tmp/patch_mask.py"]
     assert "脚本执行效应未解析" in detail["unresolved"]
-    assert detail["write_capable"] is True and not detail.get("touched")
+    assert detail["write_capable"] is True and detail["touched"] == ["/tmp/patch_mask.py"]
 
 
 def test_known_read_does_not_hide_unknown_external_script() -> None:
     ops, detail = file_ops("cat /proj/input.md; python3 /tmp/external.py")
-    assert [(op.op, op.path) for op in ops] == [("read", "/proj/input.md")]
+    assert ops == [] and detail["read_candidates"][0]["path"] == "/proj/input.md"
+    assert detail["read_candidates"][0]["proof"]["execution"] == "unknown"
     assert detail["unknown_scripts"] == ["/tmp/external.py"]
     assert "脚本执行效应未解析" in detail["unresolved"]
 
@@ -80,9 +81,10 @@ def test_collection_keeps_uncertainty_without_inventing_target_writer_or_version
     ledger = atoms.build_ledger(atoms_collect.collect_cc(str(root), seq=[0]))
     actions = [act for agent in ledger.agents.values() for act in agent.actions if act.tool == "Bash"]
     assert len(actions) == 1 and "脚本执行效应未解析" in actions[0].detail["unresolved"]
-    assert [(ref.op, ref.path) for ref in actions[0].files] == [("write", "/tmp/patch_mask.py")]
+    assert actions[0].files == [] and actions[0].detail["effect_candidates"] == ["/tmp/patch_mask.py"]
     assert set(ledger.stories) == {"/tmp/patch_mask.py"}
-    assert [version.content for version in ledger.stories["/tmp/patch_mask.py"].versions] == [BODY]
+    assert not ledger.stories["/tmp/patch_mask.py"].versions
+    assert ledger.stories["/tmp/patch_mask.py"].touches
 
 
 def codex_wrapper(*commands: str) -> str:
@@ -155,6 +157,7 @@ def test_codex_collection_preserves_unknown_effect_without_target_version(tmp_pa
     assert len(actions) == 1 and actions[0].ok and actions[0].tuid == "wrapper-real-call"
     assert actions[0].detail["unknown_scripts"] == ["/tmp/patch_mask.py"]
     assert "脚本执行效应未解析" in actions[0].detail["unresolved"]
-    assert [(ref.op, ref.path) for ref in actions[0].files] == [("write", "/tmp/patch_mask.py")]
-    assert [version.content for version in ledger.stories["/tmp/patch_mask.py"].versions] == [BODY]
+    assert actions[0].files == [] and actions[0].detail["effect_candidates"] == ["/tmp/patch_mask.py"]
+    assert not ledger.stories["/tmp/patch_mask.py"].versions
+    assert ledger.stories["/tmp/patch_mask.py"].touches
     assert not any(story.versions for path, story in ledger.stories.items() if path != "/tmp/patch_mask.py")

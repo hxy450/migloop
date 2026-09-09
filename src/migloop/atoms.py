@@ -25,6 +25,8 @@ from datetime import datetime
 from functools import cache
 from typing import Any
 
+from migloop.evidence import FileProof, proof_payload
+
 from migloop.filestory import (
     EXTERNAL,
     OUTBAND,
@@ -50,6 +52,10 @@ class FileRef:
     v: int | None = None
     certain: bool = True       # 读:版本是实锤还是状态未知时的就近绑定(build 后回填)
     observation_uncertain: bool = False  # 调用窗口与写入重叠,快照取得时刻无法确定
+
+    @property
+    def proof(self) -> FileProof | None:
+        return self.ev.proof
 
 
 @dataclass
@@ -149,14 +155,14 @@ class Ledger:
     _identity: str | None = field(default=None, init=False, repr=False)
 
 
-LEDGER_CODE_VERSION = "atoms-2026-09-09-observation4"
+LEDGER_CODE_VERSION = "atoms-2026-09-09-file-evidence5"
 
 
 @cache
 def _builder_fingerprint() -> str:
     """构建器代码内容摘要,进程内一次;换机器或换行格式不改变它。"""
     h = hashlib.sha256()
-    for name in ("atoms.py", "atoms_collect.py", "filestory.py", "filestory_collect.py", "shellparse.py", "audit.py"):
+    for name in ("atoms.py", "atoms_collect.py", "filestory.py", "filestory_collect.py", "shellparse.py", "audit.py", "evidence.py"):
         h.update(name.encode("ascii"))
         path = os.path.join(os.path.dirname(__file__), name)
         with open(path, "rb") as fh:
@@ -202,12 +208,12 @@ def ledger_identity(ledger: Ledger) -> str:
             for ref in act.files:
                 add(["ref", ref.op, ref.path, ref.v, ref.certain, ref.ev.dep, ref.ev.conditional,
                      ref.ev.start, ref.ev.n, ref.ev.full, ref.ev.seen, digest(ref.ev.content),
-                     ref.ev.use_ts, ref.ev.done_ts, ref.observation_uncertain])
+                     ref.ev.use_ts, ref.ev.done_ts, ref.observation_uncertain, proof_payload(ref.proof)])
     for path, story in sorted(ledger.stories.items()):
         add(["file", path])
         for ver in story.versions:
             add(["version", ver.v, ver.ts, ver.seq, ver.by, ver.by_ver, ver.act_seq, ver.source, ver.via,
-                 ver.conditional, ver.state_gap, digest(ver.content), digest(ver.partial), digest(ver.diff)])
+                 ver.conditional, ver.state_gap, digest(ver.content), digest(ver.partial), digest(ver.diff), proof_payload(ver.proof)])
     ledger._identity = f"{LEDGER_CODE_VERSION}:{len(ledger.tag_paths)}:{h.hexdigest()[:24]}"
     return ledger._identity
 
@@ -380,7 +386,8 @@ def build_ledger(agents: dict[str, AgentRec]) -> Ledger:
     for a in agents.values():
         for act in a.actions:
             # 必须先进入重建引擎,不能 build_stories 后才补一条展示用虚线。
-            candidates = set(act.detail.get("conditional") or []) | set(act.detail.get("touched") or [])
+            candidates = (set(act.detail.get("conditional") or []) | set(act.detail.get("touched") or [])
+                          | set(act.detail.get("effect_candidates") or []))
             for p in candidates:
                 events.append(Ev(act.ts, act.seq, "candidate", p, a.id, stage=act.stage,
                                  use_ts=act.ts, done_ts=act.done_ts))
@@ -427,16 +434,23 @@ def build_ledger(agents: dict[str, AgentRec]) -> Ledger:
                 ref.v = index.get((ref.path, ref.ev.seq))
                 if ref.op == "read":
                     feeds[(ref.path, ref.ev.seq)] = act.at
-                    ref.certain = certain.get((ref.path, ref.ev.seq), True)
+                    ref.certain = certain.get((ref.path, ref.ev.seq), False)
                     ref.observation_uncertain = observation_uncertain.get((ref.path, ref.ev.seq), False)
                     read_act[(ref.path, ref.ev.seq)] = act.seq
                 else:
                     act_seq[(ref.path, ref.ev.seq)] = act.seq
             # 脚本碰过但方向不明的路径:不立版本,挂到文件原子上(没写过的文件也进目录),指针指回这次调用
             for p in act.detail.get("touched") or []:
+                if p in (act.detail.get("conditional") or []):
+                    continue  # same candidate compatibility alias; retain the more precise reason below
                 st = stories.setdefault(p, FileStory(p))
                 st.touches.append(Touch(act.ts, act.seq, a.id, act.ver if act.ver is not None else act.at,
                                         str(act.detail.get("unresolved") or "方向不明"), act.stage))
+            for p in (set(act.detail.get("effect_candidates") or []) - set(act.detail.get("touched") or [])
+                      - set(act.detail.get("conditional") or [])):
+                st = stories.setdefault(p, FileStory(p))
+                st.touches.append(Touch(act.ts, act.seq, a.id, act.ver if act.ver is not None else act.at,
+                                        "语法识别的可能效应,执行未知", act.stage))
             # 条件分支里的效应:不进正式状态(评审反例:false && 写 A,文件没变,账本却多出一版和一次「实录外修改」),记候选
             for p in act.detail.get("conditional") or []:
                 st = stories.setdefault(p, FileStory(p))
@@ -446,11 +460,20 @@ def build_ledger(agents: dict[str, AgentRec]) -> Ledger:
                 st = stories.setdefault(p, FileStory(p))
                 st.touches.append(Touch(act.ts, act.seq, a.id, act.at,
                                         "条件分支,读取未获证实(不是已见输入)", act.stage))
+            for candidate in act.detail.get("read_candidates") or []:
+                if candidate["path"] in (act.detail.get("conditional_reads") or []):
+                    continue
+                st = stories.setdefault(candidate["path"], FileStory(candidate["path"]))
+                st.touches.append(Touch(act.ts, act.seq, a.id, act.at,
+                                        "输出定位线索,读取执行未获证实(非确定正文读)", act.stage))
             # 存在性守卫里探过的路径:文件当时可能不存在,只留指针
             for p in act.detail.get("probed") or []:
                 st = stories.setdefault(p, FileStory(p))
                 st.touches.append(Touch(act.ts, act.seq, a.id, act.ver if act.ver is not None else act.at,
                                         "存在性探测,内容未进上下文", act.stage))
+            for p in act.detail.get("script_mentions") or []:
+                stories.setdefault(p, FileStory(p))  # Navigation only: no version, author, read or state barrier.
+    _sweep_phantoms(stories)  # New mention/probe-only paths must not reintroduce basename ghosts.
     # 目录级线索:建了目录 / --out 指到目录 / 脚本正文写着这个目录 的运行,该目录下首见即外部的文件挂
     # 「可能由此次运行生成」—— 只看首见之前的运行(生成后几小时才被读是常态),最近的 3 次,不立版本不猜
     runs_by_dir: dict[str, list[tuple[str, str, Action]]] = {}
@@ -970,6 +993,7 @@ def file_atom(ledger: Ledger, hint: str, v: int | None = None,
             "gen_runs": list(ver.gen_runs), "batch": ver.batch,
             "diff_kind": ver.diff_kind, "sealed": ver.sealed, "conditional": ver.conditional,
             "state_gap": ver.state_gap,
+            "proof": proof_payload(ver.proof),
             "lines": len(ver.content.splitlines()) if ver.content else None,   # 末尾换行不算一行
             "has_diff": ver.diff is not None,
             "content_known": ver.content is not None,
@@ -986,7 +1010,7 @@ def file_atom(ledger: Ledger, hint: str, v: int | None = None,
                 "start": r.start, "n": r.n, "dep": r.dep, "certain": r.certain,
                 "use_ts": r.use_ts, "done_ts": r.ts, "observation_uncertain": r.observation_uncertain,
                 "seen": [list(x) for x in r.seen] if r.seen else None,
-                "seen_n": len(r.seen or ()), "full": r.full}
+                "seen_n": len(r.seen or ()), "full": r.full, "proof": proof_payload(r.proof)}
                for r in st.reads]
     for reader in readers:
         # A read after the final effect is a real observation but its feeding
@@ -1078,7 +1102,7 @@ def file_ref_payload(ref: FileRef) -> dict[str, Any]:
             "full": ref.ev.full, "start": ref.ev.start, "n": ref.ev.n,
             "seen": [list(x) for x in ref.ev.seen] if ref.ev.seen else None,
             "use_ts": ref.ev.use_ts, "done_ts": ref.ev.done_ts,
-            "observation_uncertain": ref.observation_uncertain}
+            "observation_uncertain": ref.observation_uncertain, "proof": proof_payload(ref.proof)}
 
 
 def action_links(ledger: Ledger, agent_id: str, seq: int) -> dict[str, Any]:
@@ -1163,7 +1187,7 @@ def agent_atom(ledger: Ledger, agent_id: str, v: int | None = None,
                     "latest_v": latest,
                     "stale": bool(latest is not None and ref.v is not None and ref.v < latest),
                 })
-            else:
+            elif ref.op != "read":
                 writes.append({"ts": ref.ev.ts, "t": rel_time(ref.ev.ts, ledger.t0),
                                "path": ref.path, "v": ref.v, "op": ref.op,
                                "ver": act.ver, "via": ref.ev.via})

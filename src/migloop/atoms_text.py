@@ -82,7 +82,7 @@ def _read_tags(r: dict[str, Any]) -> str:
     if r.get("dep"):
         t.append("依赖读")
     if r.get("self_written"):
-        t.append("写前读")
+        t.append("同 agent 也写过")
     if r.get("via") == "script":
         t.append("脚本读")
     elif r.get("via") == "inject":
@@ -95,6 +95,11 @@ def _read_tags(r: dict[str, Any]) -> str:
         t.append("读写窗口重叠,观测时刻未确认")
     if r.get("availability_basis") in ("input", "dependency"):
         t.append("工具输入/依赖线索,不是返回读回")
+    proof = r.get("proof")
+    if isinstance(proof, dict) and proof.get("execution") != "confirmed":
+        t.append("读取执行依据未核")
+    elif isinstance(proof, dict) and not r.get("dep") and proof.get("delivery") != "content":
+        t.append("正文交付未核")
     return f" [{' '.join(t)}]" if t else ""
 
 
@@ -262,8 +267,11 @@ def _evidence_label(vv: dict[str, Any]) -> str:
     """每一版凭什么:工具写/Edit 是「报告成功」(工具说成功,内容是请求的正文);heredoc / ast / cp / 黑盒是「推导」
     (满足执行条件才有这个变换);快照、首见、实录外是「观测」。证据强弱按断言,不按来路一刀切。"""
     src, via, known = vv.get("source"), vv.get("via"), bool(vv.get("content_known"))
+    proof = vv.get("proof") or {}
+    if src in ("full", "delta", "derived", "opaque", "delete") and proof.get("execution") != "confirmed":
+        return "历史操作执行依据未核 · " + str(src)
     if src == "full":
-        return "工具写·报告成功" if via == "tool" else ("推导·heredoc 全文" if via == "shell" else "推导·脚本字面量全文")
+        return "工具写·报告成功" if via == "tool" else ("推导·heredoc 全文" if via == "shell" else "推导·受支持脚本全文")
     if src == "delta":
         return "Edit·报告成功" if via == "tool" else "推导·ast 读改写"
     if src == "derived":
@@ -294,7 +302,8 @@ def render_file(ledger: atoms.Ledger, hint: str, v: int | None = None, root: str
                 m_from: int = 1, m_n: int = 40, m_all: bool = False) -> str:
     """默认只给写者脊柱与碰过:单根往上追看的是写者。读者是下游,归并阶段才用(指南漏条款波及了哪些页),
     默认一行计数,readers=True 展开;按词找读者用 search(file=)。"""
-    fa = atoms.file_atom(ledger, hint, v, with_diff=diff, with_content=content)
+    from .atom_queries import file_data
+    fa = file_data(ledger, hint, v, diff=diff, content=content)
     if fa is None:
         return "\n".join([f"账本里没有该文件: {hint}", *_scan_note(ledger)])
     anchor = fa["v"]
@@ -302,7 +311,7 @@ def render_file(ledger: atoms.Ledger, hint: str, v: int | None = None, root: str
     lines = ledger.locs
     out = [f"# 文件 {rel(fa['path'], root)} @v{anchor}  (共 {fa['n_versions']} 版)"]
     out.append(f"完整路径: {fa['path']}")
-    out.append(render_time_scope(time_scope.for_atom(ledger, "file", fa)))
+    out.append(render_time_scope(fa["time_scope"]))
     out += _scan_note(ledger)
     if vv_anchor is not None:
         out.append("这一版内容: " + ("可复原" if vv_anchor["content_known"]
@@ -313,10 +322,11 @@ def render_file(ledger: atoms.Ledger, hint: str, v: int | None = None, root: str
         out.append(f"⚠ 断点 {b['kind']} @ {b['ts'][:19]}: {b['detail']}")
     # v 是查询锚点;v_from/v_to 仅选择锚点以内的 diff 窗口,不能偷偷换锚点。
     log = diff and (v is None or v_from is not None or v_to is not None)
-    if ((v_from is not None and (v_from < 1 or v_from > anchor))
-            or (v_to is not None and (v_to < 1 or v_to > anchor))
-            or (v_from is not None and v_to is not None and v_from > v_to)):
-        return f"⛔ diff 窗口必须满足 1 ≤ v_from ≤ v_to ≤ 查询锚点 v{anchor};未执行查询。"
+    from .atom_queries import validate_file_window
+    try:
+        validate_file_window(anchor, v_from, v_to)
+    except ValueError as exc:
+        return str(exc)
     lo_v = max(v_from or 1, 1)
     hi_v = min(v_to or (lo_v + 39), anchor) if log else anchor
     if log:
@@ -483,27 +493,27 @@ def _possible_suffix(ledger: atoms.Ledger, a: dict[str, Any], root: str) -> str:
 
 def render_agent(ledger: atoms.Ledger, agent_id: str, v: int | None = None,
                  root: str = "", full_text: bool = True, since: int | None = None,
-                 reads: bool = True, seen: bool = False, until: int | None = None) -> str:
+                 reads: bool | None = None, seen: bool = False, until: int | None = None) -> str:
     """默认是索引:头部、派发词全文、收件索引行、逐版效应、读记录按调用合行(安卓路径缩短、看见的行只留行号)、
     正文索引行、收尾。0723 复盘:agent 整段 1.27 万字里三分之二是读清单和看见的行,报告每根只引 6 个文件名和
     6 次「看见」;信息不删,只是不默认铺开 —— seen=True 铺原文,reads=False 只给每版读的条数。
     曾试过默认折叠非目标版本的窗口(变体 B):调查员改用逐窗口查询,总字符没省,还把 AboutUsPage 那条链
     误判成「漏读」—— 整段仍给,只是压短。"""
-    ag = atoms.agent_atom(ledger, agent_id, v, since=since)
+    from .atom_queries import agent_data
+    try:
+        ag = agent_data(ledger, agent_id, v, since=since, until=until)
+    except ValueError as exc:
+        return f"⛔ until 时间截止无法核验，未打开 agent: {exc}"
     if ag is None:
         return f"账本里没有该 agent: {agent_id}"
-    if until is not None:
-        from .atom_scope import agent_until
-        try:
-            ag = agent_until(ledger, ag, until)
-        except ValueError as exc:
-            return f"⛔ until 时间截止无法核验，未打开 agent: {exc}"
     anchor = ag["v"]
     big_note = ""
-    if reads and since is None and ag["n_versions"] > 25:
+    if reads is None and since is None and ag["n_versions"] > 25:
         # pod730 一个 closer 52 版,整段 1.8 万字里读清单占大头:大 agent 不带窗口只给每版读的条数
         reads = False
         big_note = "(超过 25 版且没带 since 窗口:读只给条数;reads=1 全铺,或 agent(id, v, since=v-1) 看一版的窗口)"
+    elif reads is None:
+        reads = True
     lines = ledger.locs
     out = [f"# agent {ag['label']}  id={ag['id']}  v{anchor} / 共 {ag['n_versions']} 版"
            + (f"  窗口 v{since + 1}–v{anchor}(只给喂养这段版本的动作)" if since is not None else "")
@@ -516,6 +526,20 @@ def render_agent(ledger: atoms.Ledger, agent_id: str, v: int | None = None,
         ident.append(ag["description"])
     out.append("身份: " + " · ".join(ident))
     out.append(render_time_scope(ag.get("time_scope") or time_scope.for_atom(ledger, "agent", ag, until=until)))
+    input_scope = ag.get("input_scope") or {}
+    omitted = input_scope.get("omitted_prior") or {}
+    if any(omitted.values()):
+        out.append("早期输入索引(本窗口未展开，不等于没有): "
+                   + " · ".join(f"{key} {count}" for key, count in omitted.items() if count))
+        for r in input_scope.get("prior_read_preview") or []:
+            out.append(f"  早期读 {_short(r['path'], root)}{_vtag(r)}{_read_tags(r)} → 喂 v{r['at']} "
+                       + _ref(r["seq"], None, lines.get(r["seq"])))
+        remaining = input_scope.get("prior_read_remaining") or 0
+        query = input_scope.get("prior_query")
+        if query:
+            out.append((f"  另有 {remaining} 条早期读；" if remaining else "  ")
+                       + f"展开 agent({query['id']}, v={query['v']}, reads=True)；"
+                       + "早期记录是否相关由调查判断，未继承本次 until 截止。")
     cutoff = ag.get("cutoff")
     if cutoff:
         out.append("截止输入边界: " + cutoff["use_ts"] + "；发起序号在前不等于结果已返回。")

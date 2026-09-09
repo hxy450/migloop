@@ -74,6 +74,42 @@ def read_json(path: Path) -> Any:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def write_submission_artifacts(run_dir: Path, loaded: dict[str, Any]) -> dict[str, Any] | None:
+    """Materialize an accepted submission without replacing any recorded artifact."""
+    submission = loaded.get("submission")
+    if not isinstance(submission, dict):
+        return None  # Frozen sources predating submission.py keep the legacy path.
+    metadata_path = run_dir / "submission.json"
+    if metadata_path.exists():
+        raise FileExistsError(f"Refusing to overwrite submission metadata: {metadata_path}")
+    accepted = submission.get("status") == "accepted" and loaded.get("data") is not None and not loaded.get("errors")
+    document_name = None
+    findings_name = None
+    if accepted:
+        raw = loaded.get("raw")
+        kind = loaded.get("kind")
+        if not isinstance(raw, str) or kind not in ("yaml", "json"):
+            raise ValueError("Accepted submission lacks an exact YAML/JSON document body")
+        document_name = "document.json" if kind == "json" else "verdict.yaml"
+        document_path = run_dir / document_name
+        if document_path.exists():
+            raise FileExistsError(f"Refusing to overwrite submitted document: {document_path}")
+        with document_path.open("x", encoding="utf-8", newline="") as fh:
+            fh.write(raw)
+        if isinstance(loaded.get("findings"), dict):
+            findings_name = "findings.json"
+            with (run_dir / findings_name).open("x", encoding="utf-8", newline="") as fh:
+                fh.write(json.dumps(loaded["findings"], ensure_ascii=False, indent=2) + "\n")
+    metadata = {**submission, "accepted": accepted, "document_artifact": document_name,
+                "findings_artifact": findings_name,
+                "document_kind": loaded.get("kind") if accepted else None,
+                "final_response_artifact": "result.json",
+                "check_records_artifact": "transcript.jsonl" if (run_dir / "transcript.jsonl").is_file() else None}
+    with metadata_path.open("x", encoding="utf-8", newline="") as fh:
+        fh.write(json.dumps(metadata, ensure_ascii=False, indent=2) + "\n")
+    return metadata
+
+
 def common_task(case: dict[str, Any]) -> str:
     roots = "\n".join("- " + Path(root).name for root in case["roots"])
     return COMMON_TASK.format(file=case["file"], pool=case["pool"],
@@ -237,14 +273,22 @@ def guide_instruction(tool_transport: str, *, smoke: bool = False) -> str:
     raise ValueError("tool_transport must be native or code-host")
 
 
-def build_prompt(case_dir: Path, case: dict[str, Any], arm: str, tool_transport: str = "code-host") -> str:
+def build_prompt(case_dir: Path, case: dict[str, Any], arm: str, tool_transport: str = "code-host",
+                 final_mode: str = "document") -> str:
+    if final_mode not in ("document", "reference"):
+        raise ValueError("final_mode must be document or reference")
     common = (case_dir / "common-task.md").read_text(encoding="utf-8")
     if arm == "tools":
+        final_instruction = (
+            "正式产出使用当前 GUIDE 要求的 migloop-verdict/1 YAML，将共同任务的全部语义要求"
+            "写进 GUIDE 允许的 reason/evidence/notes 等字段；只可附一小段中文摘要，不另写重复的完整散文报告。"
+            if final_mode == "document" else
+            "调查结论仍先写成当前 GUIDE 要求的完整 migloop-verdict/1 草稿并调用 check；"
+            "最终回复严格按 GUIDE 的 reference 模式显式提交最后一次草稿的双哈希引用，不再重写全文。")
         extra = ("调查方式：仅使用本次配置的 migloop MCP。先读取当前 guide 并按当前 GUIDE 调查；"
                  + guide_instruction(tool_transport) +
                  "每次工具 sid 使用上述当前根转录的绝对路径。\n"
-                 "正式产出使用当前 GUIDE 要求的 migloop-verdict/1 YAML，将共同任务的全部语义要求"
-                 "写进 GUIDE 允许的 reason/evidence/notes 等字段；只可附一小段中文摘要，不另写重复的完整散文报告。"
+                 + final_instruction +
                  "不新增 GUIDE 未定义的字段。ledger 身份从 sessions 返回逐字照抄，缺失或不确定的信息明确标未知。\n")
     else:
         extra = ("调查方式：使用本次可用的只读 shell 命令（如 rg 和自己编写的 JSON 解析命令），分析上述 pool 中的原始 JSONL 与阶段标记。"
@@ -254,10 +298,12 @@ def build_prompt(case_dir: Path, case: dict[str, Any], arm: str, tool_transport:
     return common + "\n" + extra
 
 
-def mcp_server_config(case: dict[str, Any]) -> dict[str, Any]:
+def mcp_server_config(case: dict[str, Any], final_mode: str = "document") -> dict[str, Any]:
+    if final_mode not in ("document", "reference"):
+        raise ValueError("final_mode must be document or reference")
     return {"command": sys.executable, "args": ["-m", "migloop.mcp_server"], "cwd": case["source"],
             "env": {"PYTHONPATH": str(Path(case["source"]) / "src"), "PYTHONDONTWRITEBYTECODE": "1",
-                    "MIGLOOP_FROZEN_POOL": case["pool"]}}
+                    "MIGLOOP_FROZEN_POOL": case["pool"], "MIGLOOP_FINAL_MODE": final_mode}}
 
 
 def toml_value(value: Any) -> str:
@@ -269,7 +315,8 @@ def toml_value(value: Any) -> str:
 
 
 def build_codex_command(case: dict[str, Any], arm: str, run_dir: Path, model: str, effort: str,
-                        executable: str, tool_transport: str = "code-host") -> tuple[list[str], dict[str, Any]]:
+                        executable: str, tool_transport: str = "code-host",
+                        final_mode: str = "document") -> tuple[list[str], dict[str, Any]]:
     guide_instruction(tool_transport)  # Validate before constructing a runnable command.
     settings: dict[str, Any] = {"model_reasoning_effort": effort, "web_search": "disabled",
                               "features.shell_tool": arm == "raw"}
@@ -283,7 +330,7 @@ def build_codex_command(case: dict[str, Any], arm: str, run_dir: Path, model: st
     settings["features.skip_host_skill_discovery"] = True
     mcp: dict[str, Any] = {}
     if arm == "tools":
-        mcp["migloop"] = {**mcp_server_config(case), "required": True, "tool_timeout_sec": 120}
+        mcp["migloop"] = {**mcp_server_config(case, final_mode), "required": True, "tool_timeout_sec": 120}
     settings["mcp_servers"] = mcp
     command = [executable, "-a", "never", "exec", "--ignore-user-config", "--ignore-rules",
                "--skip-git-repo-check", "--sandbox", "read-only", "--json", "-m", model]
@@ -300,10 +347,11 @@ def build_codex_command(case: dict[str, Any], arm: str, run_dir: Path, model: st
 
 
 def build_command(case: dict[str, Any], arm: str, run_dir: Path, session_id: str, model: str,
-                  effort: str, max_turns: int, max_budget_usd: float, claude: str) -> tuple[list[str], dict[str, Any]]:
+                  effort: str, max_turns: int, max_budget_usd: float, claude: str,
+                  final_mode: str = "document") -> tuple[list[str], dict[str, Any]]:
     mcp: dict[str, Any] = {"mcpServers": {}}
     if arm == "tools":
-        server = mcp_server_config(case)
+        server = mcp_server_config(case, final_mode)
         mcp["mcpServers"]["migloop"] = {k: v for k, v in server.items() if k != "cwd"}
     cmd = [claude, "--print", "--model", model, "--effort", effort, "--session-id", session_id,
            "--max-turns", str(max_turns), "--max-budget-usd", str(max_budget_usd), "--output-format", "json",
@@ -781,7 +829,9 @@ def stop_process(proc: subprocess.Popen[Any]) -> None:
 
 
 def collect_verdict(case: dict[str, Any], result: dict[str, Any], arm: str,
-                    run_dir: Path | None = None) -> dict[str, Any]:
+                    run_dir: Path | None = None, final_mode: str = "document") -> dict[str, Any]:
+    if final_mode not in ("document", "reference"):
+        raise ValueError("final_mode must be document or reference")
     service, atoms, verdict = load_modules(Path(case["source"]))
     old_pool = os.environ.get("MIGLOOP_FROZEN_POOL")
     os.environ["MIGLOOP_FROZEN_POOL"] = case["pool"]
@@ -790,21 +840,49 @@ def collect_verdict(case: dict[str, Any], result: dict[str, Any], arm: str,
         identity = atoms.ledger_identity(ledger)
         if arm == "raw":
             return {"required": False, "found": False, "data": None, "errors": [], "harness_identity": identity, "repaired": False}
-        loaded = verdict.load_block(str(result.get("response_text") or result.get("result") or ""))
+        supports_coverage = (Path(case["source"]) / "src/migloop/coverage.py").is_file()
+        calls: list[dict[str, Any]] = []
+        trace: dict[str, Any] = {}
+        if supports_coverage:
+            via = importlib.import_module("migloop.via")
+            # The metrics sequence records counts, not full returned text. Only
+            # the frozen probe's raw transcript reader can authenticate sessions/checks.
+            probe = importlib.import_module("migloop.probe")
+            calls = probe._transcript_calls(str(run_dir)) if run_dir is not None else []
+            trace = via.trace_identity(ledger, calls, {"harness_identity": identity})
+        report = str(result.get("response_text") or result.get("result") or "")
+        submission_supported = (Path(case["source"]) / "src/migloop/submission.py").is_file()
+        if submission_supported:
+            submission = importlib.import_module("migloop.submission")
+            loaded = submission.load_submission(report, ledger, calls, trace, identity)
+        else:
+            loaded = verdict.load_block(report)
+        submission_mode = (loaded.get("submission") or {}).get("mode")
+        if final_mode == "reference" and (not submission_supported or submission_mode != "checked_draft_ref"):
+            loaded["data"] = None
+            loaded["errors"] = list(loaded.get("errors") or []) + [
+                "reference final mode requires an authenticated migloop-verdict-ref/1 submission"]
+        elif final_mode == "document" and submission_mode == "checked_draft_ref":
+            loaded["data"] = None
+            loaded["errors"] = list(loaded.get("errors") or []) + [
+                "document final mode requires an inline migloop-verdict/1 document"]
         if not loaded.get("found"):
             loaded["errors"] = list(loaded.get("errors") or []) + ["Required YAML verdict block was not found"]
         out = {**loaded, "required": True, "harness_identity": identity, "repaired": False, "repair": None,
                "schema": "migloop-verdict/1"}
-        if (Path(case["source"]) / "src/migloop/coverage.py").is_file():
+        if supports_coverage:
             coverage = importlib.import_module("migloop.coverage")
-            via = importlib.import_module("migloop.via")
-            # The metrics sequence records counts, not full returned text. Only
-            # the frozen probe's raw transcript reader can authenticate sessions.
-            probe = importlib.import_module("migloop.probe")
-            calls = probe._transcript_calls(str(run_dir)) if run_dir is not None else []
-            trace = via.trace_identity(ledger, calls or [], {"harness_identity": identity})
             bound = verdict.build(ledger, loaded.get("data"), loaded.get("errors") or [],
                                   {"harness_identity": identity, "trace_identity": trace})
+            if (Path(case["source"]) / "src/migloop/findings.py").is_file():
+                findings = importlib.import_module("migloop.findings")
+                bound["document_source"] = {
+                    "kind": "checked_draft_ref" if submission_mode == "checked_draft_ref" else "final_inline",
+                    "verified": bool(loaded.get("data") is not None and not loaded.get("errors")
+                                     and (loaded.get("submission") or {}).get("status") == "accepted"),
+                    "semantic_checked": False,
+                    "note": "文档来自本次最终正文或已认证的原始 check；来源核验不等于归因正确。"}
+                out["findings"] = findings.project(bound)
             manifest = coverage.manifest(ledger, service.fixchain_payload(case["current_root"]), case["file"])
             out.update(trace_identity=trace, repair_manifest=manifest,
                        coverage=coverage.reconcile(ledger, manifest, (loaded.get("data") or {}).get("coverage"),
@@ -836,16 +914,23 @@ def actual_codex_context(result: dict[str, Any], transcript: dict[str, Any] | No
 
 def run_one(case_dir: Path, arm: str, rep: int, model: str | None = "gpt-5.6-sol", effort: str = "medium",
             max_turns: int = 45, max_budget_usd: float = 5.0, timeout_s: float = 3600,
-            backend: str = "codex", tool_transport: str = "code-host") -> dict[str, Any]:
+            backend: str = "codex", tool_transport: str = "code-host",
+            final_mode: str = "document") -> dict[str, Any]:
     guide_instruction(tool_transport)
     if backend != "codex" and tool_transport != "code-host":
         raise ValueError("Explicit tool_transport selection is supported only by the Codex backend")
     if backend not in ("claude", "codex") or not model:
         raise ValueError("An explicit supported backend and concrete model ID are required")
+    if final_mode not in ("document", "reference"):
+        raise ValueError("final_mode must be document or reference")
     if arm not in ("raw", "tools") or rep < 1 or max_turns < 1 or max_budget_usd <= 0 or timeout_s <= 0:
         raise ValueError("Invalid arm, repetition, or run limits")
     case_dir = case_dir.resolve()
     case = read_json(case_dir / "case.json")
+    if final_mode == "reference" and arm != "tools":
+        raise ValueError("reference final mode is available only for the tools arm")
+    if final_mode == "reference" and not (Path(case["source"]) / "src/migloop/submission.py").is_file():
+        raise ValueError("Frozen source does not support reference submissions")
     run_dir = case_dir / "runs" / arm / f"rep{rep}"
     if run_dir.exists():
         raise FileExistsError(f"Refusing to overwrite run: {run_dir}")
@@ -854,17 +939,19 @@ def run_one(case_dir: Path, arm: str, rep: int, model: str | None = "gpt-5.6-sol
         raise RuntimeError("Frozen pool, source, or task changed; prepare a new case")
     run_dir.mkdir(parents=True, exist_ok=False)
     session_id = str(uuid.uuid4())
-    prompt = build_prompt(case_dir, case, arm, tool_transport)
+    prompt = build_prompt(case_dir, case, arm, tool_transport, final_mode)
     if backend == "codex":
         prompt += f"\n调查预算提醒：在 {max_turns} 轮以内完成并尽快明确未知项；这是任务约束，不是工具自动截断。\n"
-        cmd, mcp = build_codex_command(case, arm, run_dir, model, effort, shutil.which("codex") or "codex", tool_transport)
+        cmd, mcp = build_codex_command(case, arm, run_dir, model, effort, shutil.which("codex") or "codex",
+                                       tool_transport, final_mode)
     else:
         cmd, mcp = build_command(case, arm, run_dir, session_id, model, effort, max_turns, max_budget_usd,
-                                 shutil.which("claude") or "claude")
+                                 shutil.which("claude") or "claude", final_mode)
     (run_dir / "prompt.md").write_text(prompt, encoding="utf-8")
     write_json(run_dir / "mcp.json", mcp)
     config = {"case": case["case"], "arm": arm, "rep": rep, "backend": backend, "model_requested": model, "effort": effort,
               "tool_transport": tool_transport if backend == "codex" else None,
+              "final_mode": final_mode,
               "max_turns": max_turns, "max_budget_usd": max_budget_usd, "timeout_s": timeout_s,
               "run_id": session_id, "session_id_expected": session_id if backend == "claude" else None,
               "turn_limit_enforced": backend == "claude", "dollar_limit_enforced": backend == "claude",
@@ -877,6 +964,7 @@ def run_one(case_dir: Path, arm: str, rep: int, model: str | None = "gpt-5.6-sol
     env["PYTHONPATH"] = str(Path(case["source"]) / "src")
     env["PYTHONDONTWRITEBYTECODE"] = "1"
     env["MIGLOOP_FROZEN_POOL"] = case["pool"]
+    env["MIGLOOP_FINAL_MODE"] = final_mode
     started = time.perf_counter()
     metrics: dict[str, Any] = {**config, "started_at": now(), "attempts": 1, "status": "starting", "cost_usd": None,
                               "cost_usd_total": None, "wall_s": None, "transcript": None, "integrity_before": integrity_before}
@@ -936,10 +1024,16 @@ def run_one(case_dir: Path, arm: str, rep: int, model: str | None = "gpt-5.6-sol
         transcript_status["error"] = type(exc).__name__ + ": " + str(exc)
     write_json(run_dir / "transcript-status.json", transcript_status)
     try:
-        verdict = collect_verdict(case, result, arm, run_dir)
+        verdict = collect_verdict(case, result, arm, run_dir, final_mode)
     except Exception as exc:
         verdict = {"data": None, "errors": [type(exc).__name__ + ": " + str(exc)], "harness_identity": None, "repaired": False}
     write_json(run_dir / "verdict.json", verdict)
+    try:
+        metrics["submission_artifact"] = write_submission_artifacts(run_dir, verdict)
+    except (OSError, ValueError) as exc:
+        metrics["submission_artifact_error"] = type(exc).__name__ + ": " + str(exc)
+        if metrics["status"] == "completed":
+            metrics["status"] = "result_error"
     model_usage = result.get("modelUsage")
     metrics.update(cost_usd=number(result.get("total_cost_usd")), cost_usd_total=number(result.get("total_cost_usd")),
                    api_duration_ms=number(result.get("duration_api_ms")), duration_ms=number(result.get("duration_ms")),
@@ -1107,6 +1201,8 @@ def main(argv: list[str] | None = None) -> int:
     run.add_argument("--max-budget-usd", type=float, default=5.0, help="Claude CLI cap; unavailable/unforced for Codex")
     run.add_argument("--timeout-seconds", type=float, default=3600)
     run.add_argument("--tool-transport", choices=("native", "code-host"), default="code-host", help="Codex tool transport; select explicitly for models without code-host tools")
+    run.add_argument("--final-mode", choices=("document", "reference"), default="document",
+                     help="Immutable per-run final submission protocol; reference requires frozen-source support")
     args = ap.parse_args(argv)
     try:
         if args.command in ("prepare", "variant"):
@@ -1117,10 +1213,13 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "smoke":
             metrics = run_smoke(args.source, args.store, args.model, args.effort, args.timeout_seconds, args.arm, args.tool_transport)
         else:
-            metrics = run_one(args.case_dir, args.arm, args.rep, args.model, args.effort, args.max_turns, args.max_budget_usd, args.timeout_seconds, args.backend, args.tool_transport)
+            metrics = run_one(args.case_dir, args.arm, args.rep, args.model, args.effort, args.max_turns,
+                              args.max_budget_usd, args.timeout_seconds, args.backend, args.tool_transport,
+                              final_mode=args.final_mode)
         print(json.dumps({key: metrics.get(key) for key in
                           ("run_dir", "backend", "arm", "rep", "status", "model_requested", "actual_models",
-                           "actual_effort", "tool_transport", "cost_usd_total", "wall_s", "end_to_end_wall_s", "recording_complete", "verdict_ok", "smoke_passed")}, ensure_ascii=False))
+                           "actual_effort", "tool_transport", "final_mode", "cost_usd_total", "wall_s",
+                           "end_to_end_wall_s", "recording_complete", "verdict_ok", "smoke_passed")}, ensure_ascii=False))
         return 0 if metrics["status"] == "completed" else 1
     except (ValueError, OSError, RuntimeError) as exc:
         print(type(exc).__name__ + ": " + str(exc), file=sys.stderr)

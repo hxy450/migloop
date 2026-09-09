@@ -451,15 +451,19 @@ def resolve_evidence(ledger: atoms.Ledger, ev: Any) -> dict[str, Any]:
 
 
 def _rel_write(ledger: atoms.Ledger, ag: dict[str, Any], fl: dict[str, Any]) -> tuple[str, str]:
+    from .evidence import CONFIRMED_BASES
     ver = ledger.stories[fl["key"]].versions[fl["v"] - 1]
     if ver.by != ag["key"]:
         return "false", f"v{fl['v']} 的写者是 {ver.by}" + (f" v{ver.by_ver}" if ver.by_ver is not None else "")
     if ver.by_ver == ag["v"]:
+        if ver.proof is None or ver.proof.execution != "confirmed" or ver.proof.operation_basis not in CONFIRMED_BASES:
+            return "unknown", "写者坐标有记录,但操作执行依据未核验(legacy/候选),不认证写入"
         return "true", f"写于 agent v{ver.by_ver}" + (f"(#{ver.act_seq})" if ver.act_seq else "")
     return "false", f"是它写的,但写者版本是 v{ver.by_ver},不是 v{ag['v']}"
 
 
 def _rel_read(ledger: atoms.Ledger, fl: dict[str, Any], ag: dict[str, Any]) -> tuple[str, str]:
+    from .evidence import read_basis
     a = ledger.agents[ag["key"]]
     best, note = "false", "账本里没有它读这一版的记录"
     for act in a.actions:
@@ -469,11 +473,14 @@ def _rel_read(ledger: atoms.Ledger, fl: dict[str, Any], ag: dict[str, Any]) -> t
         for ref in act.files:
             if ref.op != "read" or ref.path != fl["key"] or ref.v != fl["v"]:
                 continue
-            if ref.certain and not ref.ev.dep and not ref.observation_uncertain:
+            basis = read_basis(ref)
+            if basis == "read":
                 return "true", f"#{act.seq} 读到 v{fl['v']},喂 v{feed}"
             best, note = "unknown", (f"#{act.seq} 读写窗口重叠,观测时刻与版本未确认"
-                                     if ref.observation_uncertain else
-                                     f"#{act.seq} 读了它但版本是就近绑定或依赖读(内容未进上下文)")
+                                     if basis == "overlapping_read" else
+                                     f"#{act.seq} 依赖读,内容未进上下文" if basis == "dependency_read" else
+                                     f"#{act.seq} 版本是就近绑定,不确定" if basis == "uncertain_version" else
+                                     f"#{act.seq} 有读取线索,操作/执行/正文观测未全部确认")
         if best == "false" and fl["key"] in (act.detail.get("conditional_reads") or []):
             best, note = "unknown", f"#{act.seq} 条件分支里提到,是否读到未知"
     return best, note

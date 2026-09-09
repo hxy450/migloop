@@ -388,6 +388,7 @@ def test_identity_mismatch_and_legacy_are_flagged(tmp_path: Any) -> None:
     vj = {"kind": "json", "raw": "{}", "errors": [], "repaired": True, "harness_identity": "atoms-old:1:deadbeef",
           "data": {"schema": verdict.SCHEMA, "ledger": "atoms-old:1:deadbeef", "defects": [
               {"id": "A", "title": "t", "nodes": [{"node": "agent:conv-a@v1", "role": "进入·缺", "reason": "r"}]}]}}
+    vj["raw"] = json.dumps(vj["data"], ensure_ascii=False)  # This case tests identity, not conflicting cache content.
     p = probe.probe_payload(led, _run_dir(tmp_path, [], "散文", vj))
     s = p["structured"]
     assert s["identity"]["match"] is False and s["identity"]["claimed"] == "atoms-old:1:deadbeef" and s["repaired"] is True
