@@ -756,6 +756,23 @@
       return b;
     }
     function readUncertain(r) { return r.certain !== true || !!r.dep || !!r.observation_uncertain; }
+    function readerAnchor(r) {
+      // Feeding slots can extend beyond the final numbered effect. They are
+      // useful read metadata, not agent coordinates, even when the read is real.
+      var slot = r.feeding_slot != null ? r.feeding_slot : r.at;
+      var key = agentKey(r.by), known = ENG.ag[key] || agentById[r.by] || agentById["agent-" + key];
+      var count = known && Number.isInteger(known.n_versions) ? known.n_versions : null;
+      var explicit = Object.prototype.hasOwnProperty.call(r, "agent_v");
+      var v = explicit ? r.agent_v : (count != null ? slot : null);
+      var tail = r.after_last_effect === true || (count != null && Number.isInteger(slot) && slot > count);
+      if (tail) return { v: null, slot: slot, status: "tail",
+        label: "收尾后读取（未形成" + (Number.isInteger(slot) ? "v" + slot : "效应版本") + "）" };
+      if (Number.isInteger(v) && v > 0 && (count == null || v <= count)) {
+        return { v: v, slot: slot, status: "valid", label: "v" + v };
+      }
+      return { v: null, slot: slot, status: "unverified", label: "读取关联版本未核验（"
+        + (Number.isInteger(slot) ? "喂养槽 " + slot + "，" : "") + "未形成可导航版本）" };
+    }
     function addKid(node, kid) {
       kid.parent = node.tid;
       kid.depth = node.depth + 1;
@@ -938,15 +955,17 @@
         var seen = {};
         ((fa && fa.readers) || []).forEach(function (r) {
           if (r.v !== anchor) return;
-          var key = r.by + "@" + r.at;
+          var ra = readerAnchor(r);
+          if (ra.v == null) return;  // Kept in the drawer with raw action links, not a fake downstream node.
+          var key = r.by + "@" + ra.v;
           if (seen[key]) {
             if (!readUncertain(r)) seen[key].relationUncertain = false;
             return;
           }
           var b = readBadges(r);
           if (r.start != null && r.n != null && !(r.start === 1 && r.n >= (fa.versions[anchor - 1] || {}).lines)) b.push({ cls: "", t: r.start + "-" + (r.start + r.n - 1) + "行" });
-          var reader = xtNode("agent", { aid: r.by, anchorVer: r.at, isReader: true, relationUncertain: readUncertain(r),
-            label: (r.by_name || agentLabelOf(r.by)) + (r.at != null ? " v" + r.at : ""), badges: b });
+          var reader = xtNode("agent", { aid: r.by, anchorVer: ra.v, isReader: true, relationUncertain: readUncertain(r),
+            label: (r.by_name || agentLabelOf(r.by)) + " v" + ra.v, badges: b });
           seen[key] = reader;
           addRight(root, reader);
         });
@@ -2420,13 +2439,19 @@
         body.appendChild(list);
         // 下游:谁读了这一版
         var rd = (fa.readers || []).filter(function (r) { return r.v === anchor; });
-        var sr = sec("读了 @v" + anchor + " 的 agent · 下游(点 → 以它当时的版本为根)");
+        var sr = sec("读了 @v" + anchor + " 的 agent · 下游(有有效效应版本才可导航，原文另查)");
         if (!rd.length) sr.appendChild(el("div", "kv", "(没人读过这一版)"));
         rd.forEach(function (r) {
-          var row = el("div", "vrow");
-          row.appendChild(el("span", "vn", r.at != null ? "v" + r.at : ""));
+          var ra = readerAnchor(r), row = el("div", "vrow reader-row");
+          row.dataset.anchorStatus = ra.status;
+          if (r.seq != null) row.dataset.seq = String(r.seq);
+          if (ra.slot != null) row.dataset.feedingSlot = String(ra.slot);
+          if (ra.v != null) row.dataset.agentVersion = String(ra.v);
+          row.appendChild(el("span", "vn", ra.v != null ? "v" + ra.v : ra.status === "tail" ? "尾" : "?"));
           var mid = el("span", null, "");
-          mid.appendChild(lnk((r.by_name || agentLabelOf(r.by)) + (r.at != null ? " v" + r.at : ""), "who", function () { openRoot({ kind: "agent", id: r.by, v: r.at }); }));
+          var label = (r.by_name || agentLabelOf(r.by)) + " · " + ra.label;
+          if (ra.v != null) mid.appendChild(lnk(label, "who reader-version", function () { openRoot({ kind: "agent", id: r.by, v: ra.v }); }));
+          else mid.appendChild(el("span", "who", label));
           mid.appendChild(el("span", "meta", String(r.ts).slice(5, 19).replace("T", " ")
             + (r.full === true ? " · 全文" : r.start != null && r.n != null ? " · " + r.start + "-" + (r.start + r.n - 1) + " 行"
                : r.seen_n ? " · 命中 " + r.seen_n + " 行" : " · 读取范围未记录")
@@ -2434,7 +2459,19 @@
             + (r.observation_uncertain ? " · 调用窗口重叠，快照时刻待核" : "")
             + (r.use_ts || r.done_ts ? " · 调用 " + (r.use_ts || "?") + " → 返回 " + (r.done_ts || "?") : "")));
           row.appendChild(mid);
-          row.appendChild(el("span", null, ""));
+          var action = el("span", "act", "");
+          if (r.by && Number.isInteger(r.seq) && r.seq >= 0) {
+            var link = el("span", "more reader-action", "#" + r.seq + " 原文"), pre = null;
+            link.addEventListener("click", function (ev) {
+              ev.stopPropagation();
+              if (pre) { pre.remove(); pre = null; link.textContent = "#" + r.seq + " 原文"; return; }
+              pre = el("pre", "diffblock", "加载原文…"); mid.appendChild(pre);
+              link.textContent = "#" + r.seq + " 收起";
+              loadActionInto(pre, r.by, r.seq);
+            });
+            action.appendChild(link);
+          } else action.textContent = "原文位置未记录";
+          row.appendChild(action);
           sr.appendChild(row);
         });
         container.appendChild(sr);

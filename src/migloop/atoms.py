@@ -988,6 +988,14 @@ def file_atom(ledger: Ledger, hint: str, v: int | None = None,
                 "seen": [list(x) for x in r.seen] if r.seen else None,
                 "seen_n": len(r.seen or ()), "full": r.full}
                for r in st.reads]
+    for reader in readers:
+        # A read after the final effect is a real observation but its feeding
+        # slot is not an existing agent version. Keep both facts distinct.
+        owner = ledger.agents.get(reader["by"])
+        slot = reader["at"]
+        reader["feeding_slot"] = slot
+        reader["agent_v"] = slot if owner and type(slot) is int and 1 <= slot <= owner.n_versions else None
+        reader["after_last_effect"] = bool(owner and type(slot) is int and slot > owner.n_versions)
     touches = [{"by": t.by, "by_name": _agent_label(ledger.agents, t.by), "by_ver": t.by_ver,
                 "ts": t.ts, "t": rel_time(t.ts, ledger.t0), "seq": t.seq, "reason": t.reason}
                for t in st.touches]
@@ -1441,8 +1449,31 @@ def search_pool(ledger: Ledger, q: str, until_ts: str, since_ts: str | None = No
     for aid in ledger.agents:
         res = search_agent(ledger, aid, q, since_ts=since_ts or ledger.t0 or "0", until_ts=until_ts)
         hits = [h for h in (res or {}).get("hits", []) if h.get("seq") is not None]
+        # A call launched first can return last. Earliest output means the
+        # matched field's recorded time, not its invocation's sequence number.
+        hits.sort(key=lambda hit: (ts_norm(hit.get("ts")), hit["seq"], hit.get("field") or ""))
         if hits:
             h = hits[0]
-            agents.append({"agent": aid, "label": (res or {}).get("label") or aid, "n": len(hits), "first": h})
+            # A prompt mentioning a command must not hide that command's actual
+            # returned output. Partition by recorded source, never by whether a
+            # snippet agrees with a desired answer; preserve every hit in counts.
+            groups: dict[str, list[dict[str, Any]]] = {}
+            for hit in hits:
+                if hit.get("claim_note") or hit["kind"] in ("say", "think", "inbox", "notify", "compact"):
+                    source = "statement"
+                elif hit["kind"] in ("instruction", "inject", "system", "prompt"):
+                    source = "instruction"
+                elif hit.get("field") == "output":
+                    source = "tool_output"
+                elif hit.get("field") == "input":
+                    source = "tool_input"
+                else:
+                    source = "other"
+                groups.setdefault(source, []).append(hit)
+            sources = [{"source": source, "n": len(groups[source]), "first": groups[source][0]}
+                       for source in ("tool_output", "tool_input", "statement", "instruction", "other")
+                       if source in groups]
+            agents.append({"agent": aid, "label": (res or {}).get("label") or aid,
+                           "n": len(hits), "first": h, "sources": sources})
     return {"q": q, "until_ts": until_ts, "since_ts": since_ts, "files": files, "agents": agents,
             "unknown_versions": unknown, "n_agents": len(ledger.agents), "n_files": len(ledger.stories)}

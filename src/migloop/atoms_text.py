@@ -30,6 +30,9 @@ _TEXT_KINDS = {"say": "说", "think": "想", "instruction": "指令", "inject": 
 def _who(ledger: atoms.Ledger, by: str, ver: int | None) -> str:
     if by in _EXT_LABEL:
         return _EXT_LABEL[by]
+    owner = ledger.agents.get(by)
+    if owner and ver is not None and ver > owner.n_versions:
+        return atoms.agent_label(ledger, by) + f" 收尾后(喂养槽 {ver}，未形成版本；action 查原文)"
     return atoms.agent_label(ledger, by) + (f" v{ver}" if ver is not None else "")
 
 
@@ -1077,17 +1080,23 @@ def _render_pool_search(ledger: atoms.Ledger, q: str, until_ts: str, since_ts: s
         if len(res["files"]) > 30:
             out.append(f"  …还有 {len(res['files']) - 30} 个文件")
     if res["agents"]:
-        out.append("## agent 的记录里(每个 agent 只报最早一条)")
+        out.append("## agent 的记录里（每种来源展示最早一条；数量包含未展开命中）")
+        out.append("来源按记录形态分，不判断内容真假；工具输出也可能含转述，仍须 action 核原文和上下文。")
+        source_labels = {"tool_output": "工具返回", "tool_input": "工具输入", "statement": "消息/自述",
+                         "instruction": "指令/注入", "other": "其他记录"}
         for a in res["agents"][:30]:
-            h = a["first"]
-            _navigation_hit(ledger, navigation_hits, "agent", a["agent"],
-                            h.get("ver") if h.get("ver") is not None else h.get("at"), h.get("seq"), h["kind"])
-            where = ", ".join(rel(p, root) for p in (h.get("targets") or [])[:2])
-            out.append(f"- {a['label']} · 命中 {a['n']} 条 · 最早 {_SEARCH_KIND.get(h['kind'], h['kind'])}"
-                       + (f" {where}" if where else "") + " " + _ref(h["seq"], h.get("t"), h.get("line"))
-                       + f"  → search(q, agent={a['agent']}, until_ts=…) 看全部")
-            for ln, snip in h["snips"][:1]:
-                out.append(f"    {'第 ' + str(ln) + ' 行: ' if ln else ''}{snip}")
+            out.append(f"- {a['label']} · 命中 {a['n']} 条 · agent={a['agent']}"
+                       + "；search(q, agent=此id, 同一 since_ts/until_ts) 展开")
+            for group in a["sources"]:
+                h = group["first"]
+                _navigation_hit(ledger, navigation_hits, "agent", a["agent"],
+                                h.get("ver") if h.get("ver") is not None else h.get("at"), h.get("seq"), h["kind"])
+                where = ", ".join(rel(p, root) for p in (h.get("targets") or [])[:2])
+                out.append(f"  [{source_labels[group['source']]} {group['n']} 条] 最早 {h.get('tool') or h['kind']}"
+                           + (f" {where}" if where else "") + " " + _ref(h["seq"], h.get("t"), h.get("line"))
+                           + f" → action(id={a['agent']}, seq={h['seq']})")
+                for ln, snip in h["snips"][:1]:
+                    out.append(f"    {'第 ' + str(ln) + ' 行: ' if ln else ''}{snip}")
         if len(res["agents"]) > 30:
             out.append(f"  …还有 {len(res['agents']) - 30} 个 agent")
     if not res["files"] and not res["agents"]:

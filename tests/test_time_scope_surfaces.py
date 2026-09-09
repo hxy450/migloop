@@ -4,7 +4,7 @@ import asyncio
 import pytest
 
 from migloop import atoms, atoms_text, service, time_scope
-from tests.test_atoms import MAIN_ID, _call, _ledger
+from tests.test_atoms import MAIN_ID, _call, _ledger, _read_call
 
 
 def _example(tmp_path):
@@ -140,3 +140,22 @@ def test_invalid_cutoff_mcp_does_not_register_a_successful_open():
     bad, good = asyncio.run(query())
     assert bad.startswith("⛔")
     assert good.startswith("# agent") and "SECRET_RETURN" not in good
+
+
+def test_tail_file_reader_is_not_an_existing_agent_version(tmp_path, monkeypatch):
+    ledger = _ledger(tmp_path, [
+        *_call("2026-01-01T00:00:00Z", "write", "Write", {"file_path": "/proj/A.ets", "content": "a\n"}, "ok"),
+        *_read_call("2026-01-01T00:00:05Z", "read", "/proj/A.ets", "a\n")])
+    payload = atoms.file_atom(ledger, "A.ets", 1)
+    reader = payload["readers"][0]
+    assert reader["at"] == reader["feeding_slot"] == 2
+    assert reader["after_last_effect"] is True and reader["agent_v"] is None
+    assert reader["seq"] is not None
+    text = atoms_text.render_file(ledger, "A.ets", 1, readers=True)
+    assert "收尾后" in text and "未形成版本" in text
+    monkeypatch.setattr(service, "session_ledger", lambda _: ledger)
+    monkeypatch.setattr(service, "session_cwd", lambda _: "/proj")
+    for tool, args in (("agent", {"id": MAIN_ID, "v": 2}), ("file", {"path": "A.ets", "v": 2})):
+        with pytest.raises(ValueError, match="版本不存在"):
+            service.atom_json("unused", tool, args)
+        assert service.atom_text("unused", tool, args).startswith("⛔")

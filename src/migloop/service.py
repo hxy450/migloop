@@ -667,6 +667,11 @@ def atom_json(path: str, tool: str, args: dict[str, Any]) -> dict[str, Any] | No
     from . import time_scope
 
     ledger = session_ledger(path)
+    if tool in ("file", "agent") and _opt_int(args, "v") is not None:
+        from .via import target
+        _, error = target(ledger, tool, str(args.get("path" if tool == "file" else "id") or ""), _opt_int(args, "v"))
+        if error:
+            raise ValueError(error)
     if tool == "index":
         scope = time_scope.overview(ledger)
         if args.get("kind") == "time":
@@ -725,6 +730,11 @@ def atom_text(path: str, tool: str, args: dict[str, Any]) -> str:
             out += "\n\n" + atoms_text.render_repair_manifest(ledger, payload, str(hint), root=cwd)
         return out
     ledger = session_ledger(path)
+    if tool in ("file", "agent") and _opt_int(args, "v") is not None:
+        from .via import target
+        _, error = target(ledger, tool, str(args.get("path" if tool == "file" else "id") or ""), _opt_int(args, "v"))
+        if error:
+            return error
     if tool == "index":
         return atoms_text.render_index(ledger, args.get("kind") or None, args.get("query") or None,
                                        root=cwd, limit=_opt_int(args, "limit") or (300 if args.get("query") else 80))

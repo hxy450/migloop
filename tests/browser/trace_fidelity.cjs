@@ -186,7 +186,17 @@ const server=http.createServer((req,res)=>{
   }
   else if(url.searchParams.get('scope_only')==='1')body=activeFixture==='time-scope-failure'?{error:'fixture scope unavailable'}:
     {time_scope:timeScopeFixture(Number(url.searchParams.get('v')||3),url.searchParams.get('id'))};
-  else if(url.pathname==='/atom/file')body={path:file,v:3,versions,readers:[],mentions:[{by:'agent-b',by_name:'Agent B',by_ver:1,cls:'change',ctx:'lexical candidate',win:1}]};
+  else if(url.pathname==='/atom/file'){
+    const reader=(by,at,seq,extra={})=>({by,by_name:by,at,seq,v:1,ts:'2026-01-01T00:00:05Z',full:false,certain:true,...extra});
+    const readers=activeFixture==='tail-readers' ? [
+      reader('agent-a',1,301,{agent_v:1,feeding_slot:1,after_last_effect:false}),
+      reader('agent-a',3,302,{agent_v:null,feeding_slot:3,after_last_effect:true}),
+      reader('agent-b',2,303),reader('agent-b',1,304),reader('agent-missing',8,305),
+      reader('agent-absent',null,306,{agent_v:null,feeding_slot:null,after_last_effect:false}),
+      reader('agent-a',1,307,{agent_v:null,feeding_slot:1,after_last_effect:false})
+    ] : [];
+    body={path:file,v:3,versions,readers,mentions:[{by:'agent-b',by_name:'Agent B',by_ver:1,cls:'change',ctx:'lexical candidate',win:1}]};
+  }
   else if(url.pathname==='/atom/agent')body=agents.find(a=>a.id==='agent-'+url.searchParams.get('id'))||agents[0];
   else if(url.pathname==='/atom/action')body={input:'ACTION '+url.searchParams.get('seq'),output:'EVIDENCE '+url.searchParams.get('seq')};
   else body={};
@@ -365,6 +375,23 @@ async function main(){
     await send('Page.navigate',{url:origin+'/?probe=time-scope-failure'});
     await until("document.querySelector('#side .time-scope')?.textContent.includes('范围未加载')");
     await check('scope request failure does not imply absent later activity or alter graph',"document.querySelector('#side .time-scope').textContent.includes('fixture scope unavailable') && __mig.xt().walk && document.querySelectorAll('.wire.route').length===5 && !document.querySelector('#side .time-scope-summary')");
+    await send('Page.navigate',{url:origin+'/?probe=tail-readers'});
+    await until("__mig.xt()?.walk && document.querySelectorAll('.wire.route').length===5");
+    await evaluate("[...document.querySelectorAll('#canvas .node')].find(n=>n.textContent.startsWith('A.ets@v1')).click()");
+    await until("document.querySelector('#side .vrow.anchor .vn')?.textContent==='v1'");
+    await check('tail reads keep evidence but never label feeding slots as agent versions',"document.querySelectorAll('.reader-row').length===7 && document.querySelectorAll('.reader-row[data-anchor-status=tail]').length===2 && document.querySelectorAll('.reader-row[data-anchor-status=unverified]').length===3 && document.querySelectorAll('.reader-version').length===2 && !document.querySelector('.reader-row[data-seq=\"307\"] .reader-version') && document.querySelector('#side').textContent.includes('收尾后读取（未形成v3）') && document.querySelector('#side').textContent.includes('收尾后读取（未形成v2）')");
+    await evaluate("window.beforeTailTrace=JSON.stringify(__mig.probe().trajectory);window.beforeTailTree=JSON.stringify(Object.keys(__mig.xt().byId));document.querySelector('.reader-row[data-seq=\"302\"] .reader-action').click()");
+    await until("document.querySelector('.reader-row[data-seq=\"302\"]').textContent.includes('EVIDENCE 302')");
+    await check('tail original opens by actual action without fabricating a node or model visit',"JSON.stringify(__mig.probe().trajectory)===window.beforeTailTrace && JSON.stringify(Object.keys(__mig.xt().byId))===window.beforeTailTree && document.querySelectorAll('.wire.route').length===5 && !document.querySelector('.reader-row[data-seq=\"302\"] .reader-version') && performance.getEntriesByType('resource').some(r=>r.name.includes('/atom/action?id=agent-a&seq=302'))");
+    await evaluate("document.querySelector('.reader-row[data-seq=\"305\"] .reader-action').click()");
+    await until("document.querySelector('.reader-row[data-seq=\"305\"]').textContent.includes('EVIDENCE 305')");
+    await check('legacy unknown owner remains raw-locatable but cannot navigate an invented version',"!document.querySelector('.reader-row[data-seq=\"305\"] .reader-version') && !performance.getEntriesByType('resource').some(r=>new URL(r.name).pathname==='/atom/agent'&&new URL(r.name).searchParams.get('id')==='agent-missing')");
+    await evaluate("document.querySelector('#side .rootbtn').click()");
+    await until("__mig.xt()?.walk!==true && Object.values(__mig.xt().byId).some(n=>n.isReader)");
+    await check('non-query file expansion includes only actual reader effect versions',"(()=>{const ns=Object.values(__mig.xt().byId),rs=ns.filter(n=>n.isReader);return rs.length===2&&rs.every(n=>n.anchorVer===1)&&!ns.some(n=>n.kind==='agent'&&(n.aid==='agent-missing'||n.aid==='agent-absent'||n.anchorVer>({ 'agent-a':2,'agent-b':1 }[n.aid]||Infinity)))})()");
+    await evaluate("document.querySelector('.reader-row[data-seq=\"301\"] .reader-version').click()");
+    await until("__mig.xt()?.rootKind==='agent' && __mig.xt().byId[__mig.xt().root].anchorVer===1");
+    await check('ordinary known reader keeps its exact agent navigation',"__mig.xt().byId[__mig.xt().root].aid==='agent-a' && !performance.getEntriesByType('resource').some(r=>{const u=new URL(r.name);return u.pathname==='/atom/agent'&&['3','8'].includes(u.searchParams.get('v'))})");
     const output=process.env.MIGLOOP_BROWSER_SCREENSHOT_DIR||path.join(repo,'docs/experiments/2026-09-09-trace-fidelity/screenshots');
     fs.mkdirSync(output,{recursive:true});
     const screenshot=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
