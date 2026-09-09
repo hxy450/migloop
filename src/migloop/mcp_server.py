@@ -150,7 +150,7 @@ reviewer 的 wrong_edit/PASS 只证明它作过该判断;没有对应实现/运�
 
 ## 结构化结论(正式产出,页面靠它给节点着色、展示原因和证据)
 另起一个 ```yaml 围栏块,严格按这个格式(未知键、词表外的词、缺版本号都载入失败):
-reason / boundary / notes 等自由文本优先用 YAML 块字符串 `|-` 换行缩进,尤其含冒号时;坐标和 evidence 用引号包围。
+reason / boundary / notes 等自由文本必须用 YAML 块字符串 `|-` 换行缩进,不能把反引号开头的代码或含冒号文本直接放在冒号后;坐标和 evidence 用引号包围。
 ```yaml
 schema: migloop-verdict/1
 ledger: <照抄 sessions 输出首行「账本身份:」后面那一串>
@@ -160,7 +160,8 @@ defects:
     title: <简短中文问题短语>
     repair: {before: file:<路径>@v<修复前版本>, after: file:<路径>@v<修复后版本>, evidence: ["#标识:n@L行"]}
     entry: [agent:<账本 id>@v<K>]           # 故障进入点;可以不止一个,查不出就留空列表
-    boundary: <停在哪、为什么:池外输入 / 批量生成 / 停止追溯;不停可省>
+    boundary: |-
+      <停在哪、为什么:池外输入 / 批量生成 / 停止追溯;不停可省>
     nodes:                                  # 展示顺序;相邻两项不代表因果
       - node: file:<账本路径>@v<N>            # 或 agent:<账本 id>@v<K>;坐标照抄工具输出,版本必填
         role: 正常                            # 正常 / 带病传递 / 进入·错 / 进入·缺 / 无法确认
@@ -173,14 +174,17 @@ coverage:                                   # sessions(file=目标) 清单的每
   - node: file:<路径>@v<N>
     status: explained                       # explained / unresolved / not_repair
     defects: [A]                            # 对应上面的缺陷 id;未确认或不算修复时可为空
-    reason: <此版本具体改了什么、归到哪项或为什么尚不能解释>
+    reason: |-
+      <此版本具体改了什么、归到哪项或为什么尚不能解释>
     evidence: ["#标识:n@L行"]
   - candidate: candidate:<清单里的20位摘要>   # 与 node 二选一;候选不是文件版本,不可自造版本/作者
     status: unresolved                      # 核清无关或只读可 not_repair;确认修复则 explained 并关联缺陷
     defects: []
-    reason: <核过哪些原文、真实目标/效应是什么或仍缺什么证据>
+    reason: |-
+      <核过哪些原文、真实目标/效应是什么或仍缺什么证据>
     evidence: ["#标识:n@L行"]
-notes: <可选备注,字符串或字符串列表>
+notes: |-
+  <可选备注>
 ```
 角色的意思:正常 = 有依据地正确提供了输入(reason 一句话说它提供了什么就够,不展开;没查过的上游不用列);带病传递 = 保留了上游缺陷并传给下游(说保留了什么、
 怎么传的;不等于失职,失职要另有证据);进入·错 = 有好的输入没用或用错(说正确输入与错误实现的落差);
