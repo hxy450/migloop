@@ -1090,7 +1090,7 @@ def _render_pool_search(ledger: atoms.Ledger, q: str, until_ts: str, since_ts: s
             for group in a["sources"]:
                 h = group["first"]
                 _navigation_hit(ledger, navigation_hits, "agent", a["agent"],
-                                h.get("ver") if h.get("ver") is not None else h.get("at"), h.get("seq"), h["kind"])
+                                h.get("ver") if h.get("ver") is not None else h.get("at"), h.get("seq"), h["field"])
                 where = ", ".join(rel(p, root) for p in (h.get("targets") or [])[:2])
                 out.append(f"  [{source_labels[group['source']]} {group['n']} 条] 最早 {h.get('tool') or h['kind']}"
                            + (f" {where}" if where else "") + " " + _ref(h["seq"], h.get("t"), h.get("line"))
@@ -1157,10 +1157,10 @@ def render_search(ledger: atoms.Ledger, q: str, agent: str | None = None, v: int
             for h in hs[:20]:
                 if owner:
                     _navigation_hit(ledger, navigation_hits, "agent", owner.id,
-                                    h.get("ver") if h.get("ver") is not None else h.get("at"), h.get("seq"), h["kind"])
+                                    h.get("ver") if h.get("ver") is not None else h.get("at"), h.get("seq"), h["field"])
                 where = ""
                 if h["kind"] in ("read", "write", "delete") and h.get("target"):
-                    _navigation_hit(ledger, navigation_hits, "file", h["target"], h.get("target_v"), h.get("seq"), h["kind"])
+                    _navigation_hit(ledger, navigation_hits, "file", h["target"], h.get("target_v"), h.get("seq"), h["field"])
                     where = f" {rel(h['target'], root)}@v{h.get('target_v')}"
                 elif h.get("targets"):
                     where = " " + ", ".join(rel(p, root) for p in h["targets"][:3])

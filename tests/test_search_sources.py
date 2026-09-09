@@ -51,3 +51,19 @@ def test_earliest_output_uses_return_time_not_launch_order(tmp_path):
     result = atoms.search_pool(ledger, "marker", until_ts="2026-01-01T00:00:11Z")
     outputs = next(g for g in result["agents"][0]["sources"] if g["source"] == "tool_output")
     assert outputs["n"] == 2 and "marker fast" in str(outputs["first"]["snips"])
+
+
+def test_navigation_receipt_records_actual_matched_field_not_action_kind(tmp_path):
+    from migloop import via
+    from tests.test_verdict import _pool
+
+    ledger = _pool(tmp_path)
+    for args in ({"q": "spec", "until_ts": "2026-01-01T01:00:00Z"},
+                 {"q": "spec", "agent": "agent-c", "v": 1}):
+        hits = []
+        text = atoms_text.render_search(ledger, navigation_hits=hits, **args)
+        readers = [h for h in hits if h["kind"] == "agent" and h["key"] == "agent-c"]
+        assert {h["field"] for h in readers} == {"input", "output"}
+        result = via.search_return(ledger, via.ViaState(), args, text, hits)
+        receipt = via.search_receipt(result, args)
+        assert any(h["field"] == "output" and h["key"] == "agent-c" for h in receipt["hits"])
