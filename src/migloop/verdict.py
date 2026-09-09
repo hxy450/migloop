@@ -291,8 +291,9 @@ def validate(data: Any) -> list[str]:
                     _check_node_spec(row.get("node"), where, errs)
                     if not str(row.get("node") or "").startswith("file:"):
                         errs.append(f"{where}: 对账对象必须是 file@版本")
-                if row.get("status") not in ("explained", "unresolved", "not_repair"):
-                    errs.append(f"{where}: status 必须是 explained / unresolved / not_repair")
+                from .coverage import STATUSES
+                if row.get("status") not in STATUSES:
+                    errs.append(f"{where}: status 必须是 " + " / ".join(STATUSES))
                 if not _is_str(row.get("reason")):
                     errs.append(f"{where}: 缺 reason")
                 refs = row.get("evidence")
@@ -526,6 +527,48 @@ def _norm_checks(checks: Any) -> list[dict[str, str]]:
     return out
 
 
+def _consistency(defect: dict[str, Any]) -> list[dict[str, Any]]:
+    """Check structured assertions against each other, not the truth of prose reasons.
+
+    Only resolved coordinates may be compared. These advisories neither erase
+    claims nor promote a role, repair anchor, or causal explanation to fact.
+    """
+    warnings: list[dict[str, Any]] = []
+
+    def key(n: dict[str, Any] | None) -> tuple | None:
+        return (n["kind"], n["key"], n["v"]) if n and n.get("ok") else None
+
+    def warn(code: str, n: dict[str, Any], message: str) -> None:
+        warnings.append({"code": code, "level": "warning", "defect": defect["id"],
+                         "node": n.get("spec"), "message": message})
+
+    nodes = defect["nodes"]
+    for entry in defect["entry"]:
+        if key(entry) is None:
+            continue
+        matches = [n for n in nodes if key(n) == key(entry)]
+        if not matches:
+            warn("entry_without_node_reason", entry, "进入点没有对应的有效节点角色与原因记录。")
+        elif any(n["role"] not in ("进入·错", "进入·缺") for n in matches):
+            warn("entry_role_conflict", entry,
+                 "同一缺陷把此节点列为进入点，却标为 " + " / ".join(n["role"] for n in matches)
+                 + "；请核对，未代替模型改判。")
+    seen: dict[tuple, list[dict[str, Any]]] = {}
+    for n in nodes:
+        if key(n) is not None:
+            seen.setdefault(key(n), []).append(n)
+    for rows in seen.values():
+        if len({n["role"] for n in rows}) > 1:
+            warn("node_role_conflict", rows[0], "同一缺陷的同一节点版本有不同角色声明，均已保留。")
+    before, after = (defect["repair"].get(k) for k in ("before", "after"))
+    if key(before) is not None and key(after) is not None:
+        if before["kind"] != "file" or after["kind"] != "file":
+            warn("repair_not_file_pair", after, "修复前后锚点不是两个文件版本，无法按文件变化核对修复。")
+        elif before["key"] == after["key"] and before["v"] >= after["v"]:
+            warn("repair_non_increasing", after, "同一文件的修复后版本没有晚于修复前版本；此区间不能证明发生了修复。")
+    return warnings
+
+
 def build(ledger: atoms.Ledger, data: dict[str, Any] | None, errors: list[str],
           meta: dict[str, Any]) -> dict[str, Any]:
     """校验过的块 → 页面载荷:defects(节点 / 边 / 修复锚点各带核验结果)+ roles(按 键 → [(缺陷, 版本, 角色)] 摊平,
@@ -555,6 +598,8 @@ def build(ledger: atoms.Ledger, data: dict[str, Any] | None, errors: list[str],
         "coverage_rows": (data or {}).get("coverage"),
         # This is harness metadata, never a field supplied by the model's YAML.
         "recorded_repair_manifest": meta.get("recorded_repair_manifest"),
+        "consistency": {"checked": bool(data is not None and bound), "semantic_checked": False,
+                        "advisories": []},
     }
     if data is None:
         return out
@@ -621,5 +666,8 @@ def build(ledger: atoms.Ledger, data: dict[str, Any] | None, errors: list[str],
         out["defects"].append({"id": did, "title": str(d.get("title") or ""), "boundary": d.get("boundary"),
                                "repair": {"before": before, "after": after, "evidence": rep_ev},
                                "entry": entries, "nodes": nodes, "edges": edges})
+        built = out["defects"][-1]
+        built["advisories"] = _consistency(built) if bound else []
+        out["consistency"]["advisories"].extend(built["advisories"])
     out["roles"] = roles
     return out

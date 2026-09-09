@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from migloop import atoms
+from migloop import atoms, time_scope
 
 _EXT_LABEL = {"__external__": "外部输入", "__outband__": "实录外修改"}
 
@@ -117,6 +117,8 @@ def _scan_note(ledger: atoms.Ledger, agent: str | None = None, seq: int | None =
 def render_index(ledger: atoms.Ledger, kind: str | None = None, query: str | None = None,
                  root: str = "", limit: int = 300) -> str:
     """目录。kind: agent | ets | spec | src | other | None(全部);query 子串过滤。"""
+    if kind == "time":
+        return render_time_scope(time_scope.overview(ledger), expanded=True, query=query, limit=limit)
     q = (query or "").lower()
     out: list[str] = _scan_note(ledger)
     if kind == "scan":
@@ -166,6 +168,43 @@ def render_index(ledger: atoms.Ledger, kind: str | None = None, query: str | Non
             out.append(f"- {rel(f['path'], root)} | {f['kind']} | {tag} · 读 {f['n_reads']}{touch}{hops}")
         if len(fs) > limit:
             out.append(f"  …还有 {len(fs) - limit} 个,用 query/kind 缩小")
+    return "\n".join(out)
+
+
+def render_time_scope(scope: dict[str, Any], expanded: bool = False,
+                      query: str | None = None, limit: int = 80) -> str:
+    """The same bounded metadata is supplied to HTTP; no inferred validation events."""
+    roots = scope["roots"]
+    latest = scope.get("latest_known_pool_time") or "未知"
+    anchor = scope.get("anchor") or {}
+    out = [f"全池时间边界: {len(roots)} 个会话分组 · 最晚已记录活动 {latest}（不是验证成功证明）。"]
+    if anchor.get("time"):
+        later = scope.get("later_sessions") or []
+        other = scope.get("other_later_sessions")
+        out.append(f"当前查询锚点 {anchor['time']}；之后仍有 {len(later)} 个会话的活动"
+                   + (f"（其他会话 {len(other)} 个）" if other is not None else "")
+                   + "。早期窗口没构建 ≠ 后续全池没构建；是否包含本次补丁仍需核验。")
+        window = scope.get("search_window")
+        if window:
+            out.append(f"后续窗口查法: search(q=检索词, since_ts=\"{window['since_ts']}\", "
+                       f"until_ts=\"{window['until_ts']}\")；这是后续证据，不是生成前输入。")
+    if expanded:
+        q = (query or "").lower()
+        selected = [r for r in roots if not q or q in str(r.get("session") or "").lower()
+                    or q in str(r.get("root_agent") or "").lower()]
+        for r in selected[:max(0, limit)]:
+            vr = r.get("root_versions") or {}
+            versions = f" v{vr['first']}–v{vr['last']}" if vr.get("count") else " 无已编号效应版本"
+            out.append(f"- 会话 {r.get('session') or '未记录'} · root={r.get('root_agent') or '缺失或歧义'}{versions}"
+                       f" · {r.get('observed_start') or '未知'} → {r.get('observed_end') or '未知'}"
+                       f" · {r['agent_count']} agents / {r['action_count']} actions")
+        if len(selected) > max(0, limit):
+            out.append(f"另 {len(selected) - max(0, limit)} 个分组未展开；index(kind=time, limit={len(selected)})。")
+        out.append(scope["scope"])
+    else:
+        out.append("index(kind=time) 展开各会话与主代理版本范围；只覆盖已提供记录，不保证池外、子代理记录齐全。")
+    if scope.get("reversed_intervals") or any(scope.get("unknown_timestamps", {}).values()):
+        out.append("部分动作时刻缺失/无法排序；零计数不是不存在的证明。")
     return "\n".join(out)
 
 
@@ -258,6 +297,7 @@ def render_file(ledger: atoms.Ledger, hint: str, v: int | None = None, root: str
     lines = ledger.locs
     out = [f"# 文件 {rel(fa['path'], root)} @v{anchor}  (共 {fa['n_versions']} 版)"]
     out.append(f"完整路径: {fa['path']}")
+    out.append(render_time_scope(time_scope.for_atom(ledger, "file", fa)))
     out += _scan_note(ledger)
     if vv_anchor is not None:
         out.append("这一版内容: " + ("可复原" if vv_anchor["content_known"]
@@ -468,6 +508,7 @@ def render_agent(ledger: atoms.Ledger, agent_id: str, v: int | None = None,
     if ag.get("description"):
         ident.append(ag["description"])
     out.append("身份: " + " · ".join(ident))
+    out.append(render_time_scope(time_scope.for_atom(ledger, "agent", ag, until=until)))
     out += _scan_note(ledger, ag["id"])
     if ag.get("t0"):
         out.append(f"时刻: 动作号旁的 T+h:mm 相对迁移开始 {ag['t0']}(池子里最早一条动作),跨 agent 对先后用它;"
@@ -623,7 +664,8 @@ def render_repair_manifest(ledger: atoms.Ledger, payload: dict[str, Any], hint: 
     if doc.get("errors"):
         return "\n".join(out + ["清单无法确定: " + "; ".join(str(x) for x in doc["errors"])])
     out.append(f"共 {len(doc['items'])} 个返修阶段记录版本 + {len(doc['candidates'])} 个待核候选。每项须在 coverage 单独交代;repair.before/after 区间不能代替中间项。")
-    out.append("可标 explained / unresolved / not_repair;阶段后新增不自动是生成错误,写了理由不等于理由已证实。")
+    out.append("可标 explained / unresolved / out_of_scope / not_repair。out_of_scope=本题未调查，仍留在分母；"
+               "not_repair=有依据认为非修复，不能仅因为不在题目内。阶段后新增不自动是生成错误，写了理由不等于理由已证实。")
     excluded = (doc.get("candidate_scope") or {}).get("excluded_nonexecution") or {}
     if excluded:
         out.append("未列入执行候选的纯文本记录: " + ", ".join(f"{kind}={count}" for kind, count in sorted(excluded.items()))
@@ -642,7 +684,9 @@ def render_repair_manifest(ledger: atoms.Ledger, payload: dict[str, Any], hint: 
         scope = doc.get("candidate_scope") or {}
         out.append("### 待核候选（不是已确认修复，不新增作者或版本）")
         out.append("来源为修复参与者窗口内的方向不明触碰及精确路径提及；窗口: " + str(scope.get("window_scope")))
-        out.append("同一动作仅列一次；用 action 核对 input/output 的真实目标和效应。无关/只读可记 not_repair，证据不足记 unresolved，确认修复后关联 defect。")
+        out.append("同一动作仅列一次；用 action 核对 input/output 的真实目标和效应。已核明未影响目标/只读可记 not_repair；"
+                   "本题不调查记 out_of_scope，调查后证据不足记 unresolved，确认修复后关联 defect。"
+                   "未立正式版本不等于未写入：脚本执行及输出也可作为效应证据，须说明证据强度。")
         for item in doc["candidates"]:
             out.append(f"- {item['id']} · {item['ref'] or '原始调用指针未知'} · agent:{item['agent']} · {item['ts']}")
             out.append("  线索（不是事实）: " + str(item.get("reason") or "效应待核") + " · " + str(item.get("ctx") or ""))
@@ -953,6 +997,8 @@ _SEARCH_KIND = {"prompt": "派发词", "read": "读", "write": "写", "delete": 
                 "interrupt": "打断", "dispatch": "派发", "message": "发消息", "other": "命令", "skill": "技能",
                 "compact": "压缩摘要"}
 
+_SEARCH_MATCH = "匹配方式: 不区分大小写的字面子串；不支持正则/OR，| 也是普通字符。多个词请分次查。"
+
 
 def _next_hint(h: dict[str, Any], root: str) -> str:
     """每条命中带下一跳:模型只能顺着账本里的边走,跳不出去。"""
@@ -1050,12 +1096,12 @@ def render_search(ledger: atoms.Ledger, q: str, agent: str | None = None, v: int
     file=:只看它到第 v 版为止的内容和读者。搜索命中可用于调查导航,不证明历史读写或因果关系。
     kind=write:时间窗口里全池有写能力的命令(断点窗口候选),q 可空。"""
     if kind == "write":
-        return "\n".join([*_scan_note(ledger), _render_window_writes(ledger, q, since_ts, until_ts, root)])
+        return "\n".join([*_scan_note(ledger), _render_window_writes(ledger, q, since_ts, until_ts, root), _SEARCH_MATCH])
     if not agent and not file:
         if not until_ts:
             return ("search 要么带起点(agent= 或 file=),要么全池但只允许带时间上限:search(q, until_ts=…)。"
                     "全池查可发现上游候选或核限定范围的零命中;搜索跳转不证明历史关系。")
-        return "\n".join([*_scan_note(ledger), _render_pool_search(ledger, q, until_ts, since_ts, root, navigation_hits)])
+        return "\n".join([*_scan_note(ledger), _render_pool_search(ledger, q, until_ts, since_ts, root, navigation_hits), _SEARCH_MATCH])
     if agent:
         res = atoms.search_agent(ledger, agent, q, v, since, after, since_ts, until_ts)
         if res is None:
@@ -1067,6 +1113,7 @@ def render_search(ledger: atoms.Ledger, q: str, agent: str | None = None, v: int
                "零命中只支持「此范围内未检索到」;可用 search(q, until_ts=那一刻) 扩大全池范围,仍不证明无人见过或要求不存在"]
         groups: dict[str, list[dict[str, Any]]] = {}
         owner = atoms.resolve_agent(ledger, agent)
+        out.append(_SEARCH_MATCH)
         out += _scan_note(ledger, owner.id if owner else agent)
         for h in res["hits"]:
             groups.setdefault(h["kind"], []).append(h)
@@ -1098,7 +1145,7 @@ def render_search(ledger: atoms.Ledger, q: str, agent: str | None = None, v: int
         if res["excluded_after"]:
             out.append(f"锚点之后另有 {res['excluded_after']} 条命中(非因果;after=True 可看)")
         if not res["hits"]:
-            out.append("(范围内没有命中 —— 只证明这个 agent 在这个范围内没见过这个词;不证明别的 agent 或别的版本没见过,"
+            out.append("(范围内没有命中 —— 只说明此范围内未检索到字面子串;不证明这个或别的 agent 没见过相关信息,"
                        "别写成「全实录只有…」)")
         return "\n".join(out)
     res2 = atoms.search_file(ledger, str(file), q, v)
@@ -1109,6 +1156,7 @@ def render_search(ledger: atoms.Ledger, q: str, agent: str | None = None, v: int
            + (f";内容未知 {res2['unknown']} 版查不了" if res2.get("unknown") else "")
            + " —— 别的文件不在内,要查「那一刻之前谁写过 / 见过」用 search(q, until_ts=那一刻)"]
     out += _scan_note(ledger)
+    out.append(_SEARCH_MATCH)
     if res2["first"] is None:
         out.append("这些版本的已知内容里没有这个词(内容未知的版本查不了)")
     else:

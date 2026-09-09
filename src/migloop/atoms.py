@@ -1415,11 +1415,14 @@ def search_pool(ledger: Ledger, q: str, until_ts: str, since_ts: str | None = No
     """全池按词查,只允许带时间上限:until_ts 之前所有 agent 的记录 + 所有文件到那一刻为止的已知内容。
     用途是核否定 —— 「生成期没人见过 X」只能引用这种范围的零命中;找上游仍要走 agent / file 的边。"""
     ql = q.lower()
+    until_key = ts_norm(until_ts)
+    since_key = ts_norm(since_ts) if since_ts else None
     files = []
     unknown = 0
     for path, st in ledger.stories.items():
         for ver in st.versions:
-            if ver.ts > until_ts or (since_ts and ver.ts < since_ts):
+            version_key = ts_norm(ver.ts)
+            if version_key > until_key or (since_key and version_key < since_key):
                 continue
             body = ver.content if ver.content is not None else ver.partial
             if body is None:

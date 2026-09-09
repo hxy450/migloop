@@ -172,13 +172,13 @@ defects:
       - {from: agent:<id>@v<K>, to: file:<路径>@v<N>, relation: 写}
 coverage:                                   # sessions(file=目标) 清单的每个版本与候选各一项,不能用区间冒充逐项覆盖
   - node: file:<路径>@v<N>
-    status: explained                       # explained / unresolved / not_repair
+    status: explained                       # explained / unresolved / out_of_scope / not_repair
     defects: [A]                            # 对应上面的缺陷 id;未确认或不算修复时可为空
     reason: |-
       <此版本具体改了什么、归到哪项或为什么尚不能解释>
     evidence: ["#标识:n@L行"]
   - candidate: candidate:<清单里的20位摘要>   # 与 node 二选一;候选不是文件版本,不可自造版本/作者
-    status: unresolved                      # 核清无关或只读可 not_repair;确认修复则 explained 并关联缺陷
+    status: unresolved                      # 本题未调查=out_of_scope;已核非修复=not_repair;确认修复=explained
     defects: []
     reason: |-
       <核过哪些原文、真实目标/效应是什么或仍缺什么证据>
@@ -199,6 +199,10 @@ evidence 有效仅表示能定位;节点的 reason 仍是你的主张。无法�
 repair.before/after 必须是本项实际变化的可核版本,不能借相邻版本当时间窗口,不能 before=after;缺版本就省略对应字段或整个 repair。
 coverage 仅保证清单逐项有交代,unresolved 不等于已查清;不能为了交齐把所有候选直接宣称无关或已修复。
 coverage 只抄 sessions 清单真实条目;没有对应清单就用 [],将未知放 nodes/notes,不得自造 candidate 或把别的报告文件版本当目标修复清单。
+不在本题内的改动记 out_of_scope，不能因此判 not_repair。not_repair 必须有非修复的依据；真实 diff 的改动即使无关本题也不消失。
+file/agent 给出当前锚点及全池最晚记录，index(kind=time) 展开所有已提供会话的时段与主代理版本范围。
+结论要说“后续没有构建/安装/验证”时，必须查锚点之后到全池末尾的相应记录；早期调用说“未构建”只描述当时。
+后续 build/install 的存在不等于包含目标补丁，更不等于运行行为正确；这些判断分别说明依据与未知。
 候选里的修复可在对应已打开的 agent 节点写原因,repair.after 未有确定版本时可省略;不得虚构 file@v 来安放它。
 目标没有可核文件版本时,root 可用实际打开的 agent:<id>@v<K>,在 notes 写目标路径与版本缺口;
 未建立文件修复清单就不声称覆盖所有文件版本。只有生成期内部修改也应如实标明,不硬称执行结束后的返修。
@@ -261,6 +265,8 @@ def build_server(backend: Any | None = None) -> Any:
         cwd = await rt.get_session_cwd(sid)
         ledger = await rt.get_ledger(sid)
         out = atoms_text.render_chains(payload, root=cwd, file=file, identity=atoms.ledger_identity(ledger))
+        from . import time_scope
+        out += "\n\n" + atoms_text.render_time_scope(time_scope.overview(ledger))
         if file:
             out += "\n\n" + atoms_text.render_repair_manifest(ledger, payload, file, root=cwd)
         return out
@@ -268,7 +274,7 @@ def build_server(backend: Any | None = None) -> Any:
     @srv.tool(**text_options)
     async def index(sid: str, kind: str | None = None, query: str | None = None,
                     limit: int = 0) -> str:
-        """账本目录:agent 与文件各一行。kind = agent | ets | spec | src | other | scan(扫描缺口);空=全部;query 子串过滤。
+        """账本目录:agent 与文件各一行。kind = agent | ets | spec | src | other | scan(扫描缺口) | time(全池会话时段);空=全部;query 子串过滤。
         不带 query 只给前 80 条(大会话有两百多个 agent,整张表就是三万字),带 query 给到 300。"""
         ledger, cwd = await _ctx(sid)
         return atoms_text.render_index(ledger, kind, query, root=cwd, limit=limit or (300 if query else 80))
@@ -348,7 +354,7 @@ def build_server(backend: Any | None = None) -> Any:
     async def search(sid: str, q: str = "", agent: str | None = None, v: int | None = None,
                      since: int | None = None, file: str | None = None, after: bool = False,
                      since_ts: str | None = None, until_ts: str | None = None, kind: str | None = None) -> str:
-        """带起点的按词查找。agent=(id 或名字)+ v / since:只看它喂养第 v 版及之前的记录(派发词、读到的内容、
+        """字面子串查找（不区分大小写，不支持正则/OR，| 是普通字符；多个词分次查）。agent=(id 或名字)+ v / since:只看它喂养第 v 版及之前的记录(派发词、读到的内容、
         写入、命令与结果、自述、收件、注入技能),命中按种类分组、带 (#n@L行) 与下一跳;锚点之后的只计数(after=True 才列)。
         since_ts / until_ts:按时间区间查派发者(用文件时间线上两个版本的时刻)。file=(+ v):这个词首次出现在第几版、
         谁写的,哪些读者的读结果命中过。不带 agent / file 时必须带 until_ts:全池查那一刻之前所有 agent 的记录与

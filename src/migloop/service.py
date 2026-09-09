@@ -664,20 +664,40 @@ def _flag(args: dict[str, Any], key: str, default: str) -> bool:
 
 def atom_json(path: str, tool: str, args: dict[str, Any]) -> dict[str, Any] | None:
     """index / file / agent / blame / action 的 JSON 形态。参数缺失抛 ValueError。"""
+    from . import time_scope
+
     ledger = session_ledger(path)
     if tool == "index":
-        return atoms.ledger_index(ledger)
+        scope = time_scope.overview(ledger)
+        if args.get("kind") == "time":
+            return {"time_scope": scope}
+        return {**atoms.ledger_index(ledger), "time_scope": scope}
     if tool == "file":
         if not args.get("path"):
             raise ValueError("path")
-        return atoms.file_atom(ledger, str(args["path"]), _opt_int(args, "v"),
-                               with_diff=_flag(args, "diff", "1"),
-                               with_content=_flag(args, "content", "1"))
+        scope_only = _flag(args, "scope_only", "0")
+        result = atoms.file_atom(ledger, str(args["path"]), _opt_int(args, "v"),
+                                with_diff=not scope_only and _flag(args, "diff", "1"),
+                                with_content=not scope_only and _flag(args, "content", "1"))
+        if result is None:
+            return None
+        scope = time_scope.for_atom(ledger, "file", result)
+        return {"time_scope": scope} if scope_only else {**result, "time_scope": scope}
     if tool == "agent":
         if not args.get("id"):
             raise ValueError("id")
-        return atoms.agent_atom(ledger, str(args["id"]), _opt_int(args, "v"),
-                                since=_opt_int(args, "since"))
+        result = atoms.agent_atom(ledger, str(args["id"]), _opt_int(args, "v"),
+                                  since=_opt_int(args, "since"))
+        if result is None:
+            return None
+        until = _opt_int(args, "until")
+        scope = time_scope.for_atom(ledger, "agent", result, until=until)
+        if until is not None:
+            # Match the MCP text cutoff; time metadata must not claim an earlier
+            # window while the JSON silently includes later input rows.
+            for key in ("reads", "actions", "inbox"):
+                result[key] = [r for r in result[key] if r.get("seq") is None or r["seq"] <= until]
+        return {"time_scope": scope} if _flag(args, "scope_only", "0") else {**result, "time_scope": scope}
     if tool == "blame":
         if not args.get("path"):
             raise ValueError("path")
@@ -701,6 +721,8 @@ def atom_text(path: str, tool: str, args: dict[str, Any]) -> str:
         hint = args.get("path") or args.get("file") or None
         ledger, payload = session_ledger(path), fixchain_payload(path)
         out = atoms_text.render_chains(payload, root=cwd, file=hint, identity=atoms.ledger_identity(ledger))
+        from . import time_scope
+        out += "\n\n" + atoms_text.render_time_scope(time_scope.overview(ledger))
         if hint:
             out += "\n\n" + atoms_text.render_repair_manifest(ledger, payload, str(hint), root=cwd)
         return out

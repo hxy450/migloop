@@ -11,7 +11,7 @@ from .filestory import ts_norm
 
 SCHEMA = "migloop-repair-manifest/1"
 POLICY = "execution-candidates/2"
-STATUSES = ("explained", "unresolved", "not_repair")
+STATUSES = ("explained", "unresolved", "not_repair", "out_of_scope")
 MAX_ROWS = 20_000
 DIFF_LINES = 8
 DIFF_CHARS = 800
@@ -244,12 +244,25 @@ def _defect_ids(defects: Any) -> set[str]:
             if (isinstance(d, dict) and isinstance(d.get("id"), str)) or isinstance(d, str)}
 
 
+def _recorded_changed_lines(item: dict[str, Any]) -> int | None:
+    """只用冻结清单的明确字面差分元数据;旧清单缺字段时不从正文补事实。"""
+    change = item.get("change")
+    if not isinstance(change, dict) or change.get("literal") is not True:
+        return None
+    count = change.get("changed_lines")
+    return count if type(count) is int and count >= 0 else None
+
+
 def reconcile(ledger: atoms.Ledger, manifest_doc: dict[str, Any], rows: Any, defects: Any,
               *, identity_bound: bool = False) -> dict[str, Any]:
-    """complete 仅指清单中每版及每候选有唯一合法声明;unresolved 也算交代,不代表问题已解决。
+    """complete 仅指清单中每版及每候选有唯一合法声明;延后也算交代,不代表问题已解决。
 
     identity_bound 由入口核验后显式传入。这里从不读取 repair.before/after、散文或其它引用来猜覆盖。
+    模型状态 out_of_scope 汇总为 deferred,与历史 out_of_scope 非法目标错误桶分开。
+    unconfirmed 只汇总有效已交代行中的 unresolved/deferred;缺项与无效行仍在各自错误桶。
+    advisories 是字面记录与主张的待核提示,不裁决理由真伪,不影响 valid/complete。
     """
+    version_items = {item["node"]: item for item in manifest_doc.get("items") or []}
     expected_versions = [item["node"] for item in manifest_doc.get("items") or []]
     expected_candidates = [item["id"] for item in manifest_doc.get("candidates") or []]
     expected = expected_versions + expected_candidates
@@ -260,9 +273,11 @@ def reconcile(ledger: atoms.Ledger, manifest_doc: dict[str, Any], rows: Any, def
                            "missing_versions": [], "missing_candidates": [],
                            "out_of_scope": [], "invalid_status": [], "empty_reason": [], "unknown_defects": [],
                            "invalid_rows": [], "manifest_errors": list(manifest_doc.get("errors") or []), "errors": [],
-                           "unresolved": [], "not_repair": []}
+                           "unresolved": [], "not_repair": [], "deferred": [], "unconfirmed": [],
+                           "advisories": [], "claim_advisories_checked": False}
     if manifest_doc.get("ledger") != atoms.ledger_identity(ledger):
         out["manifest_errors"].append({"code": "ledger_mismatch", "message": "清单身份不属于当前账本"})
+    out["claim_advisories_checked"] = out["identity_bound"] and not out["manifest_errors"]
     occurrences: dict[str, list[int]] = defaultdict(list)
     valid: dict[str, list[int]] = defaultdict(list)
     ids = _defect_ids(defects)
@@ -328,12 +343,25 @@ def reconcile(ledger: atoms.Ledger, manifest_doc: dict[str, Any], rows: Any, def
         if not isinstance(evidence, list) or any(not isinstance(ref, str) or not ref.strip() for ref in evidence):
             issue("invalid_rows", i, **target, message="evidence 必须是非空引用字符串组成的列表(允许空列表)")
         okay = len(out["errors"]) == error_count and canonical in expected_set
+        claim_checked = out["claim_advisories_checked"] and canonical in expected_set
+        manifest_item = version_items.get(canonical, {}) if claim_checked else {}
+        changed_lines = _recorded_changed_lines(manifest_item)
+        advisories = []
+        if status == "not_repair" and changed_lines is not None and changed_lines > 0:
+            advisories.append({"code": "recorded_change_needs_basis", "level": "warning", "row": i,
+                               "target": canonical, "changed_lines": changed_lines,
+                               "event_ref": (manifest_item.get("event") or {}).get("ref"),
+                               "message": "清单有字面变化行,not_repair 仍需依据;变化不自动等于缺陷或真实修复。"
+                                          "若仅因本题未调查,用 out_of_scope/unresolved,不能据此认定没有修复。"})
+            out["advisories"].extend(advisories)
         out["rows"].append({"row": i, "node": row.get("node"), "candidate": row.get("candidate"),
                              "canonical_node": canonical if target_kind == "node" else None,
                              "canonical_candidate": canonical if target_kind == "candidate" else None,
                              "canonical_target": canonical, "status": status,
                              "defects": linked, "reason": reason, "evidence": evidence, "valid": okay,
-                             "semantic_checked": False, "evidence_checked": False})
+                             "semantic_checked": False, "evidence_checked": False,
+                             "claim_advisories_checked": claim_checked, "recorded_changed_lines": changed_lines,
+                             "advisories": advisories})
         if okay:
             valid[canonical].append(i)
     out["missing"] = [node for node in expected if node not in occurrences]
@@ -349,6 +377,10 @@ def reconcile(ledger: atoms.Ledger, manifest_doc: dict[str, Any], rows: Any, def
     for row in out["rows"]:
         if row["canonical_target"] in accounted and row["status"] in ("unresolved", "not_repair"):
             out[row["status"]].append(row["canonical_target"])
+        if row["canonical_target"] in accounted and row["status"] == "out_of_scope":
+            out["deferred"].append(row["canonical_target"])
+        if row["canonical_target"] in accounted and row["status"] in ("unresolved", "out_of_scope"):
+            out["unconfirmed"].append(row["canonical_target"])
     out["complete"] = out["provided"] and out["identity_bound"] and not out["errors"]
     if out["manifest_errors"]:
         out["status"] = "invalid_manifest"
@@ -363,5 +395,8 @@ def reconcile(ledger: atoms.Ledger, manifest_doc: dict[str, Any], rows: Any, def
     out["counts"] = {"expected": len(expected), "provided": len(values), "accounted": len(accounted),
                      "expected_versions": len(expected_versions), "expected_candidates": len(expected_candidates),
                      "missing_versions": len(out["missing_versions"]), "missing_candidates": len(out["missing_candidates"]),
-                     "missing": len(out["missing"]), "unresolved": len(out["unresolved"]), "not_repair": len(out["not_repair"])}
+                     "missing": len(out["missing"]), "unresolved": len(out["unresolved"]), "not_repair": len(out["not_repair"]),
+                     "deferred": len(out["deferred"]), "unconfirmed": len(out["unconfirmed"]),
+                     "advisories": len(out["advisories"]),
+                     "advisory_rows": len({advice["row"] for advice in out["advisories"]})}
     return out

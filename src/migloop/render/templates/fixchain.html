@@ -277,6 +277,13 @@
   .probe .coverage-reason, .probe .structured-notes { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 11.5px; color: var(--ink-2); }
   .probe .coverage-scope, .probe .coverage-note { color: var(--ink-3); font-size: 11px; white-space: pre-wrap; overflow-wrap: anywhere; }
   .probe .identity-detail { font-size: 11px; overflow-wrap: anywhere; }
+  .claim-advisory { margin: 5px 0; padding: 5px 7px; border-left: 3px solid #b88928; background: #fff8e7; color: #88651a; font-size: 11.5px; overflow-wrap: anywhere; white-space: pre-wrap; }
+  .claim-advisory summary { cursor: pointer; color: inherit; }
+  .claim-advisory button { border: 0; background: none; padding: 2px 0; color: #88651a; font: inherit; cursor: pointer; }
+  .time-scope { font-size: 11.5px; color: var(--ink-2); overflow-wrap: anywhere; }
+  .time-scope summary { cursor: pointer; }
+  .time-scope-root { margin-top: 7px; padding-top: 5px; border-top: 1px solid var(--ring); }
+  .time-scope-note { margin-top: 5px; color: var(--ink-3); white-space: pre-wrap; }
 </style>
 
 <header>
@@ -464,7 +471,7 @@
       .catch(function (e) { idxChip.textContent = "目录装配失败:" + e; });
 
     // ---- 两原子供数:按原子身份键控缓存,重复节点零成本;截断在客户端 ----
-    var ENG = { sid: (DATA.sid || DATA.sid8), fv: {}, fvCb: {}, ag: {}, agCb: {}, fc: {}, fcCb: {} };
+    var ENG = { sid: (DATA.sid || DATA.sid8), fv: {}, fvCb: {}, ag: {}, agCb: {}, fc: {}, fcCb: {}, ts: {}, tsCb: {} };
     function lazyFetch(store, cbs, key, url, cb) {
       if (store[key]) { cb(store[key]); return; }
       if (cbs[key]) { cbs[key].push(cb); return; }
@@ -490,6 +497,54 @@
     function atomAgent(aid, cb) {
       var key = agentKey(aid);
       lazyFetch(ENG.ag, ENG.agCb, key, API + "/agent?id=" + encodeURIComponent(key), cb);
+    }
+    function timeScopeSection(container, kind, key, anchor) {
+      var section = sec("全池时间边界 · 仅元数据"), body = el("div", "time-scope", "范围加载中…");
+      section.appendChild(body); container.appendChild(section);
+      var requestKey = kind + ":" + key + "@" + (anchor == null ? "overview" : anchor);
+      var query = "?scope_only=1&" + (kind === "file" ? "path=" : "id=") + encodeURIComponent(key)
+        + (anchor == null ? "" : "&v=" + anchor);
+      // 只读元数据缓存与原子全脊柱缓存分开;不向模型访问记录或图结构添加任何内容。
+      lazyFetch(ENG.ts, ENG.tsCb, requestKey, API + "/" + kind + query, function (result, error) {
+        body.textContent = "";
+        var scope = result && result.time_scope;
+        if (!scope || scope.schema !== "migloop-time-scope/1") {
+          body.textContent = "范围未加载：" + (error || "接口未返回时间边界；不能推断后来没有活动"); return;
+        }
+        body.dataset.anchor = (scope.anchor || {}).time || "";
+        body.dataset.requestedVersion = anchor == null ? "" : String(anchor);
+        body.appendChild(el("div", "time-scope-summary", "全池最晚已知时刻：" + (scope.latest_known_pool_time || "未知")));
+        var a = scope.anchor || {}, later = scope.later_sessions, other = scope.other_later_sessions;
+        body.appendChild(el("div", null, "本次元数据锚点：" + (a.time || "未设或无效")
+          + (a.session ? " · 会话 " + a.session : " · 锚点会话未确认")));
+        body.appendChild(el("div", "time-scope-after", "锚点后有活动会话：" + (Array.isArray(later) ? later.length + " 个" : "无法计算")
+          + " · 其他会话：" + (Array.isArray(other) ? other.length + " 个" : "无法计算")));
+        var details = el("details", "time-scope-roots");
+        details.appendChild(el("summary", null, "展开池内会话 / 根 agent / 时间（" + (scope.roots || []).length + " 组）"));
+        (scope.roots || []).forEach(function (r) {
+          var row = el("div", "time-scope-root"); row.dataset.session = r.session || "";
+          row.appendChild(el("div", null, "会话：" + (r.session || "未分配，不推测所属根")));
+          row.appendChild(el("div", null, "已观测：" + (r.observed_start || "未知") + " → " + (r.observed_end || "未知")));
+          if (r.after_anchor) row.appendChild(el("div", null, "锚点后发起 " + r.after_anchor.started + " · 返回 "
+            + r.after_anchor.results_returned + " · 跨锚点调用 " + r.after_anchor.known_straddling + "（返回不代表成功）"));
+          if (!(r.root_agents || []).length) row.appendChild(el("div", null, "未记录根 agent，不补造"));
+          (r.root_agents || []).forEach(function (root) {
+            var versions = root.versions || {};
+            row.appendChild(el("div", null, "根 agent：" + root.id + (r.root_ambiguous ? "（多个候选根）" : "")
+              + (versions.count ? " · v" + versions.first + "–v" + versions.last + "（已编号 " + versions.count + " 版）" : " · 无已编号版本")));
+            (root.source_paths || []).forEach(function (p) { row.appendChild(el("div", "time-scope-note", "原始位置：" + p)); });
+          });
+          details.appendChild(row);
+        });
+        if (Array.isArray(later)) details.appendChild(el("div", "time-scope-note", "锚点后会话：" + (later.join("、") || "本范围未记录")));
+        if (Array.isArray(other)) details.appendChild(el("div", "time-scope-note", "其他后置会话：" + (other.join("、") || "本范围未记录")));
+        if (scope.unknown_intervals || scope.reversed_intervals) details.appendChild(el("div", "time-scope-note",
+          "时间区间未知 " + (scope.unknown_intervals || 0) + " · 逆序 " + (scope.reversed_intervals || 0)));
+        (scope.diagnostics || []).forEach(function (d) { details.appendChild(el("div", "time-scope-note", d)); });
+        body.appendChild(details);
+        body.appendChild(el("div", "time-scope-note", scope.scope || "仅已记录时间的元数据，不保证覆盖全局活动。"));
+        body.appendChild(el("div", "time-scope-note", "此展开不新增调查访问或图边；后续活动不代表针对本文件的验证，也不代表验证成功或行为正确。"));
+      });
     }
     function agentLabelOf(aid) {
       var k = agentKey(aid);
@@ -1470,7 +1525,19 @@
         + " 个、候选 " + count("missing_candidates", items.filter(function (i) { return i.kind === "candidate" && !i.rows.length; }).length) + " 个；重复或无效声明另列待改正。"));
       var unresolved = count("unresolved", (c && c.unresolved || []).length);
       var excluded = count("not_repair", (c && c.not_repair || []).length);
-      box.appendChild(el("div", "coverage-note", "其中 " + unresolved + " 项登记为仍未知，" + excluded + " 项声明不属于修复。已登记不等于查清；解释与证据语义未核验。"));
+      var deferred = count("deferred", (c && c.deferred || []).length);
+      var unconfirmed = count("unconfirmed", unresolved + deferred);
+      var stateCounts = el("div", "coverage-note coverage-state-counts", "其中 " + unresolved + " 项登记为仍未知，"
+        + deferred + " 项本题未调查，" + excluded + " 项声明不属于修复。已交代中的未确认项合计 " + unconfirmed
+        + "；缺项与无效声明另列。已登记不等于查清；解释与证据语义未核验。");
+      stateCounts.dataset.deferred = deferred; stateCounts.dataset.unconfirmed = unconfirmed; box.appendChild(stateCounts);
+      var adviceCount = count("advisory_rows", rows.filter(function (r) { return (r.advisories || []).length; }).length);
+      if (adviceCount) {
+        var adviceSummary = el("div", "claim-advisory coverage-advisory-summary", "⚠ " + adviceCount + " 项声明提示 · "
+          + (blocked || invalidManifest || !c.claim_advisories_checked ? "历史提示未绑定当前清单。" : "已记录变化与声明需核对。")
+          + "不改变原状态或清单是否交代齐全，不判断真实缺陷或修复。");
+        adviceSummary.dataset.rows = adviceCount; box.appendChild(adviceSummary);
+      }
       if (c && c.complete && !blocked && !invalidManifest) box.appendChild(el("div", "coverage-note", "清单交代齐全，不代表调查完整或全部修复已确认。"));
       if (!c || !c.provided) box.appendChild(el("div", "coverage-note", "报告未提供逐项交代；不从散文或其他引用推测覆盖。"));
       var groups = [{ title: "尚未交代或声明待改正", rows: items.filter(function (i) { return !i.accounted; }), open: true },
@@ -1482,7 +1549,8 @@
         group.rows.forEach(function (entry) {
           var item = entry.item, row = el("div", "coverage-item"); row.dataset.target = entry.id; row.dataset.kind = entry.kind;
           var claim = entry.rows[0], state = !entry.rows.length ? "尚未交代" : !entry.accounted ? "声明待改正（重复或无效，不计已交代）"
-            : claim.status === "unresolved" ? "已登记 · 仍未知（未查清）" : claim.status === "not_repair" ? "已登记 · 声明非修复（未验证）" : "已登记 · 给出解释（未核验）";
+            : claim.status === "unresolved" ? "已登记 · 仍未知（未查清）" : claim.status === "out_of_scope" ? "已登记 · 本题未调查（保留分母，不判非修复）"
+            : claim.status === "not_repair" ? "已登记 · 声明非修复（未验证）" : "已登记 · 给出解释（未核验）";
           if (blocked && entry.rows.length) state = "历史声明未绑定 · " + state;
           row.dataset.state = entry.accounted ? claim.status : entry.rows.length ? "invalid" : "missing";
           var node = coverageFileNode(item.node), label = entry.kind === "version" ? "记录版本 · " + (node ? baseName(node.path) + " @v" + node.v : item.node)
@@ -1513,6 +1581,14 @@
             if (r.reason) row.appendChild(el("div", "coverage-reason", "报告交代：" + r.reason));
             if ((r.defects || []).length) row.appendChild(el("div", "coverage-note", "关联事项：" + r.defects.join("、")));
             (Array.isArray(r.evidence) ? r.evidence : []).forEach(function (ref) { row.appendChild(el("div", "coverage-note", "报告引用（未核验）：" + ref)); });
+            (r.advisories || []).forEach(function (a) {
+              var advice = el("details", "claim-advisory coverage-row-advisory"); advice.dataset.code = a.code || "";
+              advice.appendChild(el("summary", null, "⚠ " + (a.message || a.code || "声明待核")));
+              advice.appendChild(el("div", null, "提示代码：" + (a.code || "未知") + (a.event_ref ? " · 原始位置：" + a.event_ref : "")));
+              if (a.changed_lines != null) advice.appendChild(el("div", null, "清单字面变化行：" + a.changed_lines + "；不自动等于缺陷或真实修复。"));
+              if (blocked || invalidManifest || r.claim_advisories_checked !== true) advice.appendChild(el("div", null, "历史提示未绑定当前清单；保留原文，不作当前核验。"));
+              row.appendChild(advice);
+            });
           });
           row.appendChild(note); details.appendChild(row);
         }); box.appendChild(details);
@@ -1542,6 +1618,33 @@
       if (!probeClaimsBound(PROBE)) line.textContent = "历史结构化结论 " + (s.defects || []).length + " 项 · 节点角色 " + nodes + " 条 · 坐标与关系未绑定当前账本";
       line.title = "结论按缺陷事项计数;同一节点在不同缺陷下的角色分别计数。关系核验只查账本关系,不验证模型问题主张或缺陷因果。";
       host.appendChild(line);
+    }
+    function renderConsistency(host, structured, defect, claimsBound) {
+      var consistency = structured.consistency || {};
+      var advisories = defect.advisories || (consistency.advisories || []).filter(function (a) { return a.defect === defect.id; });
+      if (!advisories.length) return;
+      var section = el("section", "consistency-advisories"); section.dataset.defect = defect.id;
+      section.appendChild(el("div", "coverage-note", "声明自洽检查，不判断原因真假。"
+        + (claimsBound && consistency.checked === true ? "提示不影响 schema、身份或节点颜色。" : "未完成当前身份下的检查，以下仅保留历史提示。")));
+      advisories.forEach(function (a) {
+        var advice = el("details", "claim-advisory consistency-advisory"); advice.dataset.code = a.code || "";
+        advice.appendChild(el("summary", null, "⚠ " + (a.message || a.code || "声明待核")));
+        var spec = typeof a.node === "string" ? a.node : a.node && a.node.spec;
+        advice.appendChild(el("div", null, "代码：" + (a.code || "未知") + (spec ? " · 坐标：" + spec : "")));
+        var candidates = (defect.nodes || []).concat(defect.entry || [], [((defect.repair || {}).before), ((defect.repair || {}).after)]);
+        var target = candidates.filter(function (n) { return n && n.ok && n.spec === spec; })[0];
+        var existing = target && XT && Object.keys(XT.byId).some(function (tid) {
+          var n = XT.byId[tid]; return n.kind === target.kind && probeKeyOf(n) === target.key
+            && (n.kind === "file" ? n.anchorV : n.anchorVer) === target.v;
+        });
+        if (claimsBound && consistency.checked === true && existing) {
+          var locate = el("button", "consistency-locate", "定位已在图上的节点（不新增访问）");
+          locate.addEventListener("click", function () { openProbeNode(nodeSpecOf(target)); }); advice.appendChild(locate);
+        }
+        advice.appendChild(el("pre", "consistency-raw", JSON.stringify(a, null, 2)));
+        section.appendChild(advice);
+      });
+      host.appendChild(section);
     }
     function renderStructured(host) {
       var s = PROBE.structured;
@@ -1574,6 +1677,7 @@
       (s.defects || []).forEach(function (d) {
         if (PROBE.defect && d.id !== PROBE.defect) return;
         host.appendChild(el("div", "sub", "缺陷 " + d.id + " · " + d.title));
+        renderConsistency(host, s, d, claimsBound);
         var rep = d.repair || {};
         [["修复前", rep.before], ["修复后", rep.after]].forEach(function (pair) {
           var n = pair[1];
@@ -2392,9 +2496,11 @@
         });
         body.appendChild(sc);
       }
+      var scopeHolder = el("div", null, ""); body.appendChild(scopeHolder);
       var holder = el("div", null, "");
       body.appendChild(holder);
       fileVersionSection(body, node.path, node.anchorV, function (fa, anchor) {
+        timeScopeSection(scopeHolder, "file", node.path, anchor);
         contentSection(holder, node.path, anchor, fa);
       });
     }
@@ -2529,6 +2635,7 @@
           (function () { var n = cut.filter(function (r) { return r.via === "script"; }).length; return n ? { cls: "via", t: "脚本读 " + n } : null; })()
         ]));
         body.appendChild(s0);
+        timeScopeSection(body, "agent", ag.id, anchor);
         if (ag.parent) {
           var s1 = sec("派发自");
           s1.appendChild(lnk((ag.parent.name || agentLabelOf(ag.parent.id)) + (ag.parent.ver != null ? " @v" + ag.parent.ver : ""), "", function () { openRoot({ kind: "agent", id: ag.parent.id, v: ag.parent.ver }); }));

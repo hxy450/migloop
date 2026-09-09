@@ -388,3 +388,123 @@ def test_legacy_manifest_without_policy_keeps_its_saved_denominator() -> None:
     checked = coverage.reconcile(ledger, legacy, rows, ["A"], identity_bound=True)
     assert checked["missing_candidates"] == [legacy["candidates"][0]["id"]]
     assert not checked["complete"]  # 不因新策略从旧清单里删掉一项或自动补 not_repair。
+
+
+def test_out_of_scope_is_deferred_not_removed_or_reclassified_as_not_repair() -> None:
+    ledger, chains = splash_ledger()
+    candidate_action(ledger, 100, touch=True)
+    manifest = coverage.manifest(ledger, chains, PATH)
+    candidate = manifest["candidates"][0]
+    rows = [declaration(52, status="out_of_scope", defects=[], reason="本题未调查"),
+            declaration(53, status="unresolved", defects=[]), declaration(54),
+            candidate_declaration(candidate, status="out_of_scope", reason="题目范围外,不判断是否修复")]
+    snapshot = deepcopy((manifest, rows))
+    result = coverage.reconcile(ledger, manifest, rows, ["A"], identity_bound=True)
+    assert result["complete"] and result["errors"] == []
+    assert result["counts"]["expected"] == result["counts"]["accounted"] == 4
+    assert result["counts"]["expected_versions"] == 3 and result["counts"]["expected_candidates"] == 1
+    assert result["deferred"] == [f"file:{PATH}@v52", candidate["id"]]
+    assert result["unconfirmed"] == [f"file:{PATH}@v52", f"file:{PATH}@v53", candidate["id"]]
+    assert result["counts"]["deferred"] == 2 and result["counts"]["unconfirmed"] == 3
+    assert result["out_of_scope"] == result["not_repair"] == []
+    assert result["rows"][0]["status"] == "out_of_scope"
+    assert result["rows"][0]["recorded_changed_lines"] > 0
+    assert result["rows"][0]["advisories"] == []
+    assert (manifest, rows) == snapshot
+
+
+def test_out_of_scope_status_does_not_allow_targets_outside_manifest_or_cover_missing_rows() -> None:
+    ledger, chains = splash_ledger()
+    manifest = coverage.manifest(ledger, chains, PATH)
+    result = coverage.reconcile(ledger, manifest,
+                                [declaration(52, status="out_of_scope"), declaration(51, status="out_of_scope")],
+                                ["A"], identity_bound=True)
+    assert not result["complete"] and result["status"] == "invalid"
+    assert len(result["out_of_scope"]) == 1  # 历史错误桶仍表示非法目标,不是合法延后状态。
+    assert result["out_of_scope"][0]["node"] == "file:SplashPage.ets@v51"
+    assert result["deferred"] == [f"file:{PATH}@v52"]
+    assert result["missing_versions"] == [f"file:{PATH}@v53", f"file:{PATH}@v54"]
+    assert result["counts"]["accounted"] == result["counts"]["deferred"] == 1
+
+
+def test_member_literal_changes_warn_on_not_repair_without_rewriting_or_invalidating_rows() -> None:
+    path = "/project/entry/MemberCenterPage.ets"
+    versions = {10: "CTA.width(100)", 13: "indicator.color(purple)", 14: "indicator.bottom(8)"}
+    ledger = atoms.Ledger(agents={}, stories=filestory.build_stories([
+        filestory.Ev(f"2026-01-01T00:00:{v:02d}Z", v, "wfull", path, "agent-fix",
+                     content=f"// version {v}\n{versions.get(v, 'existing()')}\n", aver=v)
+        for v in range(1, 15)
+    ]))
+    manifest = coverage.manifest(ledger, [{"file_abs": path, "fix_versions": [10, 13, 14]}], path)
+    rows = [{"node": f"file:{path}@v{v}", "status": "not_repair", "defects": [],
+             "reason": "题外修复未调查" if v != 14 else "This change is benign; no bug is asserted.",
+             "evidence": []} for v in (10, 13, 14)]
+    before = deepcopy(rows)
+    result = coverage.reconcile(ledger, manifest, rows, [], identity_bound=True)
+    assert result["complete"] and result["status"] == "complete" and result["errors"] == []
+    assert result["counts"]["accounted"] == result["counts"]["not_repair"] == 3
+    assert result["counts"]["advisories"] == result["counts"]["advisory_rows"] == 3
+    assert [advice["row"] for advice in result["advisories"]] == [0, 1, 2]
+    assert all(advice["code"] == "recorded_change_needs_basis" and advice["level"] == "warning"
+               and advice["changed_lines"] > 0 for advice in result["advisories"])
+    assert all(row["valid"] and row["status"] == "not_repair" and row["claim_advisories_checked"]
+               and row["advisories"][0] in result["advisories"] for row in result["rows"])
+    assert rows == before and result["semantic_checked"] is False
+    # 不判断理由是否有道理,不因为它提到“真实修复”或“benign”改变提示。
+    assert [row["reason"] for row in result["rows"]] == [row["reason"] for row in before]
+
+
+@pytest.mark.parametrize("literal,count", [(False, 5), (True, 0), (True, None), (True, True)])
+def test_advisory_requires_explicit_positive_literal_change_metadata(literal: bool, count: Any) -> None:
+    ledger, chains = splash_ledger()
+    manifest = coverage.manifest(ledger, chains, PATH)
+    # 旧清单缺 changed_lines 不能从文字、理由或猜测中补一个变化事实。
+    for item in manifest["items"]:
+        item["change"] = {"literal": literal, "text": "+the body is not parsed"}
+        if count is not None:
+            item["change"]["changed_lines"] = count
+    rows = [declaration(v, status="not_repair", defects=[]) for v in (52, 53, 54)]
+    result = coverage.reconcile(ledger, manifest, rows, [], identity_bound=True)
+    assert result["complete"] and result["advisories"] == []
+    assert result["counts"]["advisories"] == result["counts"]["advisory_rows"] == 0
+
+
+def test_claim_advisories_fail_closed_on_unbound_or_stale_identity() -> None:
+    ledger, chains = splash_ledger()
+    manifest = coverage.manifest(ledger, chains, PATH)
+    rows = [declaration(v, status="not_repair", defects=[]) for v in (52, 53, 54)]
+    for result in (coverage.reconcile(ledger, manifest, rows, []),
+                   coverage.reconcile(ledger, {**manifest, "ledger": "stale"}, rows, [], identity_bound=True),
+                   coverage.reconcile(ledger, {**manifest, "errors": [{"code": "invalid_fix_version"}]},
+                                      rows, [], identity_bound=True)):
+        assert not result["complete"] and not result["claim_advisories_checked"]
+        assert result["advisories"] == []
+        assert all(not row["claim_advisories_checked"] and row["recorded_changed_lines"] is None
+                   and not row["advisories"] for row in result["rows"])
+    deferred = coverage.reconcile(ledger, manifest,
+                                  [declaration(v, status="out_of_scope", defects=[]) for v in (52, 53, 54)], [])
+    assert deferred["status"] == "unbound" and not deferred["complete"]
+
+
+def test_claim_advisory_is_independent_of_incomplete_coverage_and_structural_row_errors() -> None:
+    ledger, chains = splash_ledger()
+    manifest = coverage.manifest(ledger, chains, PATH)
+    for row in (declaration(52, status="not_repair"), declaration(52, status="not_repair", reason="")):
+        result = coverage.reconcile(ledger, manifest, [row], ["A"], identity_bound=True)
+        assert not result["complete"] and len(result["missing"]) == 2
+        assert len(result["advisories"]) == 1 and result["counts"]["advisory_rows"] == 1
+        assert result["advisories"][0]["code"] == "recorded_change_needs_basis"
+        assert all(error["code"] != "recorded_change_needs_basis" for error in result["errors"])
+        assert result["rows"][0]["valid"] is bool(row["reason"])
+
+
+def test_explained_empty_defects_remains_legal_and_candidates_do_not_inherit_change_warnings() -> None:
+    ledger, chains = splash_ledger()
+    candidate_action(ledger, 100)
+    manifest = coverage.manifest(ledger, chains, PATH)
+    rows = [declaration(v, defects=[]) for v in (52, 53, 54)]
+    rows.append(candidate_declaration(manifest["candidates"][0], status="not_repair"))
+    result = coverage.reconcile(ledger, manifest, rows, [], identity_bound=True)
+    assert result["complete"] and result["advisories"] == []
+    assert result["rows"][-1]["recorded_changed_lines"] is None
+    assert result["counts"]["unconfirmed"] == result["counts"]["deferred"] == 0

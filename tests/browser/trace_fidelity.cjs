@@ -74,15 +74,29 @@ agents[0].reads=[
 ];
 const data={sid:'fixture',sid8:'fixture',project:'Trace fidelity regression',urls:{data:'/data',atom:'/atom',probe:'/probe',filediff:'/diff',report:null}};
 const html=fs.readFileSync(path.join(repo,'src/migloop/render/templates/fixchain.html'),'utf8').replace('__FIXCHAIN_JSON__',JSON.stringify(data));
+let activeFixture='fixture';
+function timeScopeFixture(v, agent){
+  const anchor='2026-01-01T00:00:0'+v+'.000000Z';
+  const root=(session,id,end)=>({session,observed_start:'2026-01-01T00:00:00.000000Z',observed_end:end,
+    root_present:true,root_agent:id,root_ambiguous:false,root_agents:[{id,versions:{first:1,last:3,count:3},source_paths:['/fixture/'+session+'.jsonl']}],
+    after_anchor:{started:2,results_returned:1,observed_actions:2,known_straddling:1}});
+  return {schema:'migloop-time-scope/1',anchor:{time:anchor,status:'valid',agent:agent||'agent-a',session:'fixture'},
+    latest_known_pool_time:'2026-01-03T00:00:00.000000Z',later_sessions:['fixture','later-session'],other_later_sessions:['later-session'],
+    roots:[root('fixture','__main__:fixture','2026-01-02T00:00:00.000000Z'),root('later-session','__main__:later','2026-01-03T00:00:00.000000Z'),
+      {session:null,root_present:false,root_agents:[],observed_start:null,observed_end:null,after_anchor:null}],
+    unknown_intervals:1,reversed_intervals:0,diagnostics:[],scope_complete:false,negative_proof:false,
+    scope:'只汇总已提供动作时间；后续活动不证明验证成功，零计数不证明全局无活动。'};
+}
 const server=http.createServer((req,res)=>{
   const url=new URL(req.url,'http://127.0.0.1');
   let body;
-  if(url.pathname==='/') {res.setHeader('Content-Type','text/html; charset=utf-8');res.end(html);return;}
+  if(url.pathname==='/') {activeFixture=url.searchParams.get('probe')||'fixture';res.setHeader('Content-Type','text/html; charset=utf-8');res.end(html);return;}
   if(url.pathname==='/data')body={chains:[]};
   else if(url.pathname==='/atom/index')body={agents,files:[{path:file,kind:'ets',n_versions:3,has_writer:true}]};
   else if(url.pathname==='/probe'){
     body=structuredClone(probe);
     const run=url.searchParams.get('run');
+    activeFixture=run;
     if(run.startsWith('coverage')||run.startsWith('trace-')){
       const row=coverageFixture(body);
       if(run==='coverage-invalid'){
@@ -94,6 +108,15 @@ const server=http.createServer((req,res)=>{
         body.coverage.rows.push(row(fid+'@v2','explained','补充的版本交代'),row(candidateTwo,'unresolved','候选已登记但未查清'));
         Object.assign(body.coverage,{complete:true,status:'complete',missing:[],missing_versions:[],missing_candidates:[],unresolved:[fid+'@v3',candidateTwo]});
         Object.assign(body.coverage.counts,{accounted:5,provided:5,missing:0,missing_versions:0,missing_candidates:0,unresolved:2});
+      }
+      if(run==='coverage-advisories'){
+        const advice={code:'recorded_change_needs_basis',level:'warning',row:0,target:fid+'@v1',changed_lines:4,event_ref:'#a:101@L1',message:'有字面变化行，非修复声明仍需依据 <b>原文</b>'};
+        body.coverage.rows[0]=row(fid+'@v1','not_repair','本次原状态保持，提示不是自动判错');
+        Object.assign(body.coverage.rows[0],{row:0,advisories:[advice],claim_advisories_checked:true,recorded_changed_lines:4});
+        body.coverage.rows.push(row(fid+'@v2','out_of_scope','本题未调查，可能是真实修复'),row(candidateTwo,'out_of_scope','候选仍需交代，不判无改动'));
+        Object.assign(body.coverage,{complete:true,status:'complete',missing:[],missing_versions:[],missing_candidates:[],deferred:[fid+'@v2',candidateTwo],unconfirmed:[fid+'@v3',fid+'@v2',candidateTwo],
+          advisories:[advice],claim_advisories_checked:true,not_repair:[fid+'@v1',candidateOne]});
+        Object.assign(body.coverage.counts,{accounted:5,provided:5,missing:0,missing_versions:0,missing_candidates:0,deferred:2,unconfirmed:3,not_repair:2,advisories:1,advisory_rows:1});
       }
       if(run==='coverage-unprovided'){
         Object.assign(body.coverage,{provided:false,status:'unprovided',rows:[],unresolved:[],not_repair:[],missing_versions:[1,2,3].map(v=>fid+'@v'+v),missing_candidates:[candidateOne,candidateTwo]});
@@ -119,6 +142,14 @@ const server=http.createServer((req,res)=>{
     }
     if(run==='other-calls') body.steps.push({i:8,tool:'Bash',ok:true,args:{command:'read-only'},provenance:{format:'claude_transcript',path:'transcript.jsonl'}});
     if(run==='legacy'){body.structured=null;body.legacy=true;delete body.trace_identity;}
+    if(run.startsWith('consistency')){
+      const advice={code:'entry_role_conflict',level:'warning',defect:'A',node:'agent:agent-a@v1',message:'声明间需核对 <b>不判原因真假</b>'};
+      body.structured.consistency={checked:true,semantic_checked:false,advisories:[advice]};
+      body.structured.defects[0].advisories=[advice];body.structured.defects[1].advisories=[];
+      if(run==='consistency-unbound'){
+        body.structured.identity={bound:false,status:'missing',match:null};body.structured.consistency.checked=false;
+      }
+    }
     if(run==='relations'){
       const red={...legacyRole,v:3,reason:'两端红也不把探索线染红'};
       body.roles[file].push(red);body.structured.defects[0].nodes.push(claim(red));
@@ -153,6 +184,8 @@ const server=http.createServer((req,res)=>{
       if(url.searchParams.get('run')==='empty'){body.trajectory.nodes=[];body.structured.defects=[];body.roles={};}
     }
   }
+  else if(url.searchParams.get('scope_only')==='1')body=activeFixture==='time-scope-failure'?{error:'fixture scope unavailable'}:
+    {time_scope:timeScopeFixture(Number(url.searchParams.get('v')||3),url.searchParams.get('id'))};
   else if(url.pathname==='/atom/file')body={path:file,v:3,versions,readers:[],mentions:[{by:'agent-b',by_name:'Agent B',by_ver:1,cls:'change',ctx:'lexical candidate',win:1}]};
   else if(url.pathname==='/atom/agent')body=agents.find(a=>a.id==='agent-'+url.searchParams.get('id'))||agents[0];
   else if(url.pathname==='/atom/action')body={input:'ACTION '+url.searchParams.get('seq'),output:'EVIDENCE '+url.searchParams.get('seq')};
@@ -301,7 +334,38 @@ async function main(){
     await evaluate("new Promise(resolve=>setTimeout(resolve,200))");
     await evaluate("(()=>{const p=document.querySelector('#probe'),c=document.querySelector('.repair-coverage');p.scrollTop+=c.getBoundingClientRect().top-p.getBoundingClientRect().top})()");
     await check('coverage summary is visibly reachable inside the scrollable panel',"(()=>{const p=document.querySelector('#probe').getBoundingClientRect(),s=document.querySelector('.coverage-summary').getBoundingClientRect();return s.top>=p.top && s.bottom<=p.bottom})()");
-    const output=path.join(repo,'docs/experiments/2026-09-09-trace-fidelity/screenshots');
+    await evaluate("__mig.load('coverage-advisories')");
+    await until("document.querySelector('.coverage-advisory-summary')!==null && document.querySelector('.coverage-summary').dataset.status==='complete'");
+    await check('out-of-scope remains in the denominator and separate from not-repair',"document.querySelector('.coverage-summary').dataset.accounted==='5' && document.querySelectorAll('.coverage-item').length===5 && document.querySelectorAll('.coverage-item[data-state=\"out_of_scope\"]').length===2 && [...document.querySelectorAll('.coverage-item[data-state=\"out_of_scope\"]')].every(n=>n.textContent.includes('本题未调查（保留分母，不判非修复）')) && document.querySelector('.coverage-state-counts').dataset.deferred==='2' && document.querySelector('.coverage-state-counts').dataset.unconfirmed==='3'");
+    await check('coverage amber advisory preserves original status and complete',"document.querySelector('.coverage-summary').dataset.status==='complete' && document.querySelector('.coverage-row-advisory').closest('.coverage-item').dataset.state==='not_repair' && document.querySelector('.coverage-advisory-summary').dataset.rows==='1' && getComputedStyle(document.querySelector('.coverage-advisory-summary')).color==='rgb(136, 101, 26)' && document.querySelector('.coverage-row-advisory').textContent.includes('#a:101@L1') && !document.querySelector('.coverage-row-advisory b')");
+    await evaluate("__mig.load('fixture')");
+    await until("__mig.probe().runDir==='fixture' && document.querySelectorAll('.wire.route').length===5");
+    await evaluate("window.beforeConsistencyColors=[...document.querySelectorAll('#canvas .node')].map(n=>n.className).join('|');window.beforeConsistencyVisits=JSON.stringify(__mig.probe().trajectory.visits)");
+    await evaluate("__mig.load('consistency')");
+    await until("document.querySelector('.consistency-locate')!==null");
+    await check('consistency warnings are not schema failure and never recolor nodes',"document.querySelector('.consistency-advisories').textContent.includes('声明自洽检查，不判断原因真假') && !document.querySelector('#probe .bad') && !document.querySelector('.consistency-advisory b') && [...document.querySelectorAll('#canvas .node')].map(n=>n.className).join('|')===window.beforeConsistencyColors && JSON.stringify(__mig.probe().trajectory.visits)===window.beforeConsistencyVisits");
+    await evaluate("document.querySelector('.consistency-advisory').open=true;document.querySelector('.consistency-locate').click()");
+    await check('consistency warning locates only an existing node and preserves raw warning',"document.querySelector('#canvas .node.sel').textContent.startsWith('Agent A v1') && document.querySelector('.consistency-raw').textContent.includes('entry_role_conflict') && Object.values(__mig.xt().byId).filter(n=>n.traj).length===4 && document.querySelectorAll('.wire.route').length===5");
+    await evaluate("[...document.querySelectorAll('.dchips span')].find(n=>n.textContent.startsWith('B ')).click()");
+    await check('consistency warning follows its own defect filter',"!document.querySelector('.consistency-advisory')");
+    await evaluate("__mig.load('consistency-unbound')");
+    await until("document.querySelector('.consistency-advisories')!==null && __mig.probe().structured.consistency.checked===false");
+    await check('unbound consistency warnings retain text without current-node actions',"document.querySelector('.consistency-advisories').textContent.includes('仅保留历史提示') && !document.querySelector('.consistency-locate') && !document.querySelector('#probe .bad') && !document.querySelector('#canvas .node.p-chain')");
+    await send('Page.navigate',{url:origin+'/?probe=time-scope'});
+    await until("__mig.xt() && __mig.xt().walk && document.querySelector('#side .time-scope-summary')!==null");
+    await check('file drawer time scope uses its requested version and labels pool limits',"document.querySelector('#side .time-scope').dataset.requestedVersion==='3' && document.querySelector('#side .time-scope').dataset.anchor==='2026-01-01T00:00:03.000000Z' && document.querySelector('#side .time-scope-summary').textContent.includes('2026-01-03') && document.querySelector('#side .time-scope-after').textContent.includes('其他会话：1 个')");
+    await evaluate("window.beforeScopeGraph=JSON.stringify(Object.keys(__mig.xt().byId));window.beforeScopeVisits=JSON.stringify(__mig.probe().trajectory.visits);window.beforeScopeRequests=performance.getEntriesByType('resource').filter(r=>r.name.includes('scope_only=1')).length;document.querySelector('#side .time-scope-roots').open=true");
+    await check('time scope expansion is metadata only with honest missing-root and returned-result labels',"document.querySelectorAll('#side .time-scope-root').length===3 && document.querySelector('#side .time-scope').textContent.includes('__main__:later') && document.querySelector('#side .time-scope').textContent.includes('未记录根 agent，不补造') && document.querySelector('#side .time-scope').textContent.includes('返回不代表成功') && !document.querySelector('#side .time-scope a,#side .time-scope button') && JSON.stringify(Object.keys(__mig.xt().byId))===window.beforeScopeGraph && JSON.stringify(__mig.probe().trajectory.visits)===window.beforeScopeVisits && performance.getEntriesByType('resource').filter(r=>r.name.includes('scope_only=1')).length===window.beforeScopeRequests");
+    await evaluate("[...document.querySelectorAll('#canvas .node')].find(n=>n.textContent.startsWith('A.ets@v1')).click()");
+    await until("document.querySelector('#side .time-scope')?.dataset.requestedVersion==='1'");
+    await check('older file version never reuses latest-version time anchor',"document.querySelector('#side .time-scope').dataset.anchor==='2026-01-01T00:00:01.000000Z' && document.querySelectorAll('.wire.route').length===5");
+    await evaluate(clickAgent);
+    await until("document.querySelector('#side .time-scope')?.dataset.requestedVersion==='1' && document.querySelector('#side .tag').textContent.includes('Agent')");
+    await check('agent drawer requests its own exact anchor without adding visits',"performance.getEntriesByType('resource').some(r=>r.name.includes('/atom/agent?scope_only=1')&&r.name.includes('v=1')) && document.querySelector('#side .time-scope').textContent.includes('后续活动不代表针对本文件的验证') && JSON.stringify(__mig.probe().trajectory.visits)===window.beforeScopeVisits");
+    await send('Page.navigate',{url:origin+'/?probe=time-scope-failure'});
+    await until("document.querySelector('#side .time-scope')?.textContent.includes('范围未加载')");
+    await check('scope request failure does not imply absent later activity or alter graph',"document.querySelector('#side .time-scope').textContent.includes('fixture scope unavailable') && __mig.xt().walk && document.querySelectorAll('.wire.route').length===5 && !document.querySelector('#side .time-scope-summary')");
+    const output=process.env.MIGLOOP_BROWSER_SCREENSHOT_DIR||path.join(repo,'docs/experiments/2026-09-09-trace-fidelity/screenshots');
     fs.mkdirSync(output,{recursive:true});
     const screenshot=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
     const screenshotPath=path.join(output,'02-repair-coverage-'+Date.now()+'.png');
