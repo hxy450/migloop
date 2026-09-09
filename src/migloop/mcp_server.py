@@ -152,13 +152,17 @@ def build_server(backend: Any | None = None) -> Any:
     @srv.tool(**text_options)
     async def search(sid: str, q: str = "", agent: str | None = None, v: int | None = None,
                      since: int | None = None, file: str | None = None, after: bool = False,
-                     since_ts: str | None = None, until_ts: str | None = None, kind: str | None = None) -> str:
-        """字面子串(不区分大小写，不支持正则/OR)。agent+v/since 查该代理输入效应；file+v 查文件生命周期内容。
+                     since_ts: str | None = None, until_ts: str | None = None, kind: str | None = None,
+                     q_any: list[str] | None = None) -> str:
+        """q 是不区分大小写的字面子串（| 不作正则）；q_any 可给 2–8 个字面量 OR，与非空 q 互斥，总展示预算固定。
+        agent+v/since 查该代理输入效应；file+v 查文件生命周期内容。多词逐项列命中/展示/省略，命中不等于历史读写。
         全池必须 until_ts，可加 since_ts；kind=write 查写能力候选。after=True 才列锚点后结果。
         返回范围/缺口；零命中不证明不存在。hits 中精确 via 凭据可独立打开命中节点，不证明历史读写。"""
         ledger, cwd = await _ctx(sid)
         args = dict(q=q, agent=agent, v=v, since=since, file=file, after=after,
                     since_ts=since_ts, until_ts=until_ts, kind=kind)
+        if q_any is not None:
+            args["q_any"] = q_any
         hits: list[dict[str, Any]] = []
         from . import atom_queries
         out = atom_queries.render_text(ledger, cwd, "search", args, navigation_hits=hits)

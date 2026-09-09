@@ -637,7 +637,7 @@ def _consistency(defect: dict[str, Any], ledger: atoms.Ledger | None = None) -> 
             from .evidence_boundary import node_advisories
             warnings.extend(node_advisories(ledger, n, defect["id"]))
         alignment = n.get("entry_effect_alignment") or {}
-        if alignment.get("status") == "earlier_effects_only":
+        if alignment.get("status") == "earlier_effects_only" and alignment.get("entry_declared"):
             versions = sorted({event["effect_v"] for event in alignment["events"]})
             warnings.append({"code": "entry_effect_earlier_only", "level": "warning",
                 "defect": defect["id"], "node": n.get("spec"), "source": "ledger_coordinates",

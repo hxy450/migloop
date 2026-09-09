@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 from typing import Any
+import json
 
 from migloop import atoms, time_scope
 
@@ -312,6 +313,9 @@ def render_file(ledger: atoms.Ledger, hint: str, v: int | None = None, root: str
     lines = ledger.locs
     out = [f"# 文件 {rel(fa['path'], root)} @v{anchor}  (共 {fa['n_versions']} 版)"]
     out.append(f"完整路径: {fa['path']}")
+    if anchor > 0:
+        out.append("从当前节点继续时可照抄：via=" + json.dumps(f"file:{fa['path']}@v{anchor}", ensure_ascii=False)
+                   + "（来处坐标，不证明读写关系）")
     out.append(render_time_scope(fa["time_scope"]))
     out += _scan_note(ledger)
     if vv_anchor is not None:
@@ -542,6 +546,8 @@ def render_agent(ledger: atoms.Ledger, agent_id: str, v: int | None = None,
     if ag.get("description"):
         ident.append(ag["description"])
     out.append("身份: " + " · ".join(ident))
+    out.append("从当前节点继续时可照抄：via=" + json.dumps(f"agent:{ag['id']}@v{anchor}", ensure_ascii=False)
+               + "（来处坐标，不证明读写关系）")
     out.append(f"动作摘要每条至多 {summary_chars} 字；summary_chars=200/600 可展开已有摘要，仍非原文。"
                "动作与引用不因摘要缩短而省略；action 展开完整输入输出。")
     out.append(render_time_scope(ag.get("time_scope") or time_scope.for_atom(ledger, "agent", ag, until=until)))
@@ -1195,10 +1201,16 @@ def _render_window_writes(ledger: atoms.Ledger, q: str, since_ts: str | None, un
 def render_search(ledger: atoms.Ledger, q: str, agent: str | None = None, v: int | None = None,
                   since: int | None = None, file: str | None = None, after: bool = False,
                   since_ts: str | None = None, until_ts: str | None = None, root: str = "",
-                  kind: str | None = None, navigation_hits: list[dict[str, Any]] | None = None) -> str:
+                  kind: str | None = None, navigation_hits: list[dict[str, Any]] | None = None,
+                  q_any: list[str] | None = None) -> str:
     """带起点的按词查找。agent=:只看它喂养第 v 版及之前的记录(或 since_ts/until_ts 时间区间);
     file=:只看它到第 v 版为止的内容和读者。搜索命中可用于调查导航,不证明历史读写或因果关系。
     kind=write:时间窗口里全池有写能力的命令(断点窗口候选),q 可空。"""
+    if q_any is not None:
+        from . import atom_queries
+        args = atom_queries.parameters("search", dict(q=q, q_any=q_any, agent=agent, file=file,
+            v=v, since=since, after=after, since_ts=since_ts, until_ts=until_ts, kind=kind))
+        return _render_multi_search(ledger, args, root, navigation_hits)
     if kind == "write":
         return "\n".join([*_scan_note(ledger), _render_window_writes(ledger, q, since_ts, until_ts, root), _SEARCH_MATCH])
     if not agent and not file:
@@ -1294,4 +1306,138 @@ def render_search(ledger: atoms.Ledger, q: str, agent: str | None = None, v: int
             out.append(f"- {_who(ledger, r['by'], r['at'])} 读 @v{r['v']}{ref} · 命中 {r['n']} 行")
             for ln, snip in r["snips"]:
                 out.append(f"    {'第 ' + str(ln) + ' 行: ' if ln else '(行号未知) '}{snip}")
+    return "\n".join(out)
+
+
+def _render_multi_search(ledger: atoms.Ledger, args: dict[str, Any], root: str,
+                         navigation_hits: list[dict[str, Any]] | None) -> str:
+    """OR-only projection: one total budget, per-literal disclosure, no new facts."""
+    import json
+    from . import search_terms
+    terms = args["q_any"]
+    agent, file, v = args["agent"], args["file"], args["v"]
+    since_ts, until_ts = args["since_ts"], args["until_ts"]
+    notes: list[str] = []
+    if args["kind"] == "write":
+        if not since_ts and not until_ts:
+            raise ValueError("q_any kind=write 必须带 since_ts / until_ts 时间窗口")
+        result = atoms.search_window_writes(ledger, since_ts, until_ts, q_any=terms)
+        rows = result["rows"]
+        scope = f"全池写能力候选 ({since_ts or '…'}, {until_ts or '…'}]"
+        notes.append("范围是分析器登记的写能力候选命令，不证明实际写入；未解析/未登记命令不在此集合。")
+        notes.append(f"扫描对应原始调用的解码 input；原始输入无法取得 {result['unknown_inputs']} 条未查，不用命令摘要代替原文。")
+    elif agent:
+        result = atoms.search_agent(ledger, agent, "", v, args["since"], args["after"],
+                                    since_ts, until_ts, q_any=terms)
+        if result is None:
+            raise ValueError(f"账本里没有该 agent: {agent}")
+        rows = result["hits"]
+        window = (f"时间 [{since_ts or '…'}, {until_ts or '…'}]（按输入/返回各自时刻）" if since_ts or until_ts
+                  else "完整生命周期" if v is None and args["since"] is None
+                  else f"版本窗口 ({args['since'] or 0}, {result['v']}]" + ("，另列窗口外命中" if args["after"] else ""))
+        scope = f"agent={result['agent']} {window}"
+        notes.append(f"只查该 agent 记录；窗口外未展示命中动作 {result['excluded_after']} 个，不证明没有相关信息。")
+    elif file:
+        result = atoms.search_file(ledger, file, "", v, q_any=terms)
+        if result is None:
+            raise ValueError(f"账本里没有该文件: {file}")
+        rows = result["versions"] + result["readers"]
+        scope = f"file={result['path']} ≤v{result['v']} 已知内容及匹配读结果子集"
+        notes.append(f"全文未知 {result['unknown']} 版；部分内容不能证明全文。读者仅含绑定≤v或版本未知者，读取可能更晚，不证明锚点前可用。")
+    else:
+        if not until_ts:
+            raise ValueError("q_any 全池 search 必须带 until_ts 时间上限，或指定 agent/file")
+        result = atoms.search_pool(ledger, "", until_ts, since_ts, q_any=terms)
+        rows = result["rows"]
+        scope = f"全池时间 [{since_ts or '…'}, {until_ts}]"
+        notes.append(f"范围: {result['n_agents']} 个 agent 记录 + {result['n_files']} 个文件的窗口内已知版本；内容未知 {result['unknown_versions']} 版未查；仅部分内容 {result['partial_versions']} 版，不能证明全文。")
+    rows = search_terms.unique_rows(rows)
+    if since_ts or until_ts:
+        notes.append(f"时间未知的候选字段/版本 {result.get('unknown_times', 0)} 条未列入窗口；不拿调用时刻替代未知返回时刻。")
+    chosen = search_terms.fair_rows(rows, terms)
+    head = ["# search 字面量 OR " + json.dumps(terms, ensure_ascii=False), "范围: " + scope, *notes,
+            "匹配: lower() 后字面子串的任一项；| 不作正则。计数按唯一来源记录/字段或文件版本，非词×命中次数。",
+            "来源按记录形态区分，不证明内容真假、历史读取或因果；零命中仅支持此范围内未检索到，不证明不存在。",
+            *_scan_note(ledger)]
+    # Ensure each literal has a representative excerpt before filling remaining
+    # rows. One row may need several excerpts, but the TOTAL budgets stay fixed.
+    wanted: dict[tuple[Any, ...], list[dict[str, Any]]] = {tuple(r["record_key"]): [] for r in chosen}
+    for term in terms:
+        for row in chosen:
+            excerpt = next((e for e in row["excerpts"] if term in e["matched_terms"]), None)
+            if excerpt:
+                dest = wanted[tuple(row["record_key"])]
+                if excerpt not in dest:
+                    dest.append(excerpt)
+                break
+    for row in chosen:
+        key = tuple(row["record_key"])
+        if not wanted[key] and row["excerpts"]:
+            wanted[key].append(row["excerpts"][0])
+    out = list(head)
+    used = sum(len(line) + 1 for line in head)
+    displayed = {term: 0 for term in terms}
+    shown = 0
+    totals = {term: sum(term in r["matched_terms"] for r in rows) for term in terms}
+    file_rows = sum(r.get("field") == "content" and r.get("kind") == "file" for r in rows)
+    def summary_lines() -> list[str]:
+        lines = [f"合并结果: 唯一来源字段/版本 {len(rows)} 条（记录字段 {len(rows) - file_rows}；文件版本 {file_rows}）；"
+                 f"展示 {shown} 条；未展示 {len(rows) - shown} 条。"
+                 f"总预算≤{search_terms.MAX_ROWS}条/{search_terms.MAX_BODY_CHARS}字符，不随词数扩大。"]
+        for term in terms:
+            total = totals[term]
+            lines.append(f"- 词 {json.dumps(term, ensure_ascii=False)}: 命中 {total} 条；片段可见 {displayed[term]} 条；"
+                         f"未展示/片段省略 {total - displayed[term]} 条"
+                         + ("；此范围内未检索到（不是不存在证明）" if not total else ""))
+        lines.append("未展示命中没有导航凭据；需保留相同范围缩小词组或用 action 原文展开。片段字符位置仅属于当前显示的解码字段/读结果子集。")
+        return lines
+    # Reserve actual escaped query size, not term_count * an assumed label size.
+    tail_reserve = sum(len(line) + 1 for line in summary_lines()) + 64
+    if used + tail_reserve > search_terms.MAX_BODY_CHARS:
+        raise ValueError("q_any 范围描述超过总展示预算；请缩短范围标识或查询字面量")
+    labels = {"tool_input": "工具输入", "tool_output": "工具返回", "statement": "消息/自述",
+              "instruction": "指令/注入", "file_content": "文件内容", "other": "其他"}
+    for row in chosen:
+        excerpts = wanted[tuple(row["record_key"])]
+        if not excerpts:
+            continue
+        if row.get("path") and row.get("field") == "content":
+            label = f"{row['path']}@v{row['v']}" + ("（仅部分内容）" if row.get("partial") else "")
+            nav = ("file", row["path"], row["v"])
+        else:
+            aid = row.get("agent") or row.get("by")
+            owner = ledger.agents.get(aid)
+            av = row.get("ver") if row.get("ver") is not None else row.get("at")
+            valid = owner and row.get("seq") is not None and type(av) is int and 1 <= av <= owner.n_versions
+            label = f"agent={aid}" + (f"@v{av}" if valid else "（未核出可导航效应版本）")
+            nav = ("agent", aid, av) if valid else None
+        ref = " " + _ref(row["seq"], row.get("t"), row.get("line")) if row.get("seq") else "（派发词，无动作定位）"
+        meta = " · 只查已记录读结果子集" if row.get("read_subset") else ""
+        if row.get("action_ok") is False:
+            meta += " · 原动作失败，正文仅是记录"
+        if row.get("after"):
+            meta += " · 查询版本窗口外"
+        block = [f"- [{labels[search_terms.source(row)]}] {label} {row.get('field', '')}{ref}{meta}"]
+        visible: set[str] = set()
+        for excerpt in excerpts:
+            visible.update(excerpt["matched_terms"])
+            block += [(f"  观察行 {excerpt['observed_line']} 的字符 " if "observed_line" in excerpt else "  字段字符 ")
+                      + f"[{excerpt['start']},{excerpt['end']})（非 JSONL 字节偏移）"
+                      + ("；前部省略" if excerpt["prefix_omitted"] else "")
+                      + ("；后部省略" if excerpt["suffix_omitted"] else ""), excerpt["text"]]
+        block.append("  此片段可见词: " + json.dumps([t for t in terms if t in visible], ensure_ascii=False))
+        size = sum(len(line) + 1 for line in block)
+        if used + size + tail_reserve > search_terms.MAX_BODY_CHARS:
+            continue
+        out.extend(block)
+        used += size
+        shown += 1
+        for term in visible:
+            displayed[term] += 1
+        if nav and navigation_hits is not None:
+            before = len(navigation_hits)
+            _navigation_hit(ledger, navigation_hits, *nav, row.get("seq"), row.get("field", ""))
+            for hit in navigation_hits[before:]:
+                hit["matched_terms"] = [t for t in terms if t in visible]
+    out.extend(summary_lines())
     return "\n".join(out)

@@ -10,6 +10,7 @@ from . import atoms, coverage, verdict
 SCHEMA = "migloop-draft-check/1"
 MAX_CHARS = 120_000
 MAX_ISSUES = 40
+MAX_ADVISORIES_FOR_ENTRIES = 12
 
 
 def document_hash(data: Any) -> str | None:
@@ -40,6 +41,7 @@ def evaluate(ledger: atoms.Ledger, draft: str, chain_payload: dict[str, Any] | N
         "scope": "仅核此草稿的格式、声明坐标/引用/关系及已提供清单；不认证原因、原文支持程度、实际看过或任务完备。",
         "coverage": None, "identity_bound": False, "ledger": atoms.ledger_identity(ledger),
         "document_sha256": None, "issues": [],
+        "entry_effect_alignments": [], "entry_effect_alignments_omitted": 0,
     }
     issues: list[dict[str, Any]] = []
 
@@ -100,6 +102,12 @@ def evaluate(ledger: atoms.Ledger, draft: str, chain_payload: dict[str, Any] | N
             if n.get("basis"):
                 for side in ("expected_evidence", "actual_evidence"):
                     refs(n["basis"][side], at + ".basis." + side)
+            if n.get("entry_effect_alignment"):
+                if len(out["entry_effect_alignments"]) < MAX_ADVISORIES_FOR_ENTRIES:
+                    out["entry_effect_alignments"].append({"node": n["spec"], "defect": d["id"],
+                                                          **n["entry_effect_alignment"]})
+                else:
+                    out["entry_effect_alignments_omitted"] += 1
         target_binding = d.get("target_binding")
         if target_binding and target_binding.get("status") != "matched":
             add("target_scope_unlocated", target_binding.get("diag") or "文件范围未解析；不创建版本或repair",
@@ -211,6 +219,11 @@ def final_binding(ledger: atoms.Ledger, calls: list[dict[str, Any]] | None, fina
         row.update(verified=True, status=result["status"], counts=result.get("counts"),
                    draft_sha256=raw_hash, document_sha256=digest, issues=returned_issues,
                    omitted_issues=result["omitted_issues"], coverage=result.get("coverage"))
+        # Preserve additional recorded diagnostics without inventing them for
+        # older checks. Their source is the authenticated return, not hindsight.
+        for field in ("entry_effect_alignments", "entry_effect_alignments_omitted"):
+            if field in result:
+                row[field] = result[field]
     last = rows[-1] if rows else None
     matched = bool(last and last["verified"] and last["document_sha256"] == current_hash)
     status = ("not_checked" if not rows else "invalid_final" if current_hash is None else

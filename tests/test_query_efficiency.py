@@ -135,3 +135,18 @@ def test_agent_summary_limit_is_shared_by_http_text(tmp_path, monkeypatch):
             atom_queries.parameters("agent", {"id": MAIN_ID, "summary_chars": value})
     with pytest.raises(ValueError, match="JSON 投影不支持"):
         atom_queries.json_data(led, "agent", args)
+
+
+def test_successful_atom_headers_supply_exact_copyable_via_without_opening_nodes(tmp_path):
+    import json
+    from migloop import via
+    path = "/proj/nested/A.ets"
+    led = _ledger(tmp_path, [*_call("2026-01-01T00:00:00Z", "w", "Write", {"file_path": path, "content": "a"})])
+    state = via.ViaState()
+    for kind, key, text in (("file", path, atoms_text.render_file(led, path, 1)),
+                            ("agent", MAIN_ID, atoms_text.render_agent(led, MAIN_ID, 1))):
+        coordinate = f"{kind}:{key}@v1"
+        assert "via=" + json.dumps(coordinate, ensure_ascii=False) in text
+        assert "不证明读写关系" in text
+        assert via.parse(led, coordinate)["key"] == key
+    assert state.opened == []

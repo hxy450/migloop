@@ -1526,6 +1526,23 @@
           : refs.filter(function (e) { return e.status !== "ok" && e.status !== "drifted"; }).length;
         box.appendChild(el("div", "basis-evidence-note", "引用位置未核 " + bad + " 条；位置可核不证明支持此归因。"));
       } else box.appendChild(el("div", "basis-evidence-note", "历史主张未绑定：保留文字与引用，不核当前位置，也不提供导航。"));
+      var alignment = node.entry_effect_alignment;
+      if (alignment && !rawOnly) {
+        var alignmentBox = el("details", "entry-effect-alignment");
+        alignmentBox.dataset.status = bound ? alignment.status : "unbound";
+        alignmentBox.dataset.source = bound ? "ledger_coordinates" : "unbound_history";
+        alignmentBox.appendChild(el("summary", null, "进入点坐标对账（仅元数据，非语义判定）"));
+        alignmentBox.appendChild(el("div", "basis-note", (bound ? "声明坐标：" : "历史声明坐标，未绑定：")
+          + (node.spec || "agent:" + alignment.anchor_agent + "@v" + alignment.anchor_v)
+          + (alignment.entry_declared ? "；列为进入点" : "；角色标为进入，但未列入 entry")));
+        (alignment.events || []).forEach(function (event) {
+          alignmentBox.appendChild(el("div", "basis-note entry-effect-row", (event.ref || "引用未提供") + " → "
+            + (event.agent || "归属未知") + (Number.isInteger(event.effect_v) ? " 的效应 v" + event.effect_v : "：无正式效应版本")));
+        });
+        if (alignment.events_omitted) alignmentBox.appendChild(el("div", "basis-note", "另有 " + alignment.events_omitted + " 个事件未展开。"));
+        alignmentBox.appendChild(el("div", "basis-note", "只列引用定位到的事件；其他引用仍保留在上面。累计状态与进入事件不是同一概念，不据此改角色、颜色或连边。"));
+        box.appendChild(alignmentBox);
+      }
       box.appendChild(el("div", "basis-note", "内容齐全不代表验证通过；不改变节点角色、图色或缺陷判定。"));
       return box;
     }
@@ -2074,6 +2091,12 @@
           record.appendChild(el("div", null, "覆盖对账（工具原始返回）：覆盖齐全不代表修复已确认。"));
           record.appendChild(el("pre", "draft-check-coverage", JSON.stringify(check.coverage, null, 2)));
         } else record.appendChild(el("div", null, "未提供覆盖诊断。"));
+        if (Array.isArray(check.entry_effect_alignments)) {
+          record.appendChild(el("div", null, "工具当时返回的进入点坐标对账（不是原因认证）："));
+          record.appendChild(el("pre", "draft-check-entry-alignments", JSON.stringify(check.entry_effect_alignments, null, 2)));
+          if (check.entry_effect_alignments_omitted) record.appendChild(el("div", null,
+            "工具另省略 " + check.entry_effect_alignments_omitted + " 个坐标对账；本页不猜补。"));
+        }
         details.appendChild(record);
       });
       box.appendChild(details); host.appendChild(box);

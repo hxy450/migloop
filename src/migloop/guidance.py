@@ -60,6 +60,7 @@ reads=True 显式铺开索引,seen=True 再展开看见的片段,原始全文仍
 summary_chars 默认96，只缩短每条动作摘要，不省略动作或引用；200/600展开已有长摘要，仍不等于原文。
 
 ## search:带起点的按词查找
+`q` 仍是单个字面量（`|` 不是正则 OR）；多个关键词可用 `q_any=["词一","词二"]` 做显式字面量 OR，2–8项，与非空q互斥。每词分别显示命中/已展示/未展示，固定总展示预算；结果并集不表示各词之间有因果关系。
 `search(sid, q, agent=id或名字, v=, since=)` 只在这个 agent 喂养第 v 版及之前的记录里找:派发词、读到的内容、写入内容、
 命令与结果、它自己说的话、收件、注入的技能。命中按种类分组,每条带 (#n@L行)、喂哪一版、下一跳(file / diff / action)。
 锚点之后的命中只计数,不混进因果;范围内零命中只能支持“在这个范围里未检索到”。派发者后来说的话用 since_ts / until_ts
@@ -239,6 +240,7 @@ file/agent 必填真实 v 和 via：照抄已成功打开的 file:<路径>@vN / 
 action/diff/blame/search 不移动；action 优先 ref=照抄完整原文引用（与id/seq二选一），转录标识不是agentID，agent查询复制 id= 字段。
 action 默认同时给输入和输出，短调用无需拆两次；find/offset 仅作用于所选 part，Write 正文或命令要 part=input，返回原文用 part=output。不要对输出搜写入正文。
 默认只给索引/计数，content、reads、seen、m_n、分页按需展开；摘要不是全文。已打开的同一来源上的独立查询可以并行，但不能抢先使用尚未返回的 via/坐标。
+同范围的多个字面量可用 search(q_any=["词一","词二"],...) 合查；不是正则，逐词查看命中/省略，展开原文仍按需要进行。file/agent头部给可照抄的via，不要从名称猜agentID。
 详细帮助按需 guide(topic=...)：evidence 证据与原文边界；search 查询范围；investigation 归因准则；navigation 路线；verdict 完整结论/check；full 全部原指南。
 """
 

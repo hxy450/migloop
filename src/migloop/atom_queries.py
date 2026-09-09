@@ -26,7 +26,7 @@ _DEFAULTS: dict[str, dict[str, Any]] = {
     "blame": {"path": None, "v": None, "start": None, "n": None, "changed": False},
     "diff": {"path": None, "v": None},
     "search": {"q": "", "agent": None, "v": None, "since": None, "file": None, "after": False,
-               "since_ts": None, "until_ts": None, "kind": None},
+               "since_ts": None, "until_ts": None, "kind": None, "q_any": None},
     "action": {"id": None, "seq": None, "ref": None, "max_chars": 20000, "offset": 0, "find": "", "part": None,
                "m_n": 0, "m_from": 1},
     "check": {"draft": None, "file": None},
@@ -77,7 +77,10 @@ def parameters(tool: str, supplied: dict[str, Any]) -> dict[str, Any]:
         raise ValueError("未知查询参数: " + ", ".join(sorted(unknown)))
     out = dict(_DEFAULTS[tool])
     for key, value in values.items():
-        if key in _INTS:
+        if tool == "search" and key == "q_any":
+            from .search_terms import normalize
+            out[key] = normalize(values.get("q", ""), value, http_json=True)
+        elif key in _INTS:
             parsed = optional_int(values, key)
             out[key] = out[key] if parsed is None else parsed
         elif key in _BOOLS:
@@ -91,6 +94,21 @@ def parameters(tool: str, supplied: dict[str, Any]) -> dict[str, Any]:
             raise ValueError(key)
     if tool == "agent" and not 32 <= out["summary_chars"] <= 600:
         raise ValueError("summary_chars 必须在 32–600 之间；完整原文用 action")
+    if tool == "search" and out["q_any"] is not None:
+        from .search_terms import normalize, valid_time
+        out["q_any"] = normalize(out["q"], out["q_any"])
+        if out["agent"] and out["file"]:
+            raise ValueError("q_any 的 agent 与 file 范围互斥")
+        if out["kind"] not in (None, "write"):
+            raise ValueError("q_any 仅支持普通 search 或 kind=write")
+        if out["file"] and any(out[k] not in (None, False) for k in ("since", "after", "since_ts", "until_ts", "kind")):
+            raise ValueError("file 的 q_any 只支持 v 窗口；时间范围请用 agent 或全池查询")
+        if out["kind"] == "write" and any(out[k] is not None for k in ("agent", "file", "v", "since")):
+            raise ValueError("kind=write 的 q_any 只支持全池时间窗口")
+        if any(out[k] is not None and not valid_time(out[k]) for k in ("since_ts", "until_ts")):
+            raise ValueError("q_any 的 since_ts/until_ts 必须是 ISO 时刻")
+        if out["since_ts"] and out["until_ts"] and atoms.ts_norm(out["since_ts"]) > atoms.ts_norm(out["until_ts"]):
+            raise ValueError("q_any 的 since_ts 不能晚于 until_ts")
     if tool == "action":
         if out["ref"] is not None:
             if out["id"] is not None or out["seq"] is not None:

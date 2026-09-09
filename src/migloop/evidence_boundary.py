@@ -33,12 +33,13 @@ def entry_effect_alignment(ledger: Ledger, node: dict[str, Any]) -> dict[str, An
     effects may legitimately explain cumulative state. Never reinterpret a read,
     text record, or feeding slot as an effect version to obtain a comparison.
     """
-    if not (node.get("ok") and node.get("entry") and node.get("kind") == "agent"
+    if not (node.get("ok") and node.get("kind") == "agent"
             and node.get("role") in ("进入·错", "进入·缺") and node.get("basis")):
         return None
     result: dict[str, Any] = {
         "schema": "migloop-entry-effect-alignment/1", "status": "indeterminate",
         "anchor_agent": node["key"], "anchor_v": node["v"], "events": [],
+        "entry_declared": node.get("entry") is True,
         "events_omitted": 0, "source": "ledger_coordinates", "semantic_checked": False,
         "note": "只比较声明进入点与实际侧引用的效应版本，不认证进入原因或首次发生时刻。",
     }

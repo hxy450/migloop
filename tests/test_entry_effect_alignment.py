@@ -83,5 +83,21 @@ def test_ambiguous_context_later_evidence_and_nonentry_are_not_earlier_only(tmp_
     assert rows == []
     if change in ("read", "file_ref", "missing_ref"):
         assert resolved["entry_effect_alignment"]["status"] == "indeterminate"
-    if change in ("not_entry", "propagation", "normal", "unbound"):
+    if change == "not_entry":
+        assert resolved["entry_effect_alignment"]["entry_declared"] is False
+        assert resolved["entry_effect_alignment"]["status"] == "earlier_effects_only"
+    if change in ("propagation", "normal", "unbound"):
         assert "entry_effect_alignment" not in resolved
+
+
+def test_mixed_sources_still_show_exact_metadata_without_a_semantic_warning(tmp_path):
+    ledger, refs, doc = fixture(tmp_path)
+    defect = doc["defects"][0]
+    defect["entry"] = []
+    defect["nodes"][0]["basis"]["actual_evidence"].append(refs["read"])
+    checked = draft_check.evaluate(ledger, json.dumps(doc))
+    assert not any(row["code"] == "entry_effect_earlier_only" for row in checked["issues"])
+    alignment = checked["entry_effect_alignments"][0]
+    assert alignment["status"] == "indeterminate" and alignment["entry_declared"] is False
+    assert [row["effect_v"] for row in alignment["events"]] == [1, 2, None]
+    assert alignment["semantic_checked"] is False

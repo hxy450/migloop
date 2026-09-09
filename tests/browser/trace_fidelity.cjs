@@ -192,6 +192,13 @@ const server=http.createServer((req,res)=>{
           {type:'action',ref:'#missing:44@L44',status:'ok',aid:'agent-missing',v:8,seq:44});
         Object.assign(body.roles['agent-a'][i],{basis:value,basis_evidence_bad:1});
         Object.assign(body.structured.defects[i].nodes[0],{basis:structuredClone(value),basis_evidence_bad:1});
+        if(i===0){
+          const alignment={schema:'migloop-entry-effect-alignment/1',status:'indeterminate',anchor_agent:'agent-a',anchor_v:1,
+            entry_declared:false,source:'ledger_coordinates',semantic_checked:false,events_omitted:2,
+            events:[{ref:'#a:41@L41',agent:'agent-a',seq:41,effect_v:1},{ref:'#a:43@L43',agent:'agent-a',seq:43,effect_v:null}]};
+          body.roles['agent-a'][i].entry_effect_alignment=structuredClone(alignment);
+          body.structured.defects[i].nodes[0].entry_effect_alignment=structuredClone(alignment);
+        }
       }
       if(run==='with-basis-unbound') body.structured.identity={bound:false,match:false,status:'mismatch'};
     }
@@ -659,6 +666,7 @@ async function main(){
     await evaluate(clickAgent);
     await until("document.querySelector('#side .attribution-basis')!==null");
     await check('reason drawer exposes each defect own attribution basis without assigning verification',"document.querySelectorAll('#side .attribution-basis').length===2 && document.querySelector('#side .attribution-basis').textContent.includes('当时要求') && document.querySelector('#side .attribution-basis').textContent.includes('实际输出') && document.querySelector('#side .attribution-basis').textContent.includes('反证边界') && __mig.probe().roles['agent-a'].every(n=>n.checked==='not_checked')");
+    await check('entry coordinate metadata preserves unknown effect versions and omitted counts',"document.querySelector('#side .entry-effect-alignment').dataset.source==='ledger_coordinates' && document.querySelector('#side .entry-effect-alignment').textContent.includes('无正式效应版本') && document.querySelector('#side .entry-effect-alignment').textContent.includes('另有 2 个事件未展开') && document.querySelector('#side .entry-effect-alignment').textContent.includes('未列入 entry') && !document.querySelector('#side .entry-effect-alignment button,#side .entry-effect-alignment .lnk') && JSON.stringify(__mig.probe().trajectory.visits)===window.beforeBasisVisits");
     await evaluate("[...document.querySelectorAll('.dchips span')].find(n=>n.textContent.startsWith('B ')).click()");
     await check('switching defects isolates both structured and drawer attribution',"document.querySelectorAll('#probe .attribution-basis').length===1 && document.querySelectorAll('#side .attribution-basis').length===1 && document.querySelector('#side .attribution-basis').textContent.includes('B EXPECTED') && !document.querySelector('#side .attribution-basis').textContent.includes('A EXPECTED') && !document.querySelector('#probe .attribution-basis').textContent.includes('A EXPECTED')");
     await evaluate("document.querySelector('#side .attribution-basis').open=true;document.querySelector('#side .basis-actual-evidence .lnk').click()");
@@ -666,6 +674,7 @@ async function main(){
     await evaluate("__mig.load('with-basis-unbound')");
     await until("__mig.probe().structured.identity.bound===false && document.querySelector('#probe .attribution-basis')");
     await check('unbound attribution retains text without source validation or action links',"document.querySelector('#probe .attribution-basis').textContent.includes('EXPECTED') && document.querySelector('#probe .attribution-basis').textContent.includes('历史引用未绑定') && !document.querySelector('.attribution-basis .lnk,.attribution-basis .more,.attribution-basis .verow.ok') && !document.querySelector('#canvas .node.p-chain')");
+    await check('unbound entry coordinate metadata stays historical, not revalidated',"document.querySelector('.entry-effect-alignment').dataset.status==='unbound' && document.querySelector('.entry-effect-alignment').dataset.source==='unbound_history' && document.querySelector('.entry-effect-alignment').textContent.includes('历史声明坐标，未绑定')");
     await evaluate("__mig.load('action-steps')");
     await until("__mig.probe().runDir==='action-steps' && __mig.xt()?.evidenceMode");
     await evaluate("window.actionSnapshot=JSON.stringify({trace:__mig.probe().trajectory,steps:__mig.probe().steps,graph:__mig.probe().evidence_graph,root:__mig.xt().root,ids:Object.keys(__mig.xt().byId)});[...document.querySelectorAll('#probe .st')].find(n=>n.querySelector('.no').textContent==='#8').click()");

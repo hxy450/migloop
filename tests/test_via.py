@@ -59,6 +59,29 @@ def test_first_move_only_from_sessions_then_only_from_opened_nodes(tmp_path: Any
     assert via.describe(led, st) == "file:A.ets@v2、file:A.ets@v1、agent:conv-a@v1"
 
 
+def test_first_self_via_rejection_explains_retry_without_opening_anything(tmp_path):
+    led = _pool(tmp_path)
+    state = via.ViaState()
+    destination = ("file", "/proj/entry/A.ets", 2)
+    text = via.check(led, state, "file:entry/A.ets@v2", destination)
+    assert text.startswith("⛔") and "改用 via=sessions" in text
+    assert "本次未打开目标" in text and state.opened == []
+    assert via.check(led, state, "sessions", destination) is None
+    assert state.opened == []  # Validation itself never claims a tool returned.
+
+
+def test_exact_error_choices_are_bounded_but_do_not_remove_opened_nodes(tmp_path):
+    led = _pool(tmp_path)
+    state = via.ViaState()
+    for version in range(1, 13):
+        state.open(("file", "/exact/nested/A.ets", version))
+    before = list(state.opened)
+    text = via.describe(led, state, exact=True, limit=8)
+    assert "file:/exact/nested/A.ets@v12" in text and "另有 4 个" in text
+    assert "@v1、" not in text
+    assert state.opened == before and state.has(before[0])
+
+
 def test_parse_resolves_main_session_and_keeps_version_as_written(tmp_path: Any) -> None:
     led = _pool(tmp_path)
     p = via.parse(led, f"agent:{MAIN_ID}@v2 派发")

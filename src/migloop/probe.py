@@ -54,7 +54,8 @@ def _step_scope(tool: str, inp: dict[str, Any]) -> str:
         win = f"v{inp['since']}→{v}" if inp.get("since") is not None and v is not None else (vs.strip() or "全程")
         return win + (" 到 " + str(inp["until"]) if inp.get("until") else "") + (" 不含读取" if inp.get("reads") is False else "")
     if tool == "search":
-        return "搜索窗口" + vs
+        terms = inp.get("q_any")
+        return "搜索窗口" + vs + (" · 字面量 OR：" + json.dumps(terms, ensure_ascii=False) if isinstance(terms, list) else "")
     if tool == "action":
         return "原文 " + str(inp.get("ref") or f"#{inp.get('seq')}") + (f" {inp['part']}" if inp.get("part") else "")
     if tool == "sessions":

@@ -21,6 +21,7 @@ FIRST_TAGS = ("sessions", "task")
 SEARCH_RE = re.compile(r"^search:([0-9a-f]{24}):(\d+)(?=\s|$)")
 SEARCH_RECEIPT = "MIGLOOP_SEARCH_RECEIPT "
 SEARCH_SCHEMA = "migloop-search/1"
+SEARCH_OR_SCHEMA = "migloop-search/2"
 SEARCH_DEFAULTS: dict[str, Any] = {"q": "", "agent": None, "v": None, "since": None, "file": None,
                                     "after": False, "since_ts": None, "until_ts": None, "kind": None}
 REJECT = "⛔"
@@ -109,12 +110,22 @@ class ViaState:
 
 
 def search_args(args: dict[str, Any]) -> dict[str, Any]:
-    return {key: args.get(key, default) for key, default in SEARCH_DEFAULTS.items()}
+    if not isinstance(args, dict):
+        raise ValueError("search 参数必须是对象")
+    out = {key: args.get(key, default) for key, default in SEARCH_DEFAULTS.items()}
+    if args.get("q_any") is not None:
+        from . import atom_queries
+        normalized = atom_queries.parameters("search", {**out, "q_any": args["q_any"]})
+        out = {key: normalized[key] for key in SEARCH_DEFAULTS}
+        out["q_any"] = normalized["q_any"]
+    return out
 
 
 def search_return(ledger: atoms.Ledger, state: ViaState, args: dict[str, Any], text: str,
                   hits: list[dict[str, Any]]) -> str:
     """只给渲染器实际展示的精确命中发导航凭据;不解析片段中的自述坐标。"""
+    normalized_args = search_args(args)
+    multi = normalized_args.get("q_any") is not None
     token = secrets.token_hex(12)
     targets: list[dict[str, Any]] = []
     for hit in hits:
@@ -124,12 +135,21 @@ def search_return(ledger: atoms.Ledger, state: ViaState, args: dict[str, Any], t
         node, _ = target(ledger, kind, key, v)
         if node != (kind, key, v):
             continue
+        if multi:
+            shown_terms = hit.get("matched_terms")
+            if not isinstance(shown_terms, list) or not shown_terms \
+                    or any(not isinstance(t, str) for t in shown_terms) \
+                    or len(set(shown_terms)) != len(shown_terms) \
+                    or not set(shown_terms) <= set(normalized_args["q_any"]):
+                continue
         number = len(targets) + 1
         targets.append({"hit": number, "kind": kind, "key": key, "v": v, "seq": hit.get("seq"),
                         "field": hit.get("field"), "via": f"search:{token}:{number}"})
+        if multi:
+            targets[-1]["matched_terms"] = list(hit.get("matched_terms") or [])
     body = text + "\n搜索导航: 下列 hits 的 via 可直接打开其精确 kind/key/v;只证明本次搜索返回命中,不证明历史读取或因果。"
-    receipt = {"schema": SEARCH_SCHEMA, "id": token, "ledger": atoms.ledger_identity(ledger),
-               "args": search_args(args), "body_sha256": hashlib.sha256(body.encode("utf-8")).hexdigest(), "hits": targets}
+    receipt = {"schema": SEARCH_OR_SCHEMA if multi else SEARCH_SCHEMA, "id": token, "ledger": atoms.ledger_identity(ledger),
+               "args": normalized_args, "body_sha256": hashlib.sha256(body.encode("utf-8")).hexdigest(), "hits": targets}
     state.searches[token] = receipt
     return body + "\n" + SEARCH_RECEIPT + json.dumps(receipt, ensure_ascii=False, separators=(",", ":"))
 
@@ -141,11 +161,13 @@ def search_receipt(text: str, args: dict[str, Any]) -> dict[str, Any] | None:
         return None
     try:
         row = json.loads(footer)
+        normalized_args = search_args(args)
     except (ValueError, TypeError):
         return None
-    if not isinstance(row, dict) or row.get("schema") != SEARCH_SCHEMA \
+    schema = SEARCH_OR_SCHEMA if normalized_args.get("q_any") is not None else SEARCH_SCHEMA
+    if not isinstance(row, dict) or row.get("schema") != schema \
             or not isinstance(row.get("id"), str) or not re.fullmatch(r"[0-9a-f]{24}", row["id"]) \
-            or row.get("args") != search_args(args) \
+            or row.get("args") != normalized_args \
             or row.get("body_sha256") != hashlib.sha256(body.encode("utf-8")).hexdigest() \
             or not isinstance(row.get("ledger"), str) or not row["ledger"] or not isinstance(row.get("hits"), list):
         return None
@@ -154,6 +176,11 @@ def search_receipt(text: str, args: dict[str, Any]) -> dict[str, Any] | None:
                 or not isinstance(hit.get("key"), str) or type(hit.get("v")) is not int or hit["v"] < 1 \
                 or hit.get("via") != f"search:{row['id']}:{i}":
             return None
+        if schema == SEARCH_OR_SCHEMA:
+            matched = hit.get("matched_terms")
+            if not isinstance(matched, list) or not matched or any(not isinstance(t, str) for t in matched) \
+                    or len(set(matched)) != len(matched) or not set(matched) <= set(normalized_args["q_any"]):
+                return None
     return row
 
 
@@ -242,14 +269,18 @@ def label(ledger: atoms.Ledger, node: Node) -> str:
     return f"agent:{name}" + (f"@v{v}" if v is not None else "(整个)")
 
 
-def describe(ledger: atoms.Ledger, state: ViaState) -> str:
-    return "、".join(label(ledger, n) for n in state.opened) or "(还没打开任何节点)"
+def describe(ledger: atoms.Ledger, state: ViaState, *, exact: bool = False, limit: int | None = None) -> str:
+    rows = state.opened if limit is None else state.opened[-limit:]
+    names = [f"{kind}:{key}@v{v}" if exact else label(ledger, (kind, key, v)) for kind, key, v in rows]
+    omitted = len(state.opened) - len(rows)
+    return ("、".join(names) + (f"；另有 {omitted} 个已打开节点，原调用记录可查" if omitted else "")) \
+        if names else "(还没打开任何节点)"
 
 
 def check(ledger: atoms.Ledger, state: ViaState, via: str, destination: Node | None = None) -> str | None:
     """file / agent 调用前校验 via。返回 None = 放行;否则返回给模型看的错误文本(以 ⛔ 开头,调用不执行;probe 按这个前缀识别被拒)。"""
     pv = parse(ledger, via)
-    opened = describe(ledger, state)
+    opened = describe(ledger, state, exact=True, limit=8)
     if pv["search"]:
         receipt = state.searches.get(pv["search"])
         if receipt is None or receipt.get("ledger") != atoms.ledger_identity(ledger):
@@ -274,4 +305,6 @@ def check(ledger: atoms.Ledger, state: ViaState, via: str, destination: Node | N
         return None
     same_key = [n for n in state.opened if n[0] == node[0] and n[1] == node[1]]
     hint = f"你打开的是 {'、'.join(label(ledger, n) for n in same_key)},版本对不上。" if same_key else ""
+    if not state.opened:
+        hint += "当前没有已打开节点；若这是首次版本查询，请保持目标不变、改用 via=sessions 重试。本次未打开目标。"
     return f"⛔ via 不是已打开的节点:{pv['text'][:80]}。{hint}打开了什么只能从什么跳。已打开:{opened}"

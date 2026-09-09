@@ -665,27 +665,62 @@ def version_at(ledger: Ledger, path: str, ts: str) -> int:
 
 
 def search_window_writes(ledger: Ledger, since_ts: str | None, until_ts: str | None,
-                         q: str = "", cap: int = 60) -> dict[str, Any]:
+                         q: str = "", cap: int = 60, *, q_any: list[str] | None = None) -> dict[str, Any]:
     """时间窗口 (since_ts, until_ts] 里全池有写能力的命令,q 过滤命令文本。只按时间圈,不解析脚本。"""
+    from . import search_terms
+    terms = search_terms.normalize(q, q_any)
     by_seq = {act.seq: (a, act) for a in ledger.agents.values() for act in a.actions}
     ql = (q or "").lower()
     rows: list[dict[str, Any]] = []
     n = 0
+    missing_input = 0
+    unknown_times = 0
     for ts, seq, aid in ledger.write_cmds:
-        if (since_ts and ts <= since_ts) or (until_ts and ts > until_ts):
+        if terms and not search_terms.valid_time(ts):
+            unknown_times += 1
+            continue
+        key = ts_norm(ts) if terms else ts
+        if (since_ts and key <= (ts_norm(since_ts) if terms else since_ts)) \
+                or (until_ts and key > (ts_norm(until_ts) if terms else until_ts)):
             continue
         _a, act = by_seq[seq]
         cmd = str(act.detail.get("cmd") or act.detail.get("args") or "")
-        if ql and ql not in cmd.lower():
+        if terms:
+            original_input = None
+            if act.src is not None:
+                path, use, _ = act.src
+                try:
+                    lines = _transcript_lines(path)
+                    if type(use) is int and use >= 0:
+                        record = json.loads(lines[use])
+                        if isinstance(record, dict):
+                            original_input = _record_texts(record, act).get("input")
+                except (OSError, IndexError, ValueError, TypeError):
+                    pass
+            if original_input is None:
+                missing_input += 1
+                continue
+            cmd = original_input
+        matched = search_terms.scan(cmd, terms) if terms else None
+        if (terms and matched is None) or (not terms and ql and ql not in cmd.lower()):
             continue
         n += 1
-        if len(rows) >= cap:
+        if not terms and len(rows) >= cap:
             continue
         effects = ", ".join(f"写 {f.path.rsplit('/', 1)[-1]}@v{f.v}" for f in act.files if f.op != "read")
         rows.append({"ts": ts, "t": rel_time(ts, ledger.t0), "seq": seq, "by": aid,
                      "by_ver": act.ver if act.ver is not None else act.at, "cmd": cmd[:160],
                      "effects": effects, "unresolved": act.detail.get("unresolved")})
-    return {"rows": rows, "n": n, "n_agents": len(ledger.agents)}
+        if terms:
+            rows[-1].update(matched or {})
+            rows[-1].update(record_key=("action", aid, seq, "input"), agent=aid, field="input",
+                            kind=act.kind, tool=act.tool, at=act.at, ver=act.ver,
+                            line=ledger.locs.get(seq), action_ok=act.ok)
+    result = {"rows": rows, "n": n, "n_agents": len(ledger.agents)}
+    if terms:
+        result["unknown_inputs"] = missing_input
+        result["unknown_times"] = unknown_times
+    return result
 
 
 def _command_mentions(stories: dict[str, FileStory], agents: dict[str, AgentRec]) -> dict[str, list[Mention]]:
@@ -1335,10 +1370,12 @@ def _snips(text: str, ql: str, cap: int = 3) -> tuple[list[tuple[int | None, str
 
 def search_agent(ledger: Ledger, agent_id: str, q: str, v: int | None = None, since: int | None = None,
                  after: bool = False, since_ts: str | None = None,
-                 until_ts: str | None = None) -> dict[str, Any] | None:
+                 until_ts: str | None = None, *, q_any: list[str] | None = None) -> dict[str, Any] | None:
     """在一个 agent 的记录里找词,只看喂养第 v 版及之前的(since 给了只看 (since, v]);派发者可改用时间区间
     since_ts / until_ts(由文件时间线上的两个版本给出)。锚点之后的命中只计数(after=True 才列),不混进因果。
     命中的字段按记录种类:工具动作看 input / output,说 / 想看正文,指令 / 收件 / 注入看文本。"""
+    from . import search_terms
+    terms = search_terms.normalize(q, q_any)
     a = resolve_agent(ledger, agent_id)
     if a is None:
         return None
@@ -1347,10 +1384,17 @@ def search_agent(ledger: Ledger, agent_id: str, q: str, v: int | None = None, si
     anchor = n if v is None else max(0, min(v, n))
     hits: list[dict[str, Any]] = []
     excluded = 0
-    if a.prompt and ql in a.prompt.lower() and not (since_ts or until_ts):
-        snips, cnt = _snips(a.prompt, ql)
+    unknown_times = 0
+    prompt_match = search_terms.scan(a.prompt, terms) if terms and a.prompt else None
+    if a.prompt and (prompt_match is not None if terms else ql in a.prompt.lower()) and not (since_ts or until_ts):
+        snips, cnt = ([], 0) if terms else _snips(a.prompt, ql)
         hits.append({"kind": "prompt", "tool": "prompt", "seq": None, "line": None, "at": 1, "ver": None,
                      "ts": "", "t": "", "field": "text", "target": None, "snips": snips, "n": cnt})
+        if terms:
+            hits[-1].update(prompt_match or {})
+            hits[-1].pop("n")
+            hits[-1].pop("snips")
+            hits[-1].update(record_key=("prompt", a.id), agent=a.id)
     for act in a.actions:
         if act.src is None:
             continue
@@ -1358,6 +1402,8 @@ def search_agent(ledger: Ledger, agent_id: str, q: str, v: int | None = None, si
         if since_ts or until_ts:
             start, end = sorted((ts_norm(act.ts), ts_norm(act.done_ts or act.ts)))
             known_extent = act.done_ts is not None or act.src[1] == act.src[2]
+            if terms and not (search_terms.valid_time(act.ts) and search_terms.valid_time(act.done_ts or act.ts)):
+                known_extent = False
             if known_extent and ((since_ts and end < ts_norm(since_ts)) or (until_ts and start > ts_norm(until_ts))):
                 continue
             in_window = True
@@ -1369,6 +1415,7 @@ def search_agent(ledger: Ledger, agent_id: str, q: str, v: int | None = None, si
         idxs = [ui] + ([ri] if ri is not None and ri != ui else [])
         fields: dict[str, str] = {}
         field_times: dict[str, str] = {}
+        term_matches: dict[str, dict[str, Any]] = {}
         for i in idxs:
             if i is None or i >= len(lines):
                 continue
@@ -1378,6 +1425,13 @@ def search_agent(ledger: Ledger, agent_id: str, q: str, v: int | None = None, si
                 continue
             for fld, text in _record_texts(rec, act).items():
                 field_ts = str(rec.get("timestamp") or (act.done_ts if fld == "output" else act.ts) or act.ts)
+                if terms and (since_ts or until_ts):
+                    # Missing result time is not the invocation time. Keep a
+                    # gap count instead of presenting it inside a precise window.
+                    field_ts = str(rec.get("timestamp") or (act.done_ts if fld == "output" else act.ts) or "")
+                    if not search_terms.valid_time(field_ts):
+                        unknown_times += 1
+                        continue
                 if ((since_ts and ts_norm(field_ts) < ts_norm(since_ts))
                         or (until_ts and ts_norm(field_ts) > ts_norm(until_ts))):
                     continue
@@ -1390,14 +1444,17 @@ def search_agent(ledger: Ledger, agent_id: str, q: str, v: int | None = None, si
                 if act.kind not in ("say", "think", "inbox", "instruction", "inject", "system", "notify", "interrupt") \
                         and fld not in ("input", "output"):
                     continue
-                if ql in text.lower():
+                matched = search_terms.scan(text, terms) if terms else None
+                if matched is not None if terms else ql in text.lower():
                     fields[fld] = text
                     field_times[fld] = field_ts
+                    if matched is not None:
+                        term_matches[fld] = matched
         if not in_window and not after:
             excluded += bool(fields)
             continue
         for fld, text in fields.items():
-            snips, cnt = _snips(text, ql)
+            snips, cnt = ([], 0) if terms else _snips(text, ql)
             target = None
             rs = [ref.path for ref in act.files if ref.op == "read"]
             ws = [ref.path for ref in act.files if ref.op != "read"]
@@ -1416,12 +1473,23 @@ def search_agent(ledger: Ledger, agent_id: str, q: str, v: int | None = None, si
                                        if mention_effect(ledger, p, act.seq) is None]
                                       if fld == "input" and not ws else []),
                          "after": not in_window, "snips": snips, "n": cnt})
-    return {"agent": a.id, "label": _agent_label(ledger.agents, a.id) or a.id, "q": q, "v": anchor, "since": since,
-            "since_ts": since_ts, "until_ts": until_ts, "hits": hits, "excluded_after": excluded}
+            if terms:
+                hits[-1].update(term_matches[fld])
+                hits[-1].pop("n")
+                hits[-1].pop("snips")
+                hits[-1].update(record_key=("action", a.id, act.seq, fld), agent=a.id, action_ok=act.ok)
+    result = {"agent": a.id, "label": _agent_label(ledger.agents, a.id) or a.id, "q": q, "v": anchor, "since": since,
+              "since_ts": since_ts, "until_ts": until_ts, "hits": hits, "excluded_after": excluded}
+    if terms:
+        result["unknown_times"] = unknown_times
+    return result
 
 
-def search_file(ledger: Ledger, hint: str, q: str, v: int | None = None) -> dict[str, Any] | None:
+def search_file(ledger: Ledger, hint: str, q: str, v: int | None = None, *,
+                q_any: list[str] | None = None) -> dict[str, Any] | None:
     """在一个文件到第 v 版为止的内容里找词:哪几版含它(首次出现在第几版、谁写的),哪些读者的读结果里命中过。"""
+    from . import search_terms
+    terms = search_terms.normalize(q, q_any)
     path = find_story_path(ledger.stories, hint)
     if path is None:
         return None
@@ -1431,18 +1499,49 @@ def search_file(ledger: Ledger, hint: str, q: str, v: int | None = None) -> dict
     rows = []
     for ver in vers:
         body, partial = (ver.content, False) if ver.content is not None else (ver.partial, True)
-        if body is None or ql not in body.lower():
+        matched = search_terms.scan(body, terms) if terms and body is not None else None
+        if body is None or (matched is None if terms else ql not in body.lower()):
             continue
         snips = []
-        for i, ln in enumerate(body.split("\n"), 1):
+        for i, ln in enumerate(body.split("\n") if not terms else [], 1):
             if ql in ln.lower():
                 snips.append((0 if partial else i, _WS.sub(" ", ln).strip()[:160]))
         rows.append({"v": ver.v, "by": ver.by, "by_ver": ver.by_ver, "seq": ver.act_seq,
                      "line": ledger.locs.get(ver.act_seq or -1), "t": rel_time(ver.ts, ledger.t0),
                      "snips": snips[:3], "n": len(snips), "partial": partial})
+        if terms:
+            rows[-1].update(matched or {})
+            rows[-1].pop("n")
+            rows[-1].pop("snips")
+            rows[-1].update(record_key=("file", path, ver.v, "content"), path=path, field="content", kind="file")
     readers = []
     for r in st.reads:
         if not r.seen:
+            continue
+        if terms:
+            if v is not None and r.version is not None and r.version > v:
+                continue
+            # Observed lines may have gaps. Never concatenate non-adjacent lines
+            # into a fictitious multiline literal match or original field slice.
+            line_matches = []
+            found: set[str] = set()
+            for ln, text in r.seen:
+                match = search_terms.scan(text, terms)
+                if match and set(match["matched_terms"]) - found:
+                    line_matches.append((ln, match))
+                    found.update(match["matched_terms"])
+                if len(found) == len(terms):
+                    break  # counts are source fields, not repeated line/term hits
+            if not line_matches:
+                continue
+            matched = {"matched_terms": [term for term in terms if any(term in m["matched_terms"] for _, m in line_matches)],
+                       "excerpts": [{**e, "observed_line": ln} for ln, m in line_matches for e in m["excerpts"]]}
+            seq = ledger.read_act.get((path, r.seq))
+            readers.append({"by": r.by, "agent": r.by, "at": ledger.feeds.get((path, r.seq)),
+                            "v": r.version, "seq": seq, "line": ledger.locs.get(seq or -1),
+                            "t": rel_time(r.ts, ledger.t0), "field": "output", "kind": "read",
+                            "record_key": ("action", r.by, seq, "output") if seq is not None else ("observation", path, r.seq),
+                            "read_subset": True, **matched})
             continue
         got = [(ln, _WS.sub(" ", t).strip()[:160]) for ln, t in r.seen if ql in t.lower()]
         if got:
@@ -1455,9 +1554,14 @@ def search_file(ledger: Ledger, hint: str, q: str, v: int | None = None) -> dict
             "first": rows[0]["v"] if rows else None, "versions": rows, "readers": readers}
 
 
-def search_pool(ledger: Ledger, q: str, until_ts: str, since_ts: str | None = None) -> dict[str, Any]:
+def search_pool(ledger: Ledger, q: str, until_ts: str, since_ts: str | None = None, *,
+                q_any: list[str] | None = None) -> dict[str, Any]:
     """全池按词查,只允许带时间上限:until_ts 之前所有 agent 的记录 + 所有文件到那一刻为止的已知内容。
     用途是核否定 —— 「生成期没人见过 X」只能引用这种范围的零命中;找上游仍要走 agent / file 的边。"""
+    from . import search_terms
+    terms = search_terms.normalize(q, q_any)
+    if terms:
+        return _search_pool_any(ledger, terms, until_ts, since_ts)
     ql = q.lower()
     until_key = ts_norm(until_ts)
     since_key = ts_norm(since_ts) if since_ts else None
@@ -1513,3 +1617,42 @@ def search_pool(ledger: Ledger, q: str, until_ts: str, since_ts: str | None = No
                            "n": len(hits), "first": h, "sources": sources})
     return {"q": q, "until_ts": until_ts, "since_ts": since_ts, "files": files, "agents": agents,
             "unknown_versions": unknown, "n_agents": len(ledger.agents), "n_files": len(ledger.stories)}
+
+
+def _search_pool_any(ledger: Ledger, terms: list[str], until_ts: str,
+                     since_ts: str | None) -> dict[str, Any]:
+    """One pass per source; do not lose later/rare literals to first-union-hit compression."""
+    from . import search_terms
+    rows: list[dict[str, Any]] = []
+    unknown = 0
+    partial = 0
+    unknown_times = 0
+    for path, story in ledger.stories.items():
+        for ver in story.versions:
+            if not search_terms.valid_time(ver.ts):
+                unknown_times += 1
+                continue
+            stamp = ts_norm(ver.ts)
+            if stamp > ts_norm(until_ts) or (since_ts and stamp < ts_norm(since_ts)):
+                continue
+            body = ver.content if ver.content is not None else ver.partial
+            if body is None:
+                unknown += 1
+                continue
+            partial += ver.content is None
+            matched = search_terms.scan(body, terms)
+            if matched:
+                rows.append({"path": path, "v": ver.v, "by": ver.by, "by_ver": ver.by_ver,
+                             "seq": ver.act_seq, "line": ledger.locs.get(ver.act_seq or -1),
+                             "t": rel_time(ver.ts, ledger.t0), "partial": ver.content is None,
+                             "record_key": ("file", path, ver.v, "content"), "field": "content", "kind": "file",
+                             **matched})
+    for aid in ledger.agents:
+        result = search_agent(ledger, aid, "", since_ts=since_ts or ledger.t0 or "0",
+                              until_ts=until_ts, q_any=terms)
+        unknown_times += (result or {}).get("unknown_times", 0)
+        rows.extend(h for h in (result or {}).get("hits", []) if h.get("seq") is not None)
+    return {"q_any": terms, "rows": search_terms.unique_rows(rows), "unknown_versions": unknown,
+            "partial_versions": partial, "unknown_times": unknown_times,
+            "n_agents": len(ledger.agents), "n_files": len(ledger.stories),
+            "since_ts": since_ts, "until_ts": until_ts}
