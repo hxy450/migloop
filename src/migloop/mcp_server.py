@@ -102,6 +102,8 @@ spec 时凭什么」用 search(q, agent=主会话, v=那一版) 按词切,不要
 
 ## 结论要求
 正式产出用下面的结构化结论,无需再逐环写一份同义散文。可加不超过一小段的中文摘要。
+nodes 只收该项问题段与判定所必需的证据边界;正常上游一句即可。其余查过的节点会自动由调用轨迹展示,
+不必为了画图把所有查询再写成结论,也不必为每个修复前后坐标重读一遍全文。索引打开与正文查看是不同范围,据实记录。
 每条缺陷分别解释生成行为、当时适用的要求、后续修改和依据;一个节点只总结它在这条缺陷中的具体作用。
 标“进入·错”之前,必须实际打开与该缺陷有关的输入原文/片段及生成实现,证明要求在当时适用且未满足;
 不要求把所有上游全文读完,也不能因只打开文件索引就声称核完输入。
@@ -111,6 +113,10 @@ spec 时凭什么」用 search(q, agent=主会话, v=那一版) 按词切,不要
 后续新增不自动是生成 agent 的错误;每份输入也不是天然都应包含这项要求,不得把输入全标成缺。
 找到局部错误且依据充分可以停止该支上溯;无法确认则保留边界。批量生成/池外仅是边界,不是正确性证明。
 引用更多、打开更深不等于更准确。优先覆盖实际修复事项,明确未解释项,不为凑链而加节点或归罪。
+先用正向证据说明要求何时被派发、实际改了什么。已查明后续新增要求且没有更早适用依据时,可以写“未确认早期义务”并停止该支;
+不必为了认证不存在而反复枚举关键词。标题优先写可观测变化,例如“测试阶段加入参数桥”,不把检索边界藏在“非生成遗漏”这类绝对标题后。
+纯新增代码不证明没有行为回归;端点文本无差异也不证明期间没有写入或修改后还原。没有相应测试证据时,不要写“不影响原有逻辑”。
+没有展开后续读者/构建者的记录时,只能写“尚未核验”,不能写“不存在后置验证”;概括时也不要把“我没读到”改成“没有”。
 凡是写「没有 / 零命中 / 从没读过 / 无人」,后面必须跟工具输出的「范围」行(哪些 agent、哪些文件、到哪一刻、内容未知几版);
 没有全池 until_ts 查询撑腰的,只能写成「X 在这个范围内未检索到」。
 出现「提及索引不完备」时,先 index(kind=scan) 查缺口,再 action(part=input/output, offset=…/find=…) 看原文。
@@ -150,14 +156,30 @@ defects:
         evidence: ["#标识:n@L行", "file:<路径>@v<N>"]
     edges:                                  # 可省;每条对应账本里的一条 写 / 读 / 派发 边;拿不准写 候选 或 省略
       - {from: agent:<id>@v<K>, to: file:<路径>@v<N>, relation: 写}
+coverage:                                   # sessions(file=目标) 清单的每个版本与候选各一项,不能用区间冒充逐项覆盖
+  - node: file:<路径>@v<N>
+    status: explained                       # explained / unresolved / not_repair
+    defects: [A]                            # 对应上面的缺陷 id;未确认或不算修复时可为空
+    reason: <此版本具体改了什么、归到哪项或为什么尚不能解释>
+    evidence: ["#标识:n@L行"]
+  - candidate: candidate:<清单里的20位摘要>   # 与 node 二选一;候选不是文件版本,不可自造版本/作者
+    status: unresolved                      # 核清无关或只读可 not_repair;确认修复则 explained 并关联缺陷
+    defects: []
+    reason: <核过哪些原文、真实目标/效应是什么或仍缺什么证据>
+    evidence: ["#标识:n@L行"]
+notes: <可选备注,字符串或字符串列表>
 ```
 角色的意思:正常 = 有依据地正确提供了输入(reason 一句话说它提供了什么就够,不展开;没查过的上游不用列);带病传递 = 保留了上游缺陷并传给下游(说保留了什么、
 怎么传的;不等于失职,失职要另有证据);进入·错 = 有好的输入没用或用错(说正确输入与错误实现的落差);
 进入·缺 = 输入里本来就没有;无法确认 = 内容未知或证据不够 —— 不为了把进入点推给下游而宣布上游正常。
+角色必须与 reason 一致:后续新增能力的扩展对象不自动是“带病传递”,不要标红后再用文字说它其实没有已确认缺陷。
+“正常”只针对本项已核对的输入/义务,不是整个节点功能已验证;尚无法判定该项义务或输入是否正确时用“无法确认”。
 文件坐标用 file() / sessions 打印的路径,agent 坐标用 agent() / index 打印的 id(主会话是 __main__:<会话号前 8 位>);
 修复后的版本只放 repair.after,不进 nodes 标带病;修复后是否仍有问题另起一条缺陷或写在 notes。
 ledger 必须照抄本次 sessions 的身份。身份缺失/冲突时历史主张保留,但不能重新绑定到当前账本的同号版本。
 evidence 有效仅表示能定位;节点的 reason 仍是你的主张。无法核实就写无法确认,不能自报“已机检”替代验证。
+coverage 仅保证清单逐项有交代,unresolved 不等于已查清;不能为了交齐把所有候选直接宣称无关或已修复。
+候选里的修复可在对应已打开的 agent 节点写原因,repair.after 未有确定版本时可省略;不得虚构 file@v 来安放它。
 """
 
 
@@ -208,7 +230,10 @@ def build_server(backend: Any | None = None) -> Any:
         payload = await rt.get_fixchain(sid)
         cwd = await rt.get_session_cwd(sid)
         ledger = await rt.get_ledger(sid)
-        return atoms_text.render_chains(payload, root=cwd, file=file, identity=atoms.ledger_identity(ledger))
+        out = atoms_text.render_chains(payload, root=cwd, file=file, identity=atoms.ledger_identity(ledger))
+        if file:
+            out += "\n\n" + atoms_text.render_repair_manifest(ledger, payload, file, root=cwd)
+        return out
 
     @srv.tool(annotations=readonly)
     async def index(sid: str, kind: str | None = None, query: str | None = None,
@@ -305,12 +330,13 @@ def build_server(backend: Any | None = None) -> Any:
 
     @srv.tool(annotations=readonly)
     async def action(sid: str, id: str, seq: int, max_chars: int = 20000, offset: int = 0, find: str = "",
-                     part: str | None = None) -> str:
+                     part: str | None = None, m_n: int = 0, m_from: int = 1) -> str:
         """展开 agent 某一次工具调用的完整原始输入与输出(agent 工具时间线里的 #n 就是 seq)。
-        账本是实录的索引,摘要不足时用此工具回看对应记录原文。输出超过 max_chars 会截断并说明剩余多少:
-        part=input/output 选择翻页侧;offset= 从第几字继续,find= 直接跳到关键词前(长 think/写入正文里找决策句用它)。"""
+        max_chars 限制被选中的原文窗口,来源/已确认读写指针另列,不冒充原文。part=input/output 选择翻页侧;
+        offset= 从第几字继续,find= 直接跳到关键词前。词法候选导航默认 m_n=0 只给计数,需看时 m_n=40、m_from 翻页。"""
         ledger, _cwd = await _ctx(sid)
-        return atoms_text.render_action(ledger, id, seq, max_chars=max_chars, offset=offset, find=find, part=part)
+        return atoms_text.render_action(ledger, id, seq, max_chars=max_chars, offset=offset, find=find,
+                                        part=part, m_n=m_n, m_from=m_from)
 
     return srv
 

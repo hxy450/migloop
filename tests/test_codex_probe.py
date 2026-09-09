@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from migloop import probe
+from migloop import atoms, probe
 from tests.test_atoms import _write_jsonl
 from tests.test_trajectory import _block, _pool, _run_dir
 
@@ -26,6 +26,43 @@ def _run(tmp_path: Path, records: list[dict[str, Any]], report: str = "") -> str
     _write_jsonl(str(Path(run_dir) / "transcript.jsonl"), [
         {"type": "session_meta", "payload": {"id": "test-thread", "cwd": "/proj"}}, *records])
     return run_dir
+
+
+def test_historical_query_identity_does_not_rebind_same_numbered_version(tmp_path: Path) -> None:
+    led = _pool(tmp_path)
+    report = "```json\n" + json.dumps({"schema": "migloop-verdict/1", "ledger": atoms.ledger_identity(led),
+        "defects": [{"id": "A", "title": "claim", "nodes": [{"node": "file:/proj/entry/A.ets@v2",
+        "role": "带病传递", "reason": "model typed current identity despite old runtime"}]}]}) + "\n```"
+    run_dir = _run(tmp_path, [
+        _call("s", "sessions", {"file": "A.ets"}), _result("s", "账本身份: old-ledger\n# chains"),
+        _call("f", "file", {"path": "A.ets", "v": 2, "via": "sessions"}), _result("f", "# entry/A.ets@v2"),
+    ], report)
+    result = probe.probe_payload(led, run_dir)
+    assert result["trace_identity"]["bound"] is False
+    assert result["structured"]["identity"]["bound"] is False
+    assert result["roles"] == {} and result["trajectory"]["nodes"] == []
+    assert result["trajectory"]["visits"][0]["status"] == "unverified"
+    assert "账本身份" in result["trajectory"]["visits"][0]["note"]
+
+
+def test_sessions_file_argument_is_a_real_chain_anchor(tmp_path: Path) -> None:
+    led = _pool(tmp_path)
+    run_dir = _run(tmp_path, [_call("s", "sessions", {"file": "A.ets"}),
+                             _result("s", "账本身份: " + atoms.ledger_identity(led) + "\n# chains")])
+    result = probe.probe_payload(led, run_dir)
+    assert result["root"] == "/proj/entry/A.ets" and result["trace_identity"]["bound"] is True
+
+
+def test_legacy_without_via_cannot_draw_current_ledger_after_identity_conflict(tmp_path: Path) -> None:
+    led = _pool(tmp_path)
+    run_dir = _run(tmp_path, [
+        _call("s", "sessions", {"file": "A.ets"}), _result("s", "账本身份: old-ledger\n# chains"),
+        _call("f", "file", {"path": "A.ets", "v": 2}), _result("f", "# entry/A.ets@v2"),
+    ])
+    result = probe.probe_payload(led, run_dir)
+    assert result["structured"] is None and result["trace_identity"]["bound"] is False
+    assert result["trajectory"]["nodes"] == [] and result["trajectory"]["edges"] == []
+    assert result["trajectory"]["visits"][0]["status"] == "unverified"
 
 
 def test_rollout_pairs_native_ids_and_preserves_physical_positions(tmp_path: Path) -> None:

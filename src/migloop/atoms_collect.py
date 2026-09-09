@@ -1332,8 +1332,12 @@ def _file_ops(name: str, inp: dict[str, Any], out: str, tur: Any, cwd: object,
             why = _unresolved_reason(cmd)
             if why:
                 detail["unresolved"] = why      # 不许静默:解析不了的读写要能报出自己
-            elif hints.get("unknown_scripts"):
-                detail["unresolved"] = "脚本正文未知(运行时尚未写出或会话外)"
+        if hints.get("unknown_scripts"):
+            # 已识别出脚本落盘/其他读写,不代表同调用里运行该脚本的效应也已解析。
+            # 只保留执行处的知识缺口;不提前使用本调用随后登记的脚本正文推断目标。
+            detail["unknown_scripts"] = list(dict.fromkeys(hints["unknown_scripts"]))
+            unknown = "脚本执行效应未解析(静态解析未关联到执行用的脚本正文)"
+            detail["unresolved"] = (detail["unresolved"] + "；" if detail.get("unresolved") else "") + unknown
         if undetermined and "unresolved" not in detail:
             detail["unresolved"] = "脚本字面量方向不明"
         _note_touched(detail, touched, ops)
@@ -1847,6 +1851,12 @@ def _codex_exec_ops(raw_arg: Any, out_text: str, cwd: object,
             why = _unresolved_reason(cmd)
             if why:
                 detail["unresolved"] = why      # 不许静默(与 CC 同一条规矩)
+        if hints.get("unknown_scripts"):
+            # 与 CC 一样:其他已解析效应不能覆盖执行脚本的未知效应;跨 shell 调用合并线索。
+            detail["unknown_scripts"] = list(dict.fromkeys((detail.get("unknown_scripts") or []) + hints["unknown_scripts"]))
+            unknown = "脚本执行效应未解析(静态解析未关联到执行用的脚本正文)"
+            if unknown not in (detail.get("unresolved") or ""):
+                detail["unresolved"] = (detail["unresolved"] + "；" if detail.get("unresolved") else "") + unknown
         if undetermined and "unresolved" not in detail:
             detail["unresolved"] = "脚本字面量方向不明"
         _note_touched(detail, touched, sub_ops)

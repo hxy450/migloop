@@ -66,6 +66,132 @@ def test_prepare_never_overwrites_case_or_accepts_path_escape(frozen_case: Path)
         pair.prepare("current", "A.ets", "../escape", frozen_case.parent, Path(case["source"]), "new-code")
 
 
+def new_source(tmp_path: Path) -> Path:
+    source = tmp_path / "new-source"
+    (source / "src/migloop").mkdir(parents=True)
+    (source / "src/migloop/service.py").write_text("# optimized frozen source\n", encoding="utf-8")
+    return source
+
+
+def test_common_task_explicitly_allows_all_in_pool_roots_for_both_arms(frozen_case: Path) -> None:
+    case = pair.read_json(frozen_case / "case.json")
+    for arm in ("tools", "raw"):
+        text = pair.build_prompt(frozen_case, case, arm)
+        assert "- prior-session.jsonl" in text and "- current-session.jsonl" in text
+        assert "两组都允许检索、打开池内全部会话" in text
+        assert "全部 subagents 子目录" in text and "调查起点，不是范围边界" in text
+        assert "不访问池外原工程、其他会话" not in text
+
+
+def test_harness_coverage_is_separate_from_schema_and_respects_actual_trace(frozen_case: Path, monkeypatch):
+    from migloop import atoms, probe, verdict
+    from tests.test_repair_coverage import PATH, declaration, splash_ledger
+    ledger, chains = splash_ledger()
+    case = pair.read_json(frozen_case / "case.json")
+    case["file"] = PATH
+    # Feature-detection fixture, not imported code; actual modules below are injected.
+    (Path(case["source"]) / "src/migloop/coverage.py").write_text("# supported", encoding="utf-8")
+    service = SimpleNamespace(session_ledger=lambda root: ledger, fixchain_payload=lambda root: {"chains": chains})
+    monkeypatch.setattr(pair, "load_modules", lambda src: (service, atoms, verdict))
+    data = {"schema": verdict.SCHEMA, "ledger": atoms.ledger_identity(ledger), "defects": [],
+            "coverage": [declaration(v, status="unresolved", defects=[]) for v in (52, 53, 54)]}
+    response = {"response_text": "```json\n" + json.dumps(data) + "\n```"}
+    got = pair.collect_verdict(case, response, "tools")
+    assert not got["errors"] and got["coverage"]["complete"] is True
+    assert got["coverage"]["counts"]["unresolved"] == 3 and got["coverage"]["semantic_checked"] is False
+    trace = [{"tool": "sessions", "has_result": True, "is_error": False, "text": "账本身份: historical-ledger"}]
+    monkeypatch.setattr(probe, "_transcript_calls", lambda folder: trace)
+    old = pair.collect_verdict(case, response, "tools", frozen_case)
+    assert not old["errors"] and old["coverage"]["complete"] is False
+    assert old["trace_identity"]["bound"] is False
+
+
+def test_task_refresh_is_explicit_new_case_and_never_mutates_parent(frozen_case: Path, tmp_path: Path) -> None:
+    original = pair.read_json(frozen_case / "case.json")
+    # Simulate a recorded older, ambiguous prompt. This synthetic fixture is not a real run.
+    task = frozen_case / "common-task.md"
+    task.write_text("older scope wording", encoding="utf-8")
+    original["common_task_sha256"] = pair.sha256(task)
+    pair.write_json(frozen_case / "case.json", original)
+    before = pair.inventory(frozen_case)
+    new = pair.variant(frozen_case, new_source(tmp_path), tmp_path / "v2", "new-code", refresh_task=True)
+    doc = pair.read_json(new / "case.json")
+    assert doc["task_revision"] == "pool-scope/2" and doc["pool"] == original["pool"]
+    assert doc["common_task_sha256"] != original["common_task_sha256"]
+    assert doc["parent_case"]["common_task_sha256"] == original["common_task_sha256"]
+    assert pair.inventory(frozen_case) == before
+    assert pair.check_frozen(new, doc)["task_unchanged"] is True
+
+
+def test_variant_reuses_absolute_pool_and_exact_task_without_copying_runs(frozen_case: Path, tmp_path: Path) -> None:
+    original = pair.read_json(frozen_case / "case.json")
+    task = frozen_case / "common-task.md"
+    task.write_bytes(task.read_bytes() + "\r\n逐字保留\r\n".encode())
+    original["common_task_sha256"] = pair.sha256(task)
+    pair.write_json(frozen_case / "case.json", original)
+    old_run = frozen_case / "runs/raw/rep1"
+    old_run.mkdir(parents=True)
+    (old_run / "metrics.json").write_text('{"historical":true}', encoding="utf-8")
+    before = pair.inventory(frozen_case)
+    pool_stats = {p: (p.stat().st_mode, p.stat().st_mtime_ns) for p in Path(original["pool"]).rglob("*")}
+    source = new_source(tmp_path)
+    destination = pair.variant(frozen_case, source, tmp_path / "variant-store", "new-code")
+    assert destination == tmp_path / "variant-store" / original["case"]
+    assert not (destination / "pool").exists() and not (destination / "runs").exists()
+    updated = pair.read_json(destination / "case.json")
+    changed = {key for key in updated if updated[key] != original.get(key)}
+    assert changed == {"source", "source_code_id", "source_digest", "parent_case"}
+    assert updated["source"] == str(source) and updated["source_code_id"] == "new-code"
+    assert updated["parent_case"] == {"case_dir": str(frozen_case), "case_sha256": pair.sha256(frozen_case / "case.json")}
+    assert (destination / "common-task.md").read_bytes() == task.read_bytes()
+    assert (destination / "pool-manifest.json").read_bytes() == (frozen_case / "pool-manifest.json").read_bytes()
+    assert pair.read_json(destination / "source-manifest.json") == pair.inventory(source / "src/migloop")
+    for arm in ("raw", "tools"):
+        assert pair.build_prompt(destination, updated, arm) == pair.build_prompt(frozen_case, original, arm)
+        argv, _ = pair.build_codex_command(updated, arm, destination / "run", "model", "medium", "codex")
+        assert argv[argv.index("-C") + 1] == original["pool"]
+    assert all(pair.check_frozen(destination, updated)[key] for key in ("pool_unchanged", "source_unchanged", "task_unchanged"))
+    assert pair.inventory(frozen_case) == before
+    assert {p: (p.stat().st_mode, p.stat().st_mtime_ns) for p in pool_stats} == pool_stats
+    with pytest.raises(FileExistsError):
+        pair.variant(frozen_case, source, destination.parent, "another-code")
+
+
+@pytest.mark.parametrize("target", ["pool/current-session.jsonl", "common-task.md", "source"])
+def test_variant_rejects_changed_parent_before_writing(frozen_case: Path, tmp_path: Path, target: str) -> None:
+    original = pair.read_json(frozen_case / "case.json")
+    path = Path(original["source"]) / "src/migloop/service.py" if target == "source" else frozen_case / target
+    path.chmod(path.stat().st_mode | stat.S_IWUSR)
+    path.write_text("changed", encoding="utf-8")
+    store = tmp_path / "variant-store"
+    with pytest.raises(RuntimeError, match="Frozen parent"):
+        pair.variant(frozen_case, new_source(tmp_path), store, "new-code")
+    assert not store.exists()
+
+
+def test_variant_rejects_protected_destination_and_invalid_source(frozen_case: Path, tmp_path: Path) -> None:
+    original = pair.read_json(frozen_case / "case.json")
+    source = new_source(tmp_path)
+    for store in (frozen_case / "nested", Path(original["pool"]), Path(original["source"]), source):
+        with pytest.raises(ValueError, match="outside"):
+            pair.variant(frozen_case, source, store, "new-code")
+        assert not (store / original["case"]).exists()
+    with pytest.raises(ValueError, match="Frozen source"):
+        pair.variant(frozen_case, tmp_path / "missing-source", tmp_path / "variant-store", "new-code")
+    assert not (tmp_path / "variant-store").exists()
+
+
+def test_variant_cli_is_offline(frozen_case: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    source = new_source(tmp_path)
+    monkeypatch.setattr(pair, "load_modules", lambda *args: pytest.fail("Variant must not load source or locate live data"))
+    monkeypatch.setattr(pair.subprocess, "Popen", lambda *args, **kwargs: pytest.fail("Variant must not start a model"))
+    store = tmp_path / "new-store"
+    assert pair.main(["variant", "--case-dir", str(frozen_case), "--source", str(source), "--store", str(store), "--code-id", "new-code"]) == 0
+    result = json.loads(capsys.readouterr().out)
+    assert result["case_dir"] == str(store / frozen_case.name)
+    assert result["case"]["pool"] == str(frozen_case / "pool")
+
+
 def test_common_task_is_identical_and_only_arm_instructions_differ(frozen_case: Path) -> None:
     case = pair.read_json(frozen_case / "case.json")
     common = (frozen_case / "common-task.md").read_text(encoding="utf-8")
@@ -435,6 +561,98 @@ def test_same_explicit_call_id_deduplicates_native_and_response_views(tmp_path: 
     leaf = parsed["seq"][0]
     assert leaf["call_id"] == "call_real" and leaf["response_use_line"] == 1 and leaf["response_result_line"] == 2
     assert leaf["source_id_type"] == "codex_mcp_item_id" and leaf["result_line"] == 3
+
+
+def test_host_command_leaf_preserves_raw_fields_and_does_not_count_wrapper_output(tmp_path: Path) -> None:
+    transcript = tmp_path / "transcript.jsonl"
+    command = ["powershell.exe", "-NoProfile", "-Command", "Get-ChildItem -Force -LiteralPath ."]
+    item = {"type": "CommandExecution", "id": "exec-native-shell", "process_id": "46152", "command": command,
+            "cwd": "file:///C:/snapshot/pool", "parsed_cmd": [{"type": "unknown", "cmd": command[-1]}],
+            "source": "unified_exec_startup", "status": "completed", "stdout": "out\n", "stderr": "warn\n",
+            "aggregated_output": "out\nwarn\n", "exit_code": 0, "duration": {"secs": 0, "nanos": 8991800},
+            "formatted_output": "output wrapper"}
+    done = {"timestamp": "2026-09-09T06:25:07.584Z", "type": "event_msg", "payload": {
+        "type": "item_completed", "item": item, "started_at_ms": 1788935107575, "completed_at_ms": 1788935107584}}
+    write_records(transcript, [
+        {"type": "response_item", "payload": {"type": "custom_tool_call", "call_id": "call_wrapper", "name": "exec", "input": "await tools.exec_command(...)"}},
+        done,
+        {"type": "response_item", "payload": {"type": "custom_tool_call_output", "call_id": "call_wrapper", "output": "wrapper repeats output"}},
+        done])
+    parsed = pair.parse_codex_transcript(transcript)
+    assert parsed["tool_calls"] == parsed["command_item_calls"] == parsed["wrapper_count"] == 1
+    assert parsed["mcp_item_calls"] == 0 and parsed["failed_calls"] == parsed["pending_calls"] == 0
+    assert parsed["tool_chars"] == len(item["aggregated_output"])
+    assert parsed["wrapper_tool_chars"] == len("wrapper repeats output")
+    leaf = parsed["seq"][0]
+    assert leaf["source_id"] == leaf["item_id"] == "exec-native-shell"
+    assert leaf["source_id_type"] == "codex_command_item_id" and leaf["source_file"] == transcript.name
+    assert leaf["call_id"] is None and leaf["tool_use_id"] is None and leaf["is_wrapper"] is False
+    assert leaf["tool"] == leaf["tool_name"] == "command_execution" and leaf["input"] == command
+    for key in ("command", "cwd", "process_id", "parsed_cmd", "stdout", "stderr", "aggregated_output", "exit_code", "duration", "formatted_output"):
+        assert leaf[key] == item[key]
+    assert leaf["command_source"] == item["source"] and leaf["native_status"] == "completed"
+    assert leaf["use_line"] is None and leaf["source_line"] == leaf["result_line"] == 2
+    assert leaf["event_lines"] == [2, 4] and leaf["duplicate_result_lines"] == [4]
+    assert leaf["started_at_ms"] == 1788935107575 and leaf["completed_at_ms"] == 1788935107584
+    assert leaf["ts"] == done["timestamp"] and "parent_call_id" not in leaf
+
+
+def test_host_command_events_keep_pending_failures_empty_and_unknown_output(tmp_path: Path) -> None:
+    transcript = tmp_path / "transcript.jsonl"
+    def event(ident: str, typ: str = "item_completed", **fields: Any) -> dict[str, Any]:
+        return {"type": "event_msg", "payload": {"type": typ, "item": {
+            "type": "CommandExecution", "id": ident, "command": ["read-only command"], **fields}}}
+    write_records(transcript, [
+        event("pending", "item_started", status="in_progress"),
+        event("failed", "item_started", status="in_progress"),
+        event("empty", status="completed", aggregated_output="", stdout="", stderr="", exit_code=0),
+        event("failed", status="completed", stdout="", stderr="process error", exit_code=2),
+        event("unknown", status="failed", error={"message": "blocked by policy"}),
+        event("declined", status="declined"),
+        event("missing", status="completed", exit_code=0),
+        event("pending", "item_started", status="in_progress")])
+    parsed = pair.parse_codex_transcript(transcript)
+    assert parsed["tool_calls"] == parsed["command_item_calls"] == 6
+    assert parsed["failed_calls"] == 2 and parsed["rejected_calls"] == 1 and parsed["pending_calls"] == 1
+    rows = {call["source_id"]: call for call in parsed["seq"]}
+    assert rows["pending"]["use_line"] == 1 and rows["pending"]["replay_use_lines"] == [8]
+    assert rows["failed"]["use_line"] == 2 and rows["failed"]["result_line"] == 4
+    assert rows["failed"]["chars"] == len("process error") and rows["failed"]["aggregated_output"] is None
+    assert rows["empty"]["chars"] == 0 and rows["empty"]["status"] == "returned"
+    assert all(rows[key]["chars"] is None for key in ("pending", "unknown", "declined", "missing"))
+    assert rows["unknown"]["exit_code"] is None and rows["unknown"]["error"] == {"message": "blocked by policy"}
+    assert parsed["tool_chars"] is None and parsed["tool_chars_observed"] == len("process error")
+
+
+def test_host_command_json_output_is_data_not_an_mcp_result_envelope(tmp_path: Path) -> None:
+    transcript = tmp_path / "transcript.jsonl"
+    output = '{"result":"actual file contents"}'
+    write_records(transcript, [{"type": "event_msg", "payload": {"type": "item_completed", "item": {
+        "type": "CommandExecution", "id": "exec-json", "command": ["read JSON"], "status": "completed",
+        "aggregated_output": output, "exit_code": 0}}}])
+    parsed = pair.parse_codex_transcript(transcript)
+    assert parsed["tool_chars"] == len(output) and parsed["seq"][0]["aggregated_output"] == output
+
+
+@pytest.mark.parametrize("same_id", [True, False])
+def test_host_command_and_direct_call_merge_only_with_explicit_equal_id(tmp_path: Path, same_id: bool) -> None:
+    transcript = tmp_path / "transcript.jsonl"
+    write_records(transcript, [
+        {"type": "response_item", "payload": {"type": "function_call", "call_id": "call_shell", "name": "exec_command", "arguments": '{"cmd":"list"}'}},
+        {"type": "response_item", "payload": {"type": "function_call_output", "call_id": "call_shell", "output": "listed"}},
+        {"type": "event_msg", "payload": {"type": "item_completed", "item": {"type": "CommandExecution",
+            "id": "call_shell" if same_id else "exec-different", "command": ["list"], "status": "completed",
+            "aggregated_output": "listed", "exit_code": 0}}}])
+    parsed = pair.parse_codex_transcript(transcript)
+    assert parsed["tool_calls"] == (1 if same_id else 2) and parsed["command_item_calls"] == 1
+    leaf = next(call for call in parsed["seq"] if call["source_id_type"] == "codex_command_item_id")
+    assert leaf["call_id"] == ("call_shell" if same_id else None)
+    assert leaf["tool_use_id"] == ("call_shell" if same_id else None)
+    if same_id:
+        assert leaf["response_use_line"] == leaf["use_line"] == 1 and leaf["response_result_line"] == 2
+    else:
+        assert "response_use_line" not in leaf and leaf["use_line"] is None
+    assert leaf["result_line"] == 3
 
 
 @pytest.mark.parametrize("variant,passed", [("success", True), ("no_execution", False), ("blocked", False),

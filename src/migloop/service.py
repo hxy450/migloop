@@ -612,7 +612,7 @@ def probe_payload(path: str, run_dir: str) -> dict[str, Any]:
     d = run_dir if os.path.isabs(run_dir) else os.path.join(base, run_dir)
     if not os.path.isfile(os.path.join(d, "metrics.json")):
         raise ValueError(f"run 目录里没有 metrics.json: {d}")
-    return probe.probe_payload(session_ledger(path), d)
+    return probe.probe_payload(session_ledger(path), d, chain_payload=fixchain_payload(path))
 
 
 def fixchain_html(path: str) -> str:
@@ -670,8 +670,12 @@ def atom_text(path: str, tool: str, args: dict[str, Any]) -> str:
         return mcp_server.GUIDE
     cwd = session_cwd(path)
     if tool == "sessions":
-        return atoms_text.render_chains(fixchain_payload(path), root=cwd, file=args.get("path") or args.get("file") or None,
-                                        identity=atoms.ledger_identity(session_ledger(path)))
+        hint = args.get("path") or args.get("file") or None
+        ledger, payload = session_ledger(path), fixchain_payload(path)
+        out = atoms_text.render_chains(payload, root=cwd, file=hint, identity=atoms.ledger_identity(ledger))
+        if hint:
+            out += "\n\n" + atoms_text.render_repair_manifest(ledger, payload, str(hint), root=cwd)
+        return out
     ledger = session_ledger(path)
     if tool == "index":
         return atoms_text.render_index(ledger, args.get("kind") or None, args.get("query") or None,
@@ -708,7 +712,9 @@ def atom_text(path: str, tool: str, args: dict[str, Any]) -> str:
         return atoms_text.render_action(ledger, str(args["id"]), int(args["seq"]),
                                         max_chars=_opt_int(args, "max_chars") or 20000,
                                         offset=_opt_int(args, "offset") or 0, find=str(args.get("find") or ""),
-                                        part=args.get("part") or None)
+                                        part=args.get("part") or None,
+                                        m_n=_opt_int(args, "m_n") or 0,
+                                        m_from=_opt_int(args, "m_from") or 1)
     raise ValueError(f"未知工具或缺参数: {tool}")
 
 

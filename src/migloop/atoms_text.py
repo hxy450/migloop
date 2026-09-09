@@ -611,8 +611,42 @@ def _window(text: str, cap: int, offset: int = 0, find: str = "") -> tuple[str, 
     return piece, note
 
 
+def render_repair_manifest(ledger: atoms.Ledger, payload: dict[str, Any], hint: str,
+                           root: str = "") -> str:
+    """Expose the fixed ledger denominator; do not equate accounted rows with true causes."""
+    from . import coverage as repair_coverage
+
+    doc = repair_coverage.manifest(ledger, payload, hint)
+    out = ["## 版本与候选对账清单（记录内范围，不等于真实缺陷总数）"]
+    if doc.get("errors"):
+        return "\n".join(out + ["清单无法确定: " + "; ".join(str(x) for x in doc["errors"])])
+    out.append(f"共 {len(doc['items'])} 个返修阶段记录版本 + {len(doc['candidates'])} 个待核候选。每项须在 coverage 单独交代;repair.before/after 区间不能代替中间项。")
+    out.append("可标 explained / unresolved / not_repair;阶段后新增不自动是生成错误,写了理由不等于理由已证实。")
+    for item in doc["items"]:
+        node = f"file:{rel(str(doc['file']), root)}@v{item['v']}"
+        event = item.get("event") or {}
+        change = item.get("change") or {}
+        out.append(f"- {node} · {item.get('source')} · 内容{'已观测/可复原' if item.get('content_known') else '未知'}"
+                   + (f" · {event['ref']}" if event.get("ref") else " · 原始调用指针未知"))
+        snippet = str(change.get("text") or "变化细节未知")
+        cue = snippet.replace("\n", " ⏎ ")
+        out.append("  变化线索（不是归因）: " + cue[:450]
+                   + (" …（摘录已截断，完整变化请用 diff/action）" if len(cue) > 450 or change.get("truncated") else ""))
+    if doc["candidates"]:
+        scope = doc.get("candidate_scope") or {}
+        out.append("### 待核候选（不是已确认修复，不新增作者或版本）")
+        out.append("来源为修复参与者窗口内的方向不明触碰及精确路径提及；窗口: " + str(scope.get("window_scope")))
+        out.append("同一动作仅列一次；用 action 核对 input/output 的真实目标和效应。无关/只读可记 not_repair，证据不足记 unresolved，确认修复后关联 defect。")
+        for item in doc["candidates"]:
+            out.append(f"- {item['id']} · {item['ref'] or '原始调用指针未知'} · agent:{item['agent']} · {item['ts']}")
+            out.append("  线索（不是事实）: " + str(item.get("reason") or "效应待核") + " · " + str(item.get("ctx") or ""))
+    out.append("此清单不覆盖索引之外的真实写入,也不证明一个版本内每个语义修改均已解释;已交代不等于已查清,候选不等于修复。")
+    return "\n".join(out)
+
+
 def render_action(ledger: atoms.Ledger, agent_id: str, seq: int, max_chars: int = 20000,
-                  offset: int = 0, find: str = "", part: str | None = None) -> str:
+                  offset: int = 0, find: str = "", part: str | None = None,
+                  m_n: int = 40, m_from: int = 1) -> str:
     """一次工具调用的原始输入输出 —— 账本是实录的索引,这里按指针展开原文,不经摘要。
     part=input/output 可选择翻页侧;不指定时沿用输出优先、无输出则翻输入。"""
     import json
@@ -657,10 +691,22 @@ def render_action(ledger: atoms.Ledger, agent_id: str, seq: int, max_chars: int 
                 op = "读" if f["op"] == "read" else "删" if f["op"] == "delete" else "写"
                 out.append(f"- {op} {f['path']}@v{f['v']} → file({f['path']}, v={f['v']})")
         if links["possible"]:
-            out.append("## 命令里提到、账本没记到读写的文件(可能碰到;「当时」按时刻就近)→ file(path, v)")
-            for p in links["possible"]:
+            total = len(links["possible"])
+            size, start = max(0, min(int(m_n), 200)), max(1, int(m_from))
+            page = links["possible"][start - 1:start - 1 + size]
+            query = f"action(id={agent_id}, seq={seq}, m_n=40, m_from="
+            out.append(f"## 命令里提到、账本没记到读写的文件({total} 条候选;不是确定读写)")
+            if not size:
+                out.append(f"候选仅计数,未展开 {total} 条;需要时 {query}1) 查看。未展开不等于没有候选。")
+            elif start > total:
+                out.append(f"m_from={start} 超出 {total} 条候选;从 {query}1) 查看。")
+            else:
+                out.append(f"候选第 {start}-{start + len(page) - 1} / {total} 条;「当时」仅按时刻就近 → file(path, v)")
+            for p in page:
                 amb = " · 只给了文件名,同名不止一个" if p["ambiguous"] else ""
                 out.append(f"- {p['path']} 当时@v{p['v']}{amb} | …{p['ctx']}… → file({p['path']}, v={max(p['v'], 1)})")
+            if size and start - 1 + len(page) < total:
+                out.append(f"还有 {total - start + 1 - len(page)} 条候选未展开;{query}{start + len(page)}) 继续。")
     out += ["## 输入" + (f"({in_note})" if in_note else ""), "```", in_piece, "```",
             "## 输出" + (f"({note})" if note else ""), "```", piece, "```"]
     tur = raw.get("tool_use_result")
@@ -706,8 +752,10 @@ def _render_blame_changed(ledger: atoms.Ledger, bl: dict[str, Any], root: str) -
     head = f"# 被替换行归属 {rel(bl['path'], root)} @v{bl['v']}  (共 {bl['n_versions']} 版)"
     if not bl["known"]:
         return head + "\n" + str(bl.get("note") or "无法定位被替换行")
-    out = [head, f"v{bl['v']} 替换/删除了 v{bl['prev_v']} 的 {len(bl['lines'])} 行,新增 {bl['added']} 行"
-                 f"(前一版共 {bl['n_lines']} 行;新增行没有原作者,要问 v{bl['prev_v']} 的写者当时为什么没写)"]
+    out = [head, f"可观测端点文本比较：v{bl['v']} 替换/删除了 v{bl['prev_v']} 的 {len(bl['lines'])} 行,新增 {bl['added']} 行"
+                 f"(前一版共 {bl['n_lines']} 行;新增行没有对应的旧行原作者)"]
+    if bl.get("comparison_note"):
+        out.append(str(bl["comparison_note"]))
     if bl["summary"]:
         out.append("## 被替换行的原作者")
         for s in bl["summary"]:
@@ -734,6 +782,14 @@ def render_diff(ledger: atoms.Ledger, hint: str, v: int, root: str = "") -> str:
     vv = fa["versions"][-1]
     head = f"# diff {rel(fa['path'], root)} @v{vv['v']} ← {_who(ledger, vv['by'], vv['by_ver'])} · {vv['diff_kind']}"
     if not vv.get("diff"):
+        if vv.get("content_known"):
+            bl = atoms.blame(ledger, hint, v, changed=True)
+            if bl and bl["known"]:
+                if not bl["lines"] and bl["added"] == 0:
+                    return head + "\n可观测端点文本相同：净新增 0 行、净删除/替换 0 行，无非空 diff 正文。\n" + str(bl["comparison_note"])
+                return (head + f"\n未保存 diff 正文；端点比较净新增 {bl['added']} 行、净删除/替换 {len(bl['lines'])} 行。\n"
+                        + str(bl["comparison_note"]))
+            return head + "\n本版内容可见；" + str((bl or {}).get("note") or "前一版无法比较") + "。无 diff 正文不等于没有变化。"
         return head + "\n(无 diff 正文:" + _unknown_reason(vv) + ")"
     return head + "\n```diff\n" + _clip(vv["diff"], 20000) + "\n```"
 

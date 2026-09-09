@@ -1,7 +1,7 @@
 """Smaller query views retain a recoverable evidence surface and exact anchor."""
 from __future__ import annotations
 
-from migloop import atoms_text, service
+from migloop import atoms, atoms_text, service
 from tests.test_atoms import MAIN_ID, _call, _ledger
 
 
@@ -48,3 +48,52 @@ def test_http_text_preserves_zero_mentions_and_input_paging(tmp_path, monkeypatc
     monkeypatch.setattr(atoms_text, "render_file", lambda *a, **kw: got.update(kw) or "ok")
     service.atom_text("ignored", "file", {"path": path, "v": 1, "m_n": 0})
     assert got["m_n"] == 0
+
+
+def test_action_candidate_pages_do_not_change_raw_window(tmp_path, monkeypatch):
+    led = _ledger(tmp_path, [*_call("2026-01-01T00:00:00Z", "w", "Write", {
+        "file_path": "/proj/A.ets", "content": "prefix " * 100 + "EVIDENCE_MARKER" + " tail" * 100
+    })])
+    seq = led.agents[MAIN_ID].actions[0].seq
+    links = atoms.action_links(led, MAIN_ID, seq)
+    links["possible"] = [{"path": f"/proj/P{i}.ets", "v": 1, "ambiguous": False,
+                           "ctx": "CANDIDATE_" + str(i) + " " + "context " * 30} for i in range(15)]
+    monkeypatch.setattr(atoms, "action_links", lambda *args: links)
+    args = dict(part="input", find="EVIDENCE_MARKER", max_chars=256)
+    small = atoms_text.render_action(led, MAIN_ID, seq, m_n=0, **args)
+    full = atoms_text.render_action(led, MAIN_ID, seq, m_n=40, **args)
+    assert small.split("## 输入", 1)[1] == full.split("## 输入", 1)[1]
+    assert "未展开 15 条" in small and "m_n=40" in small
+    assert "CANDIDATE_" not in small and "EVIDENCE_MARKER" in small
+    assert "事件 id" in small and "账本记到的读写" in small
+    assert len(small) < len(full) * 0.5
+    pages = [atoms_text.render_action(led, MAIN_ID, seq, m_n=4, m_from=i, **args) for i in (1, 5, 9, 13)]
+    import re
+    assert [int(n) for page in pages for n in re.findall(r"CANDIDATE_(\d+) ", page)] == list(range(15))
+    assert "还有 11 条" in pages[0] and "还有" not in pages[-1]
+    assert "超出 15 条" in atoms_text.render_action(led, MAIN_ID, seq, m_n=4, m_from=99, **args)
+
+
+def test_http_action_candidate_defaults_and_explicit_page(monkeypatch):
+    monkeypatch.setattr(service, "session_ledger", lambda _: object())
+    monkeypatch.setattr(service, "session_cwd", lambda _: "/proj")
+    got = {}
+    monkeypatch.setattr(atoms_text, "render_action", lambda *args, **kwargs: got.update(kwargs) or "ok")
+    service.atom_text("ignored", "action", {"id": MAIN_ID, "seq": 1})
+    assert got["m_n"] == 0 and got["m_from"] == 1
+    service.atom_text("ignored", "action", {"id": MAIN_ID, "seq": 1, "m_n": 40, "m_from": 41})
+    assert got["m_n"] == 40 and got["m_from"] == 41
+
+
+def test_manifest_text_keeps_every_version_and_candidate_with_uncertainty(monkeypatch):
+    from migloop import coverage
+    monkeypatch.setattr(coverage, "manifest", lambda *args: {
+        "file": "/proj/A.ets", "errors": [], "candidate_scope": {"window_scope": "actor full window"},
+        "items": [{"v": 2, "source": "edit", "content_known": True,
+                   "event": {"ref": "#abc:1@L10"}, "change": {"text": "+line"}}],
+        "candidates": [{"id": "candidate:" + "a" * 20, "ref": "#abc:2@L20", "agent": "fixer",
+                        "ts": "2026-01-01", "reason": "方向未知", "ctx": "possible change"}]})
+    text = atoms_text.render_repair_manifest(object(), {}, "A.ets", "/proj")
+    assert "file:A.ets@v2" in text and "candidate:" + "a" * 20 in text
+    assert "#abc:1@L10" in text and "#abc:2@L20" in text and "actor full window" in text
+    assert "候选不等于修复" in text and "已交代不等于已查清" in text

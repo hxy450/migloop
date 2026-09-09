@@ -22,12 +22,13 @@ ROLES = ("正常", "带病传递", "进入·错", "进入·缺", "无法确认")
 RED = ("带病传递", "进入·错", "进入·缺")
 RELATIONS = ("写", "读", "派发", "候选", "省略")
 CHECK_RESULTS = ("true", "false", "unknown", "not_checked")
-_TOP = {"schema", "run", "ledger", "root", "defects", "notes"}
+_TOP = {"schema", "run", "ledger", "root", "defects", "notes", "coverage"}
 _DEFECT = {"id", "title", "repair", "entry", "boundary", "nodes", "edges"}
 _NODE = {"node", "role", "reason", "evidence", "boundary", "checks"}
 _EDGE = {"from", "to", "relation", "note"}
 _REPAIR = {"before", "after", "evidence"}
 _CHECK = {"claim", "result"}
+_COVERAGE = {"node", "candidate", "status", "defects", "reason", "evidence"}
 NODE_RE = re.compile(r"^(file|agent):(.+?)(?:@v(\d+))?$")
 _FENCE = re.compile(r"```[ \t]*(yaml|yml|json|verdict)?[^\n]*\n(.*?)```", re.DOTALL)
 _MAX_BLOCK_CHARS = 1_000_000
@@ -165,9 +166,13 @@ def validate(data: Any) -> list[str]:
     _check_keys(data, _TOP, "顶层", errs)
     if data.get("schema") != SCHEMA:
         errs.append(f"schema 必须是 {SCHEMA}(现在是 {data.get('schema')!r})")
-    for k in ("run", "ledger", "root", "notes"):
+    for k in ("run", "ledger", "root"):
         if k in data and data[k] is not None and not isinstance(data[k], str):
             errs.append(f"{k} 必须是字符串")
+    notes = data.get("notes")
+    if notes is not None and not (isinstance(notes, str) or
+                                  isinstance(notes, list) and all(isinstance(x, str) for x in notes)):
+        errs.append("notes 必须是字符串或字符串列表")
     if "root" in data and data["root"] is not None:
         _check_node_spec(data["root"], "root", errs)
     defects = data.get("defects")
@@ -262,6 +267,38 @@ def validate(data: Any) -> list[str]:
                     errs.append(f"{we}: relation 必须是 {' / '.join(RELATIONS)} 之一(现在是 {e.get('relation')!r})")
                 if e.get("note") is not None and not isinstance(e["note"], str):
                     errs.append(f"{we}: note 必须是字符串")
+    if "coverage" in data:
+        coverage = data["coverage"]
+        if not isinstance(coverage, list):
+            errs.append("coverage 必须是逐版本及候选列表")
+        else:
+            for i, row in enumerate(coverage):
+                where = f"coverage[{i}]"
+                if not isinstance(row, dict):
+                    errs.append(f"{where}: 必须是映射")
+                    continue
+                _check_keys(row, _COVERAGE, where, errs)
+                if ("node" in row) == ("candidate" in row):
+                    errs.append(f"{where}: node 与 candidate 必须且只能提供一个")
+                elif "candidate" in row:
+                    if not isinstance(row["candidate"], str) or not re.fullmatch(r"candidate:[a-f0-9]{20}", row["candidate"]):
+                        errs.append(f"{where}: candidate 必须逐字使用清单提供的 candidate:<20位十六进制摘要>")
+                else:
+                    _check_node_spec(row.get("node"), where, errs)
+                    if not str(row.get("node") or "").startswith("file:"):
+                        errs.append(f"{where}: 对账对象必须是 file@版本")
+                if row.get("status") not in ("explained", "unresolved", "not_repair"):
+                    errs.append(f"{where}: status 必须是 explained / unresolved / not_repair")
+                if not _is_str(row.get("reason")):
+                    errs.append(f"{where}: 缺 reason")
+                refs = row.get("evidence")
+                if not (isinstance(refs, list) and all(_is_str(x) for x in refs)):
+                    errs.append(f"{where}: evidence 必须是字符串列表")
+                assigned = row.get("defects")
+                if not isinstance(assigned, list) or not all(isinstance(x, str) for x in assigned):
+                    errs.append(f"{where}: defects 必须是缺陷 id 列表")
+                elif any(x not in ids for x in assigned):
+                    errs.append(f"{where}: defects 引用了不存在的 id")
     return errs
 
 
@@ -490,7 +527,9 @@ def build(ledger: atoms.Ledger, data: dict[str, Any] | None, errors: list[str],
     cur = atoms.ledger_identity(ledger)
     model = (data or {}).get("ledger") or None
     harness = meta.get("harness_identity") or None
-    conflict = any(x != cur for x in (model, harness) if x is not None)
+    trace_identity = meta.get("trace_identity") or {}
+    conflict = (any(x != cur for x in (model, harness) if x is not None)
+                or trace_identity.get("bound") is False)
     bound = bool(model and not conflict)
     status = "mismatch" if conflict else "matched" if bound else "missing"
     diag = ("账本身份不匹配,原始主张未绑定当前账本" if conflict else
@@ -499,9 +538,15 @@ def build(ledger: atoms.Ledger, data: dict[str, Any] | None, errors: list[str],
         "schema": (data or {}).get("schema"), "kind": meta.get("kind"), "raw": meta.get("raw"),
         "errors": list(errors), "repaired": bool(meta.get("repaired")),
         "identity": {"current": cur, "claimed": model or harness, "model": model, "harness": harness,
+                     "observed": list(trace_identity.get("source_identities") or []),
+                     "trace_bound": trace_identity.get("bound"),
                      "match": False if conflict else True if bound else None,
                      "bound": bound, "status": status, "diag": diag},
-        "root": None, "defects": [], "roles": {}, "fixed": [], "notes": (data or {}).get("notes"),
+        "root": None, "defects": [], "roles": {}, "fixed": [],
+        "notes": ("\n\n".join(data["notes"]) if isinstance((data or {}).get("notes"), list)
+                  else (data or {}).get("notes")),
+        "revalidated": bool(meta.get("revalidated")), "previous_errors": list(meta.get("previous_errors") or []),
+        "coverage_rows": (data or {}).get("coverage"),
     }
     if data is None:
         return out

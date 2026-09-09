@@ -18,6 +18,65 @@ REJECT = "⛔"
 Node = tuple[str, str, int | None]
 
 
+def trace_identity(ledger: atoms.Ledger, calls: list[dict[str, Any]] | None,
+                   metrics: dict[str, Any] | None) -> dict[str, Any]:
+    """核查询轨迹身份,不读取模型 YAML 的 ledger 或结论核验状态。
+
+    calls 是原始转录配对后的调用(text/has_result/is_error),不是 metrics 调用计数摘要。
+    sessions 的身份由渲染器放在首行;只接受首个非空行的完整身份头,不在正文引用里搜索。
+    任一明确提供者与当前账本不一致即拒绝绑定;没有提供者返回 None,不是匹配成功。
+    """
+    current = atoms.ledger_identity(ledger)
+    observations: list[dict[str, Any]] = []
+    ignored: list[dict[str, Any]] = []
+    for step, call in enumerate(calls or [], 1):
+        if not isinstance(call, dict) or call.get("tool") not in ("sessions", "mcp__migloop__sessions"):
+            continue
+        text = call.get("text")
+        provenance = call.get("provenance")
+        reason = None
+        if call.get("has_result") is not True:
+            reason = "missing_result"
+        elif call.get("is_error") or call.get("ok") is False or call.get("parse_error") \
+                or call.get("status") in ("rejected", "error", "failed", "pending"):
+            reason = "failed_or_rejected"
+        elif isinstance(provenance, dict) and provenance.get("complete_pair") is False:
+            reason = "unpaired_result"
+        elif not isinstance(text, str):
+            reason = "missing_text"
+        elif text.lstrip().startswith(REJECT):
+            reason = "failed_or_rejected"
+        if reason:
+            ignored.append({"step": step, "reason": reason})
+            continue
+        assert isinstance(text, str)
+        first = next((line for line in text.removeprefix("\ufeff").splitlines() if line.strip()), "")
+        header = re.fullmatch(r"账本身份:[ \t]+(\S+)[ \t]*", first)
+        if header is None:
+            ignored.append({"step": step, "reason": "missing_identity_header"})
+            continue
+        observations.append({"identity": header.group(1), "step": step,
+                             "call_id": call.get("call_id"), "item_id": call.get("item_id"),
+                             "result_line": call.get("result_line"), "provenance": provenance})
+    identities = list(dict.fromkeys(row["identity"] for row in observations))
+    harness = metrics.get("harness_identity") if isinstance(metrics, dict) else None
+    # 空字符串没有提供身份;非字符串的显式值不能用 truthiness 吞掉,必须报冲突。
+    harness_present = harness is not None and harness != ""
+    harness_valid = isinstance(harness, str) and bool(re.fullmatch(r"\S+", harness))
+    conflict = any(identity != current for identity in identities) or \
+        (harness_present and (not harness_valid or harness != current))
+    source = "sessions+harness" if identities and harness_present else \
+             "sessions" if identities else "harness" if harness_present else None
+    bound = False if conflict else True if source else None
+    status = "mismatch" if conflict else "matched" if source else "legacy"
+    diag = ("查询轨迹身份冲突:成功 sessions 返回或 harness 明示身份与当前账本不一致,不能绑定当前版本与关系。"
+            if conflict else "查询轨迹身份未记录:历史调用未认证,不能据此声称当前账本身份已匹配。"
+            if source is None else "查询轨迹身份匹配;只确认账本坐标所属,不验证模型缺陷主张。")
+    return {"current": current, "bound": bound, "match": bound, "status": status, "source": source,
+            "source_identities": identities, "harness_identity": harness,
+            "observations": observations, "ignored_sessions": ignored, "diag": diag}
+
+
 @dataclass
 class ViaState:
     opened: list[Node] = field(default_factory=list)

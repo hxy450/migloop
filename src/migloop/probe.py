@@ -116,7 +116,7 @@ def _step_node(ledger: atoms.Ledger, tool: str, inp: dict[str, Any]) -> dict[str
             return {"kind": "file", "path": fk(inp.get("file")), "v": _int(inp.get("v")), "q": inp.get("q")}
         return {"kind": "pool", "q": inp.get("q"), "until_ts": inp.get("until_ts"), "since_ts": inp.get("since_ts")}
     if tool == "sessions":
-        return {"kind": "chain", "path": fk(inp.get("path")) if inp.get("path") else None}
+        return {"kind": "chain", "path": fk(inp.get("file") or inp.get("path"))}
     return None
 
 
@@ -172,9 +172,10 @@ def _entries(report: str) -> list[int]:
     return nos
 
 
-def probe_payload(ledger: atoms.Ledger, run_dir: str) -> dict[str, Any]:
+def probe_payload(ledger: atoms.Ledger, run_dir: str, chain_payload: dict[str, Any] | None = None) -> dict[str, Any]:
     m, report = _load_run(run_dir)
     calls = _transcript_calls(run_dir)
+    trace_identity = via.trace_identity(ledger, calls, m)
     seq = calls if calls is not None else ((m.get("transcript") or {}).get("seq") or [])
     steps: list[dict[str, Any]] = []
     for i, s in enumerate(seq, 1):
@@ -189,6 +190,7 @@ def probe_payload(ledger: atoms.Ledger, run_dir: str) -> dict[str, Any]:
                       "use_event": s.get("use_event"), "result_event": s.get("result_event"),
                       "use_time_ms": s.get("use_time_ms"), "result_time_ms": s.get("result_time_ms"),
                       "scope": _step_scope(str(s.get("tool")), inp),
+                      "identity_unbound": trace_identity["bound"] is False,
                       "via": str(inp.get("via") or "")})
     entries = _entries(report)
     entry_no = entries[0] if entries else None
@@ -237,22 +239,32 @@ def probe_payload(ledger: atoms.Ledger, run_dir: str) -> dict[str, Any]:
     fm = re.search(r"文件[::]\s*([^\s(（]+)", report)
     if not root and fm:
         root = filestory.find_story_path(ledger.stories, fm.group(1))
-    structured = _structured(ledger, run_dir, report)
+    structured = _structured(ledger, run_dir, report, trace_identity=trace_identity)
     if structured is not None:
         if structured["defects"]:
             defects = {d["id"]: d["title"] for d in structured["defects"]}
         sr = structured.get("root")
         if sr and sr.get("ok") and sr.get("kind") == "file":
             root = sr["key"]
+    repair_manifest = coverage_report = None
+    if chain_payload is not None and root:
+        from . import coverage as repair_coverage
+        repair_manifest = repair_coverage.manifest(ledger, chain_payload, root)
+        coverage_report = repair_coverage.reconcile(
+            ledger, repair_manifest, (structured or {}).get("coverage_rows"),
+            (structured or {}).get("defects") or [],
+            identity_bound=(structured or {}).get("identity", {}).get("bound") is True)
     return {"run": os.path.basename(os.path.dirname(os.path.abspath(run_dir))), "cost": m.get("cost_usd"), "turns": m.get("num_turns"),
             "root": root, "steps": steps, "links": links, "entry": entry_no, "entries": entries, "verdicts": verdicts,
             "bad_refs": sum(len(lk["bad_refs"]) for lk in links), "defects": defects, "report": report,
             "legacy": structured is None, "structured": structured,
+            "trace_identity": trace_identity, "repair_manifest": repair_manifest, "coverage": coverage_report,
             "roles": (structured or {}).get("roles") or {}, "fixed": (structured or {}).get("fixed") or [],
              "trajectory": _trajectory(ledger, run_dir, steps, root, structured, verdicts, calls)}
 
 
-def _structured(ledger: atoms.Ledger, run_dir: str, report: str) -> dict[str, Any] | None:
+def _structured(ledger: atoms.Ledger, run_dir: str, report: str,
+                trace_identity: dict[str, Any] | None = None) -> dict[str, Any] | None:
     """harness 落的 verdict.json(带 harness 算的账本身份、修复重试记录)优先;没有就从报告正文里抽结论块。
     没有结论块 → None(legacy 散文);有块但校验失败 → 只带原文与错误,主张不猜。"""
     vp = os.path.join(run_dir, "verdict.json")
@@ -261,6 +273,13 @@ def _structured(ledger: atoms.Ledger, run_dir: str, report: str) -> dict[str, An
             vj = json.load(fh)
         data = vj.get("data")
         errors = list(vj.get("errors") or [])
+        previous_errors = list(errors)
+        revalidated = False
+        if data is None and isinstance(vj.get("raw"), str) and vj.get("kind") in ("yaml", "json"):
+            candidate, parse_errors = verdict.parse_block(vj["kind"], vj["raw"])
+            current_errors = parse_errors or verdict.validate(candidate)
+            if not current_errors:
+                data, errors, revalidated = candidate, [], True
         if data is not None:
             errors = verdict.validate(data)                      # 以当前 schema 再核一遍,不信 harness 的旧结论
             if errors:
@@ -268,12 +287,15 @@ def _structured(ledger: atoms.Ledger, run_dir: str, report: str) -> dict[str, An
         if data is None and not vj.get("raw") and not vj.get("found", True):
             return None
         meta = {"kind": vj.get("kind"), "raw": vj.get("raw"), "repaired": vj.get("repaired"),
-                "harness_identity": vj.get("harness_identity")}
+                "harness_identity": vj.get("harness_identity"),
+                "trace_identity": trace_identity,
+                "revalidated": revalidated, "previous_errors": previous_errors if revalidated else []}
         return verdict.build(ledger, data, errors, meta)
     lb = verdict.load_block(report)
     if not lb["found"]:
         return None
-    return verdict.build(ledger, lb["data"], lb["errors"], {"kind": lb["kind"], "raw": lb["raw"]})
+    return verdict.build(ledger, lb["data"], lb["errors"], {"kind": lb["kind"], "raw": lb["raw"],
+                                                         "trace_identity": trace_identity})
 
 
 # ═══════════════ 调查路径与账本关系分层 ═══════════════
@@ -923,7 +945,9 @@ def _trajectory_walk(ledger: atoms.Ledger, steps: list[dict[str, Any]], texts: l
                                 "use_time_ms": s.get("use_time_ms"), "result_time_ms": s.get("result_time_ms"),
                                 "use_line": s.get("use_line"), "result_line": s.get("result_line"), "note": None}
         visits.append(visit)
-        if s.get("result_present") is not True:
+        if s.get("identity_unbound"):
+            visit.update(status="unverified", actual_node=None, note="历史调用的账本身份与当前不一致,不绑定当前版本或关系")
+        elif s.get("result_present") is not True:
             visit.update(status="pending", note="没有可配对的工具返回,未打开")
         elif _rejected(text):
             visit.update(status="rejected", actual_node=None, note=text.strip().splitlines()[0])
@@ -1060,6 +1084,10 @@ def _trajectory(ledger: atoms.Ledger, run_dir: str, steps: list[dict[str, Any]],
     if any(s.get("via") or (int(s["i"]) <= len(texts) and _rejected(texts[int(s["i"]) - 1]))
            for s in steps if s.get("tool") in ("file", "agent")):
         return _trajectory_walk(ledger, steps, texts, structured, verdicts)
+    if any(s.get("identity_unbound") for s in steps):
+        # Legacy reports have no structured.identity to consult. Do not first bind
+        # old handles to today's ledger and merely add an unverified label.
+        return _trajectory_walk(ledger, steps, texts, structured, {})
     bound = not structured or (structured.get("identity") or {}).get("bound") is not False
     tree = _trajectory_ledger(ledger, run_dir, steps, root if bound else None, structured if bound else None,
                               verdicts if not structured else {})

@@ -869,7 +869,9 @@ def _blame_changed(ledger: Ledger, path: str, st: FileStory, anchor: int) -> dic
     行级 diff 直接挑出旧侧的 replace/delete 行,归属取自 v-1 的逐行签名,新增侧只给行数。"""
     base: dict[str, Any] = {"path": path, "v": anchor, "n_versions": len(st.versions), "changed": True,
                             "prev_v": anchor - 1 if anchor > 1 else None, "known": False,
-                            "n_lines": 0, "lines": [], "added": 0, "summary": [], "unknown": 0, "note": ""}
+                            "n_lines": None, "lines": [], "added": None, "removed": None,
+                            "summary": [], "unknown": None, "note": "",
+                            "comparison_basis": "unavailable", "comparison_note": ""}
     if anchor < 2:
         base["note"] = "创建版,没有前一版可比"
         return base
@@ -898,7 +900,14 @@ def _blame_changed(ledger: Ledger, path: str, st: FileStory, anchor: int) -> dic
             unknown += 1
         else:
             counts[x["owner"]] = counts.get(x["owner"], 0) + 1
-    base.update(known=True, n_lines=len(old), lines=lines, added=added, unknown=unknown,
+    observed = (prev.sealed or ver.sealed or prev.state_gap or ver.state_gap
+                or prev.source == "outband" or ver.source == "outband" or ver.diff_kind in ("interval", "collapsed"))
+    comparison_note = "计数只表示可观测文本端点的行级净差异，不证明业务行为无回归。"
+    if observed:
+        comparison_note += " 至少一个端点来自后续观测封口或区间重锚；0增0删不证明黑盒调用没有改写，期间经过仍未知。"
+    base.update(known=True, n_lines=len(old), lines=lines, added=added, removed=len(lines), unknown=unknown,
+                comparison_basis="observed_endpoints" if observed else "adjacent_version_text",
+                comparison_note=comparison_note,
                 summary=[{"owner": k, "owner_name": _agent_label(ledger.agents, k), "n": c}
                          for k, c in sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))])
     return base

@@ -45,8 +45,24 @@ const steps=visits.map(v=>{
 });
 function claim(r) { return {...r,ok:true,label:r.kind==='file'?'A.ets@v'+r.v:'Agent A v'+r.v,spec:r.kind+':'+r.key+'@v'+r.v}; }
 const probe={run:'fixture',root:file,cost:0,steps,links:[],legacy:false,roles:{'agent-a':roles,[file]:[legacyRole]},fixed:[],defects:{A:'缺陷甲',B:'缺陷乙'},
+ trace_identity:{bound:true,status:'matched',current:'fixture-ledger',source:'sessions',source_identities:['fixture-ledger']},
  structured:{identity:{match:true,bound:true,status:'matched'},errors:[],defects:[{id:'A',title:'缺陷甲',nodes:[claim(roles[0]),claim(legacyRole)],edges:[]},{id:'B',title:'缺陷乙',nodes:[claim(roles[1])],edges:[]}]},
  trajectory:{mode:'via',root,nodes,edges:[],visits,transitions,declared:[],side_title:'未查询 · 结论提及'}};
+const candidateOne='candidate:'+'a'.repeat(20), candidateTwo='candidate:'+'b'.repeat(20);
+function coverageFixture(body){
+  const item=v=>({node:fid+'@v'+v,v,writer:{id:'agent-a',v:1},event:{status:'recorded',seq:100+v,ref:'#a:'+(100+v)+'@L'+v},change:{text:'变化摘录',semantic_checked:false}});
+  const candidate=(id,seq)=>({id,agent:'agent-b',file,seq,reason:'精确提及，执行效应未确认',ctx:'shell 候选命令，不据此认定写者',repair_confirmed:false,writer_confirmed:false,
+    event:{status:'recorded',seq,ref:'#b:'+seq+'@L10',use_line:10,result_line:11,tool_use_id:'candidate-tool-'+seq}});
+  const row=(target,status,reason)=>({canonical_target:target,canonical_node:target.startsWith('file:')?target:null,canonical_candidate:target.startsWith('candidate:')?target:null,
+    status,reason,valid:true,defects:[],evidence:['#a:1@L1'],semantic_checked:false,evidence_checked:false});
+  body.repair_manifest={ledger:'fixture-ledger',file,items:[1,2,3].map(item),candidates:[candidate(candidateOne,201),candidate(candidateTwo,202)],errors:[],
+    scope:'仅当前账本返修版本及候选，不保证包含所有真实修复；候选不是作者认定。',candidate_scope:{window_scope:'同链参与者的动作窗口，不保证动作属于修复阶段。'}};
+  body.coverage={provided:true,identity_bound:true,status:'incomplete',complete:false,semantic_checked:false,evidence_checked:false,
+    rows:[row(fid+'@v1','explained','生成输入已有依据'),row(fid+'@v3','unresolved','缺少执行过程，仍未知'),row(candidateOne,'not_repair','模型声明只是检查，未独立验证')],
+    missing_versions:[fid+'@v2'],missing_candidates:[candidateTwo],missing:[fid+'@v2',candidateTwo],unresolved:[fid+'@v3'],not_repair:[candidateOne],duplicates:[],errors:[],
+    counts:{expected:5,provided:3,accounted:3,expected_versions:3,expected_candidates:2,missing_versions:1,missing_candidates:1,missing:2,unresolved:1,not_repair:1}};
+  return row;
+}
 const versions=[1,2,3].map(v=>({v,by:v===2?'agent-b':'agent-a',by_name:v===2?'Agent B':'Agent A',by_ver:v===3?2:1,ts:'2026-01-01T00:00:0'+v+'Z',lines:1,content_known:false,source:'opaque'}));
 const agents=['agent-a','agent-b'].map(id=>({id,label:id==='agent-a'?'Agent A':'Agent B',n_versions:id==='agent-a'?2:1,kind:'agent',session:'fixture',reads:[],writes:[],actions:[],inbox:[]}));
 const data={sid:'fixture',sid8:'fixture',project:'Trace fidelity regression',urls:{data:'/data',atom:'/atom',probe:'/probe',filediff:'/diff',report:null}};
@@ -59,6 +75,57 @@ const server=http.createServer((req,res)=>{
   else if(url.pathname==='/atom/index')body={agents,files:[{path:file,kind:'ets',n_versions:3,has_writer:true}]};
   else if(url.pathname==='/probe'){
     body=structuredClone(probe);
+    const run=url.searchParams.get('run');
+    if(run.startsWith('coverage')||run.startsWith('trace-')){
+      const row=coverageFixture(body);
+      if(run==='coverage-invalid'){
+        body.coverage.rows.push({...body.coverage.rows[0],reason:'重复声明不可自动选优'});
+        body.coverage.status='invalid';body.coverage.counts.accounted=2;body.coverage.counts.provided=4;
+        body.coverage.duplicates=[{node:fid+'@v1',rows:[0,3]}];body.coverage.errors=[{code:'duplicates',node:fid+'@v1'}];
+      }
+      if(run==='coverage-complete'){
+        body.coverage.rows.push(row(fid+'@v2','explained','补充的版本交代'),row(candidateTwo,'unresolved','候选已登记但未查清'));
+        Object.assign(body.coverage,{complete:true,status:'complete',missing:[],missing_versions:[],missing_candidates:[],unresolved:[fid+'@v3',candidateTwo]});
+        Object.assign(body.coverage.counts,{accounted:5,provided:5,missing:0,missing_versions:0,missing_candidates:0,unresolved:2});
+      }
+      if(run==='coverage-unprovided'){
+        Object.assign(body.coverage,{provided:false,status:'unprovided',rows:[],unresolved:[],not_repair:[],missing_versions:[1,2,3].map(v=>fid+'@v'+v),missing_candidates:[candidateOne,candidateTwo]});
+        Object.assign(body.coverage.counts,{accounted:0,provided:0,missing:5,missing_versions:3,missing_candidates:2,unresolved:0,not_repair:0});
+      }
+      if(run==='coverage-compat'){
+        Object.assign(body.structured,{notes:['保留备注甲','<b>备注乙不是HTML</b>'],revalidated:true,previous_errors:['notes 必须是字符串']});
+      }
+      if(run==='coverage-absent-version'){
+        body.repair_manifest.items[1]={...body.repair_manifest.items[1],v:99,node:fid+'@v99'};
+        body.coverage.missing_versions=[fid+'@v99'];body.coverage.missing=[fid+'@v99',candidateTwo];
+      }
+      if(run==='trace-mismatch'){
+        body.trace_identity={bound:false,status:'mismatch',current:'current-ledger',source:'sessions+harness',source_identities:['old-ledger'],harness_identity:'old-ledger',diag:'成功 sessions 记录与当前账本不匹配'};
+        // Deliberately retain stale bound claims/nodes: the page must still fail closed on explicit trace conflict.
+      }
+      if(run==='trace-legacy')body.trace_identity={bound:null,status:'legacy',current:'fixture-ledger',source:null,diag:'查询轨迹身份未记录'};
+    }
+    if(run==='metrics'){
+      body.steps.forEach(s=>{s.provenance={format:'codex_rollout_event',path:'transcript.jsonl',pairing:'item_runtime'};});
+      for(let i=0;i<70;i++) body.steps.push({i:8+i,tool:'guide',ok:true,args:{},provenance:{format:'codex_rollout_event',path:'transcript.jsonl',pairing:'item_runtime'}});
+      for(let i=0;i<41;i++) body.steps.push({i:78+i,tool:i%2?'functions.exec':'exec',ok:true,args:{input:'host wrapper'},call_id:'host-'+i,use_line:100+i*2,result_line:101+i*2,provenance:{format:'codex_rollout',path:'transcript.jsonl',pairing:'call_id'}});
+    }
+    if(run==='other-calls') body.steps.push({i:8,tool:'Bash',ok:true,args:{command:'read-only'},provenance:{format:'claude_transcript',path:'transcript.jsonl'}});
+    if(run==='legacy'){body.structured=null;body.legacy=true;delete body.trace_identity;}
+    if(run==='navigation'){
+      const added=[
+        {id:fid+'@2',kind:'file',key:file,v:2,label:'A.ets@v2',parent:root,side:'up',source:'查过',opened:[8]},
+        {id:'agent:agent-a@2',kind:'agent',key:'agent-a',v:2,label:'Agent A v2',parent:aid,side:'up',source:'查过',opened:[9]},
+        {id:'file:/else/A.ets@2',kind:'file',key:'/else/A.ets',v:2,label:'Other A.ets@v2',parent:root,side:'up',source:'查过',opened:[10]}
+      ];
+      body.trajectory.nodes.push(...added);
+      added.forEach(n=>{
+        const step=n.opened[0], args=n.kind==='file'?{path:n.key,v:n.v}:{id:n.key,v:n.v};
+        body.trajectory.transitions.push({step,from:n.parent,to:n.id,relation:null,match:'账本无此边'});
+        body.trajectory.visits.push({step,tool:n.kind,node:n.id,requested_node:n.id,from:n.parent,status:'opened',verified:true,args});
+        body.steps.push({i:step,tool:n.kind,ok:true,args,node:{kind:n.kind,path:n.kind==='file'?n.key:undefined,aid:n.kind==='agent'?n.key:undefined,v:n.v}});
+      });
+    }
     if(url.searchParams.get('run')==='no-root'||url.searchParams.get('run')==='empty'){
       body.trajectory.root=null;body.trajectory.nodes=[{...nodes[3],parent:null}];body.trajectory.transitions=[];
       body.trajectory.visits=visits.filter(v=>v.status==='rejected');body.steps=steps.filter(s=>s.i===7);
@@ -99,6 +166,9 @@ async function main(){
     await check('one entity per exact version',"Object.values(__mig.xt().byId).filter(n=>n.traj).length === 4");
     await check('unqueried conclusion version has no checked badge',"[...document.querySelectorAll('#canvas .node')].some(n=>n.textContent.startsWith('A.ets@v1') && n.textContent.includes('未查询') && !n.querySelector('.badge.step'))");
     await check('rejected visit overrides successful transport status',"[...document.querySelectorAll('#probe .st')].some(n=>n.textContent.startsWith('✗7') && n.textContent.includes('被拒 · 未打开'))");
+    await check('structured summary excludes prose ring metrics',"!document.querySelector('#probe').textContent.includes('判定落到树上') && !document.querySelector('#probe').textContent.includes('报告的环') && document.querySelector('#probe').textContent.includes('结构化结论 2 项')");
+    await check('revisits, unqueried claims and rejected visits counted separately',"document.querySelector('.visit-summary').textContent==='成功版本访问 6 次 · 未打开 1 次 · 去重已查版本节点 3 个 · 图中版本节点 4 个'");
+    await check('unrelated navigation is neutral and explicitly noncausal',"[...document.querySelectorAll('.badge.navigation')].some(n=>n.textContent==='探索跳转：未核出直接账本边' && n.title.includes('不是因果边') && !n.classList.contains('stale')) && [...document.querySelectorAll('.wire.route title')].every(n=>n.textContent.includes('不是因果边'))");
     const point=await evaluate("(()=>{const r=document.querySelector('.route-step[data-step=\"4\"]').getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2}})()");
     await send('Input.dispatchMouseEvent',{type:'mousePressed',button:'left',clickCount:1,...point});
     await send('Input.dispatchMouseEvent',{type:'mouseReleased',button:'left',clickCount:1,...point});
@@ -133,13 +203,72 @@ async function main(){
     await evaluate("__mig.load('empty')");
     await until("__mig.xt()===null");
     await check('all rejected payload clears previous graph',"document.querySelectorAll('#canvas .node').length===0 && document.querySelector('#rootlbl').textContent.includes('没有已核验')");
-    await evaluate("__mig.load('fixture')");
+    await evaluate("__mig.load('metrics')");
+    await until("document.querySelectorAll('#probe .st').length===118 && __mig.xt() && __mig.xt().walk");
+    await check('118 native records split into 77 MCP queries and 41 wrappers',"document.querySelector('.call-summary').dataset.mcp==='77' && document.querySelector('.call-summary').dataset.wrapper==='41' && document.querySelector('.call-summary').dataset.other==='0' && document.querySelectorAll('.st[data-call-kind=\"mcp\"]').length===77 && document.querySelectorAll('.st[data-call-kind=\"wrapper\"]').length===41");
+    await check('wrappers retain source, IDs and physical lines without becoming visits',"document.querySelector('.st[data-call-kind=\"wrapper\"] .t').title.includes('codex_rollout') && document.querySelector('.st[data-call-kind=\"wrapper\"] .t').title.includes('host-0') && document.querySelector('.st[data-call-kind=\"wrapper\"] .t').title.includes('100 → 101') && __mig.probe().trajectory.visits.length===7 && document.querySelectorAll('.wire.route').length===5");
+    await evaluate("__mig.load('other-calls')");
+    await until("document.querySelector('.call-summary').dataset.other==='1'");
+    await check('unrecognized host calls are not counted as MCP or wrapper',"document.querySelector('.call-summary').dataset.mcp==='7' && document.querySelector('.call-summary').dataset.wrapper==='0' && document.querySelectorAll('.st[data-call-kind=\"other\"]').length===1");
+    await evaluate("__mig.load('legacy')");
+    await until("__mig.probe().legacy===true");
+    await check('legacy prose ring display remains readable',"document.querySelector('#probe').textContent.includes('报告的环') && document.querySelector('.visit-summary').textContent.includes('0 环')");
+    await evaluate("__mig.load('navigation')");
+    await until("document.querySelectorAll('.wire.route').length===8");
+    await check('same file versions labeled as navigation without inventing a relation',"__mig.xt().transitions.find(t=>t.step===8).navigation==='同文件版本导航' && __mig.xt().transitions.find(t=>t.step===8).relation===null && document.querySelector('.wire.route[data-step=\"8\"] title').textContent.includes('同文件版本导航')");
+    await check('same agent versions labeled as navigation without inventing a relation',"__mig.xt().transitions.find(t=>t.step===9).navigation==='同agent版本导航' && __mig.xt().transitions.find(t=>t.step===9).relation===null && [...document.querySelectorAll('.badge.navigation')].some(n=>n.textContent==='同agent版本导航')");
+    await check('identical basenames at different full paths remain exploratory jumps',"__mig.xt().transitions.find(t=>t.step===10).navigation==='探索跳转：未核出直接账本边' && [...document.querySelectorAll('#canvas .node')].some(n=>n.title.startsWith('/else/A.ets'))");
+    await evaluate("[...document.querySelectorAll('#canvas .node')].find(n=>n.textContent.startsWith('A.ets@v2')).click()");
+    await check('file drawer uses neutral navigation badge and a noncausal note',"document.querySelector('#side .pill.navigation').textContent==='同文件版本导航' && !document.querySelector('#side .pill.navigation').classList.contains('warn') && document.querySelector('#side').textContent.includes('查询导航,不是因果边')");
+    await evaluate("__mig.load('coverage')");
     await until("__mig.xt() && __mig.xt().walk && document.querySelectorAll('.wire.route').length===5");
+    await check('coverage distinguishes accounted items, missing versions and unconfirmed candidates',"document.querySelector('.coverage-summary').textContent==='已交代 3/5 项 · 尚未有效交代 2 项' && document.querySelector('.repair-coverage').textContent.includes('记录版本 3 个 · 未确认候选 2 个（候选不等于修复）') && document.querySelector('.repair-coverage').textContent.includes('尚未登记：记录版本 1 个、候选 1 个')");
+    await check('registered unknown and not-repair declarations are not presented as verified conclusions',"[...document.querySelectorAll('.coverage-item')].some(n=>n.dataset.state==='unresolved' && n.textContent.includes('已登记 · 仍未知（未查清）')) && [...document.querySelectorAll('.coverage-item')].some(n=>n.dataset.state==='not_repair' && n.textContent.includes('声明非修复（未验证）')) && document.querySelector('.repair-coverage').textContent.includes('解释与证据语义未核验')");
+    await evaluate("window.coverageTreeIds=JSON.stringify(Object.keys(__mig.xt().byId));[...document.querySelectorAll('.coverage-item')].find(n=>n.dataset.target.endsWith('@v2')).querySelector('.coverage-file').click()");
+    await until("document.querySelector('#side .vrow.anchor .vn')?.textContent==='v2'");
+    await check('missing version opens actual ledger drawer without adding a queried node or changing route',"JSON.stringify(Object.keys(__mig.xt().byId))===window.coverageTreeIds && __mig.xt().walk && document.querySelectorAll('.wire.route').length===5 && document.querySelector('#side').textContent.includes('清单定位 · 不计入模型查询') && !Object.values(__mig.xt().byId).some(n=>n.kind==='file' && n.anchorV===2)");
+    await evaluate("[...document.querySelectorAll('.dchips span')].find(n=>n.textContent.startsWith('B ')).click()");
+    await check('defect switch retains the missing-version drawer and whole-manifest coverage',"document.querySelector('#side .vrow.anchor .vn').textContent==='v2' && document.querySelectorAll('.coverage-item').length===5 && document.querySelector('.coverage-summary').dataset.accounted==='3'");
+    const candidatePoint=await evaluate("(()=>{const b=[...document.querySelectorAll('.coverage-item')].find(n=>n.dataset.target==='"+candidateTwo+"').querySelector('.coverage-action');b.scrollIntoView({block:'center'});const r=b.getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2}})()");
+    await send('Input.dispatchMouseEvent',{type:'mousePressed',button:'left',clickCount:1,...candidatePoint});
+    await send('Input.dispatchMouseEvent',{type:'mouseReleased',button:'left',clickCount:1,...candidatePoint});
+    await until("[...document.querySelectorAll('.coverage-item')].find(n=>n.dataset.target==='"+candidateTwo+"').textContent.includes('EVIDENCE 202')");
+    await check('candidate action click opens original evidence without new versions or problem coloring',"JSON.stringify(Object.keys(__mig.xt().byId))===window.coverageTreeIds && document.querySelectorAll('.wire.route').length===5 && !document.querySelector('.coverage-item .r-err') && !document.querySelector('.coverage-item .r-carry')");
+    await evaluate("document.querySelector('#zf').click()");
+    await check('fit still displays the entire recorded tree after coverage navigation',"(()=>{const g=document.querySelector('#graph').getBoundingClientRect(),t=document.querySelector('.toolbar').getBoundingClientRect();return [...document.querySelectorAll('#canvas .node')].every(n=>{const r=n.getBoundingClientRect();return r.left>=g.left-1 && r.right<=g.right+1 && r.top>=t.bottom-1 && r.bottom<=g.bottom+1})})()");
+    await evaluate("__mig.load('coverage-invalid')");
+    await until("document.querySelector('.coverage-summary').dataset.status==='invalid'");
+    await check('duplicate declarations do not inflate accounted count or disappear as missing-zero',"document.querySelector('.coverage-summary').textContent==='已交代 2/5 项 · 尚未有效交代 3 项' && [...document.querySelectorAll('.coverage-item')].some(n=>n.dataset.state==='invalid' && n.textContent.includes('重复声明不可自动选优'))");
+    await evaluate("__mig.load('coverage-complete')");
+    await until("document.querySelector('.coverage-summary').dataset.status==='complete'");
+    await check('complete means all items accounted for, not all candidates or defects resolved',"document.querySelector('.coverage-summary').textContent.includes('已交代 5/5 项') && document.querySelector('.repair-coverage').textContent.includes('清单交代齐全，不代表调查完整或全部修复已确认') && document.querySelectorAll('.coverage-item[data-state=\"unresolved\"]').length===2");
+    await evaluate("__mig.load('coverage-unprovided')");
+    await until("document.querySelector('.coverage-summary').dataset.status==='unprovided'");
+    await check('missing coverage remains explicitly unprovided rather than inferred from defect count',"document.querySelector('.coverage-summary').textContent.includes('已交代 0/5 项') && document.querySelectorAll('.coverage-item[data-state=\"missing\"]').length===5 && document.querySelector('.repair-coverage').textContent.includes('不从散文或其他引用推测覆盖')");
+    await evaluate("__mig.load('coverage-absent-version')");
+    await until("document.querySelector('.coverage-item[data-target=\"file:/fixture/A.ets@v99\"]')!==null");
+    await evaluate("document.querySelector('.coverage-item[data-target=\"file:/fixture/A.ets@v99\"] .coverage-file').click()");
+    await until("document.querySelector('.repair-coverage').textContent.includes('当前原子未提供该版本')");
+    await check('invalid version cannot create a phantom drawer or graph node',"!Object.values(__mig.xt().byId).some(n=>n.anchorV===99) && !document.querySelector('#side .tag').textContent.includes('@v99')");
+    await evaluate("__mig.load('trace-mismatch')");
+    await until("document.querySelector('.trace-identity').dataset.status==='mismatch' && __mig.xt()===null");
+    await check('explicit trace conflict blocks stale bound graph, roles, step links and coverage links',"document.querySelector('#rootlbl').textContent.includes('当前账本不匹配') && document.querySelectorAll('#canvas .node').length===0 && document.querySelectorAll('#probe .st').length===7 && [...document.querySelectorAll('#probe .st')].every(n=>n.classList.contains('na')) && !document.querySelector('#probe .pn.r-err') && !document.querySelector('.coverage-file') && !document.querySelector('.coverage-action') && document.querySelector('.coverage-summary').textContent.includes('未绑定，不计为当前覆盖')");
+    await evaluate("__mig.load('trace-legacy')");
+    await until("document.querySelector('.trace-identity').dataset.status==='legacy' && __mig.xt() && __mig.xt().walk");
+    await check('legacy identity is explicitly unrecorded without falsely marking verification',"document.querySelector('.trace-identity').textContent.includes('调查身份未记录 · 历史查询未认证') && document.querySelector('.trace-identity').dataset.status!=='matched' && document.querySelectorAll('.wire.route').length===5");
+    await evaluate("__mig.load('coverage-compat')");
+    await until("document.querySelector('.structured-compat')!==null");
+    await check('revalidated historical notes show compatibility warning and preserve text safely',"document.querySelector('.structured-compat').textContent.includes('不是模型重跑') && document.querySelector('.structured-compat').textContent.includes('旧诊断：notes 必须是字符串') && document.querySelector('.structured-notes').textContent.includes('保留备注甲') && document.querySelector('.structured-notes').textContent.includes('<b>备注乙不是HTML</b>') && !document.querySelector('.structured-notes b')");
     await evaluate(clickAgent);
+    await evaluate("new Promise(resolve=>setTimeout(resolve,200))");
+    await evaluate("(()=>{const p=document.querySelector('#probe'),c=document.querySelector('.repair-coverage');p.scrollTop+=c.getBoundingClientRect().top-p.getBoundingClientRect().top})()");
+    await check('coverage summary is visibly reachable inside the scrollable panel',"(()=>{const p=document.querySelector('#probe').getBoundingClientRect(),s=document.querySelector('.coverage-summary').getBoundingClientRect();return s.top>=p.top && s.bottom<=p.bottom})()");
     const output=path.join(repo,'docs/experiments/2026-09-09-trace-fidelity/screenshots');
     fs.mkdirSync(output,{recursive:true});
     const screenshot=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
-    fs.writeFileSync(path.join(output,'01-route-revisits-defects.png'),Buffer.from(screenshot.data,'base64'));
+    const screenshotPath=path.join(output,'02-repair-coverage-'+Date.now()+'.png');
+    fs.writeFileSync(screenshotPath,Buffer.from(screenshot.data,'base64'));
+    console.log('SCREENSHOT '+screenshotPath);
     assert.deepEqual(errors,[],'browser console exceptions');
     console.log('PASS no browser exceptions');
   }finally{

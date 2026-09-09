@@ -67,6 +67,45 @@ def _build(led: atoms.Ledger, data: dict[str, Any]) -> dict[str, Any]:
     return verdict.build(led, {**data, "ledger": atoms.ledger_identity(led)}, [], {})
 
 
+def test_notes_scalar_or_string_list_is_lossless_without_relaxing_coordinates(tmp_path):
+    led = _pool(tmp_path)
+    data = {"schema": verdict.SCHEMA, "defects": [], "notes": ["first", "second"]}
+    assert verdict.validate(data) == []
+    assert _build(led, data)["notes"] == "first\n\nsecond"
+    assert data["notes"] == ["first", "second"]
+    for notes in ([{"claim": "bad type"}], [1], [["nested"]]):
+        assert any("notes" in e for e in verdict.validate({**data, "notes": notes}))
+    assert any("版本" in e or "@v" in e for e in verdict.validate({**data, "root": "file:A.ets"}))
+
+
+def test_coverage_accepts_candidate_or_version_but_not_both():
+    row = {"candidate": "candidate:" + "a" * 20, "status": "unresolved", "defects": [],
+           "reason": "只有线索，尚未判定效应", "evidence": []}
+    data = {"schema": verdict.SCHEMA, "defects": [], "coverage": [row]}
+    assert verdict.validate(data) == []
+    for bad in ({**row, "node": "file:A.ets@v1"}, {**row, "candidate": "candidate:short"},
+                {k: v for k, v in row.items() if k != "candidate"}, {**row, "evidence": None}):
+        assert verdict.validate({**data, "coverage": [bad]})
+    version = {k: v for k, v in row.items() if k != "candidate"}
+    version["node"] = "file:A.ets@v1"
+    assert verdict.validate({**data, "coverage": [version]}) == []
+
+
+def test_old_notes_rejection_can_be_revalidated_but_identity_still_fails_closed(tmp_path):
+    led = _pool(tmp_path)
+    data = {"schema": verdict.SCHEMA, "ledger": "different-ledger", "defects": [], "notes": ["first", "second"]}
+    raw = json.dumps(data)
+    saved = {"data": None, "raw": raw, "kind": "json", "found": True,
+             "errors": ["notes 必须是字符串"], "harness_identity": atoms.ledger_identity(led)}
+    run = _run_dir(tmp_path, [], "report", saved)
+    got = probe.probe_payload(led, run)["structured"]
+    assert got["revalidated"] is True and got["previous_errors"] == saved["errors"]
+    assert got["errors"] == [] and got["notes"] == "first\n\nsecond"
+    assert got["identity"]["bound"] is False
+    with open(os.path.join(run, "verdict.json"), encoding="utf-8") as stream:
+        assert json.load(stream) == saved
+
+
 # ═══════════════ 解析:严格 schema,重复键与无效类型拒绝 ═══════════════
 
 def test_extract_and_parse_reject_bad_blocks() -> None:
