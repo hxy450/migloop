@@ -1,0 +1,43 @@
+{
+  "schema": "migloop-offline-delivery-prototypes/1",
+  "status": "paused_not_integrated",
+  "date": "2026-09-10",
+  "purpose": "Retain reproducible offline presentation comparisons, not production renderers or investigator guidance.",
+  "runtime_imports": false,
+  "included_in_frozen_runtime_code": false,
+  "included_in_investigator_prompt": false,
+  "paid_model_calls": 0,
+  "files": [
+    {"path": "docs/experiments/file-first-10/capture_text_delivery.py", "sha256": "b39a49ec4c28d17a6720e35efa1bf72942690ff4fe56873a93f4ca545f3d212c", "role": "Version-bound read-only Dice batch capture; exclusive new EVAL directory."},
+    {"path": "docs/experiments/file-first-10/capture_member_text.py", "sha256": "f34ad30b226cc8f123090cea73463c7160b5ee94bf21add4f85b88f3ee2bcbc9", "role": "Version-bound read-only Member single-query capture; exclusive new EVAL directory."},
+    {"path": "docs/experiments/file-first-10/text_mcp_prototype.py", "sha256": "cbeb0b5b3c0a5b9382a53378a92b7ac8326bb50bd4533bb2d6787cc7a5209138", "role": "Useful lossless representation baseline and experimental receipt validator; not suitable as Luna default output."},
+    {"path": "docs/experiments/file-first-10/progressive_text_prototype.py", "sha256": "a50bb01cca187ff9ac5f31fe90f91beeb761e63876a441410228c536dc6cc1c2", "role": "Useful progressive text experiment with exhaustive local omission audit; intentionally not lossless and no production receipt."},
+    {"path": "docs/experiments/file-first-10/verify_progressive_queries.py", "sha256": "7f98a343e9bfaf3b8048e06aa7883bff4ca2a6b74d979dd0b42a6f91a3580f57", "role": "Version-bound read-only checks of two composed example queries; not an automatic repair or rerun step."},
+    {"path": "docs/experiments/file-first-10/text-mcp-prototype.md", "sha256": "12dba5fff66b327d954bcf7c16232e9cc11ef940c60b3eedfc6216e954b23642", "role": "Lossless measurement definitions, boundaries and integration risks."},
+    {"path": "docs/experiments/file-first-10/progressive-text-prototype.md", "sha256": "320017949de02186a6f13b10064f0063d713aaa62570e33c2ccd62d6fdfeb8e8", "role": "Progressive examples index, actual delivery/omission definitions and separate row-pagination costs."}
+  ],
+  "local_eval_artifacts_not_committed": [
+    "tools-v3-text-prototype-20260910-1/capture.json",
+    "tools-v3-text-prototype-20260910-1/selected.json",
+    "tools-v3-text-prototype-20260910-1/projected.json",
+    "tools-v3-text-prototype-20260910-1/render-3/",
+    "tools-v3-progressive-text-20260910-1/member-capture/",
+    "tools-v3-progressive-text-20260910-1/render-3/"
+  ],
+  "measurement_rules": [
+    "Lossless and progressive figures have different delivery coverage and are not interchangeable.",
+    "Only render-3 artifacts supply final figures; earlier render folders are retained, not overwritten.",
+    "Character counts are not token counts, model accuracy, or measured human usability.",
+    "Capture helpers are bound to recorded query contracts and package hashes. Later view/default changes require a new explicit experiment; do not silently rerun and claim historical equivalence.",
+    "Saved data can be rendered offline without constructing a ledger or accessing original transcript pools."
+  ],
+  "safety_review": {
+    "committed_historical_raw_payloads": false,
+    "committed_exact_historical_raw_refs_or_author_examples": false,
+    "reference_contract_or_adjudication_content_read_by_scripts": false,
+    "credentials_or_environment_values_embedded": false,
+    "history_commands_executed": false,
+    "runtime_check": "src and tests do not import these prototype modules; run_tools10 freezes src/migloop only.",
+    "scope": "Review covers the explicitly listed files, not unrelated repository or EVAL content."
+  }
+}
