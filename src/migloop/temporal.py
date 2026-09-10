@@ -117,12 +117,38 @@ def _page(rows: list[dict[str, Any]], offset: int, limit: int) -> dict[str, Any]
             "rows": rows[offset:offset + limit]}
 
 
+def _annotation_view(annotations: list[dict[str, Any]], kind: str, key: str | None,
+                     details: bool) -> tuple[list[dict[str, Any]], int]:
+    """Disclosure only: admission/search still uses all original annotations.
+
+    A bulk script may touch hundreds of files. Repeating every unrelated path
+    in each file's first page obscures its evidence and blows the return budget.
+    Counts and details=true preserve an explicit expansion path.
+    """
+    if details:
+        return annotations, 0
+    shown = []
+    ranked = annotations
+    if kind == "file":
+        ranked = sorted(annotations, key=lambda a: not any(r["path"] == key for r in a["relations"]))
+    for annotation in ranked[:4]:
+        relations = annotation["relations"]
+        focused = [r for r in relations if r["path"] == key] if kind == "file" else relations
+        selected = focused[:6]
+        shown.append({**annotation, "relations": selected, "relation_count": len(relations),
+                      "relations_omitted": len(relations) - len(selected)})
+    return shown, max(0, len(annotations) - len(shown))
+
+
 def query(ledger: atoms.Ledger, *, kind: str, key: str | None = None, at: str = "latest",
           since_ts: str | None = None, q: str | None = None, q_any: list[str] | None = None,
-          offset: int = 0, limit: int = 40, include_undated: bool = False) -> dict[str, Any]:
+          offset: int = 0, limit: int = 40, include_undated: bool = False,
+          details: bool = False) -> dict[str, Any]:
     """Search all selected raw content; disclosure budgets affect only output."""
     from .search_terms import normalize
     window = Window.parse(at, since_ts)
+    if type(details) is not bool:
+        raise ValueError("details 必须是布尔值")
     _page([], offset, limit)
     if kind not in ("agent", "file", "pool"):
         raise ValueError("时间查询只支持 agent/file/pool")
@@ -187,7 +213,9 @@ def query(ledger: atoms.Ledger, *, kind: str, key: str | None = None, at: str = 
                     continue
                 position = min((text.casefold().find(needle) for needle in needles if needle in text.casefold()), default=0)
                 preview = text[max(0, position - 60):max(0, position - 60) + 240]
-                row = {**record.address(), "agents": sorted(owners), "annotations": annotation,
+                shown, omitted = _annotation_view(annotation, kind, key, details)
+                row = {**record.address(), "agents": sorted(owners), "annotations": shown,
+                       "annotations_omitted": omitted,
                        "preview": preview, "chars": len(text), "matched": matched,
                        "reference_status": "ambiguous_source" if source_counts[store.source_key(path)] > 1 else "addressable",
                        "association": "agent_transcript" if kind == "agent" else
@@ -202,12 +230,13 @@ def query(ledger: atoms.Ledger, *, kind: str, key: str | None = None, at: str = 
                 "identity_status": "unresolved_lexical_scope" if kind == "file" and key not in ledger.stories else "indexed"},
                 scope={"since_ts": window.since, "at": window.at, "bounds": "inclusive",
                        "corpus": "owned_raw_jsonl", "selection": kind, "search_terms": terms},
-                counts=counts, gaps=gaps, undated=_page(undated, offset, limit),
+                counts=counts, gaps=gaps, undated=_page(undated, offset, limit), details=details,
                 stale_annotation_sources=stale,
                 source_count=len(registry), raw_scan_complete=not gaps and bool(registry),
                 causal_complete=False,
                 note="时间只限定已记录证据，不证明因果或磁盘状态。相同时刻不推断先后；"
                      "未知时间单列，不作为截止前输入。摘要可展开；搜索不受分页/摘要限制。"
+                     "关系注释默认摘要；annotations_omitted/relations_omitted可用同查询details=true、较小limit展开。"
                      "文件入口含已索引关系与文件名提及，不能证明所有未识别效应都已关联到文件。")
     body["receipt"] = {"schema": "migloop-query-receipt/1", "node": body["node"],
                        "scope": body["scope"], "records": [r["ref"] for r in body["rows"]],

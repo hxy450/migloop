@@ -184,6 +184,9 @@ def validate(data: Any) -> list[str]:
     structure_error = _structure_error(data)
     if structure_error:
         return [structure_error]
+    if data.get("schema") == "migloop-verdict/3":
+        from . import verdict_v3
+        return verdict_v3.validate(data)
     if data.get("schema") == "migloop-verdict/2":
         from . import verdict_v2
         return verdict_v2.validate(data)
@@ -653,6 +656,9 @@ def build(ledger: atoms.Ledger, data: dict[str, Any] | None, errors: list[str],
           meta: dict[str, Any]) -> dict[str, Any]:
     """校验过的块 → 页面载荷:defects(节点 / 边 / 修复锚点各带核验结果)+ roles(按 键 → [(缺陷, 版本, 角色)] 摊平,
     只收主语有效的节点)+ fixed(修复落点)。errors 非空时 data 为 None,只回原文与错误。"""
+    if isinstance(data, dict) and data.get("schema") == "migloop-verdict/3":
+        from . import verdict_v3
+        return verdict_v3.build(ledger, data, errors, meta)
     cur = atoms.ledger_identity(ledger)
     model = (data or {}).get("ledger") or None
     harness = meta.get("harness_identity") or None

@@ -315,9 +315,9 @@ def _reference_topic(topic: str) -> str:
 
 def verdict_version() -> str:
     import os
-    version = os.environ.get("MIGLOOP_VERDICT_VERSION", "2")
-    if version not in ("1", "2"):
-        raise ValueError("MIGLOOP_VERDICT_VERSION must be 1 or 2")
+    version = os.environ.get("MIGLOOP_VERDICT_VERSION", "3")
+    if version not in ("1", "2", "3"):
+        raise ValueError("MIGLOOP_VERDICT_VERSION must be 1, 2 or 3")
     return version
 
 
@@ -329,10 +329,13 @@ def guide_text(final_mode: str | None = None, topic: str = "time") -> str:
         raise ValueError("MIGLOOP_FINAL_MODE must be document or reference")
     if not isinstance(topic, str) or topic not in TOPICS:
         raise ValueError("guide topic must be one of: " + ", ".join(TOPICS))
+    version = verdict_version()
+    if version == "3":
+        from . import guidance_v3
+        return guidance_v3.text(topic, mode)
     if topic == "time":
         return TIME_GUIDE
     text = CORE if topic == "core" else _reference_topic(topic)
-    version = verdict_version()
     if version == "2":
         from .guidance_v2 import VERDICT, CORE_ADDENDUM
         if topic == "core":

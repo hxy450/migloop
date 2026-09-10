@@ -14,7 +14,7 @@ from . import atoms, time_scope
 
 _INTS = frozenset({"v", "since", "until", "start", "n", "v_from", "v_to", "diff_chars",
                    "m_from", "m_n", "max_chars", "offset", "seq", "limit", "summary_chars"})
-_BOOLS = frozenset({"content", "diff", "readers", "m_all", "reads", "seen", "after", "scope_only", "changed", "include_undated"})
+_BOOLS = frozenset({"content", "diff", "readers", "m_all", "reads", "seen", "after", "scope_only", "changed", "include_undated", "details"})
 _DEFAULTS: dict[str, dict[str, Any]] = {
     "sessions": {"file": None},
     "index": {"kind": None, "query": None, "limit": 0},
@@ -36,6 +36,8 @@ for _tool in ("file", "agent", "search", "diff", "blame"):
     _DEFAULTS[_tool].update(at=None, offset=0, limit=40, include_undated=False)
     _DEFAULTS[_tool].setdefault("since_ts", None)
 _DEFAULTS["diff"]["max_chars"] = 6000
+for _tool in ("file", "agent", "search"):
+    _DEFAULTS[_tool]["details"] = False
 _REQUIRED = {"file": ("path",), "agent": ("id",), "blame": ("path",),
              "diff": ("path",), "record": ("ref",)}
 
@@ -119,7 +121,7 @@ def parameters(tool: str, supplied: dict[str, Any], *, validate_search_scope: bo
         if tool == "search" and out.get("agent") and out.get("file"):
             raise ValueError("search 的 agent 与 file 范围互斥")
         common = {"at", "since_ts", "offset", "limit", "include_undated"}
-        fields = {"agent": {"id"}, "file": {"path"}, "search": {"q", "q_any", "agent", "file"},
+        fields = {"agent": {"id", "details"}, "file": {"path", "details"}, "search": {"q", "q_any", "agent", "file", "details"},
                   "record": {"ref", "max_chars"}, "diff": {"path", "max_chars"}, "blame": {"path", "start", "n"}}
         ignored = [k for k in out if k not in common | fields[tool] and out[k] != _DEFAULTS[tool][k]]
         if ignored:
@@ -127,6 +129,8 @@ def parameters(tool: str, supplied: dict[str, Any], *, validate_search_scope: bo
         return out
     if tool == "diff" and out["v"] is None:
         raise ValueError("diff 需要 at 时刻或旧 v 版本")
+    if out.get("details"):
+        raise ValueError("details 仅用于 at 时间证据查询")
     if tool == "search" and validate_search_scope:
         from .search_terms import normalize, valid_time
         out["q_any"] = normalize(out["q"], out["q_any"])
@@ -248,6 +252,10 @@ def agent_data(ledger: atoms.Ledger, aid: str, v: int | None = None, *,
 
 def render_text(ledger: atoms.Ledger, root: str, tool: str, supplied: dict[str, Any], *,
                 chains: dict[str, Any] | None = None, navigation_hits: list[dict[str, Any]] | None = None) -> str:
+    if tool in ("batch", "changes", "expand", "events"):
+        from . import investigation
+        return (investigation.render_batch(ledger, **investigation.batch_parameters(supplied)) if tool == "batch"
+                else investigation.render_query(ledger, tool, supplied))
     from . import atoms_text, draft_check
     args = validate_target(ledger, tool, parameters(tool, supplied))
     if args.get("at") is not None:
@@ -259,7 +267,7 @@ def render_text(ledger: atoms.Ledger, root: str, tool: str, supplied: dict[str, 
         else:
             text = temporal.render(data)
         return time_receipts.append(ledger, tool, args, text, data)
-    for key in ("at", "offset", "limit", "include_undated", "since_ts"):
+    for key in ("at", "offset", "limit", "include_undated", "since_ts", "details"):
         if tool in ("file", "agent", "diff", "blame") or tool == "search" and key != "since_ts":
             args.pop(key, None)
     if tool == "diff":
@@ -313,6 +321,10 @@ def render_text(ledger: atoms.Ledger, root: str, tool: str, supplied: dict[str, 
 
 def json_data(ledger: atoms.Ledger, tool: str, supplied: dict[str, Any], *,
               chains: dict[str, Any] | None = None) -> dict[str, Any] | None:
+    if tool in ("batch", "changes", "expand", "events"):
+        from . import investigation
+        return (investigation.batch(ledger, **investigation.batch_parameters(supplied)) if tool == "batch"
+                else {**investigation.query(ledger, tool, supplied), "ledger": atoms.ledger_identity(ledger)})
     args = validate_target(ledger, tool, parameters(tool, supplied))
     if args.get("at") is not None:
         return temporal_data(ledger, tool, args)
@@ -354,11 +366,20 @@ def json_data(ledger: atoms.Ledger, tool: str, supplied: dict[str, Any], *,
         return data
     if tool == "check":
         from . import draft_check
-        return draft_check.evaluate(ledger, args["draft"], chains, args["file"])
+        return draft_check.evaluate(ledger, args["draft"], chains, args["file"], with_graph=True)
     raise ValueError(f"工具无 JSON 投影: {tool}")
 
 
 def temporal_data(ledger: atoms.Ledger, tool: str, args: dict[str, Any]) -> dict[str, Any]:
+    """Scalar time endpoints and batch endpoints share the same scope semantics."""
+    from . import investigation
+    if tool in ("file", "agent", "search", "diff", "blame"):
+        return investigation.query(ledger, tool, args)
+    return temporal_data_core(ledger, tool, args)
+
+
+def temporal_data_core(ledger: atoms.Ledger, tool: str, args: dict[str, Any]) -> dict[str, Any]:
+    """Low-level selected data; transport-free and without recursive scope binding."""
     from . import temporal
     if tool in ("diff", "blame"):
         from . import temporal_state
@@ -373,4 +394,4 @@ def temporal_data(ledger: atoms.Ledger, tool: str, args: dict[str, Any]) -> dict
     key = args.get("path") or args.get("id") if tool != "search" else args.get("agent") or args.get("file")
     return temporal.query(ledger, kind=kind, key=key, at=args["at"], since_ts=args.get("since_ts"),
                           q=args.get("q"), q_any=args.get("q_any"), offset=args["offset"],
-                          limit=args["limit"], include_undated=args["include_undated"])
+                          limit=args["limit"], include_undated=args["include_undated"], details=args["details"])

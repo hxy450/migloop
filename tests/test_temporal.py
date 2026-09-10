@@ -98,6 +98,36 @@ def test_pagination_never_limits_search_corpus(tmp_path):
     assert len(text["text"]) == 5 and text["next_offset"] == 5
 
 
+def test_relation_summary_keeps_target_and_expands_without_changing_corpus(tmp_path, monkeypatch):
+    ledger, agent, path = corpus(tmp_path)
+    import os
+    path = os.path.normcase(os.path.abspath(path))
+    annotation = {"agent": agent, "tool": "Bash", "state": "returned", "relations": [
+        {"path": f"/p/file-{n}.ets", "kind": "write", "status": "candidate"} for n in range(100)]}
+    annotation["relations"].append({"path": "/p/A.ets", "kind": "read", "status": "confirmed"})
+    monkeypatch.setattr(temporal, "_annotations", lambda *_: {(path, 3): [annotation]})
+    small = temporal.query(ledger, kind="file", key="/p/A.ets", at=ts(15))
+    full = temporal.query(ledger, kind="file", key="/p/A.ets", at=ts(15), details=True)
+    assert small["total"] == full["total"]
+    assert [r["ref"] for r in small["rows"]] == [r["ref"] for r in full["rows"]]
+    shown = next(r["annotations"][0] for r in small["rows"] if r["annotations"])
+    assert [r["path"] for r in shown["relations"]] == ["/p/A.ets"]
+    assert shown["relations_omitted"] == 100
+    assert len(next(r["annotations"][0] for r in full["rows"] if r["annotations"])["relations"]) == 101
+    # The search can still match an undisplayed path in the original corpus;
+    # annotations are not a replacement corpus or an admission filter.
+    assert temporal.query(ledger, kind="file", key="/p/A.ets", at=ts(15), q="LATE_SECRET")["total"] == 1
+
+
+def test_agent_annotation_fold_has_count_and_full_expansion():
+    annotations = [{"relations": [{"path": str(n)} for n in range(25)]} for _ in range(9)]
+    shown, hidden = temporal._annotation_view(annotations, "agent", "a", False)
+    assert len(shown) == 4 and hidden == 5
+    assert all(len(a["relations"]) == 6 and a["relations_omitted"] == 19 for a in shown)
+    expanded, hidden = temporal._annotation_view(annotations, "agent", "a", True)
+    assert expanded == annotations and hidden == 0
+
+
 def test_raw_ids_survive_parser_upgrade_and_append_but_not_content_change(tmp_path):
     ledger, agent, path = corpus(tmp_path)
     before = temporal.query(ledger, kind="agent", key=agent, q="LONGTAIL")["rows"][0]["ref"]

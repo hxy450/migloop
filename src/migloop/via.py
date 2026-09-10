@@ -40,6 +40,19 @@ def trace_identity(ledger: atoms.Ledger, calls: list[dict[str, Any]] | None,
     observations: list[dict[str, Any]] = []
     ignored: list[dict[str, Any]] = []
     for step, call in enumerate(calls or [], 1):
+        if isinstance(call, dict) and call.get("tool") in ("batch", "changes", "expand"):
+            from . import investigation
+            provenance = call.get("provenance") or {}
+            eligible = (call.get("has_result") is True and not call.get("is_error")
+                        and not call.get("delivery_truncated") and not provenance.get("origin_unverified")
+                        and provenance.get("complete_pair") is not False and isinstance(call.get("text"), str))
+            saved = investigation.parse_receipt(call["tool"], call.get("input") or {}, call.get("text") or "") if eligible else None
+            if saved:
+                observations.append({"identity": saved["receipt"]["ledger"], "step": step,
+                                     "source": "investigation", "call_id": call.get("call_id"), "provenance": provenance})
+            else:
+                ignored.append({"step": step, "reason": "unverified_investigation_receipt"})
+            continue
         if not isinstance(call, dict) or call.get("tool") not in ("sessions", "mcp__migloop__sessions", "search", "mcp__migloop__search"):
             continue
         text = call.get("text")
@@ -82,7 +95,7 @@ def trace_identity(ledger: atoms.Ledger, calls: list[dict[str, Any]] | None,
     harness_valid = isinstance(harness, str) and bool(re.fullmatch(r"\S+", harness))
     conflict = any(identity != current for identity in identities) or \
         (harness_present and (not harness_valid or harness != current))
-    sources = [name for name in ("sessions", "search") if any(row.get("source", "sessions") == name for row in observations)]
+    sources = [name for name in ("sessions", "search", "investigation") if any(row.get("source", "sessions") == name for row in observations)]
     if harness_present:
         sources.append("harness")
     source = "+".join(sources) or None

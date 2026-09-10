@@ -61,6 +61,34 @@ class _Handler(BaseHTTPRequestHandler):
     def _path_of(self, sid: str) -> str:
         return service.locate_session(urllib.parse.unquote(sid), self.roots)
 
+    def do_POST(self) -> None:
+        """Read-only JSON queries; POST avoids long YAML/batch data in URLs."""
+        route = urllib.parse.urlsplit(self.path).path
+        match = _RE_ATOM.match(route)
+        try:
+            size = int(self.headers.get("Content-Length", "0"))
+            if not 0 < size <= 1_000_000:
+                self._json(413, {"error": "JSON query body must be 1..1000000 bytes"})
+                return
+            # Consume a bounded ordinary request before rejecting its route.
+            # Closing a Windows socket with unread request bytes can reset it
+            # before the client receives the otherwise valid 404 response.
+            body = self.rfile.read(size)
+            if not match or match.group(2) not in {"batch", "check", "expand", "changes", "events"}:
+                self._json(404, {"error": "no such read-only query route"})
+                return
+            args = json.loads(body.decode("utf-8"))
+            if not isinstance(args, dict):
+                raise ValueError("JSON query must be an object")
+            data = service.atom_json(self._path_of(match.group(1)), match.group(2), args)
+            self._json(200, data)
+        except service.SessionLookupError as exc:
+            self._json(404, {"error": str(exc)})
+        except (ValueError, UnicodeError) as exc:
+            self._json(400, {"error": str(exc)})
+        except Exception as exc:
+            self._json(500, {"error": str(exc)})
+
     def do_GET(self) -> None:
         url = urllib.parse.urlsplit(self.path)
         route = url.path

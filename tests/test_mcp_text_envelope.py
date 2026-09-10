@@ -15,12 +15,12 @@ from tests.test_atoms import MAIN_ID, _call, _ledger
 def test_all_queries_advertise_text_only_without_a_duplicate_output_schema():
     server = mcp_server.build_server()
     tools = asyncio.run(server.list_tools())
-    assert len(tools) == 11
-    assert {t.name for t in tools} == {"guide", "sessions", "index", "file", "agent", "search", "blame", "diff", "action", "record", "check"}
+    assert len(tools) == 14
+    assert {t.name for t in tools} == {"guide", "sessions", "index", "file", "agent", "search", "blame", "diff", "action", "record", "check", "batch", "changes", "expand"}
     assert all(t.outputSchema is None for t in tools)
 
 
-@pytest.mark.parametrize("topic,title", [("core", "MigLoop 调查入口"), ("full", "MigLoop 两原子归因指南")])
+@pytest.mark.parametrize("topic,title", [("core", "MigLoop 自由时间调查"), ("full", "MigLoop 自由时间调查")])
 def test_guide_envelope_contains_exactly_one_copy_of_the_guide(topic, title):
     blocks = asyncio.run(mcp_server.build_server().call_tool("guide", {"topic": topic}))
     assert isinstance(blocks, list) and len(blocks) == 1

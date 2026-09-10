@@ -198,6 +198,10 @@ def probe_payload(ledger: atoms.Ledger, run_dir: str, chain_payload: dict[str, A
     m, report = _load_run(run_dir)
     calls = _transcript_calls(run_dir)
     trace_identity = via.trace_identity(ledger, calls, m)
+    from . import time_probe
+    if time_probe.is_v3_run(run_dir, report, calls):
+        return time_probe.probe_payload(ledger, run_dir, report=report, calls=calls,
+                                        metadata=m, trace_identity=trace_identity)
     seq = calls if calls is not None else ((m.get("transcript") or {}).get("seq") or [])
     steps: list[dict[str, Any]] = []
     for i, s in enumerate(seq, 1):
@@ -427,7 +431,8 @@ def _structured(ledger: atoms.Ledger, run_dir: str, report: str,
 # 「出现于 #j」只说明第 j 次返回文本含精确坐标,不推出模型为何选择下一跳。
 
 
-_MIGLOOP_TOOLS = frozenset(("guide", "sessions", "index", "file", "agent", "search", "blame", "diff", "action", "record", "check"))
+_MIGLOOP_TOOLS = frozenset(("guide", "sessions", "index", "file", "agent", "search", "blame", "diff",
+                          "action", "record", "check", "batch", "changes", "expand", "events"))
 
 
 def _tool_origin(name: Any, namespace: Any = None, server: Any = None) -> dict[str, Any]:

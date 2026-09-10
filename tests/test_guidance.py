@@ -53,7 +53,7 @@ def test_short_entry_keeps_nonnegotiable_evidence_and_time_boundaries():
 
 
 def test_v2_is_explicit_and_preserves_v1_guide_as_a_legacy_mode(monkeypatch):
-    monkeypatch.delenv("MIGLOOP_VERDICT_VERSION", raising=False)
+    monkeypatch.setenv("MIGLOOP_VERDICT_VERSION", "2")
     core = guidance.guide_text("document", "core")
     assert "migloop-verdict/2" in core and "event_claims" in core
     assert "schema: migloop-verdict/2" in guidance.guide_text("document", "verdict")
@@ -61,3 +61,13 @@ def test_v2_is_explicit_and_preserves_v1_guide_as_a_legacy_mode(monkeypatch):
     assert "schema: migloop-verdict-ref/1" in guidance.guide_text("reference", "verdict")
     monkeypatch.setenv("MIGLOOP_VERDICT_VERSION", "1")
     assert guidance.guide_text("document", "full") == guidance.GUIDE
+
+
+def test_default_v3_keeps_free_queries_and_posthoc_arguments(monkeypatch):
+    monkeypatch.delenv("MIGLOOP_VERDICT_VERSION", raising=False)
+    core = guidance.guide_text("document", "time")
+    assert "migloop-verdict/3" in core and "batch" in core
+    assert "不填写via" in core and "不要求先check才能提交" in core
+    template = guidance.guide_text("document", "verdict")
+    assert "counterevidence" in template and "claim:" in template
+    assert "schema: migloop-verdict/3" in template

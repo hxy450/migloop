@@ -29,7 +29,7 @@ def parse(draft: str):
 
 
 def evaluate(ledger: atoms.Ledger, draft: str, chain_payload: dict[str, Any] | None = None,
-             file: str | None = None) -> dict[str, Any]:
+             file: str | None = None, *, with_graph: bool = False) -> dict[str, Any]:
     """Check declared coordinates/structure only; never echo or rewrite the draft.
 
     No raw action bodies, graph traversal, visits or external model calls. Coverage
@@ -63,6 +63,9 @@ def evaluate(ledger: atoms.Ledger, draft: str, chain_payload: dict[str, Any] | N
         add("draft_size", f"draft 必须是非空 YAML/JSON 文本，最多 {MAX_CHARS} 字符；未执行正文核查。")
         return finish()
     data, errors = parse(draft)
+    if not errors and isinstance(data, dict) and data.get("schema") == "migloop-verdict/3":
+        from . import verdict_v3
+        return verdict_v3.check(ledger, data, draft, with_graph=with_graph)
     if errors:
         for error in errors:
             add("schema", error)

@@ -327,6 +327,33 @@
   .time-controls input { width: 100%; min-width: 0; padding: 5px; border: 1px solid var(--ring); border-radius: 4px; }
   .time-controls label { display: block; width: 100%; color: var(--ink-2); font-size: 11.5px; }
   .time-record { margin: 7px 0; padding-top: 5px; border-top: 1px solid var(--ring); font-size: 11.5px; }
+  .draft-loader, .query-trace, .argument-summary { margin: 8px 0; padding: 8px; border: 1px solid var(--ring); border-radius: 7px; overflow-wrap: anywhere; }
+  .draft-loader summary, .query-trace summary { cursor: pointer; }
+  .draft-loader textarea, .draft-loader input { width: 100%; margin: 6px 0; padding: 6px; background: var(--wash); color: var(--ink); border: 1px solid var(--ring); border-radius: 4px; font: 11px var(--mono); }
+  .draft-loader textarea { min-height: 120px; resize: vertical; }
+  .draft-loader button, .argument-view button, .argument-detail button, .query-trace button { padding: 4px 7px; margin: 4px 4px 4px 0; border: 1px solid var(--ring); border-radius: 5px; background: var(--surface); color: var(--ink-2); cursor: pointer; font: inherit; }
+  .argument-view { padding: 14px; font-size: 12px; }
+  .argument-mode > .toolbar, .argument-mode > #canvas, .argument-mode > .legacy-spacer { display: none; }
+  .argument-note, .argument-detail .pnote { white-space: pre-wrap; color: var(--ink-3); margin: 6px 0; overflow-wrap: anywhere; }
+  .argument-findings { display: flex; flex-wrap: wrap; gap: 5px; margin: 8px 0; }
+  .argument-findings button.on { border-color: var(--c-spec); color: var(--c-spec); font-weight: 700; }
+  .argument-network { position: relative; padding: 20px; margin: 10px 0; overflow: auto; }
+  .argument-cards { display: grid; grid-template-columns: repeat(2, minmax(190px, 1fr)); gap: 44px 70px; position: relative; z-index: 1; }
+  .argument-card { text-align: left; min-width: 0; overflow-wrap: anywhere; border-left: 3px solid var(--c-file) !important; padding: 9px !important; }
+  .argument-card[data-kind="agent"] { border-left-color: var(--c-gen) !important; }
+  .argument-card.selected { outline: 2px solid var(--c-spec); }
+  .argument-card .argument-key { font: 11px var(--mono); display: block; margin: 4px 0; }
+  .argument-card .argument-state { display: block; color: var(--ink-3); margin-top: 4px; }
+  .argument-wires { position: absolute; inset: 0; pointer-events: none; overflow: visible; }
+  .argument-wire { stroke: var(--c-spec); stroke-width: 1.5; fill: none; }
+  .argument-wire.candidate { stroke: #a47c20; stroke-dasharray: 5 4; }
+  .argument-edge, .argument-reference, .query-item { border-top: 1px solid var(--ring); padding: 7px 0; margin-top: 5px; overflow-wrap: anywhere; }
+  .argument-break { border-left: 3px solid #b88d36; padding-left: 7px; }
+  .argument-detail { padding: 12px; font-size: 12px; overflow-wrap: anywhere; }
+  .argument-detail h3 { font-size: 14px; margin: 6px 0; }
+  .argument-text, .argument-json { white-space: pre-wrap; overflow-wrap: anywhere; }
+  .argument-json { font: 11px/1.5 var(--mono); max-height: 340px; overflow: auto; background: var(--wash); padding: 7px; }
+  @media (max-width: 1000px) { .argument-cards { grid-template-columns: minmax(180px, 1fr); } }
 </style>
 
 <header>
@@ -357,6 +384,7 @@
       <div class="zoomctl"><button id="zo">−</button><button id="zi">+</button><button id="zf">适应</button><button id="z1">1:1</button></div>
     </div>
     <div class="canvas" id="canvas"><svg class="wires" id="wires"></svg></div>
+    <section id="argument-view" class="argument-view" hidden></section>
   </div>
   <aside class="side panel" id="side">
     <div class="placeholder">左栏搜一个文件或 agent,点开它的版本,选一个当根。<br><br>文件@v → 左边写者(上游),右边读者(下游);<br>agent v → 左边读取与派发者(上游),右边产出(下游)。<br><br>右侧抽屉:版本脊柱 / 内容复原 / 派发指令 / 收件箱 / 逐版时间线。</div>
@@ -505,7 +533,7 @@
         chip("跨会话接力 · 前序会话 " + d.cross.priors.map(reportLink).join("、") + " · " + d.cross.n_cross + " 条跨链");
       }
       renderRail();
-      if (!XT) { renderEmptyCanvas(); openFromHash(); }
+      if (!XT && !argumentGraph()) { renderEmptyCanvas(); openFromHash(); }
     }
     fetch(U.data, { credentials: "include" })
       .then(function (r) { return r.json(); })
@@ -522,7 +550,7 @@
         (IDX.agents || []).forEach(function (a) { agentById[a.id] = a; });
         idxChip.innerHTML = "目录 · <b>" + (IDX.files || []).length + "</b> 个文件 · <b>" + (IDX.agents || []).length + "</b> 个 agent";
         renderRail();
-        if (!XT) openFromHash();
+        if (!XT && !argumentGraph()) openFromHash();
       })
       .catch(function (e) { idxChip.textContent = "目录装配失败:" + e; });
 
@@ -1111,6 +1139,7 @@
       renderRail();
     }
     function openFileRoot(path, v) {
+      argumentMode(false);
       XT = { byId: {}, seq: 0, root: null, rights: [], rootKind: "file" };
       var root = xtNode("file", { path: path, anchorV: v, isRoot: true, label: baseName(path) + (v ? "@v" + v : "") });
       XT.root = root.tid;
@@ -1154,6 +1183,7 @@
       });
     }
     function openAgentRoot(id, v) {
+      argumentMode(false);
       XT = { byId: {}, seq: 0, root: null, rights: [], rootKind: "agent" };
       var root = xtNode("agent", { aid: id, anchorVer: v, isRoot: true, label: agentLabelOf(id) + (v ? " v" + v : "") });
       XT.root = root.tid;
@@ -1195,6 +1225,8 @@
     // 树是给人做调查用的;probe 是一次调查员(模型)跑的轨迹:每次工具调用落到的节点 + 报告每环指到的节点与判定。
     // 查过的节点打「查 #k」,判过的按 传递 / 错 / 缺 上色,故障进入点描边,没查过的变淡 —— 它查了什么、漏了什么、把问题定在哪,一眼可见。
     var PROBE = null;
+    var draftInput = "", draftFile = "", draftBusy = false, draftMessage = "", probeRequest = 0;
+    var argumentFinding = null, argumentSelected = null, argumentResize = null;
     var probeEl = document.getElementById("probe");
     var VD_CLS = { "错": "err", "缺": "gap", "传递": "pass" };
     var VD_RANK = { "错": 3, "缺": 2, "传递": 1 };
@@ -1432,6 +1464,315 @@
       });
       host.appendChild(details);
     }
+    // V3 uses entity + explicit time, not invented legacy version coordinates.
+    // The graph, investigator deliveries and independent viewer requests stay separate.
+    function argumentGraph() {
+      var g = PROBE && PROBE.argument_graph;
+      return g && g.schema === "migloop-argument-graph/1" ? g : null;
+    }
+    function argumentBound() {
+      var graph = argumentGraph();
+      return !!(graph && graph.identity && graph.identity.bound === true && (!PROBE.trace_identity || PROBE.trace_identity.bound !== false));
+    }
+    function argumentMode(on) {
+      document.getElementById("graph").classList.toggle("argument-mode", !!on);
+      document.getElementById("argument-view").hidden = !on;
+    }
+    function argumentText(value) { return typeof value === "string" ? value : JSON.stringify(value == null ? null : value, null, 2); }
+    function argumentDetails(host, label, value, cls) {
+      if (value == null) return;
+      var box = el("details", cls || ""); box.appendChild(el("summary", null, label));
+      box.appendChild(el("pre", "argument-json", argumentText(value))); host.appendChild(box); return box;
+    }
+    function explicitScope(value) {
+      if (!value || typeof value !== "object") return null;
+      var scope = {};
+      ["kind", "key", "at", "since_ts"].forEach(function (k) { if (Object.prototype.hasOwnProperty.call(value, k)) scope[k] = value[k]; });
+      return Object.keys(scope).length ? scope : null;
+    }
+    function nodeTimeScope(node) {
+      var binding = node.binding || {};
+      return {kind: node.kind, key: binding.canonical_key || node.key, at: binding.at || node.at, since_ts: null};
+    }
+    function argumentRequest(tool, args, scope) {
+      var clean = Object.assign({}, args || {}); delete clean.sid; // Routing is carried by this page's authenticated endpoint.
+      var request = {tool: tool, args: clean}, selected = explicitScope(scope || clean.scope);
+      if (selected) delete clean.scope; // Do not send a second metadata-bearing copy that conflicts with the explicit scope.
+      if (selected) request.scope = selected;
+      return request;
+    }
+    function independentlyQuery(requests, host, budget) {
+      host.textContent = "独立重查中…（不是原次交付）";
+      var payload = {requests: requests.map(function (r) { return argumentRequest(r.tool, r.args, r.scope); })};
+      if (budget != null) payload.max_chars = budget;
+      return fetch(API + "/batch", {method: "POST", credentials: "include", headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(payload)}).then(function (r) { return r.json(); }).then(function (data) {
+        host.textContent = "";
+        host.appendChild(el("div", "pnote", "当前查看器的独立重查；不新增模型访问、不修改已保存轨迹或历史边。"));
+        if (data.error) { host.appendChild(el("pre", "argument-json", argumentText(data.error))); return; }
+        if (!Array.isArray(data.items)) { host.appendChild(el("pre", "argument-json", argumentText(data))); return; }
+        data.items.forEach(function (item, index) {
+          var box = el("details", "query-recheck-result"); box.open = true;
+          box.appendChild(el("summary", null, "item " + (item.item_index == null ? index : item.item_index) + " · " + item.tool + " · " + item.status));
+          box.appendChild(el("pre", "argument-json", argumentText(item.data == null ? item : item.data)));
+          var request = requests[index], result = item.data || {};
+          if ((Array.isArray(result.rows) ? result.rows : []).some(function (r) { return r.status === "observed_change"; })) {
+            box.appendChild(el("div", "pnote observation-time-note", "observed_at 仅为观察时刻；不等于修改时刻。use_ts、done_ts 或 change_time 未确定时保持未知，也不据此认定唯一作者。"));
+          }
+          if (item.status === "ok" && request && result.next_offset != null) {
+            var more = el("button", "query-next", "继续展开（保留原范围）"), target = el("div");
+            more.onclick = function () {
+              more.disabled = true;
+              independentlyQuery([argumentRequest(request.tool, Object.assign({}, request.args, {offset: result.next_offset}), item.scope || request.scope)], target);
+            };
+            box.appendChild(more); box.appendChild(target);
+          }
+          host.appendChild(box);
+        });
+      }).catch(function (error) { host.textContent = "重查失败：" + error; });
+    }
+    function argumentEvidence(host, items, fallbackScope, label) {
+      var group = el("div", "argument-evidence"); group.appendChild(el("b", null, label || "证据"));
+      (Array.isArray(items) ? items : []).forEach(function (value) {
+        var e = typeof value === "string" ? {ref: value} : value || {}, row = el("div", "argument-reference");
+        if (!e.ref && Array.isArray(e.evidence)) {
+          row.appendChild(el("div", "pnote", "原始操作定位：" + (e.status || "未核") + "；不是缺陷传播认证。"));
+          argumentDetails(row, "操作执行 / 交付依据", e);
+          argumentEvidence(row, e.evidence, fallbackScope, "操作引用"); group.appendChild(row); return;
+        }
+        var ref = e.original_ref == null ? e.ref : e.original_ref;
+        row.appendChild(el("div", "mono", ref || "未提供引用"));
+        row.appendChild(el("div", "pnote", "定位：" + (e.status || "未核") + (e.diag ? " · " + argumentText(e.diag) : "") + "；位置可核不证明归因成立。"));
+        var scope = explicitScope(e.scope || fallbackScope);
+        var openRef = e.raw_ref || e.ref;
+        if (argumentBound() && e.status === "ok" && typeof openRef === "string" && openRef.indexOf("raw:") === 0 && scope && scope.at) {
+          var button = el("button", "argument-open-original", "展开原文（独立查阅）"), target = el("div");
+          button.onclick = function () {
+            button.disabled = true;
+            independentlyQuery([argumentRequest("record", {ref: openRef, offset: 0, max_chars: 12000}, scope)], target);
+          };
+          row.appendChild(button); row.appendChild(target);
+        } else row.appendChild(el("div", "pnote", "保留引用；未核定位、旧式引用或截止范围缺失，不自动改用 latest。"));
+        argumentDetails(row, "定位与交付元数据", e);
+        group.appendChild(row);
+      });
+      if (!Array.isArray(items) || !items.length) group.appendChild(el("div", "pnote", "未列引用（不补证据）"));
+      host.appendChild(group);
+    }
+    function argumentFindings(graph) { return Array.isArray(graph.findings) ? graph.findings : []; }
+    function activeArgumentFinding(graph) {
+      var all = argumentFindings(graph);
+      return all.find(function (f) { return String(f.id) === String(argumentFinding); }) || all[0] || null;
+    }
+    function findingNodes(graph, finding) {
+      if (!finding) return [];
+      var ids = (finding.nodes || []).map(function (n) { return typeof n === "string" ? n : n.id; });
+      return (graph.nodes || []).filter(function (n) { return String(n.finding) === String(finding.id) || ids.indexOf(n.id) >= 0; });
+    }
+    function findingEdges(graph, finding, nodes) {
+      var ids = Object.create(null); nodes.forEach(function (n) { ids[n.id] = true; });
+      return (graph.edges || []).filter(function (e) {
+        return e.finding != null ? String(e.finding) === String(finding.id)
+          : !!(ids[e.from] || ids[e.to] || String(e.from).indexOf(finding.id + "/") === 0 || String(e.to).indexOf(finding.id + "/") === 0);
+      });
+    }
+    function argumentEdgeDrawable(edge, byId) {
+      var read = edge.relation === "read" || edge.relation === "possible_read";
+      return argumentBound() && ["confirmed", "candidate"].indexOf((edge.binding || {}).status) >= 0
+        && ["read", "write", "possible_read", "possible_write"].indexOf(edge.relation) >= 0
+        && byId[edge.from] && byId[edge.to] && edge.from !== edge.to
+        && (byId[edge.from].binding || {}).status === "matched" && (byId[edge.to].binding || {}).status === "matched"
+        && byId[edge.from].kind === (read ? "file" : "agent") && byId[edge.to].kind === (read ? "agent" : "file")
+        && byId[edge.from].at && byId[edge.to].at;
+    }
+    function showArgumentNode(node, finding, edges) {
+      argumentSelected = node.id; activeDrawerNode = null;
+      document.querySelectorAll(".argument-card").forEach(function (card) { card.classList.toggle("selected", card.dataset.nodeId === node.id); });
+      side.textContent = ""; var body = el("div", "argument-detail");
+      body.dataset.nodeId = node.id; body.dataset.source = "model"; body.dataset.semanticChecked = "false";
+      body.appendChild(el("div", "argument-note", "时间论证节点 · 模型主张，语义未验证"));
+      body.appendChild(el("h3", null, (node.kind || "实体") + " · " + (node.key || node.id)));
+      body.appendChild(el("div", "mono", "截至 " + (node.at || "未知（不映射到最近版本）")));
+      body.appendChild(el("div", "argument-node-role", "主张角色：" + (node.role || "未填写") + " · finding " + finding.id));
+      body.appendChild(el("p", "argument-text argument-node-reason", node.reason || "未填写节点原因"));
+      argumentDetails(body, "实体定位（不是语义判定）", node.binding || {status: "unrecorded"});
+      var scope = nodeTimeScope(node);
+      argumentEvidence(body, node.evidence, scope, "支持引用");
+      argumentEvidence(body, node.counterevidence, scope, "反证 / 边界引用");
+      (edges || []).filter(function (e) { return e.from === node.id || e.to === node.id; }).forEach(function (e) {
+        var row = el("details", "argument-edge");
+        row.appendChild(el("summary", null, e.relation + " · " + ((e.binding || {}).status || "未核")));
+        row.appendChild(el("div", "argument-text", e.claim || "未填写关系主张"));
+        argumentDetails(row, "关系机械核验", e.binding || {status: "unrecorded"});
+        argumentEvidence(row, e.evidence, null, "关系主张引用");
+        argumentEvidence(row, (e.binding || {}).evidence, null, "关系定位依据");
+        body.appendChild(row);
+      });
+      if (argumentBound() && (node.binding || {}).status === "matched" && scope.at && ["file", "agent"].indexOf(node.kind) >= 0) {
+        var inspect = el("button", "argument-inspect-node", "独立查询此实体的原时段"), target = el("div");
+        inspect.onclick = function () {
+          inspect.disabled = true;
+          var args = {}; args[node.kind === "file" ? "path" : "id"] = scope.key;
+          independentlyQuery([argumentRequest(node.kind, args, scope)], target);
+        };
+        body.appendChild(inspect); body.appendChild(target);
+      }
+      side.appendChild(body);
+    }
+    function renderArgumentView() {
+      var graph = argumentGraph(); if (!graph) return;
+      if (argumentResize) { argumentResize.disconnect(); argumentResize = null; }
+      argumentMode(true); activeDrawerNode = null;
+      var host = document.getElementById("argument-view"); host.textContent = "";
+      var finding = activeArgumentFinding(graph); argumentFinding = finding ? finding.id : null;
+      document.getElementById("rootlbl").textContent = "时间论证图 · 引用实体 × 时刻（不是版本树）";
+      clearBtn.classList.add("show");
+      host.appendChild(el("h3", null, "事后可核论证链"));
+      host.appendChild(el("div", "argument-note", "节点原因是模型主张；定位与关系核验另列。只画明确提供且已定位的关系，缺边保持断点，独立材料不要求连通。"));
+      if (!argumentBound()) host.appendChild(el("div", "argument-note argument-unbound", "文稿或查询身份未绑定当前账本：保留主张，不画历史关系或提供原文导航。"));
+      argumentDetails(host, "文稿来源与身份（非语义认证）", {identity: graph.identity, document_source: graph.document_source, document_sha256: graph.document_sha256});
+      var chips = el("div", "argument-findings");
+      argumentFindings(graph).forEach(function (f) {
+        var button = el("button", finding && String(f.id) === String(finding.id) ? "on" : "", f.id + " · " + (f.title || "未命名"));
+        button.dataset.finding = f.id;
+        button.onclick = function () { argumentFinding = f.id; argumentSelected = null; renderArgumentView(); renderProbe(); };
+        chips.appendChild(button);
+      }); host.appendChild(chips);
+      argumentDetails(host, "目标范围", graph.target || (PROBE.argument_document || {}).target || PROBE.target);
+      if (!finding) { host.appendChild(el("div", "argument-note", "没有可展示的 finding；不制造节点或关系。")); side.textContent = ""; return; }
+      host.appendChild(el("div", "argument-text argument-finding-reason", finding.reason || "未填写 finding 原因"));
+      host.appendChild(el("div", "argument-note", "主张状态：" + (finding.status || "未填写") + " · source=model · semantic_checked=false"));
+      var nodes = findingNodes(graph, finding), edges = findingEdges(graph, finding, nodes), byId = Object.create(null), buttons = Object.create(null);
+      nodes.forEach(function (n) { byId[n.id] = n; });
+      var drawable = edges.filter(function (e) { return argumentEdgeDrawable(e, byId); });
+      host.appendChild(el("div", "argument-note", "实线：已定位关系 · 虚线：候选关系 · 箭头：声明方向。关系定位不认证节点原因。"));
+      var network = el("div", "argument-network"), cards = el("div", "argument-cards");
+      var wires = document.createElementNS("http://www.w3.org/2000/svg", "svg"); wires.setAttribute("class", "argument-wires");
+      network.appendChild(wires); network.appendChild(cards); host.appendChild(network);
+      nodes.forEach(function (n) {
+        var linked = drawable.some(function (e) { return e.from === n.id || e.to === n.id; });
+        var card = el("button", "argument-card"); card.dataset.nodeId = n.id; card.dataset.kind = n.kind;
+        card.dataset.role = n.role || ""; card.dataset.binding = (n.binding || {}).status || "unrecorded";
+        card.appendChild(el("b", null, (n.kind || "实体") + " · " + (n.role || "未填写角色")));
+        card.appendChild(el("span", "argument-key", n.key || n.id));
+        card.appendChild(el("span", "argument-state", "截至 " + (n.at || "未知")));
+        card.appendChild(el("span", "argument-state", "定位 " + card.dataset.binding + (linked ? "" : " · 独立材料 / 断点")));
+        card.onclick = function () { showArgumentNode(n, finding, edges); };
+        cards.appendChild(card); buttons[n.id] = card;
+      });
+      function draw() {
+        if (!network.isConnected) return;
+        wires.textContent = ""; wires.setAttribute("width", network.scrollWidth); wires.setAttribute("height", network.scrollHeight);
+        var defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
+        var marker = document.createElementNS("http://www.w3.org/2000/svg", "marker");
+        marker.setAttribute("id", "argument-arrow"); marker.setAttribute("viewBox", "0 0 10 10"); marker.setAttribute("refX", "9"); marker.setAttribute("refY", "5");
+        marker.setAttribute("markerWidth", "6"); marker.setAttribute("markerHeight", "6"); marker.setAttribute("orient", "auto");
+        var tip = document.createElementNS("http://www.w3.org/2000/svg", "path"); tip.setAttribute("d", "M0,0 L10,5 L0,10 z"); tip.setAttribute("fill", "#687b92");
+        marker.appendChild(tip); defs.appendChild(marker); wires.appendChild(defs);
+        var rect = network.getBoundingClientRect();
+        drawable.forEach(function (e) {
+          var a = buttons[e.from].getBoundingClientRect(), b = buttons[e.to].getBoundingClientRect();
+          var x1 = a.left + a.width / 2 - rect.left, y1 = a.bottom - rect.top, x2 = b.left + b.width / 2 - rect.left, y2 = b.top - rect.top;
+          if (Math.abs(b.top - a.top) < Math.min(a.height, b.height) / 2) {
+            var right = b.left > a.left; x1 = (right ? a.right : a.left) - rect.left; x2 = (right ? b.left : b.right) - rect.left;
+            y1 = a.top + a.height / 2 - rect.top; y2 = b.top + b.height / 2 - rect.top;
+          } else if (b.top < a.top) { y1 = a.top - rect.top; y2 = b.bottom - rect.top; }
+          var path = document.createElementNS("http://www.w3.org/2000/svg", "path"), candidate = (e.binding || {}).status === "candidate" || e.relation.indexOf("possible_") === 0;
+          path.setAttribute("class", "argument-wire" + (candidate ? " candidate" : ""));
+          path.setAttribute("marker-end", "url(#argument-arrow)");
+          path.dataset.from = e.from; path.dataset.to = e.to; path.dataset.status = (e.binding || {}).status; path.dataset.relation = e.relation;
+          path.setAttribute("d", "M" + x1 + "," + y1 + " C" + x1 + "," + ((y1 + y2) / 2) + " " + x2 + "," + ((y1 + y2) / 2) + " " + x2 + "," + y2);
+          var title = document.createElementNS("http://www.w3.org/2000/svg", "title"); title.textContent = e.relation + " · " + (candidate ? "候选关系，不是确定读写" : "关系已定位，不认证归因"); path.appendChild(title); wires.appendChild(path);
+        });
+      }
+      requestAnimationFrame(draw);
+      if (window.ResizeObserver) { argumentResize = new ResizeObserver(draw); argumentResize.observe(cards); }
+      var relations = el("div", "argument-relations");
+      relations.appendChild(el("b", null, "显式关系 / 断点（不从查阅顺序补边）"));
+      edges.forEach(function (e) {
+        var status = (e.binding || {}).status || "unrecorded", row = el("details", "argument-edge" + (argumentEdgeDrawable(e, byId) ? "" : " argument-break"));
+        row.dataset.binding = status;
+        row.appendChild(el("summary", null, e.from + " → " + e.to + " · " + e.relation + " · " + status));
+        row.appendChild(el("div", "argument-text", e.claim || "未填写关系原因"));
+        argumentDetails(row, "机械核验（不是模型原因的真值）", e.binding || {status: "unrecorded"});
+        argumentEvidence(row, e.evidence, null, "关系引用"); relations.appendChild(row);
+      });
+      if (!edges.length) relations.appendChild(el("div", "argument-note", "没有显式关系；以上材料保持独立。"));
+      host.appendChild(relations);
+      ["changes", "hypothesis", "recommendation", "validation", "unknown"].forEach(function (k) { argumentDetails(host, k + "（模型主张）", finding[k]); });
+      argumentDetails(host, "覆盖声明（非完整性认证）", graph.coverage);
+      argumentDetails(host, "投影诊断", graph.diagnostics);
+      var selected = nodes.find(function (n) { return n.id === argumentSelected; }) || nodes[0];
+      if (selected) showArgumentNode(selected, finding, edges); else side.textContent = "该 finding 没有节点；保留文字主张与诊断。";
+    }
+    function renderQueryTrace(host) {
+      var trace = PROBE.query_trace, box = el("details", "query-trace");
+      box.appendChild(el("summary", null, "实际查询足迹（独立于论证图）"));
+      if (PROBE.manual_input || !trace) {
+        box.appendChild(el("div", "argument-note", PROBE.manual_input ? "人工载入文稿：没有实际调查轨迹；页面重查不冒充模型调用。" : "没有已记录的查询足迹；不按图节点或文稿引用推测模型查过。"));
+        host.appendChild(box); return;
+      }
+      box.appendChild(el("div", "argument-note", "保留实际调用与批内 item；交付材料不要求额外 file/agent 调用。返回定位不证明模型采用或归因成立。"));
+      function row(step, parentStep) {
+        var item = el("details", "query-item"), tool = step.tool || "未知", number = step.step == null ? parentStep : step.step;
+        item.dataset.tool = tool; item.dataset.step = number == null ? "" : number;
+        if (step.item_index != null) item.dataset.itemIndex = step.item_index;
+        item.appendChild(el("summary", null, "#" + (number == null ? "?" : number) + (step.item_index == null ? "" : " / item " + step.item_index) + " " + tool + " · " + (step.status || "状态未记录")));
+        argumentDetails(item, "原请求", step.args || step.request || {});
+        argumentDetails(item, "实际范围", step.scope);
+        argumentDetails(item, "交付与截断状态（非全文阅读证明）", step.delivery);
+        argumentDetails(item, "调用定位", {call_id: step.call_id, use_line: step.use_line, result_line: step.result_line});
+        var requestList = null;
+        if (tool === "batch") {
+          var requests = (step.args || {}).requests;
+          if (typeof requests === "string") { try { requests = JSON.parse(requests); } catch (_e) { requests = null; } }
+          if (Array.isArray(requests)) requestList = requests;
+        } else if (["file", "agent", "search", "diff", "record", "expand", "blame", "changes", "events"].indexOf(tool) >= 0) {
+          requestList = [argumentRequest(tool, step.args || step.request || {}, step.scope)];
+        }
+        if (requestList) {
+          var button = el("button", "query-recheck", "按原工具 / 参数独立重查"), target = el("div");
+          button.onclick = function () { button.disabled = true; independentlyQuery(requestList, target, tool === "batch" ? (step.args || {}).max_chars : null); };
+          item.appendChild(button); item.appendChild(target);
+        }
+        (step.items || []).forEach(function (child) { item.appendChild(row(child, number)); });
+        return item;
+      }
+      (trace.steps || []).forEach(function (step) { box.appendChild(row(step)); }); host.appendChild(box);
+    }
+    function renderArgumentProbe() {
+      var graph = argumentGraph(), summary = el("div", "argument-summary");
+      summary.appendChild(el("b", null, "时间论证 · " + argumentFindings(graph).length + " findings"));
+      summary.appendChild(el("div", "argument-note", "原因是模型主张；原文定位与关系核验分别展示。断点不补边。"));
+      var back = el("button", "argument-return", "显示时间论证图"); back.onclick = renderArgumentView; summary.appendChild(back);
+      if (PROBE.manual_input) summary.appendChild(el("div", "argument-note manual-trace-note", "人工载入 · 无实际调查轨迹"));
+      argumentDetails(summary, "文稿诊断", graph.diagnostics || PROBE.diagnostics);
+      probeEl.appendChild(summary); renderQueryTrace(probeEl);
+    }
+    function renderDraftLoader(host) {
+      var box = el("details", "draft-loader"); box.appendChild(el("summary", null, "粘贴 YAML / JSON 论证文稿"));
+      var file = el("input"), text = el("textarea"), button = el("button", "draft-submit", "机械核验并载入"), message = el("div", "argument-note", draftMessage);
+      file.placeholder = "目标文件（可选；仍以文稿声明与校验为准）"; file.value = draftFile; file.setAttribute("aria-label", "文稿目标文件");
+      text.placeholder = "粘贴 migloop-verdict/3 YAML 或 JSON"; text.value = draftInput; text.setAttribute("aria-label", "YAML 或 JSON 论证文稿");
+      file.oninput = function () { draftFile = file.value; }; text.oninput = function () { draftInput = text.value; };
+      button.disabled = draftBusy;
+      button.onclick = function () {
+        if (!text.value.trim()) { message.textContent = "请先粘贴文稿。"; return; }
+        draftInput = text.value; draftFile = file.value; draftBusy = true; button.disabled = true;
+        var ticket = ++probeRequest; message.textContent = "核验引用与结构中…不认证因果真值。";
+        fetch(API + "/check", {method: "POST", credentials: "include", headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({draft: draftInput, file: draftFile || null})}).then(function (r) { return r.json(); }).then(function (data) {
+            if (ticket !== probeRequest) return;
+            if (!data.argument_graph || data.argument_graph.schema !== "migloop-argument-graph/1") throw Error(argumentText(data.error || data.diagnostics || data));
+            draftMessage = "已载入人工文稿；机械定位不是语义验证。";
+            PROBE = {argument_graph: data.argument_graph, argument_document: data, manual_input: true, run: "人工载入", steps: []};
+            argumentFinding = null; argumentSelected = null; renderArgumentView();
+          }).catch(function (error) { if (ticket === probeRequest) draftMessage = "载入失败：" + error; })
+          .finally(function () { draftBusy = false; if (ticket === probeRequest) renderProbe(); });
+      };
+      box.appendChild(file); box.appendChild(text); box.appendChild(button); box.appendChild(message);
+      box.appendChild(el("div", "argument-note", "只提交文稿供机械校验，不调用调查模型；人工文稿没有实际查询轨迹。")); host.appendChild(box);
+    }
     function renderTimeTrace(host) {
       var trace = PROBE.time_trace;
       if (!trace || !trace.steps || !trace.steps.length) return;
@@ -1468,8 +1809,10 @@
       ld.appendChild(inp);
       ld.appendChild(btn);
       probeEl.appendChild(ld);
+      renderDraftLoader(probeEl);
       if (!PROBE) { probeEl.appendChild(el("div", "sum", "载入调查记录：所有查询、回访和搜索保留在时间线；读写主图只投影已有原始证据支持的定向读写关系，不是完整根因图。结论按缺陷 × 版本显示模型主张。")); return; }
       if (PROBE.error) { probeEl.appendChild(el("div", "sum", "载入失败:" + PROBE.error)); return; }
+      if (argumentGraph()) { renderArgumentProbe(); return; }
       var counts = { mcp: 0, wrapper: 0, other: 0 };
       (PROBE.steps || []).forEach(function (s) { counts[probeCallKind(s)]++; });
       var calls = el("div", "sum call-summary", "");
@@ -2337,11 +2680,20 @@
     }
     function loadProbe(run) {
       if (!run) return;
+      var ticket = ++probeRequest;
       fetch(U.probe + "?run=" + encodeURIComponent(run), { credentials: "include" })
         .then(function (r) { return r.json(); })
         .then(function (p) {
+          if (ticket !== probeRequest) return;
           if (p.error) { PROBE = { error: p.error, runDir: run }; renderProbe(); return; }
           p.runDir = run;
+          if (p.argument_graph && p.argument_graph.schema === "migloop-argument-graph/1") {
+            PROBE = p; argumentFinding = null; argumentSelected = null;
+            var previous = document.getElementById("probe-chip"); if (previous) previous.remove();
+            chip("", "probe-chip").textContent = "时间调查 · " + (p.run || run);
+            renderProbe(); renderArgumentView(); return;
+          }
+          argumentMode(false);
           probeIndex(p);
           PROBE = p;
           showCand = false;
@@ -2372,7 +2724,7 @@
           };
           go();
         })
-        .catch(function (e) { PROBE = { error: String(e), runDir: run }; renderProbe(); });
+        .catch(function (e) { if (ticket === probeRequest) { PROBE = { error: String(e), runDir: run }; renderProbe(); } });
     }
     function bootProbe() {
       renderProbe();
@@ -2675,7 +3027,7 @@
     var zoom = 1;
     var autoFit = true;
     var layoutSize = { w: 0, h: 0 };
-    var spacer = el("div", null, "");
+    var spacer = el("div", "legacy-spacer", "");
     spacer.style.position = "relative";
     spacer.style.pointerEvents = "none";
     graphEl.appendChild(spacer);
@@ -3426,6 +3778,7 @@
       applyZoom(1, true);
     }
     function reset() {
+      argumentMode(false);
       clearBtn.classList.remove("show");
       curRootKey = null;
       document.getElementById("rootlbl").textContent = "两原子探索树 —— 版本文件 × 版本 agent,任何一个版本都能当根";
@@ -3441,6 +3794,7 @@
     document.getElementById("zf").addEventListener("click", function () { fitView(); });
     document.getElementById("z1").addEventListener("click", function () { applyZoom(1); });
     graphEl.addEventListener("wheel", function (ev) {
+      if (graphEl.classList.contains("argument-mode")) return;
       if (!ev.ctrlKey) return;
       ev.preventDefault();
       applyZoom(zoom * (ev.deltaY < 0 ? 1.15 : 0.87));

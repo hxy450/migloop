@@ -57,6 +57,6 @@ def test_mcp_time_entry_does_not_require_via_and_matches_http(tmp_path):
         blocks = await server.call_tool("agent", {"sid": "test", "id": agent})
         assert time_receipts.parse(ledger, "agent", {"id": agent}, blocks[0].text)
         guide = await server.call_tool("guide", {})
-        assert "时间调查接口" in guide[0].text
+        assert "自由时间调查" in guide[0].text and "migloop-verdict/3" in guide[0].text
 
     asyncio.run(run())
