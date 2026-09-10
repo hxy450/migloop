@@ -1,0 +1,568 @@
+{
+  "schema_version": 1,
+  "call_event_association_policy": "Native patch_apply_end success/changes are independent write facts. Nearby outer call_* text and its empty result are supporting context only; event exec-* IDs are not joined to outer calls as proven nesting.",
+  "pool_cutoff": {"source_basename":"rollout-2026-08-21T09-18-20-01a021e5-c150-7b12-a610-d40c07816b98.jsonl","physical_line":7916,"timestamp_utc":"2026-08-22T15:24:43.116Z"},
+  "source_policy": "Original two root rollouts only; current model reports and old adjudications are not truth. Quotes checked against decoded record text; line hash uses original UTF-8 physical line without terminator.",
+  "boundary_evidence": [
+    "B1",
+    "B2"
+  ],
+  "accepted": [
+    {
+      "id": "codex_launch_agreement_dialog",
+      "target_file": "entry/src/main/ets/pages/LaunchAgreementDialog.ets",
+      "post_execute": true,
+      "actual_write_evidence": [
+        "L11",
+        "L14"
+      ],
+      "nearby_call_context": ["L10", "L12"],
+      "generation_evidence": [
+        "L1",
+        "L2",
+        "L3"
+      ],
+      "original_writer_identity": "/root/close_batch_02, reported Slice 1 implementation; internal write unavailable",
+      "limits": [
+        "The worker creation patch and complete consumed inputs are unavailable.",
+        "Block mode comments are partially shown after Default; the Block enumerator declaration is cut off.",
+        "Immediate post-patch validation failed before build; source-to-later-HAP identity and button behavior are unverified."
+      ]
+    },
+    {
+      "id": "codex_build_profile_signing",
+      "target_file": "build-profile.json5",
+      "post_execute": true,
+      "actual_write_evidence": [
+        "C7"
+      ],
+      "nearby_call_context": ["C6", "C8"],
+      "generation_evidence": [
+        "C1"
+      ],
+      "original_writer_identity": "unknown: file predates execute and native creation call is absent",
+      "limits": [
+        "Missing signingConfig reference is directly visible; origin/author of omission is unknown.",
+        "Immediate signed build is a child report; later build/install output is directly logged.",
+        "Package signing reference does not configure API request signers or establish successful login."
+      ]
+    }
+  ],
+  "evidence": [
+    {
+      "id": "B1",
+      "source_basename": "rollout-2026-08-16T17-54-23-01a009fe-68e3-7f42-b76b-5e863c555976.jsonl",
+      "physical_line": 7686,
+      "timestamp_utc": "2026-08-16T23:49:46.898Z",
+      "call_id": null,
+      "record_type": "event_msg",
+      "payload_type": "agent_message",
+      "record_sha256": "0b0c969e1284d48007a68beb517e03057fa8b0943c62023d095893b7641c73aa",
+      "tier": "root_completion_message",
+      "quote_fragments": [
+        "迁移执行已完成",
+        "`a2h-execute` 已完成；尚未启动下一阶段 `a2h-verify`。"
+      ]
+    },
+    {
+      "id": "B2",
+      "source_basename": "rollout-2026-08-16T17-54-23-01a009fe-68e3-7f42-b76b-5e863c555976.jsonl",
+      "physical_line": 7687,
+      "timestamp_utc": "2026-08-16T23:49:46.899Z",
+      "call_id": null,
+      "record_type": "response_item",
+      "payload_type": "message",
+      "record_sha256": "c1c1eace2ddd9390377c2f1b6b284779f2dc42447b5c7d9e8b476e7cdf9bce21",
+      "tier": "root_completion_message_duplicate",
+      "quote_fragments": [
+        "`a2h-execute` 已完成；尚未启动下一阶段 `a2h-verify`。"
+      ]
+    },
+    {
+      "id": "L1",
+      "source_basename": "rollout-2026-08-16T17-54-23-01a009fe-68e3-7f42-b76b-5e863c555976.jsonl",
+      "physical_line": 5527,
+      "timestamp_utc": "2026-08-16T20:39:49.665Z",
+      "call_id": "call_y2Qx61DO0DXgmFg3Y8kwPAlR",
+      "record_type": "response_item",
+      "payload_type": "custom_tool_call_output",
+      "record_sha256": "3f741c89d7c270083822c60e2ecb3f650b3d53707755476558cd7ddffeac29ea",
+      "tier": "source_tool_output: generated requirement, not worker read receipt",
+      "quote_fragments": [
+        "F001-AC02 点击同意后写入值 1",
+        "F001-AC03 首次点击拒绝只切换为",
+        "F001-AC05 用户协议与隐私政策链接"
+      ]
+    },
+    {
+      "id": "L2",
+      "source_basename": "rollout-2026-08-16T17-54-23-01a009fe-68e3-7f42-b76b-5e863c555976.jsonl",
+      "physical_line": 5640,
+      "timestamp_utc": "2026-08-16T20:45:39.696Z",
+      "call_id": "call_drGM12inO1khuRQXRYqCotQG",
+      "record_type": "response_item",
+      "payload_type": "custom_tool_call_output",
+      "record_sha256": "8cef53be703744c48769279e60b498757dcff82708257f75489473b03bf3eb32",
+      "tier": "source_tool_output: source-understanding report, not Kotlin source",
+      "quote_fragments": [
+        "`LaunchAgreementDialog.onClick` uses `cancle` as a two-stage rejection state"
+      ]
+    },
+    {
+      "id": "L3",
+      "source_basename": "rollout-2026-08-16T17-54-23-01a009fe-68e3-7f42-b76b-5e863c555976.jsonl",
+      "physical_line": 5717,
+      "timestamp_utc": "2026-08-16T20:52:57.556Z",
+      "call_id": null,
+      "record_type": "response_item",
+      "payload_type": "agent_message",
+      "record_sha256": "dfc76fd6d60d5375c53efaf72da3fd75e8d699cf5e095b87d642c139496d64db",
+      "tier": "child_agent_report: creation claim",
+      "quote_fragments": [
+        "Sender: /root/close_batch_02",
+        "CREATED: 10 code files",
+        "`LaunchAgreementDialog.ets`",
+        "BUILD: NOT_RUN"
+      ]
+    },
+    {
+      "id": "L4",
+      "source_basename": "rollout-2026-08-16T17-54-23-01a009fe-68e3-7f42-b76b-5e863c555976.jsonl",
+      "physical_line": 7997,
+      "timestamp_utc": "2026-08-17T03:09:20.059Z",
+      "call_id": null,
+      "record_type": "response_item",
+      "payload_type": "message",
+      "record_sha256": "91ba33bfc1b0c26906b663165f2d24f0a9c12a942eb15d4fb98d1f5b82115965",
+      "tier": "user_report: symptom and requested repair",
+      "quote_fragments": [
+        "卡在这个页面了，点击同意也没反应，你能帮我修复一下吗"
+      ]
+    },
+    {
+      "id": "L5",
+      "source_basename": "rollout-2026-08-16T17-54-23-01a009fe-68e3-7f42-b76b-5e863c555976.jsonl",
+      "physical_line": 8000,
+      "timestamp_utc": "2026-08-17T03:09:28.242Z",
+      "call_id": null,
+      "record_type": "event_msg",
+      "payload_type": "agent_message",
+      "record_sha256": "94aeba60dad087bc01cb587c9944977cc9d7ed06f8238655cb5c1259f15acab4",
+      "tier": "root_diagnosis: initial hypothesis",
+      "quote_fragments": [
+        "更像是事件没有真正接到启动协调器"
+      ]
+    },
+    {
+      "id": "L6",
+      "source_basename": "rollout-2026-08-16T17-54-23-01a009fe-68e3-7f42-b76b-5e863c555976.jsonl",
+      "physical_line": 8027,
+      "timestamp_utc": "2026-08-17T03:10:07.647Z",
+      "call_id": "call_7fkY9pgpk0sNPDyhCFcX0npm",
+      "record_type": "response_item",
+      "payload_type": "custom_tool_call_output",
+      "record_sha256": "7b79a7c1957fafda57b0439e07512238a897a67c453a9ddb8648c6931a8c1968",
+      "tier": "source_tool_output: pre-patch source and parent caller",
+      "quote_fragments": [
+        ".onClick((): void => this.onAccept())",
+        ".hitTestBehavior(this.visible ? HitTestMode.Block : HitTestMode.None)",
+        "onAccept: (): void => this.onPrivacyResult(true)"
+      ]
+    },
+    {
+      "id": "L7",
+      "source_basename": "rollout-2026-08-16T17-54-23-01a009fe-68e3-7f42-b76b-5e863c555976.jsonl",
+      "physical_line": 8037,
+      "timestamp_utc": "2026-08-17T03:10:28.882Z",
+      "call_id": "call_Aks8t0ufTVQeXM7rSNvpvQN2",
+      "record_type": "response_item",
+      "payload_type": "custom_tool_call_output",
+      "record_sha256": "5ec9547aee067978dd24c32572495ad3d9d1bc348814c052843ac13466d31c28",
+      "tier": "source_tool_output: parent call-site counterevidence",
+      "quote_fragments": [
+        "SplashPage.ets:197:          onAccept: (): void => this.onPrivacyResult(true)"
+      ]
+    },
+    {
+      "id": "L8",
+      "source_basename": "rollout-2026-08-16T17-54-23-01a009fe-68e3-7f42-b76b-5e863c555976.jsonl",
+      "physical_line": 8048,
+      "timestamp_utc": "2026-08-17T03:10:45.199Z",
+      "call_id": "call_P25PVpQdj6880uvIX5rXeevD",
+      "record_type": "response_item",
+      "payload_type": "custom_tool_call_output",
+      "record_sha256": "1fa8c3405a73d447bb5433de8e8cd20e6086d3f214c669dea84d3f93b093a896",
+      "tier": "source_tool_output: archived SDK excerpt",
+      "quote_fragments": [
+        "Both self and children nodes respond to the hit test for touch events",
+        "but block hit test of children and other nodes which is masked by this node."
+      ]
+    },
+    {
+      "id": "L9",
+      "source_basename": "rollout-2026-08-16T17-54-23-01a009fe-68e3-7f42-b76b-5e863c555976.jsonl",
+      "physical_line": 8055,
+      "timestamp_utc": "2026-08-17T03:10:53.995Z",
+      "call_id": null,
+      "record_type": "event_msg",
+      "payload_type": "agent_message",
+      "record_sha256": "05013564693e66d885f7d3514e879a4df9645898a2720e165c47ee18fcd3fe4b",
+      "tier": "root_diagnosis: revised hypothesis",
+      "quote_fragments": [
+        "弹窗最外层 `Stack` 在可见时被设为 `HitTestMode.Block`"
+      ]
+    },
+    {
+      "id": "L10",
+      "source_basename": "rollout-2026-08-16T17-54-23-01a009fe-68e3-7f42-b76b-5e863c555976.jsonl",
+      "physical_line": 8066,
+      "timestamp_utc": "2026-08-17T03:11:06.675Z",
+      "call_id": "call_sOYpciVhfgk1glebywbIbHAY",
+      "record_type": "response_item",
+      "payload_type": "custom_tool_call",
+      "record_sha256": "c214ff7ec31bd232a4d1f1ab5aee892c43e517239996a1189670ed840604f677",
+      "tier": "native_patch_call: product source",
+      "quote_fragments": [
+        "-    .hitTestBehavior(this.visible ? HitTestMode.Block : HitTestMode.None)",
+        "+    .hitTestBehavior(this.visible ? HitTestMode.Default : HitTestMode.None)"
+      ]
+    },
+    {
+      "id": "L11",
+      "source_basename": "rollout-2026-08-16T17-54-23-01a009fe-68e3-7f42-b76b-5e863c555976.jsonl",
+      "physical_line": 8067,
+      "timestamp_utc": "2026-08-17T03:11:06.817Z",
+      "call_id": "exec-4ef57557-1919-4ec6-b81e-4b4d9d8c112a",
+      "record_type": "event_msg",
+      "payload_type": "patch_apply_end",
+      "record_sha256": "fde44a196809789bce24817c825227a5809b4f3dd08ae7c53f6fd7752fcc7b73",
+      "tier": "native_patch_event: successful write",
+      "quote_fragments": [
+        "\"success\":true",
+        "LaunchAgreementDialog.ets"
+      ]
+    },
+    {
+      "id": "L12",
+      "source_basename": "rollout-2026-08-16T17-54-23-01a009fe-68e3-7f42-b76b-5e863c555976.jsonl",
+      "physical_line": 8068,
+      "timestamp_utc": "2026-08-17T03:11:06.825Z",
+      "call_id": "call_sOYpciVhfgk1glebywbIbHAY",
+      "record_type": "response_item",
+      "payload_type": "custom_tool_call_output",
+      "record_sha256": "81762630e945db869558fbd1623f1ce8574289d8b24ecdef4027051a9188a07b",
+      "tier": "native_patch_outer_empty_result: not write proof or event nesting proof",
+      "quote_fragments": [
+        "Script completed"
+      ]
+    },
+    {
+      "id": "L13",
+      "source_basename": "rollout-2026-08-16T17-54-23-01a009fe-68e3-7f42-b76b-5e863c555976.jsonl",
+      "physical_line": 8101,
+      "timestamp_utc": "2026-08-17T03:11:45.666Z",
+      "call_id": "call_K4votC9ADdWZuKxjzYSHC9lK",
+      "record_type": "response_item",
+      "payload_type": "custom_tool_call_output",
+      "record_sha256": "c6535e16f0a0c0c3050e1076be525b98e0bf24607a332931ebb4db034dcaa8ee",
+      "tier": "source_tool_output: configuration validator failure",
+      "quote_fragments": [
+        "config.json missing"
+      ]
+    },
+    {
+      "id": "L14",
+      "source_basename": "rollout-2026-08-16T17-54-23-01a009fe-68e3-7f42-b76b-5e863c555976.jsonl",
+      "physical_line": 8110,
+      "timestamp_utc": "2026-08-17T03:12:02.536Z",
+      "call_id": "call_qMphaUcIWYqr2IY7APprp85k",
+      "record_type": "response_item",
+      "payload_type": "custom_tool_call_output",
+      "record_sha256": "dfb45d14319d705635d30175827d1fa002d351381e814408e1821be3e8ede6c5",
+      "tier": "source_tool_output: source readback and old artifact",
+      "quote_fragments": [
+        ".hitTestBehavior(this.visible ? HitTestMode.Default : HitTestMode.None)",
+        "2026-08-17 11:05:57 CST 12186559"
+      ]
+    },
+    {
+      "id": "L15",
+      "source_basename": "rollout-2026-08-16T17-54-23-01a009fe-68e3-7f42-b76b-5e863c555976.jsonl",
+      "physical_line": 8115,
+      "timestamp_utc": "2026-08-17T03:12:10.312Z",
+      "call_id": null,
+      "record_type": "response_item",
+      "payload_type": "message",
+      "record_sha256": "5effd2f01f01282392de1454a73ba84eb8c1740f3426d3b5eaf450892d9c0e16",
+      "tier": "root_final_claim: behavior unverified",
+      "quote_fragments": [
+        "现有 HAP 仍是修复前版本"
+      ]
+    },
+    {
+      "id": "C1",
+      "source_basename": "rollout-2026-08-16T17-54-23-01a009fe-68e3-7f42-b76b-5e863c555976.jsonl",
+      "physical_line": 120,
+      "timestamp_utc": "2026-08-16T11:18:03.875Z",
+      "call_id": "call_ZCtfL6Tg97dBG0jHXIWkXOCk",
+      "record_type": "response_item",
+      "payload_type": "custom_tool_call_output",
+      "record_sha256": "dc29051d37d41ea817b6df37e79fdab9552f6c2ae203fe2a85b2b415f2c71453",
+      "tier": "source_tool_output: file already existed before execute",
+      "quote_fragments": [
+        "AIPPT_830_test/build-profile.json5"
+      ]
+    },
+    {
+      "id": "C2",
+      "source_basename": "rollout-2026-08-21T09-18-20-01a021e5-c150-7b12-a610-d40c07816b98.jsonl",
+      "physical_line": 4921,
+      "timestamp_utc": "2026-08-21T11:14:26.907Z",
+      "call_id": null,
+      "record_type": "response_item",
+      "payload_type": "agent_message",
+      "record_sha256": "d8e7d4f23fc9fd98538dfca5831ca8ab1c77874b4168afbdeab2001b3edd5f8c",
+      "tier": "child_agent_report: pre-patch unsigned build",
+      "quote_fragments": [
+        "signingConfigs present but no product references it",
+        "FILES_CHANGED:\n- none"
+      ]
+    },
+    {
+      "id": "C3",
+      "source_basename": "rollout-2026-08-21T09-18-20-01a021e5-c150-7b12-a610-d40c07816b98.jsonl",
+      "physical_line": 4930,
+      "timestamp_utc": "2026-08-21T11:14:42.786Z",
+      "call_id": "call_8N7RoqR0XTc63HuR9I41Nq6Z",
+      "record_type": "response_item",
+      "payload_type": "custom_tool_call_output",
+      "record_sha256": "0e6f207b1bb101a63c4cb3fc63946646d8f92497a84196245873691126092257",
+      "tier": "source_tool_output: complete pre-patch configuration",
+      "quote_fragments": [
+        "\"products\": [",
+        "\"name\": \"default\"",
+        "\"signingConfigs\": ["
+      ]
+    },
+    {
+      "id": "C4",
+      "source_basename": "rollout-2026-08-21T09-18-20-01a021e5-c150-7b12-a610-d40c07816b98.jsonl",
+      "physical_line": 4934,
+      "timestamp_utc": "2026-08-21T11:14:48.679Z",
+      "call_id": "call_nfwjmlicObG8LyPwc3f5ZPgb",
+      "record_type": "response_item",
+      "payload_type": "custom_tool_call_output",
+      "record_sha256": "cd082603a39b32f6b07ae0f36e0450169cc7385b6b01203c757352eaac520e41",
+      "tier": "source_tool_output: approved decision ledger",
+      "quote_fragments": [
+        "开发阶段使用目标工程现有调试签名",
+        "生产 profile、证书、AGC/Kit 开通项由发布责任人提供"
+      ]
+    },
+    {
+      "id": "C5",
+      "source_basename": "rollout-2026-08-21T09-18-20-01a021e5-c150-7b12-a610-d40c07816b98.jsonl",
+      "physical_line": 4941,
+      "timestamp_utc": "2026-08-21T11:15:03.064Z",
+      "call_id": null,
+      "record_type": "event_msg",
+      "payload_type": "agent_message",
+      "record_sha256": "91cab75d4ff28ad7e6a1ae4c46ae8a1112d69171bec0b3b36e74b3274c68fc4a",
+      "tier": "root_diagnosis: configuration missing reference",
+      "quote_fragments": [
+        "product 漏了对现有 `default` signingConfig 的引用"
+      ]
+    },
+    {
+      "id": "C6",
+      "source_basename": "rollout-2026-08-21T09-18-20-01a021e5-c150-7b12-a610-d40c07816b98.jsonl",
+      "physical_line": 4943,
+      "timestamp_utc": "2026-08-21T11:15:04.158Z",
+      "call_id": "call_bLvRxsabKt5jwrDAGfcDP0LK",
+      "record_type": "response_item",
+      "payload_type": "custom_tool_call",
+      "record_sha256": "8a7b1fbc650e4fe6cb61bb907139f023b3766660f8e74290cef535ca11f6f115",
+      "tier": "native_patch_call: product configuration",
+      "quote_fragments": [
+        "signingConfig",
+        "default"
+      ]
+    },
+    {
+      "id": "C7",
+      "source_basename": "rollout-2026-08-21T09-18-20-01a021e5-c150-7b12-a610-d40c07816b98.jsonl",
+      "physical_line": 4944,
+      "timestamp_utc": "2026-08-21T11:15:04.181Z",
+      "call_id": "exec-9c2b0363-9806-4d9a-8733-06f2e3379843",
+      "record_type": "event_msg",
+      "payload_type": "patch_apply_end",
+      "record_sha256": "326517f6f7207b954fb0f515489aaee0a2e8a458ef06af3eb297208c129f6472",
+      "tier": "native_patch_event: successful write",
+      "quote_fragments": [
+        "\"success\":true",
+        "build-profile.json5"
+      ]
+    },
+    {
+      "id": "C8",
+      "source_basename": "rollout-2026-08-21T09-18-20-01a021e5-c150-7b12-a610-d40c07816b98.jsonl",
+      "physical_line": 4945,
+      "timestamp_utc": "2026-08-21T11:15:04.202Z",
+      "call_id": "call_bLvRxsabKt5jwrDAGfcDP0LK",
+      "record_type": "response_item",
+      "payload_type": "custom_tool_call_output",
+      "record_sha256": "fef6189803559623e4dd893cb3150388d3b3166a89f18b9329f9cf62de2855e7",
+      "tier": "native_patch_outer_empty_result: not write proof or event nesting proof",
+      "quote_fragments": [
+        "Script completed"
+      ]
+    },
+    {
+      "id": "C9",
+      "source_basename": "rollout-2026-08-21T09-18-20-01a021e5-c150-7b12-a610-d40c07816b98.jsonl",
+      "physical_line": 4966,
+      "timestamp_utc": "2026-08-21T11:16:05.982Z",
+      "call_id": null,
+      "record_type": "response_item",
+      "payload_type": "agent_message",
+      "record_sha256": "55ab7601781c87bbf9a1ab0970098dc7b604111861af5c69a47db90e48d5eee0",
+      "tier": "child_agent_report: signed build, not root build output",
+      "quote_fragments": [
+        "BUILD_TYPE: signed-hap",
+        "`SignHap` 成功",
+        "未修改源码、签名引用或凭据值"
+      ]
+    },
+    {
+      "id": "C10",
+      "source_basename": "rollout-2026-08-21T09-18-20-01a021e5-c150-7b12-a610-d40c07816b98.jsonl",
+      "physical_line": 5017,
+      "timestamp_utc": "2026-08-21T11:20:34.401Z",
+      "call_id": null,
+      "record_type": "event_msg",
+      "payload_type": "agent_message",
+      "record_sha256": "d2c2ff79b56e58fa7a83ef608cbad7008d9bef11881ebe916d5916fa3ee88d8e",
+      "tier": "root_report: install claim, child device actions absent",
+      "quote_fragments": [
+        "新 signed HAP 安装成功"
+      ]
+    },
+    {
+      "id": "C11",
+      "source_basename": "rollout-2026-08-21T09-18-20-01a021e5-c150-7b12-a610-d40c07816b98.jsonl",
+      "physical_line": 7694,
+      "timestamp_utc": "2026-08-21T20:37:07.829Z",
+      "call_id": "call_dacW1PmSvf6UGEA9wFwJcdnz",
+      "record_type": "response_item",
+      "payload_type": "custom_tool_call_output",
+      "record_sha256": "c19238a84ec6c9222cb7de20430475db108d50717568f340dbae3a53846d9048",
+      "tier": "source_tool_output: later actual build and install output",
+      "quote_fragments": [
+        "BUILD SUCCESSFUL in 12 s 22 ms",
+        "HAP installed"
+      ]
+    },
+    {
+      "id": "X1",
+      "source_basename": "rollout-2026-08-21T09-18-20-01a021e5-c150-7b12-a610-d40c07816b98.jsonl",
+      "physical_line": 4848,
+      "timestamp_utc": "2026-08-21T11:09:45.205Z",
+      "call_id": null,
+      "record_type": "response_item",
+      "payload_type": "agent_message",
+      "record_sha256": "0eba7b3fc58b1bc86dfe42421896f5febc55098fa294d1d29e2c24dea9b59121",
+      "tier": "child_agent_report: independent API signing blocker",
+      "quote_fragments": [
+        "当前仓库缺少可确定的真实签名配置",
+        "未修改任何文件",
+        "MainSigningKeyProvider",
+        "AipptDevelopmentSecretProvider"
+      ]
+    },
+    {
+      "id": "X2",
+      "source_basename": "rollout-2026-08-21T09-18-20-01a021e5-c150-7b12-a610-d40c07816b98.jsonl",
+      "physical_line": 6957,
+      "timestamp_utc": "2026-08-21T18:44:56.776Z",
+      "call_id": null,
+      "record_type": "response_item",
+      "payload_type": "agent_message",
+      "record_sha256": "1d414244dd518fa5fd9665f424e2d43c59bfcea8d363fd59ce9300dfc39a403e",
+      "tier": "child_agent_report: reviewer hypothesis, not product patch",
+      "quote_fragments": [
+        "新增 progressPercent Monitor"
+      ]
+    },
+    {
+      "id": "X3",
+      "source_basename": "rollout-2026-08-21T09-18-20-01a021e5-c150-7b12-a610-d40c07816b98.jsonl",
+      "physical_line": 7574,
+      "timestamp_utc": "2026-08-21T20:11:43.876Z",
+      "call_id": "call_rHkspr6Fzhub0xEU83VOrdsF",
+      "record_type": "response_item",
+      "payload_type": "custom_tool_call_output",
+      "record_sha256": "918774b14fed7020fbb37af0fd00e20486429eaed2d9eddfe25d03151244f45e",
+      "tier": "source_tool_output: findings report",
+      "quote_fragments": [
+        "canonical 误采集系统联系人"
+      ]
+    },
+    {
+      "id": "X4",
+      "source_basename": "rollout-2026-08-21T09-18-20-01a021e5-c150-7b12-a610-d40c07816b98.jsonl",
+      "physical_line": 7653,
+      "timestamp_utc": "2026-08-21T20:31:08.165Z",
+      "call_id": null,
+      "record_type": "response_item",
+      "payload_type": "agent_message",
+      "record_sha256": "81083e35b516e4bb0bd7d014b1b8526eddc520dcef179f5072839c19ce21f7f5",
+      "tier": "child_agent_report: open verification debt",
+      "quote_fragments": [
+        "GuideInit fresh capture"
+      ]
+    },
+    {
+      "id": "X5",
+      "source_basename": "rollout-2026-08-21T09-18-20-01a021e5-c150-7b12-a610-d40c07816b98.jsonl",
+      "physical_line": 7680,
+      "timestamp_utc": "2026-08-21T20:36:28.546Z",
+      "call_id": null,
+      "record_type": "response_item",
+      "payload_type": "agent_message",
+      "record_sha256": "1df29114297de6eacade8f8c2d5df050f6daeedb0df440fd268d21e9967d8ec5",
+      "tier": "child_agent_report: reviewer counterclaim",
+      "quote_fragments": [
+        "修改前 PptRecordRepository.insert() 已使用同一 PptCreateDao.getInstance()"
+      ]
+    },
+    {
+      "id": "X6",
+      "source_basename": "rollout-2026-08-21T09-18-20-01a021e5-c150-7b12-a610-d40c07816b98.jsonl",
+      "physical_line": 7683,
+      "timestamp_utc": "2026-08-21T20:36:33.470Z",
+      "call_id": "call_BYzt9sjwzhzxLipXgCsr6q4Y",
+      "record_type": "response_item",
+      "payload_type": "custom_tool_call_output",
+      "record_sha256": "94a7bd988209de57a26305abe8291093e8ced2f94d5f9c33e9c4e49f22c11905",
+      "tier": "source_tool_output: persisted fixer report, not product patch",
+      "quote_fragments": [
+        "第 6 步移出缓存 Swiper",
+        "生成完成统一走 WorksService 入库并发布 CREATED 事件"
+      ]
+    },
+    {
+      "id": "X7",
+      "source_basename": "rollout-2026-08-21T09-18-20-01a021e5-c150-7b12-a610-d40c07816b98.jsonl",
+      "physical_line": 7825,
+      "timestamp_utc": "2026-08-21T20:46:48.336Z",
+      "call_id": null,
+      "record_type": "event_msg",
+      "payload_type": "agent_message",
+      "record_sha256": "1c2b3acc8c1d7b74172365a744efe31fd247cfff30a475c629a0666d6cfae9ef",
+      "tier": "root_final_report: debt remains",
+      "quote_fragments": [
+        "GuideInit 仍有两项低置信人工复核债"
+      ]
+    }
+  ]
+}

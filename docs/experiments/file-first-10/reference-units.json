@@ -1,0 +1,88 @@
+{
+  "schema": "migloop-file-first-causal-reference-draft/1",
+  "status": "draft_not_frozen_not_a_score",
+  "visibility": "reviewers_only",
+  "scoring_policy": "README.md",
+  "matching": "Semantic many-to-many matching: investigators may merge or split presentation. Event ids and paragraph counts are not required answer wording.",
+  "unknown_policy": "When positive evidence exists, vague abstention is incomplete. Where source evidence is missing, a bounded unknown with the available facts and competing explanations is correct.",
+  "cases": [
+    {
+      "id": "F10-01", "dossier": "../file-first-luna/review-v2/member-center.md",
+      "units": [
+        {"id": "mask", "changes": ["fixer:103"], "supported": "Mask configuration was added with different intended transparency by dialog; the prior specific upstream cause is not established.", "reject": "All dialogs were made dark, or H5 transparency was newly removed."},
+        {"id": "images", "changes": ["fixer:233"], "supported": "Two retention-image layouts gained explicit aspect/height constraints to represent intrinsic size and padding; exact earlier input responsibility and visual success remain bounded.", "reject": "The patch proves all retention image pixels were verified correct."},
+        {"id": "cta", "changes": ["fixer:436"], "supported": "CTA horizontal layout changed from width plus margins to outer padding, while existing height/click/animation were retained; it was not a no-change case.", "reject": "The button was not changed because its height stayed the same."},
+        {"id": "price", "changes": ["fixer:528", "fixer:592"], "supported": "Uniform price styling was replaced by segmented styling, with an intermediate strategy replaced later. Slice8 had received relevant price source before producing a still-uniform output; earliest unique author and deeper mechanism are not proven.", "reject": "Slice8 never received relevant source, or the last whole-file writer is therefore the proven first cause."},
+        {"id": "indicator", "changes": ["fixer:528", "fixer:532"], "supported": "Swiper indicator styling/configuration was added or adjusted; the exact prior input/actor that should have supplied all values is not established.", "reject": "Exact missing indicator values are proven to have been explicitly supplied to the first generator without evidence."},
+        {"id": "repair-compile", "changes": ["fixer:592", "builder:32", "builder:34"], "supported": "The later fixed-Span helper strategy introduced private priceDigits/priceSuffix; cross-struct access failed compilation and removing private corrected that build error. This is repair-induced, not initial generation.", "reject": "These private helpers were introduced by the initial generator or by fixer:528."}
+      ]
+    },
+    {
+      "id": "F10-02", "dossier": "../file-first-luna/review-v2/splash.md",
+      "units": [
+        {"id": "mask", "changes": ["fixer:103"], "supported": "A dialog mask configuration was added in the batch patch; the global replacement count is not this file's count, and exact initial input responsibility remains bounded.", "reject": "The global batch replacement total is the number of Splash modifications."},
+        {"id": "icon", "changes": ["fixer:233"], "supported": "App-name image dimensions became explicit while Contain was retained, correcting the repairer's identified intrinsic-layout mismatch; complete visual validation is not established.", "reject": "This is a newly added image feature or proven pixel-complete repair."},
+        {"id": "back-gate", "changes": ["fixer:346", "fixer:352"], "supported": "Initial back handling existed, assembly removed it, later assumptions did not establish sufficient gating. Repair added dismissal handling and a separate return-to-page restoration guard. Earliest version's full correctness and a unique sufficient cause are unproven.", "reject": "The initial converter is proven responsible from a later symptom, or onNavBar restoration is identical to consuming dismissal."},
+        {"id": "progress", "changes": ["fixer:346"], "supported": "Existing progress rendering gained explicit stroke thickness and scan-effect configuration; it was not absent business progress logic.", "reject": "The initial implementation had no progress functionality."},
+        {"id": "system-bars", "changes": ["fixer:485", "fixer:488"], "supported": "System bar hide/restore was added to entry/exit and routing lifecycle. Generation-pool knowledge existed, but delivery of the exact contract to the page author is not proven by the main session reading it.", "reject": "The requirement first appeared only after generation, or main-session awareness proves page-author delivery."}
+      ]
+    },
+    {
+      "id": "F10-03", "dossier": "../file-first-luna/review-v2/dice-index.md",
+      "units": [
+        {"id": "label", "changes": ["visual-fixer:66", "visual-fixer:68", "visual-fixer:70"], "supported": "Specific AC14 said Roll and resource-bound generation followed that; later Android runtime showed ROLL. Repair uppercased presentation. A generic conditional allCaps mapping is not two explicit contradictory button commands.", "reject": "The generator ignored an explicit ROLL instruction, without recovering the specific delivered specification."},
+        {"id": "button-style", "changes": ["visual-fixer:70"], "supported": "The existing button gained Normal shape/radius/shadow styling to align observed presentation, not new dice behavior; exact theme-resolution responsibility remains a bounded mechanism question.", "reject": "The patch added missing dice business logic or proves every visual detail passed."},
+        {"id": "test-integration", "changes": ["generation-root:3231", "id-inject:22", "id-inject:25", "id-inject:28"], "supported": "Dice export and UI ids were added for later unit/UI test access. No direct evidence makes these preexisting generation requirements or changes to the dice algorithm.", "reject": "These additions prove the initial dice feature was missing."},
+        {"id": "logging", "changes": ["visual-fixer:68", "ecat:57"], "supported": "The visual repair introduced console.error in the label-reading catch; later ECAT replaced it with hilog. The initial Write lacked this console and the later ban is not automatically an earlier instruction.", "reject": "The initial generator introduced this console.error or was already shown to violate the later explicit ban."},
+        {"id": "comment-policy", "changes": ["ecat:40", "ecat:44", "ecat:46", "ecat:49", "ecat:51", "ecat:53", "ecat:55", "ecat:60", "ecat:62", "ecat:64", "ecat:66", "ecat:68"], "supported": "Later quality checks drove comment/registration cleanup. Approved source-faithful todo text and comments are not automatically unimplemented business features.", "reject": "Every todo or removed comment establishes missing initial business functionality."}
+      ]
+    },
+    {
+      "id": "F10-04", "dossier": "candidate-0723.md#1-entryability漏掉启动配置修复先调用错类",
+      "units": [
+        {"id": "debug-wiring", "changes": ["R:5091", "R:5099"], "supported": "Existing debug/release phone validation depended on startup-injected configuration still defaulting false. Relevant source/contracts were delivered across actors with shared-entry editing restrictions. Later root enabled debug; unique initial owner and full build-profile correctness remain unproven.", "reject": "The patch added the missing phone regex, or Android source used BuildConfig.DEBUG rather than LOG_DEBUG."},
+        {"id": "wrong-class-repair", "changes": ["R:5099", "R:5123", "R:5126"], "supported": "The repair called F013Service.setDebug although setDebug belongs to AppTrackConfig; a real compiler failure was followed by import/call correction and successful build.", "reject": "This wrong-class invocation was an initial generation defect, or successful compilation proves end-to-end login."}
+      ]
+    },
+    {
+      "id": "F10-05", "dossier": "candidate-0723.md#2-f003repository明确保留的阻塞后期测试解锁",
+      "units": [
+        {"id": "android-id-unblock", "changes": ["R:5214", "R:5221"], "supported": "The initial actor explicitly had to leave D-010 pending and not invent an id despite a known backend blocker. Later login repair injected DevicePrefs persistent random hex within privacy initialization. This explains a real unresolved generation capability without blaming violation of the initial instruction; formal approval is not established in the audited chain and Android-id/backend equivalence remains unproven.", "reject": "The initial actor simply forgot a settled requirement; or intentional pending status means there was no real functional blocker; or random hex proves Android-id semantic equivalence."}
+      ]
+    },
+    {
+      "id": "F10-06", "dossier": "candidate-0723.md#3-guidepage初版尺寸误译沿用宿主安全区修复与验证边界",
+      "units": [
+        {"id": "back-image-box", "changes": ["Fix:168"], "supported": "The original 24-by-24 box with padding 20 was replaced by content-derived dimensions plus padding. Initial converter code already had this shape and a later functional writer read and retained it; the later whole-file writer is not the first introduction.", "reject": "The functional whole-file rewrite alone proves it first created the image sizing problem."},
+        {"id": "track-vs-control", "changes": ["Fix:469", "Fix:473"], "supported": "The 200-by-20 control frame had been used as track thickness; a later drawable read showed 4dp centered tracks. Before generation the resource actor had already received that source, while the page actor's checked mapping lacked this exact height despite linking the drawable. The initial shape was propagated by later rewrite. Separate frame from drawable and upstream delivery from downstream delivery; the unique deeper mechanism remains unproven.", "reject": "The checked page mapping explicitly delivered 4dp and was ignored; the entire generation pool lacked 4dp; or an actual compiler failure between constant use/declaration is proven."},
+        {"id": "bottom-inset", "changes": ["Fix:580"], "supported": "The repair added bottom WindowModel padding on the host Swiper. Child height/radius/margin already matched the checked XML; the finding's proposed child-size change is not the actual patch. Visual success remains unverified.", "reject": "This patch increased child button height/radius or the finding's pixel estimate is independently certified."}
+      ]
+    },
+    {
+      "id": "F10-07", "dossier": "candidate-dice.md",
+      "units": [
+        {"id": "test-bridge", "changes": ["T:35", "T:37", "T:39"], "supported": "Later UI-test design added Want/AppStorage/mock cold/hot-entry hooks while retaining the initial immersive window implementation. No established earlier bridge requirement supports calling this initial business-generation failure.", "reject": "The entire initial Ability was an empty shell or lacked dice business initialization."},
+        {"id": "error-observer", "changes": ["E:41", "E:43", "E:45"], "supported": "Later ECAT required a global error observer. SDK checking corrected the proposed kit location before writing. Earlier system jscrash output contradicts the absolute no-observer/no-report rationale; build success does not test observer behavior.", "reject": "No observer meant absolutely no crash reporting, or an erroneous ArkTS import was actually written then fixed, or observer runtime effectiveness was proved."}
+      ]
+    },
+    {
+      "id": "F10-08", "dossier": "candidate-dice.md",
+      "units": [
+        {"id": "identity-phase-and-conflict", "changes": ["I1:49"], "supported": "Initial dev-identity expressly prohibited changing bundle/vendor. Later ECAT/full widened scope, restored the Android bundle, and chose a vendor despite a conflict between the non-template demand and the skill's second-segment rule. Source com.example.diceroller still triggers the detector prefix heuristic, so an alarm is not proof the source-aligned bundle is wrong.", "reject": "The initial actor forgot the identity task, diceroller is a verified real vendor, or any com.example bundle must be a migration placeholder."},
+        {"id": "icon-scope", "changes": ["I1:45", "I1:49"], "supported": "Existing entry layered-image assets were copied to AppScope and the icon reference switched; the old app_icon resolved. This does not certify Android launcher asset migration, and the initial full icon-policy cause is not established.", "reject": "The old icon reference was necessarily missing, old assets were deleted, or copied scaffold PNGs prove source-faithful icon migration."}
+      ]
+    },
+    {
+      "id": "F10-09", "dossier": "candidate-codex.md",
+      "units": [
+        {"id": "hit-test", "changes": ["A:8067"], "supported": "After explicit execute completion, a click complaint led to real source checks: child and parent callbacks were wired, while the covering Stack's Block mode was the stronger code-level cause. A native effect/readback confirms replacement with Default. The original Block author, SDK excerpt boundary and unbuilt immediate artifact limit attribution and behavior claims.", "reject": "The generator had no input requirement, callbacks were proved unwired, or the four actions passed a post-patch device test. Later reported extra modifications cannot be treated as original patch verification."}
+      ]
+    },
+    {
+      "id": "F10-10", "dossier": "candidate-codex.md",
+      "units": [
+        {"id": "signing-reference", "changes": ["B:4944"], "supported": "A real pre-patch config showed existing default signing materials but no product reference; the patch added that reference under the development-signing decision. The file predated execute and the omission's author is unknown. Child signed-build claims and later actual build/install are distinct evidence; API request signer/secret composition is a different issue.", "reject": "Missing production certificates or API request signers are the cause repaired by this one-line HAP patch; the initial generator's deletion is proven; or build/install proves business login."}
+      ]
+    }
+  ]
+}

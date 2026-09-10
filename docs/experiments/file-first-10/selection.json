@@ -1,0 +1,60 @@
+{
+  "schema": "migloop-file-first-10-selection/1",
+  "status": "ten_files_qualified_native_receipts_reference_review_pending",
+  "visibility": "reviewers_only_never_investigator_context",
+  "selected_without_new_model_results": true,
+  "new_investigations_started": 0,
+  "reference_frozen": false,
+  "model": "gpt-5.6-luna",
+  "effort": "medium",
+  "repetitions_per_file": 2,
+  "raw_first": true,
+  "production_refactor_paused": true,
+  "pools": {
+    "0723": {
+      "path": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v1/member-center/pool",
+      "source_files": 146,
+      "generation_end": "2026-07-24T22:16:20.102Z",
+      "generation_anchor": "9b3105a2-85ec-4889-9786-b3c220f06754.jsonl:4958",
+      "observation_end": "2026-07-26T21:48:57.793Z",
+      "end_anchor": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6.jsonl:1772"
+    },
+    "dice": {
+      "path": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v1/dice-entry/pool",
+      "source_files": 80,
+      "generation_end": "2026-09-03T16:46:30.036Z",
+      "generation_anchor": "81e0a463-c9d3-4a7a-a671-b7f064830af1.jsonl:1521",
+      "observation_end": "2026-09-03T22:09:07.188Z",
+      "end_anchor": "49d451b1-f479-4c4e-bb39-9fa0dd06aeb0.jsonl:99"
+    },
+    "codex": {
+      "path": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v1/codex-c1/pool",
+      "source_files": 2,
+      "generation_end": "2026-08-16T23:49:46.899Z",
+      "generation_anchor": "rollout-2026-08-16T17-54-23-01a009fe-68e3-7f42-b76b-5e863c555976.jsonl:7687",
+      "observation_end": "2026-08-22T15:24:43.116Z",
+      "end_anchor": "rollout-2026-08-21T09-18-20-01a021e5-c150-7b12-a610-d40c07816b98.jsonl:7916",
+      "limit": "Root rollouts only; missing child internal transcripts. Later modification claims remain unverified unless direct effect evidence exists."
+    }
+  },
+  "cases": [
+    {"id": "F10-01", "pool": "0723", "file": "entry/src/main/ets/pages/MemberCenterPage.ets", "exposure": "prior_luna_baseline_and_reference", "basis": "multiple_visual_changes_and_repair_induced_compile_error", "dossier": "../file-first-luna/review-v2/member-center.md"},
+    {"id": "F10-02", "pool": "0723", "file": "entry/src/main/ets/pages/SplashPage.ets", "exposure": "prior_luna_baseline_and_reference", "basis": "generation_then_assembly_removal_and_later_repair", "dossier": "../file-first-luna/review-v2/splash.md"},
+    {"id": "F10-03", "pool": "dice", "file": "entry/src/main/ets/pages/Index.ets", "exposure": "prior_luna_baseline_and_reference", "basis": "specific_spec_vs_runtime_and_late_test_quality_changes", "dossier": "../file-first-luna/review-v2/dice-index.md"},
+    {"id": "F10-04", "pool": "0723", "file": "entry/src/main/ets/entryability/EntryAbility.ets", "exposure": "new_file_dossier_existing_project", "basis": "generation_input_delivered_but_unwired_and_repair_wrong_api", "dossier": "candidate-0723.md"},
+    {"id": "F10-05", "pool": "0723", "file": "entry/src/main/ets/repositories/F003Repository.ets", "exposure": "new_file_dossier_existing_project", "basis": "explicit_blocked_decision_then_login_unblock", "dossier": "candidate-0723.md"},
+    {"id": "F10-06", "pool": "0723", "file": "entry/src/main/ets/pages/GuidePage.ets", "exposure": "new_file_dossier_existing_project", "basis": "layout_frame_vs_track_and_rewritten_inherited_code", "dossier": "candidate-0723.md"},
+    {"id": "F10-07", "pool": "dice", "file": "entry/src/main/ets/entryability/EntryAbility.ets", "exposure": "previously_discussed_issue_references", "basis": "late_test_bridge_and_crash_observer_with_existing_crash_evidence", "dossier": "candidate-dice.md"},
+    {"id": "F10-08", "pool": "dice", "file": "AppScope/app.json5", "exposure": "new_file_dossier_existing_project", "basis": "explicit_do_not_change_instruction_vs_late_detector_and_source_identity", "dossier": "candidate-dice.md"},
+    {"id": "F10-09", "pool": "codex", "file": "entry/src/main/ets/pages/LaunchAgreementDialog.ets", "exposure": "previously_reviewed_issue_corrected_stage_boundary", "basis": "source_hit_testing_vs_callback_hypothesis_and_build_boundary", "dossier": "candidate-codex.md"},
+    {"id": "F10-10", "pool": "codex", "file": "build-profile.json5", "exposure": "previously_discussed_issue_references", "basis": "preexisting_config_omission_unknown_author_and_competing_signing_meanings", "dossier": "candidate-codex.md"}
+  ],
+  "excluded_or_reserve": [
+    {"pool": "0723", "file": "entry/src/main/ets/components/PushDetailRouter.ets", "reason": "No confirmed post-boundary target modification found; generation-stage changes do not qualify."},
+    {"pool": "0723", "file": "entry/src/main/ets/components/MineComponent.ets", "reason": "Reserve: actual later native changes exist, but new three cover more distinct input/decision/implementation ambiguities; selection is before new model results."},
+    {"pool": "codex", "file": "entry/src/main/ets/pages/GuidePage.ets", "reason": "Root reports claim modification; missing child source patches. Keep as a supplemental evidence-insufficiency case, not a qualified main file."},
+    {"pool": "codex", "file": "entry/src/main/ets/viewmodels/PptGenerationViewModel.ets", "reason": "Conflicting fixer/reviewer reports without direct product patch; not enough to qualify by actual effects."},
+    {"pool": "codex", "file": "entry/src/main/ets/pages/GuideDifficulty1Component.ets", "reason": "Direct patch is before execute completion."},
+    {"pool": "codex", "file": "entry/src/main/ets/pages/MainPage.ets", "reason": "Direct assembly patch is before execute completion; later repair claims alone do not qualify."}
+  ]
+}

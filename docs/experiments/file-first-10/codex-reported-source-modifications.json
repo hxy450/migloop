@@ -1,0 +1,82 @@
+{
+  "scope": "Round 0/1/2 root-visible FILES_MODIFIED summary claims; explicitly excluded as proof of source writes.",
+  "reports": [
+    {
+      "source_basename": "rollout-2026-08-21T09-18-20-01a021e5-c150-7b12-a610-d40c07816b98.jsonl",
+      "physical_line": 6090,
+      "timestamp_utc": "2026-08-21T16:29:54.146Z",
+      "call_id": "call_kI5kshCSzLwSgeoSPLQ4qxlX",
+      "record_sha256": "009ae114b39a4accc869000181e033a2c50586e07d927a9fc69e7e2227387fef",
+      "tier": "persisted fixer summary only; not actual product writes",
+      "reported_files": [
+        "entry/src/main/ets/components/MineComponent.ets",
+        "entry/src/main/ets/components/RecommendComponent.ets",
+        "entry/src/main/ets/components/WorksComponent.ets",
+        "entry/src/main/ets/pages/AboutUsPage.ets",
+        "entry/src/main/ets/pages/CreateOutLinePage.ets",
+        "entry/src/main/ets/pages/FileListPage.ets",
+        "entry/src/main/ets/pages/GuideInitComponent.ets",
+        "entry/src/main/ets/pages/GuidePage.ets",
+        "entry/src/main/ets/pages/HomeComponent.ets",
+        "entry/src/main/ets/pages/LaunchAgreementDialog.ets",
+        "entry/src/main/ets/pages/SplashPage.ets",
+        "entry/src/main/resources/base/element/string.json"
+      ]
+    },
+    {
+      "source_basename": "rollout-2026-08-21T09-18-20-01a021e5-c150-7b12-a610-d40c07816b98.jsonl",
+      "physical_line": 6968,
+      "timestamp_utc": "2026-08-21T18:45:18.878Z",
+      "call_id": "call_4ZEuxcrNCIe63BGyc95Q7CmY",
+      "record_sha256": "ee799ecd333fe8b01af4f32837dcc42f7cc8c5ae8f719dcf25c8e0e9a1422770",
+      "tier": "persisted fixer summary only; not actual product writes",
+      "reported_files": [
+        "entry/src/main/ets/components/FillPPTQueryDialog.ets",
+        "entry/src/main/ets/components/MineComponent.ets",
+        "entry/src/main/ets/components/RecommendComponent.ets",
+        "entry/src/main/ets/models/AssetModels.ets",
+        "entry/src/main/ets/pages/AboutUsPage.ets",
+        "entry/src/main/ets/pages/CreateOutLinePage.ets",
+        "entry/src/main/ets/pages/CreateOutLinePageParam.ets",
+        "entry/src/main/ets/pages/FileListPage.ets",
+        "entry/src/main/ets/pages/GuideInitComponent.ets",
+        "entry/src/main/ets/pages/GuidePage.ets",
+        "entry/src/main/ets/pages/HomeComponent.ets",
+        "entry/src/main/ets/pages/HomePage.ets",
+        "entry/src/main/ets/pages/PPTTemplatePreviewPage.ets",
+        "entry/src/main/ets/pages/WebViewPage.ets",
+        "entry/src/main/ets/services/ApplicationCompositionRoot.ets",
+        "entry/src/main/ets/services/EmbeddedWebService.ets",
+        "entry/src/main/ets/services/FreeCountApi.ets",
+        "entry/src/main/ets/services/FreeCountService.ets",
+        "entry/src/main/ets/services/WebTypes.ets",
+        "entry/src/main/resources/base/element/string.json"
+      ]
+    },
+    {
+      "source_basename": "rollout-2026-08-21T09-18-20-01a021e5-c150-7b12-a610-d40c07816b98.jsonl",
+      "physical_line": 7683,
+      "timestamp_utc": "2026-08-21T20:36:33.470Z",
+      "call_id": "call_BYzt9sjwzhzxLipXgCsr6q4Y",
+      "record_sha256": "94a7bd988209de57a26305abe8291093e8ced2f94d5f9c33e9c4e49f22c11905",
+      "tier": "persisted fixer summary only; not actual product writes",
+      "reported_files": [
+        "entry/src/main/ets/pages/FileListPage.ets",
+        "entry/src/main/ets/pages/GuideStatusComponent.ets",
+        "entry/src/main/ets/pages/GuideDetailsComponent.ets",
+        "entry/src/main/ets/pages/HomeComponent.ets",
+        "entry/src/main/ets/pages/GuidePage.ets",
+        "entry/src/main/ets/components/MineComponent.ets",
+        "entry/src/main/ets/pages/CustomerServiceWebPage.ets",
+        "entry/src/main/ets/pages/AboutUsPage.ets",
+        "entry/src/main/ets/pages/LoginPage.ets",
+        "entry/src/main/ets/services/PrivacyDialogStore.ets",
+        "entry/src/main/ets/services/WorksService.ets",
+        "entry/src/main/ets/viewmodels/PptGenerationViewModel.ets",
+        "entry/src/main/ets/services/ApplicationCompositionRoot.ets",
+        "entry/src/main/ets/services/TemplateCatalogService.ets",
+        "entry/src/main/ets/pages/MemberCenterActivitiy.ets"
+      ]
+    }
+  ]
+}
