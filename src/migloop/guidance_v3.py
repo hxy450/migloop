@@ -6,8 +6,10 @@ CORE = """\
 
 优先用 batch(sid,requests=[{tool,args,scope?}])。可同时打开多个file/agent、检索多词、展开多个原文；不填写via，不必按图走，不为画图补调用。
 每项tool可为file/agent/search/diff/blame/changes/events/record/expand。
+返回可能是无损compact JSON（schema=migloop-batch-wire/1）：子项在batch.items，ledger仍在顶层；omitted只省重复封装，不是省掉证据，也没有需你解析的别名。
 - file args={path,at,since_ts?,view?,offset?,limit?}；agent用id代path。at为含时区ISO或latest；latest返回时固定成实际已知截止。
   默认overview先给已索引读写、候选与原生正文入口；agent同时给有时间的任务/消息。每组独立计数和续读，不是原始记录前缀。
+  原始任务字段最多展示4096字符，短字段可完整交付；仍受批量预算约束，chars是原长，preview_span才是实际片段，不把定位当全文。
   view=writes/reads/candidates（agent另有messages）分页该组；view=records分页完整原始记录层。视图是导航，不改变search的完整范围。
 - search args={q,at,file?或agent?,since_ts?,offset?,limit?}；全池省略file/agent。q_any=[词1,词2]是字面量OR，与q互斥，不是正则。
 - changes args={path,at,since_ts}列已确认操作/未决效应；diff同样时间范围看内容变化。写入可能无净变化，修改不必然是缺陷。

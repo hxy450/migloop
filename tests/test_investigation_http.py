@@ -103,7 +103,7 @@ def test_post_batch_matches_actual_mcp_and_shared_json_core(real_http):
 
     blocks = asyncio.run(mcp_server.build_server(Backend()).call_tool("batch", {"sid": "time", **args}))
     text = "".join(block.text for block in blocks)
-    mcp_data = json.loads(text.rpartition(investigation.MARKER)[0])
+    mcp_data = investigation.parse_receipt("batch", args, text)["data"]
     status, data, headers = real_http["post"]("batch", args)
     assert status == 200
     assert data == mcp_data == atom_queries.json_data(ledger, "batch", args)

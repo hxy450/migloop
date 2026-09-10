@@ -17,10 +17,14 @@ import hashlib
 import json
 import os
 import sys
+import asyncio
 from collections import OrderedDict
+from contextlib import contextmanager
+from contextvars import ContextVar
 from copy import deepcopy
 from dataclasses import dataclass, field
-from threading import RLock
+from functools import wraps
+from threading import RLock, get_ident
 from typing import Any
 
 from . import atoms, transcript_store as store
@@ -31,6 +35,54 @@ _MAX_SOURCE_CACHE_BYTES = 8 * 1024 * 1024
 _CACHE: OrderedDict[str, tuple[str, tuple[int, int], dict[str, Any], int]] = OrderedDict()
 _CACHE_LOCK = RLock()
 _CACHE_BYTES = 0
+# Request-local source indexes use admission without LRU eviction, so repeated
+# full scans cannot evict every useful entry in the same request. This budget
+# is released at request exit and is not a persistent increase of the LRU.
+_REQUEST_SCAN_BUDGET = 128 * 1024 * 1024
+_SCAN_REUSE: ContextVar[dict | None] = ContextVar("migloop_native_scan_reuse", default=None)
+
+
+def _execution_owner():
+    try:
+        task = asyncio.current_task()
+    except RuntimeError:  # Ordinary synchronous/worker-thread queries.
+        task = None
+    return get_ident(), id(task) if task is not None else None
+
+
+def _request_state():
+    state = _SCAN_REUSE.get()
+    return state if state and state.get("owner") == _execution_owner() else None
+
+
+@contextmanager
+def scan_scope():
+    """Reuse source parsing within one execution; never freeze file state.
+
+    Registry ownership and file signatures are still checked on every access.
+    Native events, target/time projections and ledger relations are not cached.
+    Nested calls in the same task/thread share; inherited contexts in another
+    task/thread cannot access or refill their parent's state after it exits.
+    """
+    if _request_state() is not None:
+        yield
+        return
+    state = {"owner": _execution_owner(), "registry_key": None, "indexes": {},
+             "skipped": {}, "retained_bytes": 0}
+    token = _SCAN_REUSE.set(state)
+    try:
+        yield
+    finally:
+        state.clear()
+        _SCAN_REUSE.reset(token)
+
+
+def reuse_scans(function):
+    @wraps(function)
+    def wrapped(*args, **kwargs):
+        with scan_scope():
+            return function(*args, **kwargs)
+    return wrapped
 
 
 def _digest(value: Any) -> str:
@@ -150,7 +202,7 @@ def _retained_size(value: Any, ceiling: int) -> int:
             pending.extend(current.values())
         elif isinstance(current, (list, tuple, set, frozenset)):
             pending.extend(current)
-        elif isinstance(current, (_Part, store.Record)):
+        elif isinstance(current, (_Part, _Event, store.Record)):
             pending.append(vars(current))
     return total
 
@@ -162,7 +214,53 @@ def _evict(path: str) -> None:
         _CACHE_BYTES -= previous[3]
 
 
+def _drop_request_entry(state, path):
+    for name in ("indexes", "skipped"):
+        previous = state[name].pop(path, None)
+        if previous is not None:
+            state["retained_bytes"] -= previous[-1]
+
+
 def _source_index(path: str, registry_key: str) -> tuple[dict[str, Any], tuple[int, int], str]:
+    state = _request_state()
+    if state is None:
+        return _source_index_global(path, registry_key)
+    if state["registry_key"] != registry_key:
+        state["indexes"].clear()
+        state["skipped"].clear()
+        state.update(registry_key=registry_key, retained_bytes=0)
+    try:
+        before = _signature(path)
+    except OSError:
+        _drop_request_entry(state, path)
+        raise
+    held = state["indexes"].get(path)
+    if held is not None:
+        if held[0] == before and _signature(path) == before:
+            return held[1], before, "request_hit"
+        _drop_request_entry(state, path)
+    skipped = state["skipped"].get(path)
+    if skipped is not None and skipped[0] != before:
+        _drop_request_entry(state, path)
+        skipped = None
+    index, signature, cache_status = _source_index_global(path, registry_key)
+    if skipped is None and _signature(path) == signature:
+        remaining = max(0, _REQUEST_SCAN_BUDGET - state["retained_bytes"])
+        size = _retained_size((path, signature, index), remaining)
+        if size <= remaining:
+            state["indexes"][path] = (signature, index, size)
+            state["retained_bytes"] += size
+        else:
+            # Remember an uncacheable stable source without repeatedly walking
+            # its entire object graph. Guard bookkeeping is itself budgeted.
+            guard_size = _retained_size((path, signature), remaining)
+            if guard_size <= remaining:
+                state["skipped"][path] = (signature, guard_size)
+                state["retained_bytes"] += guard_size
+    return index, signature, cache_status
+
+
+def _source_index_global(path: str, registry_key: str) -> tuple[dict[str, Any], tuple[int, int], str]:
     """Cached data is private and treated as immutable after construction."""
     global _CACHE_BYTES
     before = _signature(path)
@@ -210,13 +308,21 @@ def _source_index(path: str, registry_key: str) -> tuple[dict[str, Any], tuple[i
 
 
 def _scan(ledger: atoms.Ledger, agent: str | None = None) -> dict[str, Any]:
+    return _scan_uncached(ledger, agent)
+
+
+def _scan_uncached(ledger: atoms.Ledger, agent: str | None = None) -> dict[str, Any]:
     all_sources = store.sources(ledger)
-    registry = store.sources(ledger, agent) if agent is not None else all_sources
+    # Derive the selected registry from the same owner snapshot. A second
+    # lookup could admit a new source absent from source_keys below, producing
+    # a KeyError rather than the explicit end-of-scan registry retry.
+    registry = ({path: {agent} for path, owners in all_sources.items() if agent in owners}
+                if agent is not None else all_sources)
     groups: dict[tuple[Any, ...], _Event] = {}
     unknown, gaps, signatures = [], [], {}
     source_keys: dict[str, int] = {}
     registry_key = _digest([(path, sorted(owners)) for path, owners in sorted(all_sources.items())])
-    cache_counts = {"hit": 0, "miss": 0, "oversize_not_cached": 0}
+    cache_counts = {"hit": 0, "miss": 0, "oversize_not_cached": 0, "request_hit": 0}
     for path in all_sources:
         key = store.source_key(path)
         source_keys[key] = source_keys.get(key, 0) + 1
@@ -262,11 +368,14 @@ def _scan(ledger: atoms.Ledger, agent: str | None = None) -> dict[str, Any]:
     if changed:
         groups = {key: event for key, event in groups.items() if event.source not in changed}
         unknown = [row for row in unknown if row["source_path"] not in changed]
+    if store.sources(ledger) != all_sources:
+        raise ValueError("registered source/owner mapping changed during native inventory; retry with a stable registry")
     return {"events": list(groups.values()), "unknown": unknown, "gaps": gaps,
             "source_count": len(registry), "source_signatures": signatures,
             "cache": {**cache_counts, "budget_bytes": _CACHE_BUDGET,
                       "max_source_bytes": _MAX_SOURCE_CACHE_BYTES,
-                      "note": "bounded native source indexes; oversized indexes are served without retention"}}
+                      "request_budget_bytes": _REQUEST_SCAN_BUDGET,
+                      "note": "bounded native source indexes; optional request-local admission does not evict earlier entries and is released on exit; oversized sources are still served"}}
 
 
 def _project(event: _Event, parts: list[_Part], *, scoped: bool = False) -> dict[str, Any]:
@@ -309,7 +418,7 @@ def _project(event: _Event, parts: list[_Part], *, scoped: bool = False) -> dict
     # Raw refs, not this event handle, authenticate payload bytes.
     return {"id": "native:" + _digest(identity), "source": os.path.basename(event.source),
             "source_path": event.source, "agents": sorted(event.agents), "protocol": event.protocol,
-            "call_id": event.call_id, "tool": (uses[0].payload.get("name") if len(uses) == 1 else
+            "call_id": event.call_id, "tool": (deepcopy(uses[0].payload.get("name")) if len(uses) == 1 else
                                                   "patch_apply_end" if event.protocol == "codex_patch" else None),
             "reference_status": "addressable" if event.addressable else "ambiguous_source",
             "id_unique_in_registry": event.addressable,

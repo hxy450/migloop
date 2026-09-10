@@ -273,6 +273,7 @@ def build_server(backend: Any | None = None) -> Any:
         changes给确认操作与未决效应清单，events给未依赖读写解析的原生调用；纯提及不认证写者。
         scope={kind:file|agent|pool,key:路径或id,at:ISO,since_ts:ISO或null}，默认latest会固定为当前已知时间。
         max_chars限制data正文字符（封装另计）；默认关系摘要，details=true与较小limit可展开完整注释。
+        返回JSON；若schema为migloop-batch-wire/1，子项在batch.items。只省重复封装，data/续读不变，ledger仍在顶层。
         details是统一的关系注释开关；没有额外注释层的查询也接受它，正文/时间范围不变。
         每项显示ok/error/deferred。未交付不能当查过；有依赖的下一批应等返回，查询顺序不生成历史边。"""
         ledger, cwd = await _ctx(sid)

@@ -42,11 +42,13 @@ def trace_identity(ledger: atoms.Ledger, calls: list[dict[str, Any]] | None,
     for step, call in enumerate(calls or [], 1):
         if isinstance(call, dict) and call.get("tool") in ("batch", "changes", "expand"):
             from . import investigation
+            from .probe import _unwrap_result
             provenance = call.get("provenance") or {}
             eligible = (call.get("has_result") is True and not call.get("is_error")
                         and not call.get("delivery_truncated") and not provenance.get("origin_unverified")
                         and provenance.get("complete_pair") is not False and isinstance(call.get("text"), str))
-            saved = investigation.parse_receipt(call["tool"], call.get("input") or {}, call.get("text") or "") if eligible else None
+            saved = investigation.parse_receipt(call["tool"], call.get("input") or {},
+                                                _unwrap_result(call.get("text") or "")) if eligible else None
             if saved:
                 observations.append({"identity": saved["receipt"]["ledger"], "step": step,
                                      "source": "investigation", "call_id": call.get("call_id"), "provenance": provenance})

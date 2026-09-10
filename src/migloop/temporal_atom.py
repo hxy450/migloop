@@ -16,6 +16,9 @@ from . import atoms, body_sources, raw_events, temporal, transcript_store as sto
 SCHEMA = "migloop-time-atom/1"
 _SECTIONS = ("writes", "reads", "candidates", "messages")
 _OVERVIEW_LIMITS = {"writes": 3, "reads": 3, "candidates": 2, "messages": 2}
+# Task constraints are original input, not a generated summary. Let short
+# fields fit whole; batch delivery still applies its independent total budget.
+_MESSAGE_PREVIEW_CHARS = 4096
 
 
 def _request(kind, key, window, view, offset, limit, include_undated, details):
@@ -204,9 +207,9 @@ def _messages(ledger, key, window, scope):
                 for pointer, text, label in _text_fields(record):
                     addressable = counts[store.source_key(path)] == 1
                     rows.append({**record.address(), "pointer": pointer, "message_kind": label,
-                                 "preview": text[:240], "preview_start": 0, "chars": len(text),
+                                 "preview": text[:_MESSAGE_PREVIEW_CHARS], "preview_start": 0, "chars": len(text),
                                  "preview_kind": "original_decoded_field_excerpt",
-                                 "preview_span": {"offset": 0, "chars": min(240, len(text))},
+                                 "preview_span": {"offset": 0, "chars": min(_MESSAGE_PREVIEW_CHARS, len(text))},
                                  "source_agent": key, "sender_certified": False,
                                  "reference_status": "addressable" if addressable else "ambiguous_source",
                                  "expand_query": {"tool": "expand", "args": {"refs": [{"ref": record.ref,

@@ -168,7 +168,7 @@ def test_real_http_mcp_and_core_share_annotation_and_source_pages(real_http, mon
             return "/proj"
 
     blocks = asyncio.run(mcp_server.build_server(Backend()).call_tool("batch", {"sid": "time", **args}))
-    mcp_data = json.loads("".join(block.text for block in blocks).rpartition(investigation.MARKER)[0])
+    mcp_data = investigation.parse_receipt("batch", args, "".join(block.text for block in blocks))["data"]
     status, http_data, _ = real_http["post"]("batch", args)
     assert status == 200
     assert http_data == mcp_data == atom_queries.json_data(ledger, "batch", args)

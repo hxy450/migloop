@@ -145,7 +145,7 @@ def test_original_timestamped_forbidden_task_visible_not_agent_prompt_or_tool_wr
     ledger.agents[agent].prompt = "INVENTED LATEST PROMPT"
     data = temporal_atom.query(ledger, kind="agent", key=agent, at=ts(5))
     row, = section(data, "messages")["rows"]
-    assert row["preview"] == task[:240] and row["preview_start"] == 0 and row["chars"] == len(task)
+    assert row["preview"] == task and row["preview_start"] == 0 and row["chars"] == len(task)
     assert row["pointer"] == "/message/content" and row["message_kind"] == "recorded_input"
     assert transcript_store.resolve(ledger, row["ref"]).value["message"]["content"].startswith(row["preview"])
     assert "INVENTED LATEST PROMPT" not in json.dumps(data) and "future task" not in json.dumps(data)

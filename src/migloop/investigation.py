@@ -11,12 +11,14 @@ import re
 from collections import OrderedDict
 from typing import Any
 
-from . import atoms, temporal
+from . import atoms, raw_events, temporal
 from . import transcript_store as store
 from .time_receipts import digest
 
 SCHEMA = "migloop-investigation-batch/1"
 MARKER = "\nMIGLOOP_INVESTIGATION_RECEIPT "
+WIRE_MARKER = "\nMIGLOOP_BATCH_WIRE_RECEIPT "
+WIRE_RECEIPT = "migloop-batch-wire-receipt/1"
 TOOLS = frozenset({"file", "agent", "search", "record", "expand", "diff", "blame", "changes", "events"})
 _LATEST: OrderedDict[tuple, str] = OrderedDict()
 
@@ -218,6 +220,7 @@ def changes(ledger, path, at, since_ts=None, offset=0, limit=40, related_offset=
                                   related_offset=related_offset, related_limit=related_limit)
 
 
+@raw_events.reuse_scans
 def query(ledger, tool, supplied):
     from . import atom_queries
     if tool not in TOOLS or not isinstance(supplied, dict):
@@ -283,6 +286,7 @@ def _delivery(data):
             "semantic_checked": False, "navigation_is_relation": False}
 
 
+@raw_events.reuse_scans
 def batch(ledger, requests, max_chars=100000):
     from . import delivery_budget
     if not isinstance(requests, list) or not 1 <= len(requests) <= 24:
@@ -353,10 +357,31 @@ def batch(ledger, requests, max_chars=100000):
 
 def render_batch(ledger, requests, max_chars=100000):
     data = batch(ledger, requests, max_chars)
+    return render_batch_data(data, requests, max_chars)
+
+
+def render_batch_data(data, requests, max_chars):
+    """Render the same selected data; prefer lossless wire only if shorter.
+
+    No model-visible aliases or hidden handle registry. Old JSON remains a
+    valid transport and old receipts retain their original parsing algorithm.
+    The codec limits are safety guards, not permission to drop evidence.
+    """
     body = json.dumps(data, ensure_ascii=False, separators=(",", ":"))
-    receipt = {"schema": "migloop-investigation-receipt/1", "ledger": atoms.ledger_identity(ledger),
+    receipt = {"schema": "migloop-investigation-receipt/1", "ledger": data["ledger"],
                "request_sha256": digest({"requests": requests, "max_chars": max_chars}), "body_sha256": digest(body)}
-    return body + MARKER + json.dumps(receipt, separators=(",", ":"))
+    original = body + MARKER + json.dumps(receipt, separators=(",", ":"))
+    from . import batch_wire
+    try:
+        packed = batch_wire.pack(data, requests)
+        wire_body = json.dumps(packed, ensure_ascii=False, separators=(",", ":"))
+        wire_receipt = {"schema": WIRE_RECEIPT, "codec": batch_wire.SCHEMA, "ledger": data["ledger"],
+                        "request_sha256": receipt["request_sha256"], "body_sha256": digest(wire_body),
+                        "canonical_sha256": digest(data)}
+        wire = wire_body + WIRE_MARKER + json.dumps(wire_receipt, separators=(",", ":"))
+    except ValueError:
+        return original  # Compression may decline; never truncate/coerce to fit it.
+    return wire if len(wire) < len(original) else original
 
 
 def render_query(ledger, tool, args):
@@ -396,6 +421,8 @@ def _receipt_args(tool, supplied):
 
 def parse_receipt(tool, args, text):
     """Authenticate self-consistency before comparing the source ledger identity."""
+    if WIRE_MARKER in text:
+        return _parse_wire_receipt(tool, args, text)
     body, separator, tail = text.rpartition(MARKER)
     if not separator:
         return None
@@ -420,6 +447,31 @@ def parse_receipt(tool, args, text):
         return None
 
 
+def _parse_wire_receipt(tool, args, text):
+    """Bind actual wire text before applying the pinned codec reconstruction."""
+    from . import batch_wire
+    if tool != "batch" or len(text) > batch_wire.DEFAULT_MAX_CHARS + 8192:
+        return None
+    body, separator, tail = text.rpartition(WIRE_MARKER)
+    if not separator or len(tail) > 8192:
+        return None
+    try:
+        receipt = json.loads(tail, object_pairs_hook=batch_wire._unique_object,
+                             parse_constant=batch_wire._reject_constant)
+        if (type(receipt) is not dict or set(receipt) != {
+                "schema", "codec", "ledger", "request_sha256", "body_sha256", "canonical_sha256"}
+                or receipt["schema"] != WIRE_RECEIPT or receipt["codec"] != batch_wire.SCHEMA
+                or receipt["body_sha256"] != digest(body)
+                or receipt["request_sha256"] != digest(_receipt_args(tool, args))):
+            return None
+        data = batch_wire.unpack(body, batch_parameters({k: v for k, v in args.items() if k != "sid"})["requests"])
+        if receipt["ledger"] != data["ledger"] or receipt["canonical_sha256"] != digest(data):
+            return None
+        return {"receipt": receipt, "data": data}
+    except (ValueError, TypeError, KeyError, RecursionError):
+        return None
+
+
 def project_trace(ledger, calls):
     from . import time_receipts
     from .probe import _unwrap_result
@@ -435,7 +487,7 @@ def project_trace(ledger, calls):
         provenance = call.get("provenance") or {}
         recorded = bool(call.get("has_result") and not call.get("is_error") and not call.get("delivery_truncated")
                         and not provenance.get("origin_unverified") and provenance.get("complete_pair") is not False)
-        if MARKER in text:
+        if MARKER in text or WIRE_MARKER in text:
             saved = parse_receipt(tool, args, text)
             if recorded and saved and saved["receipt"]["ledger"] == atoms.ledger_identity(ledger):
                 data = saved["data"]

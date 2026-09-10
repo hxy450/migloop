@@ -462,6 +462,7 @@ def native_diff(ledger: atoms.Ledger, row: dict[str, Any], max_chars: int = 6000
                     + ("回执未确认执行：此处仅为所报补丁，不能当实际已生效差异。" if row["status"] != "confirmed_change" else "")}
 
 
+@raw_events.reuse_scans
 def build(ledger: atoms.Ledger, current_scope: dict[str, Any], offset: int = 0,
           limit: int = 40, related_offset: int = 0, related_limit: int = 8) -> dict[str, Any]:
     """Return the selected page only after discovering the whole bounded inventory."""

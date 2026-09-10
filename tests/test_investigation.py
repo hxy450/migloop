@@ -124,7 +124,7 @@ def test_mcp_and_http_batch_share_data_and_text(tmp_path, monkeypatch):
     args = {"requests": [{"tool": "agent", "args": {"id": aid, "at": ts(10), "limit": 1}}]}
     response = asyncio.run(mcp_server.build_server(Backend()).call_tool("batch", {"sid": "x", **args}))[0].text
     assert response == service.atom_text("x", "batch", args)
-    body = json.loads(response.split(investigation.MARKER)[0])
+    body = investigation.parse_receipt("batch", args, response)["data"]
     assert body == service.atom_json("x", "batch", args)
 
 
