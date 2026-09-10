@@ -20,13 +20,14 @@ def sha(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
-def validate_grade(base, case, rep, grade):
+def validate_grade(base, case, rep, grade, *, contract_base=None):
+    contract_base = base if contract_base is None else contract_base
     report_path = base/"runs"/case/f"rep{rep}"/"report.md"
     if not report_path.exists() or grade.get("report_sha256") != sha(report_path):
         raise ValueError("Adjudication report missing or changed")
-    if grade.get("core_contract_sha256") != sha(base/"private/scoring-core.json"):
+    if grade.get("core_contract_sha256") != sha(contract_base/"private/scoring-core.json"):
         raise ValueError("Adjudication used a different scoring contract")
-    contract = read(base/"private/scoring-core.json")
+    contract = read(contract_base/"private/scoring-core.json")
     required = {k.split("/", 1)[1] for k in contract["units"] if k.startswith(case+"/")}
     units = grade.get("units", [])
     if {u["id"] for u in units} != required or len(units) != len(required):
@@ -65,7 +66,8 @@ def validate_grade(base, case, rep, grade):
             "major_errors": major, "file_pass": counts["correct"] == len(units) and major == 0}
 
 
-def summarize(base, grades):
+def summarize(base, grades, *, contract_base=None):
+    contract_base = base if contract_base is None else contract_base
     manifest = read(base/"manifest.json")
     rows = []
     for case in manifest["cases"]:
@@ -73,9 +75,9 @@ def summarize(base, grades):
             directory = base/"runs"/case["id"]/f"rep{rep}"
             metric = read(directory/"metrics.json") if (directory/"metrics.json").exists() else {}
             grade_path = grades/case["id"]/f"rep{rep}.json"
-            grade = validate_grade(base, case["id"], rep, read(grade_path)) if grade_path.exists() else None
+            grade = validate_grade(base, case["id"], rep, read(grade_path), contract_base=contract_base) if grade_path.exists() else None
             if grade is None and metric.get("status") in ("timeout", "incomplete") and not (directory/"report.md").exists():
-                contract = read(base/"private/scoring-core.json")
+                contract = read(contract_base/"private/scoring-core.json")
                 total = sum(k.startswith(case["id"]+"/") for k in contract["units"])
                 grade = {"units": total, "correct": 0, "partial": 0, "missing": total, "wrong": 0,
                     "correct_attribution_coverage": 0, "asserted_claims": 0, "supported_claims": 0,
