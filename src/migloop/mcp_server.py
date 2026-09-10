@@ -138,7 +138,9 @@ def build_server(backend: Any | None = None) -> Any:
                     annotation_offset: int = 0, annotation_limit: int | None = None,
                     relation_offset: int = 0, relation_limit: int | None = None, view: str | None = None) -> str:
         """默认打开 agent 截至 at 的输入、产出、任务及候选概览；at 省略=latest，不需 via。
-        view=reads/writes/messages/candidates 分页所选组；view=records 分页全部原始记录，未知工具也保留。
+        view=reads/writes/messages/candidates 分页所选组；messages每条给最多12000字符原始字段页，总览预览4096字符。
+        字段更长或batch预算再截断时，用expand_query的ref/pointer及offset续取；消息行offset不等于字段字符offset。
+        view=records 分页全部原始记录，未知工具也保留。
         limit/offset 只控制所选视图，不限制 search(agent=...,at=...) 搜索范围；record/expand 展开原文。
         请求早于 at、返回晚于 at，只给请求不泄漏返回。未知时间单列（include_undated），不算已知输入。
         兼容旧版：显式 v 改用 agent@v（旧 v/via 规则），不可混用 at。

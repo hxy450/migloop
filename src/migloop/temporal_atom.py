@@ -19,6 +19,9 @@ _OVERVIEW_LIMITS = {"writes": 3, "reads": 3, "candidates": 2, "messages": 2}
 # Task constraints are original input, not a generated summary. Let short
 # fields fit whole; batch delivery still applies its independent total budget.
 _MESSAGE_PREVIEW_CHARS = 4096
+# Explicit messages uses the same bounded original-field page as its expand
+# locator. Overview remains a preview; batch may further shorten either view.
+_MESSAGE_PAGE_CHARS = 12000
 
 
 def _request(kind, key, window, view, offset, limit, include_undated, details):
@@ -196,7 +199,7 @@ def _text_fields(record):
                     yield f"{base}/{index}/text", block["text"], label
 
 
-def _messages(ledger, key, window, scope):
+def _messages(ledger, key, window, scope, *, explicit=False):
     rows, gaps = [], []
     counts = Counter(store.source_key(p, store.source_spec(ledger, p)) for p in store.sources(ledger))
     for path in store.sources(ledger, key):
@@ -206,14 +209,15 @@ def _messages(ledger, key, window, scope):
                     continue  # Undated text is raw material, never cutoff input.
                 for pointer, text, label in _text_fields(record):
                     addressable = counts[store.source_key(path, store.source_spec(ledger, path))] == 1
+                    excerpt = text[:_MESSAGE_PAGE_CHARS if explicit else _MESSAGE_PREVIEW_CHARS]
                     rows.append({**record.address(), "pointer": pointer, "message_kind": label,
-                                 "preview": text[:_MESSAGE_PREVIEW_CHARS], "preview_start": 0, "chars": len(text),
+                                 "preview": excerpt, "preview_start": 0, "chars": len(text),
                                  "preview_kind": "original_decoded_field_excerpt",
-                                 "preview_span": {"offset": 0, "chars": min(_MESSAGE_PREVIEW_CHARS, len(text))},
+                                 "preview_span": {"offset": 0, "chars": len(excerpt)},
                                  "source_agent": key, "sender_certified": False,
                                  "reference_status": "addressable" if addressable else "ambiguous_source",
                                  "expand_query": {"tool": "expand", "args": {"refs": [{"ref": record.ref,
-                                     "pointer": pointer}], "max_chars": 12000}, "scope": deepcopy(scope)} if addressable else None})
+                                     "pointer": pointer}], "max_chars": _MESSAGE_PAGE_CHARS}, "scope": deepcopy(scope)} if addressable else None})
         except (OSError, UnicodeError, ValueError) as exc:
             gaps.append({"source": path, "error": str(exc)})
     rows.sort(key=lambda r: (r["ts"], r["source"], r["line"], r["pointer"]))
@@ -241,7 +245,7 @@ def query(ledger: atoms.Ledger, *, kind: str, key: str, at: str, since_ts: str |
                                                 include_undated, raw["stale_annotation_sources"])
     message_gaps = []
     if kind == "agent":
-        groups["messages"], message_gaps = _messages(ledger, key, window, scope)
+        groups["messages"], message_gaps = _messages(ledger, key, window, scope, explicit=view == "messages")
     else:
         del groups["messages"]
     # A source might change between the raw-count pass and native-index access.

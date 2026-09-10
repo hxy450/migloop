@@ -66,3 +66,55 @@ def test_scalar_and_batch_select_identical_original_input(tmp_path):
     batch = investigation.batch(ledger, [{"tool": "agent", "args": args}], 100000)
     assert batch["items"][0]["data"]["sections"] == scalar["sections"]
     assert len(batch["items"][0]["delivery"]["records"]) == 1
+
+
+@pytest.mark.parametrize("length", [4097, 9191, 12000, 12001, 40000])
+def test_explicit_messages_has_the_same_field_page_as_expand(tmp_path, length):
+    original = ("source task \"\\\n界; " * 4000)[:length]
+    ledger, agent, _ = pool(tmp_path, [message(1, original)])
+    args = {"id": agent, "at": ts(3), "view": "messages", "limit": 1}
+    data = investigation.query(ledger, "agent", args)
+    row, = data["sections"]["messages"]["rows"]
+    expanded = investigation.query(ledger, "expand", {
+        **row["expand_query"]["args"], "scope": data["scope"]})
+    field, = expanded["items"][0]["records"]
+    # An explicit message page must not silently retain the overview's 4096
+    # character selection limit. It still has the bounded native-field page.
+    assert row["preview"] == field["text"] == original[:12000]
+    assert row["chars"] == field["chars"] == length
+    assert row["preview_span"] == {"offset": 0, "chars": min(length, 12000)}
+    shown = investigation.batch(ledger, [{"tool": "agent", "args": args}], 100000)
+    assert shown["items"][0]["data"]["sections"] == data["sections"]
+    assert atom_queries.json_data(ledger, "agent", args)["sections"] == data["sections"]
+    overview = investigation.query(ledger, "agent", {"id": agent, "at": ts(3)})
+    assert overview["sections"]["messages"]["rows"][0]["preview"] == original[:4096]
+    if field["next_offset"] is not None:
+        more = investigation.query(ledger, "expand", {**row["expand_query"]["args"],
+            "offset": field["next_offset"], "scope": data["scope"]})
+        assert more["items"][0]["records"][0]["text"] == original[12000:24000]
+
+
+def test_explicit_message_page_keeps_time_scope_and_actual_budget_receipt(tmp_path):
+    original = "original input constraint; " * 400
+    ledger, agent, _ = pool(tmp_path, [message(1, "PREVIOUS"), message(3, original),
+        message(6, "FUTURE_INPUT"), message(None, "UNDATED_INPUT")])
+    args = {"id": agent, "at": ts(4), "since_ts": ts(2), "view": "messages", "limit": 1}
+    data = investigation.query(ledger, "agent", args)
+    row, = data["sections"]["messages"]["rows"]
+    assert row["preview"] == original
+    for forbidden in ("PREVIOUS", "FUTURE_INPUT", "UNDATED_INPUT"):
+        assert forbidden not in str(data["sections"])
+    fitted = delivery_budget.fit(data, delivery_budget.size(data) - 3000)
+    assert fitted["status"] == "ok"
+    actual, = fitted["data"]["sections"]["messages"]["rows"]
+    assert 0 < len(actual["preview"]) < len(original)
+    assert original.startswith(actual["preview"])
+    assert actual["preview_span"]["chars"] == len(actual["preview"])
+    delivered, = investigation._delivery(fitted["data"])["records"]
+    assert delivered["chars"] == len(actual["preview"])
+    # The row cursor is not a character cursor; the original field remains
+    # independently expandable in exactly the same time/agent scope.
+    expanded = investigation.query(ledger, "expand", {
+        **actual["expand_query"]["args"], "scope": data["scope"]})
+    assert expanded["items"][0]["records"][0]["text"] == original
+    assert row["preview"] == original  # budget projection does not mutate selection
