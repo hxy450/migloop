@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import ast
 import bisect
-import glob
 import json
 import os
 import posixpath
@@ -26,6 +25,7 @@ from functools import cache
 from typing import Any
 
 from migloop.atoms import Action, AgentRec, FileRef
+from migloop import cc_sources
 from migloop.audit import stage_order
 from migloop.evidence import CONFIRMED_BASES, FileProof, proof_payload
 from migloop.filestory import Ev, ts_norm
@@ -1864,18 +1864,32 @@ def _walk(path: str, agent_id: str, session: str, seq: list[int],
 
 def collect_cc(main_jsonl: str, seq: list[int],
                stage_intervals: list[dict[str, Any]] | None = None,
-               scripts: ScriptTable | None = None) -> dict[str, AgentRec]:
-    """CC 会话(主线 + subagents/)→ {agent_id: AgentRec}。seq 跨会话共用,保证全局可排序。
+               scripts: ScriptTable | None = None, *,
+               sources: cc_sources.CCSourceSet | None = None) -> dict[str, AgentRec]:
+    """CC 会话(主线 + 递归子转录)→ {agent_id: AgentRec}。辅助源不造agent。
     stage_intervals = run 级阶段区间(stage_intervals_from_marks),给没有归属戳的会话按时间落阶段。"""
-    sid8 = os.path.basename(main_jsonl)[:8]
-    sub = os.path.splitext(main_jsonl)[0] + "/subagents"
-    sub_files = sorted(glob.glob(os.path.join(sub, "*.jsonl"))) if os.path.isdir(sub) else []
-    # 脚本表先扫全池(带写入时刻),再走转录:谁先走谁后走都不该影响「跑的时候脚本长什么样」
+    discovered = sources if sources is not None else cc_sources.discover([main_jsonl])
+    _check_cc_source_roots([main_jsonl], discovered)
     if scripts is None:
-        scripts = _prescan_scripts([main_jsonl, *sub_files])
+        scripts = _prescan_scripts(list(discovered.actor_transcripts))
+    return _collect_cc_group(discovered.groups[0], seq, stage_intervals, scripts)
+
+
+def _check_cc_source_roots(roots: list[str], sources: cc_sources.CCSourceSet) -> None:
+    expected = list(dict.fromkeys(os.path.normcase(os.path.abspath(root)) for root in roots))
+    actual = [os.path.normcase(os.path.abspath(root)) for root in sources.roots]
+    if actual != expected:
+        raise cc_sources.CCSourceError("CC discovered sources do not match requested roots/order")
+
+
+def _collect_cc_group(group: cc_sources.CCRootSources, seq: list[int],
+                      stage_intervals: list[dict[str, Any]] | None,
+                      scripts: ScriptTable) -> dict[str, AgentRec]:
+    main_jsonl = group.root
+    sid8 = os.path.basename(main_jsonl)[:8]
     main_id = f"__main__:{sid8}"
     agents = {main_id: _walk(main_jsonl, main_id, sid8, seq, scripts, stage_intervals)}
-    for fn in sub_files:
+    for fn in group.subagents:
         stem = os.path.splitext(os.path.basename(fn))[0]
         # 时间兜底只给根会话:子 agent 没戳时由 build_ledger 继承派发那一笔的阶段(戳是 skill 粒度,
         # run 级区间是 stage 粒度 —— 直接按时间落会把 execute 期间派的 visual-verify 子代理误成 execute)
@@ -1884,14 +1898,18 @@ def collect_cc(main_jsonl: str, seq: list[int],
 
 
 def collect_cc_pool(roots: list[str], seq: list[int],
-                    stage_intervals: list[dict[str, Any]] | None = None) -> dict[str, AgentRec]:
-    """跨会话池共用同一份只读脚本历史,不是每个根会话从空表重来。"""
-    paths = list(dict.fromkeys(p for root in roots for p in
-                              [root, *sorted(glob.glob(os.path.splitext(root)[0] + "/subagents/*.jsonl"))]))
-    scripts = _prescan_scripts(paths)
+                    stage_intervals: list[dict[str, Any]] | None = None, *,
+                    sources: cc_sources.CCSourceSet | None = None) -> dict[str, AgentRec]:
+    """全池一次发现/身份预检;脚本预扫与实际收集复用同一actor源集合。
+
+    调用方将 sources.auxiliary_sources 传给 build_ledger,保留无作者原始资料。
+    """
+    discovered = sources if sources is not None else cc_sources.discover(roots)
+    _check_cc_source_roots(roots, discovered)
+    scripts = _prescan_scripts(list(discovered.actor_transcripts))
     agents: dict[str, AgentRec] = {}
-    for root in roots:
-        agents.update(collect_cc(root, seq, stage_intervals, scripts=scripts))
+    for group in discovered.groups:
+        agents.update(_collect_cc_group(group, seq, stage_intervals, scripts))
     return agents
 
 

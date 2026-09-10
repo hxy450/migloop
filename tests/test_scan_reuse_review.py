@@ -36,9 +36,9 @@ def raw_pool(tmp_path, rows, *, owner="owner-a", name="native.jsonl"):
 
 def count_global_lookups(monkeypatch):
     seen, original = [], raw_events._source_index_global
-    def counted(path, registry_key):
+    def counted(path, registry_key, source=None):
         seen.append((path, registry_key))
-        return original(path, registry_key)
+        return original(path, registry_key, source)
     monkeypatch.setattr(raw_events, "_source_index_global", counted)
     return seen
 
@@ -140,9 +140,9 @@ def test_mid_scan_duplicate_registry_change_cannot_return_addressable_old_invent
     ledger, _ = raw_pool(tmp_path / "first", [call(1, "r", "Read", file_path="/p/A.ets")])
     _, duplicate = raw_pool(tmp_path / "second", [message(2, "new duplicate source")])
     original, mutated = raw_events._source_index, False
-    def change_after_source(path, registry_key):
+    def change_after_source(path, registry_key, source=None):
         nonlocal mutated
-        data = original(path, registry_key)
+        data = original(path, registry_key, source)
         if not mutated:
             ledger.agents["owner-b"] = atoms.AgentRec("owner-b", "session", sources=[str(duplicate)])
             mutated = True
@@ -223,7 +223,7 @@ def test_first_fit_retains_earlier_indexes_and_accounts_skip_guard(tmp_path, mon
         ledger.agents[name] = atoms.AgentRec(name, "session", sources=[str(path)])
     measure = raw_events._retained_size
     def fixed_cost(value, ceiling):
-        if isinstance(value, tuple) and len(value) == 3 and isinstance(value[2], dict) and "native" in value[2]:
+        if isinstance(value, tuple) and len(value) == 4 and isinstance(value[2], dict) and "native" in value[2]:
             return 100
         if isinstance(value, tuple) and len(value) == 2:
             return 20

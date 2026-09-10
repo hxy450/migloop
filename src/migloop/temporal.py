@@ -187,7 +187,7 @@ def query(ledger: atoms.Ledger, *, kind: str, key: str | None = None, at: str = 
     all_registry = store.sources(ledger)
     source_counts: dict[str, int] = {}
     for path in all_registry:
-        tag = store.source_key(path)
+        tag = store.source_key(path, store.source_spec(ledger, path))
         source_counts[tag] = source_counts.get(tag, 0) + 1
     import os
     stale = []
@@ -205,7 +205,7 @@ def query(ledger: atoms.Ledger, *, kind: str, key: str | None = None, at: str = 
     needle_file = (key or "").rsplit("/", 1)[-1].casefold()
     for path, owners in sorted(registry.items()):
         try:
-            for record in store.records(path):
+            for record in store.records(path, source=store.source_spec(ledger, path)):
                 counts["records_scanned"] += 1
                 annotation = annotations.get((path, record.line), [])
                 text = None
@@ -243,7 +243,7 @@ def query(ledger: atoms.Ledger, *, kind: str, key: str | None = None, at: str = 
                 row = {**record.address(), "agents": sorted(owners), "annotations": annotation,
                        "annotations_omitted": 0,
                        "preview": preview, "preview_kind": "decoded_field_excerpt", "chars": len(text), "matched": matched,
-                       "reference_status": "ambiguous_source" if source_counts[store.source_key(path)] > 1 else "addressable",
+                       "reference_status": "ambiguous_source" if source_counts[store.source_key(path, store.source_spec(ledger, path))] > 1 else "addressable",
                        "association": "agent_transcript" if kind == "agent" else
                            "indexed_or_lexical_not_causal" if kind == "file" else "pool_record"}
                 (undated if record.ts is None else rows).append(row)
@@ -276,7 +276,7 @@ def query(ledger: atoms.Ledger, *, kind: str, key: str | None = None, at: str = 
     body.update(schema=SCHEMA, node={"kind": kind, "key": key, "at": window.at,
                 "identity_status": "unresolved_lexical_scope" if kind == "file" and key not in ledger.stories else "indexed"},
                 scope={"since_ts": window.since, "at": window.at, "bounds": "inclusive",
-                       "corpus": "owned_raw_jsonl", "selection": kind, "search_terms": terms},
+                       "corpus": "registered_raw_records", "selection": kind, "search_terms": terms},
                 counts=counts, gaps=gaps, undated=_page(undated, offset, limit), details=details,
                 stale_annotation_sources=stale,
                 source_count=len(registry), raw_scan_complete=not gaps and bool(registry),

@@ -198,14 +198,14 @@ def _text_fields(record):
 
 def _messages(ledger, key, window, scope):
     rows, gaps = [], []
-    counts = Counter(store.source_key(p) for p in store.sources(ledger))
+    counts = Counter(store.source_key(p, store.source_spec(ledger, p)) for p in store.sources(ledger))
     for path in store.sources(ledger, key):
         try:
-            for record in store.records(path):
+            for record in store.records(path, source=store.source_spec(ledger, path)):
                 if not window.contains(record.ts):
                     continue  # Undated text is raw material, never cutoff input.
                 for pointer, text, label in _text_fields(record):
-                    addressable = counts[store.source_key(path)] == 1
+                    addressable = counts[store.source_key(path, store.source_spec(ledger, path))] == 1
                     rows.append({**record.address(), "pointer": pointer, "message_kind": label,
                                  "preview": text[:_MESSAGE_PREVIEW_CHARS], "preview_start": 0, "chars": len(text),
                                  "preview_kind": "original_decoded_field_excerpt",

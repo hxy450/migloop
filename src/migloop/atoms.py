@@ -25,7 +25,7 @@ import re
 from dataclasses import dataclass, field, replace
 from datetime import datetime
 from functools import cache
-from typing import Any
+from typing import Any, Iterable
 
 from migloop.evidence import FileProof, proof_payload
 
@@ -159,6 +159,10 @@ class Ledger:
     write_cmds: list[tuple[str, int, str]] = field(default_factory=list)
     #: A tag shared by distinct source paths is ambiguous at every line, not just overlapping lines.
     tag_conflicts: dict[str, list[str]] = field(default_factory=dict)
+    #: 原始辅助资料(journal/未知嵌套JSONL),可查询但不凭目录赋予actor或派发关系。
+    auxiliary_sources: list[str] = field(default_factory=list)
+    #: Explicit portable identity / timestamp policy, not inferred from local parent directory names.
+    source_metadata: dict[str, dict[str, str]] = field(default_factory=dict)
     #: 建账完成时冻结;查询期间源文件的 mtime / 内容变化不能改写这本内存账本的身份。
     _identity: str | None = field(default=None, init=False, repr=False)
 
@@ -170,7 +174,8 @@ LEDGER_CODE_VERSION = "atoms-2026-09-10-temporal1"
 def _builder_fingerprint() -> str:
     """构建器代码内容摘要,进程内一次;换机器或换行格式不改变它。"""
     h = hashlib.sha256()
-    for name in ("atoms.py", "atoms_collect.py", "filestory.py", "filestory_collect.py", "shellparse.py", "audit.py", "evidence.py"):
+    for name in ("atoms.py", "atoms_collect.py", "cc_sources.py", "transcript_store.py", "filestory.py",
+                 "filestory_collect.py", "shellparse.py", "audit.py", "evidence.py"):
         h.update(name.encode("ascii"))
         path = os.path.join(os.path.dirname(__file__), name)
         with open(path, "rb") as fh:
@@ -204,6 +209,23 @@ def ledger_identity(ledger: Ledger) -> str:
             if key not in indexed:
                 sources.append((transcript_tag(path), path))
                 indexed.add(key)
+    # The discovery contract, not a guessed path namespace, distinguishes
+    # same-basename attachments. Legacy constructors keep basename identity.
+    auxiliary_keys: dict[str, str] = {}
+    for path in ledger.auxiliary_sources:
+        key = os.path.normcase(os.path.abspath(path))
+        logical = ledger.source_metadata.get(key, {}).get("logical_name", os.path.basename(path))
+        if logical in auxiliary_keys and auxiliary_keys[logical] != key:
+            raise ValueError(f"ambiguous auxiliary source identity: {auxiliary_keys[logical]}; {path}")
+        auxiliary_keys[logical] = key
+        if key not in indexed:
+            sources.append(("auxiliary:" + logical, path))
+            indexed.add(key)
+    if auxiliary_keys:
+        add(["auxiliary_sources", sorted(auxiliary_keys)])
+    if ledger.source_metadata:
+        add(["source_metadata", sorted((spec["logical_name"], spec["timestamp_policy"])
+                                      for spec in ledger.source_metadata.values())])
     for tag, path in sorted(sources):
         source = hashlib.sha256()
         try:
@@ -216,6 +238,9 @@ def ledger_identity(ledger: Ledger) -> str:
         except OSError:
             signature = "missing"
         add(["source", tag, os.path.basename(path), signature])
+        metadata = ledger.source_metadata.get(os.path.normcase(os.path.abspath(path)))
+        if metadata is not None:
+            add(["source_contract", tag, metadata])
     for aid, agent in sorted(ledger.agents.items()):
         add(["agent", aid, agent.session, agent.name, agent.parent, agent.parent_ver,
              digest(agent.prompt), digest(agent.result), [os.path.basename(p) for p in agent.sources]])
@@ -412,7 +437,21 @@ def _sweep_phantoms(stories: dict[str, FileStory]) -> None:
             stories[p].touches.extend(moved)
 
 
-def build_ledger(agents: dict[str, AgentRec]) -> Ledger:
+def build_ledger(agents: dict[str, AgentRec], *, auxiliary_sources: Iterable[str] = (),
+                 source_metadata: dict[str, dict[str, str]] | None = None) -> Ledger:
+    metadata: dict[str, dict[str, str]] = {}
+    for path, spec in (source_metadata or {}).items():
+        key = os.path.normcase(os.path.abspath(path))
+        logical = spec.get("logical_name")
+        policy = spec.get("timestamp_policy")
+        if (not isinstance(logical, str) or not logical or os.path.isabs(logical)
+                or "\\" in logical or any(part in ("", ".", "..") for part in logical.split("/"))
+                or policy not in ("record", "unknown")):
+            raise ValueError(f"invalid source identity/time contract: {path}")
+        value = {"logical_name": logical, "timestamp_policy": policy}
+        if key in metadata and metadata[key] != value:
+            raise ValueError(f"conflicting source contracts for the same path: {path}")
+        metadata[key] = value
     for a in agents.values():
         _number(a)
     _link_dispatches(agents)
@@ -594,7 +633,10 @@ def build_ledger(agents: dict[str, AgentRec]) -> Ledger:
             old = stem[6:14] if stem.startswith("agent-") else stem[:8]
             if old != tag:
                 legacy[old] = None if (old in legacy and legacy[old] != tag) else tag
+    auxiliary = dict.fromkeys(os.fspath(path) for path in auxiliary_sources)
     ledger = Ledger(stories, agents, feeds, t0, lines=lines, read_act=read_act, depth_max=dmax, depth_win=dwin,
+                  auxiliary_sources=list(auxiliary),
+                  source_metadata=metadata,
                   mentions=mentions, mention_seq=mention_seq, write_cmds=_write_capable_cmds(agents),
                   locs=locs, by_loc=by_loc, loc_ambiguous=loc_ambiguous, line_blocks=line_blocks,
                   tag_paths=tag_paths, legacy_tags=legacy,

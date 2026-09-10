@@ -270,16 +270,15 @@ def _stat_key(paths: list[str]) -> list[Any]:
 
 
 def pool_key(roots: list[str]) -> list[Any]:
-    """账本缓存键要看整个池子:root 转录 + 各自的 subagents/*.jsonl —— 子代理独立追加时也要失效(评审指出)。"""
+    """Root + all attached source files; no inferred ownership or timestamps."""
+    from . import cc_sources
     pool = _frozen_pool()
     if pool is not None:
         _validate_frozen_tree(pool)
         roots = [_frozen_root(path, pool) for path in roots]
     paths = list(roots)
     for r in roots:
-        sub = os.path.splitext(r)[0] + "/subagents"
-        if os.path.isdir(sub):
-            paths += sorted(glob.glob(os.path.join(sub, "*.jsonl")))
+        paths += cc_sources.all_source_paths(r)[1:]
     return _stat_key(paths)
 
 
@@ -418,13 +417,19 @@ def _collect(fmt: str, roots: list[str], stage_intervals: list[dict[str, Any]] |
         roots = [_frozen_root(path, pool) for path in roots]
     seq = [0]
     agents: dict[str, Any] = {}
+    auxiliary_sources: tuple[str, ...] = ()
+    source_metadata: dict[str, dict[str, str]] = {}
     if fmt == "codex":
         for p in roots:
             agents.update(atoms_collect.collect_codex(p, seq, sessions_root=pool) if pool is not None
                           else atoms_collect.collect_codex(p, seq))
     else:
-        agents = atoms_collect.collect_cc_pool(roots, seq, stage_intervals=stage_intervals)
-    ledger = atoms.build_ledger(agents)
+        from . import cc_sources
+        discovered = cc_sources.discover(roots)
+        agents = atoms_collect.collect_cc_pool(roots, seq, stage_intervals=stage_intervals, sources=discovered)
+        auxiliary_sources = discovered.auxiliary_sources
+        source_metadata = discovered.source_metadata
+    ledger = atoms.build_ledger(agents, auxiliary_sources=auxiliary_sources, source_metadata=source_metadata)
     ledger.fix_after = atoms_collect.fix_boundary(stage_intervals or [])
     return ledger
 

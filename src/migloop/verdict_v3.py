@@ -208,7 +208,8 @@ def resolve_evidence(ledger: atoms.Ledger, ref: str, *, scope: dict[str, Any], b
                 raise ValueError("旧动作没有原始记录指针")
             out.update(action_seq=action.seq, action_agent=old.get("aid"), action_block=action.blk)
             requested_line = int(match.group(3))
-            record = transcript_store.read_record(action.src[0], requested_line)
+            record = transcript_store.read_record(action.src[0], requested_line,
+                                                  source=transcript_store.source_spec(ledger, action.src[0]))
             out["legacy_status"] = old["status"]
         out.update(record.address(), ref=ref, raw_ref=record.ref, source_path=record.path,
                    status="ok", diag="原文位置/内容摘要可核；不认证主张或操作执行")

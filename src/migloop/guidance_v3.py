@@ -12,11 +12,13 @@ CORE = """\
   原始任务字段最多展示4096字符，短字段可完整交付；仍受批量预算约束，chars是原长，preview_span才是实际片段，不把定位当全文。
   view=writes/reads/candidates（agent另有messages）分页该组；view=records分页完整原始记录层。视图是导航，不改变search的完整范围。
 - search args={q,at,file?或agent?,since_ts?,offset?,limit?}；全池省略file/agent。q_any=[词1,词2]是字面量OR，与q互斥，不是正则。
+  全池还保留已登记的workflow/journal、工具输出与脚本等附件原文，不将附件伪装成agent转录。include_undated=true可检索未知时间资料；附件内的timestamp不是它进入上下文的证据。
 - changes args={path,at,since_ts}列已确认操作/未决效应；diff同样时间范围看内容变化。写入可能无净变化，修改不必然是缺陷。
 - events同样范围，索引所有已注册源的原生调用，不依赖读写解析；普通消息/未知记录也留入口。路径提及不是作者证据。
 - 展开证据：{tool:expand,scope:照抄返回scope,args:{refs:[引用1,引用2],max_chars:12000}}。
   接受raw:原文引用或diff给的旧#动作引用，请求/结果各自截时。offset是字符分页，不能把半页当全文。
   大记录可用refs:[{ref:"raw:…",pointer:"/payload/output"}]仅展开字段；pointer照events给的JSON Pointer，不猜字段。
+  未知时间附件需显式include_undated=true，在pool范围独立展开；不据此画读写边或认定是某agent截止前的输入。纯文本/脚本按原文展开，不猜JSON字段。
 - blame args={path,at,start?,n?}查保守文本来源；未知/候选/并发不猜作者。它不是原因判定。
   blame是累计来源：用同at、不带since_ts的范围，不能只拿修复期输入解释更早的来源。
 

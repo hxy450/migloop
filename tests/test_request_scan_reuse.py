@@ -11,9 +11,9 @@ from tests.test_temporal_atom import call, message, pool, result, ts
 def calls(monkeypatch):
     original = raw_events._source_index_global
     seen = []
-    def run(path, registry_key):
+    def run(path, registry_key, source=None):
         seen.append((path, registry_key))
-        return original(path, registry_key)
+        return original(path, registry_key, source)
     monkeypatch.setattr(raw_events, "_source_index_global", run)
     return seen
 

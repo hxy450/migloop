@@ -11,7 +11,7 @@ import json
 import os
 import re
 from collections import OrderedDict
-from dataclasses import dataclass
+from dataclasses import dataclass, field, replace
 from threading import RLock
 from typing import Any, Iterator
 
@@ -22,12 +22,44 @@ _LOCK = RLock()
 _BUDGET = 32 * 1024 * 1024
 _OFFSETS: OrderedDict[str, tuple[tuple[int, int], tuple[int, ...]]] = OrderedDict()
 _OFFSET_BUDGET = 8 * 1024 * 1024
-_REF = re.compile(r"raw:([0-9a-f]{20}):L([1-9][0-9]*):([0-9a-f]{20})\Z")
+_REF = re.compile(r"raw:([0-9a-f]{20}|[0-9a-f]{40}):L([1-9][0-9]*):([0-9a-f]{20})\Z")
 
 
-def source_key(path: str) -> str:
-    # Basename is portable across frozen pools. Registry checks collisions.
+def _legacy_source_key(path: str) -> str:
     return hashlib.sha256(os.path.basename(path).encode("utf-8")).hexdigest()[:20]
+
+
+@dataclass(frozen=True)
+class SourceSpec:
+    """Explicit source identity/time policy, not inferred from host directories."""
+    logical_name: str | None = None
+    timestamp_policy: str = "record"
+
+
+def source_spec(ledger: Any, path: str) -> SourceSpec:
+    key = os.path.normcase(os.path.abspath(path))
+    metadata = getattr(ledger, "source_metadata", {}).get(key)
+    if metadata is not None:
+        if (not isinstance(metadata, dict) or set(metadata) != {"logical_name", "timestamp_policy"}
+                or not isinstance(metadata["logical_name"], str) or not metadata["logical_name"]
+                or metadata["timestamp_policy"] not in ("record", "unknown")):
+            raise ValueError("invalid registered raw source metadata")
+        return SourceSpec(**metadata)
+    auxiliary = {os.path.normcase(os.path.abspath(p)) for p in getattr(ledger, "auxiliary_sources", ())}
+    return SourceSpec(timestamp_policy="unknown" if key in auxiliary or not key.lower().endswith(".jsonl") else "record")
+
+
+def source_key(path: str, source: SourceSpec | None = None) -> str:
+    """40-hex qualified keys require an explicit portable source contract.
+
+    No absolute path or guessed 'subagents' ancestor is used. Without a source
+    contract the old 20-hex basename scheme remains available; ambiguity is
+    still checked over the complete registry before resolving either version.
+    """
+    if source is None or source.logical_name is None:
+        return _legacy_source_key(path)
+    value = json.dumps(["registered-source/1", source.logical_name], ensure_ascii=True, separators=(",", ":"))
+    return hashlib.sha256(value.encode("ascii")).hexdigest()[:40]
 
 
 def sources(ledger: Any, agent: str | None = None) -> dict[str, set[str]]:
@@ -36,6 +68,9 @@ def sources(ledger: Any, agent: str | None = None) -> dict[str, set[str]]:
     for rec in agents:
         for path in [*rec.sources, *(a.src[0] for a in rec.actions if a.src)]:
             registry.setdefault(os.path.normcase(os.path.abspath(path)), set()).add(rec.id)
+    if agent is None:
+        for path in getattr(ledger, "auxiliary_sources", ()):
+            registry.setdefault(os.path.normcase(os.path.abspath(path)), set())
     return registry
 
 
@@ -82,11 +117,14 @@ class Record:
     value: Any
     ts: str | None
     malformed: bool
+    # resolve preserves a supplied legacy reference instead of silently
+    # upgrading it during old receipt/field-span replay.
+    _reference_key: str | None = field(default=None, repr=False, compare=False)
 
     @property
     def ref(self) -> str:
         digest = hashlib.sha256(self.raw.encode("utf-8")).hexdigest()[:20]
-        return f"raw:{source_key(self.path)}:L{self.line}:{digest}"
+        return f"raw:{self._reference_key or source_key(self.path)}:L{self.line}:{digest}"
 
     @property
     def text(self) -> str:
@@ -104,7 +142,12 @@ class Record:
                 "time_status": "recorded" if self.ts else "undated"}
 
 
-def records(path: str) -> Iterator[Record]:
+def _record_timestamp(path: str, value: Any, source: SourceSpec | None) -> str | None:
+    policy = source.timestamp_policy if source else "record" if path.lower().endswith(".jsonl") else "unknown"
+    return _iso(_time(value.get("timestamp"))) if policy == "record" and isinstance(value, dict) else None
+
+
+def records(path: str, *, source: SourceSpec | None = None) -> Iterator[Record]:
     path = os.path.normcase(os.path.abspath(path))
     for number, raw in enumerate(lines(path), 1):
         try:
@@ -112,11 +155,11 @@ def records(path: str) -> Iterator[Record]:
             malformed = False
         except (ValueError, RecursionError):
             value, malformed = None, True
-        ts = _iso(_time(value.get("timestamp"))) if isinstance(value, dict) else None
-        yield Record(path, number, raw, value, ts, malformed)
+        ts = _record_timestamp(path, value, source)
+        yield Record(path, number, raw, value, ts, malformed, source_key(path, source))
 
 
-def read_record(path: str, number: int) -> Record:
+def read_record(path: str, number: int, *, source: SourceSpec | None = None) -> Record:
     """Read one physical line without JSON-decoding every earlier record.
 
     A bounded byte-offset index also avoids loading giant uncached transcripts
@@ -162,8 +205,8 @@ def read_record(path: str, number: int) -> Record:
         value, malformed = json.loads(raw), False
     except (ValueError, RecursionError):
         value, malformed = None, True
-    ts = _iso(_time(value.get("timestamp"))) if isinstance(value, dict) else None
-    return Record(path, number, raw, value, ts, malformed)
+    ts = _record_timestamp(path, value, source)
+    return Record(path, number, raw, value, ts, malformed, source_key(path, source))
 
 
 def resolve(ledger: Any, ref: str) -> Record:
@@ -171,10 +214,11 @@ def resolve(ledger: Any, ref: str) -> Record:
     if not match:
         raise ValueError("invalid raw reference")
     key, line, _digest = match.groups()
-    paths = [p for p in sources(ledger) if source_key(p) == key]
+    paths = [p for p in sources(ledger) if (
+        _legacy_source_key(p) if len(key) == 20 else source_key(p, source_spec(ledger, p))) == key]
     if len(paths) != 1:
         raise ValueError("raw reference source is ambiguous or missing")
-    record = read_record(paths[0], int(line))
+    record = replace(read_record(paths[0], int(line), source=source_spec(ledger, paths[0])), _reference_key=key)
     if record.ref != ref:
         raise ValueError("raw reference content changed; refusing stale evidence")
     return record

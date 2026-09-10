@@ -32,7 +32,7 @@ from . import atoms, transcript_store as store
 SCHEMA = "migloop-raw-events/1"
 _CACHE_BUDGET = 32 * 1024 * 1024
 _MAX_SOURCE_CACHE_BYTES = 8 * 1024 * 1024
-_CACHE: OrderedDict[str, tuple[str, tuple[int, int], dict[str, Any], int]] = OrderedDict()
+_CACHE: OrderedDict[str, tuple[Any, tuple[int, int], dict[str, Any], int]] = OrderedDict()
 _CACHE_LOCK = RLock()
 _CACHE_BYTES = 0
 # Request-local source indexes use admission without LRU eviction, so repeated
@@ -202,7 +202,7 @@ def _retained_size(value: Any, ceiling: int) -> int:
             pending.extend(current.values())
         elif isinstance(current, (list, tuple, set, frozenset)):
             pending.extend(current)
-        elif isinstance(current, (_Part, _Event, store.Record)):
+        elif isinstance(current, (_Part, _Event, store.Record, store.SourceSpec)):
             pending.append(vars(current))
     return total
 
@@ -221,10 +221,10 @@ def _drop_request_entry(state, path):
             state["retained_bytes"] -= previous[-1]
 
 
-def _source_index(path: str, registry_key: str) -> tuple[dict[str, Any], tuple[int, int], str]:
+def _source_index(path: str, registry_key: str, source: store.SourceSpec | None = None) -> tuple[dict[str, Any], tuple[int, int], str]:
     state = _request_state()
     if state is None:
-        return _source_index_global(path, registry_key)
+        return _source_index_global(path, registry_key, source)
     if state["registry_key"] != registry_key:
         state["indexes"].clear()
         state["skipped"].clear()
@@ -236,19 +236,19 @@ def _source_index(path: str, registry_key: str) -> tuple[dict[str, Any], tuple[i
         raise
     held = state["indexes"].get(path)
     if held is not None:
-        if held[0] == before and _signature(path) == before:
+        if held[0] == before and held[2] == source and _signature(path) == before:
             return held[1], before, "request_hit"
         _drop_request_entry(state, path)
     skipped = state["skipped"].get(path)
     if skipped is not None and skipped[0] != before:
         _drop_request_entry(state, path)
         skipped = None
-    index, signature, cache_status = _source_index_global(path, registry_key)
+    index, signature, cache_status = _source_index_global(path, registry_key, source)
     if skipped is None and _signature(path) == signature:
         remaining = max(0, _REQUEST_SCAN_BUDGET - state["retained_bytes"])
-        size = _retained_size((path, signature, index), remaining)
+        size = _retained_size((path, signature, index, source), remaining)
         if size <= remaining:
-            state["indexes"][path] = (signature, index, size)
+            state["indexes"][path] = (signature, index, source, size)
             state["retained_bytes"] += size
         else:
             # Remember an uncacheable stable source without repeatedly walking
@@ -260,9 +260,10 @@ def _source_index(path: str, registry_key: str) -> tuple[dict[str, Any], tuple[i
     return index, signature, cache_status
 
 
-def _source_index_global(path: str, registry_key: str) -> tuple[dict[str, Any], tuple[int, int], str]:
+def _source_index_global(path: str, registry_key: str, source: store.SourceSpec | None = None) -> tuple[dict[str, Any], tuple[int, int], str]:
     """Cached data is private and treated as immutable after construction."""
     global _CACHE_BYTES
+    registry_key = (registry_key, source)
     before = _signature(path)
     with _CACHE_LOCK:
         while _CACHE and _CACHE_BYTES > _CACHE_BUDGET:
@@ -282,8 +283,10 @@ def _source_index_global(path: str, registry_key: str) -> tuple[dict[str, Any], 
         return index, before, "hit"
 
     native, unknown, gaps = [], [], []
-    for record in store.records(path):
-        recognized, other = _native(record)
+    for record in store.records(path, source=source):
+        # A saved attachment can quote native-looking envelopes. It is not a
+        # tool execution, and its own JSON timestamp is not arrival evidence.
+        recognized, other = ([], [""]) if source and source.timestamp_policy == "unknown" else _native(record)
         native.extend(recognized)
         if record.malformed:
             gaps.append({**record.address(), "source_path": path, "error": "malformed JSON record"})
@@ -313,6 +316,7 @@ def _scan(ledger: atoms.Ledger, agent: str | None = None) -> dict[str, Any]:
 
 def _scan_uncached(ledger: atoms.Ledger, agent: str | None = None) -> dict[str, Any]:
     all_sources = store.sources(ledger)
+    source_specs = {path: store.source_spec(ledger, path) for path in all_sources}
     # Derive the selected registry from the same owner snapshot. A second
     # lookup could admit a new source absent from source_keys below, producing
     # a KeyError rather than the explicit end-of-scan registry retry.
@@ -321,14 +325,15 @@ def _scan_uncached(ledger: atoms.Ledger, agent: str | None = None) -> dict[str, 
     groups: dict[tuple[Any, ...], _Event] = {}
     unknown, gaps, signatures = [], [], {}
     source_keys: dict[str, int] = {}
-    registry_key = _digest([(path, sorted(owners)) for path, owners in sorted(all_sources.items())])
+    registry_key = _digest([(path, sorted(owners), source_specs[path].logical_name, source_specs[path].timestamp_policy)
+                            for path, owners in sorted(all_sources.items())])
     cache_counts = {"hit": 0, "miss": 0, "oversize_not_cached": 0, "request_hit": 0}
     for path in all_sources:
-        key = store.source_key(path)
+        key = store.source_key(path, source_specs[path])
         source_keys[key] = source_keys.get(key, 0) + 1
     for path, agents in sorted(registry.items()):
         try:
-            index, signature, cache_status = _source_index(path, registry_key)
+            index, signature, cache_status = _source_index(path, registry_key, source_specs[path])
             signatures[path] = list(signature)
             cache_counts[cache_status] += 1
         except (OSError, UnicodeError, ValueError) as exc:
@@ -336,10 +341,10 @@ def _scan_uncached(ledger: atoms.Ledger, agent: str | None = None) -> dict[str, 
                 _evict(path)
             gaps.append({"source": os.path.basename(path), "source_path": path, "error": str(exc)})
             continue
-        ambiguous_source = source_keys[store.source_key(path)] > 1
+        ambiguous_source = source_keys[store.source_key(path, source_specs[path])] > 1
         if ambiguous_source:
             gaps.append({"source": os.path.basename(path), "source_path": path,
-                         "error": "duplicate source basename: raw references are ambiguous"})
+                         "error": "duplicate source identity: raw references are ambiguous"})
         gaps.extend(dict(gap) for gap in index["gaps"])
         unknown.extend({**row, "source_path": path, "agents": sorted(agents),
                         "reference_status": "ambiguous_source" if ambiguous_source else "addressable"}
@@ -368,7 +373,8 @@ def _scan_uncached(ledger: atoms.Ledger, agent: str | None = None) -> dict[str, 
     if changed:
         groups = {key: event for key, event in groups.items() if event.source not in changed}
         unknown = [row for row in unknown if row["source_path"] not in changed]
-    if store.sources(ledger) != all_sources:
+    if (store.sources(ledger) != all_sources or
+            {path: store.source_spec(ledger, path) for path in all_sources} != source_specs):
         raise ValueError("registered source/owner mapping changed during native inventory; retry with a stable registry")
     return {"events": list(groups.values()), "unknown": unknown, "gaps": gaps,
             "source_count": len(registry), "source_signatures": signatures,
@@ -409,7 +415,7 @@ def _project(event: _Event, parts: list[_Part], *, scoped: bool = False) -> dict
     else:
         status = "failed" if _failed(results[0].payload) else "returned"
     first = min(event.parts, key=lambda p: (p.record.line, p.block or 0))
-    identity = [store.source_key(event.source), event.protocol, event.call_id]
+    identity = [first.record.ref.split(":")[1], event.protocol, event.call_id]
     if event.call_id is None or event.protocol == "codex_patch":
         identity += [first.record.ref, first.block]
     # Portable source identity survives moving a frozen pool and later appends.

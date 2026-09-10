@@ -383,7 +383,8 @@ def native_effects(ledger: atoms.Ledger, current_scope: dict[str, Any]) -> tuple
             continue
         for part in event.get("results") or []:
             try:
-                original = store.read_record(event["source_path"], part["line"])
+                original = store.read_record(event["source_path"], part["line"],
+                                             source=store.source_spec(ledger, event["source_path"]))
             except (OSError, UnicodeError, ValueError) as exc:
                 gaps.append({"source": event["source"], "line": part["line"], "reason": str(exc)})
                 continue
@@ -490,7 +491,7 @@ def build(ledger: atoms.Ledger, current_scope: dict[str, Any], offset: int = 0,
         key = (_source(path), line)
         if key not in pointers:
             try:
-                pointers[key] = store.read_record(path, line)
+                pointers[key] = store.read_record(path, line, source=store.source_spec(ledger, path))
             except (OSError, UnicodeError, ValueError) as exc:
                 pointers[key] = None
                 gaps.append({"source": path, "line": line, "reason": str(exc)})

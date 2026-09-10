@@ -253,8 +253,8 @@ def test_source_change_during_scan_does_not_deliver_partial_inventory(tmp_path, 
     ledger, path = pool(tmp_path, [cc(0, use())])
     original = transcript_store.records
 
-    def changing(source):
-        yield from original(source)
+    def changing(path_arg, **kwargs):
+        yield from original(path_arg, **kwargs)
         path.write_text(json.dumps(cc(0, use(command="changed content"))) + "\n", encoding="utf-8")
 
     monkeypatch.setattr(transcript_store, "records", changing)
@@ -302,9 +302,9 @@ def test_warm_inventory_and_query_do_not_redecode_source(tmp_path, monkeypatch):
                               {"timestamp": ts(2), "type": "unknown", "text": "A.ets"}])
     original, calls = transcript_store.records, []
 
-    def counted(path):
+    def counted(path, **kwargs):
         calls.append(path)
-        yield from original(path)
+        yield from original(path, **kwargs)
 
     monkeypatch.setattr(transcript_store, "records", counted)
     first = raw_events.inventory(ledger)
@@ -334,9 +334,9 @@ def test_cache_invalidates_changed_signature_and_registry(tmp_path, monkeypatch)
     ledger, path = pool(tmp_path, [cc(0, use())])
     original, calls = transcript_store.records, []
 
-    def counted(source):
-        calls.append(source)
-        yield from original(source)
+    def counted(path_arg, **kwargs):
+        calls.append(path_arg)
+        yield from original(path_arg, **kwargs)
 
     monkeypatch.setattr(transcript_store, "records", counted)
     raw_events.inventory(ledger)
@@ -383,8 +383,8 @@ def test_source_changed_after_cache_hit_while_next_source_decodes_is_removed(tmp
     raw_events.query(ledger, ts(5), agent="a")  # Warm only the first source.
     original = transcript_store.records
 
-    def changing(source):
-        yield from original(source)
+    def changing(path_arg, **kwargs):
+        yield from original(path_arg, **kwargs)
         first_path.write_text(json.dumps(cc(0, use(command="changed while reading second"))) + "\n", encoding="utf-8")
 
     monkeypatch.setattr(transcript_store, "records", changing)

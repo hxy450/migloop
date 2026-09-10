@@ -25,20 +25,21 @@ _LATEST: OrderedDict[tuple, str] = OrderedDict()
 
 def _latest(ledger: atoms.Ledger) -> str:
     registry = store.sources(ledger)
+    source_specs = {path: store.source_spec(ledger, path) for path in registry}
     signature = []
     for path in sorted(registry):
         try:
             st = os.stat(path)
-            signature.append((path, st.st_mtime_ns, st.st_size))
+            signature.append((path, st.st_mtime_ns, st.st_size, source_specs[path]))
         except OSError:
-            signature.append((path, None, None))
+            signature.append((path, None, None, source_specs[path]))
     key = tuple(signature)
     if key in _LATEST:
         return _LATEST[key]
     times = []
     for path in registry:
         try:
-            times.extend(r.ts for r in store.records(path) if r.ts)
+            times.extend(r.ts for r in store.records(path, source=source_specs[path]) if r.ts)
         except (OSError, UnicodeError, ValueError):
             continue  # Actual query reports source gaps, not a silent all-clear.
     value = max(times, default="latest")
@@ -180,7 +181,7 @@ def _action_refs(ledger, ref):
         raise ValueError("动作没有可展开的原文指针")
     path, first, last = action.src
     wanted = {n + 1 for n in (first, last) if n is not None and n >= 0}
-    return [store.read_record(path, line).ref for line in sorted(wanted)]
+    return [store.read_record(path, line, source=store.source_spec(ledger, path)).ref for line in sorted(wanted)]
 
 
 def expand(ledger, refs, current, *, offset=0, max_chars=12000, include_undated=False):

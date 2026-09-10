@@ -1636,11 +1636,16 @@
         row.appendChild(el("div", "pnote", "定位：" + (e.status || "未核") + (e.diag ? " · " + argumentText(e.diag) : "") + "；位置可核不证明归因成立。"));
         var scope = explicitScope(e.scope || fallbackScope);
         var openRef = e.raw_ref || e.ref;
-        if (argumentBound() && e.status === "ok" && typeof openRef === "string" && openRef.indexOf("raw:") === 0 && scope && scope.at) {
-          var button = el("button", "argument-open-original", "展开原文（独立查阅）"), target = el("div");
+        if (argumentBound() && (e.status === "ok" || e.status === "undated") && typeof openRef === "string" && openRef.indexOf("raw:") === 0 && scope && scope.at) {
+          var undated = e.status === "undated";
+          var inspectScope = undated ? {kind: "pool", key: null, at: scope.at, since_ts: scope.since_ts == null ? null : scope.since_ts} : scope;
+          var button = el("button", "argument-open-original", undated ? "查看时间未知原文（全池独立查阅）" : "展开原文（独立查阅）"), target = el("div");
+          if (undated) row.appendChild(el("div", "pnote argument-undated-note", "原文可定位，但时间和节点输入归属未获认证；以下全池查阅不补成模型访问或历史关系。"));
           button.onclick = function () {
             button.disabled = true;
-            independentlyQuery([argumentRequest("record", {ref: openRef, offset: 0, max_chars: 12000}, scope)], target);
+            var args = {ref: openRef, offset: 0, max_chars: 12000};
+            if (undated) args.include_undated = true;
+            independentlyQuery([argumentRequest("record", args, inspectScope)], target);
           };
           row.appendChild(button); row.appendChild(target);
         } else row.appendChild(el("div", "pnote", "保留引用；未核定位、旧式引用或截止范围缺失，不自动改用 latest。"));
