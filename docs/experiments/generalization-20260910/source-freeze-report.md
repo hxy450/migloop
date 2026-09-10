@@ -105,3 +105,37 @@ readability检查只对已注册文件做UTF-8增量解码计数，不输出文�
 ## 当前停止点
 
 源字节冻结、脚本及合成测试已完成；冻结v4注册失败与侧文件覆盖风险均已如实留档。等待父端提交新candidate后再做新的注册验证，gold及模型队列仍未启动。所有自有子进程已结束，无运行时/旧runner/旧成绩改动。
+
+## candidate-source-v1真实门（2026-09-10后续，未通过）
+
+新候选为generalization-20260910/candidate-source-v1，manifest SHA为60640cdb5075538a783cc5c93e9ab881f5d4a4b21b6d83672ef7e7200311e1bd，实际code digest为0cf294977c1c622fe0503123f369e4956a328aec83954303bad3c4bdb4e06455。源及代码均通过运行前后哈希复核，原source-manifest及registry-validation-v4.json未改。
+
+新registry-validation-source-v1.json（SHA af82a7fd0957857ed0c6c20ad719f7de15ed737bdda0caf71df31007507c89f3）通过：dynamic1为169/169、JSONL78；arch11为385/385、JSONL193；缺源/额外源/UTF-8 decode gaps均为0。这只完成全文件注册与编码门。
+
+真实stdio MCP smoke使用独立smoke_transfer_sources.py，无模型、无gold。每队列默认file（不提供view）limit=1，以及q=""的pool search、include_undated=true；同批max_chars=100000，不因失败提高预算。辅助文件按相对路径排序选第一份；search的offset仅由原始物理行的未知时间顺序计数得到，不使用因果关键词。record使用返回scope和include_undated=true，完整拼接字符续页，与每个原始物理行payload直接比较。所有回执绑定真实响应正文、请求、ledger及scope；正文不写入元数据报告。
+
+| 队列 | file overview | 空pool search | 首aux record完整payload | 门 |
+| --- | --- | --- | --- | --- |
+| dynamic1 | deferred，未交付data/原文 | ok，首aux ref在回执中 | ok，48字符/1物理行 | fail |
+| arch11 | ok，scope/body scope及385源计数一致 | ok | ok，135字符/1物理行 | pass |
+
+两份aux样本均ts=null、time_status=undated、owners=[]；访问不认证actor或历史时刻。所有aux注册元数据同样无owner且timestamp_policy=unknown：dynamic1为98项（包括7份作为辅助材料注册的JSONL journal，不等同于91个非JSONL），arch11为192项。完整往返仅认证所选一份文件的全部物理行payload；record接口不交付CR/LF分隔符及首行BOM，不能写成通用byte-file下载，也未认证其余每个附件的全文交付。
+
+失败原因已用同候选同参数本地selection元数据确认，未冒充MCP正文交付：dynamic1概览selected大小3,650,409字符；body_sources为1,822,413字符，coverage为1,820,403字符，两字段约占99.79%，sections仅5,398字符。body_sources.gaps和coverage.native_source_gaps重复包含4,228条（TXT3,605、JS623），全部带malformed标记；raw_index.gaps=0。冻结raw_events.py:289虽对unknown时间源跳过_native，291–292仍对每个record.malformed追加完整address/source_path/error。因此是纯文本附件被逐行当坏JSON记录放大，并非这些文件解码失败。实际batch的file状态deferred、delivery.records=[]；同批search为ok。不能把本地能构造selected数据当交付成功。
+
+全部尝试保留在source-freeze-1下，不覆盖失败：
+
+| 产物 | SHA-256 | 范围 |
+| --- | --- | --- |
+| smoke-source-v1.json | 314462af7f8f28e60453319929c3bde189eb0a2c7ae2543992153aef52b60fe0 | 首次审计脚本未对aux路径做Windows normcase，预检误拒绝；未到MCP |
+| smoke-source-v1-attempt2.json | 21d3960f21aee13d8aa73a0652034c4a56a412d7981a70cd4423e173060726fb | 修审计脚本后真实MCP；arch11全门通过，dynamic1状态断言失败被ExceptionGroup包裹 |
+| smoke-source-v1-attempt3-dynamic1.json | 894d6a250c02803300c19026be1415a3adb05a03ffbc34da8ce95dd2c09746f4 | 仅dynamic1，保留实际deferred/ok状态、回执、尺寸与内层断言位置 |
+| smoke-source-v1-attempt4-dynamic1.json | d6a79a3895247c542f93c1755949fb0f1c427541671d61fa1324f6056c31cd4a | 仅dynamic1；保持overview失败，同时完成独立aux往返与本地元数据分解 |
+
+最终源内容门未通过，父端暂停gold，待显式冻结后续修复候选再验证；未改candidate、预算、生产代码或旧runner。所有自有MCP和审计进程已退出。
+
+## 文本附件修复与后续候选准备
+
+真实失败定位后，非 JSONL 附件统一作为可定位的原始物理文本行读取，而不是逐行尝试解释为 JSONL 事件。正文、内容哈希、旧/新原文引用和分页保留；JSON 外观的文本也不获得事件时间、actor 或 JSON Pointer。真正损坏的 JSONL 和 UTF-8 解码失败继续显式报告 gap。独立回归还发现并修复了去掉虚假 JSON Pointer 后文件相关文本被 unknown payload 过滤的问题：相关提及可查，但不因此成为读写事实。
+
+最新完整测试结果为 2,653 passed、9 skipped、1 warning，229.98 秒；warning 来自 ZIP 重复成员反例。原默认 pytest 临时目录权限错误未被掩盖或修权限，本次使用单独新建且范围受控的 basetemp。测试通过不替代真实 MCP 门，下一候选必须使用相同 100,000 字符预算重新验证；candidate-source-v1 及所有失败产物保持不变。尚未建立新 13 文件因果参考答案，也未启动其模型调查。

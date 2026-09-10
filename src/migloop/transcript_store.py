@@ -120,6 +120,7 @@ class Record:
     # resolve preserves a supplied legacy reference instead of silently
     # upgrading it during old receipt/field-span replay.
     _reference_key: str | None = field(default=None, repr=False, compare=False)
+    textual: bool = False
 
     @property
     def ref(self) -> str:
@@ -128,10 +129,12 @@ class Record:
 
     @property
     def text(self) -> str:
-        return self.raw if self.malformed else readable(self.value)
+        return self.raw if self.malformed or self.textual else readable(self.value)
 
     @property
     def kind(self) -> str:
+        if self.textual:
+            return "attachment_text"
         if not isinstance(self.value, dict):
             return "malformed" if self.malformed else "unclassified"
         return str(self.value.get("type") or "unclassified")
@@ -150,13 +153,22 @@ def _record_timestamp(path: str, value: Any, source: SourceSpec | None) -> str |
 def records(path: str, *, source: SourceSpec | None = None) -> Iterator[Record]:
     path = os.path.normcase(os.path.abspath(path))
     for number, raw in enumerate(lines(path), 1):
+        yield _record_line(path, number, raw, source)
+
+
+def _record_line(path: str, number: int, raw: str, source: SourceSpec | None) -> Record:
+    # Attachments are physical text lines, not purported JSONL events. Even a
+    # JSON-looking line in a script/output stays original text; it cannot add
+    # execution timestamps or pretend to be a decoded JSON Pointer target.
+    textual = not path.lower().endswith(".jsonl")
+    value, malformed = None, False
+    if not textual:
         try:
             value = json.loads(raw)
-            malformed = False
         except (ValueError, RecursionError):
-            value, malformed = None, True
-        ts = _record_timestamp(path, value, source)
-        yield Record(path, number, raw, value, ts, malformed, source_key(path, source))
+            malformed = True
+    stamp = None if textual else _record_timestamp(path, value, source)
+    return Record(path, number, raw, value, stamp, malformed, source_key(path, source), textual)
 
 
 def read_record(path: str, number: int, *, source: SourceSpec | None = None) -> Record:
@@ -201,12 +213,7 @@ def read_record(path: str, number: int, *, source: SourceSpec | None = None) -> 
     after = os.stat(path)
     if (after.st_mtime_ns, after.st_size) != signature:
         raise ValueError("source changed during record read")
-    try:
-        value, malformed = json.loads(raw), False
-    except (ValueError, RecursionError):
-        value, malformed = None, True
-    ts = _record_timestamp(path, value, source)
-    return Record(path, number, raw, value, ts, malformed, source_key(path, source))
+    return _record_line(path, number, raw, source)
 
 
 def resolve(ledger: Any, ref: str) -> Record:

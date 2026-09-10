@@ -291,7 +291,7 @@ def _source_index_global(path: str, registry_key: str, source: store.SourceSpec 
         if record.malformed:
             gaps.append({**record.address(), "source_path": path, "error": "malformed JSON record"})
         if other:
-            unknown.append({**record.address(), "fields": other, "_record": record})
+            unknown.append({**record.address(), "fields": [] if record.textual else other, "_record": record})
     if _signature(path) != before:
         raise ValueError("source changed during inventory; retry with a stable source")
     index = {"native": native, "unknown": unknown, "gaps": gaps}
@@ -440,7 +440,7 @@ def _unknown_public(row: dict[str, Any]) -> dict[str, Any]:
 
 def _unknown_payload(row: dict[str, Any]) -> Any:
     record = row["_record"]
-    if record.malformed:
+    if record.malformed or record.textual:
         return record.raw
     values = []
     for pointer in row["fields"]:

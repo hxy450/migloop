@@ -162,7 +162,7 @@ def _record(ledger, ref, current, *, offset=0, max_chars=12000, include_undated=
     data = temporal.record_data(ledger, ref, at=current["at"], offset=offset,
                                 max_chars=max_chars, include_undated=include_undated)
     if pointer is not None:
-        if record.malformed:
+        if record.malformed or record.textual:
             raise ValueError("原始记录不是有效JSON；只能展开原文")
         value = _field(record.value, pointer)
         text = value if isinstance(value, str) else json.dumps(value, ensure_ascii=False, separators=(",", ":"))
