@@ -60,3 +60,16 @@ def test_contextual_lowercase_does_not_claim_small_slice_contains_literal(body):
     assert piece == "" and "不是零命中" in note and "上下文" in note
     piece, _ = atoms_text._window(body, 4, find="οσ")
     assert "οσ" in piece.lower()
+
+
+def test_other_field_hit_is_only_a_navigation_hint_not_automatic_body_delivery(tmp_path):
+    from tests.test_multi_search import _ledger, _call, MAIN_ID
+    ledger = _ledger(tmp_path, _call("2026-01-01T00:00:01Z", "w", "Write",
+        {"file_path": "/proj/A.ets", "content": "needle DO_NOT_LEAK_OTHER_FIELD"}, out="ok"))
+    action = ledger.agents[MAIN_ID].actions[0]
+    text = atoms_text.render_action(ledger, MAIN_ID, action.seq, part="output", find="needle", max_chars=100)
+    assert "另一侧 input 有同一字面量（正文未展开）" in text
+    assert "输入/写入文本不是运行结果" in text
+    assert "DO_NOT_LEAK_OTHER_FIELD" not in text
+    expanded = atoms_text.render_action(ledger, MAIN_ID, action.seq, part="input", find="needle", max_chars=200)
+    assert "DO_NOT_LEAK_OTHER_FIELD" in expanded and "另一侧" not in expanded

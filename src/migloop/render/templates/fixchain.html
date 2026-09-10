@@ -3241,7 +3241,28 @@
           s1.appendChild(lnk((ag.parent.name || agentLabelOf(ag.parent.id)) + (ag.parent.ver != null ? " @v" + ag.parent.ver : ""), "", function () { openRoot({ kind: "agent", id: ag.parent.id, v: ag.parent.ver }); }));
           body.appendChild(s1);
         }
-        if (ag.prompt) body.appendChild(quoteLong("dispatch", "派发指令 · 全文", ag.prompt));
+        if (ag.prompt) {
+          body.appendChild(quoteLong("dispatch", "派发指令 · 已记录文字", ag.prompt));
+          var promptSources = ag.prompt_sources;
+          if (promptSources) {
+            var promptOrigin = sec("派发文字的同文原始记录");
+            (promptSources.matches || []).forEach(function (record) {
+              if (!record.loc) return;
+              var original = el("details", "prompt-original");
+              original.appendChild(el("summary", null, "原始记录 #" + record.seq + " · " + record.loc));
+              var pre = el("pre", "mono"); original.appendChild(pre);
+              original.addEventListener("toggle", function () {
+                if (original.open && !pre.dataset.loaded) { pre.dataset.loaded = "1"; loadActionInto(pre, ag.id, record.seq); }
+              });
+              promptOrigin.appendChild(original);
+            });
+            promptOrigin.appendChild(el("div", "muted", promptSources.note || "仅当前窗口内的同文定位，不认证消费或因果。"));
+            if (!(promptSources.matches || []).some(function (r) { return !!r.loc; }))
+              promptOrigin.appendChild(el("div", "muted", "当前窗口没有可定位同文记录，不以相邻行代替。"));
+            if (promptSources.omitted) promptOrigin.appendChild(el("div", "muted", "另有 " + promptSources.omitted + " 条未列。"));
+            body.appendChild(promptOrigin);
+          }
+        }
         (ag.inbox || []).forEach(function (m, i) {
           if (i === 0 && ag.prompt && m.text === ag.prompt) return;   // 首条收件 = 派发词本身
           var late = m.at > anchor;

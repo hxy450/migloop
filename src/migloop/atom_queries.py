@@ -198,6 +198,18 @@ def agent_data(ledger: atoms.Ledger, aid: str, v: int | None = None, *,
                 "writes": [w for w in data["writes"] if w.get("ver") is None or w["ver"] > since],
                 "children": [c for c in data["children"] if c["ver"] > since],
                 "inbox": [m for m in data["inbox"] if m["seq"] not in prior_seqs]}
+    # Locate only exact recorded text inside the already-selected input window.
+    # Matching text is not a new dispatch edge or proof of how it was consumed.
+    prompt_rows = [a for a in data["actions"] if data.get("prompt")
+                   and a["kind"] in ("inbox", "instruction")
+                   and (a.get("detail") or {}).get("text") == data["prompt"]]
+    data["prompt_sources"] = {
+        "schema": "migloop-prompt-sources/1", "source": "scoped_action_text_equality",
+        "matches": [{"seq": a["seq"], "loc": ledger.locs.get(a["seq"]), "kind": a["kind"]}
+                    for a in prompt_rows[:3]],
+        "omitted": max(0, len(prompt_rows) - 3), "total": len(prompt_rows),
+        "note": "仅当前选定窗口里与派发文字完全相同的记录；不证明新的派发、消费或因果。无定位不借邻行。",
+    }
     return {**data, "time_scope": data.get("time_scope") or time_scope.for_atom(ledger, "agent", data, until=until)}
 
 

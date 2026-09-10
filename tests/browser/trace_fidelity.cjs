@@ -71,6 +71,8 @@ function coverageFixture(body){
 }
 const versions=[1,2,3].map(v=>({v,by:v===2?'agent-b':'agent-a',by_name:v===2?'Agent B':'Agent A',by_ver:v===3?2:1,ts:'2026-01-01T00:00:0'+v+'Z',lines:1,content_known:false,source:'opaque'}));
 const agents=['agent-a','agent-b'].map(id=>({id,label:id==='agent-a'?'Agent A':'Agent B',n_versions:id==='agent-a'?2:1,kind:'agent',session:'fixture',reads:[],writes:[],actions:[],inbox:[]}));
+agents[0].prompt='PROMPT ORIGINAL TEXT';
+agents[0].prompt_sources={schema:'migloop-prompt-sources/1',source:'scoped_action_text_equality',matches:[{seq:1,loc:'1·prompt',kind:'inbox'}],omitted:0,total:1,note:'同文定位不认证消费或因果。'};
 agents[0].reads=[
   {path:file,v:1,at:1,certain:false,dep:false,observation_uncertain:true},
   {path:file,v:1,at:1,certain:true,dep:false,observation_uncertain:false},
@@ -426,7 +428,7 @@ async function main(){
   };
   function send(method,params={}){return new Promise((resolve,reject)=>{const id=++serial;const timer=setTimeout(()=>{pending.delete(id);reject(Error('CDP timeout '+method));},15000);pending.set(id,{resolve,reject,timer});socket.send(JSON.stringify({id,method,params}));});}
   async function evaluate(expression){const r=await send('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true});if(r.exceptionDetails)throw Error(r.exceptionDetails.exception?.description||r.exceptionDetails.text);return r.result.value;}
-  async function until(expression){for(let i=0;i<80;i++){if(await evaluate(expression))return;await new Promise(r=>setTimeout(r,50));}throw Error('Condition failed: '+expression);}
+  async function until(expression){for(let i=0;i<80;i++){if(await evaluate("typeof window.__mig !== 'undefined' && ("+expression+")"))return;await new Promise(r=>setTimeout(r,50));}throw Error('Condition failed: '+expression);}
   async function check(name,expression){assert.equal(await evaluate(expression),true,name);console.log('PASS '+name);}
   const clickAgent="[...document.querySelectorAll('#canvas .node')].find(n=>n.textContent.startsWith('Agent A v1')).click()";
   try{
@@ -457,6 +459,11 @@ async function main(){
     await evaluate(clickAgent);
     await check('all repeated visits and query windows preserved in drawer',"document.querySelectorAll('#side .pvisit').length===3 && document.querySelector('#side .pvisits').textContent.includes('start=2 n=4')");
     await check('query windows are labelled requested, not certified body delivery',"[...document.querySelectorAll('#side .pvisit .preason')].filter(n=>n.textContent.includes('请求范围：')).length===3 && document.querySelector('#side .pvisits').textContent.includes('不证明正文可得或全部交付')");
+    await until("document.querySelector('#side .prompt-original')!==null");
+    await check('prompt keeps its exact own source and is not labelled as all session information',"document.querySelector('#side').textContent.includes('派发指令 · 已记录文字') && document.querySelector('#side .prompt-original summary').textContent.includes('1·prompt')");
+    await evaluate("document.querySelector('#side .prompt-original').open=true");
+    await until("document.querySelector('#side .prompt-original pre').textContent.includes('EVIDENCE 1')");
+    await check('opening a prompt source preserves the recorded model investigation',"JSON.stringify(__mig.probe().trajectory)===window.originalTrajectory && document.querySelectorAll('.wire.route').length===0");
     await check('partial return is still opened but never labelled as full delivery',"document.querySelectorAll('#side .delivery-truncated').length===1 && document.querySelector('#side .delivery-truncated').parentElement.textContent.includes('已打开') && document.querySelector('#side .pvisits').textContent.includes('不证明全文交付')");
     await evaluate("[...document.querySelectorAll('.dchips span')].find(n=>n.textContent.startsWith('A ')).click()");
     await check('A drawer isolated',"document.querySelector('#side').textContent.includes('A 独有原因') && !document.querySelector('#side').textContent.includes('B 独有原因')");

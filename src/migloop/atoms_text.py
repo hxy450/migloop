@@ -615,7 +615,19 @@ def render_agent(ledger: atoms.Ledger, agent_id: str, v: int | None = None,
     if ag["prompt"] and since is not None:
         out.append(f"## 派发指令: 见 agent({ag['id']}, v=1)(窗口查询不重印,{len(ag['prompt'])} 字)")
     elif ag["prompt"]:
-        out.append("## 派发指令(全文)\n" + (_clip(ag["prompt"], 12000) if full_text else _clip(ag["prompt"], 600)))
+        limit = 12000 if full_text else 600
+        caption = (f"文字片段，显示至多{limit}/{len(ag['prompt'])}字；不是全文"
+                   if len(ag["prompt"]) > limit else "已记录文字")
+        out.append("## 派发指令(" + caption + ")\n" + _clip(ag["prompt"], limit))
+        origin = ag.get("prompt_sources") or {}
+        located = [row for row in origin.get("matches") or [] if row.get("loc")]
+        if located:
+            out.append("同文原始记录：" + "、".join(_core(row["seq"], row["loc"]) for row in located)
+                       + "；action(ref=照抄引用, part=input)核原始文字，不用邻行代替。")
+        else:
+            out.append("当前窗口未给出可定位的同文记录；不要借系统提醒、下一条动作或相邻行当派发引用。")
+        if origin.get("omitted"):
+            out.append(f"另有 {origin['omitted']} 条同文记录未列；同文不证明重复派发或因果。")
     inbox = [m for m in ag["inbox"] if not (ag["prompt"] and m["text"] == ag["prompt"])]
     if inbox:
         out.append(f"## 收件箱({len(inbox)}) —— 一行一条,action 展开全文")
@@ -857,6 +869,15 @@ def render_action(ledger: atoms.Ledger, agent_id: str, seq: int, max_chars: int 
         in_piece, in_note = _window(inp_text, max_chars, offset, find)
         piece, note = "(空)", ""
     out = [head]
+    if find and part in ("input", "output"):
+        from .search_terms import literal_span
+        selected = inp_text if part == "input" else raw["output"]
+        other = raw["output"] if part == "input" else inp_text
+        other_part = "output" if part == "input" else "input"
+        if literal_span(selected, find, offset) is None and literal_span(other, find) is not None:
+            out.append(f"所选 {part} 范围未命中；另一侧 {other_part} 有同一字面量（正文未展开）。"
+                       f"可用 action(part={other_part}, find=原词, offset=0) 单独核查；"
+                       "输入/写入文本不是运行结果，返回文本也不自动证明行为正确。")
     if in_note:
         in_note += ";part=input 单独展开/翻页"
     if note:
