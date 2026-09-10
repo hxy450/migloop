@@ -1833,11 +1833,19 @@
       });
       host.appendChild(box);
     }
+    function probeCallCountText(data) {
+      if (data.query_trace && Array.isArray(data.query_trace.steps)) {
+        var steps = data.query_trace.steps, nested = 0;
+        for (var i = 0; i < steps.length; i++) nested += Array.isArray(steps[i].items) ? steps[i].items.length : 0;
+        return steps.length + " 条录制步骤 · " + nested + " 个批内项";
+      }
+      return (data.steps || []).length + " 条调用记录";
+    }
     function renderProbe() {
       probeEl.hidden = false;
       probeEl.innerHTML = "";
       var h = el("div", "ph", "调查覆盖");
-      if (PROBE && !PROBE.error) h.appendChild(el("span", "n", PROBE.run + " · $" + (PROBE.cost != null ? Number(PROBE.cost).toFixed(2) : "?") + " · " + (PROBE.steps || []).length + " 条调用记录"));
+      if (PROBE && !PROBE.error) h.appendChild(el("span", "n", PROBE.run + " · $" + (PROBE.cost != null ? Number(PROBE.cost).toFixed(2) : "?") + " · " + probeCallCountText(PROBE)));
       probeEl.appendChild(h);
       var ld = el("div", "ld");
       var inp = el("input");
