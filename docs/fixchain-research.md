@@ -4,6 +4,7 @@
 
 2026-09-09 当前优先级更新：先验证历史归因的正确性与过程可审计性，成本其次；暂不重跑真实迁移。
 最新工作见 [Attribution-10](experiments/2026-09-09-attribution10/README.md) 和 [实现边界](experiments/2026-09-09-attribution10/implementation-notes.md)。
+09-10检查点：[完整V10](experiments/2026-09-09-attribution10/v10-complete-results.md)开发集总token节省32.83%、文件等权25.17%，但完整归因仍有实质错误；V11/V12受额度中断，未计算完整收益。见[当前状态与恢复清单](experiments/2026-09-09-attribution10/2026-09-10-checkpoint.md)，下列早期版本数字不代表最新状态。
 同日追加：[V3 结果](experiments/2026-09-09-attribution10/v3-results.md)记录同源同题归因不稳定；已补全池时间元数据、题外状态、自洽提示、输入截止投影、来源分组与尾部读者的非版本表示。917 项 Python、69 项浏览器检查通过仍不等于模型根因可信，旧跑没有被新源码/新结论覆盖。
 最新追加：[V5 结果](experiments/2026-09-09-attribution10/v5-results.md)新增节点归因对照、只读草稿预检及最终稿绑定。两次 GPT-5.5 调查均据预检修正无效坐标/引用，页面可回看理由和原告警；但仍漏早期输入、混淆保存报告与行为验证，且成本增加。不要把 matched 或机械零告警当作语义通过。
 下文旧实验、旧计划保留作历史记录，不代表全部已实现或已经证明工具优于原始转录。

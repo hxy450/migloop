@@ -1,0 +1,2880 @@
+{
+  "schema": "migloop-v12-legacy-adjudication/1",
+  "status": "partial_completed_runs_only",
+  "source_code_id": "e67d7d7",
+  "review_date": "2026-09-09",
+  "scope": "只读completed正式V12，按原始池与冻结rubric核验；无模型调用，不改V10/V11评分、冻结源、参考或run。后续viewer4871b54不重绑本轮。",
+  "rubric": {
+    "file": "core-rubric-reconciliation.md",
+    "protocol_file": "protocol.md",
+    "protocol_sha256": "19df0bb2ef9dacc62d2b8c1d911cdaf03aa6ec7941889eb78bd135c8403f7afb",
+    "reference": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/reference-v1/legacy-reference.json",
+    "reference_sha256": "2c015536094fff1e42bb3b6b5cc2dce743c0f2a0f6924254027f7f8a5faac927",
+    "facts_are_not_accuracy": true,
+    "check_not_truth": true,
+    "core_not_full_annotation": true
+  },
+  "runs": [
+    {
+      "case": "member-center",
+      "variant": "formal-v12",
+      "arm": "tools",
+      "rep": 1,
+      "run": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v12/member-center/runs/tools/rep1",
+      "source_code_id": "e67d7d7",
+      "source_digest": "526e8f61bd30b14b67b742e8c52dbebde933b04d09d9a77eca92434a4188c658",
+      "pool_digest": "a78b1373045f7558d6da3b76123e30d032635a2a0b4cdd665e7f80c0bdf8b337",
+      "common_task_sha256": "e60ad7491cd5991a948f8c7128432feca230a59bee208640ca5b90a44d68dec1",
+      "model": [
+        "gpt-5.5"
+      ],
+      "effort": "medium",
+      "questions": [
+        {
+          "id": "S3",
+          "core": "pass",
+          "basis": "三站点与1透明/2深色全对，区分脚本执行回执、局部读回、未知最终快照及设备行为；H5未点名按既有minor口径。",
+          "mandatory_gaps": [],
+          "minor_omissions": [
+            "未点名原已透明且跳过的H5；事实行保留partial。"
+          ],
+          "facts": [
+            {
+              "id": "S3.f1",
+              "status": "supported",
+              "report_claim": "执行前扫描/分类列出loadDialog206-211、Pay704-718、Renew728-739。",
+              "raw_evidence": [
+                "fixer L71/L72,L77/L78,L80/L81"
+              ]
+            },
+            {
+              "id": "S3.f2",
+              "status": "supported",
+              "report_claim": "批量脚本真实执行成功，会员页实际触碰3处/import+；分支1透明2深色，Pay直接读回，最终快照未知。",
+              "raw_evidence": [
+                "fixer L103/L104：open(path,'w').write(new)在report.append之前",
+                "fixer L106/L107：Pay局部读回"
+              ]
+            },
+            {
+              "id": "S3.f3",
+              "status": "partial",
+              "report_claim": "4个controller已有1个；3sites不是3个深色，但没有点名已有透明H5。",
+              "raw_evidence": [
+                "Slice8 L264已含H5 Color.Transparent",
+                "fixer L42/L43,L74/L75"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "S4",
+          "core": "partial",
+          "basis": "已找到file v1与Slice8 v7错误整写，但未核Slice8写前已收到正确Kotlin；两次价格修复及private编译链正确。",
+          "mandatory_gaps": [
+            "Slice8 L21/L24正确数字段Kotlin→L264/L265坏整写没有调查。"
+          ],
+          "minor_omissions": [],
+          "facts": [
+            {
+              "id": "S4.f1",
+              "status": "partial",
+              "report_claim": "原实现v1单Text30，v7业务接线仍将stripCurrency后整串Text30；只引用后期fixer的Android说明。",
+              "raw_evidence": [
+                "Slice8 L21/L24在15:33已返回正确Kotlin",
+                "Slice8 L264/L265在16:04成功整写仍整体30"
+              ]
+            },
+            {
+              "id": "S4.f2",
+              "status": "supported",
+              "report_claim": "v11/v12 ForEach分段→尾后脚本改priceDigits/priceSuffix两个Span。",
+              "raw_evidence": [
+                "fixer L528/L529,L592/L593"
+              ]
+            },
+            {
+              "id": "S4.f3",
+              "status": "supported",
+              "report_claim": "tail private helper导致兄弟struct可见性错误，builder两Edit去private，原生第二次构建EXIT0/SUCCESS。",
+              "raw_evidence": [
+                "fixer L592/L593",
+                "builder L23/L24,L32/L33,L34/L35,L36/L37"
+              ]
+            }
+          ]
+        }
+      ],
+      "extra_false_claims": [],
+      "unsupported_citations": [],
+      "annotation_requires_correction": true,
+      "full_annotation_pass": false,
+      "notes": [
+        "成功打开file v1-v9的diff（14次diff总计），已定位Slice8 v7整写，仍没有Slice8 agent或L21/L24 Kotlin原始输入；不能把找到旧输出算补齐输入近因。",
+        "唯一成功agent是builder（3次agent中2次via拒）；25次action、8次search；有1个带until_ts后置窗口；没有blame。",
+        "尾后双Span/private helper以S4E3事件声明；builder L26/L27真实grep支持进入编译状态，L23/L24错误、L32/L34去private、L36/L37成功日志正确。没有伪造tail file/agent正式版本。",
+        "S3明确真实脚本执行，三站点和值正确，H5未点名保持minor；推荐未来像素复验不称当前已通过。",
+        "两check之间只把12个无法解析search/diff引用替换/删除为原文引用，没有追加原文查询；mechanical_clear不证明新红v1因果成立。9reviewed+29系统not_investigated，补集不是模型已核。"
+      ],
+      "investigation": {
+        "tool_counts": [
+          {
+            "Name": "guide",
+            "Count": 2
+          },
+          {
+            "Name": "sessions",
+            "Count": 1
+          },
+          {
+            "Name": "diff",
+            "Count": 14
+          },
+          {
+            "Name": "file",
+            "Count": 3
+          },
+          {
+            "Name": "action",
+            "Count": 25
+          },
+          {
+            "Name": "search",
+            "Count": 8
+          },
+          {
+            "Name": "agent",
+            "Count": 3
+          },
+          {
+            "Name": "check",
+            "Count": 2
+          }
+        ],
+        "seq": [
+          {
+            "input": {},
+            "use_line": 17,
+            "result_line": 18,
+            "tool": "guide",
+            "chars": 2103
+          },
+          {
+            "input": {
+              "file": "entry/src/main/ets/pages/MemberCenterPage.ets"
+            },
+            "use_line": 26,
+            "result_line": 28,
+            "tool": "sessions",
+            "chars": 16197
+          },
+          {
+            "input": {
+              "path": "entry/src/main/ets/pages/MemberCenterPage.ets",
+              "v": 10
+            },
+            "use_line": 35,
+            "result_line": 41,
+            "tool": "diff",
+            "chars": 1640
+          },
+          {
+            "input": {
+              "path": "entry/src/main/ets/pages/MemberCenterPage.ets",
+              "v": 11
+            },
+            "use_line": 36,
+            "result_line": 43,
+            "tool": "diff",
+            "chars": 1510
+          },
+          {
+            "input": {
+              "path": "entry/src/main/ets/pages/MemberCenterPage.ets",
+              "v": 12
+            },
+            "use_line": 37,
+            "result_line": 45,
+            "tool": "diff",
+            "chars": 1240
+          },
+          {
+            "input": {
+              "path": "entry/src/main/ets/pages/MemberCenterPage.ets",
+              "v": 15
+            },
+            "use_line": 38,
+            "result_line": 46,
+            "tool": "diff",
+            "chars": 250
+          },
+          {
+            "input": {
+              "path": "entry/src/main/ets/pages/MemberCenterPage.ets",
+              "v": 16
+            },
+            "use_line": 39,
+            "result_line": 47,
+            "tool": "diff",
+            "chars": 250
+          },
+          {
+            "input": {
+              "path": "entry/src/main/ets/pages/MemberCenterPage.ets",
+              "v": 16,
+              "via": "sessions",
+              "content": true,
+              "start": 1,
+              "n": 160
+            },
+            "use_line": 54,
+            "result_line": 55,
+            "tool": "file",
+            "chars": 1382
+          },
+          {
+            "input": {
+              "ref": "#a68daf720e780b4c2:15406@L103",
+              "part": null,
+              "max_chars": 8000
+            },
+            "use_line": 63,
+            "result_line": 68,
+            "tool": "action",
+            "chars": 5046
+          },
+          {
+            "input": {
+              "ref": "#a68daf720e780b4c2:15407@L106",
+              "part": null,
+              "max_chars": 6000
+            },
+            "use_line": 64,
+            "result_line": 70,
+            "tool": "action",
+            "chars": 2776
+          },
+          {
+            "input": {
+              "ref": "#a68daf720e780b4c2:15396@L77",
+              "part": null,
+              "max_chars": 6000
+            },
+            "use_line": 65,
+            "result_line": 71,
+            "tool": "action",
+            "chars": 6511
+          },
+          {
+            "input": {
+              "ref": "#a68daf720e780b4c2:15397@L80",
+              "part": null,
+              "max_chars": 5000
+            },
+            "use_line": 66,
+            "result_line": 72,
+            "tool": "action",
+            "chars": 5271
+          },
+          {
+            "input": {
+              "ref": "#a68daf720e780b4c2:15396@L77",
+              "part": "output",
+              "offset": 4804,
+              "max_chars": 3000
+            },
+            "use_line": 79,
+            "result_line": 81,
+            "tool": "action",
+            "chars": 2248
+          },
+          {
+            "input": {
+              "path": "entry/src/main/ets/pages/MemberCenterPage.ets",
+              "v": 1
+            },
+            "use_line": 86,
+            "result_line": 95,
+            "tool": "diff",
+            "chars": 20153
+          },
+          {
+            "input": {
+              "path": "entry/src/main/ets/pages/MemberCenterPage.ets",
+              "v": 2
+            },
+            "use_line": 87,
+            "result_line": 98,
+            "tool": "diff",
+            "chars": 356
+          },
+          {
+            "input": {
+              "path": "entry/src/main/ets/pages/MemberCenterPage.ets",
+              "v": 3
+            },
+            "use_line": 88,
+            "result_line": 100,
+            "tool": "diff",
+            "chars": 1050
+          },
+          {
+            "input": {
+              "path": "entry/src/main/ets/pages/MemberCenterPage.ets",
+              "v": 4
+            },
+            "use_line": 89,
+            "result_line": 102,
+            "tool": "diff",
+            "chars": 359
+          },
+          {
+            "input": {
+              "path": "entry/src/main/ets/pages/MemberCenterPage.ets",
+              "v": 5
+            },
+            "use_line": 90,
+            "result_line": 104,
+            "tool": "diff",
+            "chars": 3323
+          },
+          {
+            "input": {
+              "path": "entry/src/main/ets/pages/MemberCenterPage.ets",
+              "v": 6
+            },
+            "use_line": 91,
+            "result_line": 105,
+            "tool": "diff",
+            "chars": 847
+          },
+          {
+            "input": {
+              "path": "entry/src/main/ets/pages/MemberCenterPage.ets",
+              "v": 7
+            },
+            "use_line": 92,
+            "result_line": 106,
+            "tool": "diff",
+            "chars": 20148
+          },
+          {
+            "input": {
+              "path": "entry/src/main/ets/pages/MemberCenterPage.ets",
+              "v": 8
+            },
+            "use_line": 93,
+            "result_line": 107,
+            "tool": "diff",
+            "chars": 642
+          },
+          {
+            "input": {
+              "path": "entry/src/main/ets/pages/MemberCenterPage.ets",
+              "v": 9
+            },
+            "use_line": 94,
+            "result_line": 108,
+            "tool": "diff",
+            "chars": 397
+          },
+          {
+            "input": {
+              "path": "entry/src/main/ets/pages/MemberCenterPage.ets",
+              "v": 9,
+              "via": "sessions",
+              "content": true,
+              "start": 1080,
+              "n": 150
+            },
+            "use_line": 119,
+            "result_line": 121,
+            "tool": "file",
+            "chars": 181
+          },
+          {
+            "input": {
+              "path": "entry/src/main/ets/pages/MemberCenterPage.ets",
+              "v": 9,
+              "via": "file:/Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723/entry/src/main/ets/pages/MemberCenterPage.ets@v16",
+              "content": true,
+              "start": 1080,
+              "n": 180
+            },
+            "use_line": 126,
+            "result_line": 128,
+            "tool": "file",
+            "chars": 1391
+          },
+          {
+            "input": {
+              "file": "entry/src/main/ets/pages/MemberCenterPage.ets",
+              "v": 9,
+              "q_any": [
+                "Text(this.item.priceText)",
+                "priceDigits",
+                "priceSuffix",
+                "stripCurrency",
+                "splitPriceRuns"
+              ],
+              "after": true
+            },
+            "use_line": 133,
+            "result_line": 135,
+            "tool": "search",
+            "chars": 68
+          },
+          {
+            "input": {
+              "file": "entry/src/main/ets/pages/MemberCenterPage.ets",
+              "v": 9,
+              "q_any": [
+                "Text(this.item.priceText)",
+                "priceDigits",
+                "priceSuffix",
+                "stripCurrency",
+                "splitPriceRuns"
+              ]
+            },
+            "use_line": 140,
+            "result_line": 142,
+            "tool": "search",
+            "chars": 7825
+          },
+          {
+            "input": {
+              "file": "entry/src/main/ets/pages/MemberCenterPage.ets",
+              "v": 16,
+              "q_any": [
+                "priceDigits",
+                "priceSuffix",
+                "splitPriceRuns",
+                "this.item.priceText"
+              ],
+              "after": false
+            },
+            "use_line": 147,
+            "result_line": 149,
+            "tool": "search",
+            "chars": 8294
+          },
+          {
+            "input": {
+              "ref": "#a68daf720e780b4c2:15676@L514",
+              "part": null,
+              "max_chars": 5000
+            },
+            "use_line": 154,
+            "result_line": 159,
+            "tool": "action",
+            "chars": 1100
+          },
+          {
+            "input": {
+              "ref": "#a68daf720e780b4c2:15677@L516",
+              "part": null,
+              "max_chars": 7000
+            },
+            "use_line": 155,
+            "result_line": 161,
+            "tool": "action",
+            "chars": 3867
+          },
+          {
+            "input": {
+              "ref": "#a68daf720e780b4c2:15681@L526",
+              "part": null,
+              "max_chars": 5000
+            },
+            "use_line": 156,
+            "result_line": 162,
+            "tool": "action",
+            "chars": 1162
+          },
+          {
+            "input": {
+              "ref": "#a68daf720e780b4c2:15731@L592",
+              "part": null,
+              "max_chars": 9000
+            },
+            "use_line": 157,
+            "result_line": 163,
+            "tool": "action",
+            "chars": 4926
+          },
+          {
+            "input": {
+              "ref": "#af0e3d2ae54dbf769:17286@L23",
+              "part": null,
+              "max_chars": 7000
+            },
+            "use_line": 170,
+            "result_line": 175,
+            "tool": "action",
+            "chars": 1765
+          },
+          {
+            "input": {
+              "ref": "#af0e3d2ae54dbf769:17287@L26",
+              "part": null,
+              "max_chars": 9000
+            },
+            "use_line": 171,
+            "result_line": 177,
+            "tool": "action",
+            "chars": 1133
+          },
+          {
+            "input": {
+              "ref": "#af0e3d2ae54dbf769:17292@L32",
+              "part": null,
+              "max_chars": 6000
+            },
+            "use_line": 172,
+            "result_line": 178,
+            "tool": "action",
+            "chars": 1116
+          },
+          {
+            "input": {
+              "ref": "#af0e3d2ae54dbf769:17294@L34",
+              "part": null,
+              "max_chars": 6000
+            },
+            "use_line": 173,
+            "result_line": 179,
+            "tool": "action",
+            "chars": 1116
+          },
+          {
+            "input": {
+              "agent": "agent-af0e3d2ae54dbf769",
+              "v": 3,
+              "since": 2,
+              "q_any": [
+                "COMPILE RESULT",
+                "BUILD SUCCESSFUL",
+                "SUCCESS",
+                "FAIL",
+                "priceDigits",
+                "priceSuffix"
+              ],
+              "after": false
+            },
+            "use_line": 188,
+            "result_line": 189,
+            "tool": "search",
+            "chars": 2198
+          },
+          {
+            "input": {
+              "id": "agent-af0e3d2ae54dbf769",
+              "v": 3,
+              "via": "agent:agent-af0e3d2ae54dbf769@v3",
+              "since": 0,
+              "reads": true,
+              "seen": true,
+              "summary_chars": 200
+            },
+            "use_line": 195,
+            "result_line": 197,
+            "tool": "agent",
+            "chars": 310
+          },
+          {
+            "input": {
+              "id": "agent-af0e3d2ae54dbf769",
+              "v": 3,
+              "via": "sessions",
+              "since": 0,
+              "reads": true,
+              "seen": true,
+              "summary_chars": 200
+            },
+            "use_line": 204,
+            "result_line": 206,
+            "tool": "agent",
+            "chars": 304
+          },
+          {
+            "input": {
+              "id": "agent-af0e3d2ae54dbf769",
+              "v": 3,
+              "via": "file:/Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723/entry/src/main/ets/pages/MemberCenterPage.ets@v16",
+              "since": 0,
+              "reads": true,
+              "seen": true,
+              "summary_chars": 200
+            },
+            "use_line": 213,
+            "result_line": 215,
+            "tool": "agent",
+            "chars": 5066
+          },
+          {
+            "input": {
+              "ref": "#af0e3d2ae54dbf769:17291@L31",
+              "part": null,
+              "max_chars": 5000
+            },
+            "use_line": 220,
+            "result_line": 222,
+            "tool": "action",
+            "chars": 510
+          },
+          {
+            "input": {
+              "id": "__main__:ff019d8a",
+              "seq": 14844,
+              "part": null,
+              "max_chars": 7000
+            },
+            "use_line": 227,
+            "result_line": 229,
+            "tool": "action",
+            "chars": 2699
+          },
+          {
+            "input": {
+              "since_ts": "2026-07-26T21:46:12.739Z",
+              "until_ts": "2026-07-26T21:48:57.218000Z",
+              "q_any": [
+                "BUILD_STATUS",
+                "COMPILE RESULT",
+                "PASS",
+                "FAIL",
+                "priceDigits",
+                "priceSuffix"
+              ],
+              "after": true
+            },
+            "use_line": 234,
+            "result_line": 236,
+            "tool": "search",
+            "chars": 4850
+          },
+          {
+            "input": {
+              "ref": "#af0e3d2ae54dbf769:17296@L36",
+              "part": null,
+              "max_chars": 7000
+            },
+            "use_line": 241,
+            "result_line": 243,
+            "tool": "action",
+            "chars": 762
+          },
+          {
+            "input": {
+              "ref": "#a68daf720e780b4c2:15738@L605",
+              "part": null,
+              "max_chars": 7000
+            },
+            "use_line": 248,
+            "result_line": 252,
+            "tool": "action",
+            "chars": 3711
+          },
+          {
+            "input": {
+              "ref": "#ff019d8a:14851@L1761",
+              "part": null,
+              "max_chars": 7000
+            },
+            "use_line": 249,
+            "result_line": 255,
+            "tool": "action",
+            "chars": 3123
+          },
+          {
+            "input": {
+              "agent": "agent-a68daf720e780b4c2",
+              "v": 41,
+              "since": 1,
+              "q_any": [
+                "maskColor",
+                "dimAmount",
+                "Palette.DIALOG_MASK",
+                "AppLoadDialog",
+                "MemberCenterPage.ets:704"
+              ],
+              "after": false
+            },
+            "use_line": 250,
+            "result_line": 254,
+            "tool": "search",
+            "chars": 17854
+          },
+          {
+            "input": {
+              "ref": "#a68daf720e780b4c2:15391@L68",
+              "part": null,
+              "max_chars": 5000
+            },
+            "use_line": 261,
+            "result_line": 265,
+            "tool": "action",
+            "chars": 1661
+          },
+          {
+            "input": {
+              "ref": "#a68daf720e780b4c2:15409@L112",
+              "part": null,
+              "find": "MemberCenter",
+              "max_chars": 6000
+            },
+            "use_line": 262,
+            "result_line": 267,
+            "tool": "action",
+            "chars": 732
+          },
+          {
+            "input": {
+              "ref": "#a68daf720e780b4c2:15394@L71",
+              "part": null,
+              "max_chars": 5000
+            },
+            "use_line": 263,
+            "result_line": 268,
+            "tool": "action",
+            "chars": 2717
+          },
+          {
+            "input": {
+              "agent": "agent-a68daf720e780b4c2",
+              "v": 41,
+              "since": 5,
+              "q_any": [
+                "MemberCenterPage.ets:206",
+                "MemberCenterPage.ets:728",
+                "maskColor: Color.Transparent",
+                "RenewRuleDialog",
+                "PayAgreementDialog"
+              ],
+              "after": false
+            },
+            "use_line": 274,
+            "result_line": 276,
+            "tool": "search",
+            "chars": 6568
+          },
+          {
+            "input": {
+              "file": "entry/src/main/ets/pages/MemberCenterPage.ets",
+              "v": 14,
+              "q_any": [
+                "maskColor: Color.Transparent",
+                "maskColor: Palette.DIALOG_MASK",
+                "builder: AppLoadDialog",
+                "builder: PayAgreementDialog",
+                "builder: RenewRuleDialog"
+              ],
+              "after": false
+            },
+            "use_line": 281,
+            "result_line": 282,
+            "tool": "search",
+            "chars": 3975
+          },
+          {
+            "input": {
+              "ref": "#a68daf720e780b4c2:15670@L501",
+              "part": null,
+              "max_chars": 8000
+            },
+            "use_line": 290,
+            "result_line": 294,
+            "tool": "action",
+            "chars": 5233
+          },
+          {
+            "input": {
+              "ref": "#a68daf720e780b4c2:15682@L528",
+              "part": null,
+              "max_chars": 10000
+            },
+            "use_line": 291,
+            "result_line": 296,
+            "tool": "action",
+            "chars": 5507
+          },
+          {
+            "input": {
+              "ref": "#a68daf720e780b4c2:15744@L615",
+              "part": null,
+              "max_chars": 8000
+            },
+            "use_line": 292,
+            "result_line": 297,
+            "tool": "action",
+            "chars": 8526
+          },
+          {
+            "input": {
+              "ref": "#a68daf720e780b4c2:15744@L615",
+              "part": "input",
+              "find": "ALIGN_PMemberCenterActivitiy_font_mismatch_product-price-suffix",
+              "max_chars": 5000
+            },
+            "use_line": 303,
+            "result_line": 305,
+            "tool": "action",
+            "chars": 5551
+          },
+          {
+            "input": {
+              "topic": "verdict"
+            },
+            "use_line": 312,
+            "result_line": 313,
+            "tool": "guide",
+            "chars": 3173
+          },
+          {
+            "input": {
+              "draft_chars": 12767
+            },
+            "use_line": 321,
+            "result_line": 323,
+            "tool": "check",
+            "chars": 3370
+          },
+          {
+            "input": {
+              "draft_chars": 12321
+            },
+            "use_line": 330,
+            "result_line": 332,
+            "tool": "check",
+            "chars": 1130
+          }
+        ],
+        "coverage": {
+          "expected": 38,
+          "provided": 9,
+          "accounted": 38,
+          "expected_versions": 7,
+          "expected_candidates": 31,
+          "missing_versions": 0,
+          "missing_candidates": 0,
+          "missing": 0,
+          "unresolved": 0,
+          "not_repair": 0,
+          "deferred": 0,
+          "unconfirmed": 0,
+          "advisories": 0,
+          "advisory_rows": 0,
+          "reviewed": 9,
+          "not_investigated": 29
+        },
+        "draft_check": {
+          "status": "matched",
+          "semantic_checked": false,
+          "checks": [
+            {
+              "step": 57,
+              "call_id": "call_veYfNsl2rTu2dgMeykthpkXR",
+              "verified": true,
+              "status": "needs_review",
+              "counts": {
+                "errors": 12,
+                "warnings": 0,
+                "total": 12
+              },
+              "draft_sha256": "dcd551df405fe681c51247a8ba698b7aefb9cc94df6c430868d831b54b73677a",
+              "document_sha256": "529dd3a5f387096bc8bc3abb09214cb324a4a6afd8220acc36f435c88ffa8bf1",
+              "issues": [
+                {
+                  "code": "invalid_reference",
+                  "severity": "error",
+                  "where": "defect:S4.nodes[0].evidence[0]",
+                  "node": null,
+                  "detail": "search:2315c3fa4df41adc53fc060c:1: unparsed;引用位置可核不代表原文支持断言"
+                },
+                {
+                  "code": "invalid_reference",
+                  "severity": "error",
+                  "where": "defect:S4.nodes[0].basis.actual_evidence[0]",
+                  "node": null,
+                  "detail": "search:2315c3fa4df41adc53fc060c:1: unparsed;引用位置可核不代表原文支持断言"
+                },
+                {
+                  "code": "invalid_reference",
+                  "severity": "error",
+                  "where": "defect:S4.nodes[1].evidence[0]",
+                  "node": null,
+                  "detail": "search:d2e26223417847d8593273ae:8: unparsed;引用位置可核不代表原文支持断言"
+                },
+                {
+                  "code": "invalid_reference",
+                  "severity": "error",
+                  "where": "defect:S4.nodes[1].evidence[1]",
+                  "node": null,
+                  "detail": "search:2315c3fa4df41adc53fc060c:2: unparsed;引用位置可核不代表原文支持断言"
+                },
+                {
+                  "code": "invalid_reference",
+                  "severity": "error",
+                  "where": "defect:S4.nodes[1].basis.actual_evidence[0]",
+                  "node": null,
+                  "detail": "search:d2e26223417847d8593273ae:8: unparsed;引用位置可核不代表原文支持断言"
+                },
+                {
+                  "code": "invalid_reference",
+                  "severity": "error",
+                  "where": "defect:S4.nodes[1].basis.actual_evidence[1]",
+                  "node": null,
+                  "detail": "search:2315c3fa4df41adc53fc060c:2: unparsed;引用位置可核不代表原文支持断言"
+                },
+                {
+                  "code": "invalid_reference",
+                  "severity": "error",
+                  "where": "defect:S4.nodes[2].evidence[1]",
+                  "node": null,
+                  "detail": "diff:entry/src/main/ets/pages/MemberCenterPage.ets@v11: unparsed;引用位置可核不代表原文支持断言"
+                },
+                {
+                  "code": "invalid_reference",
+                  "severity": "error",
+                  "where": "defect:S4.nodes[3].evidence[1]",
+                  "node": null,
+                  "detail": "diff:entry/src/main/ets/pages/MemberCenterPage.ets@v12: unparsed;引用位置可核不代表原文支持断言"
+                },
+                {
+                  "code": "invalid_reference",
+                  "severity": "error",
+                  "where": "defect:S4.nodes[4].evidence[2]",
+                  "node": null,
+                  "detail": "diff:entry/src/main/ets/pages/MemberCenterPage.ets@v15: unparsed;引用位置可核不代表原文支持断言"
+                },
+                {
+                  "code": "invalid_reference",
+                  "severity": "error",
+                  "where": "defect:S4.nodes[5].evidence[2]",
+                  "node": null,
+                  "detail": "diff:entry/src/main/ets/pages/MemberCenterPage.ets@v16: unparsed;引用位置可核不代表原文支持断言"
+                },
+                {
+                  "code": "invalid_reference",
+                  "severity": "error",
+                  "where": "defect:S4.event_claims[1].evidence[1]",
+                  "node": null,
+                  "detail": "diff:entry/src/main/ets/pages/MemberCenterPage.ets@v11: unparsed;引用位置可核不代表原文支持断言"
+                },
+                {
+                  "code": "invalid_reference",
+                  "severity": "error",
+                  "where": "defect:S4.event_claims[1].evidence[2]",
+                  "node": null,
+                  "detail": "diff:entry/src/main/ets/pages/MemberCenterPage.ets@v12: unparsed;引用位置可核不代表原文支持断言"
+                }
+              ],
+              "omitted_issues": 0,
+              "coverage": {
+                "checked": true,
+                "target": "entry/src/main/ets/pages/MemberCenterPage.ets",
+                "counts": {
+                  "expected": 38,
+                  "provided": 9,
+                  "accounted": 38,
+                  "expected_versions": 7,
+                  "expected_candidates": 31,
+                  "missing_versions": 0,
+                  "missing_candidates": 0,
+                  "missing": 0,
+                  "unresolved": 0,
+                  "not_repair": 0,
+                  "deferred": 0,
+                  "unconfirmed": 0,
+                  "advisories": 0,
+                  "advisory_rows": 0,
+                  "reviewed": 9,
+                  "not_investigated": 29
+                },
+                "accounted": true,
+                "semantic_checked": false,
+                "mode": "manifest_complement",
+                "manifest_identity_valid": true,
+                "declarations_complete": false
+              },
+              "entry_effect_alignments": [],
+              "entry_effect_alignments_omitted": 0
+            },
+            {
+              "step": 58,
+              "call_id": "call_EKAxLabm3t2MlbmQw9L7sEXP",
+              "verified": true,
+              "status": "mechanical_clear",
+              "counts": {
+                "errors": 0,
+                "warnings": 0,
+                "total": 0
+              },
+              "draft_sha256": "78b5c0b4192761663d7e168e22d01acb3f453328d4d70cd81f7447d7a6b0d803",
+              "document_sha256": "634d88f401696e94ce129e7b0a640d8f32615774e73e25ef0c18a1020309ef2b",
+              "issues": [],
+              "omitted_issues": 0,
+              "coverage": {
+                "checked": true,
+                "target": "entry/src/main/ets/pages/MemberCenterPage.ets",
+                "counts": {
+                  "expected": 38,
+                  "provided": 9,
+                  "accounted": 38,
+                  "expected_versions": 7,
+                  "expected_candidates": 31,
+                  "missing_versions": 0,
+                  "missing_candidates": 0,
+                  "missing": 0,
+                  "unresolved": 0,
+                  "not_repair": 0,
+                  "deferred": 0,
+                  "unconfirmed": 0,
+                  "advisories": 0,
+                  "advisory_rows": 0,
+                  "reviewed": 9,
+                  "not_investigated": 29
+                },
+                "accounted": true,
+                "semantic_checked": false,
+                "mode": "manifest_complement",
+                "manifest_identity_valid": true,
+                "declarations_complete": false
+              },
+              "entry_effect_alignments": [],
+              "entry_effect_alignments_omitted": 0
+            }
+          ],
+          "check_calls": 2,
+          "draft_chars": 25088,
+          "returned_chars": 4500,
+          "final_document_sha256": "634d88f401696e94ce129e7b0a640d8f32615774e73e25ef0c18a1020309ef2b",
+          "matched_check": 58
+        },
+        "until_queries": [
+          {
+            "input": {
+              "since_ts": "2026-07-26T21:46:12.739Z",
+              "until_ts": "2026-07-26T21:48:57.218000Z",
+              "q_any": [
+                "BUILD_STATUS",
+                "COMPILE RESULT",
+                "PASS",
+                "FAIL",
+                "priceDigits",
+                "priceSuffix"
+              ],
+              "after": true
+            },
+            "use_line": 234,
+            "result_line": 236,
+            "tool": "search",
+            "chars": 4850
+          }
+        ],
+        "check_changes": [
+          {
+            "InputObject": "        evidence: [\"#08b3dcf6deb3c515:6409@L61\"]",
+            "SideIndicator": "=>"
+          },
+          {
+            "InputObject": "          actual_evidence: [\"#08b3dcf6deb3c515:6409@L61\"]",
+            "SideIndicator": "=>"
+          },
+          {
+            "InputObject": "        evidence: [\"#80bbb1f44b77da0f:13670@L264\"]",
+            "SideIndicator": "=>"
+          },
+          {
+            "InputObject": "          actual_evidence: [\"#80bbb1f44b77da0f:13670@L264\"]",
+            "SideIndicator": "=>"
+          },
+          {
+            "InputObject": "        evidence: [\"#a68daf720e780b4c2:15682@L528\"]",
+            "SideIndicator": "=>"
+          },
+          {
+            "InputObject": "        evidence: [\"#a68daf720e780b4c2:15682@L528\"]",
+            "SideIndicator": "=>"
+          },
+          {
+            "InputObject": "        evidence: [\"#af0e3d2ae54dbf769:17286@L23\", \"#af0e3d2ae54dbf769:17292@L32\"]",
+            "SideIndicator": "=>"
+          },
+          {
+            "InputObject": "        evidence: [\"#af0e3d2ae54dbf769:17286@L23\", \"#af0e3d2ae54dbf769:17294@L34\"]",
+            "SideIndicator": "=>"
+          },
+          {
+            "InputObject": "        evidence: [\"#a68daf720e780b4c2:15682@L528\"]",
+            "SideIndicator": "=>"
+          },
+          {
+            "InputObject": "        evidence: [\"search:2315c3fa4df41adc53fc060c:1\"]",
+            "SideIndicator": "<="
+          },
+          {
+            "InputObject": "          actual_evidence: [\"search:2315c3fa4df41adc53fc060c:1\"]",
+            "SideIndicator": "<="
+          },
+          {
+            "InputObject": "        evidence: [\"search:d2e26223417847d8593273ae:8\", \"search:2315c3fa4df41adc53fc060c:2\"]",
+            "SideIndicator": "<="
+          },
+          {
+            "InputObject": "          actual_evidence: [\"search:d2e26223417847d8593273ae:8\", \"search:2315c3fa4df41adc53fc060c:2\"]",
+            "SideIndicator": "<="
+          },
+          {
+            "InputObject": "        evidence: [\"#a68daf720e780b4c2:15682@L528\", \"diff:entry/src/main/ets/pages/MemberCenterPage.ets@v11\"]",
+            "SideIndicator": "<="
+          },
+          {
+            "InputObject": "        evidence: [\"#a68daf720e780b4c2:15682@L528\", \"diff:entry/src/main/ets/pages/MemberCenterPage.ets@v12\"]",
+            "SideIndicator": "<="
+          },
+          {
+            "InputObject": "        evidence: [\"#af0e3d2ae54dbf769:17286@L23\", \"#af0e3d2ae54dbf769:17292@L32\", \"diff:entry/src/main/ets/pages/MemberCenterPage.ets@v15\"]",
+            "SideIndicator": "<="
+          },
+          {
+            "InputObject": "        evidence: [\"#af0e3d2ae54dbf769:17286@L23\", \"#af0e3d2ae54dbf769:17294@L34\", \"diff:entry/src/main/ets/pages/MemberCenterPage.ets@v16\"]",
+            "SideIndicator": "<="
+          },
+          {
+            "InputObject": "        evidence: [\"#a68daf720e780b4c2:15682@L528\", \"diff:entry/src/main/ets/pages/MemberCenterPage.ets@v11\", \"diff:entry/src/main/ets/pages/MemberCenterPage.ets@v12\"]",
+            "SideIndicator": "<="
+          }
+        ]
+      },
+      "reference_integrity": {
+        "candidate_bindings": [
+          {
+            "source": "mention",
+            "ref": "#a68daf720e780b4c2:15406@L103",
+            "candidate": "candidate:b30f4e449bea2bd6cc42",
+            "matches": 1
+          },
+          {
+            "source": "touch",
+            "ref": "#a68daf720e780b4c2:15407@L106",
+            "candidate": "candidate:6ffcb050ddf8488c74e4",
+            "matches": 1
+          },
+          {
+            "source": "touch",
+            "ref": "#a68daf720e780b4c2:15676@L514",
+            "candidate": "candidate:15dc8f2549f98518f8d2",
+            "matches": 1
+          },
+          {
+            "source": "touch",
+            "ref": "#a68daf720e780b4c2:15681@L526",
+            "candidate": "candidate:a5cb3bf21ae8c450587d",
+            "matches": 1
+          },
+          {
+            "source": "touch",
+            "ref": "#a68daf720e780b4c2:15731@L592",
+            "candidate": "candidate:89dc8e4fea1fb9373422",
+            "matches": 1
+          }
+        ],
+        "document_sha256": "634d88f401696e94ce129e7b0a640d8f32615774e73e25ef0c18a1020309ef2b",
+        "case": "member-center",
+        "draft_sha256": "78b5c0b4192761663d7e168e22d01acb3f453328d4d70cd81f7447d7a6b0d803",
+        "refs": [
+          {
+            "ref": "#08b3dcf6deb3c515:6409@L61",
+            "file_matches": 1,
+            "line": 61,
+            "ok": true,
+            "file": "9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aconv-member-08b3dcf6deb3c515.jsonl",
+            "timestamp": "2026-07-24T02:35:15.167Z",
+            "source_role": "assistant",
+            "record_sha256": "346a911bd16e8d671ba104756f4bfcf9499807190d61519c855288628c455537",
+            "native_ids": [
+              "toolu_01Av1mPVPn4rQrEuYyWyWqJH"
+            ]
+          },
+          {
+            "ref": "#80bbb1f44b77da0f:13670@L264",
+            "file_matches": 1,
+            "line": 264,
+            "ok": true,
+            "file": "9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aslice8-pay-80bbb1f44b77da0f.jsonl",
+            "timestamp": "2026-07-24T16:04:37.440Z",
+            "source_role": "assistant",
+            "record_sha256": "2cbc8bdd8903acbc38df933fbe6e734b8f9cf1544d98f41ee75b75d5e498d864",
+            "native_ids": [
+              "toolu_014KPLsf5z2NXVMADVFHfxbz"
+            ]
+          },
+          {
+            "ref": "#a68daf720e780b4c2:15391@L68",
+            "file_matches": 1,
+            "line": 68,
+            "ok": true,
+            "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+            "timestamp": "2026-07-26T20:35:31.687Z",
+            "source_role": "assistant",
+            "record_sha256": "ffed914700a8fce7a714f105bafc34d56f156cc60afa02095df7f70d0b3872e0",
+            "native_ids": [
+              "toolu_012Bp4rAaReFzfroz2Dew7Eh"
+            ]
+          },
+          {
+            "ref": "#a68daf720e780b4c2:15396@L77",
+            "file_matches": 1,
+            "line": 77,
+            "ok": true,
+            "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+            "timestamp": "2026-07-26T20:36:01.231Z",
+            "source_role": "assistant",
+            "record_sha256": "d62980223529c0a245178d6df6bd16ac6bf1024f80651c5e03502496fd40fade",
+            "native_ids": [
+              "toolu_016h1qeyct3Ac32r68PFp2KB"
+            ]
+          },
+          {
+            "ref": "#a68daf720e780b4c2:15397@L80",
+            "file_matches": 1,
+            "line": 80,
+            "ok": true,
+            "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+            "timestamp": "2026-07-26T20:36:15.076Z",
+            "source_role": "assistant",
+            "record_sha256": "7c126ee113537ab79cb559e72cae3ce3ecd4d02cd20f81ad3ebeac8af9d46fb5",
+            "native_ids": [
+              "toolu_011svikWwqqHYsLcQxAET1dW"
+            ]
+          },
+          {
+            "ref": "#a68daf720e780b4c2:15406@L103",
+            "file_matches": 1,
+            "line": 103,
+            "ok": true,
+            "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+            "timestamp": "2026-07-26T20:41:07.872Z",
+            "source_role": "assistant",
+            "record_sha256": "d3662b808223939b528589cd614033c8b5bffcb83d2cf78c3b5b97c0d395b4ba",
+            "native_ids": [
+              "toolu_01T6WkXMhD7rUsHaSaMPuhgx"
+            ]
+          },
+          {
+            "ref": "#a68daf720e780b4c2:15407@L106",
+            "file_matches": 1,
+            "line": 106,
+            "ok": true,
+            "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+            "timestamp": "2026-07-26T20:41:17.462Z",
+            "source_role": "assistant",
+            "record_sha256": "cb92907b23f9a26e874433f6e41be0ab102c854f2909d65e7ac823bb2a52319e",
+            "native_ids": [
+              "toolu_019xb74vC9BgRv4xeSea6NmF"
+            ]
+          },
+          {
+            "ref": "#a68daf720e780b4c2:15670@L501",
+            "file_matches": 1,
+            "line": 501,
+            "ok": true,
+            "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+            "timestamp": "2026-07-26T21:21:29.934Z",
+            "source_role": "assistant",
+            "record_sha256": "29282cec557a01a6a9c46a8f293d85541d25bd8a98cef9ad2e032b7790c62c8a",
+            "native_ids": [
+              "toolu_01YGYsH1u6KQtX8A2AkLVXFF"
+            ]
+          },
+          {
+            "ref": "#a68daf720e780b4c2:15676@L514",
+            "file_matches": 1,
+            "line": 514,
+            "ok": true,
+            "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+            "timestamp": "2026-07-26T21:22:46.628Z",
+            "source_role": "assistant",
+            "record_sha256": "d89bb2679d09c0cb6f8063a454843d5228d2a912e43fa7a161b147c0e106a672",
+            "native_ids": [
+              "toolu_01FtpChSvY6ZyLF571yQrYm5"
+            ]
+          },
+          {
+            "ref": "#a68daf720e780b4c2:15677@L516",
+            "file_matches": 1,
+            "line": 516,
+            "ok": true,
+            "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+            "timestamp": "2026-07-26T21:22:55.328Z",
+            "source_role": "assistant",
+            "record_sha256": "0842419d54cf337120262ca5ad80a280bc1c0f2b449a17186b855661edfb7ca6",
+            "native_ids": [
+              "toolu_019PTiyxoeX5Vc9KMJFu2jhw"
+            ]
+          },
+          {
+            "ref": "#a68daf720e780b4c2:15681@L526",
+            "file_matches": 1,
+            "line": 526,
+            "ok": true,
+            "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+            "timestamp": "2026-07-26T21:23:48.943Z",
+            "source_role": "assistant",
+            "record_sha256": "bd088e069c147c83094ed38f227fcd610cb50ea4d719aecfdda17eefe4f613e4",
+            "native_ids": [
+              "toolu_018iigK7PXctAwha3ACowNZP"
+            ]
+          },
+          {
+            "ref": "#a68daf720e780b4c2:15682@L528",
+            "file_matches": 1,
+            "line": 528,
+            "ok": true,
+            "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+            "timestamp": "2026-07-26T21:24:15.832Z",
+            "source_role": "assistant",
+            "record_sha256": "16690e1e9641c1ddf9dee4ca7979c4f3521bb478bc2799bdd0db2ab28f2ff6dc",
+            "native_ids": [
+              "toolu_016bvcNnvDn4tHXcYJY7CzLh"
+            ]
+          },
+          {
+            "ref": "#a68daf720e780b4c2:15731@L592",
+            "file_matches": 1,
+            "line": 592,
+            "ok": true,
+            "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+            "timestamp": "2026-07-26T21:30:17.239Z",
+            "source_role": "assistant",
+            "record_sha256": "247880efbf4a79665a1ed0968a3cfa8e7269a991e34aecc0715dedad965642d7",
+            "native_ids": [
+              "toolu_01BrL9dsi5PB64tZiKVRfWoa"
+            ]
+          },
+          {
+            "ref": "#a68daf720e780b4c2:15744@L615",
+            "file_matches": 1,
+            "line": 615,
+            "ok": true,
+            "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+            "timestamp": "2026-07-26T21:41:39.026Z",
+            "source_role": "assistant",
+            "record_sha256": "4a62b9fd1fe061c21e60017a33de7b9d8b769c42274aa798702cfa95016524d6",
+            "native_ids": [
+              "toolu_01XJTap83qih25dRyZQyQNkw"
+            ]
+          },
+          {
+            "ref": "#af0e3d2ae54dbf769:17286@L23",
+            "file_matches": 1,
+            "line": 23,
+            "ok": true,
+            "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-af0e3d2ae54dbf769.jsonl",
+            "timestamp": "2026-07-26T21:45:43.448Z",
+            "source_role": "assistant",
+            "record_sha256": "dd5a088044c503af6f19786c8b1c4eb3abbcdfe58c4207eed096bbd08b436a4f",
+            "native_ids": [
+              "toolu_01SSSyTUpqQtQF1SjZy36FTe"
+            ]
+          },
+          {
+            "ref": "#af0e3d2ae54dbf769:17287@L26",
+            "file_matches": 1,
+            "line": 26,
+            "ok": true,
+            "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-af0e3d2ae54dbf769.jsonl",
+            "timestamp": "2026-07-26T21:45:50.368Z",
+            "source_role": "assistant",
+            "record_sha256": "4bfeb5794e5b91726b4c43d97bc07059b167c69f9ff9419ee881e3debe6d17ae",
+            "native_ids": [
+              "toolu_011arLjSAKDjV6FHuTEHRqHw"
+            ]
+          },
+          {
+            "ref": "#af0e3d2ae54dbf769:17292@L32",
+            "file_matches": 1,
+            "line": 32,
+            "ok": true,
+            "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-af0e3d2ae54dbf769.jsonl",
+            "timestamp": "2026-07-26T21:46:11.820Z",
+            "source_role": "assistant",
+            "record_sha256": "94fd77263f2be9dbaff0629cf3399face77ec8c84e9fcba8f0f72a15877eca77",
+            "native_ids": [
+              "toolu_01W4Yg3nfX75u3Yxsk1X4wat"
+            ]
+          },
+          {
+            "ref": "#af0e3d2ae54dbf769:17294@L34",
+            "file_matches": 1,
+            "line": 34,
+            "ok": true,
+            "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-af0e3d2ae54dbf769.jsonl",
+            "timestamp": "2026-07-26T21:46:12.739Z",
+            "source_role": "assistant",
+            "record_sha256": "5dc57be6408fb9395737e8d66e0b239071524e71e5d8329f421483170690c200",
+            "native_ids": [
+              "toolu_01YcRVJymkRf9wtm51Pr5qt8"
+            ]
+          },
+          {
+            "ref": "#af0e3d2ae54dbf769:17296@L36",
+            "file_matches": 1,
+            "line": 36,
+            "ok": true,
+            "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-af0e3d2ae54dbf769.jsonl",
+            "timestamp": "2026-07-26T21:46:18.585Z",
+            "source_role": "assistant",
+            "record_sha256": "792568db4539cbb2617c22388993bf80fde9505a8b4b4a3d17ec302c6a8a1075",
+            "native_ids": [
+              "toolu_01PcjKpCh43ea95hpoivTyih"
+            ]
+          }
+        ],
+        "rep": 1,
+        "yaml_trim_equals_raw_trim": true,
+        "trace_bound": true,
+        "submission_status": "accepted",
+        "ledger": "atoms-2026-09-09-file-evidence5:146:d3caecc10ee760243f09ec3e",
+        "yaml_sha256": "78b5c0b4192761663d7e168e22d01acb3f453328d4d70cd81f7447d7a6b0d803",
+        "draft_changes": [
+          {
+            "InputObject": "        evidence: [\"#08b3dcf6deb3c515:6409@L61\"]",
+            "SideIndicator": "=>"
+          },
+          {
+            "InputObject": "          actual_evidence: [\"#08b3dcf6deb3c515:6409@L61\"]",
+            "SideIndicator": "=>"
+          },
+          {
+            "InputObject": "        evidence: [\"#80bbb1f44b77da0f:13670@L264\"]",
+            "SideIndicator": "=>"
+          },
+          {
+            "InputObject": "          actual_evidence: [\"#80bbb1f44b77da0f:13670@L264\"]",
+            "SideIndicator": "=>"
+          },
+          {
+            "InputObject": "        evidence: [\"#a68daf720e780b4c2:15682@L528\"]",
+            "SideIndicator": "=>"
+          },
+          {
+            "InputObject": "        evidence: [\"#a68daf720e780b4c2:15682@L528\"]",
+            "SideIndicator": "=>"
+          },
+          {
+            "InputObject": "        evidence: [\"#af0e3d2ae54dbf769:17286@L23\", \"#af0e3d2ae54dbf769:17292@L32\"]",
+            "SideIndicator": "=>"
+          },
+          {
+            "InputObject": "        evidence: [\"#af0e3d2ae54dbf769:17286@L23\", \"#af0e3d2ae54dbf769:17294@L34\"]",
+            "SideIndicator": "=>"
+          },
+          {
+            "InputObject": "        evidence: [\"#a68daf720e780b4c2:15682@L528\"]",
+            "SideIndicator": "=>"
+          },
+          {
+            "InputObject": "        evidence: [\"search:2315c3fa4df41adc53fc060c:1\"]",
+            "SideIndicator": "<="
+          },
+          {
+            "InputObject": "          actual_evidence: [\"search:2315c3fa4df41adc53fc060c:1\"]",
+            "SideIndicator": "<="
+          },
+          {
+            "InputObject": "        evidence: [\"search:d2e26223417847d8593273ae:8\", \"search:2315c3fa4df41adc53fc060c:2\"]",
+            "SideIndicator": "<="
+          },
+          {
+            "InputObject": "          actual_evidence: [\"search:d2e26223417847d8593273ae:8\", \"search:2315c3fa4df41adc53fc060c:2\"]",
+            "SideIndicator": "<="
+          },
+          {
+            "InputObject": "        evidence: [\"#a68daf720e780b4c2:15682@L528\", \"diff:entry/src/main/ets/pages/MemberCenterPage.ets@v11\"]",
+            "SideIndicator": "<="
+          },
+          {
+            "InputObject": "        evidence: [\"#a68daf720e780b4c2:15682@L528\", \"diff:entry/src/main/ets/pages/MemberCenterPage.ets@v12\"]",
+            "SideIndicator": "<="
+          },
+          {
+            "InputObject": "        evidence: [\"#af0e3d2ae54dbf769:17286@L23\", \"#af0e3d2ae54dbf769:17292@L32\", \"diff:entry/src/main/ets/pages/MemberCenterPage.ets@v15\"]",
+            "SideIndicator": "<="
+          },
+          {
+            "InputObject": "        evidence: [\"#af0e3d2ae54dbf769:17286@L23\", \"#af0e3d2ae54dbf769:17294@L34\", \"diff:entry/src/main/ets/pages/MemberCenterPage.ets@v16\"]",
+            "SideIndicator": "<="
+          },
+          {
+            "InputObject": "        evidence: [\"#a68daf720e780b4c2:15682@L528\", \"diff:entry/src/main/ets/pages/MemberCenterPage.ets@v11\", \"diff:entry/src/main/ets/pages/MemberCenterPage.ets@v12\"]",
+            "SideIndicator": "<="
+          }
+        ],
+        "raw_equals_last_draft": true,
+        "scope": "独立核转录标签/原始行/native ID/行SHA；新e67账本不套旧seq，不用后续viewer重绑。定位与check不认证语义。"
+      },
+      "cost": {
+        "started_at": "2026-09-09T22:51:53.435926+00:00",
+        "ended_at": "2026-09-09T22:59:06.835216+00:00",
+        "wall_s": 433.4094844000647,
+        "end_to_end_wall_s": 446.72639209998306,
+        "input_total": 2053412,
+        "cached_input_included": 1924608,
+        "output_total": 19919,
+        "input_plus_output": 2073331,
+        "tool_calls": 58,
+        "tool_chars": 217173,
+        "repeated_calls": 0,
+        "rejected_calls": 3
+      },
+      "fact_counts": {
+        "supported": 4,
+        "partial": 2,
+        "omitted": 0,
+        "contradicted": 0
+      },
+      "unsupported_causal_claims": [
+        {
+          "code": "unbound_early_requirement_used_for_red_entry",
+          "material": true,
+          "question": "S4",
+          "node": "file:/Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723/entry/src/main/ets/pages/MemberCenterPage.ets@v1",
+          "report_claim": "role: 进入·缺；后续finding要求保留Android多级字号时，这一实现缺少后缀降号结构。counterevidence：当时是否已有完整Android span要求进入上下文未知。",
+          "evidence": [
+            "converter L61/v1输入确有Text(item.priceText).fontSize(30)；字段注释把priceText称rolling数字，showBottom另列。",
+            "原始Slice8 L21/L24正确Kotlin到L264/v7重写的更近输入链仍未查。"
+          ],
+          "assessment": "单Text语法成立，但没有证明初始版本具体后缀数据及当时输入/适用义务；不能以更晚finding直接认证v1为最初因果进入。列material未充分支持标注，不伪称已找到相反的完整历史原因，也不改变S4原本partial。"
+        }
+      ]
+    },
+    {
+      "case": "dice-entry",
+      "variant": "formal-v12",
+      "arm": "tools",
+      "rep": 1,
+      "run": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v12/dice-entry/runs/tools/rep1",
+      "source_code_id": "e67d7d7",
+      "source_digest": "526e8f61bd30b14b67b742e8c52dbebde933b04d09d9a77eca92434a4188c658",
+      "pool_digest": "653db4192d47366e8ca099e59ef2679e929056f18320d081768539b2f5b7443e",
+      "common_task_sha256": "9060a6c160d2a1ac2b893b9f19d12e66a16e6ce1b7d301eacae0abfb9f55eec4",
+      "model": [
+        "gpt-5.5"
+      ],
+      "effort": "medium",
+      "questions": [
+        {
+          "id": "D1",
+          "core": "pass",
+          "basis": "生成者v1实际输入索引已打开，包含page/F001/immersive；后续桥派发与三Edit、阶段区分成立。生成后EntryAbility Write未专门核，细项partial但不等同未核实际输入。",
+          "mandatory_gaps": [],
+          "minor_omissions": [
+            "生成后的EntryAbility Write v2未单独核对；已打开的generator v1窗口实际含page/F001/immersive等输入，区别于未核生成输入。"
+          ],
+          "facts": [
+            {
+              "id": "D1.f1",
+              "status": "partial",
+              "report_claim": "初始迁移阶段可见派发/读索引无桥要求，读了EntryAbility v1；未专门展开生成后的EntryAbility L71/v2 Write。",
+              "raw_evidence": [
+                "generator L47/L48,L51/L52,L53/L54,L57/L58,L71/L72"
+              ]
+            },
+            {
+              "id": "D1.f2",
+              "status": "supported",
+              "report_claim": "后续Step3派发明确按设计§F写TestDataSetup与Want→AppStorage桥，v3-v5分三Edit加入。",
+              "raw_evidence": [
+                "bridge L1,L7/L8,L11/L12,L35/L36,L37/L38,L39/L40"
+              ]
+            },
+            {
+              "id": "D1.f3",
+              "status": "supported",
+              "report_claim": "不能把后续UI测试桥要求反推Stage1应有；代码写入不证明设备桥键成功。",
+              "raw_evidence": [
+                "上述生成/桥时间戳",
+                "Step4 L390及root81e L3402当轮summary"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "D2",
+          "core": "pass",
+          "basis": "ECAT worklist、SDK实际读取、三Edit及原生双目标build正确；未虚称观察者回调已触发。",
+          "mandatory_gaps": [],
+          "minor_omissions": [],
+          "facts": [
+            {
+              "id": "D2.f1",
+              "status": "supported",
+              "report_claim": "ECAT iteration0派发明确HarmonyOS约束，注册未捕获异常观察者。",
+              "raw_evidence": [
+                "root2f L100",
+                "observer L1"
+              ]
+            },
+            {
+              "id": "D2.f2",
+              "status": "supported",
+              "report_claim": "EntryAbility v5及SDK AbilityKit/ErrorObserver读取后，v6/v7/v8加入import/调用/实现。",
+              "raw_evidence": [
+                "observer L23/L24,L35/L36,L37/L38,L41-L46"
+              ]
+            },
+            {
+              "id": "D2.f3",
+              "status": "supported",
+              "report_claim": "后置builder报告主/测试构建EXIT0且may-throw WARN，不将编译认作观察者真实回调；本次后置observer编译主要按builder L82总结来源，而非独立展开原生日志。",
+              "raw_evidence": [
+                "builder L43/L44,L63/L64",
+                "builder L51/L52含maythrow WARN"
+              ]
+            }
+          ]
+        }
+      ],
+      "extra_false_claims": [],
+      "unsupported_citations": [],
+      "annotation_requires_correction": false,
+      "full_annotation_pass": false,
+      "notes": [
+        "8次agent中成功桥v4、observerv3、generatorv1、Step4v14；generator v1仍属WindowModel效应，但其实际已读page/F001/immersive等输入，报告没有把该node冒称EntryAbility生成Write v2。",
+        "27次action、6diff、3search（2个until_ts）；无effect builder错误agentv1请求遭拒，改用action(id,seq)/search(v0,after=true)可定位原文，最终events没有造builder v1。",
+        "D1_E5原生编译片段来自builder-verify-final L29，20:15已晚于桥且早于observer；D2使用另一个ECAT builder L82报告。没有把早期编译当observer后置证据。",
+        "依旧漏独立Dice10/10 addendum。曾action root593d L385 part=output find=10/10，实际输出是Edit回执没有正文；未转input、未查L256/L260原生回放。旧Step4 UI0/10当轮报告真实，不据此给后置完整验证信用。",
+        "D2写‘后续记忆/索引更晚，不能倒推初始生成’，相对生成阶段成立；没有误称21:12 memory晚于21:19 observer修复。",
+        "generator最终证据L3是skill注入，L1才是专门派发；已打开agent画像含完整L1，故是来源定位精度不足，不说实际任务从未收到。",
+        "两check间只删除entry_events，6warning→0；20个final locator均独立定位。6reviewed+1系统补集。"
+      ],
+      "investigation": {
+        "tool_counts": [
+          {
+            "Name": "guide",
+            "Count": 2
+          },
+          {
+            "Name": "sessions",
+            "Count": 1
+          },
+          {
+            "Name": "diff",
+            "Count": 6
+          },
+          {
+            "Name": "agent",
+            "Count": 8
+          },
+          {
+            "Name": "action",
+            "Count": 27
+          },
+          {
+            "Name": "search",
+            "Count": 3
+          },
+          {
+            "Name": "index",
+            "Count": 2
+          },
+          {
+            "Name": "check",
+            "Count": 2
+          }
+        ],
+        "seq": [
+          {
+            "input": {},
+            "use_line": 17,
+            "result_line": 18,
+            "tool": "guide",
+            "chars": 2103
+          },
+          {
+            "input": {
+              "file": "entry/src/main/ets/entryability/EntryAbility.ets"
+            },
+            "use_line": 26,
+            "result_line": 28,
+            "tool": "sessions",
+            "chars": 7350
+          },
+          {
+            "input": {
+              "path": "entry/src/main/ets/entryability/EntryAbility.ets",
+              "v": 3
+            },
+            "use_line": 35,
+            "result_line": 42,
+            "tool": "diff",
+            "chars": 681
+          },
+          {
+            "input": {
+              "path": "entry/src/main/ets/entryability/EntryAbility.ets",
+              "v": 4
+            },
+            "use_line": 36,
+            "result_line": 44,
+            "tool": "diff",
+            "chars": 603
+          },
+          {
+            "input": {
+              "path": "entry/src/main/ets/entryability/EntryAbility.ets",
+              "v": 5
+            },
+            "use_line": 37,
+            "result_line": 46,
+            "tool": "diff",
+            "chars": 1474
+          },
+          {
+            "input": {
+              "path": "entry/src/main/ets/entryability/EntryAbility.ets",
+              "v": 6
+            },
+            "use_line": 38,
+            "result_line": 47,
+            "tool": "diff",
+            "chars": 304
+          },
+          {
+            "input": {
+              "path": "entry/src/main/ets/entryability/EntryAbility.ets",
+              "v": 7
+            },
+            "use_line": 39,
+            "result_line": 48,
+            "tool": "diff",
+            "chars": 399
+          },
+          {
+            "input": {
+              "path": "entry/src/main/ets/entryability/EntryAbility.ets",
+              "v": 8
+            },
+            "use_line": 40,
+            "result_line": 49,
+            "tool": "diff",
+            "chars": 962
+          },
+          {
+            "input": {
+              "id": "agent-a711c5d09fb676814",
+              "v": 4,
+              "via": "sessions",
+              "reads": true,
+              "seen": true,
+              "summary_chars": 200
+            },
+            "use_line": 57,
+            "result_line": 61,
+            "tool": "agent",
+            "chars": 10413
+          },
+          {
+            "input": {
+              "id": "agent-a27497cfed8c44856",
+              "v": 3,
+              "via": "sessions",
+              "reads": true,
+              "seen": true,
+              "summary_chars": 200
+            },
+            "use_line": 58,
+            "result_line": 63,
+            "tool": "agent",
+            "chars": 90
+          },
+          {
+            "input": {
+              "id": "agent-a349784d2663f1f0a",
+              "v": 1,
+              "via": "sessions",
+              "reads": true,
+              "seen": true,
+              "summary_chars": 200
+            },
+            "use_line": 59,
+            "result_line": 64,
+            "tool": "agent",
+            "chars": 90
+          },
+          {
+            "input": {
+              "id": "agent-a27497cfed8c44856",
+              "v": 3,
+              "via": "agent:agent-a711c5d09fb676814@v4",
+              "reads": true,
+              "seen": true,
+              "summary_chars": 220
+            },
+            "use_line": 70,
+            "result_line": 73,
+            "tool": "agent",
+            "chars": 7531
+          },
+          {
+            "input": {
+              "id": "agent-a349784d2663f1f0a",
+              "v": 1,
+              "via": "agent:agent-a711c5d09fb676814@v4",
+              "reads": true,
+              "seen": true,
+              "summary_chars": 220
+            },
+            "use_line": 71,
+            "result_line": 75,
+            "tool": "agent",
+            "chars": 16518
+          },
+          {
+            "input": {
+              "ref": "#a711c5d09fb676814:2859@L11",
+              "part": "output",
+              "find": "## F",
+              "max_chars": 6000
+            },
+            "use_line": 82,
+            "result_line": 88,
+            "tool": "action",
+            "chars": 6826
+          },
+          {
+            "input": {
+              "ref": "#a711c5d09fb676814:2855@L7",
+              "part": "output",
+              "find": "§6.1",
+              "max_chars": 5000
+            },
+            "use_line": 83,
+            "result_line": 90,
+            "tool": "action",
+            "chars": 910
+          },
+          {
+            "input": {
+              "ref": "#a711c5d09fb676814:2885@L39",
+              "part": "input",
+              "max_chars": 5000
+            },
+            "use_line": 84,
+            "result_line": 92,
+            "tool": "action",
+            "chars": 2391
+          },
+          {
+            "input": {
+              "ref": "#a27497cfed8c44856:4500@L29",
+              "part": "output",
+              "find": "interface ErrorObserver",
+              "max_chars": 4000
+            },
+            "use_line": 85,
+            "result_line": 93,
+            "tool": "action",
+            "chars": 738
+          },
+          {
+            "input": {
+              "ref": "#a27497cfed8c44856:4515@L45",
+              "part": "input",
+              "max_chars": 5000
+            },
+            "use_line": 86,
+            "result_line": 94,
+            "tool": "action",
+            "chars": 1908
+          },
+          {
+            "input": {
+              "ref": "#a711c5d09fb676814:2859@L11",
+              "part": "output",
+              "find": "Mount Strategy",
+              "max_chars": 5000
+            },
+            "use_line": 103,
+            "result_line": 109,
+            "tool": "action",
+            "chars": 5823
+          },
+          {
+            "input": {
+              "ref": "#a711c5d09fb676814:2859@L11",
+              "part": "output",
+              "find": "__target_page__",
+              "max_chars": 5000
+            },
+            "use_line": 104,
+            "result_line": 111,
+            "tool": "action",
+            "chars": 5824
+          },
+          {
+            "input": {
+              "ref": "#a711c5d09fb676814:2855@L7",
+              "part": "output",
+              "find": "__target_page__",
+              "max_chars": 5000
+            },
+            "use_line": 105,
+            "result_line": 113,
+            "tool": "action",
+            "chars": 5863
+          },
+          {
+            "input": {
+              "ref": "#a27497cfed8c44856:4500@L29",
+              "part": "output",
+              "find": "ErrorObserver",
+              "max_chars": 5000
+            },
+            "use_line": 106,
+            "result_line": 114,
+            "tool": "action",
+            "chars": 5670
+          },
+          {
+            "input": {
+              "ref": "#a27497cfed8c44856:4505@L35",
+              "part": "output",
+              "find": "errorManager",
+              "max_chars": 4000
+            },
+            "use_line": 107,
+            "result_line": 115,
+            "tool": "action",
+            "chars": 2465
+          },
+          {
+            "input": {
+              "ref": "#a27497cfed8c44856:4507@L37",
+              "part": "output",
+              "max_chars": 5000
+            },
+            "use_line": 122,
+            "result_line": 124,
+            "tool": "action",
+            "chars": 3640
+          },
+          {
+            "input": {
+              "q_any": [
+                "__TEST_MODE__",
+                "__TARGET_PAGE__",
+                "consumeTestWant",
+                "P0001_MainActivity_UI",
+                "UI test",
+                "UiTest"
+              ],
+              "since_ts": "2026-09-03T19:17:35.691000Z",
+              "until_ts": "2026-09-03T22:09:07.170000Z",
+              "after": true
+            },
+            "use_line": 129,
+            "result_line": 133,
+            "tool": "search",
+            "chars": 19703
+          },
+          {
+            "input": {
+              "q_any": [
+                "errorManager.on",
+                "registerGlobalErrorObserver",
+                "uncaught exception",
+                "globalError",
+                "全局未捕获异常观察者",
+                "appRecovery"
+              ],
+              "since_ts": "2026-09-03T21:19:39.888000Z",
+              "until_ts": "2026-09-03T22:09:07.170000Z",
+              "after": true
+            },
+            "use_line": 130,
+            "result_line": 135,
+            "tool": "search",
+            "chars": 17816
+          },
+          {
+            "input": {
+              "kind": "time",
+              "limit": 80
+            },
+            "use_line": 131,
+            "result_line": 136,
+            "tool": "index",
+            "chars": 2395
+          },
+          {
+            "input": {
+              "id": "agent-a52d61ac7ab7033ba",
+              "v": 14,
+              "via": "search:fcaf84dd52cdd26fa7df077f:17",
+              "reads": true,
+              "seen": true,
+              "summary_chars": 260
+            },
+            "use_line": 144,
+            "result_line": 149,
+            "tool": "agent",
+            "chars": 71273
+          },
+          {
+            "input": {
+              "ref": "#81e0a463:1349@L3448",
+              "part": "input",
+              "max_chars": 5000
+            },
+            "use_line": 145,
+            "result_line": 151,
+            "tool": "action",
+            "chars": 1721
+          },
+          {
+            "input": {
+              "ref": "#593d4e86:4121@L385",
+              "part": "output",
+              "find": "10/10 用例实测 PASS",
+              "max_chars": 4000
+            },
+            "use_line": 146,
+            "result_line": 152,
+            "tool": "action",
+            "chars": 820
+          },
+          {
+            "input": {
+              "ref": "#2f01bcdc:4358@L224",
+              "part": "output",
+              "max_chars": 5000
+            },
+            "use_line": 147,
+            "result_line": 153,
+            "tool": "action",
+            "chars": 439
+          },
+          {
+            "input": {
+              "id": "agent-ac3b22afb4458cd07",
+              "v": 1,
+              "via": "agent:agent-a52d61ac7ab7033ba@v14",
+              "reads": true,
+              "seen": true,
+              "summary_chars": 300
+            },
+            "use_line": 160,
+            "result_line": 162,
+            "tool": "agent",
+            "chars": 56
+          },
+          {
+            "input": {
+              "ref": "#81e0a463:1349@L3448",
+              "part": "output",
+              "max_chars": 8000
+            },
+            "use_line": 167,
+            "result_line": 169,
+            "tool": "action",
+            "chars": 1623
+          },
+          {
+            "input": {
+              "ref": "#ac3b22afb4458cd07:3383@L?",
+              "part": "output",
+              "max_chars": 6000
+            },
+            "use_line": 174,
+            "result_line": 176,
+            "tool": "action",
+            "chars": 75
+          },
+          {
+            "input": {
+              "kind": "agent",
+              "query": "builder-verify-final",
+              "limit": 20
+            },
+            "use_line": 181,
+            "result_line": 183,
+            "tool": "index",
+            "chars": 161
+          },
+          {
+            "input": {
+              "id": "agent-ac3b22afb4458cd07",
+              "seq": 3383,
+              "part": "output",
+              "max_chars": 8000
+            },
+            "use_line": 188,
+            "result_line": 190,
+            "tool": "action",
+            "chars": 1361
+          },
+          {
+            "input": {
+              "id": "agent-ac3b22afb4458cd07",
+              "seq": 3385,
+              "part": "output",
+              "max_chars": 10000
+            },
+            "use_line": 195,
+            "result_line": 196,
+            "tool": "action",
+            "chars": 625
+          },
+          {
+            "input": {
+              "agent": "agent-ac3b22afb4458cd07",
+              "v": 0,
+              "q_any": [
+                "BUILD SUCCESSFUL",
+                "CompileArkTS",
+                "PackageHap",
+                "ERROR",
+                "entry-default-unsigned.hap"
+              ],
+              "after": true
+            },
+            "use_line": 202,
+            "result_line": 204,
+            "tool": "search",
+            "chars": 7824
+          },
+          {
+            "input": {
+              "id": "agent-a635575c78cd15ff6",
+              "v": 1,
+              "via": "search:657c379a76272988f6ae4b43:12",
+              "reads": true,
+              "seen": true,
+              "summary_chars": 260
+            },
+            "use_line": 209,
+            "result_line": 211,
+            "tool": "agent",
+            "chars": 38
+          },
+          {
+            "input": {
+              "ref": "#2f01bcdc:4351@L197",
+              "part": "input",
+              "max_chars": 6000
+            },
+            "use_line": 218,
+            "result_line": 223,
+            "tool": "action",
+            "chars": 2306
+          },
+          {
+            "input": {
+              "ref": "#a635575c78cd15ff6:4589@L82",
+              "part": "output",
+              "max_chars": 7000
+            },
+            "use_line": 219,
+            "result_line": 225,
+            "tool": "action",
+            "chars": 453
+          },
+          {
+            "input": {
+              "ref": "#a635575c78cd15ff6:4567@L53",
+              "part": "output",
+              "max_chars": 5000
+            },
+            "use_line": 220,
+            "result_line": 226,
+            "tool": "action",
+            "chars": 453
+          },
+          {
+            "input": {
+              "ref": "#a27497cfed8c44856:4525@L58",
+              "part": "output",
+              "max_chars": 7000
+            },
+            "use_line": 221,
+            "result_line": 227,
+            "tool": "action",
+            "chars": 448
+          },
+          {
+            "input": {
+              "ref": "#a635575c78cd15ff6:4589@L82",
+              "max_chars": 7000
+            },
+            "use_line": 236,
+            "result_line": 241,
+            "tool": "action",
+            "chars": 3283
+          },
+          {
+            "input": {
+              "ref": "#2f01bcdc:4358@L224",
+              "max_chars": 7000
+            },
+            "use_line": 237,
+            "result_line": 243,
+            "tool": "action",
+            "chars": 2302
+          },
+          {
+            "input": {
+              "ref": "#a27497cfed8c44856:4525@L58",
+              "max_chars": 7000
+            },
+            "use_line": 238,
+            "result_line": 244,
+            "tool": "action",
+            "chars": 3490
+          },
+          {
+            "input": {
+              "id": "agent-a635575c78cd15ff6",
+              "seq": 4551,
+              "part": "output",
+              "max_chars": 7000
+            },
+            "use_line": 239,
+            "result_line": 245,
+            "tool": "action",
+            "chars": 7449
+          },
+          {
+            "input": {
+              "ref": "#a52d61ac7ab7033ba:2668@L390",
+              "part": "input",
+              "max_chars": 10000
+            },
+            "use_line": 252,
+            "result_line": 254,
+            "tool": "action",
+            "chars": 8374
+          },
+          {
+            "input": {
+              "topic": "verdict"
+            },
+            "use_line": 261,
+            "result_line": 262,
+            "tool": "guide",
+            "chars": 3173
+          },
+          {
+            "input": {
+              "draft_chars": 8570
+            },
+            "use_line": 270,
+            "result_line": 272,
+            "tool": "check",
+            "chars": 1975
+          },
+          {
+            "input": {
+              "draft_chars": 8436
+            },
+            "use_line": 279,
+            "result_line": 281,
+            "tool": "check",
+            "chars": 1128
+          }
+        ],
+        "coverage": {
+          "expected": 7,
+          "provided": 6,
+          "accounted": 7,
+          "expected_versions": 6,
+          "expected_candidates": 1,
+          "missing_versions": 0,
+          "missing_candidates": 0,
+          "missing": 0,
+          "unresolved": 0,
+          "not_repair": 0,
+          "deferred": 0,
+          "unconfirmed": 0,
+          "advisories": 0,
+          "advisory_rows": 0,
+          "reviewed": 6,
+          "not_investigated": 1
+        },
+        "draft_check": {
+          "status": "matched",
+          "semantic_checked": false,
+          "checks": [
+            {
+              "step": 50,
+              "call_id": "call_uNKf7x03Mb4LVfjNAkaYW8VD",
+              "verified": true,
+              "status": "needs_review",
+              "counts": {
+                "errors": 0,
+                "warnings": 6,
+                "total": 6
+              },
+              "draft_sha256": "c03a458dd5fc506688cdda0e1c310c89222c2d2db0ec99c9413fb506e45e58ed",
+              "document_sha256": "666a8fd5fdbb9422f8f2e7057bdca0b5ecc72992b83c8ecf2203e5e796cb3617",
+              "issues": [
+                {
+                  "code": "event_entry_role_conflict",
+                  "severity": "warning",
+                  "where": "defect:D1.event_claims[0]",
+                  "node": null,
+                  "detail": "事件进入点与角色声明不一致；不自动改变角色或节点"
+                },
+                {
+                  "code": "event_entry_role_conflict",
+                  "severity": "warning",
+                  "where": "defect:D1.event_claims[1]",
+                  "node": null,
+                  "detail": "事件进入点与角色声明不一致；不自动改变角色或节点"
+                },
+                {
+                  "code": "event_entry_role_conflict",
+                  "severity": "warning",
+                  "where": "defect:D1.event_claims[2]",
+                  "node": null,
+                  "detail": "事件进入点与角色声明不一致；不自动改变角色或节点"
+                },
+                {
+                  "code": "event_entry_role_conflict",
+                  "severity": "warning",
+                  "where": "defect:D2.event_claims[0]",
+                  "node": null,
+                  "detail": "事件进入点与角色声明不一致；不自动改变角色或节点"
+                },
+                {
+                  "code": "event_entry_role_conflict",
+                  "severity": "warning",
+                  "where": "defect:D2.event_claims[1]",
+                  "node": null,
+                  "detail": "事件进入点与角色声明不一致；不自动改变角色或节点"
+                },
+                {
+                  "code": "event_entry_role_conflict",
+                  "severity": "warning",
+                  "where": "defect:D2.event_claims[2]",
+                  "node": null,
+                  "detail": "事件进入点与角色声明不一致；不自动改变角色或节点"
+                }
+              ],
+              "omitted_issues": 0,
+              "coverage": {
+                "checked": true,
+                "target": "entry/src/main/ets/entryability/EntryAbility.ets",
+                "counts": {
+                  "expected": 7,
+                  "provided": 6,
+                  "accounted": 7,
+                  "expected_versions": 6,
+                  "expected_candidates": 1,
+                  "missing_versions": 0,
+                  "missing_candidates": 0,
+                  "missing": 0,
+                  "unresolved": 0,
+                  "not_repair": 0,
+                  "deferred": 0,
+                  "unconfirmed": 0,
+                  "advisories": 0,
+                  "advisory_rows": 0,
+                  "reviewed": 6,
+                  "not_investigated": 1
+                },
+                "accounted": true,
+                "semantic_checked": false,
+                "mode": "manifest_complement",
+                "manifest_identity_valid": true,
+                "declarations_complete": false
+              },
+              "entry_effect_alignments": [],
+              "entry_effect_alignments_omitted": 0
+            },
+            {
+              "step": 51,
+              "call_id": "call_T2wijtxSj8hU2aE4gFGQ5LY7",
+              "verified": true,
+              "status": "mechanical_clear",
+              "counts": {
+                "errors": 0,
+                "warnings": 0,
+                "total": 0
+              },
+              "draft_sha256": "2b9bc8ab9e3cc4c29e5578ac0422c8fed52028786f5f13febf76c42a943e5601",
+              "document_sha256": "dbe693206fd24f91da0e5894cdfcdd5c4e4a86d84a8bd16c7e2c81856b66e8e6",
+              "issues": [],
+              "omitted_issues": 0,
+              "coverage": {
+                "checked": true,
+                "target": "entry/src/main/ets/entryability/EntryAbility.ets",
+                "counts": {
+                  "expected": 7,
+                  "provided": 6,
+                  "accounted": 7,
+                  "expected_versions": 6,
+                  "expected_candidates": 1,
+                  "missing_versions": 0,
+                  "missing_candidates": 0,
+                  "missing": 0,
+                  "unresolved": 0,
+                  "not_repair": 0,
+                  "deferred": 0,
+                  "unconfirmed": 0,
+                  "advisories": 0,
+                  "advisory_rows": 0,
+                  "reviewed": 6,
+                  "not_investigated": 1
+                },
+                "accounted": true,
+                "semantic_checked": false,
+                "mode": "manifest_complement",
+                "manifest_identity_valid": true,
+                "declarations_complete": false
+              },
+              "entry_effect_alignments": [],
+              "entry_effect_alignments_omitted": 0
+            }
+          ],
+          "check_calls": 2,
+          "draft_chars": 17006,
+          "returned_chars": 3103,
+          "final_document_sha256": "dbe693206fd24f91da0e5894cdfcdd5c4e4a86d84a8bd16c7e2c81856b66e8e6",
+          "matched_check": 51
+        },
+        "until_queries": [
+          {
+            "input": {
+              "q_any": [
+                "__TEST_MODE__",
+                "__TARGET_PAGE__",
+                "consumeTestWant",
+                "P0001_MainActivity_UI",
+                "UI test",
+                "UiTest"
+              ],
+              "since_ts": "2026-09-03T19:17:35.691000Z",
+              "until_ts": "2026-09-03T22:09:07.170000Z",
+              "after": true
+            },
+            "use_line": 129,
+            "result_line": 133,
+            "tool": "search",
+            "chars": 19703
+          },
+          {
+            "input": {
+              "q_any": [
+                "errorManager.on",
+                "registerGlobalErrorObserver",
+                "uncaught exception",
+                "globalError",
+                "全局未捕获异常观察者",
+                "appRecovery"
+              ],
+              "since_ts": "2026-09-03T21:19:39.888000Z",
+              "until_ts": "2026-09-03T22:09:07.170000Z",
+              "after": true
+            },
+            "use_line": 130,
+            "result_line": 135,
+            "tool": "search",
+            "chars": 17816
+          }
+        ],
+        "check_changes": [
+          {
+            "InputObject": "    entry_events:",
+            "SideIndicator": "<="
+          },
+          {
+            "InputObject": "      - D1_E1",
+            "SideIndicator": "<="
+          },
+          {
+            "InputObject": "      - D1_E2",
+            "SideIndicator": "<="
+          },
+          {
+            "InputObject": "      - D1_E3",
+            "SideIndicator": "<="
+          },
+          {
+            "InputObject": "    entry_events:",
+            "SideIndicator": "<="
+          },
+          {
+            "InputObject": "      - D2_E1",
+            "SideIndicator": "<="
+          },
+          {
+            "InputObject": "      - D2_E2",
+            "SideIndicator": "<="
+          },
+          {
+            "InputObject": "      - D2_E3",
+            "SideIndicator": "<="
+          },
+          {
+            "InputObject": "      - D2_E4",
+            "SideIndicator": "<="
+          }
+        ]
+      },
+      "reference_integrity": {
+        "candidate_bindings": [],
+        "document_sha256": "dbe693206fd24f91da0e5894cdfcdd5c4e4a86d84a8bd16c7e2c81856b66e8e6",
+        "case": "dice-entry",
+        "draft_sha256": "2b9bc8ab9e3cc4c29e5578ac0422c8fed52028786f5f13febf76c42a943e5601",
+        "refs": [
+          {
+            "ref": "#a27497cfed8c44856:4495@L23",
+            "file_matches": 1,
+            "line": 23,
+            "ok": true,
+            "file": "2f01bcdc-0a92-4961-a64d-5b181f03b3d3/subagents/agent-a27497cfed8c44856.jsonl",
+            "timestamp": "2026-09-03T21:18:16.787Z",
+            "source_role": "assistant",
+            "record_sha256": "5a946162bf02487a6d3f24af4236d4a486ca39e06c423f322f263b28c70011d5",
+            "native_ids": [
+              "call_17b0486d26f74bf5aa55002e"
+            ]
+          },
+          {
+            "ref": "#a27497cfed8c44856:4500@L29",
+            "file_matches": 1,
+            "line": 29,
+            "ok": true,
+            "file": "2f01bcdc-0a92-4961-a64d-5b181f03b3d3/subagents/agent-a27497cfed8c44856.jsonl",
+            "timestamp": "2026-09-03T21:18:25.065Z",
+            "source_role": "assistant",
+            "record_sha256": "c048ba117b2188501f7ae03a222bfea4daed5714a00c31bd1b2b9956f936b151",
+            "native_ids": [
+              "call_f3722a2fa80c4d2bbee5b99e"
+            ]
+          },
+          {
+            "ref": "#a27497cfed8c44856:4505@L35",
+            "file_matches": 1,
+            "line": 35,
+            "ok": true,
+            "file": "2f01bcdc-0a92-4961-a64d-5b181f03b3d3/subagents/agent-a27497cfed8c44856.jsonl",
+            "timestamp": "2026-09-03T21:18:35.605Z",
+            "source_role": "assistant",
+            "record_sha256": "e2c5c2320d2dd8bf89a1b86520e13ccb7a398b88c18a98db2f4a1cd74e1b5b81",
+            "native_ids": [
+              "call_e6d56b80320d4677b97b915b"
+            ]
+          },
+          {
+            "ref": "#a27497cfed8c44856:4507@L37",
+            "file_matches": 1,
+            "line": 37,
+            "ok": true,
+            "file": "2f01bcdc-0a92-4961-a64d-5b181f03b3d3/subagents/agent-a27497cfed8c44856.jsonl",
+            "timestamp": "2026-09-03T21:18:36.033Z",
+            "source_role": "assistant",
+            "record_sha256": "4429505296278c844975be287c5f763d10b98551f83f0a7fd89e8788c3f61683",
+            "native_ids": [
+              "call_e8130043aeef4043aa0e3ff0"
+            ]
+          },
+          {
+            "ref": "#a27497cfed8c44856:4511@L41",
+            "file_matches": 1,
+            "line": 41,
+            "ok": true,
+            "file": "2f01bcdc-0a92-4961-a64d-5b181f03b3d3/subagents/agent-a27497cfed8c44856.jsonl",
+            "timestamp": "2026-09-03T21:19:24.777Z",
+            "source_role": "assistant",
+            "record_sha256": "c146cc4cb19f479638b45729b5667285a88aeb8c3b596266d15deae467fc957a",
+            "native_ids": [
+              "call_f031a058037c467fb06fc159"
+            ]
+          },
+          {
+            "ref": "#a27497cfed8c44856:4513@L43",
+            "file_matches": 1,
+            "line": 43,
+            "ok": true,
+            "file": "2f01bcdc-0a92-4961-a64d-5b181f03b3d3/subagents/agent-a27497cfed8c44856.jsonl",
+            "timestamp": "2026-09-03T21:19:31.929Z",
+            "source_role": "assistant",
+            "record_sha256": "293cf7298c8f8f33fe2ac946178a36ddcfa2017913007853fb4151575ae62b30",
+            "native_ids": [
+              "call_7013085c03274c8183fdd455"
+            ]
+          },
+          {
+            "ref": "#a27497cfed8c44856:4515@L45",
+            "file_matches": 1,
+            "line": 45,
+            "ok": true,
+            "file": "2f01bcdc-0a92-4961-a64d-5b181f03b3d3/subagents/agent-a27497cfed8c44856.jsonl",
+            "timestamp": "2026-09-03T21:19:39.888Z",
+            "source_role": "assistant",
+            "record_sha256": "07b004834076111f9988a5e85040b50e151bb5b965bd6ae26c9e69444858477c",
+            "native_ids": [
+              "call_b6682a6aab774d88b1d1871d"
+            ]
+          },
+          {
+            "ref": "#a349784d2663f1f0a:1997@L3",
+            "file_matches": 1,
+            "line": 3,
+            "ok": true,
+            "file": "81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a349784d2663f1f0a.jsonl",
+            "timestamp": "2026-09-03T15:37:37.054Z",
+            "source_role": "user",
+            "record_sha256": "c85cebfdd1493255cf9bd56232df96c63c8e6dfff60fd73d7016539cb249075d",
+            "native_ids": []
+          },
+          {
+            "ref": "#a349784d2663f1f0a:2039@L47",
+            "file_matches": 1,
+            "line": 47,
+            "ok": true,
+            "file": "81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a349784d2663f1f0a.jsonl",
+            "timestamp": "2026-09-03T15:39:05.683Z",
+            "source_role": "assistant",
+            "record_sha256": "3a0a8ced9ebadf770ad0a8445e0e0441c22ba0aa8e418e39542c7febd7b07fa1",
+            "native_ids": [
+              "call_bc17fd91fb594eb8a9997c01"
+            ]
+          },
+          {
+            "ref": "#a52d61ac7ab7033ba:2668@L390",
+            "file_matches": 1,
+            "line": 390,
+            "ok": true,
+            "file": "81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a52d61ac7ab7033ba.jsonl",
+            "timestamp": "2026-09-03T20:05:48.750Z",
+            "source_role": "assistant",
+            "record_sha256": "bc194d617f84a58588be01e297ebc24cb0e23dc18b9a6be3d7f784f6bec45a83",
+            "native_ids": [
+              "call_bf1ca4153f7f4401bfa2c676"
+            ]
+          },
+          {
+            "ref": "#a635575c78cd15ff6:4551@L33",
+            "file_matches": 1,
+            "line": 33,
+            "ok": true,
+            "file": "2f01bcdc-0a92-4961-a64d-5b181f03b3d3/subagents/agent-a635575c78cd15ff6.jsonl",
+            "timestamp": "2026-09-03T21:23:40.800Z",
+            "source_role": "assistant",
+            "record_sha256": "c859439b47a2d1b44527d6c152972a0b847e23319b0703a7491e44399c1e1698",
+            "native_ids": [
+              "call_53a6741f92474c9bb9ab039c"
+            ]
+          },
+          {
+            "ref": "#a635575c78cd15ff6:4589@L82",
+            "file_matches": 1,
+            "line": 82,
+            "ok": true,
+            "file": "2f01bcdc-0a92-4961-a64d-5b181f03b3d3/subagents/agent-a635575c78cd15ff6.jsonl",
+            "timestamp": "2026-09-03T21:26:56.103Z",
+            "source_role": "assistant",
+            "record_sha256": "1f94f2bfc4d4aabcd48cf420ad505b75b9c0cd14f1b5bb0c8629c71cadddd4ac",
+            "native_ids": []
+          },
+          {
+            "ref": "#a711c5d09fb676814:2855@L7",
+            "file_matches": 1,
+            "line": 7,
+            "ok": true,
+            "file": "81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a711c5d09fb676814.jsonl",
+            "timestamp": "2026-09-03T19:10:15.792Z",
+            "source_role": "assistant",
+            "record_sha256": "0bc10163e6eda4ebce91274e887fe7f6924a667893a990dd00533f7d1335d65c",
+            "native_ids": [
+              "call_189b2504fca14e68979322c2"
+            ]
+          },
+          {
+            "ref": "#a711c5d09fb676814:2859@L11",
+            "file_matches": 1,
+            "line": 11,
+            "ok": true,
+            "file": "81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a711c5d09fb676814.jsonl",
+            "timestamp": "2026-09-03T19:10:17.886Z",
+            "source_role": "assistant",
+            "record_sha256": "028dea57f880deba2fee2260bd5b295f8f77a66348cc26a9d37363355aa6a767",
+            "native_ids": [
+              "call_769beeda1a324d3d95de7251"
+            ]
+          },
+          {
+            "ref": "#a711c5d09fb676814:2865@L17",
+            "file_matches": 1,
+            "line": 17,
+            "ok": true,
+            "file": "81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a711c5d09fb676814.jsonl",
+            "timestamp": "2026-09-03T19:10:25.612Z",
+            "source_role": "assistant",
+            "record_sha256": "0ff32ad35ddd89dbb00d20efbb03ab680080a5364a4b1f632f1b9bf7800788eb",
+            "native_ids": [
+              "call_ad63a77294304198a5c64ece"
+            ]
+          },
+          {
+            "ref": "#a711c5d09fb676814:2881@L35",
+            "file_matches": 1,
+            "line": 35,
+            "ok": true,
+            "file": "81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a711c5d09fb676814.jsonl",
+            "timestamp": "2026-09-03T19:17:13.810Z",
+            "source_role": "assistant",
+            "record_sha256": "ca124a76d4213257ec504a1a8c1f9a88bc24e3064941005916d9f2576a8ba75a",
+            "native_ids": [
+              "call_003bc0a35ce74684a5296325"
+            ]
+          },
+          {
+            "ref": "#a711c5d09fb676814:2883@L37",
+            "file_matches": 1,
+            "line": 37,
+            "ok": true,
+            "file": "81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a711c5d09fb676814.jsonl",
+            "timestamp": "2026-09-03T19:17:21.617Z",
+            "source_role": "assistant",
+            "record_sha256": "b7197d5f9f4beed5084a5659b86c49f26716aa6f93a0a16a72f58bac5a3dcc90",
+            "native_ids": [
+              "call_6c1a4dd0da164350a549d420"
+            ]
+          },
+          {
+            "ref": "#a711c5d09fb676814:2885@L39",
+            "file_matches": 1,
+            "line": 39,
+            "ok": true,
+            "file": "81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a711c5d09fb676814.jsonl",
+            "timestamp": "2026-09-03T19:17:35.691Z",
+            "source_role": "assistant",
+            "record_sha256": "9aa5b948a807268d1cf8910068fad64a2c798bab89963eab63d708dc9b44665f",
+            "native_ids": [
+              "call_04086bf7960b46e7b2a00be4"
+            ]
+          },
+          {
+            "ref": "#ac3b22afb4458cd07:3383@L15",
+            "file_matches": 1,
+            "line": 15,
+            "ok": true,
+            "file": "81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-ac3b22afb4458cd07.jsonl",
+            "timestamp": "2026-09-03T20:15:05.530Z",
+            "source_role": "assistant",
+            "record_sha256": "e4727909943465d16d51a68bfa9d915ff8f55782ff435bcffd342313e955bbf8",
+            "native_ids": [
+              "call_afebad7ee5364ed4b444c0ef"
+            ]
+          },
+          {
+            "ref": "#ac3b22afb4458cd07:3393@L29",
+            "file_matches": 1,
+            "line": 29,
+            "ok": true,
+            "file": "81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-ac3b22afb4458cd07.jsonl",
+            "timestamp": "2026-09-03T20:16:00.315Z",
+            "source_role": "assistant",
+            "record_sha256": "207b68cdeb1c32972fa48abeb2549457dce3a7a4d8001665b62458c9696513b2",
+            "native_ids": [
+              "call_02a0745b0c2f48c7ad2aacc5"
+            ]
+          }
+        ],
+        "rep": 1,
+        "yaml_trim_equals_raw_trim": true,
+        "trace_bound": true,
+        "submission_status": "accepted",
+        "ledger": "atoms-2026-09-09-file-evidence5:80:cfe6e7379434163b17889df6",
+        "yaml_sha256": "2b9bc8ab9e3cc4c29e5578ac0422c8fed52028786f5f13febf76c42a943e5601",
+        "draft_changes": [
+          {
+            "InputObject": "    entry_events:",
+            "SideIndicator": "<="
+          },
+          {
+            "InputObject": "      - D1_E1",
+            "SideIndicator": "<="
+          },
+          {
+            "InputObject": "      - D1_E2",
+            "SideIndicator": "<="
+          },
+          {
+            "InputObject": "      - D1_E3",
+            "SideIndicator": "<="
+          },
+          {
+            "InputObject": "    entry_events:",
+            "SideIndicator": "<="
+          },
+          {
+            "InputObject": "      - D2_E1",
+            "SideIndicator": "<="
+          },
+          {
+            "InputObject": "      - D2_E2",
+            "SideIndicator": "<="
+          },
+          {
+            "InputObject": "      - D2_E3",
+            "SideIndicator": "<="
+          },
+          {
+            "InputObject": "      - D2_E4",
+            "SideIndicator": "<="
+          }
+        ],
+        "raw_equals_last_draft": true,
+        "scope": "独立核物理行/native ID/SHA；locator唯一不认证语义。"
+      },
+      "cost": {
+        "started_at": "2026-09-09T22:59:20.853067+00:00",
+        "ended_at": "2026-09-09T23:04:50.992165+00:00",
+        "wall_s": 330.14477739995345,
+        "end_to_end_wall_s": 333.83948349999264,
+        "input_total": 1874150,
+        "cached_input_included": 1742848,
+        "output_total": 14843,
+        "input_plus_output": 1888993,
+        "tool_calls": 51,
+        "tool_chars": 251340,
+        "repeated_calls": 0,
+        "rejected_calls": 4
+      },
+      "fact_counts": {
+        "supported": 5,
+        "partial": 1,
+        "omitted": 0,
+        "contradicted": 0
+      }
+    }
+  ],
+  "pending": [
+    "member-center tools rep2",
+    "dice-entry tools rep2",
+    "splash tools rep1",
+    "splash tools rep2"
+  ],
+  "summary": {
+    "core": {
+      "pass": 3,
+      "partial": 1,
+      "fail": 0
+    },
+    "material_unsupported_causal_annotations": 1,
+    "joint_acceptance": false,
+    "note": "核心不等于完整准确率，fact计数仅定位缺口，不以成本放宽。"
+  },
+  "raw_baseline_means": {
+    "member-center": 2691060,
+    "dice-entry": 1413930.5,
+    "splash": 3305569.5
+  }
+}

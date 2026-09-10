@@ -1,0 +1,3486 @@
+{
+  "schema": "migloop-v11-legacy-adjudication/1",
+  "status": "completed_rep1_only_rep2_not_available",
+  "review_date": "2026-09-09",
+  "source_code_id": "cb3682f",
+  "scope": "只读正式完成V11 legacy；不读进行中事件、不改V10/冻结源/参考/运行。V12另立文件。",
+  "rubric": {
+    "file": "core-rubric-reconciliation.md",
+    "protocol_file": "protocol.md",
+    "protocol_sha256": "19df0bb2ef9dacc62d2b8c1d911cdaf03aa6ec7941889eb78bd135c8403f7afb",
+    "reference": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/reference-v1/legacy-reference.json",
+    "reference_sha256": "2c015536094fff1e42bb3b6b5cc2dce743c0f2a0f6924254027f7f8a5faac927",
+    "facts_are_not_accuracy": true,
+    "check_not_truth": true,
+    "core_not_full_annotation": true
+  },
+  "runs": [
+    {
+      "case": "member-center",
+      "variant": "formal-v11",
+      "arm": "tools",
+      "rep": 1,
+      "run": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v11/member-center/runs/tools/rep1",
+      "source_code_id": "cb3682f",
+      "source_digest": "1f036a60a25376819196c2005bf47ed9dfaa479c95fdd98c06db9c11e77594a1",
+      "pool_digest": "a78b1373045f7558d6da3b76123e30d032635a2a0b4cdd665e7f80c0bdf8b337",
+      "common_task_sha256": "e60ad7491cd5991a948f8c7128432feca230a59bee208640ca5b90a44d68dec1",
+      "model": [
+        "gpt-5.5"
+      ],
+      "effort": "medium",
+      "questions": [
+        {
+          "id": "S3",
+          "core": "pass",
+          "basis": "三站点与1透明/2深色全对，区分脚本执行回执、局部读回、未知最终快照及设备行为；H5未点名按既有minor口径。",
+          "mandatory_gaps": [],
+          "minor_omissions": [
+            "未点名原已透明且跳过的H5；事实行保留partial。"
+          ],
+          "facts": [
+            {
+              "id": "S3.f1",
+              "status": "supported",
+              "report_claim": "三个缺 mask 站点分别是 :206 AppLoadDialog、:704 PayAgreementDialog、:728 RenewRuleDialog。",
+              "raw_evidence": [
+                "fixer L71/L72,L77/L78,L80/L81"
+              ]
+            },
+            {
+              "id": "S3.f2",
+              "status": "supported",
+              "report_claim": "跳过已有mask，AppLoad Transparent、其他Palette；报告只把后两处最终快照保留未知。",
+              "raw_evidence": [
+                "fixer L103/L104：open(path,'w').write(new)在report.append之前",
+                "fixer L106/L107：Pay局部读回"
+              ]
+            },
+            {
+              "id": "S3.f3",
+              "status": "partial",
+              "report_claim": "4个controller已有1个；3sites不是3个深色，但没有点名已有透明H5。",
+              "raw_evidence": [
+                "Slice8 L264已含H5 Color.Transparent",
+                "fixer L42/L43,L74/L75"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "S4",
+          "core": "partial",
+          "basis": "两次价格修复及private编译链正确；未核Slice8整写前已收到正确Kotlin这一mandatory近因。",
+          "mandatory_gaps": [
+            "Slice8 L21/L24正确数字段Kotlin→L264/L265坏整写没有调查。"
+          ],
+          "minor_omissions": [],
+          "facts": [
+            {
+              "id": "S4.f1",
+              "status": "partial",
+              "report_claim": "fixer v33前已读单Text30的旧实现，但原生成者是否读过finding未确认。",
+              "raw_evidence": [
+                "Slice8 L21/L24在15:33已返回正确Kotlin",
+                "Slice8 L264/L265在16:04成功整写仍整体30"
+              ]
+            },
+            {
+              "id": "S4.f2",
+              "status": "supported",
+              "report_claim": "v11/v12 ForEach分段→尾后脚本改priceDigits/priceSuffix两个Span。",
+              "raw_evidence": [
+                "fixer L528/L529,L592/L593"
+              ]
+            },
+            {
+              "id": "S4.f3",
+              "status": "supported",
+              "report_claim": "tail private helper导致兄弟struct可见性错误，builder两Edit去private，原生第二次构建EXIT0/SUCCESS。",
+              "raw_evidence": [
+                "fixer L592/L593",
+                "builder L23/L24,L32/L33,L34/L35,L36/L37"
+              ]
+            }
+          ]
+        }
+      ],
+      "extra_false_claims": [],
+      "unsupported_citations": [],
+      "annotation_requires_correction": false,
+      "full_annotation_pass": false,
+      "notes": [
+        "实际19次action(ref)，无成功agent，唯一agent请求以自身未打开坐标via遭拒；无blame、无Slice8查询。",
+        "原文脚本在写后才汇总，报告‘可验证到的实际写入回读只有Pay’作为独立读回限定可成立；不能把它扩成其他两处没有执行。对未立正式版仍使用预期措辞偏保守，不因此加分。",
+        "S4红fixer@v33描述收到错误旧实现，不宣称它写入最初错误；未列为错误作者。尾后价格操作为S4_E1，不假绑v40。",
+        "7 reviewed+31系统not_investigated，补集不等于模型已调查；一个check clear，没有自动语义信用。"
+      ],
+      "investigation": {
+        "tool_counts": [
+          {
+            "Name": "guide",
+            "Count": 2
+          },
+          {
+            "Name": "sessions",
+            "Count": 1
+          },
+          {
+            "Name": "diff",
+            "Count": 5
+          },
+          {
+            "Name": "file",
+            "Count": 6
+          },
+          {
+            "Name": "action",
+            "Count": 19
+          },
+          {
+            "Name": "search",
+            "Count": 4
+          },
+          {
+            "Name": "agent",
+            "Count": 1
+          },
+          {
+            "Name": "check",
+            "Count": 1
+          }
+        ],
+        "seq": [
+          {
+            "input": {},
+            "use_line": 17,
+            "result_line": 18,
+            "tool": "guide",
+            "chars": 2103
+          },
+          {
+            "input": {
+              "file": "entry/src/main/ets/pages/MemberCenterPage.ets"
+            },
+            "use_line": 26,
+            "result_line": 28,
+            "tool": "sessions",
+            "chars": 16197
+          },
+          {
+            "input": {
+              "path": "entry/src/main/ets/pages/MemberCenterPage.ets",
+              "v": 10
+            },
+            "use_line": 35,
+            "result_line": 41,
+            "tool": "diff",
+            "chars": 1640
+          },
+          {
+            "input": {
+              "path": "entry/src/main/ets/pages/MemberCenterPage.ets",
+              "v": 11
+            },
+            "use_line": 36,
+            "result_line": 43,
+            "tool": "diff",
+            "chars": 1510
+          },
+          {
+            "input": {
+              "path": "entry/src/main/ets/pages/MemberCenterPage.ets",
+              "v": 12
+            },
+            "use_line": 37,
+            "result_line": 45,
+            "tool": "diff",
+            "chars": 1240
+          },
+          {
+            "input": {
+              "path": "entry/src/main/ets/pages/MemberCenterPage.ets",
+              "v": 15
+            },
+            "use_line": 38,
+            "result_line": 46,
+            "tool": "diff",
+            "chars": 250
+          },
+          {
+            "input": {
+              "path": "entry/src/main/ets/pages/MemberCenterPage.ets",
+              "v": 16
+            },
+            "use_line": 39,
+            "result_line": 47,
+            "tool": "diff",
+            "chars": 250
+          },
+          {
+            "input": {
+              "path": "entry/src/main/ets/pages/MemberCenterPage.ets",
+              "v": 16,
+              "via": "sessions",
+              "content": true,
+              "start": 1,
+              "n": 80
+            },
+            "use_line": 56,
+            "result_line": 63,
+            "tool": "file",
+            "chars": 18358
+          },
+          {
+            "input": {
+              "path": "entry/src/main/ets/pages/MemberCenterPage.ets",
+              "v": 16,
+              "via": "sessions",
+              "content": true,
+              "start": 360,
+              "n": 80
+            },
+            "use_line": 57,
+            "result_line": 65,
+            "tool": "file",
+            "chars": 181
+          },
+          {
+            "input": {
+              "path": "entry/src/main/ets/pages/MemberCenterPage.ets",
+              "v": 16,
+              "via": "sessions",
+              "content": true,
+              "start": 1120,
+              "n": 100
+            },
+            "use_line": 58,
+            "result_line": 67,
+            "tool": "file",
+            "chars": 181
+          },
+          {
+            "input": {
+              "ref": "#a68daf720e780b4c2:15406@L103",
+              "part": null,
+              "max_chars": 6000
+            },
+            "use_line": 59,
+            "result_line": 68,
+            "tool": "action",
+            "chars": 5046
+          },
+          {
+            "input": {
+              "ref": "#a68daf720e780b4c2:15407@L106",
+              "part": null,
+              "max_chars": 4000
+            },
+            "use_line": 60,
+            "result_line": 69,
+            "tool": "action",
+            "chars": 2776
+          },
+          {
+            "input": {
+              "ref": "#a68daf720e780b4c2:15731@L592",
+              "part": null,
+              "max_chars": 5000
+            },
+            "use_line": 61,
+            "result_line": 70,
+            "tool": "action",
+            "chars": 4926
+          },
+          {
+            "input": {
+              "ref": "#af0e3d2ae54dbf769:17286@L23",
+              "part": null,
+              "max_chars": 8000
+            },
+            "use_line": 80,
+            "result_line": 87,
+            "tool": "action",
+            "chars": 1765
+          },
+          {
+            "input": {
+              "ref": "#af0e3d2ae54dbf769:17292@L32",
+              "part": null,
+              "max_chars": 4000
+            },
+            "use_line": 81,
+            "result_line": 89,
+            "tool": "action",
+            "chars": 1116
+          },
+          {
+            "input": {
+              "ref": "#af0e3d2ae54dbf769:17294@L34",
+              "part": null,
+              "max_chars": 4000
+            },
+            "use_line": 82,
+            "result_line": 91,
+            "tool": "action",
+            "chars": 1116
+          },
+          {
+            "input": {
+              "ref": "#af0e3d2ae54dbf769:17299@L43",
+              "part": null,
+              "max_chars": 4000
+            },
+            "use_line": 83,
+            "result_line": 92,
+            "tool": "action",
+            "chars": 2987
+          },
+          {
+            "input": {
+              "ref": "#a68daf720e780b4c2:15676@L514",
+              "part": null,
+              "max_chars": 4000
+            },
+            "use_line": 84,
+            "result_line": 93,
+            "tool": "action",
+            "chars": 1100
+          },
+          {
+            "input": {
+              "ref": "#a68daf720e780b4c2:15677@L516",
+              "part": null,
+              "max_chars": 5000
+            },
+            "use_line": 85,
+            "result_line": 94,
+            "tool": "action",
+            "chars": 3867
+          },
+          {
+            "input": {
+              "path": "entry/src/main/ets/pages/MemberCenterPage.ets",
+              "v": 16,
+              "via": "file:/Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723/entry/src/main/ets/pages/MemberCenterPage.ets@v16",
+              "content": true,
+              "start": 1,
+              "n": 80
+            },
+            "use_line": 102,
+            "result_line": 107,
+            "tool": "file",
+            "chars": 18358
+          },
+          {
+            "input": {
+              "path": "entry/src/main/ets/pages/MemberCenterPage.ets",
+              "v": 16,
+              "via": "file:/Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723/entry/src/main/ets/pages/MemberCenterPage.ets@v16",
+              "content": true,
+              "start": 1140,
+              "n": 100
+            },
+            "use_line": 103,
+            "result_line": 109,
+            "tool": "file",
+            "chars": 18358
+          },
+          {
+            "input": {
+              "path": "entry/src/main/ets/pages/MemberCenterPage.ets",
+              "v": 16,
+              "via": "file:/Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723/entry/src/main/ets/pages/MemberCenterPage.ets@v16",
+              "content": true,
+              "start": 700,
+              "n": 70
+            },
+            "use_line": 104,
+            "result_line": 111,
+            "tool": "file",
+            "chars": 18358
+          },
+          {
+            "input": {
+              "file": "entry/src/main/ets/pages/MemberCenterPage.ets",
+              "v": 16,
+              "q_any": [
+                "new CustomDialogController",
+                "maskColor",
+                "Palette.DIALOG_MASK",
+                "Color.Transparent"
+              ]
+            },
+            "use_line": 105,
+            "result_line": 112,
+            "tool": "search",
+            "chars": 7916
+          },
+          {
+            "input": {
+              "ref": "#a68daf720e780b4c2:15394@L71",
+              "part": null,
+              "max_chars": 5000
+            },
+            "use_line": 120,
+            "result_line": 126,
+            "tool": "action",
+            "chars": 2717
+          },
+          {
+            "input": {
+              "ref": "#a68daf720e780b4c2:15396@L77",
+              "part": null,
+              "max_chars": 6000
+            },
+            "use_line": 121,
+            "result_line": 128,
+            "tool": "action",
+            "chars": 6511
+          },
+          {
+            "input": {
+              "ref": "#a68daf720e780b4c2:15397@L80",
+              "part": null,
+              "max_chars": 5000
+            },
+            "use_line": 122,
+            "result_line": 130,
+            "tool": "action",
+            "chars": 5271
+          },
+          {
+            "input": {
+              "ref": "#a68daf720e780b4c2:15395@L74",
+              "part": null,
+              "max_chars": 4000
+            },
+            "use_line": 123,
+            "result_line": 131,
+            "tool": "action",
+            "chars": 2711
+          },
+          {
+            "input": {
+              "ref": "#a68daf720e780b4c2:15401@L91",
+              "part": null,
+              "max_chars": 4000
+            },
+            "use_line": 124,
+            "result_line": 132,
+            "tool": "action",
+            "chars": 2993
+          },
+          {
+            "input": {
+              "id": "agent-a68daf720e780b4c2",
+              "v": 5,
+              "via": "agent:agent-a68daf720e780b4c2@v5",
+              "reads": true,
+              "seen": true,
+              "summary_chars": 200
+            },
+            "use_line": 141,
+            "result_line": 146,
+            "tool": "agent",
+            "chars": 187
+          },
+          {
+            "input": {
+              "agent": "agent-a68daf720e780b4c2",
+              "v": 5,
+              "q_any": [
+                "dimAmount",
+                "maskColor",
+                "BaseDialogFragment",
+                "AppLoadDialog"
+              ]
+            },
+            "use_line": 142,
+            "result_line": 148,
+            "tool": "search",
+            "chars": 16807
+          },
+          {
+            "input": {
+              "agent": "agent-a68daf720e780b4c2",
+              "v": 33,
+              "since": 27,
+              "q_any": [
+                "showNowPrice",
+                "AbsoluteSizeSpan",
+                "/天",
+                "rollingTextView"
+              ]
+            },
+            "use_line": 143,
+            "result_line": 150,
+            "tool": "search",
+            "chars": 8096
+          },
+          {
+            "input": {
+              "since_ts": "2026-07-26T21:46:12.739Z",
+              "until_ts": "2026-07-26T21:48:57.218000Z",
+              "q_any": [
+                "COMPILE RESULT:SUCCESS",
+                "BUILD SUCCESSFUL",
+                "priceDigits",
+                "priceSuffix"
+              ]
+            },
+            "use_line": 144,
+            "result_line": 151,
+            "tool": "search",
+            "chars": 3892
+          },
+          {
+            "input": {
+              "ref": "#a68daf720e780b4c2:15391@L68",
+              "part": null,
+              "max_chars": 5000
+            },
+            "use_line": 159,
+            "result_line": 165,
+            "tool": "action",
+            "chars": 1661
+          },
+          {
+            "input": {
+              "ref": "#a68daf720e780b4c2:15670@L501",
+              "part": null,
+              "max_chars": 7000
+            },
+            "use_line": 160,
+            "result_line": 167,
+            "tool": "action",
+            "chars": 5233
+          },
+          {
+            "input": {
+              "ref": "#a68daf720e780b4c2:15680@L523",
+              "part": null,
+              "max_chars": 5000
+            },
+            "use_line": 161,
+            "result_line": 169,
+            "tool": "action",
+            "chars": 1977
+          },
+          {
+            "input": {
+              "ref": "#af0e3d2ae54dbf769:17296@L36",
+              "part": null,
+              "max_chars": 5000
+            },
+            "use_line": 162,
+            "result_line": 171,
+            "tool": "action",
+            "chars": 762
+          },
+          {
+            "input": {
+              "ref": "#af0e3d2ae54dbf769:17303@L54",
+              "part": null,
+              "max_chars": 4000
+            },
+            "use_line": 163,
+            "result_line": 170,
+            "tool": "action",
+            "chars": 2388
+          },
+          {
+            "input": {
+              "topic": "verdict"
+            },
+            "use_line": 180,
+            "result_line": 181,
+            "tool": "guide",
+            "chars": 3173
+          },
+          {
+            "input": {
+              "draft_chars": 8990
+            },
+            "use_line": 189,
+            "result_line": 191,
+            "tool": "check",
+            "chars": 1669
+          }
+        ],
+        "coverage": {
+          "expected": 38,
+          "provided": 7,
+          "accounted": 38,
+          "expected_versions": 7,
+          "expected_candidates": 31,
+          "missing_versions": 0,
+          "missing_candidates": 0,
+          "missing": 0,
+          "unresolved": 0,
+          "not_repair": 0,
+          "deferred": 0,
+          "unconfirmed": 0,
+          "advisories": 0,
+          "advisory_rows": 0,
+          "reviewed": 7,
+          "not_investigated": 31
+        },
+        "draft_check": {
+          "status": "matched",
+          "semantic_checked": false,
+          "checks": [
+            {
+              "step": 39,
+              "call_id": "call_SghwIrmP75LGOfTPYgKmSxHK",
+              "verified": true,
+              "status": "mechanical_clear",
+              "counts": {
+                "errors": 0,
+                "warnings": 0,
+                "total": 0
+              },
+              "draft_sha256": "1e222fec677b701cb60e2d6aebc9bf7ac39c6b47022685d4f903ebdee803080a",
+              "document_sha256": "e5e7fd36047a2aa9ee57f75f4e26cba97e4c406327fa8be55bdc61cfcd15aac3",
+              "issues": [],
+              "omitted_issues": 0,
+              "coverage": {
+                "checked": true,
+                "target": "entry/src/main/ets/pages/MemberCenterPage.ets",
+                "counts": {
+                  "expected": 38,
+                  "provided": 7,
+                  "accounted": 38,
+                  "expected_versions": 7,
+                  "expected_candidates": 31,
+                  "missing_versions": 0,
+                  "missing_candidates": 0,
+                  "missing": 0,
+                  "unresolved": 0,
+                  "not_repair": 0,
+                  "deferred": 0,
+                  "unconfirmed": 0,
+                  "advisories": 0,
+                  "advisory_rows": 0,
+                  "reviewed": 7,
+                  "not_investigated": 31
+                },
+                "accounted": true,
+                "semantic_checked": false,
+                "mode": "manifest_complement",
+                "manifest_identity_valid": true,
+                "declarations_complete": false
+              },
+              "entry_effect_alignments": [
+                {
+                  "node": "agent:agent-a68daf720e780b4c2@v33",
+                  "defect": "S4",
+                  "schema": "migloop-entry-effect-alignment/1",
+                  "status": "indeterminate",
+                  "anchor_agent": "agent-a68daf720e780b4c2",
+                  "anchor_v": 33,
+                  "events": [
+                    {
+                      "ref": "#a68daf720e780b4c2:15677@L516",
+                      "agent": "agent-a68daf720e780b4c2",
+                      "seq": 15677,
+                      "effect_v": null
+                    },
+                    {
+                      "ref": "#a68daf720e780b4c2:15670@L501",
+                      "agent": "agent-a68daf720e780b4c2",
+                      "seq": 15670,
+                      "effect_v": null
+                    }
+                  ],
+                  "entry_declared": false,
+                  "events_omitted": 0,
+                  "source": "ledger_coordinates",
+                  "semantic_checked": false,
+                  "note": "只比较声明进入点与实际侧引用的效应版本，不认证进入原因或首次发生时刻。"
+                }
+              ],
+              "entry_effect_alignments_omitted": 0
+            }
+          ],
+          "check_calls": 1,
+          "draft_chars": 8990,
+          "returned_chars": 1669,
+          "final_document_sha256": "e5e7fd36047a2aa9ee57f75f4e26cba97e4c406327fa8be55bdc61cfcd15aac3",
+          "matched_check": 39
+        },
+        "until_queries": [
+          {
+            "input": {
+              "since_ts": "2026-07-26T21:46:12.739Z",
+              "until_ts": "2026-07-26T21:48:57.218000Z",
+              "q_any": [
+                "COMPILE RESULT:SUCCESS",
+                "BUILD SUCCESSFUL",
+                "priceDigits",
+                "priceSuffix"
+              ]
+            },
+            "use_line": 144,
+            "result_line": 151,
+            "tool": "search",
+            "chars": 3892
+          }
+        ],
+        "check_changes": []
+      },
+      "reference_integrity": {
+        "candidate_bindings": [
+          {
+            "source": "mention",
+            "ref": "#a68daf720e780b4c2:15406@L103",
+            "candidate": "candidate:b30f4e449bea2bd6cc42",
+            "matches": 1
+          },
+          {
+            "source": "touch",
+            "ref": "#a68daf720e780b4c2:15407@L106",
+            "candidate": "candidate:6ffcb050ddf8488c74e4",
+            "matches": 1
+          },
+          {
+            "source": "touch",
+            "ref": "#a68daf720e780b4c2:15731@L592",
+            "candidate": "candidate:89dc8e4fea1fb9373422",
+            "matches": 1
+          }
+        ],
+        "document_sha256": "e5e7fd36047a2aa9ee57f75f4e26cba97e4c406327fa8be55bdc61cfcd15aac3",
+        "case": "member-center",
+        "draft_sha256": "1e222fec677b701cb60e2d6aebc9bf7ac39c6b47022685d4f903ebdee803080a",
+        "refs": [
+          {
+            "ref": "#a68daf720e780b4c2:15391@L68",
+            "file_matches": 1,
+            "line": 68,
+            "ok": true,
+            "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+            "timestamp": "2026-07-26T20:35:31.687Z",
+            "source_role": "assistant",
+            "record_sha256": "ffed914700a8fce7a714f105bafc34d56f156cc60afa02095df7f70d0b3872e0",
+            "native_ids": [
+              "toolu_012Bp4rAaReFzfroz2Dew7Eh"
+            ]
+          },
+          {
+            "ref": "#a68daf720e780b4c2:15394@L71",
+            "file_matches": 1,
+            "line": 71,
+            "ok": true,
+            "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+            "timestamp": "2026-07-26T20:35:37.651Z",
+            "source_role": "assistant",
+            "record_sha256": "e2eecb8dd559711f201ac6e1ef6875731d840fc7cfe3d94b18e49378fb29d5bd",
+            "native_ids": [
+              "toolu_01JfRDQZ6RoisHjhkCsmRK5u"
+            ]
+          },
+          {
+            "ref": "#a68daf720e780b4c2:15396@L77",
+            "file_matches": 1,
+            "line": 77,
+            "ok": true,
+            "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+            "timestamp": "2026-07-26T20:36:01.231Z",
+            "source_role": "assistant",
+            "record_sha256": "d62980223529c0a245178d6df6bd16ac6bf1024f80651c5e03502496fd40fade",
+            "native_ids": [
+              "toolu_016h1qeyct3Ac32r68PFp2KB"
+            ]
+          },
+          {
+            "ref": "#a68daf720e780b4c2:15397@L80",
+            "file_matches": 1,
+            "line": 80,
+            "ok": true,
+            "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+            "timestamp": "2026-07-26T20:36:15.076Z",
+            "source_role": "assistant",
+            "record_sha256": "7c126ee113537ab79cb559e72cae3ce3ecd4d02cd20f81ad3ebeac8af9d46fb5",
+            "native_ids": [
+              "toolu_011svikWwqqHYsLcQxAET1dW"
+            ]
+          },
+          {
+            "ref": "#a68daf720e780b4c2:15398@L83",
+            "file_matches": 1,
+            "line": 83,
+            "ok": true,
+            "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+            "timestamp": "2026-07-26T20:36:31.010Z",
+            "source_role": "assistant",
+            "record_sha256": "93821f70926a8cfb9d1ed7ea649dc0d8432c44ce5578566fbd05548df15ee47b",
+            "native_ids": [
+              "toolu_01PpmHbvUKj6hDuo9TACBt4V"
+            ]
+          },
+          {
+            "ref": "#a68daf720e780b4c2:15406@L103",
+            "file_matches": 1,
+            "line": 103,
+            "ok": true,
+            "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+            "timestamp": "2026-07-26T20:41:07.872Z",
+            "source_role": "assistant",
+            "record_sha256": "d3662b808223939b528589cd614033c8b5bffcb83d2cf78c3b5b97c0d395b4ba",
+            "native_ids": [
+              "toolu_01T6WkXMhD7rUsHaSaMPuhgx"
+            ]
+          },
+          {
+            "ref": "#a68daf720e780b4c2:15407@L106",
+            "file_matches": 1,
+            "line": 106,
+            "ok": true,
+            "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+            "timestamp": "2026-07-26T20:41:17.462Z",
+            "source_role": "assistant",
+            "record_sha256": "cb92907b23f9a26e874433f6e41be0ab102c854f2909d65e7ac823bb2a52319e",
+            "native_ids": [
+              "toolu_019xb74vC9BgRv4xeSea6NmF"
+            ]
+          },
+          {
+            "ref": "#a68daf720e780b4c2:15670@L501",
+            "file_matches": 1,
+            "line": 501,
+            "ok": true,
+            "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+            "timestamp": "2026-07-26T21:21:29.934Z",
+            "source_role": "assistant",
+            "record_sha256": "29282cec557a01a6a9c46a8f293d85541d25bd8a98cef9ad2e032b7790c62c8a",
+            "native_ids": [
+              "toolu_01YGYsH1u6KQtX8A2AkLVXFF"
+            ]
+          },
+          {
+            "ref": "#a68daf720e780b4c2:15677@L516",
+            "file_matches": 1,
+            "line": 516,
+            "ok": true,
+            "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+            "timestamp": "2026-07-26T21:22:55.328Z",
+            "source_role": "assistant",
+            "record_sha256": "0842419d54cf337120262ca5ad80a280bc1c0f2b449a17186b855661edfb7ca6",
+            "native_ids": [
+              "toolu_019PTiyxoeX5Vc9KMJFu2jhw"
+            ]
+          },
+          {
+            "ref": "#a68daf720e780b4c2:15680@L523",
+            "file_matches": 1,
+            "line": 523,
+            "ok": true,
+            "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+            "timestamp": "2026-07-26T21:23:32.334Z",
+            "source_role": "assistant",
+            "record_sha256": "e46907395da4194bc57e06c99a44eb56e1238d961c03e069ea78bfd714846b50",
+            "native_ids": [
+              "toolu_01XBPsevwzempBkQ2sBNTsvW"
+            ]
+          },
+          {
+            "ref": "#a68daf720e780b4c2:15682@L528",
+            "file_matches": 1,
+            "line": 528,
+            "ok": true,
+            "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+            "timestamp": "2026-07-26T21:24:15.832Z",
+            "source_role": "assistant",
+            "record_sha256": "16690e1e9641c1ddf9dee4ca7979c4f3521bb478bc2799bdd0db2ab28f2ff6dc",
+            "native_ids": [
+              "toolu_016bvcNnvDn4tHXcYJY7CzLh"
+            ]
+          },
+          {
+            "ref": "#a68daf720e780b4c2:15731@L592",
+            "file_matches": 1,
+            "line": 592,
+            "ok": true,
+            "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+            "timestamp": "2026-07-26T21:30:17.239Z",
+            "source_role": "assistant",
+            "record_sha256": "247880efbf4a79665a1ed0968a3cfa8e7269a991e34aecc0715dedad965642d7",
+            "native_ids": [
+              "toolu_01BrL9dsi5PB64tZiKVRfWoa"
+            ]
+          },
+          {
+            "ref": "#af0e3d2ae54dbf769:17286@L23",
+            "file_matches": 1,
+            "line": 23,
+            "ok": true,
+            "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-af0e3d2ae54dbf769.jsonl",
+            "timestamp": "2026-07-26T21:45:43.448Z",
+            "source_role": "assistant",
+            "record_sha256": "dd5a088044c503af6f19786c8b1c4eb3abbcdfe58c4207eed096bbd08b436a4f",
+            "native_ids": [
+              "toolu_01SSSyTUpqQtQF1SjZy36FTe"
+            ]
+          },
+          {
+            "ref": "#af0e3d2ae54dbf769:17292@L32",
+            "file_matches": 1,
+            "line": 32,
+            "ok": true,
+            "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-af0e3d2ae54dbf769.jsonl",
+            "timestamp": "2026-07-26T21:46:11.820Z",
+            "source_role": "assistant",
+            "record_sha256": "94fd77263f2be9dbaff0629cf3399face77ec8c84e9fcba8f0f72a15877eca77",
+            "native_ids": [
+              "toolu_01W4Yg3nfX75u3Yxsk1X4wat"
+            ]
+          },
+          {
+            "ref": "#af0e3d2ae54dbf769:17294@L34",
+            "file_matches": 1,
+            "line": 34,
+            "ok": true,
+            "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-af0e3d2ae54dbf769.jsonl",
+            "timestamp": "2026-07-26T21:46:12.739Z",
+            "source_role": "assistant",
+            "record_sha256": "5dc57be6408fb9395737e8d66e0b239071524e71e5d8329f421483170690c200",
+            "native_ids": [
+              "toolu_01YcRVJymkRf9wtm51Pr5qt8"
+            ]
+          },
+          {
+            "ref": "#af0e3d2ae54dbf769:17296@L36",
+            "file_matches": 1,
+            "line": 36,
+            "ok": true,
+            "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-af0e3d2ae54dbf769.jsonl",
+            "timestamp": "2026-07-26T21:46:18.585Z",
+            "source_role": "assistant",
+            "record_sha256": "792568db4539cbb2617c22388993bf80fde9505a8b4b4a3d17ec302c6a8a1075",
+            "native_ids": [
+              "toolu_01PcjKpCh43ea95hpoivTyih"
+            ]
+          }
+        ],
+        "rep": 1,
+        "yaml_trim_equals_raw_trim": true,
+        "trace_bound": true,
+        "submission_status": "accepted",
+        "ledger": "atoms-2026-09-09-file-evidence5:146:6e917f0274bea1f4f63e45b4",
+        "yaml_sha256": "1e222fec677b701cb60e2d6aebc9bf7ac39c6b47022685d4f903ebdee803080a",
+        "draft_changes": [],
+        "raw_equals_last_draft": true,
+        "scope": "独立核原始转录标签/物理行/native ID及行SHA；不将唯一定位或当前工具绑定当作语义支持。新ledger不套旧global seq。"
+      },
+      "cost": {
+        "started_at": "2026-09-09T22:28:38.262640+00:00",
+        "ended_at": "2026-09-09T22:32:23.891627+00:00",
+        "wall_s": 225.6321071999846,
+        "end_to_end_wall_s": 239.91801929997746,
+        "input_total": 746990,
+        "cached_input_included": 638464,
+        "output_total": 9682,
+        "input_plus_output": 756672,
+        "tool_calls": 39,
+        "tool_chars": 195647,
+        "repeated_calls": 0,
+        "rejected_calls": 3
+      },
+      "fact_counts": {
+        "supported": 4,
+        "partial": 2,
+        "omitted": 0,
+        "contradicted": 0
+      }
+    },
+    {
+      "case": "dice-entry",
+      "variant": "formal-v11",
+      "arm": "tools",
+      "rep": 1,
+      "run": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v11/dice-entry/runs/tools/rep1",
+      "source_code_id": "cb3682f",
+      "source_digest": "1f036a60a25376819196c2005bf47ed9dfaa479c95fdd98c06db9c11e77594a1",
+      "pool_digest": "653db4192d47366e8ca099e59ef2679e929056f18320d081768539b2f5b7443e",
+      "common_task_sha256": "9060a6c160d2a1ac2b893b9f19d12e66a16e6ce1b7d301eacae0abfb9f55eec4",
+      "model": [
+        "gpt-5.5"
+      ],
+      "effort": "medium",
+      "questions": [
+        {
+          "id": "D1",
+          "core": "pass",
+          "basis": "成功打开生成者累计输入与后置Step3输入，桥3次Edit及阶段区分成立；旧UI0/10按当轮summary来源说明。",
+          "mandatory_gaps": [],
+          "minor_omissions": [
+            "没有独立展开设计§F准确标题附近，但派发、模板、实际设计Read及Edits已足够核心。"
+          ],
+          "facts": [
+            {
+              "id": "D1.f1",
+              "status": "supported",
+              "report_claim": "生成阶段累计输入关注页面、功能spec、沉浸式，已记录EntryAbility v2无测试桥。",
+              "raw_evidence": [
+                "generator L47/L48,L51/L52,L53/L54,L57/L58,L71/L72"
+              ]
+            },
+            {
+              "id": "D1.f2",
+              "status": "supported",
+              "report_claim": "后续Step3派发明确按设计§F写TestDataSetup与Want→AppStorage桥，v3-v5分三Edit加入。",
+              "raw_evidence": [
+                "bridge L1,L7/L8,L11/L12,L35/L36,L37/L38,L39/L40"
+              ]
+            },
+            {
+              "id": "D1.f3",
+              "status": "supported",
+              "report_claim": "不能把后续UI测试桥要求反推Stage1应有；代码写入不证明设备桥键成功。",
+              "raw_evidence": [
+                "上述生成/桥时间戳",
+                "Step4 L390及root81e L3402当轮summary"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "D2",
+          "core": "pass",
+          "basis": "ECAT worklist、SDK实际读取、三Edit及原生双目标build正确；未虚称观察者回调已触发。",
+          "mandatory_gaps": [],
+          "minor_omissions": [
+            "may-throw WARN未点名，不曾宣称0WARN。"
+          ],
+          "facts": [
+            {
+              "id": "D2.f1",
+              "status": "supported",
+              "report_claim": "ECAT iteration0派发明确HarmonyOS约束，注册未捕获异常观察者。",
+              "raw_evidence": [
+                "root2f L100",
+                "observer L1"
+              ]
+            },
+            {
+              "id": "D2.f2",
+              "status": "supported",
+              "report_claim": "EntryAbility v5及SDK AbilityKit/ErrorObserver读取后，v6/v7/v8加入import/调用/实现。",
+              "raw_evidence": [
+                "observer L23/L24,L35/L36,L37/L38,L41-L46"
+              ]
+            },
+            {
+              "id": "D2.f3",
+              "status": "partial",
+              "report_claim": "主HAP原生BUILD SUCCESS、ohosTest EXIT0；没有主动异常回调运行验证，WARN未展开。",
+              "raw_evidence": [
+                "builder L43/L44,L63/L64",
+                "builder L51/L52含maythrow WARN"
+              ]
+            }
+          ]
+        }
+      ],
+      "extra_false_claims": [],
+      "unsupported_citations": [],
+      "annotation_requires_correction": false,
+      "full_annotation_pass": false,
+      "notes": [
+        "生成者、桥、observer三者均成功agent展开；第一次observer v8无效后纠正v3，没有在最终报告造agentv8。",
+        "D1使用root81e旧final summary与当时UI0/10；池内后来root593d L260已有原生10/10/HARD21/21/EXIT0，仍未调查。这是独立addendum验证完整性缺项，不追加旧核心分母；UI测试整体最终状态不可只停留旧阻断总结。该回执仍不验证__TEST_MODE__，也早于observer补丁。",
+        "无memory修复后时序断言；不沿用V10rep2额外错误。",
+        "6 reviewed+1系统not_investigated；两个check只删entry_events，2warning→0，未补证据。"
+      ],
+      "investigation": {
+        "tool_counts": [
+          {
+            "Name": "guide",
+            "Count": 2
+          },
+          {
+            "Name": "sessions",
+            "Count": 1
+          },
+          {
+            "Name": "file",
+            "Count": 3
+          },
+          {
+            "Name": "agent",
+            "Count": 6
+          },
+          {
+            "Name": "search",
+            "Count": 4
+          },
+          {
+            "Name": "index",
+            "Count": 1
+          },
+          {
+            "Name": "action",
+            "Count": 21
+          },
+          {
+            "Name": "check",
+            "Count": 2
+          }
+        ],
+        "seq": [
+          {
+            "input": {},
+            "use_line": 17,
+            "result_line": 18,
+            "tool": "guide",
+            "chars": 2103
+          },
+          {
+            "input": {
+              "file": "entry/src/main/ets/entryability/EntryAbility.ets"
+            },
+            "use_line": 26,
+            "result_line": 28,
+            "tool": "sessions",
+            "chars": 7350
+          },
+          {
+            "input": {
+              "path": "entry/src/main/ets/entryability/EntryAbility.ets",
+              "v": 5,
+              "via": "sessions",
+              "diff": true,
+              "v_from": 1,
+              "v_to": 5,
+              "diff_chars": 20000
+            },
+            "use_line": 35,
+            "result_line": 40,
+            "tool": "file",
+            "chars": 9857
+          },
+          {
+            "input": {
+              "path": "entry/src/main/ets/entryability/EntryAbility.ets",
+              "v": 8,
+              "via": "sessions",
+              "diff": true,
+              "v_from": 5,
+              "v_to": 8,
+              "diff_chars": 20000
+            },
+            "use_line": 36,
+            "result_line": 42,
+            "tool": "file",
+            "chars": 244
+          },
+          {
+            "input": {
+              "id": "agent-a711c5d09fb676814",
+              "v": 5,
+              "via": "sessions",
+              "reads": true,
+              "seen": true,
+              "summary_chars": 200
+            },
+            "use_line": 37,
+            "result_line": 43,
+            "tool": "agent",
+            "chars": 244
+          },
+          {
+            "input": {
+              "id": "agent-a27497cfed8c44856",
+              "v": 8,
+              "via": "sessions",
+              "reads": true,
+              "seen": true,
+              "summary_chars": 200
+            },
+            "use_line": 38,
+            "result_line": 44,
+            "tool": "agent",
+            "chars": 244
+          },
+          {
+            "input": {
+              "path": "entry/src/main/ets/entryability/EntryAbility.ets",
+              "v": 8,
+              "via": "file:/private/tmp/claude-502/-Users-fengyi-Workspace-migbot-set-hmigbot-plus/12b07daf-a671-4616-96a1-c214864ee609/scratchpad/dice-hmos/entry/src/main/ets/entryability/EntryAbility.ets@v5",
+              "diff": true,
+              "v_from": 5,
+              "v_to": 8,
+              "diff_chars": 20000
+            },
+            "use_line": 53,
+            "result_line": 57,
+            "tool": "file",
+            "chars": 6950
+          },
+          {
+            "input": {
+              "id": "agent-a711c5d09fb676814",
+              "v": 5,
+              "via": "file:/private/tmp/claude-502/-Users-fengyi-Workspace-migbot-set-hmigbot-plus/12b07daf-a671-4616-96a1-c214864ee609/scratchpad/dice-hmos/entry/src/main/ets/entryability/EntryAbility.ets@v5",
+              "reads": true,
+              "seen": true,
+              "summary_chars": 300
+            },
+            "use_line": 54,
+            "result_line": 59,
+            "tool": "agent",
+            "chars": 11657
+          },
+          {
+            "input": {
+              "id": "agent-a27497cfed8c44856",
+              "v": 8,
+              "via": "file:/private/tmp/claude-502/-Users-fengyi-Workspace-migbot-set-hmigbot-plus/12b07daf-a671-4616-96a1-c214864ee609/scratchpad/dice-hmos/entry/src/main/ets/entryability/EntryAbility.ets@v5",
+              "reads": true,
+              "seen": true,
+              "summary_chars": 300
+            },
+            "use_line": 55,
+            "result_line": 60,
+            "tool": "agent",
+            "chars": 56
+          },
+          {
+            "input": {
+              "id": "agent-a27497cfed8c44856",
+              "v": 3,
+              "via": "file:/private/tmp/claude-502/-Users-fengyi-Workspace-migbot-set-hmigbot-plus/12b07daf-a671-4616-96a1-c214864ee609/scratchpad/dice-hmos/entry/src/main/ets/entryability/EntryAbility.ets@v8",
+              "reads": true,
+              "seen": true,
+              "summary_chars": 400
+            },
+            "use_line": 68,
+            "result_line": 70,
+            "tool": "agent",
+            "chars": 8071
+          },
+          {
+            "input": {
+              "q_any": [
+                "hvigor",
+                "BUILD SUCCESSFUL",
+                "errorManager",
+                "uncaught exception",
+                "P0001_MainActivity_UI",
+                "__target_page__",
+                "__TEST_MODE__"
+              ],
+              "since_ts": "2026-09-03T19:18:38.632000Z",
+              "until_ts": "2026-09-03T22:09:07.170000Z",
+              "after": true
+            },
+            "use_line": 77,
+            "result_line": 81,
+            "tool": "search",
+            "chars": 20261
+          },
+          {
+            "input": {
+              "q_any": [
+                "hvigor",
+                "BUILD SUCCESSFUL",
+                "errorManager",
+                "uncaught exception",
+                "P0001_MainActivity_UI",
+                "__target_page__",
+                "__TEST_MODE__"
+              ],
+              "since_ts": "2026-09-03T21:19:39.888000Z",
+              "until_ts": "2026-09-03T22:09:07.170000Z",
+              "after": true
+            },
+            "use_line": 78,
+            "result_line": 84,
+            "tool": "search",
+            "chars": 16584
+          },
+          {
+            "input": {
+              "kind": "time",
+              "limit": 100
+            },
+            "use_line": 79,
+            "result_line": 83,
+            "tool": "index",
+            "chars": 2395
+          },
+          {
+            "input": {
+              "ref": "#a711c5d09fb676814:2859@L11",
+              "part": "output",
+              "find": "Mount Strategy",
+              "max_chars": 1800
+            },
+            "use_line": 92,
+            "result_line": 99,
+            "tool": "action",
+            "chars": 2624
+          },
+          {
+            "input": {
+              "ref": "#a711c5d09fb676814:2855@L7",
+              "part": "output",
+              "find": "__target_page__",
+              "max_chars": 1800
+            },
+            "use_line": 93,
+            "result_line": 101,
+            "tool": "action",
+            "chars": 2662
+          },
+          {
+            "input": {
+              "ref": "#81e0a463:1335@L3402",
+              "part": "input",
+              "max_chars": 2200
+            },
+            "use_line": 94,
+            "result_line": 103,
+            "tool": "action",
+            "chars": 2912
+          },
+          {
+            "input": {
+              "ref": "#a52d61ac7ab7033ba:2526@L199",
+              "part": "output",
+              "max_chars": 2200
+            },
+            "use_line": 95,
+            "result_line": 104,
+            "tool": "action",
+            "chars": 398
+          },
+          {
+            "input": {
+              "ref": "#2f01bcdc:4353@L213",
+              "part": "output",
+              "max_chars": 2200
+            },
+            "use_line": 96,
+            "result_line": 105,
+            "tool": "action",
+            "chars": 444
+          },
+          {
+            "input": {
+              "ref": "#2f01bcdc:4356@L218",
+              "part": "output",
+              "max_chars": 1800
+            },
+            "use_line": 97,
+            "result_line": 106,
+            "tool": "action",
+            "chars": 1377
+          },
+          {
+            "input": {
+              "id": "agent-a349784d2663f1f0a",
+              "v": 2,
+              "via": "file:/private/tmp/claude-502/-Users-fengyi-Workspace-migbot-set-hmigbot-plus/12b07daf-a671-4616-96a1-c214864ee609/scratchpad/dice-hmos/entry/src/main/ets/entryability/EntryAbility.ets@v5",
+              "reads": true,
+              "seen": true,
+              "summary_chars": 300
+            },
+            "use_line": 114,
+            "result_line": 121,
+            "tool": "agent",
+            "chars": 17515
+          },
+          {
+            "input": {
+              "ref": "#2f01bcdc:4315@L100",
+              "part": "input",
+              "max_chars": 2500
+            },
+            "use_line": 115,
+            "result_line": 124,
+            "tool": "action",
+            "chars": 2901
+          },
+          {
+            "input": {
+              "ref": "#a27497cfed8c44856:4505@L35",
+              "part": "output",
+              "max_chars": 1800
+            },
+            "use_line": 116,
+            "result_line": 123,
+            "tool": "action",
+            "chars": 2457
+          },
+          {
+            "input": {
+              "ref": "#a27497cfed8c44856:4507@L37",
+              "part": "output",
+              "max_chars": 1800
+            },
+            "use_line": 117,
+            "result_line": 127,
+            "tool": "action",
+            "chars": 2456
+          },
+          {
+            "input": {
+              "ref": "#a635575c78cd15ff6:4560@L43",
+              "part": "output",
+              "max_chars": 1500
+            },
+            "use_line": 118,
+            "result_line": 125,
+            "tool": "action",
+            "chars": 547
+          },
+          {
+            "input": {
+              "ref": "#a635575c78cd15ff6:4575@L63",
+              "part": "output",
+              "max_chars": 1500
+            },
+            "use_line": 119,
+            "result_line": 126,
+            "tool": "action",
+            "chars": 534
+          },
+          {
+            "input": {
+              "ref": "#a27497cfed8c44856:4507@L37",
+              "part": "output",
+              "offset": 1700,
+              "max_chars": 1800
+            },
+            "use_line": 138,
+            "result_line": 145,
+            "tool": "action",
+            "chars": 1986
+          },
+          {
+            "input": {
+              "ref": "#a711c5d09fb676814:2881@L35",
+              "part": "input",
+              "max_chars": 2200
+            },
+            "use_line": 139,
+            "result_line": 147,
+            "tool": "action",
+            "chars": 1838
+          },
+          {
+            "input": {
+              "ref": "#a711c5d09fb676814:2883@L37",
+              "part": "input",
+              "max_chars": 2200
+            },
+            "use_line": 140,
+            "result_line": 149,
+            "tool": "action",
+            "chars": 1570
+          },
+          {
+            "input": {
+              "ref": "#a711c5d09fb676814:2885@L39",
+              "part": "input",
+              "max_chars": 3000
+            },
+            "use_line": 141,
+            "result_line": 150,
+            "tool": "action",
+            "chars": 2391
+          },
+          {
+            "input": {
+              "ref": "#a27497cfed8c44856:4511@L41",
+              "part": "input",
+              "max_chars": 1600
+            },
+            "use_line": 142,
+            "result_line": 151,
+            "tool": "action",
+            "chars": 1155
+          },
+          {
+            "input": {
+              "ref": "#a27497cfed8c44856:4515@L45",
+              "part": "input",
+              "max_chars": 2200
+            },
+            "use_line": 143,
+            "result_line": 152,
+            "tool": "action",
+            "chars": 1908
+          },
+          {
+            "input": {
+              "ref": "#a27497cfed8c44856:4513@L43",
+              "part": "input",
+              "max_chars": 1800
+            },
+            "use_line": 160,
+            "result_line": 164,
+            "tool": "action",
+            "chars": 1383
+          },
+          {
+            "input": {
+              "q_any": [
+                "throw new Error",
+                "onUnhandledException",
+                "uncaught exception",
+                "hilog error",
+                "jscrash",
+                "errorManager.on"
+              ],
+              "since_ts": "2026-09-03T21:19:39.888000Z",
+              "until_ts": "2026-09-03T22:09:07.170000Z",
+              "after": true
+            },
+            "use_line": 161,
+            "result_line": 166,
+            "tool": "search",
+            "chars": 17606
+          },
+          {
+            "input": {
+              "ref": "#81e0a463:1318@L3357",
+              "part": "output",
+              "max_chars": 1600
+            },
+            "use_line": 162,
+            "result_line": 167,
+            "tool": "action",
+            "chars": 2130
+          },
+          {
+            "input": {
+              "ref": "#a711c5d09fb676814:2859@L11",
+              "part": "output",
+              "find": "## F",
+              "max_chars": 3000
+            },
+            "use_line": 175,
+            "result_line": 179,
+            "tool": "action",
+            "chars": 3824
+          },
+          {
+            "input": {
+              "ref": "#81e0a463:1318@L3357",
+              "part": "output",
+              "offset": 1200,
+              "max_chars": 1400
+            },
+            "use_line": 176,
+            "result_line": 181,
+            "tool": "action",
+            "chars": 1348
+          },
+          {
+            "input": {
+              "q_any": [
+                "SMOKE 断桥键",
+                "UI 0/10 可达",
+                "UNREACHABLE",
+                "__TEST_MODE__ == true"
+              ],
+              "since_ts": "2026-09-03T19:18:38.632000Z",
+              "until_ts": "2026-09-03T22:09:07.170000Z",
+              "after": true
+            },
+            "use_line": 177,
+            "result_line": 182,
+            "tool": "search",
+            "chars": 18825
+          },
+          {
+            "input": {
+              "topic": "verdict"
+            },
+            "use_line": 190,
+            "result_line": 191,
+            "tool": "guide",
+            "chars": 3173
+          },
+          {
+            "input": {
+              "draft_chars": 8674
+            },
+            "use_line": 199,
+            "result_line": 201,
+            "tool": "check",
+            "chars": 1407
+          },
+          {
+            "input": {
+              "draft_chars": 8586
+            },
+            "use_line": 208,
+            "result_line": 210,
+            "tool": "check",
+            "chars": 1128
+          }
+        ],
+        "coverage": {
+          "expected": 7,
+          "provided": 6,
+          "accounted": 7,
+          "expected_versions": 6,
+          "expected_candidates": 1,
+          "missing_versions": 0,
+          "missing_candidates": 0,
+          "missing": 0,
+          "unresolved": 0,
+          "not_repair": 0,
+          "deferred": 0,
+          "unconfirmed": 0,
+          "advisories": 0,
+          "advisory_rows": 0,
+          "reviewed": 6,
+          "not_investigated": 1
+        },
+        "draft_check": {
+          "status": "matched",
+          "semantic_checked": false,
+          "checks": [
+            {
+              "step": 39,
+              "call_id": "call_04C6D8PNKsBIPx0JznVpVFRT",
+              "verified": true,
+              "status": "needs_review",
+              "counts": {
+                "errors": 0,
+                "warnings": 2,
+                "total": 2
+              },
+              "draft_sha256": "f7c3e5c80433ce0aa1b5ab6a0d16e7601ce222a3fb2f8d8ff5e72fcb226c3eec",
+              "document_sha256": "99fd801f9d4c615045385be4f32aaa3fcb301735593a38aa7878b818c61c1f4a",
+              "issues": [
+                {
+                  "code": "event_entry_role_conflict",
+                  "severity": "warning",
+                  "where": "defect:D1.event_claims[0]",
+                  "node": null,
+                  "detail": "事件进入点与角色声明不一致；不自动改变角色或节点"
+                },
+                {
+                  "code": "event_entry_role_conflict",
+                  "severity": "warning",
+                  "where": "defect:D2.event_claims[0]",
+                  "node": null,
+                  "detail": "事件进入点与角色声明不一致；不自动改变角色或节点"
+                }
+              ],
+              "omitted_issues": 0,
+              "coverage": {
+                "checked": true,
+                "target": "entry/src/main/ets/entryability/EntryAbility.ets",
+                "counts": {
+                  "expected": 7,
+                  "provided": 6,
+                  "accounted": 7,
+                  "expected_versions": 6,
+                  "expected_candidates": 1,
+                  "missing_versions": 0,
+                  "missing_candidates": 0,
+                  "missing": 0,
+                  "unresolved": 0,
+                  "not_repair": 0,
+                  "deferred": 0,
+                  "unconfirmed": 0,
+                  "advisories": 0,
+                  "advisory_rows": 0,
+                  "reviewed": 6,
+                  "not_investigated": 1
+                },
+                "accounted": true,
+                "semantic_checked": false,
+                "mode": "manifest_complement",
+                "manifest_identity_valid": true,
+                "declarations_complete": false
+              },
+              "entry_effect_alignments": [],
+              "entry_effect_alignments_omitted": 0
+            },
+            {
+              "step": 40,
+              "call_id": "call_qPKK8IKhfZwLbc00qtbUJ759",
+              "verified": true,
+              "status": "mechanical_clear",
+              "counts": {
+                "errors": 0,
+                "warnings": 0,
+                "total": 0
+              },
+              "draft_sha256": "258ca242629e48e531665a8da836e2819e3a6395f366a89f9317a83050fe02df",
+              "document_sha256": "0054d45715c37220a3f7a03a93f86c15d214a8807c6c6edaff5c5f4611cf752f",
+              "issues": [],
+              "omitted_issues": 0,
+              "coverage": {
+                "checked": true,
+                "target": "entry/src/main/ets/entryability/EntryAbility.ets",
+                "counts": {
+                  "expected": 7,
+                  "provided": 6,
+                  "accounted": 7,
+                  "expected_versions": 6,
+                  "expected_candidates": 1,
+                  "missing_versions": 0,
+                  "missing_candidates": 0,
+                  "missing": 0,
+                  "unresolved": 0,
+                  "not_repair": 0,
+                  "deferred": 0,
+                  "unconfirmed": 0,
+                  "advisories": 0,
+                  "advisory_rows": 0,
+                  "reviewed": 6,
+                  "not_investigated": 1
+                },
+                "accounted": true,
+                "semantic_checked": false,
+                "mode": "manifest_complement",
+                "manifest_identity_valid": true,
+                "declarations_complete": false
+              },
+              "entry_effect_alignments": [],
+              "entry_effect_alignments_omitted": 0
+            }
+          ],
+          "check_calls": 2,
+          "draft_chars": 17260,
+          "returned_chars": 2535,
+          "final_document_sha256": "0054d45715c37220a3f7a03a93f86c15d214a8807c6c6edaff5c5f4611cf752f",
+          "matched_check": 40
+        },
+        "until_queries": [
+          {
+            "input": {
+              "q_any": [
+                "hvigor",
+                "BUILD SUCCESSFUL",
+                "errorManager",
+                "uncaught exception",
+                "P0001_MainActivity_UI",
+                "__target_page__",
+                "__TEST_MODE__"
+              ],
+              "since_ts": "2026-09-03T19:18:38.632000Z",
+              "until_ts": "2026-09-03T22:09:07.170000Z",
+              "after": true
+            },
+            "use_line": 77,
+            "result_line": 81,
+            "tool": "search",
+            "chars": 20261
+          },
+          {
+            "input": {
+              "q_any": [
+                "hvigor",
+                "BUILD SUCCESSFUL",
+                "errorManager",
+                "uncaught exception",
+                "P0001_MainActivity_UI",
+                "__target_page__",
+                "__TEST_MODE__"
+              ],
+              "since_ts": "2026-09-03T21:19:39.888000Z",
+              "until_ts": "2026-09-03T22:09:07.170000Z",
+              "after": true
+            },
+            "use_line": 78,
+            "result_line": 84,
+            "tool": "search",
+            "chars": 16584
+          },
+          {
+            "input": {
+              "q_any": [
+                "throw new Error",
+                "onUnhandledException",
+                "uncaught exception",
+                "hilog error",
+                "jscrash",
+                "errorManager.on"
+              ],
+              "since_ts": "2026-09-03T21:19:39.888000Z",
+              "until_ts": "2026-09-03T22:09:07.170000Z",
+              "after": true
+            },
+            "use_line": 161,
+            "result_line": 166,
+            "tool": "search",
+            "chars": 17606
+          },
+          {
+            "input": {
+              "q_any": [
+                "SMOKE 断桥键",
+                "UI 0/10 可达",
+                "UNREACHABLE",
+                "__TEST_MODE__ == true"
+              ],
+              "since_ts": "2026-09-03T19:18:38.632000Z",
+              "until_ts": "2026-09-03T22:09:07.170000Z",
+              "after": true
+            },
+            "use_line": 177,
+            "result_line": 182,
+            "tool": "search",
+            "chars": 18825
+          }
+        ],
+        "check_changes": [
+          {
+            "InputObject": "    entry_events:",
+            "SideIndicator": "<="
+          },
+          {
+            "InputObject": "      - D1E1",
+            "SideIndicator": "<="
+          },
+          {
+            "InputObject": "      - D1E2",
+            "SideIndicator": "<="
+          },
+          {
+            "InputObject": "    entry_events:",
+            "SideIndicator": "<="
+          },
+          {
+            "InputObject": "      - D2E1",
+            "SideIndicator": "<="
+          },
+          {
+            "InputObject": "      - D2E2",
+            "SideIndicator": "<="
+          }
+        ]
+      },
+      "reference_integrity": {
+        "candidate_bindings": [],
+        "document_sha256": "0054d45715c37220a3f7a03a93f86c15d214a8807c6c6edaff5c5f4611cf752f",
+        "case": "dice-entry",
+        "draft_sha256": "258ca242629e48e531665a8da836e2819e3a6395f366a89f9317a83050fe02df",
+        "refs": [
+          {
+            "ref": "#2f01bcdc:4315@L100",
+            "file_matches": 1,
+            "line": 100,
+            "ok": true,
+            "file": "2f01bcdc-0a92-4961-a64d-5b181f03b3d3.jsonl",
+            "timestamp": "2026-09-03T21:17:54.675Z",
+            "source_role": "assistant",
+            "record_sha256": "aa6c7aa3d73364809534a5ce2ded8c7772f7e5644663413caf7c74a8d78b7656",
+            "native_ids": [
+              "call_1c4e6fc7af144f7d94f69fc6"
+            ]
+          },
+          {
+            "ref": "#2f01bcdc:4356@L218",
+            "file_matches": 1,
+            "line": 218,
+            "ok": true,
+            "file": "2f01bcdc-0a92-4961-a64d-5b181f03b3d3.jsonl",
+            "timestamp": "2026-09-03T21:27:15.830Z",
+            "source_role": "assistant",
+            "record_sha256": "3c94b0034877a847c2e8dbb2b46ae379a41f99658039ade68c87cc5064db113a",
+            "native_ids": [
+              "call_d47cf3ae4f0c4b5aba8a4675"
+            ]
+          },
+          {
+            "ref": "#81e0a463:1318@L3357",
+            "file_matches": 1,
+            "line": 3357,
+            "ok": true,
+            "file": "81e0a463-c9d3-4a7a-a671-b7f064830af1.jsonl",
+            "timestamp": "2026-09-03T19:10:08.539Z",
+            "source_role": "assistant",
+            "record_sha256": "2de9f2849483aef8e2eaa838638624edbf31535096e5586da3646907e1675101",
+            "native_ids": [
+              "call_fdba7590b25940ca92c0b355"
+            ]
+          },
+          {
+            "ref": "#81e0a463:1335@L3402",
+            "file_matches": 1,
+            "line": 3402,
+            "ok": true,
+            "file": "81e0a463-c9d3-4a7a-a671-b7f064830af1.jsonl",
+            "timestamp": "2026-09-03T20:10:53.296Z",
+            "source_role": "assistant",
+            "record_sha256": "0eda610cab50c7f028ced441ffcf5925f86fca91d2c3a92601820e5b0ad1ff70",
+            "native_ids": [
+              "call_2b2bfbc8be514afcaba559e5"
+            ]
+          },
+          {
+            "ref": "#a27497cfed8c44856:4495@L23",
+            "file_matches": 1,
+            "line": 23,
+            "ok": true,
+            "file": "2f01bcdc-0a92-4961-a64d-5b181f03b3d3/subagents/agent-a27497cfed8c44856.jsonl",
+            "timestamp": "2026-09-03T21:18:16.787Z",
+            "source_role": "assistant",
+            "record_sha256": "5a946162bf02487a6d3f24af4236d4a486ca39e06c423f322f263b28c70011d5",
+            "native_ids": [
+              "call_17b0486d26f74bf5aa55002e"
+            ]
+          },
+          {
+            "ref": "#a27497cfed8c44856:4505@L35",
+            "file_matches": 1,
+            "line": 35,
+            "ok": true,
+            "file": "2f01bcdc-0a92-4961-a64d-5b181f03b3d3/subagents/agent-a27497cfed8c44856.jsonl",
+            "timestamp": "2026-09-03T21:18:35.605Z",
+            "source_role": "assistant",
+            "record_sha256": "e2c5c2320d2dd8bf89a1b86520e13ccb7a398b88c18a98db2f4a1cd74e1b5b81",
+            "native_ids": [
+              "call_e6d56b80320d4677b97b915b"
+            ]
+          },
+          {
+            "ref": "#a27497cfed8c44856:4507@L37",
+            "file_matches": 1,
+            "line": 37,
+            "ok": true,
+            "file": "2f01bcdc-0a92-4961-a64d-5b181f03b3d3/subagents/agent-a27497cfed8c44856.jsonl",
+            "timestamp": "2026-09-03T21:18:36.033Z",
+            "source_role": "assistant",
+            "record_sha256": "4429505296278c844975be287c5f763d10b98551f83f0a7fd89e8788c3f61683",
+            "native_ids": [
+              "call_e8130043aeef4043aa0e3ff0"
+            ]
+          },
+          {
+            "ref": "#a27497cfed8c44856:4511@L41",
+            "file_matches": 1,
+            "line": 41,
+            "ok": true,
+            "file": "2f01bcdc-0a92-4961-a64d-5b181f03b3d3/subagents/agent-a27497cfed8c44856.jsonl",
+            "timestamp": "2026-09-03T21:19:24.777Z",
+            "source_role": "assistant",
+            "record_sha256": "c146cc4cb19f479638b45729b5667285a88aeb8c3b596266d15deae467fc957a",
+            "native_ids": [
+              "call_f031a058037c467fb06fc159"
+            ]
+          },
+          {
+            "ref": "#a27497cfed8c44856:4513@L43",
+            "file_matches": 1,
+            "line": 43,
+            "ok": true,
+            "file": "2f01bcdc-0a92-4961-a64d-5b181f03b3d3/subagents/agent-a27497cfed8c44856.jsonl",
+            "timestamp": "2026-09-03T21:19:31.929Z",
+            "source_role": "assistant",
+            "record_sha256": "293cf7298c8f8f33fe2ac946178a36ddcfa2017913007853fb4151575ae62b30",
+            "native_ids": [
+              "call_7013085c03274c8183fdd455"
+            ]
+          },
+          {
+            "ref": "#a27497cfed8c44856:4515@L45",
+            "file_matches": 1,
+            "line": 45,
+            "ok": true,
+            "file": "2f01bcdc-0a92-4961-a64d-5b181f03b3d3/subagents/agent-a27497cfed8c44856.jsonl",
+            "timestamp": "2026-09-03T21:19:39.888Z",
+            "source_role": "assistant",
+            "record_sha256": "07b004834076111f9988a5e85040b50e151bb5b965bd6ae26c9e69444858477c",
+            "native_ids": [
+              "call_b6682a6aab774d88b1d1871d"
+            ]
+          },
+          {
+            "ref": "#a349784d2663f1f0a:2039@L47",
+            "file_matches": 1,
+            "line": 47,
+            "ok": true,
+            "file": "81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a349784d2663f1f0a.jsonl",
+            "timestamp": "2026-09-03T15:39:05.683Z",
+            "source_role": "assistant",
+            "record_sha256": "3a0a8ced9ebadf770ad0a8445e0e0441c22ba0aa8e418e39542c7febd7b07fa1",
+            "native_ids": [
+              "call_bc17fd91fb594eb8a9997c01"
+            ]
+          },
+          {
+            "ref": "#a349784d2663f1f0a:2049@L57",
+            "file_matches": 1,
+            "line": 57,
+            "ok": true,
+            "file": "81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a349784d2663f1f0a.jsonl",
+            "timestamp": "2026-09-03T15:39:25.327Z",
+            "source_role": "assistant",
+            "record_sha256": "cdb66b42d2c8c7c92282446573bd413258abeaec23751fb8ac879dc48d4e6631",
+            "native_ids": [
+              "call_1488a6869bea4472921ea35f"
+            ]
+          },
+          {
+            "ref": "#a349784d2663f1f0a:2061@L71",
+            "file_matches": 1,
+            "line": 71,
+            "ok": true,
+            "file": "81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a349784d2663f1f0a.jsonl",
+            "timestamp": "2026-09-03T15:51:35.645Z",
+            "source_role": "assistant",
+            "record_sha256": "6c12a40f131dafc10e44cc99b27fc6066faeb9ccc0537af7c849a3a8412c27fe",
+            "native_ids": [
+              "call_459071197f484436b71237e5"
+            ]
+          },
+          {
+            "ref": "#a52d61ac7ab7033ba:2526@L199",
+            "file_matches": 1,
+            "line": 199,
+            "ok": true,
+            "file": "81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a52d61ac7ab7033ba.jsonl",
+            "timestamp": "2026-09-03T19:35:55.153Z",
+            "source_role": "assistant",
+            "record_sha256": "f2ddce45496563d0a203f1d937e18948774634d63c81a31e5eb920212a2e6d24",
+            "native_ids": [
+              "call_be93dc52366042928a4db7d2"
+            ]
+          },
+          {
+            "ref": "#a635575c78cd15ff6:4560@L43",
+            "file_matches": 1,
+            "line": 43,
+            "ok": true,
+            "file": "2f01bcdc-0a92-4961-a64d-5b181f03b3d3/subagents/agent-a635575c78cd15ff6.jsonl",
+            "timestamp": "2026-09-03T21:23:58.751Z",
+            "source_role": "assistant",
+            "record_sha256": "1f9fb760c4c8a2cc1fa7a581d2443ef45ec2722c610c3ffba4f5ca3b351139bb",
+            "native_ids": [
+              "call_01dfaa766cce469ca64faf64"
+            ]
+          },
+          {
+            "ref": "#a635575c78cd15ff6:4575@L63",
+            "file_matches": 1,
+            "line": 63,
+            "ok": true,
+            "file": "2f01bcdc-0a92-4961-a64d-5b181f03b3d3/subagents/agent-a635575c78cd15ff6.jsonl",
+            "timestamp": "2026-09-03T21:25:29.586Z",
+            "source_role": "assistant",
+            "record_sha256": "c01442cdebab58ab5583e6146a724866097492a0faba167ad80b3117476e3186",
+            "native_ids": [
+              "call_09982c7436e5491a84ac4559"
+            ]
+          },
+          {
+            "ref": "#a711c5d09fb676814:2855@L7",
+            "file_matches": 1,
+            "line": 7,
+            "ok": true,
+            "file": "81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a711c5d09fb676814.jsonl",
+            "timestamp": "2026-09-03T19:10:15.792Z",
+            "source_role": "assistant",
+            "record_sha256": "0bc10163e6eda4ebce91274e887fe7f6924a667893a990dd00533f7d1335d65c",
+            "native_ids": [
+              "call_189b2504fca14e68979322c2"
+            ]
+          },
+          {
+            "ref": "#a711c5d09fb676814:2859@L11",
+            "file_matches": 1,
+            "line": 11,
+            "ok": true,
+            "file": "81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a711c5d09fb676814.jsonl",
+            "timestamp": "2026-09-03T19:10:17.886Z",
+            "source_role": "assistant",
+            "record_sha256": "028dea57f880deba2fee2260bd5b295f8f77a66348cc26a9d37363355aa6a767",
+            "native_ids": [
+              "call_769beeda1a324d3d95de7251"
+            ]
+          },
+          {
+            "ref": "#a711c5d09fb676814:2865@L17",
+            "file_matches": 1,
+            "line": 17,
+            "ok": true,
+            "file": "81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a711c5d09fb676814.jsonl",
+            "timestamp": "2026-09-03T19:10:25.612Z",
+            "source_role": "assistant",
+            "record_sha256": "0ff32ad35ddd89dbb00d20efbb03ab680080a5364a4b1f632f1b9bf7800788eb",
+            "native_ids": [
+              "call_ad63a77294304198a5c64ece"
+            ]
+          },
+          {
+            "ref": "#a711c5d09fb676814:2881@L35",
+            "file_matches": 1,
+            "line": 35,
+            "ok": true,
+            "file": "81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a711c5d09fb676814.jsonl",
+            "timestamp": "2026-09-03T19:17:13.810Z",
+            "source_role": "assistant",
+            "record_sha256": "ca124a76d4213257ec504a1a8c1f9a88bc24e3064941005916d9f2576a8ba75a",
+            "native_ids": [
+              "call_003bc0a35ce74684a5296325"
+            ]
+          },
+          {
+            "ref": "#a711c5d09fb676814:2883@L37",
+            "file_matches": 1,
+            "line": 37,
+            "ok": true,
+            "file": "81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a711c5d09fb676814.jsonl",
+            "timestamp": "2026-09-03T19:17:21.617Z",
+            "source_role": "assistant",
+            "record_sha256": "b7197d5f9f4beed5084a5659b86c49f26716aa6f93a0a16a72f58bac5a3dcc90",
+            "native_ids": [
+              "call_6c1a4dd0da164350a549d420"
+            ]
+          },
+          {
+            "ref": "#a711c5d09fb676814:2885@L39",
+            "file_matches": 1,
+            "line": 39,
+            "ok": true,
+            "file": "81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a711c5d09fb676814.jsonl",
+            "timestamp": "2026-09-03T19:17:35.691Z",
+            "source_role": "assistant",
+            "record_sha256": "9aa5b948a807268d1cf8910068fad64a2c798bab89963eab63d708dc9b44665f",
+            "native_ids": [
+              "call_04086bf7960b46e7b2a00be4"
+            ]
+          }
+        ],
+        "rep": 1,
+        "yaml_trim_equals_raw_trim": true,
+        "trace_bound": true,
+        "submission_status": "accepted",
+        "ledger": "atoms-2026-09-09-file-evidence5:80:1efdb15365ba02ab0e0ffcf2",
+        "yaml_sha256": "258ca242629e48e531665a8da836e2819e3a6395f366a89f9317a83050fe02df",
+        "draft_changes": [
+          {
+            "InputObject": "    entry_events:",
+            "SideIndicator": "<="
+          },
+          {
+            "InputObject": "      - D1E1",
+            "SideIndicator": "<="
+          },
+          {
+            "InputObject": "      - D1E2",
+            "SideIndicator": "<="
+          },
+          {
+            "InputObject": "    entry_events:",
+            "SideIndicator": "<="
+          },
+          {
+            "InputObject": "      - D2E1",
+            "SideIndicator": "<="
+          },
+          {
+            "InputObject": "      - D2E2",
+            "SideIndicator": "<="
+          }
+        ],
+        "raw_equals_last_draft": true,
+        "scope": "独立核原始转录标签/物理行/native ID及行SHA；不将唯一定位或当前工具绑定当作语义支持。新ledger不套旧global seq。"
+      },
+      "cost": {
+        "started_at": "2026-09-09T22:32:38.830912+00:00",
+        "ended_at": "2026-09-09T22:37:32.316532+00:00",
+        "wall_s": 293.49058460001834,
+        "end_to_end_wall_s": 297.41356399992947,
+        "input_total": 891621,
+        "cached_input_included": 782336,
+        "output_total": 14132,
+        "input_plus_output": 905753,
+        "tool_calls": 40,
+        "tool_chars": 184515,
+        "repeated_calls": 0,
+        "rejected_calls": 4
+      },
+      "fact_counts": {
+        "supported": 5,
+        "partial": 1,
+        "omitted": 0,
+        "contradicted": 0
+      }
+    },
+    {
+      "case": "splash",
+      "variant": "formal-v11",
+      "arm": "tools",
+      "rep": 1,
+      "run": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v11/splash/runs/tools/rep1",
+      "source_code_id": "cb3682f",
+      "source_digest": "1f036a60a25376819196c2005bf47ed9dfaa479c95fdd98c06db9c11e77594a1",
+      "pool_digest": "a78b1373045f7558d6da3b76123e30d032635a2a0b4cdd665e7f80c0bdf8b337",
+      "common_task_sha256": "d2f9f03d6b8a4c56e405559fe7160308ecc1d054b877ebf64250dd084ec85134",
+      "model": [
+        "gpt-5.5"
+      ],
+      "effort": "medium",
+      "questions": [
+        {
+          "id": "S1",
+          "core": "partial",
+          "basis": "初版callback、Slice11错误isModal理解、finding与修复主链部分成立，但漏entry-setup删除mandatory环节，精确红节点另有material问题。",
+          "mandatory_gaps": [
+            "entry-setup L123/L124实际删除callback未调查。"
+          ],
+          "minor_omissions": [
+            "后置构建仅主会话/报告，未直接展开builder成功原生日志。"
+          ],
+          "facts": [
+            {
+              "id": "S1.f1",
+              "status": "supported",
+              "report_claim": "生成v1实现.onBackPressed(()=>true)，对应当时启动页禁用返回输入。",
+              "raw_evidence": [
+                "converter L7/L9,L25/L26,L71/L72"
+              ]
+            },
+            {
+              "id": "S1.f2",
+              "status": "partial",
+              "report_claim": "知道D-020接受外壳差异但把装配叙事集中Slice11，未交代更早entry-setup删除。",
+              "raw_evidence": [
+                "entry-setup L123/L124",
+                "Slice11 L250/L251"
+              ]
+            },
+            {
+              "id": "S1.f3",
+              "status": "partial",
+              "report_claim": "Slice11的isModal解释被finding反驳；L346脚本已打开但仅作为尝试/候选，精确红v37不是该解释引入事件。",
+              "raw_evidence": [
+                "Slice11 L236/L237,L250/L251",
+                "fixer L320/L321,L346/L347"
+              ]
+            },
+            {
+              "id": "S1.f4",
+              "status": "supported",
+              "report_claim": "后置有编译PASS主张，不能冒充BACK行为复测；未说池内没有构建。",
+              "raw_evidence": [
+                "builder L36/L37,L39/L40",
+                "rootff L1758通知"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "S2",
+          "core": "partial",
+          "basis": "实际hide与restore脚本/routeEdit已识别，生成实际输入边界谨慎；没核生成前主会话theme已读，mandatory早期材料环节仍缺。",
+          "mandatory_gaps": [
+            "只查07-26 fixer theme，未核07-23 root L404及早期ui-manifest/design的真实材料可用性。"
+          ],
+          "minor_omissions": [],
+          "facts": [
+            {
+              "id": "S2.f1",
+              "status": "partial",
+              "report_claim": "认为主题要求旧有但证据仅meta style_sources、full_screen及后来fixer theme；没有生成前主会话Read回执。",
+              "raw_evidence": [
+                "root9b L404 07-23 12:36主题结果",
+                "root9b L520早期ui-manifest",
+                "refdoc L188早期design"
+              ]
+            },
+            {
+              "id": "S2.f2",
+              "status": "supported",
+              "report_claim": "生成者已读page/meta/resource-mapping/immersive，具体theme传递未立证，不把全池零命中当不存在。",
+              "raw_evidence": [
+                "converter L7/L9,L8/L11,L15/L16,L19/L20,L37/L38"
+              ]
+            },
+            {
+              "id": "S2.f3",
+              "status": "supported",
+              "report_claim": "L485脚本引入window和入页hide/离页restore，L488正式Edit只补onRoute restore。",
+              "raw_evidence": [
+                "fixer L485/L486,L488/L489"
+              ]
+            }
+          ]
+        }
+      ],
+      "extra_false_claims": [
+        {
+          "code": "wrong_exact_entry_node",
+          "classification": "node_attribution_error",
+          "material": true,
+          "question": "S1",
+          "node": "agent:agent-aslice11-startup-50a0622bcfe4a588@v37",
+          "report_claim": "role: 进入·错；v45原文显示...isModal:true会吃掉系统返回键...主要引入点归因到Slice11装配/决策。",
+          "raw_counterevidence": [
+            "Slice11 L294/v37实际只把animationRunId判断改为isAnimationStale，新增helper；没有isModal或D-020变化。",
+            "isModal错误解释首次写入在L236/v22，D-020注释在L250/v26。"
+          ],
+          "assessment": "作者/阶段叙述主要正确，累计file v45保留旧错误不证明v37是进入效应；按冻结规则为实质精确节点错误，S1仍因mandatory缺链partial，不临时改fail。"
+        }
+      ],
+      "unsupported_citations": [
+        {
+          "code": "dispatch_citation_points_to_system_roster",
+          "classification": "unsupported_citation",
+          "material": true,
+          "question": "S1/S2",
+          "ref": "#50a0622bcfe4a588:10582@L2",
+          "report_claim": "引用用于‘Slice11派发明确D-020/隐私门控硬约束’及实际F001输入。",
+          "raw_counterevidence": [
+            "原始L2只有<system-reminder>Other agents active...名单，无派发硬约束。",
+            "真正完整任务在原始L1，已打开agent画像确有展示其正文；本条不是派发从未存在，而是最终引用不支持所标内容。"
+          ],
+          "assessment": "必须修正原文引用；定位ok/原事件id存在不能认证语义支持。"
+        }
+      ],
+      "annotation_requires_correction": true,
+      "full_annotation_pass": false,
+      "notes": [
+        "3个agent成功，含converter与Slice11累计输入；未查entry-setup、未查root9b早期theme。",
+        "L346/L485输入已完整打开；原始write在print(ok)之前且同ID成功回执，候选仅是解析保守，不等于修复未执行。报告正确没有把脚本硬塞v52/v53正式delta，但S1仍偏保守。",
+        "3次check：第一份缺S2红node basis格式错；第二份补basis后2search receipt无效引用；最后改为原文并保留1条中性post-anchor warning。最终未被宣称语义clear。",
+        "4 reviewed+25系统not_investigated；正文未调查补集不冒充已阅。"
+      ],
+      "investigation": {
+        "tool_counts": [
+          {
+            "Name": "guide",
+            "Count": 2
+          },
+          {
+            "Name": "sessions",
+            "Count": 1
+          },
+          {
+            "Name": "file",
+            "Count": 4
+          },
+          {
+            "Name": "diff",
+            "Count": 2
+          },
+          {
+            "Name": "blame",
+            "Count": 1
+          },
+          {
+            "Name": "agent",
+            "Count": 3
+          },
+          {
+            "Name": "action",
+            "Count": 17
+          },
+          {
+            "Name": "search",
+            "Count": 3
+          },
+          {
+            "Name": "index",
+            "Count": 1
+          },
+          {
+            "Name": "check",
+            "Count": 3
+          }
+        ],
+        "seq": [
+          {
+            "input": {},
+            "use_line": 17,
+            "result_line": 18,
+            "tool": "guide",
+            "chars": 2103
+          },
+          {
+            "input": {
+              "file": "entry/src/main/ets/pages/SplashPage.ets"
+            },
+            "use_line": 26,
+            "result_line": 28,
+            "tool": "sessions",
+            "chars": 13937
+          },
+          {
+            "input": {
+              "path": "entry/src/main/ets/pages/SplashPage.ets",
+              "v": 53,
+              "via": "sessions",
+              "diff": true,
+              "diff_chars": 20000
+            },
+            "use_line": 35,
+            "result_line": 40,
+            "tool": "file",
+            "chars": 25249
+          },
+          {
+            "input": {
+              "path": "entry/src/main/ets/pages/SplashPage.ets",
+              "v": 52
+            },
+            "use_line": 36,
+            "result_line": 42,
+            "tool": "diff",
+            "chars": 732
+          },
+          {
+            "input": {
+              "path": "entry/src/main/ets/pages/SplashPage.ets",
+              "v": 53
+            },
+            "use_line": 37,
+            "result_line": 43,
+            "tool": "diff",
+            "chars": 608
+          },
+          {
+            "input": {
+              "path": "entry/src/main/ets/pages/SplashPage.ets",
+              "v": 53,
+              "changed": true,
+              "start": 1,
+              "n": 80
+            },
+            "use_line": 38,
+            "result_line": 44,
+            "tool": "blame",
+            "chars": 1623
+          },
+          {
+            "input": {
+              "path": "entry/src/main/ets/pages/SplashPage.ets",
+              "v": 1,
+              "via": "file:/Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723/entry/src/main/ets/pages/SplashPage.ets@v53",
+              "content": true,
+              "start": 1,
+              "n": 220
+            },
+            "use_line": 51,
+            "result_line": 56,
+            "tool": "file",
+            "chars": 29168
+          },
+          {
+            "input": {
+              "id": "agent-aconv-splash-9d5902d803bbcde6",
+              "v": 1,
+              "via": "file:/Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723/entry/src/main/ets/pages/SplashPage.ets@v53",
+              "reads": true,
+              "seen": true,
+              "summary_chars": 180
+            },
+            "use_line": 52,
+            "result_line": 58,
+            "tool": "agent",
+            "chars": 9142
+          },
+          {
+            "input": {
+              "id": "agent-aslice11-startup-50a0622bcfe4a588",
+              "v": 37,
+              "via": "file:/Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723/entry/src/main/ets/pages/SplashPage.ets@v53",
+              "reads": true,
+              "seen": true,
+              "summary_chars": 180
+            },
+            "use_line": 53,
+            "result_line": 60,
+            "tool": "agent",
+            "chars": 24902
+          },
+          {
+            "input": {
+              "id": "agent-a68daf720e780b4c2",
+              "v": 31,
+              "via": "file:/Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723/entry/src/main/ets/pages/SplashPage.ets@v53",
+              "reads": true,
+              "seen": true,
+              "summary_chars": 180
+            },
+            "use_line": 54,
+            "result_line": 61,
+            "tool": "agent",
+            "chars": 57178
+          },
+          {
+            "input": {
+              "ref": "#9d5902d803bbcde6:7518@L25",
+              "part": "output",
+              "find": "onBackPressed",
+              "max_chars": 4000
+            },
+            "use_line": 69,
+            "result_line": 74,
+            "tool": "action",
+            "chars": 1772
+          },
+          {
+            "input": {
+              "ref": "#9d5902d803bbcde6:7503@L7",
+              "part": "output",
+              "max_chars": 6000
+            },
+            "use_line": 70,
+            "result_line": 76,
+            "tool": "action",
+            "chars": 3202
+          },
+          {
+            "input": {
+              "ref": "#50a0622bcfe4a588:10663@L108",
+              "part": "output",
+              "max_chars": 6000
+            },
+            "use_line": 71,
+            "result_line": 77,
+            "tool": "action",
+            "chars": 3024
+          },
+          {
+            "input": {
+              "path": "entry/src/main/ets/pages/SplashPage.ets",
+              "v": 45,
+              "via": "agent:agent-aslice11-startup-50a0622bcfe4a588@v37",
+              "content": true,
+              "start": 120,
+              "n": 420
+            },
+            "use_line": 72,
+            "result_line": 78,
+            "tool": "file",
+            "chars": 40830
+          },
+          {
+            "input": {
+              "ref": "#a68daf720e780b4c2:15550@L320",
+              "part": "output",
+              "max_chars": 8000
+            },
+            "use_line": 87,
+            "result_line": 92,
+            "tool": "action",
+            "chars": 5607
+          },
+          {
+            "input": {
+              "ref": "#a68daf720e780b4c2:15627@L438",
+              "part": "output",
+              "find": "SplashActivity",
+              "max_chars": 6000
+            },
+            "use_line": 88,
+            "result_line": 94,
+            "tool": "action",
+            "chars": 3197
+          },
+          {
+            "input": {
+              "ref": "#a68daf720e780b4c2:15650@L476",
+              "part": "output",
+              "max_chars": 6000
+            },
+            "use_line": 89,
+            "result_line": 96,
+            "tool": "action",
+            "chars": 1627
+          },
+          {
+            "input": {
+              "ref": "#a68daf720e780b4c2:15651@L478",
+              "part": "output",
+              "max_chars": 6000
+            },
+            "use_line": 90,
+            "result_line": 95,
+            "tool": "action",
+            "chars": 2324
+          },
+          {
+            "input": {
+              "ref": "#9d5902d803bbcde6:7509@L15",
+              "part": "output",
+              "max_chars": 3000
+            },
+            "use_line": 103,
+            "result_line": 108,
+            "tool": "action",
+            "chars": 2556
+          },
+          {
+            "input": {
+              "ref": "#9d5902d803bbcde6:7506@L8",
+              "part": "output",
+              "find": "windowFullscreen",
+              "max_chars": 4000
+            },
+            "use_line": 104,
+            "result_line": 110,
+            "tool": "action",
+            "chars": 4900
+          },
+          {
+            "input": {
+              "ref": "#9d5902d803bbcde6:7513@L19",
+              "part": "output",
+              "find": "windowFullscreen",
+              "max_chars": 4000
+            },
+            "use_line": 105,
+            "result_line": 111,
+            "tool": "action",
+            "chars": 4905
+          },
+          {
+            "input": {
+              "agent": "agent-aconv-splash-9d5902d803bbcde6",
+              "v": 1,
+              "q_any": [
+                "windowFullscreen",
+                "Theme.SeceretBox.Launch",
+                "statusBarColor",
+                "setWindowSystemBarEnable",
+                "系统状态栏",
+                "状态栏"
+              ],
+              "after": true
+            },
+            "use_line": 106,
+            "result_line": 112,
+            "tool": "search",
+            "chars": 2864
+          },
+          {
+            "input": {
+              "q_any": [
+                "SplashActivity_01_back_key_dismisses_privacy_dialog",
+                "ALIGN_PSplashActivity_extra_element_status-bar",
+                "setWindowSystemBarEnable",
+                "onNavBarStateChange",
+                "BACK"
+              ],
+              "since_ts": "2026-07-26T21:06:31.863Z",
+              "until_ts": "2026-07-26T21:48:57.218000Z",
+              "after": true
+            },
+            "use_line": 121,
+            "result_line": 126,
+            "tool": "search",
+            "chars": 17736
+          },
+          {
+            "input": {
+              "q_any": [
+                "fixed",
+                "PASS",
+                "通过",
+                "验证",
+                "复测",
+                "disposition"
+              ],
+              "since_ts": "2026-07-26T21:20:24.982000Z",
+              "until_ts": "2026-07-26T21:48:57.218000Z",
+              "after": true
+            },
+            "use_line": 122,
+            "result_line": 129,
+            "tool": "search",
+            "chars": 15501
+          },
+          {
+            "input": {
+              "kind": "time",
+              "limit": 100
+            },
+            "use_line": 123,
+            "result_line": 128,
+            "tool": "index",
+            "chars": 446
+          },
+          {
+            "input": {
+              "ref": "#a68daf720e780b4c2:15744@L615",
+              "part": "output",
+              "max_chars": 5000
+            },
+            "use_line": 124,
+            "result_line": 130,
+            "tool": "action",
+            "chars": 1625
+          },
+          {
+            "input": {
+              "ref": "#a68daf720e780b4c2:15567@L346",
+              "part": "input",
+              "max_chars": 12000
+            },
+            "use_line": 137,
+            "result_line": 142,
+            "tool": "action",
+            "chars": 4462
+          },
+          {
+            "input": {
+              "ref": "#a68daf720e780b4c2:15569@L352",
+              "part": "input",
+              "max_chars": 10000
+            },
+            "use_line": 138,
+            "result_line": 144,
+            "tool": "action",
+            "chars": 1884
+          },
+          {
+            "input": {
+              "path": "entry/src/main/ets/pages/SplashPage.ets",
+              "v": 52,
+              "via": "file:/Users/chenjiamin/arkTs/arkts_pilot_project/aippt_version/aippt_0723/entry/src/main/ets/pages/SplashPage.ets@v53",
+              "content": true,
+              "start": 145,
+              "n": 95
+            },
+            "use_line": 139,
+            "result_line": 145,
+            "tool": "file",
+            "chars": 24491
+          },
+          {
+            "input": {
+              "ref": "#a68daf720e780b4c2:15740@L608",
+              "part": "input",
+              "find": "SplashActivity_01_back_key_dismisses_privacy_dialog",
+              "max_chars": 6000
+            },
+            "use_line": 140,
+            "result_line": 146,
+            "tool": "action",
+            "chars": 5945
+          },
+          {
+            "input": {
+              "ref": "#a68daf720e780b4c2:15655@L485",
+              "part": "input",
+              "max_chars": 10000
+            },
+            "use_line": 153,
+            "result_line": 155,
+            "tool": "action",
+            "chars": 2667
+          },
+          {
+            "input": {
+              "ref": "#a68daf720e780b4c2:15656@L488",
+              "part": "input",
+              "max_chars": 4000
+            },
+            "use_line": 160,
+            "result_line": 162,
+            "tool": "action",
+            "chars": 1475
+          },
+          {
+            "input": {
+              "topic": "verdict"
+            },
+            "use_line": 169,
+            "result_line": 170,
+            "tool": "guide",
+            "chars": 3173
+          },
+          {
+            "input": {
+              "draft_chars": 9297
+            },
+            "use_line": 178,
+            "result_line": 180,
+            "tool": "check",
+            "chars": 695
+          },
+          {
+            "input": {
+              "draft_chars": 10058
+            },
+            "use_line": 187,
+            "result_line": 189,
+            "tool": "check",
+            "chars": 2273
+          },
+          {
+            "input": {
+              "ref": "#9d5902d803bbcde6:7526@L37",
+              "part": "output",
+              "find": "系统状态栏",
+              "max_chars": 3000
+            },
+            "use_line": 194,
+            "result_line": 196,
+            "tool": "action",
+            "chars": 3879
+          },
+          {
+            "input": {
+              "draft_chars": 9984
+            },
+            "use_line": 203,
+            "result_line": 205,
+            "tool": "check",
+            "chars": 1929
+          }
+        ],
+        "coverage": {
+          "expected": 29,
+          "provided": 4,
+          "accounted": 29,
+          "expected_versions": 2,
+          "expected_candidates": 27,
+          "missing_versions": 0,
+          "missing_candidates": 0,
+          "missing": 0,
+          "unresolved": 0,
+          "not_repair": 0,
+          "deferred": 0,
+          "unconfirmed": 0,
+          "advisories": 0,
+          "advisory_rows": 0,
+          "reviewed": 4,
+          "not_investigated": 25
+        },
+        "draft_check": {
+          "status": "matched",
+          "semantic_checked": false,
+          "checks": [
+            {
+              "step": 34,
+              "call_id": "call_D50pfjW1GHFeMNeYe8FseSsk",
+              "verified": false,
+              "status": "unverifiable",
+              "counts": null,
+              "draft_sha256": null,
+              "document_sha256": null
+            },
+            {
+              "step": 35,
+              "call_id": "call_JYjnNrmQGVuBoa0V3vqww3ts",
+              "verified": true,
+              "status": "needs_review",
+              "counts": {
+                "errors": 2,
+                "warnings": 1,
+                "total": 3
+              },
+              "draft_sha256": "e8a6fab6372480fc4aede475921d8aab094126bc6a2bbfc8037302e1ee2f7787",
+              "document_sha256": "cb3f8762632fe736735cfae0c38706887301e3138fd7e15e68aa1f4a447365a5",
+              "issues": [
+                {
+                  "code": "invalid_reference",
+                  "severity": "error",
+                  "where": "defect:S2.nodes[0].evidence[4]",
+                  "node": null,
+                  "detail": "search:0c47e0b8e42310ed454f2bc3:1: unparsed;引用位置可核不代表原文支持断言"
+                },
+                {
+                  "code": "invalid_reference",
+                  "severity": "error",
+                  "where": "defect:S2.nodes[0].evidence[5]",
+                  "node": null,
+                  "detail": "search:0c47e0b8e42310ed454f2bc3:2: unparsed;引用位置可核不代表原文支持断言"
+                },
+                {
+                  "code": "basis_action_post_anchor",
+                  "severity": "warning",
+                  "where": "defect:S1",
+                  "node": "agent:agent-aslice11-startup-50a0622bcfe4a588@v37",
+                  "detail": "#a68daf720e780b4c2:15550@L320：引用动作发起时刻晚于节点记录锚点；后置读回/反证可能合法，但不证明生成前已可用，不判断因果错误。"
+                }
+              ],
+              "omitted_issues": 0,
+              "coverage": {
+                "checked": true,
+                "target": "entry/src/main/ets/pages/SplashPage.ets",
+                "counts": {
+                  "expected": 29,
+                  "provided": 4,
+                  "accounted": 29,
+                  "expected_versions": 2,
+                  "expected_candidates": 27,
+                  "missing_versions": 0,
+                  "missing_candidates": 0,
+                  "missing": 0,
+                  "unresolved": 0,
+                  "not_repair": 0,
+                  "deferred": 0,
+                  "unconfirmed": 0,
+                  "advisories": 0,
+                  "advisory_rows": 0,
+                  "reviewed": 4,
+                  "not_investigated": 25
+                },
+                "accounted": true,
+                "semantic_checked": false,
+                "mode": "manifest_complement",
+                "manifest_identity_valid": true,
+                "declarations_complete": false
+              },
+              "entry_effect_alignments": [
+                {
+                  "node": "agent:agent-aslice11-startup-50a0622bcfe4a588@v37",
+                  "defect": "S1",
+                  "schema": "migloop-entry-effect-alignment/1",
+                  "status": "indeterminate",
+                  "anchor_agent": "agent-aslice11-startup-50a0622bcfe4a588",
+                  "anchor_v": 37,
+                  "events": [
+                    {
+                      "ref": "#50a0622bcfe4a588:10784@L294",
+                      "agent": "agent-aslice11-startup-50a0622bcfe4a588",
+                      "seq": 10784,
+                      "effect_v": 37
+                    },
+                    {
+                      "ref": "#a68daf720e780b4c2:15550@L320",
+                      "agent": "agent-a68daf720e780b4c2",
+                      "seq": 15550,
+                      "effect_v": null
+                    }
+                  ],
+                  "entry_declared": false,
+                  "events_omitted": 0,
+                  "source": "ledger_coordinates",
+                  "semantic_checked": false,
+                  "note": "只比较声明进入点与实际侧引用的效应版本，不认证进入原因或首次发生时刻。"
+                }
+              ],
+              "entry_effect_alignments_omitted": 0
+            },
+            {
+              "step": 37,
+              "call_id": "call_MUFLo1awdCUrWgoIxWU71zep",
+              "verified": true,
+              "status": "needs_review",
+              "counts": {
+                "errors": 0,
+                "warnings": 1,
+                "total": 1
+              },
+              "draft_sha256": "7a8a4ca1c5d1876d9be2c0f2b4ce09ff40fec5a59ef8b3418bfc0de58e9c46c9",
+              "document_sha256": "07f8e3bda252fc7648d06faebbb5287e424193d414242b86472d5170ba8d75f5",
+              "issues": [
+                {
+                  "code": "basis_action_post_anchor",
+                  "severity": "warning",
+                  "where": "defect:S1",
+                  "node": "agent:agent-aslice11-startup-50a0622bcfe4a588@v37",
+                  "detail": "#a68daf720e780b4c2:15550@L320：引用动作发起时刻晚于节点记录锚点；后置读回/反证可能合法，但不证明生成前已可用，不判断因果错误。"
+                }
+              ],
+              "omitted_issues": 0,
+              "coverage": {
+                "checked": true,
+                "target": "entry/src/main/ets/pages/SplashPage.ets",
+                "counts": {
+                  "expected": 29,
+                  "provided": 4,
+                  "accounted": 29,
+                  "expected_versions": 2,
+                  "expected_candidates": 27,
+                  "missing_versions": 0,
+                  "missing_candidates": 0,
+                  "missing": 0,
+                  "unresolved": 0,
+                  "not_repair": 0,
+                  "deferred": 0,
+                  "unconfirmed": 0,
+                  "advisories": 0,
+                  "advisory_rows": 0,
+                  "reviewed": 4,
+                  "not_investigated": 25
+                },
+                "accounted": true,
+                "semantic_checked": false,
+                "mode": "manifest_complement",
+                "manifest_identity_valid": true,
+                "declarations_complete": false
+              },
+              "entry_effect_alignments": [
+                {
+                  "node": "agent:agent-aslice11-startup-50a0622bcfe4a588@v37",
+                  "defect": "S1",
+                  "schema": "migloop-entry-effect-alignment/1",
+                  "status": "indeterminate",
+                  "anchor_agent": "agent-aslice11-startup-50a0622bcfe4a588",
+                  "anchor_v": 37,
+                  "events": [
+                    {
+                      "ref": "#50a0622bcfe4a588:10784@L294",
+                      "agent": "agent-aslice11-startup-50a0622bcfe4a588",
+                      "seq": 10784,
+                      "effect_v": 37
+                    },
+                    {
+                      "ref": "#a68daf720e780b4c2:15550@L320",
+                      "agent": "agent-a68daf720e780b4c2",
+                      "seq": 15550,
+                      "effect_v": null
+                    }
+                  ],
+                  "entry_declared": false,
+                  "events_omitted": 0,
+                  "source": "ledger_coordinates",
+                  "semantic_checked": false,
+                  "note": "只比较声明进入点与实际侧引用的效应版本，不认证进入原因或首次发生时刻。"
+                }
+              ],
+              "entry_effect_alignments_omitted": 0
+            }
+          ],
+          "check_calls": 3,
+          "draft_chars": 29339,
+          "returned_chars": 4897,
+          "final_document_sha256": "07f8e3bda252fc7648d06faebbb5287e424193d414242b86472d5170ba8d75f5",
+          "matched_check": 37
+        },
+        "until_queries": [
+          {
+            "input": {
+              "q_any": [
+                "SplashActivity_01_back_key_dismisses_privacy_dialog",
+                "ALIGN_PSplashActivity_extra_element_status-bar",
+                "setWindowSystemBarEnable",
+                "onNavBarStateChange",
+                "BACK"
+              ],
+              "since_ts": "2026-07-26T21:06:31.863Z",
+              "until_ts": "2026-07-26T21:48:57.218000Z",
+              "after": true
+            },
+            "use_line": 121,
+            "result_line": 126,
+            "tool": "search",
+            "chars": 17736
+          },
+          {
+            "input": {
+              "q_any": [
+                "fixed",
+                "PASS",
+                "通过",
+                "验证",
+                "复测",
+                "disposition"
+              ],
+              "since_ts": "2026-07-26T21:20:24.982000Z",
+              "until_ts": "2026-07-26T21:48:57.218000Z",
+              "after": true
+            },
+            "use_line": 122,
+            "result_line": 129,
+            "tool": "search",
+            "chars": 15501
+          }
+        ],
+        "check_changes": [
+          {
+            "InputObject": "        evidence: [\"#9d5902d803bbcde6:7503@L7\", \"#9d5902d803bbcde6:7509@L15\", \"#9d5902d803bbcde6:7526@L37\", \"#9d5902d803bbcde6:7548@L71\", \"#a68daf720e780b4c2:15650@L476\", \"#a68daf720e780b4c2:15651@L478\"]",
+            "SideIndicator": "=>"
+          },
+          {
+            "InputObject": "        basis:",
+            "SideIndicator": "=>"
+          },
+          {
+            "InputObject": "          expected: |-",
+            "SideIndicator": "=>"
+          },
+          {
+            "InputObject": "            当时适用的上游页面语义至少包含 full_screen_page / needs_immersive_safearea；Android 源侧实际 theme 还包含 `windowFullscreen=true`。若要对齐开屏真实外观，需要把“系统栏隐藏”与“安全区/背景穿透”分开处理。",
+            "SideIndicator": "=>"
+          },
+          {
+            "InputObject": "          expected_evidence: [\"#9d5902d803bbcde6:7509@L15\", \"#a68daf720e780b4c2:15650@L476\", \"#a68daf720e780b4c2:15651@L478\"]",
+            "SideIndicator": "=>"
+          },
+          {
+            "InputObject": "          actual: |-",
+            "SideIndicator": "=>"
+          },
+          {
+            "InputObject": "            Slice 11 v45 仍只在根 Navigation 上做 `.expandSafeArea(...)`，注释说明为 Layer 2 背景穿透；未见 `window` import、`setWindowSystemBarEnable([])`、或进入/离开开屏时切换系统栏显隐的实现。",
+            "SideIndicator": "=>"
+          },
+          {
+            "InputObject": "          actual_evidence: [\"#50a0622bcfe4a588:10784@L294\"]",
+            "SideIndicator": "=>"
+          },
+          {
+            "InputObject": "          counterevidence: |-",
+            "SideIndicator": "=>"
+          },
+          {
+            "InputObject": "            Slice 11 的派发/已见输入没有展开 `Theme.SeceretBox.Launch` 或 `windowFullscreen` 具体行，因此该节点更像带着生成期传递缺口继续装配，而不是已确认它明知具体 theme 要求仍遗漏。fixer 后来通过 finding 与 grep 才获得具体 theme 证据。",
+            "SideIndicator": "=>"
+          },
+          {
+            "InputObject": "        evidence: [\"#9d5902d803bbcde6:7503@L7\", \"#9d5902d803bbcde6:7509@L15\", \"#9d5902d803bbcde6:7526@L37\", \"#9d5902d803bbcde6:7548@L71\", \"search:0c47e0b8e42310ed454f2bc3:1\", \"search:0c47e0b8e42310ed454f2bc3:2\", \"#a68daf720e780b4c2:15650@L476\", \"#a68daf720e780b4c2:15651@L478\"]",
+            "SideIndicator": "<="
+          }
+        ]
+      },
+      "reference_integrity": {
+        "candidate_bindings": [
+          {
+            "source": "touch",
+            "ref": "#a68daf720e780b4c2:15567@L346",
+            "candidate": "candidate:a8c6a199e574c4a4a5b4",
+            "matches": 1
+          },
+          {
+            "source": "touch",
+            "ref": "#a68daf720e780b4c2:15655@L485",
+            "candidate": "candidate:75e861b0e88ccf157493",
+            "matches": 1
+          }
+        ],
+        "document_sha256": "07f8e3bda252fc7648d06faebbb5287e424193d414242b86472d5170ba8d75f5",
+        "case": "splash",
+        "draft_sha256": "7a8a4ca1c5d1876d9be2c0f2b4ce09ff40fec5a59ef8b3418bfc0de58e9c46c9",
+        "refs": [
+          {
+            "ref": "#50a0622bcfe4a588:10582@L2",
+            "file_matches": 1,
+            "line": 2,
+            "ok": true,
+            "file": "9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aslice11-startup-50a0622bcfe4a588.jsonl",
+            "timestamp": "2026-07-24T15:33:10.768Z",
+            "source_role": "user",
+            "record_sha256": "d68b66dce31e81cd37a44e1192f5290595931039dadb820715a59cc5dd11477c",
+            "native_ids": []
+          },
+          {
+            "ref": "#50a0622bcfe4a588:10663@L108",
+            "file_matches": 1,
+            "line": 108,
+            "ok": true,
+            "file": "9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aslice11-startup-50a0622bcfe4a588.jsonl",
+            "timestamp": "2026-07-24T15:38:02.234Z",
+            "source_role": "assistant",
+            "record_sha256": "0a6eaa4eb5d5e0a47ce80f7a7de7ab9b14d80f491da069f87cae5caff040b839",
+            "native_ids": [
+              "toolu_0155HfnqzbdmKPN1apbGCvbJ"
+            ]
+          },
+          {
+            "ref": "#50a0622bcfe4a588:10784@L294",
+            "file_matches": 1,
+            "line": 294,
+            "ok": true,
+            "file": "9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aslice11-startup-50a0622bcfe4a588.jsonl",
+            "timestamp": "2026-07-24T16:05:02.500Z",
+            "source_role": "assistant",
+            "record_sha256": "861c4bf080ac04edd8b4fe8089ebc8ed4d0a26f2d69328bd8577721b3e37777f",
+            "native_ids": [
+              "toolu_019mDNQhgfUioi3V8D9MWttv"
+            ]
+          },
+          {
+            "ref": "#9d5902d803bbcde6:7503@L7",
+            "file_matches": 1,
+            "line": 7,
+            "ok": true,
+            "file": "9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aconv-splash-9d5902d803bbcde6.jsonl",
+            "timestamp": "2026-07-24T01:56:39.184Z",
+            "source_role": "assistant",
+            "record_sha256": "bba3c2c370b5db92518598bdd4f5be5d9f5bfe5969ace0095d5fa8d0d162dbeb",
+            "native_ids": [
+              "toolu_01HzaxtnGPqoBRGu77uek45v"
+            ]
+          },
+          {
+            "ref": "#9d5902d803bbcde6:7509@L15",
+            "file_matches": 1,
+            "line": 15,
+            "ok": true,
+            "file": "9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aconv-splash-9d5902d803bbcde6.jsonl",
+            "timestamp": "2026-07-24T01:56:45.935Z",
+            "source_role": "assistant",
+            "record_sha256": "981c5ac3abf09eaf6e05562d8e2193ca87273a6b2af8d19beb43caae53c5d22a",
+            "native_ids": [
+              "toolu_01Ugd9Aj6c1ZVXfv2EZcEs26"
+            ]
+          },
+          {
+            "ref": "#9d5902d803bbcde6:7518@L25",
+            "file_matches": 1,
+            "line": 25,
+            "ok": true,
+            "file": "9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aconv-splash-9d5902d803bbcde6.jsonl",
+            "timestamp": "2026-07-24T01:56:54.571Z",
+            "source_role": "assistant",
+            "record_sha256": "5f5fa034bc6229e635fb81f8c1db9a95ea1f19640132805f37d006b2c7f60c11",
+            "native_ids": [
+              "toolu_0128HxkRCFyGY236DdACkKeX"
+            ]
+          },
+          {
+            "ref": "#9d5902d803bbcde6:7526@L37",
+            "file_matches": 1,
+            "line": 37,
+            "ok": true,
+            "file": "9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aconv-splash-9d5902d803bbcde6.jsonl",
+            "timestamp": "2026-07-24T01:58:25.961Z",
+            "source_role": "assistant",
+            "record_sha256": "369efb564ee20a932a0f6f6c949e1d643ee0c6d4e977720a1a5caf55102f423d",
+            "native_ids": [
+              "toolu_013XZ3HDcPMmLdCP82Egq6EY"
+            ]
+          },
+          {
+            "ref": "#9d5902d803bbcde6:7548@L71",
+            "file_matches": 1,
+            "line": 71,
+            "ok": true,
+            "file": "9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aconv-splash-9d5902d803bbcde6.jsonl",
+            "timestamp": "2026-07-24T02:07:13.800Z",
+            "source_role": "assistant",
+            "record_sha256": "3c9debf2a570b62dc9285fd4f07f4d18087367c552681bc4f4d4eed54c4a9cc9",
+            "native_ids": [
+              "toolu_01Np1dfx5cY3fQ9uZrHBVkbq"
+            ]
+          },
+          {
+            "ref": "#a68daf720e780b4c2:15550@L320",
+            "file_matches": 1,
+            "line": 320,
+            "ok": true,
+            "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+            "timestamp": "2026-07-26T21:01:36.924Z",
+            "source_role": "assistant",
+            "record_sha256": "dc6cd88351bddf8276cd81b39d1b454764ada59b1d19f2634ccf9f629aea1058",
+            "native_ids": [
+              "toolu_019bvhwcGrGcXSRZpcmCqdzp"
+            ]
+          },
+          {
+            "ref": "#a68daf720e780b4c2:15567@L346",
+            "file_matches": 1,
+            "line": 346,
+            "ok": true,
+            "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+            "timestamp": "2026-07-26T21:05:54.915Z",
+            "source_role": "assistant",
+            "record_sha256": "02f0e169a87a5be3ec84f52e4934cf050b093a966f5a4fc9e979895434aa609c",
+            "native_ids": [
+              "toolu_01DzVErQMcevEwF2f5T3E1U8"
+            ]
+          },
+          {
+            "ref": "#a68daf720e780b4c2:15569@L352",
+            "file_matches": 1,
+            "line": 352,
+            "ok": true,
+            "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+            "timestamp": "2026-07-26T21:06:31.863Z",
+            "source_role": "assistant",
+            "record_sha256": "a40d7bc21827e1c782b40921a135978e92e14a53ef82fe727ebbe3032f6dde42",
+            "native_ids": [
+              "toolu_01TRP8mc5pnikgvEnDDkDRuG"
+            ]
+          },
+          {
+            "ref": "#a68daf720e780b4c2:15627@L438",
+            "file_matches": 1,
+            "line": 438,
+            "ok": true,
+            "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+            "timestamp": "2026-07-26T21:16:28.992Z",
+            "source_role": "assistant",
+            "record_sha256": "45015f02beba659d8b775f1834230ba14879df8db8d91bc9944bd70a0a740dc3",
+            "native_ids": [
+              "toolu_012ikXRRimcuNK89smwLWUNn"
+            ]
+          },
+          {
+            "ref": "#a68daf720e780b4c2:15650@L476",
+            "file_matches": 1,
+            "line": 476,
+            "ok": true,
+            "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+            "timestamp": "2026-07-26T21:19:26.974Z",
+            "source_role": "assistant",
+            "record_sha256": "8f17697ad8a37d9eeef4a46973f3f42644ce8ac56a2c57c674c7e68e991b3076",
+            "native_ids": [
+              "toolu_01C8BL6ZvcFSU2VycfJeX2gN"
+            ]
+          },
+          {
+            "ref": "#a68daf720e780b4c2:15651@L478",
+            "file_matches": 1,
+            "line": 478,
+            "ok": true,
+            "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+            "timestamp": "2026-07-26T21:19:35.454Z",
+            "source_role": "assistant",
+            "record_sha256": "94ca511c1ee6bd574a50102182e799f3a4b8d9ff2edd49c8ed8fe75b03ab11ef",
+            "native_ids": [
+              "toolu_01DnbtniZgjmhVuoJ2jnBzJQ"
+            ]
+          },
+          {
+            "ref": "#a68daf720e780b4c2:15655@L485",
+            "file_matches": 1,
+            "line": 485,
+            "ok": true,
+            "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+            "timestamp": "2026-07-26T21:20:10.255Z",
+            "source_role": "assistant",
+            "record_sha256": "2cdd0931f283d641844a8ee10039f950633e1b3a8b3b97eb3e2de1eed85a2ae8",
+            "native_ids": [
+              "toolu_016H83iNne123bAaGFHtEhwF"
+            ]
+          },
+          {
+            "ref": "#a68daf720e780b4c2:15656@L488",
+            "file_matches": 1,
+            "line": 488,
+            "ok": true,
+            "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+            "timestamp": "2026-07-26T21:20:24.982Z",
+            "source_role": "assistant",
+            "record_sha256": "ae41f9a5b65c7f9101a49c48f25c68ca2d960666571ce87fa5d384d3fe398eea",
+            "native_ids": [
+              "toolu_01RknAJc4tUhzwpypigkLeRv"
+            ]
+          },
+          {
+            "ref": "#a68daf720e780b4c2:15740@L608",
+            "file_matches": 1,
+            "line": 608,
+            "ok": true,
+            "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+            "timestamp": "2026-07-26T21:35:46.240Z",
+            "source_role": "assistant",
+            "record_sha256": "31e808acebdefc34984f206ce03160362e48c1740feaeb4efa211459fcf41f90",
+            "native_ids": [
+              "toolu_01Ag84URJdUsGNfX4BptY9LC"
+            ]
+          },
+          {
+            "ref": "#a68daf720e780b4c2:15744@L615",
+            "file_matches": 1,
+            "line": 615,
+            "ok": true,
+            "file": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+            "timestamp": "2026-07-26T21:41:39.026Z",
+            "source_role": "assistant",
+            "record_sha256": "4a62b9fd1fe061c21e60017a33de7b9d8b769c42274aa798702cfa95016524d6",
+            "native_ids": [
+              "toolu_01XJTap83qih25dRyZQyQNkw"
+            ]
+          }
+        ],
+        "rep": 1,
+        "yaml_trim_equals_raw_trim": true,
+        "trace_bound": true,
+        "submission_status": "accepted",
+        "ledger": "atoms-2026-09-09-file-evidence5:146:6e917f0274bea1f4f63e45b4",
+        "yaml_sha256": "7a8a4ca1c5d1876d9be2c0f2b4ce09ff40fec5a59ef8b3418bfc0de58e9c46c9",
+        "draft_changes": [
+          {
+            "InputObject": "        evidence: [\"#9d5902d803bbcde6:7503@L7\", \"#9d5902d803bbcde6:7509@L15\", \"#9d5902d803bbcde6:7526@L37\", \"#9d5902d803bbcde6:7548@L71\", \"#a68daf720e780b4c2:15650@L476\", \"#a68daf720e780b4c2:15651@L478\"]",
+            "SideIndicator": "=>"
+          },
+          {
+            "InputObject": "        basis:",
+            "SideIndicator": "=>"
+          },
+          {
+            "InputObject": "          expected: |-",
+            "SideIndicator": "=>"
+          },
+          {
+            "InputObject": "            当时适用的上游页面语义至少包含 full_screen_page / needs_immersive_safearea；Android 源侧实际 theme 还包含 `windowFullscreen=true`。若要对齐开屏真实外观，需要把“系统栏隐藏”与“安全区/背景穿透”分开处理。",
+            "SideIndicator": "=>"
+          },
+          {
+            "InputObject": "          expected_evidence: [\"#9d5902d803bbcde6:7509@L15\", \"#a68daf720e780b4c2:15650@L476\", \"#a68daf720e780b4c2:15651@L478\"]",
+            "SideIndicator": "=>"
+          },
+          {
+            "InputObject": "          actual: |-",
+            "SideIndicator": "=>"
+          },
+          {
+            "InputObject": "            Slice 11 v45 仍只在根 Navigation 上做 `.expandSafeArea(...)`，注释说明为 Layer 2 背景穿透；未见 `window` import、`setWindowSystemBarEnable([])`、或进入/离开开屏时切换系统栏显隐的实现。",
+            "SideIndicator": "=>"
+          },
+          {
+            "InputObject": "          actual_evidence: [\"#50a0622bcfe4a588:10784@L294\"]",
+            "SideIndicator": "=>"
+          },
+          {
+            "InputObject": "          counterevidence: |-",
+            "SideIndicator": "=>"
+          },
+          {
+            "InputObject": "            Slice 11 的派发/已见输入没有展开 `Theme.SeceretBox.Launch` 或 `windowFullscreen` 具体行，因此该节点更像带着生成期传递缺口继续装配，而不是已确认它明知具体 theme 要求仍遗漏。fixer 后来通过 finding 与 grep 才获得具体 theme 证据。",
+            "SideIndicator": "=>"
+          },
+          {
+            "InputObject": "        evidence: [\"#9d5902d803bbcde6:7503@L7\", \"#9d5902d803bbcde6:7509@L15\", \"#9d5902d803bbcde6:7526@L37\", \"#9d5902d803bbcde6:7548@L71\", \"search:0c47e0b8e42310ed454f2bc3:1\", \"search:0c47e0b8e42310ed454f2bc3:2\", \"#a68daf720e780b4c2:15650@L476\", \"#a68daf720e780b4c2:15651@L478\"]",
+            "SideIndicator": "<="
+          }
+        ],
+        "raw_equals_last_draft": true,
+        "scope": "独立核原始转录标签/物理行/native ID及行SHA；不将唯一定位或当前工具绑定当作语义支持。新ledger不套旧global seq。"
+      },
+      "cost": {
+        "started_at": "2026-09-09T22:37:36.798613+00:00",
+        "ended_at": "2026-09-09T22:44:35.138692+00:00",
+        "wall_s": 418.34945039998274,
+        "end_to_end_wall_s": 431.84716010000557,
+        "input_total": 1940716,
+        "cached_input_included": 1764352,
+        "output_total": 20286,
+        "input_plus_output": 1961002,
+        "tool_calls": 37,
+        "tool_chars": 329631,
+        "repeated_calls": 0,
+        "rejected_calls": 0
+      },
+      "fact_counts": {
+        "supported": 4,
+        "partial": 3,
+        "omitted": 0,
+        "contradicted": 0
+      }
+    }
+  ],
+  "pending": [
+    "member-center tools rep2",
+    "dice-entry tools rep2",
+    "splash tools rep2"
+  ],
+  "summary": {
+    "core": {
+      "pass": 3,
+      "partial": 3,
+      "fail": 0
+    },
+    "material_node_attribution_errors": 1,
+    "material_unsupported_citations": 1,
+    "joint_acceptance": false,
+    "note": "六题次core非全量准确率；各fact计数仅定位缺项，cached包含input，reasoning包含output。"
+  },
+  "raw_baseline_means": {
+    "member-center": 2691060,
+    "dice-entry": 1413930.5,
+    "splash": 3305569.5
+  }
+}

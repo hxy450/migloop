@@ -1,0 +1,80 @@
+{
+  "schema": "migloop-v10-codex-adjudication/1",
+  "status": "partial_runs_pending",
+  "scope": {
+    "source_code_id": "80c099e",
+    "model": "gpt-5.5",
+    "effort": "medium",
+    "reference": "_migloop-eval-20260909/attribution10/reference-v1/codex-reference.json",
+    "semantic_checked_by_mechanical_check": false,
+    "source_change_boundary": "fixed observation scope plus shorter action summaries; same questions and fact builder"
+  },
+  "runs": [
+    {
+      "case": "C3",
+      "rep": 1,
+      "core": "accepted",
+      "full": "accepted_with_recoverable_omission",
+      "facts": ["partial", "supported", "supported", "supported"],
+      "major_errors": [],
+      "minor_issues": [
+        "覆盖了生成前六步引导/末页进度要求，但未明确核到 GuideInit Kotlin/layout/snapshot 输入和生成报告声称已实现 5110ms 进度流",
+        "正确把 Monitor/visibility reviewer 意见、独立挂载 fixer 意见和 capture/judge 都限定为来源主张或保存记录",
+        "正确保留 fresh capture、源码 diff、真实运行结果未知"
+      ],
+      "binding": {"target": "matched_metadata_without_file_version", "event_claims": 6, "all_events_resolved": true, "invented_effect_versions": false, "owner_mismatch": false, "textual_events_marked_textual_only": true},
+      "delivery": {"submission": "accepted_checked_draft_ref", "verdict_ok": true, "coverage_complete": true},
+      "metrics": {"input_total": 840519, "cache_read": 764416, "input_uncached": 76103, "output": 8229, "calls": 37, "tool_return_chars": 119420, "wall_s": 193.375, "end_to_end_wall_s": 196.131}
+    },
+    {
+      "case": "C2",
+      "rep": 1,
+      "core": "accepted",
+      "full": "accepted_with_recoverable_omissions",
+      "facts": ["partial", "supported", "supported", "omitted"],
+      "major_errors": [],
+      "minor_issues": [
+        "用F005/F006、事件定义和close_batch主张覆盖修改前insert/event背景，但未明确恢复唯一post-insert CREATED publisher摘要",
+        "遗漏Round 2 Works canonical被系统联系人污染",
+        "正确将fixer门面分叉假设与reviewer等价门面反证都保留为来源主张，真实断点未定"
+      ],
+      "binding": {"target": "unlocated_and_explicitly_disclosed", "event_claims": 3, "all_events_resolved": true, "invented_effect_versions": false, "owner_mismatch": false, "report_write_not_product_patch": true},
+      "delivery": {"submission": "accepted_checked_draft_ref_needs_review", "verdict_ok": true, "coverage_complete": false},
+      "metrics": {"input_total": 1454351, "cache_read": 1364480, "input_uncached": 89871, "output": 12149, "calls": 47, "tool_return_chars": 135197, "wall_s": 284.411, "end_to_end_wall_s": 287.208}
+    },
+    {
+      "case": "C1",
+      "rep": 1,
+      "core": "accepted",
+      "full": "accepted",
+      "facts": ["supported", "supported", "supported"],
+      "major_errors": [],
+      "minor_issues": [],
+      "binding": {"target": "matched", "event_claims": 3, "all_events_resolved": true, "invented_effect_versions": false, "owner_mismatch": false},
+      "delivery": {"submission": "accepted_checked_draft_ref", "verdict_ok": true, "coverage_complete": true},
+      "metrics": {"input_total": 842508, "cache_read": 757248, "input_uncached": 85260, "output": 12260, "calls": 44, "tool_return_chars": 134360, "wall_s": 265.813, "end_to_end_wall_s": 268.650}
+    },
+    {
+      "case": "C4",
+      "rep": 1,
+      "core": "accepted",
+      "full": "accepted_with_recoverable_omissions",
+      "facts": ["partial", "supported", "supported", "supported", "omitted"],
+      "major_errors": [],
+      "minor_issues": [
+        "未枚举源码中的四个Event名称",
+        "遗漏后续原生BUILD SUCCESSFUL与HAP installed事实，以保存的视觉回放记录代替",
+        "对manifest只作后置记录并明确缺补丁绑定，没有声称完整专项回归"
+      ],
+      "binding": {"target": "matched", "event_claims": 5, "all_events_resolved": true, "invented_effect_versions": false, "owner_mismatch": false, "tail_events_create_nodes": false},
+      "delivery": {"submission": "accepted_checked_draft_ref", "verdict_ok": true, "coverage_complete": true},
+      "metrics": {"input_total": 932200, "cache_read": 846336, "input_uncached": 85864, "output": 13821, "calls": 60, "tool_return_chars": 129569, "wall_s": 300.226, "end_to_end_wall_s": 302.913}
+    }
+  ],
+  "summary": {
+    "completed": "1 pending remaining V10 runs",
+    "core_acceptance": "1/1 completed",
+    "major_false_causal_or_closure_claims": 0,
+    "general_efficacy_claim_supported": false
+  }
+}

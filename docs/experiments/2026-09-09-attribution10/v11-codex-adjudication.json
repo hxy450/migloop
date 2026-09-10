@@ -1,0 +1,20 @@
+{
+  "schema": "migloop-v11-codex-adjudication/1",
+  "status": "partial_runs_pending",
+  "scope": {"source_code_id":"cb3682f","model":"gpt-5.5","effort":"medium","reference":"_migloop-eval-20260909/attribution10/reference-v1/codex-reference.json","semantic_checked_by_mechanical_check":false},
+  "runs": [
+    {
+      "case":"C3","rep":1,"core":"accepted","full":"accepted_with_recoverable_omission_and_minor_event_wording",
+      "facts":["omitted","supported","supported","supported"],"major_errors":[],
+      "minor_issues":[
+        "遗漏初始GuideInit Kotlin/layout/snapshot输入及生成报告声称已实现进度流",
+        "E_reviewer_correction绑定的是主会话写入reviewer flag的报告事件，不是reviewer本人的独立执行；内容可证主张被记录，不能提高其事实层级",
+        "正确保留最终两项低置信人工复核债与构建安装不等于行为验证"
+      ],
+      "binding":{"target":"matched_metadata_without_file_version","event_claims":8,"all_events_resolved":true,"invented_effect_versions":false,"owner_mismatch":false,"report_writes_not_product_patches":true},
+      "delivery":{"submission":"accepted_checked_draft_ref","verdict_ok":true,"coverage_complete":true},
+      "metrics":{"input_total":1220285,"cache_read":1125376,"input_uncached":94909,"output":9853,"calls":45,"tool_return_chars":161964,"wall_s":230.727,"end_to_end_wall_s":233.435}
+    }
+  ],
+  "summary":{"completed":"1 pending remaining V11 runs","core_acceptance":"1/1 completed","major_false_causal_or_closure_claims":0,"general_efficacy_claim_supported":false}
+}

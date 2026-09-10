@@ -1,0 +1,1555 @@
+{
+  "schema": "migloop-semantic-adjudication/1",
+  "suite": "formal-v12",
+  "scope": "Codex C1-C4, tools rep1 and rep2",
+  "snapshot_utc": "2026-09-09 23:01:19 UTC",
+  "investigator_source": {
+    "code_id": "e67d7d7",
+    "sha256": "526e8f61bd30b14b67b742e8c52dbebde933b04d09d9a77eca92434a4188c658"
+  },
+  "reference": {
+    "path": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/reference-v1/codex-reference.json",
+    "sha256": "1d412a2779bb8d94bbc81d2698b4ba8b92ec97cb9acaccfcb158669476edeae5",
+    "raw_record_hashes_verified": 26,
+    "fact_denominator_per_rep": {
+      "C1": 3,
+      "C2": 4,
+      "C3": 4,
+      "C4": 5
+    },
+    "protocols": [
+      "protocol.md",
+      "core-rubric-reconciliation.md",
+      "v9-codex-adjudication.md"
+    ],
+    "note": "既有 core 判据原样使用；事实逐项恢复、完整注释、错误断言、事件定位和交付独立。机械 check 不提供语义金标。"
+  },
+  "method": {
+    "completed_and_recording_complete_required": true,
+    "final_document_only": true,
+    "raw_records_not_model_reports_are_code_facts": true,
+    "source_actor_claims_labelled": true,
+    "private_holdout_read": false,
+    "paid_model_calls": 0,
+    "new_core_threshold": false,
+    "unfinished_runs_scored": false
+  },
+  "runs": [
+    {
+      "case": "C1",
+      "rep": 1,
+      "run_dir": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v12/codex-c1/runs/tools/rep1",
+      "status": "pending",
+      "core": null,
+      "annotation_complete": null,
+      "facts": null,
+      "extra_false_claims": null
+    },
+    {
+      "case": "C1",
+      "rep": 2,
+      "run_dir": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v12/codex-c1/runs/tools/rep2",
+      "status": "pending",
+      "core": null,
+      "annotation_complete": null,
+      "facts": null,
+      "extra_false_claims": null
+    },
+    {
+      "case": "C2",
+      "rep": 1,
+      "run_dir": "C:\\Users\\hongy\\projects\\_migloop-eval-20260909\\attribution10\\formal-v12\\codex-c2\\runs\\tools\\rep1",
+      "status": "adjudicated",
+      "recording_complete": true,
+      "core": "accepted",
+      "core_reason": "正确区分 fixer 的统一 WorksService 主张、reviewer 的同 DAO/同事件反证、源码与运行证据缺失；未把报告等价判断升级为业务事实，保留事务/异常/时序/刷新未知。按 V9 相同 core 口径接受。",
+      "annotation_complete": false,
+      "annotation_status": "accepted_with_omission_and_invalid_coverage_metadata",
+      "annotation_requires_correction": true,
+      "annotation_requires_completion": true,
+      "facts": [
+        {
+          "id": "C2-F1",
+          "status": "supported",
+          "reason": "明确恢复历史唯一 post-insert publisher 记录并标为早先记录，而非直接业务源码。该语句虽无专门 action 引用，冻结原始 R2 L4934 确实支持。",
+          "final_quote": "PptRecordRepository 为唯一 post-insert WorksLibraryUpdated(CREATED) publisher"
+        },
+        {
+          "id": "C2-F2",
+          "status": "supported",
+          "reason": "准确引用 fixer 摘要的 WorksService 改动方向、目标路径及 CREATED，自述与实际行为严格分开。",
+          "final_quote": "生成完成统一走 WorksService 入库并发布 CREATED 事件"
+        },
+        {
+          "id": "C2-F3",
+          "status": "supported",
+          "reason": "准确恢复 reviewer 同 DAO/同事件及 wrong_edit 原话，并拒绝仅凭它认定行为等价或修复无效。",
+          "final_quote": "不能升级为已验证事实"
+        },
+        {
+          "id": "C2-F4",
+          "status": "omitted",
+          "reason": "未交代 Round 2 Works canonical 被系统联系人污染。原文 R2 L7574 及最终所引 #4832 输入 L7581 均有该边界，但最终稿没有恢复。",
+          "final_quote": null
+        }
+      ],
+      "extra_false_claims": [],
+      "major_false_claims": [],
+      "boundary_assessment": "无目标源码节点时使用真实 agent@v218 与 3 个事件；报告写回事件是文档效应，不是 PptGenerationViewModel 修改。后续 build/install 不等于 Works 呈现验证；未知内容和零命中不当不存在证明。",
+      "delivery_note": "reference 认证成功，第二次 check 与最终稿相同；仍 needs_review（3 errors + 1 warning）。全零 manifest_sha256 被模型明确称为机械占位，不是暗中伪造业务事实，但它不是有效 coverage receipt，必须另列需纠正的交付元数据。不能称完整机检通过。",
+      "source": {
+        "harness_identity": "atoms-2026-09-09-file-evidence5:2:f26146edb7f0b81662825f3d",
+        "source_code_id": "e67d7d7",
+        "source_digest": "526e8f61bd30b14b67b742e8c52dbebde933b04d09d9a77eca92434a4188c658",
+        "runner_sha256": "4874a8064f0cf69e2d94b60b4c765c9c7841194163b3f793f5672bdc8e7e6a19",
+        "pool_digest": "5bcd5ed757c468cea95f79591b41a4fb88cea2a6d6f4b5b1505e0026d2dbfc78",
+        "common_task_sha256": "87bcb87a229540ac1185458de39880493a982767a2fc3d23386c8db60fd71c43"
+      },
+      "delivery": {
+        "status": "accepted",
+        "mode": "checked_draft_ref",
+        "source_check_step": 32,
+        "source_check_call_id": "call_SDnhMRk5CL3CjsZK8kUBXTbg",
+        "final_records": [
+          {
+            "line": 198,
+            "channel": null,
+            "record_sha256": "56bfbb94e2774bed7ea89403e84fd18bdaaad438c43bb4fae162c0df5370ec26"
+          }
+        ],
+        "document_sha256": "eaecbbed5508e9d0ba06ccda6450745ec33b537c3454d5848624cb102e5665fa",
+        "canonical_document_sha256": "90f83d770cda4ac39e07cb48e9321c1f9a50884ce5d5b8eb46d72724883922c4",
+        "saved_equals_authenticated_document": true,
+        "errors": [],
+        "check_status": "needs_review",
+        "check_counts": {
+          "errors": 3,
+          "warnings": 1,
+          "total": 4
+        },
+        "check_issues": [
+          {
+            "code": "target_scope_unlocated",
+            "severity": "warning",
+            "where": "defect:C2_works_facade_conflicting_claims.target_file",
+            "node": null,
+            "detail": "文件不在当前账本"
+          },
+          {
+            "code": "coverage_incomplete",
+            "severity": "error",
+            "where": "coverage",
+            "node": null,
+            "detail": "清单仍有未交代或无效项: {\"expected\": 0, \"provided\": 0, \"accounted\": 0, \"expected_versions\": 0, \"expected_candidates\": 0, \"missing_versions\": 0, \"missing_candidates\": 0, \"missing\": 0, \"unresolved\": 0, \"not_repair\": 0, \"deferred\": 0, \"unconfirmed\": 0, \"advisories\": 0, \"advisory_rows\": 0, \"reviewed\": 0, \"not_investigated\": 0}"
+          },
+          {
+            "code": "coverage_invalid_file",
+            "severity": "error",
+            "where": "coverage",
+            "node": null,
+            "detail": "{\"code\": \"invalid_file\", \"message\": \"文件不在当前账本\"}"
+          },
+          {
+            "code": "coverage_receipt_mismatch",
+            "severity": "error",
+            "where": "coverage",
+            "node": null,
+            "detail": "{\"code\": \"receipt_mismatch\", \"message\": \"清单摘要/账本/目标未匹配；不展开未调查补集\"}"
+          }
+        ],
+        "check_calls": [
+          {
+            "step": 29,
+            "call_id": "call_JHJ8Abq5LpOEK9QEi2fo51oR",
+            "use_line": 163,
+            "result_line": 166,
+            "saved_document_equals_input": false
+          },
+          {
+            "step": 32,
+            "call_id": "call_SDnhMRk5CL3CjsZK8kUBXTbg",
+            "use_line": 190,
+            "result_line": 193,
+            "saved_document_equals_input": true
+          }
+        ],
+        "coverage_complete": false,
+        "coverage_counts": {
+          "expected": 0,
+          "provided": 0,
+          "accounted": 0,
+          "expected_versions": 0,
+          "expected_candidates": 0,
+          "missing_versions": 0,
+          "missing_candidates": 0,
+          "missing": 0,
+          "unresolved": 0,
+          "not_repair": 0,
+          "deferred": 0,
+          "unconfirmed": 0,
+          "advisories": 0,
+          "advisory_rows": 0,
+          "reviewed": 0,
+          "not_investigated": 0
+        },
+        "verdict_ok": true
+      },
+      "locators": {
+        "identity_bound": true,
+        "trace_identity_bound": true,
+        "nodes_valid": 1,
+        "nodes_total": 1,
+        "events_locatable": 3,
+        "events_total": 3,
+        "events": [
+          {
+            "id": "E_fix_self_claim",
+            "event": "#01a021e5-c150-7b12-a610-d40c07816b98:4857@L7653",
+            "role": "无法确认",
+            "binding": {
+              "status": "ok",
+              "ok": true,
+              "ref": "#01a021e5-c150-7b12-a610-d40c07816b98:4857@L7653",
+              "original_ref": "#01a021e5-c150-7b12-a610-d40c07816b98:4857@L7653",
+              "owner_agent": "__main__:01a021e5",
+              "seq": 4857,
+              "source_path": "C:\\Users\\hongy\\projects\\_migloop-eval-20260909\\attribution10\\formal-v1\\codex-c2\\pool\\rollout-2026-08-21T09-18-20-01a021e5-c150-7b12-a610-d40c07816b98.jsonl",
+              "use_line": 7653,
+              "result_line": null,
+              "use_ts": "2026-08-21T20:31:08.165Z",
+              "done_ts": null,
+              "tool_use_id": null,
+              "tool": "inbox",
+              "action_ok": true,
+              "kind": "inbox",
+              "event_class": "text_record",
+              "textual_only": true,
+              "effect_version": null,
+              "context_anchor": {
+                "kind": "agent",
+                "aid": "__main__:01a021e5",
+                "v": 216
+              },
+              "anchor_basis": "prior_ledger_effect_order",
+              "context_available_before_event": true,
+              "context_timing_note": "此前效应的记录完成时刻不晚于事件发起时刻；只证明外壳时序，不证明内容被消费",
+              "temporal_relation": "input_after_anchor_before_next_effect",
+              "paired_result": false,
+              "diag": "文本记录只证明 actor 说过/想过这些内容，不证明所述操作执行；context_anchor 仅按账本效应顺序，不自动是事件前输入",
+              "creates_node": false,
+              "creates_edge": false,
+              "semantic_checked": false
+            }
+          },
+          {
+            "id": "E_reviewer_flag",
+            "event": "#01a021e5-c150-7b12-a610-d40c07816b98:4866@L7680",
+            "role": "无法确认",
+            "binding": {
+              "status": "ok",
+              "ok": true,
+              "ref": "#01a021e5-c150-7b12-a610-d40c07816b98:4866@L7680",
+              "original_ref": "#01a021e5-c150-7b12-a610-d40c07816b98:4866@L7680",
+              "owner_agent": "__main__:01a021e5",
+              "seq": 4866,
+              "source_path": "C:\\Users\\hongy\\projects\\_migloop-eval-20260909\\attribution10\\formal-v1\\codex-c2\\pool\\rollout-2026-08-21T09-18-20-01a021e5-c150-7b12-a610-d40c07816b98.jsonl",
+              "use_line": 7680,
+              "result_line": null,
+              "use_ts": "2026-08-21T20:36:28.546Z",
+              "done_ts": null,
+              "tool_use_id": null,
+              "tool": "inbox",
+              "action_ok": true,
+              "kind": "inbox",
+              "event_class": "text_record",
+              "textual_only": true,
+              "effect_version": null,
+              "context_anchor": {
+                "kind": "agent",
+                "aid": "__main__:01a021e5",
+                "v": 217
+              },
+              "anchor_basis": "prior_ledger_effect_order",
+              "context_available_before_event": true,
+              "context_timing_note": "此前效应的记录完成时刻不晚于事件发起时刻；只证明外壳时序，不证明内容被消费",
+              "temporal_relation": "input_after_anchor_before_next_effect",
+              "paired_result": false,
+              "diag": "文本记录只证明 actor 说过/想过这些内容，不证明所述操作执行；context_anchor 仅按账本效应顺序，不自动是事件前输入",
+              "creates_node": false,
+              "creates_edge": false,
+              "semantic_checked": false
+            }
+          },
+          {
+            "id": "E_summary_write",
+            "event": "#01a021e5-c150-7b12-a610-d40c07816b98:4868@L7686",
+            "role": "无法确认",
+            "binding": {
+              "status": "ok",
+              "ok": true,
+              "ref": "#01a021e5-c150-7b12-a610-d40c07816b98:4868@L7686",
+              "original_ref": "#01a021e5-c150-7b12-a610-d40c07816b98:4868@L7686",
+              "owner_agent": "__main__:01a021e5",
+              "seq": 4868,
+              "source_path": "C:\\Users\\hongy\\projects\\_migloop-eval-20260909\\attribution10\\formal-v1\\codex-c2\\pool\\rollout-2026-08-21T09-18-20-01a021e5-c150-7b12-a610-d40c07816b98.jsonl",
+              "use_line": 7686,
+              "result_line": 7688,
+              "use_ts": "2026-08-21T20:36:40.765Z",
+              "done_ts": "2026-08-21T20:36:40.812Z",
+              "tool_use_id": "call_XHYFotPT6f6XWmbIyXSilnMV",
+              "tool": "exec",
+              "action_ok": true,
+              "kind": "write",
+              "event_class": "recorded_action",
+              "textual_only": false,
+              "effect_version": 218,
+              "context_anchor": {
+                "kind": "agent",
+                "aid": "__main__:01a021e5",
+                "v": 217
+              },
+              "anchor_basis": "prior_ledger_effect_order",
+              "context_available_before_event": true,
+              "context_timing_note": "此前效应的记录完成时刻不晚于事件发起时刻；只证明外壳时序，不证明内容被消费",
+              "temporal_relation": "effect_after_anchor",
+              "paired_result": true,
+              "diag": "位置与调用外壳可核；成功状态不认证模型的语义归因；context_anchor 仅按账本效应顺序，不自动是事件前输入",
+              "creates_node": false,
+              "creates_edge": false,
+              "semantic_checked": false
+            }
+          }
+        ],
+        "target_bindings": [
+          {
+            "declared_path": "entry/src/main/ets/viewmodels/PptGenerationViewModel.ets",
+            "canonical_path": null,
+            "status": "unlocated",
+            "source": "model",
+            "diag": "文件不在当前账本",
+            "creates_node": false,
+            "semantic_checked": false
+          }
+        ],
+        "unique_action_references": 9,
+        "raw_references": [
+          {
+            "ref": "#01a009fe-68e3-7f42-b76b-5e863c555976:210@L754",
+            "aid": "__main__:01a009fe",
+            "seq": 210,
+            "ver": null,
+            "at": 19,
+            "kind": "other",
+            "ok": true,
+            "use_ts": "2026-08-16T15:27:20.669Z",
+            "done_ts": "2026-08-16T15:27:21.200Z",
+            "tuid": "call_hH3zNfnSu2D7Liro3e4dcfUc",
+            "src": [
+              "C:\\Users\\hongy\\projects\\_migloop-eval-20260909\\attribution10\\formal-v1\\codex-c2\\pool\\rollout-2026-08-16T17-54-23-01a009fe-68e3-7f42-b76b-5e863c555976.jsonl",
+              753,
+              754
+            ],
+            "records": [
+              {
+                "line": 754,
+                "record_sha256": "1478567ab218ab5ec67f049a08918bf54e4f29478afa5279c6ddf125faefebaa",
+                "timestamp": "2026-08-16T15:27:20.669Z",
+                "payload_type": "custom_tool_call",
+                "call_id": "call_hH3zNfnSu2D7Liro3e4dcfUc"
+              },
+              {
+                "line": 755,
+                "record_sha256": "3928e2235c1ae34ae43d263e66e04527f81ca43f36f315aac7a99668d825fd60",
+                "timestamp": "2026-08-16T15:27:21.200Z",
+                "payload_type": "custom_tool_call_output",
+                "call_id": "call_hH3zNfnSu2D7Liro3e4dcfUc"
+              }
+            ]
+          },
+          {
+            "ref": "#01a009fe-68e3-7f42-b76b-5e863c555976:293@L1019",
+            "aid": "__main__:01a009fe",
+            "seq": 293,
+            "ver": null,
+            "at": 27,
+            "kind": "other",
+            "ok": true,
+            "use_ts": "2026-08-16T15:46:03.966Z",
+            "done_ts": "2026-08-16T15:46:04.872Z",
+            "tuid": "call_6FChx9Vu7mn31KkJDAsZL9IR",
+            "src": [
+              "C:\\Users\\hongy\\projects\\_migloop-eval-20260909\\attribution10\\formal-v1\\codex-c2\\pool\\rollout-2026-08-16T17-54-23-01a009fe-68e3-7f42-b76b-5e863c555976.jsonl",
+              1018,
+              1019
+            ],
+            "records": [
+              {
+                "line": 1019,
+                "record_sha256": "7226620968913f3b0e09b161106229fcc129386aa13400942bec53a70a5cc0ba",
+                "timestamp": "2026-08-16T15:46:03.966Z",
+                "payload_type": "custom_tool_call",
+                "call_id": "call_6FChx9Vu7mn31KkJDAsZL9IR"
+              },
+              {
+                "line": 1020,
+                "record_sha256": "90c69513952973cb60668f24b65d5f8888b13a840e5b2fb17e1eabc600620d00",
+                "timestamp": "2026-08-16T15:46:04.872Z",
+                "payload_type": "custom_tool_call_output",
+                "call_id": "call_6FChx9Vu7mn31KkJDAsZL9IR"
+              }
+            ]
+          },
+          {
+            "ref": "#01a021e5-c150-7b12-a610-d40c07816b98:4832@L7581",
+            "aid": "__main__:01a021e5",
+            "seq": 4832,
+            "ver": 214,
+            "at": 214,
+            "kind": "write",
+            "ok": true,
+            "use_ts": "2026-08-21T20:12:22.929Z",
+            "done_ts": "2026-08-21T20:12:22.956Z",
+            "tuid": "call_U3KMZWo9NqI5kvGQGle0gXkf",
+            "src": [
+              "C:\\Users\\hongy\\projects\\_migloop-eval-20260909\\attribution10\\formal-v1\\codex-c2\\pool\\rollout-2026-08-21T09-18-20-01a021e5-c150-7b12-a610-d40c07816b98.jsonl",
+              7580,
+              7582
+            ],
+            "records": [
+              {
+                "line": 7581,
+                "record_sha256": "1b09fa2944de536d2ca56d5005409c06a5bcd6c46a8a847b2907a256a85bab86",
+                "timestamp": "2026-08-21T20:12:22.929Z",
+                "payload_type": "custom_tool_call",
+                "call_id": "call_U3KMZWo9NqI5kvGQGle0gXkf"
+              },
+              {
+                "line": 7583,
+                "record_sha256": "00bf48f1e741cbd6bce8df732dcb1acf6aeea05552269cea8626653c131c5e34",
+                "timestamp": "2026-08-21T20:12:22.956Z",
+                "payload_type": "custom_tool_call_output",
+                "call_id": "call_U3KMZWo9NqI5kvGQGle0gXkf"
+              }
+            ]
+          },
+          {
+            "ref": "#01a021e5-c150-7b12-a610-d40c07816b98:4857@L7653",
+            "aid": "__main__:01a021e5",
+            "seq": 4857,
+            "ver": null,
+            "at": 217,
+            "kind": "inbox",
+            "ok": true,
+            "use_ts": "2026-08-21T20:31:08.165Z",
+            "done_ts": null,
+            "tuid": null,
+            "src": [
+              "C:\\Users\\hongy\\projects\\_migloop-eval-20260909\\attribution10\\formal-v1\\codex-c2\\pool\\rollout-2026-08-21T09-18-20-01a021e5-c150-7b12-a610-d40c07816b98.jsonl",
+              7652,
+              7652
+            ],
+            "records": [
+              {
+                "line": 7653,
+                "record_sha256": "81083e35b516e4bb0bd7d014b1b8526eddc520dcef179f5072839c19ce21f7f5",
+                "timestamp": "2026-08-21T20:31:08.165Z",
+                "payload_type": "agent_message",
+                "call_id": null
+              }
+            ]
+          },
+          {
+            "ref": "#01a021e5-c150-7b12-a610-d40c07816b98:4866@L7680",
+            "aid": "__main__:01a021e5",
+            "seq": 4866,
+            "ver": null,
+            "at": 218,
+            "kind": "inbox",
+            "ok": true,
+            "use_ts": "2026-08-21T20:36:28.546Z",
+            "done_ts": null,
+            "tuid": null,
+            "src": [
+              "C:\\Users\\hongy\\projects\\_migloop-eval-20260909\\attribution10\\formal-v1\\codex-c2\\pool\\rollout-2026-08-21T09-18-20-01a021e5-c150-7b12-a610-d40c07816b98.jsonl",
+              7679,
+              7679
+            ],
+            "records": [
+              {
+                "line": 7680,
+                "record_sha256": "1df29114297de6eacade8f8c2d5df050f6daeedb0df440fd268d21e9967d8ec5",
+                "timestamp": "2026-08-21T20:36:28.546Z",
+                "payload_type": "agent_message",
+                "call_id": null
+              }
+            ]
+          },
+          {
+            "ref": "#01a021e5-c150-7b12-a610-d40c07816b98:4867@L7682",
+            "aid": "__main__:01a021e5",
+            "seq": 4867,
+            "ver": null,
+            "at": 218,
+            "kind": "other",
+            "ok": true,
+            "use_ts": "2026-08-21T20:36:33.275Z",
+            "done_ts": "2026-08-21T20:36:33.470Z",
+            "tuid": "call_BYzt9sjwzhzxLipXgCsr6q4Y",
+            "src": [
+              "C:\\Users\\hongy\\projects\\_migloop-eval-20260909\\attribution10\\formal-v1\\codex-c2\\pool\\rollout-2026-08-21T09-18-20-01a021e5-c150-7b12-a610-d40c07816b98.jsonl",
+              7681,
+              7682
+            ],
+            "records": [
+              {
+                "line": 7682,
+                "record_sha256": "079b7140216588cc81ca2b93ee7696b9dfc8c92509c29285f3c480c5b6dc3098",
+                "timestamp": "2026-08-21T20:36:33.275Z",
+                "payload_type": "custom_tool_call",
+                "call_id": "call_BYzt9sjwzhzxLipXgCsr6q4Y"
+              },
+              {
+                "line": 7683,
+                "record_sha256": "94a7bd988209de57a26305abe8291093e8ced2f94d5f9c33e9c4e49f22c11905",
+                "timestamp": "2026-08-21T20:36:33.470Z",
+                "payload_type": "custom_tool_call_output",
+                "call_id": "call_BYzt9sjwzhzxLipXgCsr6q4Y"
+              }
+            ]
+          },
+          {
+            "ref": "#01a021e5-c150-7b12-a610-d40c07816b98:4868@L7686",
+            "aid": "__main__:01a021e5",
+            "seq": 4868,
+            "ver": 218,
+            "at": 218,
+            "kind": "write",
+            "ok": true,
+            "use_ts": "2026-08-21T20:36:40.765Z",
+            "done_ts": "2026-08-21T20:36:40.812Z",
+            "tuid": "call_XHYFotPT6f6XWmbIyXSilnMV",
+            "src": [
+              "C:\\Users\\hongy\\projects\\_migloop-eval-20260909\\attribution10\\formal-v1\\codex-c2\\pool\\rollout-2026-08-21T09-18-20-01a021e5-c150-7b12-a610-d40c07816b98.jsonl",
+              7685,
+              7687
+            ],
+            "records": [
+              {
+                "line": 7686,
+                "record_sha256": "b6ee1caff1d13cd0b1d0639add6b287946f585647d1ca83e6b50f19718c942b2",
+                "timestamp": "2026-08-21T20:36:40.765Z",
+                "payload_type": "custom_tool_call",
+                "call_id": "call_XHYFotPT6f6XWmbIyXSilnMV"
+              },
+              {
+                "line": 7688,
+                "record_sha256": "9c44d9e75052a04c306b321cb7b48337e28d740ce9d2c8f0b981b833b6a2ad06",
+                "timestamp": "2026-08-21T20:36:40.812Z",
+                "payload_type": "custom_tool_call_output",
+                "call_id": "call_XHYFotPT6f6XWmbIyXSilnMV"
+              }
+            ]
+          },
+          {
+            "ref": "#01a021e5-c150-7b12-a610-d40c07816b98:4871@L7693",
+            "aid": "__main__:01a021e5",
+            "seq": 4871,
+            "ver": null,
+            "at": 219,
+            "kind": "other",
+            "ok": true,
+            "use_ts": "2026-08-21T20:36:53.410Z",
+            "done_ts": "2026-08-21T20:37:07.829Z",
+            "tuid": "call_dacW1PmSvf6UGEA9wFwJcdnz",
+            "src": [
+              "C:\\Users\\hongy\\projects\\_migloop-eval-20260909\\attribution10\\formal-v1\\codex-c2\\pool\\rollout-2026-08-21T09-18-20-01a021e5-c150-7b12-a610-d40c07816b98.jsonl",
+              7692,
+              7693
+            ],
+            "records": [
+              {
+                "line": 7693,
+                "record_sha256": "3f88421054d784d19bd129bbfbbf01b7ce06a5522b6b0809a9f09bc3da7ffa38",
+                "timestamp": "2026-08-21T20:36:53.410Z",
+                "payload_type": "custom_tool_call",
+                "call_id": "call_dacW1PmSvf6UGEA9wFwJcdnz"
+              },
+              {
+                "line": 7694,
+                "record_sha256": "c19238a84ec6c9222cb7de20430475db108d50717568f340dbae3a53846d9048",
+                "timestamp": "2026-08-21T20:37:07.829Z",
+                "payload_type": "custom_tool_call_output",
+                "call_id": "call_dacW1PmSvf6UGEA9wFwJcdnz"
+              }
+            ]
+          },
+          {
+            "ref": "#01a021e5-c150-7b12-a610-d40c07816b98:4923@L7861",
+            "aid": "__main__:01a021e5",
+            "seq": 4923,
+            "ver": null,
+            "at": 223,
+            "kind": "other",
+            "ok": true,
+            "use_ts": "2026-08-22T05:26:20.273Z",
+            "done_ts": "2026-08-22T05:26:20.451Z",
+            "tuid": "call_ldzdKvM5aENajqPWEEg5D1mG",
+            "src": [
+              "C:\\Users\\hongy\\projects\\_migloop-eval-20260909\\attribution10\\formal-v1\\codex-c2\\pool\\rollout-2026-08-21T09-18-20-01a021e5-c150-7b12-a610-d40c07816b98.jsonl",
+              7860,
+              7861
+            ],
+            "records": [
+              {
+                "line": 7861,
+                "record_sha256": "7b4f23d5ed781e600c7c802edf6c8d310d0ef20d91a70db181376d99318290fb",
+                "timestamp": "2026-08-22T05:26:20.273Z",
+                "payload_type": "custom_tool_call",
+                "call_id": "call_ldzdKvM5aENajqPWEEg5D1mG"
+              },
+              {
+                "line": 7862,
+                "record_sha256": "9db470c67183ff04a6e7229fbd9928f9d30fb5c24b9bc7735f82d85762a9bc0d",
+                "timestamp": "2026-08-22T05:26:20.451Z",
+                "payload_type": "custom_tool_call_output",
+                "call_id": "call_ldzdKvM5aENajqPWEEg5D1mG"
+              }
+            ]
+          }
+        ],
+        "additional_native_patch_proof": {
+          "path": "C:\\Users\\hongy\\projects\\_migloop-eval-20260909\\attribution10\\formal-v1\\codex-c2\\pool\\rollout-2026-08-21T09-18-20-01a021e5-c150-7b12-a610-d40c07816b98.jsonl",
+          "line": 7687,
+          "sha256": "f5f3c00438ddc6471f3ba876d67d2491195ac28bc3c17de1988b94a302d1de5c",
+          "raw": {
+            "timestamp": "2026-08-21T20:36:40.777Z",
+            "type": "event_msg",
+            "payload": {
+              "type": "patch_apply_end",
+              "call_id": "exec-36675960-b55d-4313-97ab-0987084acb1c",
+              "turn_id": "01a024f8-3404-7b40-85b6-89b08f2441f1",
+              "stdout": "Success. Updated the following files:\nM /Users/ventiu/Desktop/HUAWEI/AIPPT_830_test/docs/autofix-log/round-2/visual-fixer-summary.md\n",
+              "stderr": "",
+              "success": true,
+              "changes": {
+                "/Users/ventiu/Desktop/HUAWEI/AIPPT_830_test/docs/autofix-log/round-2/visual-fixer-summary.md": {
+                  "type": "update",
+                  "unified_diff": "@@ -108,2 +108,4 @@\n \n-- 无。`visual-fixer-reviewer` 已审 12/12 attempts：empty_diff / duplicate_hypothesis / wrong_edit 均未命中。\n+- `wrong_edit` — `ALIGN_PGuideActivity_layout_drift_option-list-button`：仅把项间距从 15vp 调到 17vp，属于小于 4px/vp 的字符级微调；下一轮应改查列表与底部 CTA 的弹性/约束关系，或依据基线一次量化完整参数组。\n+- `wrong_edit` — `WorksFragment_generated_work_missing`：原 `PptRecordRepository.insert()` 已使用同一 DAO 且已发布 `WorksLibraryUpdated(CREATED)`；替换成 `WorksService.saveGeneratedWork()` 没改变实际持久化/事件行为。下一轮应定位生成是否真正到达入库步骤、目标态数据是否存在，以及 Works 初始化/加载断点。\n+- 独立 reviewer 其余 10/12 attempts 通过；未发现 `empty_diff`、`duplicate_hypothesis` 或 `lazy_escalation`。\n",
+                  "move_path": null
+                }
+              },
+              "status": "completed"
+            }
+          }
+        },
+        "additional_process_proof": {
+          "file": "C:\\Users\\hongy\\projects\\_migloop-eval-20260909\\attribution10\\formal-v1\\codex-c2\\pool\\rollout-2026-08-21T09-18-20-01a021e5-c150-7b12-a610-d40c07816b98.jsonl",
+          "use_line": 7865,
+          "result_line": 7866,
+          "call_id": "call_79zXP3jiWrEqSzzMnjEnS7wP",
+          "use_record_sha256": "07f2c39b5a809c316401450122584b3810c6979eca44327c8ef9d912aaa921a8",
+          "result_record_sha256": "06eeb30a7875898846418e7f17c6869aa63c30627d72f54cd662655fc1a1a674",
+          "quote": "start ability successfully.",
+          "limit": "支持构建后安装/启动原始记录，不证明 Works 列表行为。"
+        }
+      },
+      "reference_evidence": [
+        {
+          "file": "rollout-2026-08-21T09-18-20-01a021e5-c150-7b12-a610-d40c07816b98.jsonl",
+          "line": 4934,
+          "call_id": "call_nfwjmlicObG8LyPwc3f5ZPgb",
+          "record_sha256": "cd082603a39b32f6b07ae0f36e0450169cc7385b6b01203c757352eaac520e41",
+          "tier": "source_tool_output: historical execution summary, not source",
+          "excerpt_summary": "exactly one post-insert WorksLibraryUpdated(CREATED) publisher: PptRecordRepository",
+          "quote_fragments": [
+            "exactly one post-insert `WorksLibraryUpdated(CREATED)` publisher"
+          ],
+          "raw_ts": "2026-08-21T11:14:48.679Z",
+          "raw_type": "response_item",
+          "payload_type": "custom_tool_call_output",
+          "raw_call_id": "call_nfwjmlicObG8LyPwc3f5ZPgb"
+        },
+        {
+          "file": "rollout-2026-08-21T09-18-20-01a021e5-c150-7b12-a610-d40c07816b98.jsonl",
+          "line": 7574,
+          "call_id": "call_rHkspr6Fzhub0xEU83VOrdsF",
+          "record_sha256": "918774b14fed7020fbb37af0fd00e20486429eaed2d9eddfe25d03151244f45e",
+          "tier": "source_tool_output: finding index",
+          "excerpt_summary": "BLOCKED_PWorksFragment: canonical 误采集系统联系人; WorksFragment_generated_work_missing",
+          "quote_fragments": [
+            "# [WorksFragment] Round 2 canonical 误采集系统联系人"
+          ],
+          "raw_ts": "2026-08-21T20:11:43.876Z",
+          "raw_type": "response_item",
+          "payload_type": "custom_tool_call_output",
+          "raw_call_id": "call_rHkspr6Fzhub0xEU83VOrdsF"
+        },
+        {
+          "file": "rollout-2026-08-21T09-18-20-01a021e5-c150-7b12-a610-d40c07816b98.jsonl",
+          "line": 7683,
+          "call_id": "call_BYzt9sjwzhzxLipXgCsr6q4Y",
+          "record_sha256": "94a7bd988209de57a26305abe8291093e8ced2f94d5f9c33e9c4e49f22c11905",
+          "tier": "source_tool_output: persisted fixer summary, not source patch",
+          "excerpt_summary": "生成完成统一走 WorksService 入库并发布 CREATED 事件",
+          "quote_fragments": [
+            "生成完成统一走 WorksService 入库并发布 CREATED 事件"
+          ],
+          "raw_ts": "2026-08-21T20:36:33.470Z",
+          "raw_type": "response_item",
+          "payload_type": "custom_tool_call_output",
+          "raw_call_id": "call_BYzt9sjwzhzxLipXgCsr6q4Y"
+        },
+        {
+          "file": "rollout-2026-08-21T09-18-20-01a021e5-c150-7b12-a610-d40c07816b98.jsonl",
+          "line": 7680,
+          "call_id": null,
+          "record_sha256": "1df29114297de6eacade8f8c2d5df050f6daeedb0df440fd268d21e9967d8ec5",
+          "tier": "agent_message: reviewer claim, not independently reproduced",
+          "excerpt_summary": "reviewer: 同一 DAO 且已发布 CREATED；替换未改变行为",
+          "quote_fragments": [
+            "修改前 PptRecordRepository.insert() 已使用同一 PptCreateDao.getInstance()"
+          ],
+          "raw_ts": "2026-08-21T20:36:28.546Z",
+          "raw_type": "response_item",
+          "payload_type": "agent_message",
+          "raw_call_id": null
+        },
+        {
+          "file": "rollout-2026-08-21T09-18-20-01a021e5-c150-7b12-a610-d40c07816b98.jsonl",
+          "line": 7686,
+          "call_id": "call_XHYFotPT6f6XWmbIyXSilnMV",
+          "record_sha256": "b6ee1caff1d13cd0b1d0639add6b287946f585647d1ca83e6b50f19718c942b2",
+          "tier": "actual_patch: report only, not product source",
+          "excerpt_summary": "写回 Works wrong_edit 到 visual-fixer-summary.md",
+          "quote_fragments": [
+            "`wrong_edit` — `WorksFragment_generated_work_missing`"
+          ],
+          "raw_ts": "2026-08-21T20:36:40.765Z",
+          "raw_type": "response_item",
+          "payload_type": "custom_tool_call",
+          "raw_call_id": "call_XHYFotPT6f6XWmbIyXSilnMV"
+        },
+        {
+          "file": "rollout-2026-08-21T09-18-20-01a021e5-c150-7b12-a610-d40c07816b98.jsonl",
+          "line": 7825,
+          "call_id": null,
+          "record_sha256": "1c2b3acc8c1d7b74172365a744efe31fd247cfff30a475c629a0666d6cfae9ef",
+          "tier": "event_msg: final report, no new source/behavior evidence",
+          "excerpt_summary": "最终消息复述 Works 等价门面替换未触及真实根因",
+          "quote_fragments": [
+            "Works 等价门面替换没有触及真实根因"
+          ],
+          "raw_ts": "2026-08-21T20:46:48.336Z",
+          "raw_type": "event_msg",
+          "payload_type": "agent_message",
+          "raw_call_id": null
+        }
+      ],
+      "integrity": {
+        "pool_unchanged": true,
+        "source_unchanged": true,
+        "task_unchanged": true,
+        "pool_digest": "5bcd5ed757c468cea95f79591b41a4fb88cea2a6d6f4b5b1505e0026d2dbfc78",
+        "source_digest": "526e8f61bd30b14b67b742e8c52dbebde933b04d09d9a77eca92434a4188c658"
+      },
+      "artifact_hashes": {
+        "metrics.json": "634fc8d5e77ee16331cbc018911e2f6413b0ec1f0e53c9012116987831e478c4",
+        "result.json": "9c9d70c59412b5e3114ce08199ca72e04e9220f27c33bb95031c708503d563f2",
+        "transcript.jsonl": "4f828b14d915e6132d179701a3063b9e1ba1acb7f201adb8d143fe5fc9d76dd1"
+      },
+      "usage_descriptive": {
+        "input_total": 794306,
+        "cache_read": 711680,
+        "cache_creation": 0,
+        "input_uncached": 82626,
+        "output": 10922,
+        "thinking_reported": 1503,
+        "output_includes_thinking": "Codex output_tokens is used once; reasoning is not added",
+        "input_semantics": "Codex input_tokens is the total; reported cache read/write are not added to it. input_uncached means input_tokens minus cached_input_tokens.",
+        "wall_s": 231.08201890008058,
+        "e2e_s": 234.05815300007816,
+        "calls": 32,
+        "tool_chars": 131230,
+        "not_used_to_score": true
+      }
+    },
+    {
+      "case": "C2",
+      "rep": 2,
+      "run_dir": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v12/codex-c2/runs/tools/rep2",
+      "status": "pending",
+      "core": null,
+      "annotation_complete": null,
+      "facts": null,
+      "extra_false_claims": null
+    },
+    {
+      "case": "C3",
+      "rep": 1,
+      "run_dir": "C:\\Users\\hongy\\projects\\_migloop-eval-20260909\\attribution10\\formal-v12\\codex-c3\\runs\\tools\\rep1",
+      "status": "adjudicated",
+      "recording_complete": true,
+      "core": "accepted",
+      "core_reason": "正确恢复 Monitor/visibility 与独立挂载两个来源假说及 reviewer 反证，明确它们不是源码/设备验证；真实根因和修复结果保持未知。沿 V9 相同 core 口径，不把可恢复的初始输入缺项重新设为核心否决。",
+      "annotation_complete": false,
+      "annotation_status": "accepted_with_recoverable_omissions",
+      "annotation_requires_correction": false,
+      "annotation_requires_completion": true,
+      "facts": [
+        {
+          "id": "C3-F1",
+          "status": "partial",
+          "reason": "有早期 Slice 1 槽位计划与生成者 5110ms/panorama 自述；未恢复 Kotlin/layout/snapshot 初始输入。",
+          "final_quote": "5110ms progress flow 与 panorama auto-scroll 已实现"
+        },
+        {
+          "id": "C3-F2",
+          "status": "supported",
+          "reason": "明确 transient/occlusion capture debt，并定位 Round 0 low_confidence 工单。",
+          "final_quote": "IMPL_MISSING/P2/low_confidence"
+        },
+        {
+          "id": "C3-F3",
+          "status": "supported",
+          "reason": "Round 1 reviewer Monitor 反证与 Round 2 currentStep===5 独立挂载报告均准确，均标来源主张。",
+          "final_quote": "第 6 步移出缓存 Swiper，currentStep===5 时独立真实挂载并传 active/progress"
+        },
+        {
+          "id": "C3-F4",
+          "status": "partial",
+          "reason": "明确 final manual review 未消除；fresh capture 仅写作下一步建议，未恢复历史最终 need-info/fresh-capture 欠账记录。",
+          "final_quote": "Round-2 最终仍有 GuideInit 两项低置信 manual_review 债"
+        }
+      ],
+      "extra_false_claims": [],
+      "major_false_claims": [],
+      "boundary_assessment": "未将 reviewer 当金标；未把 Round 2 无 GuideInit wrong_edit 标记等同实际视觉通过；无目标正式 file 版本或源码 diff 时用真实 agent/event，而非 file@v0。",
+      "delivery_note": "check mechanical_clear 且 coverage expected=0 只认证外壳；不是本题 4 个事实均恢复。",
+      "source": {
+        "harness_identity": "atoms-2026-09-09-file-evidence5:2:f26146edb7f0b81662825f3d",
+        "source_code_id": "e67d7d7",
+        "source_digest": "526e8f61bd30b14b67b742e8c52dbebde933b04d09d9a77eca92434a4188c658",
+        "runner_sha256": "4874a8064f0cf69e2d94b60b4c765c9c7841194163b3f793f5672bdc8e7e6a19",
+        "pool_digest": "5bcd5ed757c468cea95f79591b41a4fb88cea2a6d6f4b5b1505e0026d2dbfc78",
+        "common_task_sha256": "b85d9db51ded7a20b54cf5482750b0287886c5d3970254de58904cbd1090f8b7"
+      },
+      "delivery": {
+        "status": "accepted",
+        "mode": "checked_draft_ref",
+        "source_check_step": 35,
+        "source_check_call_id": "call_a6PMnfyAFnFUs8WVMRJj7d5i",
+        "final_records": [
+          {
+            "line": 191,
+            "channel": null,
+            "record_sha256": "d3e947a5ba2c0a7088e9146223046065895b1917896168d88bfbaaaf788af956"
+          }
+        ],
+        "document_sha256": "7352b967c13f8d6c8326672bfbd38c4d06bd610648fc09df63c7b9e54455d15a",
+        "canonical_document_sha256": "22558f07d6d7f0ad39c342a45d27c67146944dcfac0c8f165c8d865285a794c1",
+        "saved_equals_authenticated_document": true,
+        "errors": [],
+        "check_status": "mechanical_clear",
+        "check_counts": {
+          "errors": 0,
+          "warnings": 0,
+          "total": 0
+        },
+        "check_issues": [],
+        "check_calls": [
+          {
+            "step": 35,
+            "call_id": "call_a6PMnfyAFnFUs8WVMRJj7d5i",
+            "use_line": 185,
+            "result_line": 188,
+            "saved_document_equals_input": true
+          }
+        ],
+        "coverage_complete": true,
+        "coverage_counts": {
+          "expected": 0,
+          "provided": 0,
+          "accounted": 0,
+          "expected_versions": 0,
+          "expected_candidates": 0,
+          "missing_versions": 0,
+          "missing_candidates": 0,
+          "missing": 0,
+          "unresolved": 0,
+          "not_repair": 0,
+          "deferred": 0,
+          "unconfirmed": 0,
+          "advisories": 0,
+          "advisory_rows": 0,
+          "reviewed": 0,
+          "not_investigated": 0
+        },
+        "verdict_ok": true
+      },
+      "locators": {
+        "identity_bound": true,
+        "trace_identity_bound": true,
+        "nodes_valid": 4,
+        "nodes_total": 4,
+        "events_locatable": 6,
+        "events_total": 6,
+        "events": [
+          {
+            "id": "E1",
+            "event": "#01a009fe-68e3-7f42-b76b-5e863c555976:421@L1382",
+            "role": "无法确认",
+            "binding": {
+              "status": "ok",
+              "ok": true,
+              "ref": "#01a009fe-68e3-7f42-b76b-5e863c555976:421@L1382",
+              "original_ref": "#01a009fe-68e3-7f42-b76b-5e863c555976:421@L1382",
+              "owner_agent": "__main__:01a009fe",
+              "seq": 421,
+              "source_path": "C:\\Users\\hongy\\projects\\_migloop-eval-20260909\\attribution10\\formal-v1\\codex-c3\\pool\\rollout-2026-08-16T17-54-23-01a009fe-68e3-7f42-b76b-5e863c555976.jsonl",
+              "use_line": 1382,
+              "result_line": 1383,
+              "use_ts": "2026-08-16T16:09:13.194Z",
+              "done_ts": "2026-08-16T16:09:13.482Z",
+              "tool_use_id": "call_NNh87VRIt9wayPsl91X3xaTg",
+              "tool": "exec",
+              "action_ok": true,
+              "kind": "other",
+              "event_class": "recorded_action",
+              "textual_only": false,
+              "effect_version": null,
+              "context_anchor": {
+                "kind": "agent",
+                "aid": "__main__:01a009fe",
+                "v": 42
+              },
+              "anchor_basis": "prior_ledger_effect_order",
+              "context_available_before_event": true,
+              "context_timing_note": "此前效应的记录完成时刻不晚于事件发起时刻；只证明外壳时序，不证明内容被消费",
+              "temporal_relation": "input_after_anchor_before_next_effect",
+              "paired_result": true,
+              "diag": "位置与调用外壳可核；成功状态不认证模型的语义归因；context_anchor 仅按账本效应顺序，不自动是事件前输入",
+              "creates_node": false,
+              "creates_edge": false,
+              "semantic_checked": false
+            }
+          },
+          {
+            "id": "E2",
+            "event": "#01a021e5-c150-7b12-a610-d40c07816b98:2783@L1059",
+            "role": "无法确认",
+            "binding": {
+              "status": "ok",
+              "ok": true,
+              "ref": "#01a021e5-c150-7b12-a610-d40c07816b98:2783@L1059",
+              "original_ref": "#01a021e5-c150-7b12-a610-d40c07816b98:2783@L1059",
+              "owner_agent": "__main__:01a021e5",
+              "seq": 2783,
+              "source_path": "C:\\Users\\hongy\\projects\\_migloop-eval-20260909\\attribution10\\formal-v1\\codex-c3\\pool\\rollout-2026-08-21T09-18-20-01a021e5-c150-7b12-a610-d40c07816b98.jsonl",
+              "use_line": 1059,
+              "result_line": null,
+              "use_ts": "2026-08-21T03:23:37.186Z",
+              "done_ts": null,
+              "tool_use_id": null,
+              "tool": "say",
+              "action_ok": true,
+              "kind": "say",
+              "event_class": "text_record",
+              "textual_only": true,
+              "effect_version": null,
+              "context_anchor": {
+                "kind": "agent",
+                "aid": "__main__:01a021e5",
+                "v": 19
+              },
+              "anchor_basis": "prior_ledger_effect_order",
+              "context_available_before_event": true,
+              "context_timing_note": "此前效应的记录完成时刻不晚于事件发起时刻；只证明外壳时序，不证明内容被消费",
+              "temporal_relation": "input_after_anchor_before_next_effect",
+              "paired_result": false,
+              "diag": "文本记录只证明 actor 说过/想过这些内容，不证明所述操作执行；context_anchor 仅按账本效应顺序，不自动是事件前输入",
+              "creates_node": false,
+              "creates_edge": false,
+              "semantic_checked": false
+            }
+          },
+          {
+            "id": "E3",
+            "event": "#01a021e5-c150-7b12-a610-d40c07816b98:4287@L5878",
+            "role": "无法确认",
+            "binding": {
+              "status": "ok",
+              "ok": true,
+              "ref": "#01a021e5-c150-7b12-a610-d40c07816b98:4287@L5878",
+              "original_ref": "#01a021e5-c150-7b12-a610-d40c07816b98:4287@L5878",
+              "owner_agent": "__main__:01a021e5",
+              "seq": 4287,
+              "source_path": "C:\\Users\\hongy\\projects\\_migloop-eval-20260909\\attribution10\\formal-v1\\codex-c3\\pool\\rollout-2026-08-21T09-18-20-01a021e5-c150-7b12-a610-d40c07816b98.jsonl",
+              "use_line": 5878,
+              "result_line": 5879,
+              "use_ts": "2026-08-21T16:01:56.910Z",
+              "done_ts": "2026-08-21T16:01:57.068Z",
+              "tool_use_id": "call_8PsHI1kc3azM3FxOJBhI8I0j",
+              "tool": "exec",
+              "action_ok": true,
+              "kind": "other",
+              "event_class": "recorded_action",
+              "textual_only": false,
+              "effect_version": null,
+              "context_anchor": {
+                "kind": "agent",
+                "aid": "__main__:01a021e5",
+                "v": 155
+              },
+              "anchor_basis": "prior_ledger_effect_order",
+              "context_available_before_event": true,
+              "context_timing_note": "此前效应的记录完成时刻不晚于事件发起时刻；只证明外壳时序，不证明内容被消费",
+              "temporal_relation": "input_after_anchor_before_next_effect",
+              "paired_result": true,
+              "diag": "位置与调用外壳可核；成功状态不认证模型的语义归因；context_anchor 仅按账本效应顺序，不自动是事件前输入",
+              "creates_node": false,
+              "creates_edge": false,
+              "semantic_checked": false
+            }
+          },
+          {
+            "id": "E4",
+            "event": "#01a021e5-c150-7b12-a610-d40c07816b98:4630@L6915",
+            "role": "无法确认",
+            "binding": {
+              "status": "ok",
+              "ok": true,
+              "ref": "#01a021e5-c150-7b12-a610-d40c07816b98:4630@L6915",
+              "original_ref": "#01a021e5-c150-7b12-a610-d40c07816b98:4630@L6915",
+              "owner_agent": "__main__:01a021e5",
+              "seq": 4630,
+              "source_path": "C:\\Users\\hongy\\projects\\_migloop-eval-20260909\\attribution10\\formal-v1\\codex-c3\\pool\\rollout-2026-08-21T09-18-20-01a021e5-c150-7b12-a610-d40c07816b98.jsonl",
+              "use_line": 6915,
+              "result_line": null,
+              "use_ts": "2026-08-21T18:38:55.042Z",
+              "done_ts": null,
+              "tool_use_id": null,
+              "tool": "inbox",
+              "action_ok": true,
+              "kind": "inbox",
+              "event_class": "text_record",
+              "textual_only": true,
+              "effect_version": null,
+              "context_anchor": {
+                "kind": "agent",
+                "aid": "__main__:01a021e5",
+                "v": 194
+              },
+              "anchor_basis": "prior_ledger_effect_order",
+              "context_available_before_event": true,
+              "context_timing_note": "此前效应的记录完成时刻不晚于事件发起时刻；只证明外壳时序，不证明内容被消费",
+              "temporal_relation": "input_after_anchor_before_next_effect",
+              "paired_result": false,
+              "diag": "文本记录只证明 actor 说过/想过这些内容，不证明所述操作执行；context_anchor 仅按账本效应顺序，不自动是事件前输入",
+              "creates_node": false,
+              "creates_edge": false,
+              "semantic_checked": false
+            }
+          },
+          {
+            "id": "E5",
+            "event": "#01a021e5-c150-7b12-a610-d40c07816b98:4643@L6957",
+            "role": "无法确认",
+            "binding": {
+              "status": "ok",
+              "ok": true,
+              "ref": "#01a021e5-c150-7b12-a610-d40c07816b98:4643@L6957",
+              "original_ref": "#01a021e5-c150-7b12-a610-d40c07816b98:4643@L6957",
+              "owner_agent": "__main__:01a021e5",
+              "seq": 4643,
+              "source_path": "C:\\Users\\hongy\\projects\\_migloop-eval-20260909\\attribution10\\formal-v1\\codex-c3\\pool\\rollout-2026-08-21T09-18-20-01a021e5-c150-7b12-a610-d40c07816b98.jsonl",
+              "use_line": 6957,
+              "result_line": null,
+              "use_ts": "2026-08-21T18:44:56.776Z",
+              "done_ts": null,
+              "tool_use_id": null,
+              "tool": "inbox",
+              "action_ok": true,
+              "kind": "inbox",
+              "event_class": "text_record",
+              "textual_only": true,
+              "effect_version": null,
+              "context_anchor": {
+                "kind": "agent",
+                "aid": "__main__:01a021e5",
+                "v": 196
+              },
+              "anchor_basis": "prior_ledger_effect_order",
+              "context_available_before_event": true,
+              "context_timing_note": "此前效应的记录完成时刻不晚于事件发起时刻；只证明外壳时序，不证明内容被消费",
+              "temporal_relation": "input_after_anchor_before_next_effect",
+              "paired_result": false,
+              "diag": "文本记录只证明 actor 说过/想过这些内容，不证明所述操作执行；context_anchor 仅按账本效应顺序，不自动是事件前输入",
+              "creates_node": false,
+              "creates_edge": false,
+              "semantic_checked": false
+            }
+          },
+          {
+            "id": "E6",
+            "event": "#01a021e5-c150-7b12-a610-d40c07816b98:4867@L7682",
+            "role": "无法确认",
+            "binding": {
+              "status": "ok",
+              "ok": true,
+              "ref": "#01a021e5-c150-7b12-a610-d40c07816b98:4867@L7682",
+              "original_ref": "#01a021e5-c150-7b12-a610-d40c07816b98:4867@L7682",
+              "owner_agent": "__main__:01a021e5",
+              "seq": 4867,
+              "source_path": "C:\\Users\\hongy\\projects\\_migloop-eval-20260909\\attribution10\\formal-v1\\codex-c3\\pool\\rollout-2026-08-21T09-18-20-01a021e5-c150-7b12-a610-d40c07816b98.jsonl",
+              "use_line": 7682,
+              "result_line": 7683,
+              "use_ts": "2026-08-21T20:36:33.275Z",
+              "done_ts": "2026-08-21T20:36:33.470Z",
+              "tool_use_id": "call_BYzt9sjwzhzxLipXgCsr6q4Y",
+              "tool": "exec",
+              "action_ok": true,
+              "kind": "other",
+              "event_class": "recorded_action",
+              "textual_only": false,
+              "effect_version": null,
+              "context_anchor": {
+                "kind": "agent",
+                "aid": "__main__:01a021e5",
+                "v": 217
+              },
+              "anchor_basis": "prior_ledger_effect_order",
+              "context_available_before_event": true,
+              "context_timing_note": "此前效应的记录完成时刻不晚于事件发起时刻；只证明外壳时序，不证明内容被消费",
+              "temporal_relation": "input_after_anchor_before_next_effect",
+              "paired_result": true,
+              "diag": "位置与调用外壳可核；成功状态不认证模型的语义归因；context_anchor 仅按账本效应顺序，不自动是事件前输入",
+              "creates_node": false,
+              "creates_edge": false,
+              "semantic_checked": false
+            }
+          }
+        ],
+        "target_bindings": [
+          {
+            "declared_path": "entry/src/main/ets/pages/GuidePage.ets",
+            "canonical_path": "/Users/ventiu/Desktop/HUAWEI/AIPPT_830_test/entry/src/main/ets/pages/GuidePage.ets",
+            "status": "matched",
+            "source": "model",
+            "diag": null,
+            "creates_node": false,
+            "semantic_checked": false
+          }
+        ],
+        "unique_action_references": 8,
+        "raw_references": [
+          {
+            "ref": "#01a009fe-68e3-7f42-b76b-5e863c555976:421@L1382",
+            "aid": "__main__:01a009fe",
+            "seq": 421,
+            "ver": null,
+            "at": 43,
+            "kind": "other",
+            "ok": true,
+            "use_ts": "2026-08-16T16:09:13.194Z",
+            "done_ts": "2026-08-16T16:09:13.482Z",
+            "tuid": "call_NNh87VRIt9wayPsl91X3xaTg",
+            "src": [
+              "C:\\Users\\hongy\\projects\\_migloop-eval-20260909\\attribution10\\formal-v1\\codex-c3\\pool\\rollout-2026-08-16T17-54-23-01a009fe-68e3-7f42-b76b-5e863c555976.jsonl",
+              1381,
+              1382
+            ],
+            "records": [
+              {
+                "line": 1382,
+                "record_sha256": "1bb4ef0e6f1009c3ed33119aea1222c2161d105a4aa3cd80eb4abd882413ab39",
+                "timestamp": "2026-08-16T16:09:13.194Z",
+                "payload_type": "custom_tool_call",
+                "call_id": "call_NNh87VRIt9wayPsl91X3xaTg"
+              },
+              {
+                "line": 1383,
+                "record_sha256": "feda3a25a366003d9879e1f2df2daadb7cb8721a81f1db12e735e8d4a1ff61e8",
+                "timestamp": "2026-08-16T16:09:13.482Z",
+                "payload_type": "custom_tool_call_output",
+                "call_id": "call_NNh87VRIt9wayPsl91X3xaTg"
+              }
+            ]
+          },
+          {
+            "ref": "#01a009fe-68e3-7f42-b76b-5e863c555976:804@L2781",
+            "aid": "__main__:01a009fe",
+            "seq": 804,
+            "ver": null,
+            "at": 95,
+            "kind": "inbox",
+            "ok": true,
+            "use_ts": "2026-08-16T17:45:31.670Z",
+            "done_ts": null,
+            "tuid": null,
+            "src": [
+              "C:\\Users\\hongy\\projects\\_migloop-eval-20260909\\attribution10\\formal-v1\\codex-c3\\pool\\rollout-2026-08-16T17-54-23-01a009fe-68e3-7f42-b76b-5e863c555976.jsonl",
+              2780,
+              2780
+            ],
+            "records": [
+              {
+                "line": 2781,
+                "record_sha256": "98995a46b1c3076be3492df5ea4a8d56705221fa8a4a6e342baf625cbca5372b",
+                "timestamp": "2026-08-16T17:45:31.670Z",
+                "payload_type": "agent_message",
+                "call_id": null
+              }
+            ]
+          },
+          {
+            "ref": "#01a021e5-c150-7b12-a610-d40c07816b98:4643@L6957",
+            "aid": "__main__:01a021e5",
+            "seq": 4643,
+            "ver": null,
+            "at": 197,
+            "kind": "inbox",
+            "ok": true,
+            "use_ts": "2026-08-21T18:44:56.776Z",
+            "done_ts": null,
+            "tuid": null,
+            "src": [
+              "C:\\Users\\hongy\\projects\\_migloop-eval-20260909\\attribution10\\formal-v1\\codex-c3\\pool\\rollout-2026-08-21T09-18-20-01a021e5-c150-7b12-a610-d40c07816b98.jsonl",
+              6956,
+              6956
+            ],
+            "records": [
+              {
+                "line": 6957,
+                "record_sha256": "1d414244dd518fa5fd9665f424e2d43c59bfcea8d363fd59ce9300dfc39a403e",
+                "timestamp": "2026-08-21T18:44:56.776Z",
+                "payload_type": "agent_message",
+                "call_id": null
+              }
+            ]
+          },
+          {
+            "ref": "#01a021e5-c150-7b12-a610-d40c07816b98:4866@L7680",
+            "aid": "__main__:01a021e5",
+            "seq": 4866,
+            "ver": null,
+            "at": 218,
+            "kind": "inbox",
+            "ok": true,
+            "use_ts": "2026-08-21T20:36:28.546Z",
+            "done_ts": null,
+            "tuid": null,
+            "src": [
+              "C:\\Users\\hongy\\projects\\_migloop-eval-20260909\\attribution10\\formal-v1\\codex-c3\\pool\\rollout-2026-08-21T09-18-20-01a021e5-c150-7b12-a610-d40c07816b98.jsonl",
+              7679,
+              7679
+            ],
+            "records": [
+              {
+                "line": 7680,
+                "record_sha256": "1df29114297de6eacade8f8c2d5df050f6daeedb0df440fd268d21e9967d8ec5",
+                "timestamp": "2026-08-21T20:36:28.546Z",
+                "payload_type": "agent_message",
+                "call_id": null
+              }
+            ]
+          },
+          {
+            "ref": "#01a021e5-c150-7b12-a610-d40c07816b98:4867@L7682",
+            "aid": "__main__:01a021e5",
+            "seq": 4867,
+            "ver": null,
+            "at": 218,
+            "kind": "other",
+            "ok": true,
+            "use_ts": "2026-08-21T20:36:33.275Z",
+            "done_ts": "2026-08-21T20:36:33.470Z",
+            "tuid": "call_BYzt9sjwzhzxLipXgCsr6q4Y",
+            "src": [
+              "C:\\Users\\hongy\\projects\\_migloop-eval-20260909\\attribution10\\formal-v1\\codex-c3\\pool\\rollout-2026-08-21T09-18-20-01a021e5-c150-7b12-a610-d40c07816b98.jsonl",
+              7681,
+              7682
+            ],
+            "records": [
+              {
+                "line": 7682,
+                "record_sha256": "079b7140216588cc81ca2b93ee7696b9dfc8c92509c29285f3c480c5b6dc3098",
+                "timestamp": "2026-08-21T20:36:33.275Z",
+                "payload_type": "custom_tool_call",
+                "call_id": "call_BYzt9sjwzhzxLipXgCsr6q4Y"
+              },
+              {
+                "line": 7683,
+                "record_sha256": "94a7bd988209de57a26305abe8291093e8ced2f94d5f9c33e9c4e49f22c11905",
+                "timestamp": "2026-08-21T20:36:33.470Z",
+                "payload_type": "custom_tool_call_output",
+                "call_id": "call_BYzt9sjwzhzxLipXgCsr6q4Y"
+              }
+            ]
+          },
+          {
+            "ref": "#01a021e5-c150-7b12-a610-d40c07816b98:2783@L1059",
+            "aid": "__main__:01a021e5",
+            "seq": 2783,
+            "ver": null,
+            "at": 20,
+            "kind": "say",
+            "ok": true,
+            "use_ts": "2026-08-21T03:23:37.186Z",
+            "done_ts": null,
+            "tuid": null,
+            "src": [
+              "C:\\Users\\hongy\\projects\\_migloop-eval-20260909\\attribution10\\formal-v1\\codex-c3\\pool\\rollout-2026-08-21T09-18-20-01a021e5-c150-7b12-a610-d40c07816b98.jsonl",
+              1058,
+              1058
+            ],
+            "records": [
+              {
+                "line": 1059,
+                "record_sha256": "1784f1255249ca17adf969531b6c2c7af721cadb7acbde2400dff080ba816dbc",
+                "timestamp": "2026-08-21T03:23:37.186Z",
+                "payload_type": "message",
+                "call_id": null
+              }
+            ]
+          },
+          {
+            "ref": "#01a021e5-c150-7b12-a610-d40c07816b98:4287@L5878",
+            "aid": "__main__:01a021e5",
+            "seq": 4287,
+            "ver": null,
+            "at": 156,
+            "kind": "other",
+            "ok": true,
+            "use_ts": "2026-08-21T16:01:56.910Z",
+            "done_ts": "2026-08-21T16:01:57.068Z",
+            "tuid": "call_8PsHI1kc3azM3FxOJBhI8I0j",
+            "src": [
+              "C:\\Users\\hongy\\projects\\_migloop-eval-20260909\\attribution10\\formal-v1\\codex-c3\\pool\\rollout-2026-08-21T09-18-20-01a021e5-c150-7b12-a610-d40c07816b98.jsonl",
+              5877,
+              5878
+            ],
+            "records": [
+              {
+                "line": 5878,
+                "record_sha256": "b39364fd0f6f4a3c7ccd67e394b3b90e24c393924782a398629a86fc6d953e89",
+                "timestamp": "2026-08-21T16:01:56.910Z",
+                "payload_type": "custom_tool_call",
+                "call_id": "call_8PsHI1kc3azM3FxOJBhI8I0j"
+              },
+              {
+                "line": 5879,
+                "record_sha256": "949d758d1b5d16612381630563f01555d57ef65ed6f1f6254264c29809832c70",
+                "timestamp": "2026-08-21T16:01:57.068Z",
+                "payload_type": "custom_tool_call_output",
+                "call_id": "call_8PsHI1kc3azM3FxOJBhI8I0j"
+              }
+            ]
+          },
+          {
+            "ref": "#01a021e5-c150-7b12-a610-d40c07816b98:4630@L6915",
+            "aid": "__main__:01a021e5",
+            "seq": 4630,
+            "ver": null,
+            "at": 195,
+            "kind": "inbox",
+            "ok": true,
+            "use_ts": "2026-08-21T18:38:55.042Z",
+            "done_ts": null,
+            "tuid": null,
+            "src": [
+              "C:\\Users\\hongy\\projects\\_migloop-eval-20260909\\attribution10\\formal-v1\\codex-c3\\pool\\rollout-2026-08-21T09-18-20-01a021e5-c150-7b12-a610-d40c07816b98.jsonl",
+              6914,
+              6914
+            ],
+            "records": [
+              {
+                "line": 6915,
+                "record_sha256": "458a23b2d9116f225df08ba005529802ed0f3bdfd18b69b0285ed48bd8b4b738",
+                "timestamp": "2026-08-21T18:38:55.042Z",
+                "payload_type": "agent_message",
+                "call_id": null
+              }
+            ]
+          }
+        ]
+      },
+      "reference_evidence": [
+        {
+          "file": "rollout-2026-08-16T17-54-23-01a009fe-68e3-7f42-b76b-5e863c555976.jsonl",
+          "line": 2013,
+          "call_id": "call_b5NIkmLWkXtjLgHjdKGnc9WQ",
+          "record_sha256": "cdeef46698720d67a78d39b99b759d5d09c57a00748f5422538795dd03b470d5",
+          "tier": "source_tool_output: generated spec/source inventory",
+          "excerpt_summary": "GuideInit Kotlin/layout/snapshot; 展示引导加载动画并倒计时进入首页",
+          "quote_fragments": [
+            "展示引导加载动画并倒计时进入首页"
+          ],
+          "raw_ts": "2026-08-16T16:53:15.659Z",
+          "raw_type": "response_item",
+          "payload_type": "custom_tool_call_output",
+          "raw_call_id": "call_b5NIkmLWkXtjLgHjdKGnc9WQ"
+        },
+        {
+          "file": "rollout-2026-08-16T17-54-23-01a009fe-68e3-7f42-b76b-5e863c555976.jsonl",
+          "line": 2781,
+          "call_id": null,
+          "record_sha256": "98995a46b1c3076be3492df5ea4a8d56705221fa8a4a6e342baf625cbca5372b",
+          "tier": "agent_message: generator report",
+          "excerpt_summary": "GuideInitComponent: 5110ms progress flow ... implemented",
+          "quote_fragments": [
+            "5110ms progress flow and panorama auto-scroll implemented"
+          ],
+          "raw_ts": "2026-08-16T17:45:31.670Z",
+          "raw_type": "response_item",
+          "payload_type": "agent_message",
+          "raw_call_id": null
+        },
+        {
+          "file": "rollout-2026-08-21T09-18-20-01a021e5-c150-7b12-a610-d40c07816b98.jsonl",
+          "line": 5879,
+          "call_id": "call_8PsHI1kc3azM3FxOJBhI8I0j",
+          "record_sha256": "949d758d1b5d16612381630563f01555d57ef65ed6f1f6254264c29809832c70",
+          "tier": "source_tool_output: finding metadata",
+          "excerpt_summary": "GuideInit tickets confidence: low_confidence",
+          "quote_fragments": [
+            "GuideInit_01_loading_intro_bubble",
+            "low_confidence"
+          ],
+          "raw_ts": "2026-08-21T16:01:57.068Z",
+          "raw_type": "response_item",
+          "payload_type": "custom_tool_call_output",
+          "raw_call_id": "call_8PsHI1kc3azM3FxOJBhI8I0j"
+        },
+        {
+          "file": "rollout-2026-08-21T09-18-20-01a021e5-c150-7b12-a610-d40c07816b98.jsonl",
+          "line": 6957,
+          "call_id": null,
+          "record_sha256": "1d414244dd518fa5fd9665f424e2d43c59bfcea8d363fd59ce9300dfc39a403e",
+          "tier": "agent_message: reviewer claim, source not reproduced",
+          "excerpt_summary": "reviewer: Monitor 未建立新渲染链，progress 已响应式消费",
+          "quote_fragments": [
+            "新增 progressPercent Monitor 和 active visibility 未建立新的机器人/气泡渲染路径"
+          ],
+          "raw_ts": "2026-08-21T18:44:56.776Z",
+          "raw_type": "response_item",
+          "payload_type": "agent_message",
+          "raw_call_id": null
+        },
+        {
+          "file": "rollout-2026-08-21T09-18-20-01a021e5-c150-7b12-a610-d40c07816b98.jsonl",
+          "line": 7683,
+          "call_id": "call_BYzt9sjwzhzxLipXgCsr6q4Y",
+          "record_sha256": "94a7bd988209de57a26305abe8291093e8ced2f94d5f9c33e9c4e49f22c11905",
+          "tier": "source_tool_output: persisted fixer summary, not source patch",
+          "excerpt_summary": "currentStep===5 独立挂载；缓存子树首次 inactive 构建假设",
+          "quote_fragments": [
+            "第 6 步移出缓存 Swiper"
+          ],
+          "raw_ts": "2026-08-21T20:36:33.470Z",
+          "raw_type": "response_item",
+          "payload_type": "custom_tool_call_output",
+          "raw_call_id": "call_BYzt9sjwzhzxLipXgCsr6q4Y"
+        },
+        {
+          "file": "rollout-2026-08-21T09-18-20-01a021e5-c150-7b12-a610-d40c07816b98.jsonl",
+          "line": 7653,
+          "call_id": null,
+          "record_sha256": "81083e35b516e4bb0bd7d014b1b8526eddc520dcef179f5072839c19ce21f7f5",
+          "tier": "agent_message: fixer report",
+          "excerpt_summary": "need-info: GuideInit fresh capture",
+          "quote_fragments": [
+            "GuideInit fresh capture"
+          ],
+          "raw_ts": "2026-08-21T20:31:08.165Z",
+          "raw_type": "response_item",
+          "payload_type": "agent_message",
+          "raw_call_id": null
+        },
+        {
+          "file": "rollout-2026-08-21T09-18-20-01a021e5-c150-7b12-a610-d40c07816b98.jsonl",
+          "line": 7825,
+          "call_id": null,
+          "record_sha256": "1c2b3acc8c1d7b74172365a744efe31fd247cfff30a475c629a0666d6cfae9ef",
+          "tier": "event_msg: final report",
+          "excerpt_summary": "GuideInit 仍有两项低置信人工复核债",
+          "quote_fragments": [
+            "GuideInit 仍有两项低置信人工复核债"
+          ],
+          "raw_ts": "2026-08-21T20:46:48.336Z",
+          "raw_type": "event_msg",
+          "payload_type": "agent_message",
+          "raw_call_id": null
+        }
+      ],
+      "integrity": {
+        "pool_unchanged": true,
+        "source_unchanged": true,
+        "task_unchanged": true,
+        "pool_digest": "5bcd5ed757c468cea95f79591b41a4fb88cea2a6d6f4b5b1505e0026d2dbfc78",
+        "source_digest": "526e8f61bd30b14b67b742e8c52dbebde933b04d09d9a77eca92434a4188c658"
+      },
+      "artifact_hashes": {
+        "metrics.json": "71060033211b057d71e779b40c11e0e7c5e97d03a6d02535369f861aae6ba0df",
+        "result.json": "afcc6055b332011aa7223707ea2c2acbb9632234bf5c98bc3b30c446d11002f7",
+        "transcript.jsonl": "b775ef14cfe966c1c5975f4568a06473e4e5b4b4b029edf6bfc2e3fac175139f"
+      },
+      "usage_descriptive": {
+        "input_total": 702487,
+        "cache_read": 615424,
+        "cache_creation": 0,
+        "input_uncached": 87063,
+        "output": 8401,
+        "thinking_reported": 694,
+        "output_includes_thinking": "Codex output_tokens is used once; reasoning is not added",
+        "input_semantics": "Codex input_tokens is the total; reported cache read/write are not added to it. input_uncached means input_tokens minus cached_input_tokens.",
+        "wall_s": 190.54034069995396,
+        "e2e_s": 193.28901479998603,
+        "calls": 35,
+        "tool_chars": 161073,
+        "not_used_to_score": true
+      }
+    },
+    {
+      "case": "C3",
+      "rep": 2,
+      "run_dir": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v12/codex-c3/runs/tools/rep2",
+      "status": "pending",
+      "core": null,
+      "annotation_complete": null,
+      "facts": null,
+      "extra_false_claims": null
+    },
+    {
+      "case": "C4",
+      "rep": 1,
+      "run_dir": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v12/codex-c4/runs/tools/rep1",
+      "status": "pending",
+      "core": null,
+      "annotation_complete": null,
+      "facts": null,
+      "extra_false_claims": null
+    },
+    {
+      "case": "C4",
+      "rep": 2,
+      "run_dir": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v12/codex-c4/runs/tools/rep2",
+      "status": "pending",
+      "core": null,
+      "annotation_complete": null,
+      "facts": null,
+      "extra_false_claims": null
+    }
+  ],
+  "summary": {
+    "planned": 8,
+    "adjudicated": 2,
+    "pending": 6,
+    "core_accepted": 2,
+    "core_partial": 0,
+    "core_rejected": 0,
+    "annotation_complete": 0,
+    "delivery_failed": 0,
+    "complete": false,
+    "not_a_complete_suite_comparison": true
+  }
+}

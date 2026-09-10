@@ -4,6 +4,7 @@
 
 ## 2026-09-09-attribution10/ —— 历史归因与审计分开验收
 
+- [09-10检查点](2026-09-09-attribution10/2026-09-10-checkpoint.md)：V10跨过开发集token门槛但归因仍有实质错误；V11/V12因额度中断，完整收益保持未知。列明代码、评分和恢复范围。
 - 最新完整结果：[V8](2026-09-09-attribution10/v8-complete-results.md)、[V9](2026-09-09-attribution10/v9-complete-results.md)、[固定候选的新题对照](2026-09-09-attribution10/holdout-v3-complete-results.md)。目前均未通过“省20–30%总token＋更正确＋忠实展示”的联合目标；不只报首遍或格式通过率。
 - [交付物与展示边界](../fixchain-output.md)、[V10冻结记录](2026-09-09-attribution10/v10-preflight.md)：模型YAML、真实调用轨迹、机械校验和独立语义评分分开；新候选不覆盖旧报告。
 - [范围与进度](2026-09-09-attribution10/README.md)、[评测协议](2026-09-09-attribution10/protocol.md)：3 个项目池、10 道题、7 个文件任务，GPT-5.5/medium；不是 10 个独立项目，不重跑迁移。
