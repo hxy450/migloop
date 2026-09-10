@@ -35,3 +35,7 @@ Luna medium、每文件2重复、并发2、每跑1800秒；先整个raw组，再
 评分使用[参考协议](reference-protocol.md)和[独立评分器合同](transfer-score-contract.md)。私有答案不进入模型材料池；运行器核其字节哈希但不解析答案。read-only限制和提示词不构成OS级读取隔离证明，调查轨迹仍需查是否遵守材料范围。成本是input+output，cache不重加；调查、含核验的端到端、并发队列耗时分别列。正式模型运行期间不跑全量pytest、性能压测或冷建其他ledger，以降低上一轮时间比较的后台负载混杂。
 
 若新证据推翻参考，保留原版、登记修订并对两组对称重评。首次解盲后若用于调优，该批即为开发曝光，下次不能继续称留出。
+
+## 执行日志（进行中，不是完整成绩）
+
+package自身 `smoke-offline` 于21:44:31 UTC完成，两个cohort均通过、model_calls=0；产物SHA为`5fc4d5da949604e937ee1a0dd020e227fa4b4ac7f29c0d5e6571dc25e778989e`。raw正式队列于21:45:36 UTC启动，26项、并发2。首两项DYNAMIC1-01/02 rep1正常完成，实录确认均为gpt-5.6-luna/medium，原始记录完整且无host skill目录注入。后续调查仍按冻结顺序进行，不依据首批报告改候选。
