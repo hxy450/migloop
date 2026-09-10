@@ -154,12 +154,92 @@ def _metric(context, task, directory, condition):
     return metric, sha(path)
 
 
+def _native_initial_task(directory, metric, expected):
+    """Narrow Codex recorder proof; never search arbitrary leaves for a task.
+
+    The first response_item after the first turn_context must be the complete
+    single-block user task. Earlier environment messages and later messages,
+    quotes or tool results cannot rescue a mismatch. This is integrity evidence,
+    not authentication of a hostile recorder or an OS isolation guarantee.
+    """
+    digest, session = metric.get("transcript_sha256"), metric.get("session_id")
+    if (not isinstance(digest, str) or not re.fullmatch(r"[0-9a-f]{64}", digest)
+            or not isinstance(session, str) or not session):
+        raise ValueError("native_recording_binding_missing")
+    raw = (directory / "transcript.jsonl").read_bytes()
+    if hashlib.sha256(raw).hexdigest() != digest:
+        raise ValueError("native_transcript_hash_not_bound")
+    # Parse the hash-checked bytes, not a separately reopened/normalized stream.
+    rows = [_json(line) for line in raw.decode("utf-8").splitlines()]
+    if (not rows or not isinstance(rows[0], dict) or rows[0].get("type") != "session_meta"
+            or not isinstance(rows[0].get("payload"), dict)
+            or rows[0]["payload"].get("id") != session):
+        raise ValueError("native_session_identity_not_bound")
+    turn_line, task_line = None, None
+    for line, row in enumerate(rows, 1):
+        if not isinstance(row, dict):
+            raise ValueError("unknown_native_record_layout")
+        if row.get("type") == "turn_context":
+            if turn_line is not None and task_line is None:
+                raise ValueError("second_turn_before_initial_user")
+            if turn_line is None:
+                turn_line = line
+        elif row.get("type") == "response_item" and turn_line is not None:
+            payload = row.get("payload")
+            if not isinstance(payload, dict):
+                raise ValueError("unknown_native_response_layout")
+            user = payload.get("type") == "message" and payload.get("role") == "user"
+            if task_line is not None:
+                if user:
+                    raise ValueError("additional_native_user_message")
+                continue
+            content = payload.get("content")
+            if (not user or not isinstance(content, list) or len(content) != 1
+                    or not isinstance(content[0], dict) or content[0].get("type") != "input_text"
+                    or not isinstance(content[0].get("text"), str)):
+                raise ValueError("initial_turn_response_is_not_complete_user_task")
+            if content[0]["text"] != expected.decode("utf-8"):
+                raise ValueError("initial_native_user_task_differs")
+            task_line = line
+    if turn_line is None or task_line is None:
+        raise ValueError("initial_native_task_layout_missing")
+    return {"native_transcript_sha256": digest, "native_session_id": session,
+            "native_turn_context_line": turn_line, "native_task_line": task_line,
+            "native_task_pointer": "/payload/content/0/text",
+            "native_task_sha256": hashlib.sha256(expected).hexdigest()}
+
+
+def _prompt_binding(context, metric, directory, condition, task):
+    """Exact bytes, or the one proven Windows write_text LF->CRLF copy case."""
+    audit = {"schema": "migloop-transfer-prompt-binding/1", "bound": False,
+             "status": "unbound", "native_task_checked": False,
+             "expected_sha256": None, "actual_sha256": None}
+    try:
+        expected = (context["base"] / task["prompts"][condition]).read_bytes()
+        actual = (directory / "prompt.md").read_bytes()
+        audit.update(expected_sha256=hashlib.sha256(expected).hexdigest(),
+                     actual_sha256=hashlib.sha256(actual).hexdigest())
+        if actual == expected:
+            audit.update(bound=True, status="exact_bytes")
+            return audit
+        # Do not normalize mixed newlines, whitespace, BOM, text or final LF.
+        if b"\r" in expected or b"\n" not in expected or actual != expected.replace(b"\n", b"\r\n"):
+            audit["reason"] = "not_exact_bytes_or_pure_lf_to_crlf_copy"
+            return audit
+        audit["native_task_checked"] = True
+        audit.update(_native_initial_task(directory, metric, expected))
+        audit.update(bound=True, status="windows_crlf_copy_native_exact")
+    except (OSError, UnicodeError, ValueError, TypeError) as error:
+        audit["reason"] = type(error).__name__ + ": " + str(error)
+    return audit
+
+
 def _health(context, metric, directory, condition, task):
     if metric is None:
-        return "pending", []
+        return "pending", [], None
     status = metric.get("status")
     if status in ("starting", "running"):
-        return "pending", []
+        return "pending", [], None
     failures = []
     if status not in TERMINAL:
         failures.append("non_evaluable_status:" + str(status))
@@ -170,8 +250,8 @@ def _health(context, metric, directory, condition, task):
         failures.append("recording_or_instruction_audit_incomplete")
     if condition == "tools" and (metric.get("postprocess") or {}).get("status") != "completed":
         failures.append("postprocess_not_completed")
-    prompt = directory / "prompt.md"
-    if not prompt.exists() or sha(prompt) != sha(context["base"] / task["prompts"][condition]):
+    prompt_binding = _prompt_binding(context, metric, directory, condition, task)
+    if not prompt_binding["bound"]:
         failures.append("run_task_prompt_not_bound")
     audit_path = directory / "immutability.json"
     audit = read(audit_path) if audit_path.exists() else []
@@ -190,7 +270,7 @@ def _health(context, metric, directory, condition, task):
             if (first.get("type") == "session_meta"
                     and (first.get("payload") or {}).get("id") != metric["session_id"]):
                 failures.append("native_session_identity_differs")
-    return ("harness_failure" if failures else "evaluable"), failures
+    return ("harness_failure" if failures else "evaluable"), failures, prompt_binding
 
 
 def _pointer(value, pointer):
@@ -395,7 +475,7 @@ def _score(report, required, grade, context, cohort):
 def _validate(context, case, rep, grade, condition):
     task, directory, core = _case(context, case, rep, condition)
     metric, metric_sha = _metric(context, task, directory, condition)
-    health, _ = _health(context, metric, directory, condition, task)
+    health, _, prompt_binding = _health(context, metric, directory, condition, task)
     if health != "evaluable":
         raise ValueError("A grade cannot certify an unready or harness-failed run")
     report_path = directory / "report.md"
@@ -407,8 +487,14 @@ def _validate(context, case, rep, grade, condition):
     if any(type(grade.get(k)) is not type(v) or grade[k] != v for k, v in expected.items()):
         raise ValueError("Grade artifact/case/rep/condition/cohort/report/core binding differs")
     result = _score(report_path.read_text(encoding="utf-8"), core["required"][case], grade, context, task["cohort"])
+    result["prompt_binding"] = prompt_binding
     if sha(report_path) != expected["report_sha256"] or sha(directory / "metrics.json") != metric_sha:
         raise ValueError("Report/metrics changed during adjudication validation")
+    if sha(directory / "prompt.md") != prompt_binding["actual_sha256"]:
+        raise ValueError("Prompt copy changed during adjudication validation")
+    if (prompt_binding.get("native_transcript_sha256")
+            and sha(directory / "transcript.jsonl") != prompt_binding["native_transcript_sha256"]):
+        raise ValueError("Native prompt proof changed during adjudication validation")
     return result
 
 
@@ -564,7 +650,7 @@ def summarize(base, grades, *, condition, manifest_sha256=None):
         for rep in range(1, manifest["repetitions"] + 1):
             task, directory, core = _case(context, case["id"], rep, condition)
             metric, metric_sha = _metric(context, task, directory, condition)
-            state, failures = _health(context, metric, directory, condition, task)
+            state, failures, prompt_binding = _health(context, metric, directory, condition, task)
             report = directory / "report.md"
             present = report.exists() and bool(report.read_text(encoding="utf-8").strip())
             grade_path = grades / condition / task["id"] / f"rep{rep}.json"
@@ -585,6 +671,7 @@ def summarize(base, grades, *, condition, manifest_sha256=None):
             rows.append({"case": task["id"], "cohort": task["cohort"], "file": task["file"], "rep": rep,
                          "condition": condition, "run_status": (metric or {}).get("status", "not_started"),
                          "state": state, "harness_failures": failures, "grade": grade,
+                         "prompt_binding": prompt_binding,
                          "metrics_sha256": metric_sha, "report_sha256": sha(report) if report.exists() else None,
                          "grade_sha256": sha(grade_path) if grade_path.exists() else None,
                          "session_id": (metric or {}).get("session_id"),
@@ -626,6 +713,11 @@ def summarize(base, grades, *, condition, manifest_sha256=None):
         paths = [(directory / "metrics.json", row["metrics_sha256"]),
                  (directory / "report.md", row["report_sha256"]),
                  (grades / condition / row["case"] / f"rep{row['rep']}.json", row["grade_sha256"])]
+        prompt_binding = row.get("prompt_binding")
+        if prompt_binding and prompt_binding.get("actual_sha256"):
+            paths.append((directory / "prompt.md", prompt_binding["actual_sha256"]))
+        if prompt_binding and prompt_binding.get("native_transcript_sha256"):
+            paths.append((directory / "transcript.jsonl", prompt_binding["native_transcript_sha256"]))
         if row["mechanical"] is not None:
             paths.append((directory / "verdict.json", row["mechanical"]["verdict_sha256"]))
         if any((sha(path) if path.exists() else None) != digest for path, digest in paths):

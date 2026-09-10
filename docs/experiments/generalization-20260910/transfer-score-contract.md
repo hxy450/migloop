@@ -24,7 +24,21 @@
 
 `claims_review_complete:true` 是**审阅者声明**已覆盖全文实质主张，不是程序证明没有遗漏。major 必须为实际 contradicted/unsupported 断言，并有逐字报告片段及原始 source/line 对象；遗漏、合理未知、格式错误不自动变 major。语义支持和 major 实质性仍需独立原文审阅，不能靠验证器自行决定。
 
-Grade 同时核最终 report SHA、metrics SHA、case/rep/condition/cohort/core/manifest；run 的 `prompt.md` 必须与冻结的该 case/arm 任务字节相同。旧记录若有 transcript SHA/session id，则核原生副本与 session_meta；整 arm 已记录的 session/hash 不得跨 run 重用。缺失这些历史可选字段不会被补造为新必填值。
+Grade 同时核最终 report SHA、metrics SHA、case/rep/condition/cohort/core/manifest；run 的 `prompt.md` 原则上须与冻结的该 case/arm 任务字节相同，只有下面实证的 Windows 落盘副本例外。旧记录若有 transcript SHA/session id，则核原生副本与 session_meta；整 arm 已记录的 session/hash 不得跨 run 重用。缺失这些历史可选字段不会被补造为新必填值。
+
+### 实际提示词与 Windows 落盘副本（首轮运行中发现并修正）
+
+`raw.launch` 将冻结的 LF 字符串原样编码送入 stdin，但 `Path.write_text` 在 Windows 把单独保存的 `prompt.md` 改成 CRLF。DYNAMIC1-05/rep1 首次实际验证因此被旧评分器（SHA `b0645dadc7b61ed0486fe3e982880792bb20eb4e61739c542a29f5b247a88f3e`）拒绝。这是记录副本的字节差异，不能不经核验就忽略，也不是模型归因错误。
+
+该跑冻结任务为2070字节、SHA `1136312424772a5c4553bc529965a396f17b1d61074b906d2ee7c540a587313f`；磁盘副本2084字节、SHA `08a4296c4fd4077f05c4b8dfa8e171db2eeeeb76d93fdc3c6a8e8fb66bf28c02`，恰好14个LF变为CRLF。已与metrics绑定的原生转录L7，是首个turn_context后的首个response_item/user，其单个input_text全文与冻结LF任务逐字相等；L4环境消息不当任务。完整转录SHA和session_meta身份同时核回。
+
+新增 `prompt_binding` 状态为：
+
+- `exact_bytes`：保留原字节合同，不为旧记录偷偷增加原生消息布局要求；明确 `native_task_checked:false`。
+- `windows_crlf_copy_native_exact`：仅当期望文本纯LF、磁盘副本恰为LF→CRLF确定变换，且哈希/会话绑定的首turn首响应为完整单块用户任务并逐字相等时接受。第二turn、后续用户消息、工具结果或引用文字不能补救；出现额外用户消息也拒绝该例外。
+- `unbound`：其它文字、空白、BOM、混合换行、末尾换行变化、身份缺失、截断或未知原生布局均拒绝，不作通用归一化。
+
+验证返回及summary逐run均保留实际/期望SHA、原生任务物理行和JSON pointer；结束时复核副本及原生证明没有漂移。首次失败与修复后真实通过保存在本地 `generalization-20260910/prompt-transport-audit-v1/{before,after}-fix-DYNAMIC1-05-rep1.json`。没有改runner、题目、模型、预算、原始实验文件、参考或grade；D05语义分仍为1C、事实4/5、major0。修复后评分器SHA为`633ec783d652530acf359209f7751078329d0524dde03f9750e90ada2990f610`。作者98项合成测试通过；root独立30项prompt测试通过。它们不认证恶意记录器或OS级隔离。
 
 ## 原文定位机检的限度
 

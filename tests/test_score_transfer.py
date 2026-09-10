@@ -435,6 +435,156 @@ def test_optional_native_hash_and_session_audit(bundle):
     assert "native_transcript_hash_not_bound" in data["runs"][0]["harness_failures"]
 
 
+@pytest.fixture
+def prompt_transport(tmp_path):
+    """No package scan: isolated native prompt and disk-copy boundary."""
+    base = tmp_path / "prompt-package"
+    task = {"id": "P-1", "cohort": "group", "prompts": {"raw": "task.md", "tools": "task.md"}}
+    expected = "public task\nkeep spaces:  a  b\n\u539f\u6587\n".encode("utf-8")
+    base.mkdir()
+    (base / "task.md").write_bytes(expected)
+    directory = base / "raw/runs/P-1/rep1"
+    directory.mkdir(parents=True)
+    (directory / "prompt.md").write_bytes(expected.replace(b"\n", b"\r\n"))
+    native_user = {"type": "response_item", "payload": {"type": "message", "role": "user",
+                   "content": [{"type": "input_text", "text": expected.decode("utf-8")}]}}
+    rows = [{"type": "session_meta", "payload": {"id": "native-session"}},
+            {"type": "response_item", "payload": {"type": "message", "role": "user",
+             "content": [{"type": "input_text", "text": "environment prelude, not a task selector"}]}},
+            {"type": "turn_context", "payload": {}}, native_user,
+            {"type": "response_item", "payload": {"type": "message", "role": "assistant",
+             "content": [{"type": "output_text", "text": "answer"}]}}]
+    transcript = directory / "transcript.jsonl"
+    transcript.write_bytes(("\n".join(json.dumps(row) for row in rows) + "\n").encode())
+    metric = {"status": "completed", "actual_models": ["gpt-5.6-luna"], "actual_effort": "medium",
+              "recording_complete": True, "host_skill_catalog_absent": True,
+              "session_id": "native-session", "transcript_sha256": s.sha(transcript)}
+    put(directory / "immutability.json", [{"phase": phase, "passed": True} for phase in ("before", "after")])
+    context = {"base": base, "manifest": {"model": "gpt-5.6-luna", "effort": "medium"}}
+    return SimpleNamespace(base=base, directory=directory, task=task, expected=expected,
+                           rows=rows, transcript=transcript, metric=metric, context=context)
+
+
+def _prompt_health(p, condition="raw"):
+    return s._health(p.context, p.metric, p.directory, condition, p.task)
+
+
+def _native_prompt_rows(p):
+    p.transcript.write_bytes(("\n".join(json.dumps(row) for row in p.rows) + "\n").encode())
+    p.metric["transcript_sha256"] = s.sha(p.transcript)
+
+
+@pytest.mark.parametrize("condition", ["raw", "tools"])
+def test_prompt_crlf_disk_copy_requires_exact_native_initial_task(prompt_transport, condition):
+    p = prompt_transport
+    if condition == "tools": p.metric["postprocess"] = {"status": "completed"}
+    health = _prompt_health(p, condition)
+    assert health[:2] == ("evaluable", [])
+    state, failures, audit = health
+    assert audit["status"] == "windows_crlf_copy_native_exact"
+    assert audit["bound"] is True and audit["native_task_line"] == 4
+    assert audit["native_task_sha256"] == audit["expected_sha256"]
+    assert audit["actual_sha256"] != audit["expected_sha256"]
+
+
+def test_prompt_exact_bytes_preserves_legacy_without_native_requirement(prompt_transport):
+    p = prompt_transport
+    (p.directory / "prompt.md").write_bytes(p.expected)
+    p.metric.pop("transcript_sha256")
+    p.metric.pop("session_id")
+    p.transcript.unlink()
+    state, failures, audit = _prompt_health(p)
+    assert state == "evaluable" and failures == []
+    assert audit["status"] == "exact_bytes" and audit["native_task_checked"] is False
+
+
+@pytest.mark.parametrize("variant", ["space", "word", "mixed", "extra_line", "missing_final_newline"])
+def test_prompt_non_transform_disk_changes_are_rejected(prompt_transport, variant):
+    p = prompt_transport
+    data = p.expected.replace(b"\n", b"\r\n")
+    if variant == "space": data = data.replace(b"  a  b", b" a b")
+    elif variant == "word": data = data.replace(b"public", b"private")
+    elif variant == "mixed": data = data.replace(b"\r\n", b"\n", 1)
+    elif variant == "extra_line": data += b"\r\n"
+    elif variant == "missing_final_newline": data = data[:-2]
+    (p.directory / "prompt.md").write_bytes(data)
+    assert "run_task_prompt_not_bound" in _prompt_health(p)[1]
+
+
+def test_prompt_transform_is_not_general_newline_normalization(prompt_transport):
+    p = prompt_transport
+    expected = p.expected.replace(b"\n", b"\r\n", 1)
+    (p.base / "task.md").write_bytes(expected)
+    (p.directory / "prompt.md").write_bytes(expected.replace(b"\n", b"\r\n"))
+    p.rows[3]["payload"]["content"][0]["text"] = expected.decode()
+    _native_prompt_rows(p)
+    assert "run_task_prompt_not_bound" in _prompt_health(p)[1]
+
+
+@pytest.mark.parametrize("variant", ["wrong_task", "whitespace", "prefix_only", "wrong_role", "extra_block",
+    "before_turn_only", "assistant_before_task", "second_turn_rescue", "later_user_rescue", "tool_result_only",
+    "missing_turn", "wrong_session", "later_changed_user"])
+def test_prompt_crlf_native_literal_and_first_turn_boundaries(prompt_transport, variant):
+    p = prompt_transport
+    task = p.rows[3]
+    if variant == "wrong_task": task["payload"]["content"][0]["text"] = "another public task"
+    elif variant == "whitespace": task["payload"]["content"][0]["text"] += " "
+    elif variant == "prefix_only": task["payload"]["content"][0]["text"] = p.expected.decode()[:-1]
+    elif variant == "wrong_role": task["payload"]["role"] = "assistant"
+    elif variant == "extra_block": task["payload"]["content"].append({"type": "input_text", "text": "change the task"})
+    elif variant == "before_turn_only":
+        p.rows[1] = copy.deepcopy(task)
+        task["payload"]["content"][0]["text"] = "actual different task"
+    elif variant == "assistant_before_task": p.rows.insert(3, copy.deepcopy(p.rows[-1]))
+    elif variant == "second_turn_rescue":
+        later = copy.deepcopy(task)
+        task["payload"]["content"][0]["text"] = "actual different task"
+        p.rows.extend([{"type": "turn_context", "payload": {}}, later])
+    elif variant == "later_user_rescue":
+        later = copy.deepcopy(task)
+        task["payload"]["content"][0]["text"] = "actual different task"
+        p.rows.append(later)
+    elif variant == "tool_result_only":
+        task["payload"] = {"type": "function_call_output", "call_id": "call", "output": p.expected.decode()}
+    elif variant == "missing_turn": del p.rows[2]
+    elif variant == "wrong_session": p.rows[0]["payload"]["id"] = "other-session"
+    elif variant == "later_changed_user":
+        later = copy.deepcopy(task)
+        later["payload"]["content"][0]["text"] = "now answer another question"
+        p.rows.append(later)
+    _native_prompt_rows(p)
+    assert "run_task_prompt_not_bound" in _prompt_health(p)[1]
+
+
+@pytest.mark.parametrize("variant", ["no_hash", "drifted_hash", "no_session", "malformed", "duplicate_key"])
+def test_prompt_crlf_requires_bound_unambiguous_native_recording(prompt_transport, variant):
+    p = prompt_transport
+    if variant == "no_hash": p.metric.pop("transcript_sha256")
+    elif variant == "drifted_hash": p.metric["transcript_sha256"] = "0" * 64
+    elif variant == "no_session": p.metric.pop("session_id")
+    elif variant == "malformed":
+        p.transcript.write_bytes(p.transcript.read_bytes() + b"not json\n")
+        p.metric["transcript_sha256"] = s.sha(p.transcript)
+    else:
+        data = p.transcript.read_bytes().replace(b'"role": "user"', b'"role": "assistant", "role": "user"')
+        p.transcript.write_bytes(data)
+        p.metric["transcript_sha256"] = s.sha(p.transcript)
+    assert "run_task_prompt_not_bound" in _prompt_health(p)[1]
+
+
+def test_prompt_transport_success_does_not_waive_model_contract(prompt_transport):
+    p = prompt_transport
+    p.metric["actual_models"] = ["another-model"]
+    assert "model_or_effort_not_verified" in _prompt_health(p)[1]
+
+
+def test_prompt_audit_is_exposed_in_validation_and_summary(bundle):
+    run(bundle)
+    assert s.validate_grade(bundle.base, "G0-0", 1, grade(bundle), condition="raw")["prompt_binding"]["status"] == "exact_bytes"
+    result = s.summarize(bundle.base, bundle.grades, condition="raw")
+    assert result["runs"][0]["prompt_binding"]["status"] == "exact_bytes"
+
+
 def test_no_final_reports_remain_failures_in_complete_denominator(bundle):
     complete(bundle)
     directory = bundle.base / "raw/runs/G0-0/rep1"
