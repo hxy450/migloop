@@ -249,7 +249,7 @@ def query(ledger, tool, supplied):
     if details and tool not in ("file", "agent", "search"):
         data = {**data, "details": True,
                 "details_effect": "此查询没有折叠的关系注释；正文及分页不因details改变，原始记录用expand展开。"}
-    if tool == "file":
+    if tool == "file" and data.get("schema") != "migloop-time-atom/1":
         from . import body_sources
         data = {**data, "body_sources": body_sources.navigation(ledger, current["key"], current["at"],
             current["since_ts"], show=args.get("offset", 0) == 0)}
@@ -275,6 +275,9 @@ def _delivery(data):
         for name in ("unclassified_related", "undated", "unknown_records", "native_io"):
             if isinstance(value.get(name), dict):
                 visit(value[name])
+        if value.get("schema") == "migloop-time-atom/1":
+            for section in value.get("sections", {}).values():
+                visit(section)
     visit(data)
     return {"records": records, "scope": data.get("scope"), "data_schema": data.get("schema"),
             "semantic_checked": False, "navigation_is_relation": False}

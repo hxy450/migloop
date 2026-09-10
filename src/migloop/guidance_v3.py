@@ -6,7 +6,9 @@ CORE = """\
 
 优先用 batch(sid,requests=[{tool,args,scope?}])。可同时打开多个file/agent、检索多词、展开多个原文；不填写via，不必按图走，不为画图补调用。
 每项tool可为file/agent/search/diff/blame/changes/events/record/expand。
-- file args={path,at,since_ts?,offset?,limit?}；agent用id代path。at为含时区ISO或latest；latest返回时固定成实际已知截止。
+- file args={path,at,since_ts?,view?,offset?,limit?}；agent用id代path。at为含时区ISO或latest；latest返回时固定成实际已知截止。
+  默认overview先给已索引读写、候选与原生正文入口；agent同时给有时间的任务/消息。每组独立计数和续读，不是原始记录前缀。
+  view=writes/reads/candidates（agent另有messages）分页该组；view=records分页完整原始记录层。视图是导航，不改变search的完整范围。
 - search args={q,at,file?或agent?,since_ts?,offset?,limit?}；全池省略file/agent。q_any=[词1,词2]是字面量OR，与q互斥，不是正则。
 - changes args={path,at,since_ts}列已确认操作/未决效应；diff同样时间范围看内容变化。写入可能无净变化，修改不必然是缺陷。
 - events同样范围，索引所有已注册源的原生调用，不依赖读写解析；普通消息/未知记录也留入口。路径提及不是作者证据。
@@ -20,7 +22,8 @@ CORE = """\
 修复起点since_ts只定义待解释修改；调查生成输入必须另开更早范围。读结果在调用后返回，不能算发起时已知。
 agent展示已保存转录，不证明所有文字当时仍在上下文或被采纳；file是证据历史，不是假定的完整磁盘快照。
 分页/折叠仅控制交付，search查完整范围；留意next_offset、error/deferred、未分类和未知时间。零命中不证明不存在。
-file/agent/search关系注释默认摘要；omitted计数可用同查询details=true（配较小limit）展开；原文无需先开完整注释。
+原始记录层和search的关系注释默认摘要；省略计数和next_query可展开，details=true也受交付预算限制；原文无需先开完整注释。
+概览中的请求正文入口不等于当前文件内容；已索引写入不等于已证缺陷。unknown状态不表示原文没有历史Write，优先核原生正文入口。
 摘要、历史报告、实际操作回执、构建成功、特定产物行为验证分开看；别把worker报告扩大成全阶段事实。
 
 先自由调查，再组织论证。系统记录实际调用及交付，不需要你回忆路线；搜索跳转不构成历史读写边。

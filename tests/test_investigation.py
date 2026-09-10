@@ -187,7 +187,7 @@ def test_batch_delivers_prefixes_fairly_and_receipt_mentions_only_delivered_rows
     from tests.test_temporal import source
     path = source(tmp_path, [{"timestamp": ts(i), "text": "payload " + "x" * 600} for i in range(30)])
     ledger = atoms.build_ledger({"a": atoms.AgentRec("a", "s", sources=[path])})
-    requests = [{"tool": "agent", "args": {"id": "a", "at": ts(29)}} for _ in range(2)]
+    requests = [{"tool": "agent", "args": {"id": "a", "at": ts(29), "view": "records"}} for _ in range(2)]
     data = investigation.batch(ledger, requests, max_chars=12000)
     assert data["data_chars"] <= 12000
     for item in data["items"]:

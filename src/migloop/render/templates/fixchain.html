@@ -616,24 +616,15 @@
         fetch(url, { credentials: "include" }).then(function (r) { return r.json(); })
           .then(function (data) { cb(data, data.error); }).catch(function (error) { cb(null, String(error)); });
       }
-      function openRecord(row, target, cutoff, undated) {
-        target.textContent = "原文加载中…";
-        function page(offset) {
-          fetchJSON("record", {ref: row.ref, at: cutoff, offset: offset, max_chars: 12000, include_undated: undated ? "true" : "false"}, function (data, error) {
-            if (error) { target.textContent = error; return; }
-            if (!offset) target.textContent = "";
-            target.appendChild(el("pre", "diffblock", data.text));
-            if (data.next_offset != null) {
-              var more = el("button", null, "继续展开 · 共 " + data.chars + " 字");
-              more.onclick = function () { more.remove(); page(data.next_offset); }; target.appendChild(more);
-            }
-          });
-        }
-        page(0);
+      function openRecord(row, target, scope, undated) {
+        if (!scope || !scope.at) { target.textContent = "未返回明确时间范围，不能自动改用 latest 展开。"; return; }
+        independentlyQuery([argumentRequest("record", {ref: row.ref, offset: 0, max_chars: 12000,
+          include_undated: !!undated}, scope)], target);
       }
       function load(offset, includeUndated) {
         var ticket = ++request, tool = q.value || presetTerms && presetTerms.length ? "search" : kind;
         var args = {at: at.value || "latest", offset: offset || 0, limit: 30, include_undated: !!includeUndated};
+        if (tool === "file" || tool === "agent") args.view = "records";
         args[tool === "search" ? kind : kind === "file" ? "path" : "id"] = key;
         if (since.value) args.since_ts = since.value;
         if (q.value) args.q = q.value;
@@ -651,7 +642,10 @@
             var item = el("details", "time-record"), head = el("summary", null, (row.ts || "时间未知·不计入截止前") + " · " + row.kind + " · " + row.source + ":" + row.line);
             item.appendChild(head); item.appendChild(el("div", "kv", row.preview));
             var raw = el("div"), button = el("button", null, "展开原始记录");
-            button.onclick = function () { button.disabled = true; openRecord(row, raw, data.node.at, !row.ts); };
+            button.onclick = function () {
+              button.disabled = true;
+              openRecord(row, raw, explicitScope(data.scope || Object.assign({since_ts: args.since_ts || null}, data.node)), !row.ts);
+            };
             item.appendChild(button); item.appendChild(raw);
             (row.annotations || []).forEach(function (a) {
               var tags = el("details"), tagHead = el("summary", null, a.tool + " · " + a.state + " · 解析关系（不是归因）");
@@ -1506,6 +1500,93 @@
       if (selected) request.scope = selected;
       return request;
     }
+    function timeAtomRequest(query, fallbackScope) {
+      if (!query || typeof query !== "object" || Array.isArray(query)
+          || ["file", "agent", "search", "record", "expand", "diff", "blame", "changes", "events"].indexOf(query.tool) < 0
+          || !query.args || typeof query.args !== "object" || Array.isArray(query.args)) return null;
+      var declared = query.scope, args = query.args;
+      // Entity navigation can deliberately leave the current entity/window.
+      // Only use an explicit returned target and both returned time bounds;
+      // never reinterpret an agent scope as a file scope or fill in latest.
+      if (!declared && ["file", "agent"].indexOf(query.tool) >= 0 && args.at
+          && Object.prototype.hasOwnProperty.call(args, "since_ts") && args[query.tool === "file" ? "path" : "id"]) {
+        declared = {kind: query.tool, key: args[query.tool === "file" ? "path" : "id"],
+          at: args.at, since_ts: args.since_ts};
+      }
+      var scope = explicitScope(declared || fallbackScope);
+      if (!scope || ["file", "agent", "pool"].indexOf(scope.kind) < 0 || !scope.at || scope.at === "latest"
+          || (scope.kind !== "pool" && !scope.key)) return null;
+      return argumentRequest(query.tool, query.args, scope);
+    }
+    function timeAtomQueryButton(host, label, query, scope, cls) {
+      var request = timeAtomRequest(query, scope);
+      if (!request) return false; // No inferred tool, entity, cutoff, or cursor.
+      var button = el("button", cls || "time-atom-query", label), target = el("div");
+      button.onclick = function () { button.disabled = true; independentlyQuery([request], target); };
+      host.appendChild(button); host.appendChild(target); return true;
+    }
+    function renderTimeAtomNavigation(host, label, value, scope) {
+      if (!value || typeof value !== "object") return;
+      var box = el("details", "time-atom-navigation");
+      box.appendChild(el("summary", null, label));
+      box.appendChild(el("div", "pnote", "仅原文导航；点击才独立查询，不认证历史读写或内容已被读取。"));
+      argumentDetails(box, "返回的导航元数据", value);
+      timeAtomQueryButton(box, "独立打开此范围", value.query, scope);
+      timeAtomQueryButton(box, "此范围下一页", value.next_query, scope, "time-atom-next");
+      (Array.isArray(value.entries) ? value.entries : []).forEach(function (entry) {
+        var row = el("div", "time-atom-source");
+        row.appendChild(el("span", "mono", (entry.ref || entry.source || "未定位") + (entry.pointer == null ? "" : " " + entry.pointer)));
+        timeAtomQueryButton(row, "独立展开此原文入口", entry.query, scope);
+        box.appendChild(row);
+      });
+      host.appendChild(box);
+    }
+    function renderTimeAtom(host, data, fallbackScope) {
+      if (!data || data.schema !== "migloop-time-atom/1") return false;
+      var scope = explicitScope(data.scope || fallbackScope), box = el("div", "time-atom-overview");
+      box.appendChild(el("div", "pnote", "时间原子总览：操作、候选与消息分别披露；原文入口不是正文交付，也不证明问题传播。"));
+      argumentDetails(box, "完整返回字段（含缺口与未知）", data);
+      var sections = data.sections;
+      if (sections && typeof sections === "object" && !Array.isArray(sections)) {
+        var names = {writes: "写入操作", reads: "读取操作", candidates: "候选（未认证为读写）", messages: "消息 / 输入"};
+        Object.keys(sections).forEach(function (name) {
+          var page = sections[name];
+          if (!page || typeof page !== "object") return;
+          var section = el("details", "time-atom-section"); section.dataset.section = name; section.open = true;
+          section.appendChild(el("summary", null, (names[name] || name) + " · total=" + (page.total == null ? "未知" : page.total)
+            + " · 本页 " + (Array.isArray(page.rows) ? page.rows.length : "未知")));
+          argumentDetails(section, "分区范围 / 分页 / 原文字段", page);
+          (Array.isArray(page.rows) ? page.rows : []).forEach(function (row) {
+            var item = el("details", "time-atom-row");
+            item.appendChild(el("summary", null, ((row.operation || {}).path || row.path || row.agent || row.id || row.kind || "记录")
+              + " · " + ((row.operation || {}).status || row.status || row.state || "未认证状态")));
+            if (typeof row.preview === "string") item.appendChild(el("div", "time-atom-preview", row.preview));
+            argumentDetails(item, "返回的操作 / 候选 / 消息字段", row);
+            timeAtomQueryButton(item, "独立查看此项", row.query, scope);
+            timeAtomQueryButton(item, "独立展开原文（保持所列范围）", row.expand_query, scope);
+            timeAtomQueryButton(item, "独立查看 agent（按返回的另选范围）", row.agent_query, scope);
+            timeAtomQueryButton(item, "独立查看文件（按返回的另选范围）", row.file_query, scope);
+            section.appendChild(item);
+          });
+          timeAtomQueryButton(section, "独立打开此分区", page.query, scope);
+          timeAtomQueryButton(section, "此分区下一页（保留范围）", page.next_query, scope, "time-atom-next");
+          box.appendChild(section);
+        });
+      }
+      renderTimeAtomNavigation(box, "原始记录全集（另查，不受总览分区省略影响）", data.raw_index, scope);
+      renderTimeAtomNavigation(box, "历史正文入口（不代表当前状态）", data.body_sources, scope);
+      timeAtomQueryButton(box, "独立查看原生事件索引", data.events_query, scope);
+      host.appendChild(box); return true;
+    }
+    function recordedTimeRequest(tool, args, scope, delivery, authenticated) {
+      if (args != null && (typeof args !== "object" || Array.isArray(args))) return null;
+      var clean = Object.assign({}, args || {});
+      // An authenticated old time-view receipt identifies the selected data.
+      // Missing schema is not permission to invent a historical view choice.
+      if (authenticated && delivery && delivery.data_schema === "migloop-time-view/1"
+          && ["file", "agent"].indexOf(tool) >= 0 && clean.view == null) clean.view = "records";
+      return argumentRequest(tool, clean, scope);
+    }
     function independentlyQuery(requests, host, budget) {
       host.textContent = "独立重查中…（不是原次交付）";
       var payload = {requests: requests.map(function (r) { return argumentRequest(r.tool, r.args, r.scope); })};
@@ -1519,12 +1600,17 @@
         data.items.forEach(function (item, index) {
           var box = el("details", "query-recheck-result"); box.open = true;
           box.appendChild(el("summary", null, "item " + (item.item_index == null ? index : item.item_index) + " · " + item.tool + " · " + item.status));
-          box.appendChild(el("pre", "argument-json", argumentText(item.data == null ? item : item.data)));
           var request = requests[index], result = item.data || {};
+          var timeAtom = renderTimeAtom(box, result, item.scope || (request && request.scope));
+          if (!timeAtom) box.appendChild(el("pre", "argument-json", argumentText(item.data == null ? item : item.data)));
           if ((Array.isArray(result.rows) ? result.rows : []).some(function (r) { return r.status === "observed_change"; })) {
             box.appendChild(el("div", "pnote observation-time-note", "observed_at 仅为观察时刻；不等于修改时刻。use_ts、done_ts 或 change_time 未确定时保持未知，也不据此认定唯一作者。"));
           }
-          if (item.status === "ok" && request && result.next_offset != null) {
+          (Array.isArray(item.continuations) ? item.continuations : []).forEach(function (continuation) {
+            timeAtomQueryButton(box, "继续查询未交付的范围", continuation.next_query,
+              continuation.scope || item.scope || (request && request.scope), "time-atom-next");
+          });
+          if (!timeAtom && item.status === "ok" && request && result.next_offset != null) {
             var more = el("button", "query-next", "继续展开（保留原范围）"), target = el("div");
             more.onclick = function () {
               more.disabled = true;
@@ -1753,8 +1839,9 @@
         host.appendChild(box); return;
       }
       box.appendChild(el("div", "argument-note", "保留实际调用与批内 item；交付材料不要求额外 file/agent 调用。返回定位不证明模型采用或归因成立。"));
-      function row(step, parentStep) {
+      function row(step, parentStep, parentAuthenticated) {
         var item = el("details", "query-item"), tool = step.tool || "未知", number = step.step == null ? parentStep : step.step;
+        var authenticated = step.status === "recorded_response" || (parentAuthenticated === true && step.status === "ok");
         item.dataset.tool = tool; item.dataset.step = number == null ? "" : number;
         if (step.item_index != null) item.dataset.itemIndex = step.item_index;
         item.appendChild(el("summary", null, "#" + (number == null ? "?" : number) + (step.item_index == null ? "" : " / item " + step.item_index) + " " + tool + " · " + (step.status || "状态未记录")));
@@ -1766,16 +1853,25 @@
         if (tool === "batch") {
           var requests = (step.args || {}).requests;
           if (typeof requests === "string") { try { requests = JSON.parse(requests); } catch (_e) { requests = null; } }
-          if (Array.isArray(requests)) requestList = requests;
+          if (Array.isArray(requests) && requests.every(function (request) {
+            return request && typeof request === "object" && !Array.isArray(request)
+              && (!Object.prototype.hasOwnProperty.call(request, "args")
+                || request.args && typeof request.args === "object" && !Array.isArray(request.args));
+          })) requestList = requests.map(function (request, index) {
+            var child = (step.items || []).find(function (entry) { return entry.item_index === index; }) || {};
+            return recordedTimeRequest(request.tool, request.args || {}, child.scope || request.scope, child.delivery,
+              authenticated && child.status === "ok");
+          });
         } else if (["file", "agent", "search", "diff", "record", "expand", "blame", "changes", "events"].indexOf(tool) >= 0) {
-          requestList = [argumentRequest(tool, step.args || step.request || {}, step.scope)];
+          var replay = recordedTimeRequest(tool, step.args || step.request || {}, step.scope, step.delivery, authenticated);
+          if (replay) requestList = [replay];
         }
         if (requestList) {
-          var button = el("button", "query-recheck", "按原工具 / 参数独立重查"), target = el("div");
+          var button = el("button", "query-recheck", "按原工具 / 参数独立重查（当前实现，不保证原次交付相同）"), target = el("div");
           button.onclick = function () { button.disabled = true; independentlyQuery(requestList, target, tool === "batch" ? (step.args || {}).max_chars : null); };
           item.appendChild(button); item.appendChild(target);
         }
-        (step.items || []).forEach(function (child) { item.appendChild(row(child, number)); });
+        (step.items || []).forEach(function (child) { item.appendChild(row(child, number, authenticated)); });
         return item;
       }
       (trace.steps || []).forEach(function (step) { box.appendChild(row(step)); }); host.appendChild(box);

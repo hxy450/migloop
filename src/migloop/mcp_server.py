@@ -91,16 +91,20 @@ def build_server(backend: Any | None = None) -> Any:
                    at: str | None = None, since_ts: str | None = None, offset: int = 0, limit: int = 40,
                    include_undated: bool = False, details: bool = False,
                    annotation_offset: int = 0, annotation_limit: int | None = None,
-                   relation_offset: int = 0, relation_limit: int | None = None) -> str:
-        """默认按时间打开文件证据历史：at=带时区ISO/latest，since_ts 可缩窗口，offset/limit 分页；不需要 via。
-        包含确定/候选操作和词法记录；不是精确磁盘快照。record 展开原文，search(file=...,at=...) 查完整同范围。
+                   relation_offset: int = 0, relation_limit: int | None = None, view: str | None = None) -> str:
+        """默认按时间打开文件读写概览：at=带时区ISO/latest，since_ts 可缩窗口，不需要 via。
+        view=overview 先列已索引读写、候选和原生正文入口；view=writes/reads/candidates 分页该组。
+        view=records 分页全部相关原始记录；offset/limit 属于所选视图，search(file=...,at=...) 始终搜完整同范围。
+        概览不是精确磁盘快照，导航不是历史边。record/expand 展开原文。
         兼容旧版：显式 v 改用 file@v，旧 v/via 规则仍适用，不可混用 at。
         content=True+start/n 展开复原行；diff=True 看该版，v_from/v_to 展开锚点内区间(每页40版)。
         readers 展开读者；词法候选默认只计数，m_n=40/m_from 翻页、m_all 铺只读提及，均非确定读写。"""
         ledger, cwd = await _ctx(sid)
         from . import atom_queries
         disclosure = {"annotation_offset": annotation_offset, "annotation_limit": annotation_limit,
-                      "relation_offset": relation_offset, "relation_limit": relation_limit}
+                      "relation_offset": relation_offset, "relation_limit": relation_limit, "view": view}
+        if v is not None and at is None and view is not None:
+            return "⛔ view 仅用于at时间查询。"
         if v is not None and at is None and (annotation_offset != 0 or relation_offset != 0
                                              or annotation_limit is not None or relation_limit is not None):
             return "⛔ 注释分页仅用于at时间查询。"
@@ -132,9 +136,10 @@ def build_server(backend: Any | None = None) -> Any:
                     summary_chars: int = 96, at: str | None = None, since_ts: str | None = None,
                     offset: int = 0, limit: int = 40, include_undated: bool = False, details: bool = False,
                     annotation_offset: int = 0, annotation_limit: int | None = None,
-                    relation_offset: int = 0, relation_limit: int | None = None) -> str:
-        """默认打开 agent 截至 at 的所有已保存原始记录索引；at 省略=latest，不需 via。解析失败/未知工具也可查。
-        limit/offset 只控制展示，不限制 search(agent=...,at=...) 搜索范围；record 展开原文。
+                    relation_offset: int = 0, relation_limit: int | None = None, view: str | None = None) -> str:
+        """默认打开 agent 截至 at 的输入、产出、任务及候选概览；at 省略=latest，不需 via。
+        view=reads/writes/messages/candidates 分页所选组；view=records 分页全部原始记录，未知工具也保留。
+        limit/offset 只控制所选视图，不限制 search(agent=...,at=...) 搜索范围；record/expand 展开原文。
         请求早于 at、返回晚于 at，只给请求不泄漏返回。未知时间单列（include_undated），不算已知输入。
         兼容旧版：显式 v 改用 agent@v（旧 v/via 规则），不可混用 at。
         since 只看(since,v]，主会话宜缩窗口；早期输入索引可另开，不能据窗口断言没读。
@@ -144,7 +149,9 @@ def build_server(backend: Any | None = None) -> Any:
         ledger, cwd = await _ctx(sid)
         from . import atom_queries
         disclosure = {"annotation_offset": annotation_offset, "annotation_limit": annotation_limit,
-                      "relation_offset": relation_offset, "relation_limit": relation_limit}
+                      "relation_offset": relation_offset, "relation_limit": relation_limit, "view": view}
+        if v is not None and at is None and view is not None:
+            return "⛔ view 仅用于at时间查询。"
         if v is not None and at is None and (annotation_offset != 0 or relation_offset != 0
                                              or annotation_limit is not None or relation_limit is not None):
             return "⛔ 注释分页仅用于at时间查询。"

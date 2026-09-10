@@ -13,7 +13,7 @@ from copy import deepcopy
 from typing import Any
 
 PAGE_SCHEMAS = {"migloop-time-view/1", "migloop-time-changes/1", "migloop-time-state/1",
-                "migloop-raw-event-query/1"}
+                "migloop-raw-event-query/1", "migloop-time-atom/1"}
 RECORD_SCHEMAS = {"migloop-raw-record/1", "migloop-raw-field/1"}
 EXPANSION_SCHEMA = "migloop-evidence-expansion/1"
 
@@ -29,7 +29,12 @@ def _integer(value: Any) -> bool:
 
 def _pages(data: dict) -> list[tuple[str, dict, str]]:
     main = ("source_rows" if data.get("view") == "sources" else "events") if data.get("schema") == "migloop-raw-event-query/1" else "rows"
-    result = [(main, data, main)]
+    if data.get("schema") == "migloop-time-atom/1":
+        if not isinstance(data.get("sections"), dict):
+            raise ValueError("atom sections must be a mapping")
+        result = [("sections." + name + ".rows", page, "rows") for name, page in data["sections"].items()]
+    else:
+        result = [(main, data, main)]
     for name in ("undated", "unknown_records"):
         if name in data:
             result.append((name + ".rows", data[name], "rows"))
@@ -116,6 +121,8 @@ def _row_prefix(row: dict, field: str, count: int) -> dict:
         out["delivered_diff_chars"] = count
     else:
         out["preview_budget_truncated"] = count < len(row[field])
+        if isinstance(out.get("preview_span"), dict):
+            out["preview_span"]["chars"] = len(out[field])
     return out
 
 
@@ -138,11 +145,17 @@ def _page_fit(data: dict, budget: int) -> dict | None:
     output_pages = _pages(output)
     for (name, page, key), (_, original, _) in zip(output_pages, original_pages):
         _set_page(page, key, [], original, name)
-    # Small body navigation is not the body itself. Fold its entries before
-    # allowing navigation metadata to displace an actual evidence row.
+    # Raw-record views prioritize their selected evidence prefix. Atom views
+    # instead prioritize historical body navigation over unrelated raw mentions.
+    # Neither kind of locator certifies that its target body was delivered.
     navigation = output.get("body_sources")
     if isinstance(navigation, dict) and isinstance(navigation.get("entries"), list) and isinstance(navigation.get("query"), dict):
-        navigation.update(entries=[], remaining=navigation["total"], budget_folded=True)
+        if data.get("schema") != "migloop-time-atom/1":
+            navigation.update(entries=[], remaining=navigation["total"], budget_folded=True)
+        else:
+            while navigation["entries"] and size(output) > budget:
+                navigation["entries"].pop()
+                navigation.update(remaining=navigation["total"] - len(navigation["entries"]), budget_folded=True)
     _receipt(output)
     if size(output) > budget:
         return None
@@ -174,7 +187,7 @@ def _page_fit(data: dict, budget: int) -> dict | None:
             if size(candidate) > budget:
                 field = ("diff" if data["schema"] == "migloop-time-state/1" and data.get("tool") == "diff"
                          and isinstance(row.get("diff"), str) and _integer(row.get("diff_chars")) else
-                         "preview" if data["schema"] == "migloop-time-view/1" and isinstance(row.get("preview"), str) else None)
+                         "preview" if data["schema"] in ("migloop-time-view/1", "migloop-time-atom/1") and isinstance(row.get("preview"), str) else None)
                 candidate = _max_prefix(row[field], lambda n, value=row, name=field, include=append:
                                         include(_row_prefix(value, name, n)), budget) if field else None
                 blocked.add(index)  # A partial row is the final row of this page.
@@ -182,7 +195,11 @@ def _page_fit(data: dict, budget: int) -> dict | None:
                 output = candidate
                 positions[index] += 1
                 progress = True
-    return output if any(positions) or not any(p[k] for _, p, k in original_pages) else None
+    # An atom's count-only section plus an executable same-scope query is useful
+    # navigation. Its delivery contains no raw-read assertion. Other protocols
+    # retain their existing nonempty-prefix requirement.
+    return output if (any(positions) or not any(p[k] for _, p, k in original_pages)
+                      or data.get("schema") == "migloop-time-atom/1") else None
 
 
 def _expand_fit(data: dict, budget: int) -> dict | None:

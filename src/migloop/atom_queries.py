@@ -42,6 +42,8 @@ for _tool in ("file", "agent", "search", "diff", "blame"):
     _DEFAULTS[_tool]["details"] = False
 for _tool in ("file", "agent", "search"):
     _DEFAULTS[_tool].update(annotation_offset=0, annotation_limit=None, relation_offset=0, relation_limit=None)
+for _tool in ("file", "agent"):
+    _DEFAULTS[_tool]["view"] = None
 _REQUIRED = {"file": ("path",), "agent": ("id",), "blame": ("path",),
              "diff": ("path",), "record": ("ref",)}
 
@@ -130,6 +132,19 @@ def parameters(tool: str, supplied: dict[str, Any], *, validate_search_scope: bo
         if tool == "search" and out.get("agent") and out.get("file"):
             raise ValueError("search 的 agent 与 file 范围互斥")
         common = {"at", "since_ts", "offset", "limit", "include_undated", "details"}
+        if tool in ("file", "agent"):
+            common.add("view")
+            # Explicit annotation pagination is an existing raw-record contract.
+            # Preserve it when no new selector is supplied; never silently apply
+            # a raw cursor to an indexed-operation page.
+            annotation_page = any(out[k] != default for k, default in temporal_annotation.FIELDS.items())
+            out["view"] = out["view"] or ("records" if annotation_page else "overview")
+            if out["view"] not in ("overview", "records", "writes", "reads", "candidates", "messages"):
+                raise ValueError("view 必须为 overview/records/writes/reads/candidates/messages")
+            if annotation_page and out["view"] != "records":
+                raise ValueError("注释分页属于 view=records 原始记录视图，不是读写概览的游标")
+            if tool == "file" and out["view"] == "messages":
+                raise ValueError("messages 仅用于 agent；文件相关消息在 view=records 中")
         if tool in ("file", "agent", "search"):
             common.update(temporal_annotation.FIELDS)
         fields = {"agent": {"id", "details"}, "file": {"path", "details"}, "search": {"q", "q_any", "agent", "file", "details"},
@@ -139,6 +154,8 @@ def parameters(tool: str, supplied: dict[str, Any], *, validate_search_scope: bo
         if ignored:
             raise ValueError("时间查询不支持这些旧展示参数: " + ", ".join(sorted(ignored)))
         return out
+    if tool in ("file", "agent") and out.get("view") is not None:
+        raise ValueError("view 仅用于 at 时间查询；旧版本入口不混用")
     if tool == "diff" and out["v"] is None:
         raise ValueError("diff 需要 at 时刻或旧 v 版本")
     if tool in ("diff", "blame") and (out["window_offset"] != 0 or out["window_limit"] != 4):
@@ -275,16 +292,21 @@ def render_text(ledger: atoms.Ledger, root: str, tool: str, supplied: dict[str, 
     if args.get("at") is not None:
         from . import temporal, time_receipts
         data = temporal_data(ledger, tool, args)
-        if tool in ("diff", "blame"):
+        if data.get("schema") == "migloop-time-atom/1":
+            from . import temporal_atom_text
+            text = temporal_atom_text.render(data)
+        elif tool in ("diff", "blame"):
             from . import temporal_state
             text = temporal_state.render(data)
         else:
             text = temporal.render(data)
-        return time_receipts.append(ledger, tool, args, text, data)
+        return time_receipts.append(ledger, tool, supplied, text, data)
     for key in ("at", "offset", "limit", "include_undated", "since_ts", "details", "window_offset", "window_limit",
                 "annotation_offset", "annotation_limit", "relation_offset", "relation_limit"):
         if tool in ("file", "agent", "diff", "blame") or tool == "search" and key != "since_ts":
             args.pop(key, None)
+    if tool in ("file", "agent"):
+        args.pop("view", None)
     if tool == "diff":
         args.pop("max_chars", None)
     if tool == "sessions":
@@ -408,6 +430,11 @@ def temporal_data_core(ledger: atoms.Ledger, tool: str, args: dict[str, Any]) ->
         raise ValueError("该工具没有时间投影")
     kind = tool if tool != "search" else "agent" if args["agent"] else "file" if args["file"] else "pool"
     key = args.get("path") or args.get("id") if tool != "search" else args.get("agent") or args.get("file")
+    if tool in ("file", "agent") and args.get("view", "overview") != "records":
+        from . import temporal_atom
+        return temporal_atom.query(ledger, kind=kind, key=key, at=args["at"], since_ts=args.get("since_ts"),
+            view=args.get("view") or "overview", offset=args["offset"], limit=args["limit"],
+            include_undated=args["include_undated"], details=args["details"])
     return temporal.query(ledger, kind=kind, key=key, at=args["at"], since_ts=args.get("since_ts"),
                           q=args.get("q"), q_any=args.get("q_any"), offset=args["offset"],
                           limit=args["limit"], include_undated=args["include_undated"], details=args["details"],

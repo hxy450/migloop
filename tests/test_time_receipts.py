@@ -8,7 +8,7 @@ from tests.test_temporal import corpus, ts
 
 def test_receipt_binds_query_bytes_body_and_does_not_create_edge(tmp_path):
     ledger, agent, _ = corpus(tmp_path)
-    args = {"id": agent, "at": ts(10)}
+    args = {"id": agent, "at": ts(10), "view": "records"}
     text = atom_queries.render_text(ledger, "", "agent", args)
     receipt = time_receipts.parse(ledger, "agent", args, text)
     assert receipt and receipt["node"]["at"].startswith("2026-09-10T10:10")

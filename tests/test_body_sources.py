@@ -83,7 +83,10 @@ def test_file_entry_lists_body_navigation_without_calling_replay(tmp_path):
     ledger, _ = pool(tmp_path, [cc(0, use("w", "Write", file_path="/p/A.ets", content="SOURCE"))])
     data = investigation.query(ledger, "file", {"path": "/p/A.ets", "at": ts(3)})
     assert data["body_sources"]["total"] == 1
-    assert not investigation._delivery(data)["records"][0]["extent"].startswith("raw_segment")
+    assert investigation._delivery(data)["records"] == []
+    raw = investigation.query(ledger, "file", {"path": "/p/A.ets", "at": ts(3), "view": "records"})
+    assert raw["body_sources"]["total"] == 1
+    assert not investigation._delivery(raw)["records"][0]["extent"].startswith("raw_segment")
 
 
 def test_query_alias_cannot_retarget_an_absolute_native_write(tmp_path):

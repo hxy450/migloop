@@ -25,7 +25,28 @@ def canonical(tool: str, request: dict[str, Any]) -> dict[str, Any]:
     args = {k: v for k, v in request.items() if k not in ("sid", "via")}
     if tool in ("file", "agent", "diff") and args.get("v") is None and args.get("at") is None:
         args["at"] = "latest"
-    return parameters(tool, args)
+    normalized = parameters(tool, args)
+    # The old protocol had no view selector. Keep already-recorded request
+    # hashes verifiable; do not reinterpret their bodies using today's default.
+    # Explicit record/section selectors belong to the new request identity.
+    if tool in ("file", "agent") and args.get("view") is None:
+        normalized.pop("view", None)
+    return normalized
+
+
+def _request_matches(tool, request, expected):
+    normalized = canonical(tool, request)
+    if digest(normalized) == expected:
+        return True
+    # Earlier time receipts predate annotation pagination as well as atom
+    # sections. Accept their old default-only canonical shape, not a different
+    # explicit view or cursor. The original body hash is still checked below.
+    from .temporal_annotation import FIELDS
+    if request.get("view") is not None or any(request.get(k, default) != default for k, default in FIELDS.items()):
+        return False
+    for key in FIELDS:
+        normalized.pop(key, None)
+    return digest(normalized) == expected
 
 
 def append(ledger: atoms.Ledger, tool: str, request: dict[str, Any], text: str, data: dict[str, Any]) -> str:
@@ -36,6 +57,9 @@ def append(ledger: atoms.Ledger, tool: str, request: dict[str, Any], text: str, 
             [r["ref"] for r in data.get("undated", {}).get("rows", [])])
     if data.get("schema") == "migloop-raw-record/1":
         refs = [data["ref"]]
+    if data.get("schema") == "migloop-time-atom/1":
+        from .temporal_atom_text import preview_rows
+        refs = [row["ref"] for row in preview_rows(data)]
     # State diff/blame already has legacy action references, no raw row receipt.
     raw_refs = [ref for ref in refs if isinstance(ref, str) and ref.startswith("raw:")]
     receipt = {"schema": "migloop-time-receipt/1", "tool": tool, "ledger": atoms.ledger_identity(ledger),
@@ -53,7 +77,7 @@ def parse(ledger: atoms.Ledger, tool: str, request: dict[str, Any], text: str) -
         receipt = json.loads(tail)
         if (receipt.get("schema") != "migloop-time-receipt/1" or receipt["tool"] != tool
                 or receipt["ledger"] != atoms.ledger_identity(ledger)
-                or receipt["request_sha256"] != digest(canonical(tool, request))
+                or not _request_matches(tool, request, receipt["request_sha256"])
                 or receipt["body_sha256"] != digest(body)):
             return None
         if tool == "record":

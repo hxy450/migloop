@@ -169,7 +169,7 @@ def test_serve_routes(session: tuple[str, dict[str, str]]) -> None:
         assert st == 200 and json.loads(body)["files"]
         st, body, _ = _get(base, "/api/insight1/atom/abcdef12/file?path=A.ets&v=3&content=1")
         assert st == 200 and json.loads(body)["versions"]
-        st, body, _ = _get(base, "/api/insight1/atom/abcdef12/agent?id=" + MAIN_ID + "&at=latest&limit=1")
+        st, body, _ = _get(base, "/api/insight1/atom/abcdef12/agent?id=" + MAIN_ID + "&at=latest&limit=1&view=records")
         temporal = json.loads(body)
         assert st == 200 and temporal["schema"] == "migloop-time-view/1" and len(temporal["rows"]) == 1
         ref = urllib.parse.quote(temporal["rows"][0]["ref"], safe="")

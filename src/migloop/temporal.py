@@ -261,6 +261,7 @@ def query(ledger: atoms.Ledger, *, kind: str, key: str | None = None, at: str = 
             query_args[kind] = key
     else:
         query_args["path" if kind == "file" else "id"] = key
+        query_args["view"] = "records"
     annotation_query = {"tool": query_kind, "args": query_args,
                         "scope": {"kind": kind, "key": key, "at": window.at, "since_ts": window.since}}
     for page_rows in (rows, undated):
@@ -311,26 +312,81 @@ def record_data(ledger: atoms.Ledger, ref: str, *, at: str = "latest", offset: i
 
 
 def render(data: dict[str, Any]) -> str:
-    """Text and UI consume the exact same selected rows and scope metadata."""
+    """Disclose selected evidence and navigation without changing selection.
+
+    Queries below are literal query parameters, not instructions to execute
+    historical commands. Navigation entries never count as delivered bodies.
+    """
     import json
+    def compact(value):
+        return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+
+    def commands(label, value):
+        for key in ("query", "next_query"):
+            if isinstance(value.get(key), dict):
+                out.append(f"  {label}.{key}: " + compact(value[key]))
+
+    def page(label, value):
+        if not isinstance(value, dict):
+            return
+        out.append(f"  {label}分页: " + compact({key: item for key, item in value.items()
+                                              if key not in ("query", "next_query")}))
+        commands(label, value)
+
     if data["schema"] == "migloop-raw-record/1":
         return (f"# 原始记录 {data['ref']} · {data['ts'] or '时间未知'} · 截至 {data['at']}\n"
-                f"字符 {data['offset']} 起 / 共 {data['chars']}；next_offset={data['next_offset']}\n" + data["text"])
+                f"字符 {data['offset']} 起 / 本段 {len(data['text'])} / 共 {data['chars']}；"
+                f"next_offset={data['next_offset']}\n" + data["text"])
     node, counts = data["node"], data["counts"]
     out = [f"# 时间原子 {node['kind']}:{node['key'] or '*'} · 截至 {node['at']}",
            "范围 " + json.dumps(data["scope"], ensure_ascii=False),
            (f"匹配 {data['total']} 条；本页 {len(data['rows'])} 条；next_offset={data['next_offset']}；"
-            f"未知时间 {counts['undated']}；源缺口 {len(data['gaps'])}"), data["note"]]
+            f"未知时间 {counts['undated']}；源缺口 {len(data['gaps'])}"), data["note"],
+           "注释state是调用记录状态，关系status/execution是效应证据状态；returned不等于目标读写已确认。"]
     for label, rows in (("已记录时间", data["rows"]), ("时间未知·不属于截止前证据", data["undated"]["rows"])):
         if rows:
             out.append("## " + label)
         for row in rows:
             out.append(f"- {row['ts'] or '?'} {row['ref']} · {','.join(row['agents'])} · {row['kind']} · {row['chars']} 字")
+            out.append(f"  注释显示 {len(row['annotations'])}；annotations_omitted={row.get('annotations_omitted', 0)}")
+            page("注释", row.get("annotation_page"))
             for annotation in row["annotations"]:
-                rels = "; ".join(f"{r['kind']} {r['path']} [{r['status']};版本绑定 {r.get('version_binding', '不适用')}]"
-                                 for r in annotation["relations"])
-                out.append(f"  {annotation['tool']} [{annotation['state']}] {rels}")
-            out.append("  摘要: " + row["preview"].replace("\n", " "))
+                relation_fields = {"relations", "relation_count", "relations_omitted", "relation_status_counts",
+                                   "relation_kind_counts", "relation_page"}
+                out.append("  调用注释: " + compact({key: value for key, value in annotation.items()
+                                                  if key not in relation_fields}))
+                out.append(f"  关系显示 {len(annotation['relations'])}；" + compact({key: annotation[key]
+                    for key in ("relation_count", "relations_omitted", "relation_status_counts", "relation_kind_counts")
+                    if key in annotation}))
+                for relation in annotation["relations"]:
+                    out.append(f"    {relation['kind']} {relation['path']} " + compact({key: value
+                        for key, value in relation.items() if key not in ("kind", "path")}))
+                page("关系", annotation.get("relation_page"))
+            preview = row["preview"]
+            extent = {key: row[key] for key in ("preview_kind", "preview_start", "preview_chars", "preview_truncated")
+                      if key in row}
+            out.append(f"  预览实显 {len(preview)} 字符；记录可读表示共 {row['chars']} 字符；" + compact(extent))
+            if "preview_start" not in row or "preview_truncated" not in row:
+                out.append("  未提供的原文偏移/截断标记不推断；预览不是完整原文字段声明。")
+            # The scalar receipt parser recognizes renderer-owned address
+            # lines at column zero. Historical text can contain that syntax;
+            # indent every displayed line without flattening/changing the
+            # underlying preview content or allowing it to impersonate a row.
+            indented = "\n".join("    " + line for line in preview.split("\n"))
+            out.extend(("  预览开始（保持内容/换行，仅加显示缩进）:", indented, "  预览结束"))
+    navigation = data.get("body_sources")
+    if isinstance(navigation, dict):
+        entries = navigation.get("entries", [])
+        out.append("## 原文正文导航（仅定位，正文未读取；不认证作者或当前文件状态）")
+        out.append(f"入口本页显示 {len(entries)}；" + compact({key: value for key, value in navigation.items()
+            if key not in ("entries", "query", "next_query")}))
+        for entry in entries:
+            # A locator's chars is the available body size, not text delivered
+            # by this navigation. Do not render accidental body-like fields.
+            out.append("- 正文入口（正文交付0字符）: " + compact({key: value for key, value in entry.items()
+                if key not in ("query", "next_query", "text", "preview", "diff", "content", "body")}))
+            commands("正文展开", entry)
+        commands("正文导航", navigation)
     if data["gaps"]:
         out.append("源缺口 " + json.dumps(data["gaps"], ensure_ascii=False))
     if data["stale_annotation_sources"]:

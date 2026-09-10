@@ -176,7 +176,7 @@ def test_file_includes_unparsed_candidate_between_versions(tmp_path):
 
 def test_shared_time_json_and_text_selection(tmp_path):
     ledger, agent, _ = corpus(tmp_path)
-    args = {"id": agent, "at": ts(10), "limit": 2}
+    args = {"id": agent, "at": ts(10), "limit": 2, "view": "records"}
     data = atom_queries.json_data(ledger, "agent", args)
     from migloop import time_receipts
     text = atom_queries.render_text(ledger, "/p", "agent", args)

@@ -80,6 +80,7 @@
 - [公共任务模板](task-template.md)：没有缺陷标题、数量、责任人或关键答案线索；两个模型组共享语义任务。
 - 新增底稿：[0723](candidate-0723.md)、[Dice](candidate-dice.md)、[Codex](candidate-codex.md)。旧三文件底稿保留在 `file-first-luna/review-v2`。
 - 设计备忘：[design-hypotheses.md](design-hypotheses.md)，含最初登记、自由时间实现后的实验反馈和下一版待验证假设；不把实现完成当正确率改善。
+- 新默认入口：[时间原子概览](time-atom-overview.md)。恢复输入输出导航，完整原始记录仍可展开；该改动的准确率需要新实验检验，不改上述冻结分数。
 
 不依赖 migloop 的原始核验：`audit_reference.py` 对三池 146 + 80 + 2 份原始 JSONL 扫描；十文件均有后置 native 更新/patch 成功回执。结果在 `C:/Users/hongy/projects/_migloop-eval-20260909/file-first-10/audit-v2/{0723,dice,codex}.json`。v1 是扫描器开发产物（遗漏可选成功标志与 code-host 内部事件），保留但不用作资格结论。自动 native 清单不包含手审 Bash 效应，不当作全修改清单。
 

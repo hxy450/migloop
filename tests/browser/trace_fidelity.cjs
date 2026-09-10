@@ -83,6 +83,10 @@ const data={sid:'fixture',sid8:'fixture',project:'Trace fidelity regression',url
 data.observation_scope={mode:'frozen_anchor',roots_source:'explicit_configuration',anchor:'/fixture/anchor.jsonl',roots:['/fixture/early.jsonl','/fixture/anchor<b>.jsonl']};
 const html=fs.readFileSync(path.join(repo,'src/migloop/render/templates/fixchain.html'),'utf8').replace('__FIXCHAIN_JSON__',JSON.stringify(data));
 let activeFixture='fixture';
+const rawBatchRequests=[], legacyRawGets=[];
+const timeRawRef='raw:00000000000000000000:L1:11111111111111111111';
+const expectedRawScope={kind:'agent',key:'agent-a',at:'2026-01-01T00:00:10Z',since_ts:'2026-01-01T00:00:00Z'};
+const expectedRawRequest={requests:[{tool:'record',args:{ref:timeRawRef,offset:0,max_chars:12000,include_undated:false},scope:expectedRawScope}]};
 function timeScopeFixture(v, agent){
   const anchor='2026-01-01T00:00:0'+v+'.000000Z';
   const root=(session,id,end)=>({session,observed_start:'2026-01-01T00:00:00.000000Z',observed_end:end,
@@ -98,6 +102,30 @@ function timeScopeFixture(v, agent){
 const server=http.createServer((req,res)=>{
   const url=new URL(req.url,'http://127.0.0.1');
   let body;
+  if(url.pathname==='/atom/batch'){
+    if(req.method!=='POST'){res.writeHead(405,{'Content-Type':'application/json'});res.end(JSON.stringify({error:'batch requires POST'}));return;}
+    const chunks=[];
+    req.on('data',part=>chunks.push(part));
+    req.on('end',()=>{
+      res.setHeader('Content-Type','application/json; charset=utf-8');
+      try{
+        const request=JSON.parse(Buffer.concat(chunks).toString('utf8'));
+        rawBatchRequests.push({method:req.method,path:url.pathname,body:request});
+        assert.deepEqual(request,expectedRawRequest,'raw expansion must carry its actual entity and both time bounds');
+        const text='<b>RAW_TIME_EVIDENCE</b> (plain text) <img src=x onerror="window.rawXss=1">';
+        const data={schema:'migloop-raw-record/1',scope:expectedRawScope,ref:timeRawRef,offset:0,text,chars:text.length,next_offset:null};
+        body={schema:'migloop-investigation-batch/1',items:[{item_index:0,tool:'record',status:'ok',scope:expectedRawScope,data,
+          delivery:{records:[{ref:timeRawRef,extent:'raw_segment',offset:0,chars:text.length,next_offset:null}],
+            scope:expectedRawScope,data_schema:data.schema,semantic_checked:false,navigation_is_relation:false}}]};
+        res.end(JSON.stringify(body));
+      }catch(error){res.statusCode=400;res.end(JSON.stringify({error:String(error)}));}
+    });
+    return;
+  }
+  if(url.pathname==='/atom/record'){
+    legacyRawGets.push({method:req.method,url:req.url});
+    res.writeHead(405,{'Content-Type':'application/json'});res.end(JSON.stringify({error:'no unscoped GET record fallback in this fixture'}));return;
+  }
   if(url.pathname==='/') {activeFixture=url.searchParams.get('probe')||'fixture';res.setHeader('Content-Type','text/html; charset=utf-8');res.end(html);return;}
   if(url.pathname==='/data')body={chains:[]};
   else if(url.pathname==='/atom/index')body={agents,files:[{path:file,kind:'ets',n_versions:3,has_writer:true}]};
@@ -382,14 +410,14 @@ const server=http.createServer((req,res)=>{
   }
   else if(url.searchParams.get('scope_only')==='1')body=activeFixture==='time-scope-failure'?{error:'fixture scope unavailable'}:
     {time_scope:timeScopeFixture(Number(url.searchParams.get('v')||3),url.searchParams.get('id'))};
-  else if(url.pathname==='/atom/record')body={schema:'migloop-raw-record/1',text:'<b>RAW_TIME_EVIDENCE</b> (plain text)',chars:41,next_offset:null};
   else if(url.searchParams.has('at')){
     const kind=url.pathname.endsWith('/agent')||url.searchParams.has('agent')?'agent':'file';
     body={schema:'migloop-time-view/1',node:{kind,key:kind==='agent'?'agent-a':file,at:url.searchParams.get('at')},
+      scope:{kind,key:kind==='agent'?'agent-a':file,at:url.searchParams.get('at'),since_ts:url.searchParams.get('since_ts')},
       total:1,offset:Number(url.searchParams.get('offset')||0),limit:30,remaining:0,next_offset:null,
       counts:{undated:0},gaps:[],stale_annotation_sources:[],undated:{rows:[],next_offset:null},
       note:'fixture time scope: query is not a read/write edge',
-      rows:[{ref:'raw:00000000000000000000:L1:11111111111111111111',ts:'2026-01-01T00:00:01Z',kind:'tool_result',
+      rows:[{ref:timeRawRef,ts:'2026-01-01T00:00:01Z',kind:'tool_result',
         source:'fixture.jsonl',line:1,preview:'TIME_WINDOW_PROOF',agents:['agent-a'],annotations:[]}]};
   }
   else if(url.pathname==='/atom/file'){
@@ -847,12 +875,17 @@ async function main(){
     await until("document.querySelector('#side .time-evidence')");
     await evaluate("window.timeOriginalTrace=JSON.stringify(__mig.probe().trajectory);window.timeOriginalNodes=JSON.stringify(Object.keys(__mig.xt().byId));document.querySelector('#side .time-evidence').open=true");
     await until("document.querySelector('#side .time-evidence').textContent.includes('TIME_WINDOW_PROOF')");
+    await check('full raw panel explicitly requests records instead of the new default overview',"performance.getEntriesByType('resource').some(r=>{const u=new URL(r.name);return u.pathname==='/atom/agent'&&u.searchParams.get('view')==='records'&&u.searchParams.get('id')==='agent-a'})");
     await evaluate("(()=>{const box=document.querySelector('#side .time-evidence'),inputs=box.querySelectorAll('.time-controls input');inputs[0].value='2026-01-01T00:00:10Z';inputs[1].value='2026-01-01T00:00:00Z';inputs[2].value='needle';box.querySelector('.time-controls button').click()})()");
     await until("performance.getEntriesByType('resource').some(r=>r.name.includes('/atom/search?')&&new URL(r.name).searchParams.get('q')==='needle') && document.querySelector('#side .time-record')");
     await check('time search preserves cutoff and start in the actual HTTP query',"performance.getEntriesByType('resource').some(r=>{const u=new URL(r.name);return u.pathname==='/atom/search'&&u.searchParams.get('at')==='2026-01-01T00:00:10Z'&&u.searchParams.get('since_ts')==='2026-01-01T00:00:00Z'&&u.searchParams.get('agent')==='agent-a'})");
     await evaluate("document.querySelector('#side .time-record').open=true;document.querySelector('#side .time-record button').click()");
     await until("document.querySelector('#side .time-record').textContent.includes('RAW_TIME_EVIDENCE')");
-    await check('raw expansion remains scoped and treats transcript markup as text',"performance.getEntriesByType('resource').some(r=>{const u=new URL(r.name);return u.pathname==='/atom/record'&&u.searchParams.get('at')==='2026-01-01T00:00:10Z'}) && !document.querySelector('#side .time-record pre b')");
+    assert.deepEqual(rawBatchRequests,[{method:'POST',path:'/atom/batch',body:expectedRawRequest}],
+      'actual HTTP raw request preserves agent-a and both time bounds');
+    console.log('PASS actual POST batch raw request retains entity, cutoff, lower bound and original ref');
+    await check('raw expansion uses POST batch with no hidden GET fallback and renders markup literally',"performance.getEntriesByType('resource').some(r=>new URL(r.name).pathname==='/atom/batch') && !performance.getEntriesByType('resource').some(r=>new URL(r.name).pathname==='/atom/record') && document.querySelector('#side .time-record pre').textContent.includes('<b>RAW_TIME_EVIDENCE</b>') && !document.querySelector('#side .time-record pre b, #side .time-record pre img') && !window.rawXss");
+    assert.deepEqual(legacyRawGets,[],'no GET record attempt may be hidden by a successful POST response');
     await check('time viewer expansion never changes model visits nodes or graph edges',"JSON.stringify(__mig.probe().trajectory)===window.timeOriginalTrace && JSON.stringify(Object.keys(__mig.xt().byId))===window.timeOriginalNodes");
     await evaluate("document.querySelector('#side .time-evidence').scrollIntoView({block:'start'})");
     const output=process.env.MIGLOOP_BROWSER_SCREENSHOT_DIR||path.join(repo,'docs/experiments/2026-09-09-trace-fidelity/screenshots');
