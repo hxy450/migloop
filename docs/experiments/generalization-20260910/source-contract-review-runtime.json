@@ -1,0 +1,71 @@
+{
+  "schema": "migloop-source-contract-review/1",
+  "audit": "post-v4 source discovery and explicit contract; no new gold",
+  "runtime_files": [
+    {
+      "path": "C:/Users/hongy/projects/migloop/src/migloop/atoms.py",
+      "sha256": "fef18551180b242100076fd6f237d911659a794375d068357ab5baefa7db97da"
+    },
+    {
+      "path": "C:/Users/hongy/projects/migloop/src/migloop/atoms_collect.py",
+      "sha256": "dfcb17a8b5049aa57ae31b06a8da5a4271149bc6cc55a0e0fbd9c2a9c1466c72"
+    },
+    {
+      "path": "C:/Users/hongy/projects/migloop/src/migloop/cc_sources.py",
+      "sha256": "1302c62d129a725228a85e4c040e9f63e621eeef1ec2080dc15494c18932de33"
+    },
+    {
+      "path": "C:/Users/hongy/projects/migloop/src/migloop/transcript_store.py",
+      "sha256": "71c02a976a1f1eb6f3b7a30416268137ebd837b26b9703c91f9596740a7d0a19"
+    },
+    {
+      "path": "C:/Users/hongy/projects/migloop/src/migloop/service.py",
+      "sha256": "022583740de1e569816b1b9ea419d95b2d428dfd8e8cc5af28b0756b46bdee87"
+    },
+    {
+      "path": "C:/Users/hongy/projects/migloop/src/migloop/raw_events.py",
+      "sha256": "d59d845cc65ae11833db1d0d80d96283e8873331363e53bea3be9dc684ae5f01"
+    },
+    {
+      "path": "C:/Users/hongy/projects/migloop/src/migloop/temporal.py",
+      "sha256": "5c4181343bedc6ba27660882cc2a91299cea607fcfffcf8fbb803d2b5f98af1e"
+    },
+    {
+      "path": "C:/Users/hongy/projects/migloop/src/migloop/temporal_atom.py",
+      "sha256": "558939402cebaf574963b2c9d14eac4afb5a36bdd4a242be4cb47214ef8a27c8"
+    },
+    {
+      "path": "C:/Users/hongy/projects/migloop/src/migloop/investigation.py",
+      "sha256": "953ae2e6450ae6420b7e6e10013edb44d62b132e810316d22f3d132b45449822"
+    },
+    {
+      "path": "C:/Users/hongy/projects/migloop/src/migloop/change_inventory.py",
+      "sha256": "323d995865665913495f71f90a2b5fb59b9d5b194eb6fb4b445cff9f1022aca0"
+    },
+    {
+      "path": "C:/Users/hongy/projects/migloop/src/migloop/verdict_v3.py",
+      "sha256": "d5a47cf70fb503ecc8740c09e31dc026cfd5257ba99d457303d014a4755f30fe"
+    }
+  ],
+  "verification": {
+    "new_and_old_targeted_passed": 351,
+    "skipped": 6,
+    "skip_reason": "Windows cannot create symbolic links; explicit reparse flag test passed",
+    "fixture_root": "C:/Users/hongy/projects/_migloop-eval-20260909/source-contract-final-02"
+  },
+  "metadata_only_real_discovery": {
+    "project": "dynamic1",
+    "all_sources": 169,
+    "actor_transcripts_including_root": 71,
+    "auxiliary_sources": 98,
+    "auxiliary_suffix_counts": {
+      ".json": 77,
+      ".jsonl": 7,
+      ".txt": 10,
+      ".js": 4
+    },
+    "source_metadata_count": 169,
+    "logical_names_unique": true,
+    "full_real_registry_gate": "owned by parent; not claimed by this metadata discovery audit"
+  }
+}

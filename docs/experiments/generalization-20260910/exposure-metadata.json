@@ -1,0 +1,240 @@
+{
+  "schema": "migloop-generalization-exposure-metadata/1",
+  "roots": [
+    "C:/Users/hongy/projects/migloop/docs/experiments",
+    "C:/Users/hongy/projects/_migloop-handoff"
+  ],
+  "excluded_current_selection": "**/generalization-20260910/**",
+  "method": "rg -l -i -F --hidden --no-ignore; path-only output; no matching lines or answer bodies opened",
+  "results": [
+    {
+      "literal": "pod730",
+      "case_sensitive": false,
+      "artifact_count": 11,
+      "artifacts": [
+        "C:/Users/hongy/projects/migloop/docs/experiments/README.md",
+        "C:/Users/hongy/projects/migloop/docs/experiments/2026-09-08-pod730/prompt_template_chain_raw_pod.md",
+        "C:/Users/hongy/projects/migloop/docs/experiments/2026-09-08-pod730/chains-af3e3923.json",
+        "C:/Users/hongy/projects/migloop/docs/experiments/2026-09-08-pod730/pod_raw/chain90-AudioPlayerPage.ets/prompt.md",
+        "C:/Users/hongy/projects/migloop/docs/experiments/2026-09-08-pod730/pod_raw/chain90-AudioPlayerPage.ets/metrics.json",
+        "C:/Users/hongy/projects/migloop/docs/experiments/2026-09-08-pod730/pod_raw/chain90-MainPage.ets/metrics.json",
+        "C:/Users/hongy/projects/migloop/docs/experiments/2026-09-08-pod730/pod_raw/chain90-MainPage.ets/result.json",
+        "C:/Users/hongy/projects/migloop/docs/experiments/2026-09-08-pod730/pod_raw/chain90-HomePage.ets/result.json",
+        "C:/Users/hongy/projects/migloop/docs/experiments/2026-09-08-pod730/pod_raw/chain90-HomePage.ets/prompt.md",
+        "C:/Users/hongy/projects/migloop/docs/experiments/2026-09-08-pod730/pod_raw/chain90-HomePage.ets/metrics.json",
+        "C:/Users/hongy/projects/migloop/docs/experiments/2026-09-08-pod730/pod_raw/chain90-MainPage.ets/prompt.md"
+      ]
+    },
+    {
+      "literal": "transfer-app-pod730",
+      "case_sensitive": false,
+      "artifact_count": 10,
+      "artifacts": [
+        "C:/Users/hongy/projects/migloop/docs/experiments/2026-09-08-pod730/prompt_template_chain_raw_pod.md",
+        "C:/Users/hongy/projects/migloop/docs/experiments/2026-09-08-pod730/chains-af3e3923.json",
+        "C:/Users/hongy/projects/migloop/docs/experiments/2026-09-08-pod730/pod_raw/chain90-MainPage.ets/result.json",
+        "C:/Users/hongy/projects/migloop/docs/experiments/2026-09-08-pod730/pod_raw/chain90-MainPage.ets/prompt.md",
+        "C:/Users/hongy/projects/migloop/docs/experiments/2026-09-08-pod730/pod_raw/chain90-MainPage.ets/metrics.json",
+        "C:/Users/hongy/projects/migloop/docs/experiments/2026-09-08-pod730/pod_raw/chain90-AudioPlayerPage.ets/prompt.md",
+        "C:/Users/hongy/projects/migloop/docs/experiments/2026-09-08-pod730/pod_raw/chain90-HomePage.ets/result.json",
+        "C:/Users/hongy/projects/migloop/docs/experiments/2026-09-08-pod730/pod_raw/chain90-AudioPlayerPage.ets/metrics.json",
+        "C:/Users/hongy/projects/migloop/docs/experiments/2026-09-08-pod730/pod_raw/chain90-HomePage.ets/prompt.md",
+        "C:/Users/hongy/projects/migloop/docs/experiments/2026-09-08-pod730/pod_raw/chain90-HomePage.ets/metrics.json"
+      ]
+    },
+    {
+      "literal": "transfer-app-arch11",
+      "case_sensitive": false,
+      "artifact_count": 0,
+      "artifacts": []
+    },
+    {
+      "literal": "462439ee-b5af-4443-8a58-2e785a2ef826",
+      "case_sensitive": false,
+      "artifact_count": 0,
+      "artifacts": []
+    },
+    {
+      "literal": "AntennaPod",
+      "case_sensitive": false,
+      "artifact_count": 0,
+      "artifacts": []
+    },
+    {
+      "literal": "de.danoeh.antennapod",
+      "case_sensitive": false,
+      "artifact_count": 0,
+      "artifacts": []
+    },
+    {
+      "literal": "AudioPlayerPage.ets",
+      "case_sensitive": false,
+      "artifact_count": 10,
+      "artifacts": [
+        "C:/Users/hongy/projects/migloop/docs/experiments/2026-09-08-pod730/judge/pod_tools_vs_pod_raw.chain.json",
+        "C:/Users/hongy/projects/migloop/docs/experiments/2026-09-08-pod730/pod_raw/chain90-AudioPlayerPage.ets/metrics.json",
+        "C:/Users/hongy/projects/migloop/docs/experiments/2026-09-08-pod730/pod_raw/chain90-AudioPlayerPage.ets/result.json",
+        "C:/Users/hongy/projects/migloop/docs/experiments/2026-09-08-pod730/pod_raw/chain90-AudioPlayerPage.ets/prompt.md",
+        "C:/Users/hongy/projects/migloop/docs/experiments/2026-09-08-pod730/pod_tools2/chain90-AudioPlayerPage.ets/result.json",
+        "C:/Users/hongy/projects/migloop/docs/experiments/2026-09-08-pod730/pod_tools2/chain90-AudioPlayerPage.ets/prompt.md",
+        "C:/Users/hongy/projects/migloop/docs/experiments/2026-09-08-pod730/pod_tools2/chain90-AudioPlayerPage.ets/metrics.json",
+        "C:/Users/hongy/projects/migloop/docs/experiments/2026-09-08-pod730/pod_tools/chain90-AudioPlayerPage.ets/result.json",
+        "C:/Users/hongy/projects/migloop/docs/experiments/2026-09-08-pod730/pod_tools/chain90-AudioPlayerPage.ets/prompt.md",
+        "C:/Users/hongy/projects/migloop/docs/experiments/2026-09-08-pod730/pod_tools/chain90-AudioPlayerPage.ets/metrics.json"
+      ]
+    },
+    {
+      "literal": "VideoplayerPage.ets",
+      "case_sensitive": false,
+      "artifact_count": 1,
+      "artifacts": [
+        "C:/Users/hongy/projects/migloop/docs/experiments/2026-09-08-verdict-ui/dice_via3/chain02-EntryAbility.ets/rep1/transcript.jsonl"
+      ]
+    },
+    {
+      "literal": "Media3VideoPlayerPage.ets",
+      "case_sensitive": false,
+      "artifact_count": 0,
+      "artifacts": []
+    },
+    {
+      "literal": "route_map.json",
+      "case_sensitive": false,
+      "artifact_count": 0,
+      "artifacts": []
+    },
+    {
+      "literal": "FeedItemlistPage.ets",
+      "case_sensitive": false,
+      "artifact_count": 0,
+      "artifacts": []
+    },
+    {
+      "literal": "FeedInfoPage.ets",
+      "case_sensitive": false,
+      "artifact_count": 0,
+      "artifacts": []
+    },
+    {
+      "literal": "ItemPagerViewModel.ets",
+      "case_sensitive": false,
+      "artifact_count": 0,
+      "artifacts": []
+    },
+    {
+      "literal": "transfer-app-dynamic1",
+      "case_sensitive": false,
+      "artifact_count": 0,
+      "artifacts": []
+    },
+    {
+      "literal": "5629edf4-bf1b-4616-81fb-e2c7b3c2ca26",
+      "case_sensitive": false,
+      "artifact_count": 0,
+      "artifacts": []
+    },
+    {
+      "literal": "LimitedGiftDialog.ets",
+      "case_sensitive": false,
+      "artifact_count": 0,
+      "artifacts": []
+    },
+    {
+      "literal": "HttpCore.ets",
+      "case_sensitive": false,
+      "artifact_count": 0,
+      "artifacts": []
+    },
+    {
+      "literal": "WorksView.ets",
+      "case_sensitive": false,
+      "artifact_count": 0,
+      "artifacts": []
+    },
+    {
+      "literal": "RecommendView.ets",
+      "case_sensitive": false,
+      "artifact_count": 0,
+      "artifacts": []
+    },
+    {
+      "literal": "PptDb.ets",
+      "case_sensitive": false,
+      "artifact_count": 0,
+      "artifacts": []
+    },
+    {
+      "literal": "ChoicePPTTemplatePage.ets",
+      "case_sensitive": false,
+      "artifact_count": 0,
+      "artifacts": []
+    }
+  ],
+  "audit_date": "2026-09-10",
+  "no_answer_bodies_opened": true,
+  "interpretation": {
+    "business_exposure": "AntennaPod is already represented by the pod730 development experiments; arch11 is a different run, not an unseen app.",
+    "exact_run_exposure": "No old bounded experiment/handoff literal match for transfer-app-arch11 or its root UUID; static UI/cache exposure is separately known.",
+    "basename_limits": "Case-insensitive basename matches identify possible same-file-family exposure, not identical revision, cause, or contents; zero matches are not a universal non-exposure claim.",
+    "package_limits": "The package literal de.danoeh.antennapod has no bounded hit; current generic com.example.myapplication is not a discriminating app identity and was not used to override project lineage.",
+    "target_classification": [
+      {
+        "basename": "AudioPlayerPage.ets",
+        "tier": "prior_same_file_family_explicit_model_target",
+        "old_model_result_artifacts": 3,
+        "old_judgment_artifacts": 1,
+        "arch11_exact_reference_confirmed": false,
+        "retain": true
+      },
+      {
+        "basename": "VideoplayerPage.ets",
+        "tier": "prior_investigator_transcript_literal_mention_only",
+        "old_model_result_artifacts": 0,
+        "old_judgment_artifacts": 0,
+        "arch11_exact_reference_confirmed": false,
+        "retain": true
+      },
+      {
+        "basename": "Media3VideoPlayerPage.ets",
+        "tier": "no_bounded_old_basename_match",
+        "old_model_result_artifacts": 0,
+        "old_judgment_artifacts": 0,
+        "arch11_exact_reference_confirmed": false,
+        "retain": true
+      },
+      {
+        "basename": "route_map.json",
+        "tier": "no_bounded_old_basename_match",
+        "old_model_result_artifacts": 0,
+        "old_judgment_artifacts": 0,
+        "arch11_exact_reference_confirmed": false,
+        "retain": true
+      },
+      {
+        "basename": "FeedItemlistPage.ets",
+        "tier": "no_bounded_old_basename_match",
+        "old_model_result_artifacts": 0,
+        "old_judgment_artifacts": 0,
+        "arch11_exact_reference_confirmed": false,
+        "retain": true
+      },
+      {
+        "basename": "FeedInfoPage.ets",
+        "tier": "no_bounded_old_basename_match",
+        "old_model_result_artifacts": 0,
+        "old_judgment_artifacts": 0,
+        "arch11_exact_reference_confirmed": false,
+        "retain": true
+      },
+      {
+        "basename": "ItemPagerViewModel.ets",
+        "tier": "no_bounded_old_basename_match",
+        "old_model_result_artifacts": 0,
+        "old_judgment_artifacts": 0,
+        "arch11_exact_reference_confirmed": false,
+        "retain": true
+      }
+    ],
+    "dynamic1": "All six selected basenames, project literal and root UUID have zero bounded old matches, but the same AIPPT app family was tuned before and this run already had static UI/README/cache exposure."
+  }
+}

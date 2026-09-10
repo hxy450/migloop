@@ -1,0 +1,2219 @@
+{
+  "schema": "migloop-arch11-boundary-source-availability/1",
+  "archive": "C:/Users/hongy/projects/migloop/dist/arch11-session-462439ee-full.zip",
+  "archive_sha256": "9e3670140402600547399b1ed387da5d60bc52a413169abd733e9ea1491adf69",
+  "generation_cutoff": "2026-07-18T01:23:20.239Z",
+  "modification_since": "2026-07-18T01:23:52.130Z",
+  "observation_end": "2026-07-20T15:34:16.751Z",
+  "gap_seconds": 31.891,
+  "gap_tool_uses": [
+    {
+      "source": "462439ee-b5af-4443-8a58-2e785a2ef826.jsonl",
+      "line": 2239,
+      "ts": "2026-07-18T01:23:21.139Z",
+      "tool": "TaskUpdate",
+      "call_id": "toolu_01XoZ5ZRJU18ws6aAxTeYb6S",
+      "target": null
+    },
+    {
+      "source": "462439ee-b5af-4443-8a58-2e785a2ef826.jsonl",
+      "line": 2241,
+      "ts": "2026-07-18T01:23:21.803Z",
+      "tool": "TaskUpdate",
+      "call_id": "toolu_01EqHNrnw9pGjSH764Lxrw75",
+      "target": null
+    }
+  ],
+  "gap_native_app_write_edit": 0,
+  "gap_tool_results": [
+    {
+      "source": "462439ee-b5af-4443-8a58-2e785a2ef826.jsonl",
+      "line": 2240,
+      "block": 0,
+      "ts": "2026-07-18T01:23:21.317Z",
+      "call_id": "toolu_01XoZ5ZRJU18ws6aAxTeYb6S",
+      "request_line": 2239,
+      "tool": "TaskUpdate"
+    },
+    {
+      "source": "462439ee-b5af-4443-8a58-2e785a2ef826.jsonl",
+      "line": 2242,
+      "block": 0,
+      "ts": "2026-07-18T01:23:21.959Z",
+      "call_id": "toolu_01EqHNrnw9pGjSH764Lxrw75",
+      "request_line": 2241,
+      "tool": "TaskUpdate"
+    }
+  ],
+  "native_or_shell_calls_spanning_generation_cutoff": [],
+  "pre_cutoff_unreturned_native_or_shell_calls": [],
+  "undated_native_or_shell_uses": [],
+  "native_or_shell_scan_tools": ["Write", "Edit", "Bash", "PowerShell"],
+  "availability_scope": "All recorded native request/result fields in the archive are available for later inspection; this does not certify unrecorded filesystem state, invoked external file contents, command semantics, or file effects.",
+  "persisted_marker_check": "Check only the first 700 recorded output characters for explicit persisted/truncated output markers; zero matches is not proof no information was ever omitted by a tool.",
+  "archive_members": 385,
+  "archive_member_types": {
+    ".jsonl": 193,
+    "meta.json": 192
+  },
+  "post_checkpoint_bash": 68,
+  "full_native_bash_inputs": 68,
+  "uniquely_paired_bash_results": 68,
+  "bash_result_error_flags": 4,
+  "marker_bearing_bash_calls": 0,
+  "bash_calls": [
+    {
+      "source": "462439ee-b5af-4443-8a58-2e785a2ef826/subagents/agent-a039741565b7a09d8.jsonl",
+      "line": 36,
+      "block": 0,
+      "ts": "2026-07-18T02:02:32.299Z",
+      "call_id": "toolu_014fsxjdQdsehVV66UMYNnzu",
+      "command_chars": 120,
+      "command_sha256": "b332a624477ea9db3490d36966e4df0d1a50319f16b2d4cec3f8b3a173033f34",
+      "full_input_field": true,
+      "run_in_background": false,
+      "results": [
+        {
+          "line": 37,
+          "block": 0,
+          "ts": "2026-07-18T02:02:35.356Z",
+          "is_error": false,
+          "content_chars": 9328,
+          "native_result_keys": [
+            "stdout",
+            "stderr",
+            "interrupted",
+            "isImage",
+            "noOutputExpected"
+          ],
+          "native_stdout_chars": 9328,
+          "persisted_output_marker": false,
+          "external_output_path_lines": []
+        }
+      ],
+      "result_count": 1,
+      "paired_in_window": true
+    },
+    {
+      "source": "462439ee-b5af-4443-8a58-2e785a2ef826/subagents/agent-a039741565b7a09d8.jsonl",
+      "line": 54,
+      "block": 0,
+      "ts": "2026-07-18T02:03:42.485Z",
+      "call_id": "toolu_01XbZBKEXMrKsTtShj9xKgBd",
+      "command_chars": 218,
+      "command_sha256": "1c9b2f567442dcdcedc302c0d858106f67aafad5a302c24d2126e686f829163e",
+      "full_input_field": true,
+      "run_in_background": false,
+      "results": [
+        {
+          "line": 55,
+          "block": 0,
+          "ts": "2026-07-18T02:03:42.975Z",
+          "is_error": false,
+          "content_chars": 1360,
+          "native_result_keys": [
+            "stdout",
+            "stderr",
+            "interrupted",
+            "isImage",
+            "noOutputExpected"
+          ],
+          "native_stdout_chars": 1360,
+          "persisted_output_marker": false,
+          "external_output_path_lines": []
+        }
+      ],
+      "result_count": 1,
+      "paired_in_window": true
+    },
+    {
+      "source": "462439ee-b5af-4443-8a58-2e785a2ef826/subagents/agent-a039741565b7a09d8.jsonl",
+      "line": 73,
+      "block": 0,
+      "ts": "2026-07-18T02:04:29.703Z",
+      "call_id": "toolu_013TcezztLp5TNuu3cEGLJAF",
+      "command_chars": 233,
+      "command_sha256": "0b89e0ef9a34b14bdae44f308498b322d95b1559a02b811eea660f14bc6c7c1f",
+      "full_input_field": true,
+      "run_in_background": false,
+      "results": [
+        {
+          "line": 74,
+          "block": 0,
+          "ts": "2026-07-18T02:04:30.175Z",
+          "is_error": false,
+          "content_chars": 901,
+          "native_result_keys": [
+            "stdout",
+            "stderr",
+            "interrupted",
+            "isImage",
+            "noOutputExpected"
+          ],
+          "native_stdout_chars": 901,
+          "persisted_output_marker": false,
+          "external_output_path_lines": []
+        }
+      ],
+      "result_count": 1,
+      "paired_in_window": true
+    },
+    {
+      "source": "462439ee-b5af-4443-8a58-2e785a2ef826/subagents/agent-a039741565b7a09d8.jsonl",
+      "line": 77,
+      "block": 0,
+      "ts": "2026-07-18T02:04:58.651Z",
+      "call_id": "toolu_018PW9jReVDYuYcEpQbSkNWR",
+      "command_chars": 1315,
+      "command_sha256": "aca01197bca054ae83e603e30563403f2aea1267259e23e2bcdba6fa717394c2",
+      "full_input_field": true,
+      "run_in_background": false,
+      "results": [
+        {
+          "line": 78,
+          "block": 0,
+          "ts": "2026-07-18T02:05:03.573Z",
+          "is_error": false,
+          "content_chars": 1405,
+          "native_result_keys": [
+            "stdout",
+            "stderr",
+            "interrupted",
+            "isImage",
+            "noOutputExpected"
+          ],
+          "native_stdout_chars": 1405,
+          "persisted_output_marker": false,
+          "external_output_path_lines": []
+        }
+      ],
+      "result_count": 1,
+      "paired_in_window": true
+    },
+    {
+      "source": "462439ee-b5af-4443-8a58-2e785a2ef826/subagents/agent-a039741565b7a09d8.jsonl",
+      "line": 111,
+      "block": 0,
+      "ts": "2026-07-18T02:07:21.094Z",
+      "call_id": "toolu_013vxmCaGmkAmYtMDFDPkDKx",
+      "command_chars": 1171,
+      "command_sha256": "8329515f79417e95cf0e87282fc37f9093dacf16391a5c240a8ee5afb26ae1f0",
+      "full_input_field": true,
+      "run_in_background": false,
+      "results": [
+        {
+          "line": 112,
+          "block": 0,
+          "ts": "2026-07-18T02:07:25.556Z",
+          "is_error": false,
+          "content_chars": 133,
+          "native_result_keys": [
+            "stdout",
+            "stderr",
+            "interrupted",
+            "isImage",
+            "noOutputExpected"
+          ],
+          "native_stdout_chars": 133,
+          "persisted_output_marker": false,
+          "external_output_path_lines": []
+        }
+      ],
+      "result_count": 1,
+      "paired_in_window": true
+    },
+    {
+      "source": "462439ee-b5af-4443-8a58-2e785a2ef826/subagents/agent-a039741565b7a09d8.jsonl",
+      "line": 115,
+      "block": 0,
+      "ts": "2026-07-18T02:07:46.478Z",
+      "call_id": "toolu_01RggunzGra7SgHtF44HQtgY",
+      "command_chars": 381,
+      "command_sha256": "bd691061c21f85e32edca0db87c8f907bded95b1fbcc116b4be6379a203fc4e4",
+      "full_input_field": true,
+      "run_in_background": false,
+      "results": [
+        {
+          "line": 116,
+          "block": 0,
+          "ts": "2026-07-18T02:07:48.674Z",
+          "is_error": false,
+          "content_chars": 846,
+          "native_result_keys": [
+            "stdout",
+            "stderr",
+            "interrupted",
+            "isImage",
+            "noOutputExpected"
+          ],
+          "native_stdout_chars": 846,
+          "persisted_output_marker": false,
+          "external_output_path_lines": []
+        }
+      ],
+      "result_count": 1,
+      "paired_in_window": true
+    },
+    {
+      "source": "462439ee-b5af-4443-8a58-2e785a2ef826/subagents/agent-a039741565b7a09d8.jsonl",
+      "line": 119,
+      "block": 0,
+      "ts": "2026-07-18T02:08:00.774Z",
+      "call_id": "toolu_01PBTcPSuLsCDtvKZQx9EAwB",
+      "command_chars": 627,
+      "command_sha256": "253b6446eefad45fabfbea7768f279721f5e637def290d51e3acc0c9217095a6",
+      "full_input_field": true,
+      "run_in_background": false,
+      "results": [
+        {
+          "line": 120,
+          "block": 0,
+          "ts": "2026-07-18T02:08:49.031Z",
+          "is_error": false,
+          "content_chars": 3835,
+          "native_result_keys": [
+            "stdout",
+            "stderr",
+            "interrupted",
+            "isImage",
+            "noOutputExpected"
+          ],
+          "native_stdout_chars": 3835,
+          "persisted_output_marker": false,
+          "external_output_path_lines": []
+        }
+      ],
+      "result_count": 1,
+      "paired_in_window": true
+    },
+    {
+      "source": "462439ee-b5af-4443-8a58-2e785a2ef826/subagents/agent-a039741565b7a09d8.jsonl",
+      "line": 123,
+      "block": 0,
+      "ts": "2026-07-18T02:09:06.456Z",
+      "call_id": "toolu_012brqHtY2ArgrX9vSt4rZr7",
+      "command_chars": 472,
+      "command_sha256": "a78fd62f269147c482136afc4f39b6a21d3de7295e53d0803773f3db697738f6",
+      "full_input_field": true,
+      "run_in_background": false,
+      "results": [
+        {
+          "line": 124,
+          "block": 0,
+          "ts": "2026-07-18T02:09:08.829Z",
+          "is_error": false,
+          "content_chars": 147,
+          "native_result_keys": [
+            "stdout",
+            "stderr",
+            "interrupted",
+            "isImage",
+            "noOutputExpected"
+          ],
+          "native_stdout_chars": 147,
+          "persisted_output_marker": false,
+          "external_output_path_lines": []
+        }
+      ],
+      "result_count": 1,
+      "paired_in_window": true
+    },
+    {
+      "source": "462439ee-b5af-4443-8a58-2e785a2ef826/subagents/agent-a039741565b7a09d8.jsonl",
+      "line": 127,
+      "block": 0,
+      "ts": "2026-07-18T02:09:16.556Z",
+      "call_id": "toolu_01AC1p9yb8eFyc6aRZS2HVx6",
+      "command_chars": 742,
+      "command_sha256": "6d26a5e25946777b217f41f2c73e9653ff0ba95e0d75369f1516ce8661e1942a",
+      "full_input_field": true,
+      "run_in_background": false,
+      "results": [
+        {
+          "line": 128,
+          "block": 0,
+          "ts": "2026-07-18T02:09:19.855Z",
+          "is_error": false,
+          "content_chars": 207,
+          "native_result_keys": [
+            "stdout",
+            "stderr",
+            "interrupted",
+            "isImage",
+            "noOutputExpected"
+          ],
+          "native_stdout_chars": 207,
+          "persisted_output_marker": false,
+          "external_output_path_lines": []
+        }
+      ],
+      "result_count": 1,
+      "paired_in_window": true
+    },
+    {
+      "source": "462439ee-b5af-4443-8a58-2e785a2ef826/subagents/agent-a039741565b7a09d8.jsonl",
+      "line": 131,
+      "block": 0,
+      "ts": "2026-07-18T02:09:35.427Z",
+      "call_id": "toolu_017xh7jAK945HGZPN6qn4M8B",
+      "command_chars": 329,
+      "command_sha256": "5424af639cc73f1b716c73bd4af0d18de73aaddddae0c2593cb3d92223109aba",
+      "full_input_field": true,
+      "run_in_background": false,
+      "results": [
+        {
+          "line": 132,
+          "block": 0,
+          "ts": "2026-07-18T02:09:38.875Z",
+          "is_error": false,
+          "content_chars": 315,
+          "native_result_keys": [
+            "stdout",
+            "stderr",
+            "interrupted",
+            "isImage",
+            "noOutputExpected"
+          ],
+          "native_stdout_chars": 315,
+          "persisted_output_marker": false,
+          "external_output_path_lines": []
+        }
+      ],
+      "result_count": 1,
+      "paired_in_window": true
+    },
+    {
+      "source": "462439ee-b5af-4443-8a58-2e785a2ef826/subagents/agent-a039741565b7a09d8.jsonl",
+      "line": 135,
+      "block": 0,
+      "ts": "2026-07-18T02:09:51.647Z",
+      "call_id": "toolu_01F2ZviVrbAzebRGd1nymQLo",
+      "command_chars": 1158,
+      "command_sha256": "9b3ee5071dc31718fefcd9643d32ea8739661b74e22338e691b30248454942ac",
+      "full_input_field": true,
+      "run_in_background": false,
+      "results": [
+        {
+          "line": 136,
+          "block": 0,
+          "ts": "2026-07-18T02:09:54.036Z",
+          "is_error": false,
+          "content_chars": 118,
+          "native_result_keys": [
+            "stdout",
+            "stderr",
+            "interrupted",
+            "isImage",
+            "noOutputExpected"
+          ],
+          "native_stdout_chars": 118,
+          "persisted_output_marker": false,
+          "external_output_path_lines": []
+        }
+      ],
+      "result_count": 1,
+      "paired_in_window": true
+    },
+    {
+      "source": "462439ee-b5af-4443-8a58-2e785a2ef826/subagents/agent-abdfd359882cc572f.jsonl",
+      "line": 24,
+      "block": 0,
+      "ts": "2026-07-18T01:24:24.456Z",
+      "call_id": "toolu_01DqcFnxPSuywGuMMfh46VNK",
+      "command_chars": 97,
+      "command_sha256": "f192858a266c16e3cd72a349321066c732834094909c2aee1c0561d3f27703be",
+      "full_input_field": true,
+      "run_in_background": false,
+      "results": [
+        {
+          "line": 25,
+          "block": 0,
+          "ts": "2026-07-18T01:24:24.894Z",
+          "is_error": false,
+          "content_chars": 1492,
+          "native_result_keys": [
+            "stdout",
+            "stderr",
+            "interrupted",
+            "isImage",
+            "noOutputExpected"
+          ],
+          "native_stdout_chars": 1492,
+          "persisted_output_marker": false,
+          "external_output_path_lines": []
+        }
+      ],
+      "result_count": 1,
+      "paired_in_window": true
+    },
+    {
+      "source": "462439ee-b5af-4443-8a58-2e785a2ef826/subagents/agent-abdfd359882cc572f.jsonl",
+      "line": 30,
+      "block": 0,
+      "ts": "2026-07-18T01:24:34.910Z",
+      "call_id": "toolu_017aRAF9esteVXfosgRypnjB",
+      "command_chars": 462,
+      "command_sha256": "a94dbcf5ffa19fadcab28789eb798e2f6ba1d7119ee62abddc168256357c6fe8",
+      "full_input_field": true,
+      "run_in_background": false,
+      "results": [
+        {
+          "line": 31,
+          "block": 0,
+          "ts": "2026-07-18T01:24:35.911Z",
+          "is_error": false,
+          "content_chars": 328,
+          "native_result_keys": [
+            "stdout",
+            "stderr",
+            "interrupted",
+            "isImage",
+            "noOutputExpected"
+          ],
+          "native_stdout_chars": 328,
+          "persisted_output_marker": false,
+          "external_output_path_lines": []
+        }
+      ],
+      "result_count": 1,
+      "paired_in_window": true
+    },
+    {
+      "source": "462439ee-b5af-4443-8a58-2e785a2ef826/subagents/agent-abdfd359882cc572f.jsonl",
+      "line": 40,
+      "block": 0,
+      "ts": "2026-07-18T01:25:00.877Z",
+      "call_id": "toolu_012p3FUtLVTsFJgiS4WvcHk9",
+      "command_chars": 363,
+      "command_sha256": "95b78a4b51b5445e5cce4ceba594ebc4b8638839c9ec56a175838705c9ba2e8f",
+      "full_input_field": true,
+      "run_in_background": false,
+      "results": [
+        {
+          "line": 41,
+          "block": 0,
+          "ts": "2026-07-18T01:25:01.382Z",
+          "is_error": false,
+          "content_chars": 3206,
+          "native_result_keys": [
+            "stdout",
+            "stderr",
+            "interrupted",
+            "isImage",
+            "noOutputExpected"
+          ],
+          "native_stdout_chars": 3206,
+          "persisted_output_marker": false,
+          "external_output_path_lines": []
+        }
+      ],
+      "result_count": 1,
+      "paired_in_window": true
+    },
+    {
+      "source": "462439ee-b5af-4443-8a58-2e785a2ef826/subagents/agent-abdfd359882cc572f.jsonl",
+      "line": 46,
+      "block": 0,
+      "ts": "2026-07-18T01:25:20.082Z",
+      "call_id": "toolu_01MZkh72bhHsR2Pqgvtqqdx1",
+      "command_chars": 490,
+      "command_sha256": "194bf085c087101ac18e37fa880356ead8665110d7b7603d48f78da5eb4c9f45",
+      "full_input_field": true,
+      "run_in_background": false,
+      "results": [
+        {
+          "line": 47,
+          "block": 0,
+          "ts": "2026-07-18T01:25:20.640Z",
+          "is_error": false,
+          "content_chars": 3476,
+          "native_result_keys": [
+            "stdout",
+            "stderr",
+            "interrupted",
+            "isImage",
+            "noOutputExpected"
+          ],
+          "native_stdout_chars": 3476,
+          "persisted_output_marker": false,
+          "external_output_path_lines": []
+        }
+      ],
+      "result_count": 1,
+      "paired_in_window": true
+    },
+    {
+      "source": "462439ee-b5af-4443-8a58-2e785a2ef826/subagents/agent-abdfd359882cc572f.jsonl",
+      "line": 48,
+      "block": 0,
+      "ts": "2026-07-18T01:25:22.141Z",
+      "call_id": "toolu_01HhUzkt1yyUGnTNEiH1Q9dP",
+      "command_chars": 426,
+      "command_sha256": "b0c2f627033c509629b9ccb2aaf215dbeadd7e937f31a5bb82152efa911a8b8e",
+      "full_input_field": true,
+      "run_in_background": false,
+      "results": [
+        {
+          "line": 49,
+          "block": 0,
+          "ts": "2026-07-18T01:25:22.761Z",
+          "is_error": false,
+          "content_chars": 1224,
+          "native_result_keys": [
+            "stdout",
+            "stderr",
+            "interrupted",
+            "isImage",
+            "noOutputExpected"
+          ],
+          "native_stdout_chars": 1224,
+          "persisted_output_marker": false,
+          "external_output_path_lines": []
+        }
+      ],
+      "result_count": 1,
+      "paired_in_window": true
+    },
+    {
+      "source": "462439ee-b5af-4443-8a58-2e785a2ef826/subagents/agent-abdfd359882cc572f.jsonl",
+      "line": 58,
+      "block": 0,
+      "ts": "2026-07-18T01:25:54.946Z",
+      "call_id": "toolu_01SgRmoeeqs9ZDZtjicHTD7D",
+      "command_chars": 509,
+      "command_sha256": "c5be2ff25398423f89bc2f373c05d7074802b25d828006cd9456350208e344ff",
+      "full_input_field": true,
+      "run_in_background": false,
+      "results": [
+        {
+          "line": 59,
+          "block": 0,
+          "ts": "2026-07-18T01:25:55.415Z",
+          "is_error": false,
+          "content_chars": 4178,
+          "native_result_keys": [
+            "stdout",
+            "stderr",
+            "interrupted",
+            "isImage",
+            "noOutputExpected"
+          ],
+          "native_stdout_chars": 4178,
+          "persisted_output_marker": false,
+          "external_output_path_lines": []
+        }
+      ],
+      "result_count": 1,
+      "paired_in_window": true
+    },
+    {
+      "source": "462439ee-b5af-4443-8a58-2e785a2ef826/subagents/agent-abdfd359882cc572f.jsonl",
+      "line": 90,
+      "block": 0,
+      "ts": "2026-07-18T01:27:38.674Z",
+      "call_id": "toolu_01KQie4bUExQxoU9joyUZvdd",
+      "command_chars": 478,
+      "command_sha256": "fe6efd91de49c9980be8ba67da744df519b1b15ec09f4617aa86d9c256e4616e",
+      "full_input_field": true,
+      "run_in_background": false,
+      "results": [
+        {
+          "line": 91,
+          "block": 0,
+          "ts": "2026-07-18T01:27:39.240Z",
+          "is_error": false,
+          "content_chars": 2840,
+          "native_result_keys": [
+            "stdout",
+            "stderr",
+            "interrupted",
+            "isImage",
+            "noOutputExpected"
+          ],
+          "native_stdout_chars": 2840,
+          "persisted_output_marker": false,
+          "external_output_path_lines": []
+        }
+      ],
+      "result_count": 1,
+      "paired_in_window": true
+    },
+    {
+      "source": "462439ee-b5af-4443-8a58-2e785a2ef826/subagents/agent-abdfd359882cc572f.jsonl",
+      "line": 96,
+      "block": 0,
+      "ts": "2026-07-18T01:28:28.017Z",
+      "call_id": "toolu_017Qy8r3jLjqJd4DV7VMCUaA",
+      "command_chars": 633,
+      "command_sha256": "fd1dfc35347750b1213fbfd76a76acabaf9efc13073259274267b2675d0302d5",
+      "full_input_field": true,
+      "run_in_background": false,
+      "results": [
+        {
+          "line": 97,
+          "block": 0,
+          "ts": "2026-07-18T01:28:28.617Z",
+          "is_error": false,
+          "content_chars": 1248,
+          "native_result_keys": [
+            "stdout",
+            "stderr",
+            "interrupted",
+            "isImage",
+            "noOutputExpected"
+          ],
+          "native_stdout_chars": 1248,
+          "persisted_output_marker": false,
+          "external_output_path_lines": []
+        }
+      ],
+      "result_count": 1,
+      "paired_in_window": true
+    },
+    {
+      "source": "462439ee-b5af-4443-8a58-2e785a2ef826/subagents/agent-abdfd359882cc572f.jsonl",
+      "line": 102,
+      "block": 0,
+      "ts": "2026-07-18T01:28:45.389Z",
+      "call_id": "toolu_01JZwfCBsLy4mYLpPreYGtEA",
+      "command_chars": 535,
+      "command_sha256": "1b082cbba06c34f301f14dd9a9a01d62a69251f2dd4c6e8132514f6bd33369f9",
+      "full_input_field": true,
+      "run_in_background": false,
+      "results": [
+        {
+          "line": 103,
+          "block": 0,
+          "ts": "2026-07-18T01:28:50.445Z",
+          "is_error": false,
+          "content_chars": 920,
+          "native_result_keys": [
+            "stdout",
+            "stderr",
+            "interrupted",
+            "isImage",
+            "noOutputExpected"
+          ],
+          "native_stdout_chars": 920,
+          "persisted_output_marker": false,
+          "external_output_path_lines": []
+        }
+      ],
+      "result_count": 1,
+      "paired_in_window": true
+    },
+    {
+      "source": "462439ee-b5af-4443-8a58-2e785a2ef826/subagents/agent-abdfd359882cc572f.jsonl",
+      "line": 106,
+      "block": 0,
+      "ts": "2026-07-18T01:29:05.412Z",
+      "call_id": "toolu_01K8oxHpfob8jwWCsYd4Wyv9",
+      "command_chars": 478,
+      "command_sha256": "80349768e9c502e6813c7148c23f83ff545bdbc327714c0b8fc10d0d328b4ed8",
+      "full_input_field": true,
+      "run_in_background": false,
+      "results": [
+        {
+          "line": 107,
+          "block": 0,
+          "ts": "2026-07-18T01:29:05.853Z",
+          "is_error": false,
+          "content_chars": 89,
+          "native_result_keys": [
+            "stdout",
+            "stderr",
+            "interrupted",
+            "isImage",
+            "noOutputExpected"
+          ],
+          "native_stdout_chars": 89,
+          "persisted_output_marker": false,
+          "external_output_path_lines": []
+        }
+      ],
+      "result_count": 1,
+      "paired_in_window": true
+    },
+    {
+      "source": "462439ee-b5af-4443-8a58-2e785a2ef826/subagents/agent-abdfd359882cc572f.jsonl",
+      "line": 109,
+      "block": 0,
+      "ts": "2026-07-18T01:29:15.591Z",
+      "call_id": "toolu_01AaDT7KqBunDHWvtShCtzde",
+      "command_chars": 664,
+      "command_sha256": "e37d76f7ef98f99f4367d983c871366a4ce2faacee8ad5bfc73387145d34546a",
+      "full_input_field": true,
+      "run_in_background": false,
+      "results": [
+        {
+          "line": 110,
+          "block": 0,
+          "ts": "2026-07-18T01:29:16.319Z",
+          "is_error": false,
+          "content_chars": 858,
+          "native_result_keys": [
+            "stdout",
+            "stderr",
+            "interrupted",
+            "isImage",
+            "noOutputExpected"
+          ],
+          "native_stdout_chars": 858,
+          "persisted_output_marker": false,
+          "external_output_path_lines": []
+        }
+      ],
+      "result_count": 1,
+      "paired_in_window": true
+    },
+    {
+      "source": "462439ee-b5af-4443-8a58-2e785a2ef826/subagents/agent-abdfd359882cc572f.jsonl",
+      "line": 113,
+      "block": 0,
+      "ts": "2026-07-18T01:29:37.970Z",
+      "call_id": "toolu_012vB62Mi8VoFBuXDAskzt2B",
+      "command_chars": 878,
+      "command_sha256": "ffc0a7f0ad1c50d7ef6f25a38ffb6c4389d2a71b9147778236b46e3cbc2ffa17",
+      "full_input_field": true,
+      "run_in_background": false,
+      "results": [
+        {
+          "line": 114,
+          "block": 0,
+          "ts": "2026-07-18T01:29:39.195Z",
+          "is_error": false,
+          "content_chars": 5853,
+          "native_result_keys": [
+            "stdout",
+            "stderr",
+            "interrupted",
+            "isImage",
+            "returnCodeInterpretation",
+            "noOutputExpected"
+          ],
+          "native_stdout_chars": 5853,
+          "persisted_output_marker": false,
+          "external_output_path_lines": []
+        }
+      ],
+      "result_count": 1,
+      "paired_in_window": true
+    },
+    {
+      "source": "462439ee-b5af-4443-8a58-2e785a2ef826/subagents/agent-abdfd359882cc572f.jsonl",
+      "line": 126,
+      "block": 0,
+      "ts": "2026-07-18T01:30:59.796Z",
+      "call_id": "toolu_014dKRjXHcKHoxsLNyFPMSmt",
+      "command_chars": 556,
+      "command_sha256": "d130d051201822c5ed0b36937e259e172b7ab1c6b1abe88c0b12ab73de71f1d6",
+      "full_input_field": true,
+      "run_in_background": false,
+      "results": [
+        {
+          "line": 127,
+          "block": 0,
+          "ts": "2026-07-18T01:31:00.328Z",
+          "is_error": false,
+          "content_chars": 1938,
+          "native_result_keys": [
+            "stdout",
+            "stderr",
+            "interrupted",
+            "isImage",
+            "noOutputExpected"
+          ],
+          "native_stdout_chars": 1938,
+          "persisted_output_marker": false,
+          "external_output_path_lines": []
+        }
+      ],
+      "result_count": 1,
+      "paired_in_window": true
+    },
+    {
+      "source": "462439ee-b5af-4443-8a58-2e785a2ef826/subagents/agent-abdfd359882cc572f.jsonl",
+      "line": 135,
+      "block": 0,
+      "ts": "2026-07-18T01:32:00.037Z",
+      "call_id": "toolu_01JHzrUeE1UX1JrwBEkKb5Rs",
+      "command_chars": 757,
+      "command_sha256": "94780d19bec031e3be8cb505b9d95c9e9813fd2044599eee3511d7bc5474b5de",
+      "full_input_field": true,
+      "run_in_background": false,
+      "results": [
+        {
+          "line": 136,
+          "block": 0,
+          "ts": "2026-07-18T01:32:00.822Z",
+          "is_error": false,
+          "content_chars": 1884,
+          "native_result_keys": [
+            "stdout",
+            "stderr",
+            "interrupted",
+            "isImage",
+            "noOutputExpected"
+          ],
+          "native_stdout_chars": 1884,
+          "persisted_output_marker": false,
+          "external_output_path_lines": []
+        }
+      ],
+      "result_count": 1,
+      "paired_in_window": true
+    },
+    {
+      "source": "462439ee-b5af-4443-8a58-2e785a2ef826/subagents/agent-abdfd359882cc572f.jsonl",
+      "line": 145,
+      "block": 0,
+      "ts": "2026-07-18T01:32:41.650Z",
+      "call_id": "toolu_019fD5UNv1q5fwThLdPX4r66",
+      "command_chars": 826,
+      "command_sha256": "f664d5768d37375f33ae08e2a3c941a125e9dab13baaa8b35192daedb857ef83",
+      "full_input_field": true,
+      "run_in_background": false,
+      "results": [
+        {
+          "line": 146,
+          "block": 0,
+          "ts": "2026-07-18T01:32:42.382Z",
+          "is_error": false,
+          "content_chars": 3250,
+          "native_result_keys": [
+            "stdout",
+            "stderr",
+            "interrupted",
+            "isImage",
+            "noOutputExpected"
+          ],
+          "native_stdout_chars": 3250,
+          "persisted_output_marker": false,
+          "external_output_path_lines": []
+        }
+      ],
+      "result_count": 1,
+      "paired_in_window": true
+    },
+    {
+      "source": "462439ee-b5af-4443-8a58-2e785a2ef826/subagents/agent-abdfd359882cc572f.jsonl",
+      "line": 152,
+      "block": 0,
+      "ts": "2026-07-18T01:33:52.837Z",
+      "call_id": "toolu_01Y39TNCokovgYezZLJPBVA5",
+      "command_chars": 752,
+      "command_sha256": "731a83df0e1848e7ca21618ddcc200e048fe779fb49d316ce95a6cf03c2c3a70",
+      "full_input_field": true,
+      "run_in_background": false,
+      "results": [
+        {
+          "line": 153,
+          "block": 0,
+          "ts": "2026-07-18T01:33:53.514Z",
+          "is_error": false,
+          "content_chars": 761,
+          "native_result_keys": [
+            "stdout",
+            "stderr",
+            "interrupted",
+            "isImage",
+            "noOutputExpected"
+          ],
+          "native_stdout_chars": 761,
+          "persisted_output_marker": false,
+          "external_output_path_lines": []
+        }
+      ],
+      "result_count": 1,
+      "paired_in_window": true
+    },
+    {
+      "source": "462439ee-b5af-4443-8a58-2e785a2ef826/subagents/agent-abdfd359882cc572f.jsonl",
+      "line": 154,
+      "block": 0,
+      "ts": "2026-07-18T01:33:56.024Z",
+      "call_id": "toolu_01YEprrPQsGCs82NJUE3yfTh",
+      "command_chars": 715,
+      "command_sha256": "f942313ee62b48b72c9b3d3509886437733f6f7508c514a1d2ec1303b96b151a",
+      "full_input_field": true,
+      "run_in_background": false,
+      "results": [
+        {
+          "line": 155,
+          "block": 0,
+          "ts": "2026-07-18T01:33:56.553Z",
+          "is_error": false,
+          "content_chars": 1432,
+          "native_result_keys": [
+            "stdout",
+            "stderr",
+            "interrupted",
+            "isImage",
+            "noOutputExpected"
+          ],
+          "native_stdout_chars": 1432,
+          "persisted_output_marker": false,
+          "external_output_path_lines": []
+        }
+      ],
+      "result_count": 1,
+      "paired_in_window": true
+    },
+    {
+      "source": "462439ee-b5af-4443-8a58-2e785a2ef826/subagents/agent-abdfd359882cc572f.jsonl",
+      "line": 160,
+      "block": 0,
+      "ts": "2026-07-18T01:34:53.843Z",
+      "call_id": "toolu_01VsFggJMttcZyoUyvPpf6Xw",
+      "command_chars": 476,
+      "command_sha256": "f8c92da07240610fd5333f6865478979d85182b79f40c9ece3291af6ec39a749",
+      "full_input_field": true,
+      "run_in_background": false,
+      "results": [
+        {
+          "line": 161,
+          "block": 0,
+          "ts": "2026-07-18T01:34:54.395Z",
+          "is_error": false,
+          "content_chars": 1147,
+          "native_result_keys": [
+            "stdout",
+            "stderr",
+            "interrupted",
+            "isImage",
+            "noOutputExpected"
+          ],
+          "native_stdout_chars": 1147,
+          "persisted_output_marker": false,
+          "external_output_path_lines": []
+        }
+      ],
+      "result_count": 1,
+      "paired_in_window": true
+    },
+    {
+      "source": "462439ee-b5af-4443-8a58-2e785a2ef826/subagents/agent-abdfd359882cc572f.jsonl",
+      "line": 178,
+      "block": 0,
+      "ts": "2026-07-18T01:35:41.716Z",
+      "call_id": "toolu_01XtaDwi2QmqC3m3qjbLHNq9",
+      "command_chars": 142,
+      "command_sha256": "5338d481c183b181fd3186835bca14dbaaf603712a66ca27a62796d1e4ac3b3c",
+      "full_input_field": true,
+      "run_in_background": false,
+      "results": [
+        {
+          "line": 179,
+          "block": 0,
+          "ts": "2026-07-18T01:35:42.103Z",
+          "is_error": false,
+          "content_chars": 250,
+          "native_result_keys": [
+            "stdout",
+            "stderr",
+            "interrupted",
+            "isImage",
+            "noOutputExpected"
+          ],
+          "native_stdout_chars": 250,
+          "persisted_output_marker": false,
+          "external_output_path_lines": []
+        }
+      ],
+      "result_count": 1,
+      "paired_in_window": true
+    },
+    {
+      "source": "462439ee-b5af-4443-8a58-2e785a2ef826/subagents/agent-abdfd359882cc572f.jsonl",
+      "line": 212,
+      "block": 0,
+      "ts": "2026-07-18T01:38:56.899Z",
+      "call_id": "toolu_01FeSY2eij7wobhTVAHZKuDB",
+      "command_chars": 447,
+      "command_sha256": "d10578b55044f3d15f1ab6d47908e23a00a1a4a220594438f45c722ee3888b07",
+      "full_input_field": true,
+      "run_in_background": false,
+      "results": [
+        {
+          "line": 213,
+          "block": 0,
+          "ts": "2026-07-18T01:38:57.383Z",
+          "is_error": false,
+          "content_chars": 262,
+          "native_result_keys": [
+            "stdout",
+            "stderr",
+            "interrupted",
+            "isImage",
+            "noOutputExpected"
+          ],
+          "native_stdout_chars": 262,
+          "persisted_output_marker": false,
+          "external_output_path_lines": []
+        }
+      ],
+      "result_count": 1,
+      "paired_in_window": true
+    },
+    {
+      "source": "462439ee-b5af-4443-8a58-2e785a2ef826/subagents/agent-abdfd359882cc572f.jsonl",
+      "line": 233,
+      "block": 0,
+      "ts": "2026-07-18T01:39:52.038Z",
+      "call_id": "toolu_01CvSDVkP9pi8PDXZsnNvb7d",
+      "command_chars": 744,
+      "command_sha256": "2847128cdca17ba4072edfdbfa252bbe1ce8932366c503ebb392ff27bdf46879",
+      "full_input_field": true,
+      "run_in_background": false,
+      "results": [
+        {
+          "line": 234,
+          "block": 0,
+          "ts": "2026-07-18T01:39:52.863Z",
+          "is_error": false,
+          "content_chars": 800,
+          "native_result_keys": [
+            "stdout",
+            "stderr",
+            "interrupted",
+            "isImage",
+            "noOutputExpected"
+          ],
+          "native_stdout_chars": 800,
+          "persisted_output_marker": false,
+          "external_output_path_lines": []
+        }
+      ],
+      "result_count": 1,
+      "paired_in_window": true
+    },
+    {
+      "source": "462439ee-b5af-4443-8a58-2e785a2ef826/subagents/agent-abdfd359882cc572f.jsonl",
+      "line": 239,
+      "block": 0,
+      "ts": "2026-07-18T01:40:16.025Z",
+      "call_id": "toolu_017c7haJiDP9X8Fc143sdMRM",
+      "command_chars": 305,
+      "command_sha256": "85cae6df4fe441c99c2bf99da3592efefda051066395602c32d117088042cb9e",
+      "full_input_field": true,
+      "run_in_background": false,
+      "results": [
+        {
+          "line": 240,
+          "block": 0,
+          "ts": "2026-07-18T01:40:16.557Z",
+          "is_error": false,
+          "content_chars": 3086,
+          "native_result_keys": [
+            "stdout",
+            "stderr",
+            "interrupted",
+            "isImage",
+            "noOutputExpected"
+          ],
+          "native_stdout_chars": 3086,
+          "persisted_output_marker": false,
+          "external_output_path_lines": []
+        }
+      ],
+      "result_count": 1,
+      "paired_in_window": true
+    },
+    {
+      "source": "462439ee-b5af-4443-8a58-2e785a2ef826/subagents/agent-abdfd359882cc572f.jsonl",
+      "line": 247,
+      "block": 0,
+      "ts": "2026-07-18T01:40:45.432Z",
+      "call_id": "toolu_01TpzzBSFSg9qUNv1eRJ6r7L",
+      "command_chars": 182,
+      "command_sha256": "c62fe475df9f52613b1a57b28b76c5607c9ab0cf37e4d344a6a53b8e2df3ac80",
+      "full_input_field": true,
+      "run_in_background": false,
+      "results": [
+        {
+          "line": 248,
+          "block": 0,
+          "ts": "2026-07-18T01:40:49.125Z",
+          "is_error": false,
+          "content_chars": 1537,
+          "native_result_keys": [
+            "stdout",
+            "stderr",
+            "interrupted",
+            "isImage",
+            "noOutputExpected"
+          ],
+          "native_stdout_chars": 1537,
+          "persisted_output_marker": false,
+          "external_output_path_lines": []
+        }
+      ],
+      "result_count": 1,
+      "paired_in_window": true
+    },
+    {
+      "source": "462439ee-b5af-4443-8a58-2e785a2ef826/subagents/agent-abdfd359882cc572f.jsonl",
+      "line": 250,
+      "block": 0,
+      "ts": "2026-07-18T01:40:53.292Z",
+      "call_id": "toolu_01Nmmv19jToawoyvifyVavUH",
+      "command_chars": 324,
+      "command_sha256": "b408f76f6e743d74c7d6dba58a4f14f64773ea725c14c2f2ebb067a9ab626c0c",
+      "full_input_field": true,
+      "run_in_background": false,
+      "results": [
+        {
+          "line": 251,
+          "block": 0,
+          "ts": "2026-07-18T01:41:03.928Z",
+          "is_error": false,
+          "content_chars": 15,
+          "native_result_keys": [
+            "stdout",
+            "stderr",
+            "interrupted",
+            "isImage",
+            "noOutputExpected"
+          ],
+          "native_stdout_chars": 15,
+          "persisted_output_marker": false,
+          "external_output_path_lines": []
+        }
+      ],
+      "result_count": 1,
+      "paired_in_window": true
+    },
+    {
+      "source": "462439ee-b5af-4443-8a58-2e785a2ef826/subagents/agent-abdfd359882cc572f.jsonl",
+      "line": 254,
+      "block": 0,
+      "ts": "2026-07-18T01:41:15.972Z",
+      "call_id": "toolu_01P4shrjnYRxLqtffV9Bqwvc",
+      "command_chars": 996,
+      "command_sha256": "db8b2d0e7b8e4a6e787e01f7698ea53855239ce3a214decd886eec98c8a0abf3",
+      "full_input_field": true,
+      "run_in_background": false,
+      "results": [
+        {
+          "line": 255,
+          "block": 0,
+          "ts": "2026-07-18T01:41:18.116Z",
+          "is_error": false,
+          "content_chars": 5446,
+          "native_result_keys": [
+            "stdout",
+            "stderr",
+            "interrupted",
+            "isImage",
+            "noOutputExpected"
+          ],
+          "native_stdout_chars": 5446,
+          "persisted_output_marker": false,
+          "external_output_path_lines": []
+        }
+      ],
+      "result_count": 1,
+      "paired_in_window": true
+    },
+    {
+      "source": "462439ee-b5af-4443-8a58-2e785a2ef826/subagents/agent-abdfd359882cc572f.jsonl",
+      "line": 258,
+      "block": 0,
+      "ts": "2026-07-18T01:42:19.592Z",
+      "call_id": "toolu_01KQRw2fYTSd1X2apHYPxY76",
+      "command_chars": 1062,
+      "command_sha256": "e2d2cc1a74e185c8673dcd8d4b47933b30a1fb68edf3c37b67701aec099bb1c8",
+      "full_input_field": true,
+      "run_in_background": false,
+      "results": [
+        {
+          "line": 259,
+          "block": 0,
+          "ts": "2026-07-18T01:42:22.452Z",
+          "is_error": false,
+          "content_chars": 506,
+          "native_result_keys": [
+            "stdout",
+            "stderr",
+            "interrupted",
+            "isImage",
+            "noOutputExpected"
+          ],
+          "native_stdout_chars": 506,
+          "persisted_output_marker": false,
+          "external_output_path_lines": []
+        }
+      ],
+      "result_count": 1,
+      "paired_in_window": true
+    },
+    {
+      "source": "462439ee-b5af-4443-8a58-2e785a2ef826/subagents/agent-abdfd359882cc572f.jsonl",
+      "line": 262,
+      "block": 0,
+      "ts": "2026-07-18T01:43:22.378Z",
+      "call_id": "toolu_01GRBdP5QhFhAxedR2Fm9CEQ",
+      "command_chars": 188,
+      "command_sha256": "934c393da068e77ad9d46afc7b4dc2736844e0ea69b40a5d0a17bb1143236953",
+      "full_input_field": true,
+      "run_in_background": false,
+      "results": [
+        {
+          "line": 263,
+          "block": 0,
+          "ts": "2026-07-18T01:43:24.503Z",
+          "is_error": false,
+          "content_chars": 544,
+          "native_result_keys": [
+            "stdout",
+            "stderr",
+            "interrupted",
+            "isImage",
+            "noOutputExpected"
+          ],
+          "native_stdout_chars": 544,
+          "persisted_output_marker": false,
+          "external_output_path_lines": []
+        }
+      ],
+      "result_count": 1,
+      "paired_in_window": true
+    },
+    {
+      "source": "462439ee-b5af-4443-8a58-2e785a2ef826/subagents/agent-abdfd359882cc572f.jsonl",
+      "line": 264,
+      "block": 0,
+      "ts": "2026-07-18T01:43:30.341Z",
+      "call_id": "toolu_01WT2UTy53yRrdGjtgpLSQgX",
+      "command_chars": 703,
+      "command_sha256": "972e6d64be46224f8da611374be199c019368490d98556a62d8a1f323ae1348a",
+      "full_input_field": true,
+      "run_in_background": false,
+      "results": [
+        {
+          "line": 265,
+          "block": 0,
+          "ts": "2026-07-18T01:43:34.244Z",
+          "is_error": false,
+          "content_chars": 310,
+          "native_result_keys": [
+            "stdout",
+            "stderr",
+            "interrupted",
+            "isImage",
+            "noOutputExpected"
+          ],
+          "native_stdout_chars": 310,
+          "persisted_output_marker": false,
+          "external_output_path_lines": []
+        }
+      ],
+      "result_count": 1,
+      "paired_in_window": true
+    },
+    {
+      "source": "462439ee-b5af-4443-8a58-2e785a2ef826/subagents/agent-abdfd359882cc572f.jsonl",
+      "line": 268,
+      "block": 0,
+      "ts": "2026-07-18T01:44:53.196Z",
+      "call_id": "toolu_018X96KgD3QAf6hTFSpKadSe",
+      "command_chars": 466,
+      "command_sha256": "93974bc367183bf55a655d54fe88d9cbec7466502ddfcac84393749d32cfce46",
+      "full_input_field": true,
+      "run_in_background": false,
+      "results": [
+        {
+          "line": 269,
+          "block": 0,
+          "ts": "2026-07-18T01:44:53.778Z",
+          "is_error": false,
+          "content_chars": 4899,
+          "native_result_keys": [
+            "stdout",
+            "stderr",
+            "interrupted",
+            "isImage",
+            "noOutputExpected"
+          ],
+          "native_stdout_chars": 4899,
+          "persisted_output_marker": false,
+          "external_output_path_lines": []
+        }
+      ],
+      "result_count": 1,
+      "paired_in_window": true
+    },
+    {
+      "source": "462439ee-b5af-4443-8a58-2e785a2ef826/subagents/agent-abdfd359882cc572f.jsonl",
+      "line": 272,
+      "block": 0,
+      "ts": "2026-07-18T01:45:49.838Z",
+      "call_id": "toolu_01JMPrxK7zigMu4qbZkfpd1C",
+      "command_chars": 789,
+      "command_sha256": "b8a349a16ccb406e99b85706114f5a8fa7676aa5a162caaff9877bde76d2a1f3",
+      "full_input_field": true,
+      "run_in_background": false,
+      "results": [
+        {
+          "line": 273,
+          "block": 0,
+          "ts": "2026-07-18T01:45:53.211Z",
+          "is_error": true,
+          "content_chars": 779,
+          "native_result_keys": [],
+          "native_stdout_chars": null,
+          "persisted_output_marker": false,
+          "external_output_path_lines": []
+        }
+      ],
+      "result_count": 1,
+      "paired_in_window": true
+    },
+    {
+      "source": "462439ee-b5af-4443-8a58-2e785a2ef826/subagents/agent-abdfd359882cc572f.jsonl",
+      "line": 275,
+      "block": 0,
+      "ts": "2026-07-18T01:46:08.770Z",
+      "call_id": "toolu_019JBvfTdyVNP4gGAHtyHh5H",
+      "command_chars": 748,
+      "command_sha256": "7eacb737e02f27c3349fa666849c7c07b6fb0b0b273163504bfbdbba721bb900",
+      "full_input_field": true,
+      "run_in_background": false,
+      "results": [
+        {
+          "line": 276,
+          "block": 0,
+          "ts": "2026-07-18T01:46:11.283Z",
+          "is_error": true,
+          "content_chars": 168,
+          "native_result_keys": [],
+          "native_stdout_chars": null,
+          "persisted_output_marker": false,
+          "external_output_path_lines": []
+        }
+      ],
+      "result_count": 1,
+      "paired_in_window": true
+    },
+    {
+      "source": "462439ee-b5af-4443-8a58-2e785a2ef826/subagents/agent-abdfd359882cc572f.jsonl",
+      "line": 278,
+      "block": 0,
+      "ts": "2026-07-18T01:46:23.020Z",
+      "call_id": "toolu_01G55TJXTZegQnPNuG36yiXG",
+      "command_chars": 741,
+      "command_sha256": "5feb2844d6eccb618799092814e245be33a25c04e26937c4c213910ef26cfa3f",
+      "full_input_field": true,
+      "run_in_background": false,
+      "results": [
+        {
+          "line": 279,
+          "block": 0,
+          "ts": "2026-07-18T01:46:25.776Z",
+          "is_error": false,
+          "content_chars": 150,
+          "native_result_keys": [
+            "stdout",
+            "stderr",
+            "interrupted",
+            "isImage",
+            "noOutputExpected"
+          ],
+          "native_stdout_chars": 150,
+          "persisted_output_marker": false,
+          "external_output_path_lines": []
+        }
+      ],
+      "result_count": 1,
+      "paired_in_window": true
+    },
+    {
+      "source": "462439ee-b5af-4443-8a58-2e785a2ef826/subagents/agent-abdfd359882cc572f.jsonl",
+      "line": 282,
+      "block": 0,
+      "ts": "2026-07-18T01:46:48.224Z",
+      "call_id": "toolu_01FbKE9JN5Wk3J3ucDZHY9Zb",
+      "command_chars": 1041,
+      "command_sha256": "7c3f9e1a268bd160e75a8988e56b393217d5d930aefade36b50bedb8ea7e172e",
+      "full_input_field": true,
+      "run_in_background": false,
+      "results": [
+        {
+          "line": 283,
+          "block": 0,
+          "ts": "2026-07-18T01:46:50.733Z",
+          "is_error": true,
+          "content_chars": 448,
+          "native_result_keys": [],
+          "native_stdout_chars": null,
+          "persisted_output_marker": false,
+          "external_output_path_lines": []
+        }
+      ],
+      "result_count": 1,
+      "paired_in_window": true
+    },
+    {
+      "source": "462439ee-b5af-4443-8a58-2e785a2ef826/subagents/agent-abdfd359882cc572f.jsonl",
+      "line": 286,
+      "block": 0,
+      "ts": "2026-07-18T01:47:20.969Z",
+      "call_id": "toolu_01DpPjW4EydEDxgcX3a79xEb",
+      "command_chars": 744,
+      "command_sha256": "3039cdeb89ca60525b7bb1bf6c5e8d8254535eecf8fa90e72caf5669be5f5cf8",
+      "full_input_field": true,
+      "run_in_background": false,
+      "results": [
+        {
+          "line": 287,
+          "block": 0,
+          "ts": "2026-07-18T01:47:25.592Z",
+          "is_error": false,
+          "content_chars": 1674,
+          "native_result_keys": [
+            "stdout",
+            "stderr",
+            "interrupted",
+            "isImage",
+            "noOutputExpected"
+          ],
+          "native_stdout_chars": 1674,
+          "persisted_output_marker": false,
+          "external_output_path_lines": []
+        }
+      ],
+      "result_count": 1,
+      "paired_in_window": true
+    },
+    {
+      "source": "462439ee-b5af-4443-8a58-2e785a2ef826/subagents/agent-abdfd359882cc572f.jsonl",
+      "line": 290,
+      "block": 0,
+      "ts": "2026-07-18T01:48:13.896Z",
+      "call_id": "toolu_016Ah5Q2E2Ts7eBSKx8U5LMo",
+      "command_chars": 974,
+      "command_sha256": "38811f8f7e7c95f117c81dbe99aae28d7ae712d519201559dbe80a599b0fbbc1",
+      "full_input_field": true,
+      "run_in_background": false,
+      "results": [
+        {
+          "line": 291,
+          "block": 0,
+          "ts": "2026-07-18T01:48:16.347Z",
+          "is_error": false,
+          "content_chars": 1221,
+          "native_result_keys": [
+            "stdout",
+            "stderr",
+            "interrupted",
+            "isImage",
+            "noOutputExpected"
+          ],
+          "native_stdout_chars": 1221,
+          "persisted_output_marker": false,
+          "external_output_path_lines": []
+        }
+      ],
+      "result_count": 1,
+      "paired_in_window": true
+    },
+    {
+      "source": "462439ee-b5af-4443-8a58-2e785a2ef826/subagents/agent-abdfd359882cc572f.jsonl",
+      "line": 294,
+      "block": 0,
+      "ts": "2026-07-18T01:49:04.208Z",
+      "call_id": "toolu_012546Zf4WJ4drhhf4NjXJvf",
+      "command_chars": 469,
+      "command_sha256": "ba78ce34492ec3247865681fa5b016d05e62ad96ceef4a9a6488616fcae7b211",
+      "full_input_field": true,
+      "run_in_background": false,
+      "results": [
+        {
+          "line": 295,
+          "block": 0,
+          "ts": "2026-07-18T01:49:07.346Z",
+          "is_error": false,
+          "content_chars": 522,
+          "native_result_keys": [
+            "stdout",
+            "stderr",
+            "interrupted",
+            "isImage",
+            "noOutputExpected"
+          ],
+          "native_stdout_chars": 522,
+          "persisted_output_marker": false,
+          "external_output_path_lines": []
+        }
+      ],
+      "result_count": 1,
+      "paired_in_window": true
+    },
+    {
+      "source": "462439ee-b5af-4443-8a58-2e785a2ef826/subagents/agent-abdfd359882cc572f.jsonl",
+      "line": 297,
+      "block": 0,
+      "ts": "2026-07-18T01:49:15.055Z",
+      "call_id": "toolu_01SQrmCRiF137g2GwnH5DbhA",
+      "command_chars": 190,
+      "command_sha256": "5767f213a8557c5e0e7350d2c3bde6e7fd290a5713c08774f21811914eb11479",
+      "full_input_field": true,
+      "run_in_background": false,
+      "results": [
+        {
+          "line": 298,
+          "block": 0,
+          "ts": "2026-07-18T01:49:20.192Z",
+          "is_error": false,
+          "content_chars": 1748,
+          "native_result_keys": [
+            "stdout",
+            "stderr",
+            "interrupted",
+            "isImage",
+            "noOutputExpected"
+          ],
+          "native_stdout_chars": 1748,
+          "persisted_output_marker": false,
+          "external_output_path_lines": []
+        }
+      ],
+      "result_count": 1,
+      "paired_in_window": true
+    },
+    {
+      "source": "462439ee-b5af-4443-8a58-2e785a2ef826/subagents/agent-abdfd359882cc572f.jsonl",
+      "line": 301,
+      "block": 0,
+      "ts": "2026-07-18T01:49:38.494Z",
+      "call_id": "toolu_01TrNhGAgB3MtzV4cXzgiaiA",
+      "command_chars": 403,
+      "command_sha256": "100735e828aae2f84d0985a8fc1b4af62fb6001a3182600b65917265ae7c823b",
+      "full_input_field": true,
+      "run_in_background": false,
+      "results": [
+        {
+          "line": 302,
+          "block": 0,
+          "ts": "2026-07-18T01:49:40.759Z",
+          "is_error": false,
+          "content_chars": 1478,
+          "native_result_keys": [
+            "stdout",
+            "stderr",
+            "interrupted",
+            "isImage",
+            "noOutputExpected"
+          ],
+          "native_stdout_chars": 1478,
+          "persisted_output_marker": false,
+          "external_output_path_lines": []
+        }
+      ],
+      "result_count": 1,
+      "paired_in_window": true
+    },
+    {
+      "source": "462439ee-b5af-4443-8a58-2e785a2ef826/subagents/agent-abdfd359882cc572f.jsonl",
+      "line": 305,
+      "block": 0,
+      "ts": "2026-07-18T01:49:53.619Z",
+      "call_id": "toolu_019D3fpVUitkMMHdFTMnHAsR",
+      "command_chars": 273,
+      "command_sha256": "c086199be9d1f95baece4ac67dff7a3b43e1d9fbba3000773569138bd8acbb71",
+      "full_input_field": true,
+      "run_in_background": false,
+      "results": [
+        {
+          "line": 306,
+          "block": 0,
+          "ts": "2026-07-18T01:49:54.034Z",
+          "is_error": false,
+          "content_chars": 31,
+          "native_result_keys": [
+            "stdout",
+            "stderr",
+            "interrupted",
+            "isImage",
+            "noOutputExpected"
+          ],
+          "native_stdout_chars": 0,
+          "persisted_output_marker": false,
+          "external_output_path_lines": []
+        }
+      ],
+      "result_count": 1,
+      "paired_in_window": true
+    },
+    {
+      "source": "462439ee-b5af-4443-8a58-2e785a2ef826/subagents/agent-abdfd359882cc572f.jsonl",
+      "line": 308,
+      "block": 0,
+      "ts": "2026-07-18T01:50:04.314Z",
+      "call_id": "toolu_01NDEpjb4K1rBbYquhbwr99E",
+      "command_chars": 617,
+      "command_sha256": "92f1471bc0fc2700212dafd0bde6ea18359aeb485d8afd3c26021337bda5e171",
+      "full_input_field": true,
+      "run_in_background": false,
+      "results": [
+        {
+          "line": 309,
+          "block": 0,
+          "ts": "2026-07-18T01:50:04.650Z",
+          "is_error": true,
+          "content_chars": 45,
+          "native_result_keys": [],
+          "native_stdout_chars": null,
+          "persisted_output_marker": false,
+          "external_output_path_lines": []
+        }
+      ],
+      "result_count": 1,
+      "paired_in_window": true
+    },
+    {
+      "source": "462439ee-b5af-4443-8a58-2e785a2ef826/subagents/agent-abdfd359882cc572f.jsonl",
+      "line": 311,
+      "block": 0,
+      "ts": "2026-07-18T01:50:16.050Z",
+      "call_id": "toolu_018hKWpF5HyVX8XpxR9mo5kr",
+      "command_chars": 489,
+      "command_sha256": "cc62b7f1ad7c34f1c825bdb06db115e92fd985715809f87b99ac14f9fc968748",
+      "full_input_field": true,
+      "run_in_background": false,
+      "results": [
+        {
+          "line": 312,
+          "block": 0,
+          "ts": "2026-07-18T01:50:16.562Z",
+          "is_error": false,
+          "content_chars": 2353,
+          "native_result_keys": [
+            "stdout",
+            "stderr",
+            "interrupted",
+            "isImage",
+            "noOutputExpected"
+          ],
+          "native_stdout_chars": 2353,
+          "persisted_output_marker": false,
+          "external_output_path_lines": []
+        }
+      ],
+      "result_count": 1,
+      "paired_in_window": true
+    },
+    {
+      "source": "462439ee-b5af-4443-8a58-2e785a2ef826/subagents/agent-abdfd359882cc572f.jsonl",
+      "line": 314,
+      "block": 0,
+      "ts": "2026-07-18T01:50:26.275Z",
+      "call_id": "toolu_01GxSpn6njZnY76WAZSckQzy",
+      "command_chars": 271,
+      "command_sha256": "447c9d432ad68b4bb1ba73432f7389a9ef72e8ca6d3e3d7f6e067821fddfc761",
+      "full_input_field": true,
+      "run_in_background": false,
+      "results": [
+        {
+          "line": 315,
+          "block": 0,
+          "ts": "2026-07-18T01:50:26.717Z",
+          "is_error": false,
+          "content_chars": 1294,
+          "native_result_keys": [
+            "stdout",
+            "stderr",
+            "interrupted",
+            "isImage",
+            "noOutputExpected"
+          ],
+          "native_stdout_chars": 1294,
+          "persisted_output_marker": false,
+          "external_output_path_lines": []
+        }
+      ],
+      "result_count": 1,
+      "paired_in_window": true
+    },
+    {
+      "source": "462439ee-b5af-4443-8a58-2e785a2ef826/subagents/agent-abdfd359882cc572f.jsonl",
+      "line": 318,
+      "block": 0,
+      "ts": "2026-07-18T01:50:53.855Z",
+      "call_id": "toolu_01THXtncq6WF5WwyUAnLLjNE",
+      "command_chars": 1500,
+      "command_sha256": "4a1a6643a76cfcd1ff10c4f7452083105b8bf7c0ec05a6c807af383f4b76eeba",
+      "full_input_field": true,
+      "run_in_background": false,
+      "results": [
+        {
+          "line": 319,
+          "block": 0,
+          "ts": "2026-07-18T01:50:56.948Z",
+          "is_error": false,
+          "content_chars": 185,
+          "native_result_keys": [
+            "stdout",
+            "stderr",
+            "interrupted",
+            "isImage",
+            "noOutputExpected"
+          ],
+          "native_stdout_chars": 185,
+          "persisted_output_marker": false,
+          "external_output_path_lines": []
+        }
+      ],
+      "result_count": 1,
+      "paired_in_window": true
+    },
+    {
+      "source": "462439ee-b5af-4443-8a58-2e785a2ef826/subagents/agent-abdfd359882cc572f.jsonl",
+      "line": 324,
+      "block": 0,
+      "ts": "2026-07-18T01:51:16.828Z",
+      "call_id": "toolu_013kn26CjjfLDRrNsWWp9dtp",
+      "command_chars": 150,
+      "command_sha256": "b252624e6147ba6d32bc47b7422e5bf5433d8aeac13f9525e4af441076db3139",
+      "full_input_field": true,
+      "run_in_background": false,
+      "results": [
+        {
+          "line": 325,
+          "block": 0,
+          "ts": "2026-07-18T01:51:23.990Z",
+          "is_error": false,
+          "content_chars": 5531,
+          "native_result_keys": [
+            "stdout",
+            "stderr",
+            "interrupted",
+            "isImage",
+            "noOutputExpected"
+          ],
+          "native_stdout_chars": 5531,
+          "persisted_output_marker": false,
+          "external_output_path_lines": []
+        }
+      ],
+      "result_count": 1,
+      "paired_in_window": true
+    },
+    {
+      "source": "462439ee-b5af-4443-8a58-2e785a2ef826/subagents/agent-abdfd359882cc572f.jsonl",
+      "line": 328,
+      "block": 0,
+      "ts": "2026-07-18T01:51:58.099Z",
+      "call_id": "toolu_01UmzanNGMVAZVm59oupugZ9",
+      "command_chars": 481,
+      "command_sha256": "b19a18fbe35620c6535715bbaaaf9332e7f51784da676040cc975a390d919a32",
+      "full_input_field": true,
+      "run_in_background": false,
+      "results": [
+        {
+          "line": 329,
+          "block": 0,
+          "ts": "2026-07-18T01:52:00.893Z",
+          "is_error": false,
+          "content_chars": 1467,
+          "native_result_keys": [
+            "stdout",
+            "stderr",
+            "interrupted",
+            "isImage",
+            "noOutputExpected"
+          ],
+          "native_stdout_chars": 1467,
+          "persisted_output_marker": false,
+          "external_output_path_lines": []
+        }
+      ],
+      "result_count": 1,
+      "paired_in_window": true
+    },
+    {
+      "source": "462439ee-b5af-4443-8a58-2e785a2ef826/subagents/agent-abdfd359882cc572f.jsonl",
+      "line": 332,
+      "block": 0,
+      "ts": "2026-07-18T01:52:54.451Z",
+      "call_id": "toolu_01BjXRdxWZEVjAiHiobV5nXE",
+      "command_chars": 397,
+      "command_sha256": "4e31c01ad8926076f0df7b63b8bea10fe3e1b2d8e5559a27e06ef5bebad56a1f",
+      "full_input_field": true,
+      "run_in_background": false,
+      "results": [
+        {
+          "line": 333,
+          "block": 0,
+          "ts": "2026-07-18T01:53:51.130Z",
+          "is_error": false,
+          "content_chars": 666,
+          "native_result_keys": [
+            "stdout",
+            "stderr",
+            "interrupted",
+            "isImage",
+            "noOutputExpected"
+          ],
+          "native_stdout_chars": 666,
+          "persisted_output_marker": false,
+          "external_output_path_lines": []
+        }
+      ],
+      "result_count": 1,
+      "paired_in_window": true
+    },
+    {
+      "source": "462439ee-b5af-4443-8a58-2e785a2ef826/subagents/agent-abdfd359882cc572f.jsonl",
+      "line": 341,
+      "block": 0,
+      "ts": "2026-07-18T01:54:21.414Z",
+      "call_id": "toolu_01SNoHqmrtBoPJMseyyYRfjV",
+      "command_chars": 177,
+      "command_sha256": "d8a82778953bbaee4fb966a6c5e3950481fe074f3b0747b6905c2dc41699dae4",
+      "full_input_field": true,
+      "run_in_background": false,
+      "results": [
+        {
+          "line": 342,
+          "block": 0,
+          "ts": "2026-07-18T01:54:25.188Z",
+          "is_error": false,
+          "content_chars": 58,
+          "native_result_keys": [
+            "stdout",
+            "stderr",
+            "interrupted",
+            "isImage",
+            "noOutputExpected"
+          ],
+          "native_stdout_chars": 58,
+          "persisted_output_marker": false,
+          "external_output_path_lines": []
+        }
+      ],
+      "result_count": 1,
+      "paired_in_window": true
+    },
+    {
+      "source": "462439ee-b5af-4443-8a58-2e785a2ef826/subagents/agent-abdfd359882cc572f.jsonl",
+      "line": 345,
+      "block": 0,
+      "ts": "2026-07-18T01:54:35.489Z",
+      "call_id": "toolu_018bsLJKQdJTG7uTfSkEWYaC",
+      "command_chars": 501,
+      "command_sha256": "1a53d2aa6e406e9cffa59456f396555313fd364dc89a21a0b02bdd74186ad680",
+      "full_input_field": true,
+      "run_in_background": false,
+      "results": [
+        {
+          "line": 346,
+          "block": 0,
+          "ts": "2026-07-18T01:55:55.418Z",
+          "is_error": false,
+          "content_chars": 3488,
+          "native_result_keys": [
+            "stdout",
+            "stderr",
+            "interrupted",
+            "isImage",
+            "noOutputExpected"
+          ],
+          "native_stdout_chars": 3488,
+          "persisted_output_marker": false,
+          "external_output_path_lines": []
+        }
+      ],
+      "result_count": 1,
+      "paired_in_window": true
+    },
+    {
+      "source": "462439ee-b5af-4443-8a58-2e785a2ef826/subagents/agent-abdfd359882cc572f.jsonl",
+      "line": 349,
+      "block": 0,
+      "ts": "2026-07-18T01:56:14.130Z",
+      "call_id": "toolu_01WccqgPSVc4arWqqaitfK4x",
+      "command_chars": 766,
+      "command_sha256": "fef6c3ab6e3542fcb64f876dbaa3cf0a19ac44ca4fb415f60a6291e739b81aec",
+      "full_input_field": true,
+      "run_in_background": false,
+      "results": [
+        {
+          "line": 350,
+          "block": 0,
+          "ts": "2026-07-18T01:56:26.336Z",
+          "is_error": false,
+          "content_chars": 109,
+          "native_result_keys": [
+            "stdout",
+            "stderr",
+            "interrupted",
+            "isImage",
+            "noOutputExpected"
+          ],
+          "native_stdout_chars": 109,
+          "persisted_output_marker": false,
+          "external_output_path_lines": []
+        }
+      ],
+      "result_count": 1,
+      "paired_in_window": true
+    },
+    {
+      "source": "462439ee-b5af-4443-8a58-2e785a2ef826/subagents/agent-abdfd359882cc572f.jsonl",
+      "line": 353,
+      "block": 0,
+      "ts": "2026-07-18T01:56:34.426Z",
+      "call_id": "toolu_01LysKCP7we3aCaeBYBjYi74",
+      "command_chars": 212,
+      "command_sha256": "b6bd8dee2c093199ca4de572455371037ecdd929a062e474a5b8f3fccd2354f1",
+      "full_input_field": true,
+      "run_in_background": false,
+      "results": [
+        {
+          "line": 354,
+          "block": 0,
+          "ts": "2026-07-18T01:56:35.015Z",
+          "is_error": false,
+          "content_chars": 696,
+          "native_result_keys": [
+            "stdout",
+            "stderr",
+            "interrupted",
+            "isImage",
+            "noOutputExpected"
+          ],
+          "native_stdout_chars": 696,
+          "persisted_output_marker": false,
+          "external_output_path_lines": []
+        }
+      ],
+      "result_count": 1,
+      "paired_in_window": true
+    },
+    {
+      "source": "462439ee-b5af-4443-8a58-2e785a2ef826/subagents/agent-abdfd359882cc572f.jsonl",
+      "line": 357,
+      "block": 0,
+      "ts": "2026-07-18T01:57:11.882Z",
+      "call_id": "toolu_014Fq5Uht9WGU1KrU8rHhqmG",
+      "command_chars": 199,
+      "command_sha256": "c52951b2bbc53cb550bbbcfc330700e60d536ab14c905317e46ab2a671f737a8",
+      "full_input_field": true,
+      "run_in_background": false,
+      "results": [
+        {
+          "line": 358,
+          "block": 0,
+          "ts": "2026-07-18T01:57:14.217Z",
+          "is_error": false,
+          "content_chars": 26,
+          "native_result_keys": [
+            "stdout",
+            "stderr",
+            "interrupted",
+            "isImage",
+            "noOutputExpected"
+          ],
+          "native_stdout_chars": 26,
+          "persisted_output_marker": false,
+          "external_output_path_lines": []
+        }
+      ],
+      "result_count": 1,
+      "paired_in_window": true
+    },
+    {
+      "source": "462439ee-b5af-4443-8a58-2e785a2ef826/subagents/agent-abdfd359882cc572f.jsonl",
+      "line": 363,
+      "block": 0,
+      "ts": "2026-07-18T01:58:21.475Z",
+      "call_id": "toolu_019wVUMkm6SKkK8a5GsYhnkV",
+      "command_chars": 172,
+      "command_sha256": "609ad1997f49b8bce5844de2b0f08276e940bf0c3c3b8218200d364c6119c923",
+      "full_input_field": true,
+      "run_in_background": false,
+      "results": [
+        {
+          "line": 364,
+          "block": 0,
+          "ts": "2026-07-18T01:58:23.576Z",
+          "is_error": false,
+          "content_chars": 206,
+          "native_result_keys": [
+            "stdout",
+            "stderr",
+            "interrupted",
+            "isImage",
+            "noOutputExpected"
+          ],
+          "native_stdout_chars": 206,
+          "persisted_output_marker": false,
+          "external_output_path_lines": []
+        }
+      ],
+      "result_count": 1,
+      "paired_in_window": true
+    },
+    {
+      "source": "462439ee-b5af-4443-8a58-2e785a2ef826/subagents/agent-abdfd359882cc572f.jsonl",
+      "line": 369,
+      "block": 0,
+      "ts": "2026-07-18T01:59:27.893Z",
+      "call_id": "toolu_01NgatwypmB3o6vYZ3BU4gRk",
+      "command_chars": 208,
+      "command_sha256": "8dfdabaa86d5fb8e0a50a4f2075dc76bd6fd15718d30650188c4268022938a17",
+      "full_input_field": true,
+      "run_in_background": false,
+      "results": [
+        {
+          "line": 370,
+          "block": 0,
+          "ts": "2026-07-18T01:59:30.929Z",
+          "is_error": false,
+          "content_chars": 706,
+          "native_result_keys": [
+            "stdout",
+            "stderr",
+            "interrupted",
+            "isImage",
+            "noOutputExpected"
+          ],
+          "native_stdout_chars": 706,
+          "persisted_output_marker": false,
+          "external_output_path_lines": []
+        }
+      ],
+      "result_count": 1,
+      "paired_in_window": true
+    },
+    {
+      "source": "462439ee-b5af-4443-8a58-2e785a2ef826/subagents/agent-abdfd359882cc572f.jsonl",
+      "line": 373,
+      "block": 0,
+      "ts": "2026-07-18T01:59:48.579Z",
+      "call_id": "toolu_01LE43aPpkoWXZhazDbUu1LT",
+      "command_chars": 1755,
+      "command_sha256": "e109740a0120dfdd0aa52b88b636fefc80a9fb0cc71451b23d464e7d33fa9103",
+      "full_input_field": true,
+      "run_in_background": false,
+      "results": [
+        {
+          "line": 374,
+          "block": 0,
+          "ts": "2026-07-18T01:59:51.946Z",
+          "is_error": false,
+          "content_chars": 404,
+          "native_result_keys": [
+            "stdout",
+            "stderr",
+            "interrupted",
+            "isImage",
+            "noOutputExpected"
+          ],
+          "native_stdout_chars": 404,
+          "persisted_output_marker": false,
+          "external_output_path_lines": []
+        }
+      ],
+      "result_count": 1,
+      "paired_in_window": true
+    },
+    {
+      "source": "462439ee-b5af-4443-8a58-2e785a2ef826/subagents/agent-abdfd359882cc572f.jsonl",
+      "line": 377,
+      "block": 0,
+      "ts": "2026-07-18T01:59:58.614Z",
+      "call_id": "toolu_01JEw2jP5wxobnYfHorEn92r",
+      "command_chars": 210,
+      "command_sha256": "0e0ea25aa93c3564164302579930769f41f96e28861ca04c861e0f7525a3e10b",
+      "full_input_field": true,
+      "run_in_background": false,
+      "results": [
+        {
+          "line": 378,
+          "block": 0,
+          "ts": "2026-07-18T01:59:59.088Z",
+          "is_error": false,
+          "content_chars": 181,
+          "native_result_keys": [
+            "stdout",
+            "stderr",
+            "interrupted",
+            "isImage",
+            "noOutputExpected"
+          ],
+          "native_stdout_chars": 181,
+          "persisted_output_marker": false,
+          "external_output_path_lines": []
+        }
+      ],
+      "result_count": 1,
+      "paired_in_window": true
+    },
+    {
+      "source": "462439ee-b5af-4443-8a58-2e785a2ef826.jsonl",
+      "line": 2261,
+      "block": 0,
+      "ts": "2026-07-18T02:10:53.930Z",
+      "call_id": "toolu_01BUbGrx5TWAR2h42EGXmugE",
+      "command_chars": 824,
+      "command_sha256": "c2a2e49757eb6b7e0aedc167b716ef240c7c6f73f57b9cb9885a3cd233d5bd7c",
+      "full_input_field": true,
+      "run_in_background": false,
+      "results": [
+        {
+          "line": 2262,
+          "block": 0,
+          "ts": "2026-07-18T02:10:57.358Z",
+          "is_error": false,
+          "content_chars": 333,
+          "native_result_keys": [
+            "stdout",
+            "stderr",
+            "interrupted",
+            "isImage",
+            "noOutputExpected"
+          ],
+          "native_stdout_chars": 333,
+          "persisted_output_marker": false,
+          "external_output_path_lines": []
+        }
+      ],
+      "result_count": 1,
+      "paired_in_window": true
+    },
+    {
+      "source": "462439ee-b5af-4443-8a58-2e785a2ef826.jsonl",
+      "line": 2276,
+      "block": 0,
+      "ts": "2026-07-18T02:12:48.132Z",
+      "call_id": "toolu_01Vs8dL89EwFoTrL2Dq7gQ7T",
+      "command_chars": 679,
+      "command_sha256": "bbc7516f01f9ada2391a91fa7f721c6b91ea62cf67110bffc5868ef0613a34cb",
+      "full_input_field": true,
+      "run_in_background": false,
+      "results": [
+        {
+          "line": 2278,
+          "block": 0,
+          "ts": "2026-07-18T02:12:53.802Z",
+          "is_error": false,
+          "content_chars": 111,
+          "native_result_keys": [
+            "stdout",
+            "stderr",
+            "interrupted",
+            "isImage",
+            "noOutputExpected"
+          ],
+          "native_stdout_chars": 111,
+          "persisted_output_marker": false,
+          "external_output_path_lines": []
+        }
+      ],
+      "result_count": 1,
+      "paired_in_window": true
+    }
+  ]
+}
