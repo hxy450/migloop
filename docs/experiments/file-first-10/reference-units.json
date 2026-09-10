@@ -1,6 +1,6 @@
 {
   "schema": "migloop-file-first-causal-reference-draft/1",
-  "status": "draft_not_frozen_not_a_score",
+  "status": "reviewed_supporting_reference_core_contract_controls_scoring",
   "visibility": "reviewers_only",
   "scoring_policy": "README.md",
   "matching": "Semantic many-to-many matching: investigators may merge or split presentation. Event ids and paragraph counts are not required answer wording.",
@@ -12,9 +12,9 @@
         {"id": "mask", "changes": ["fixer:103"], "supported": "Mask configuration was added with different intended transparency by dialog; the prior specific upstream cause is not established.", "reject": "All dialogs were made dark, or H5 transparency was newly removed."},
         {"id": "images", "changes": ["fixer:233"], "supported": "Two retention-image layouts gained explicit aspect/height constraints to represent intrinsic size and padding; exact earlier input responsibility and visual success remain bounded.", "reject": "The patch proves all retention image pixels were verified correct."},
         {"id": "cta", "changes": ["fixer:436"], "supported": "CTA horizontal layout changed from width plus margins to outer padding, while existing height/click/animation were retained; it was not a no-change case.", "reject": "The button was not changed because its height stayed the same."},
-        {"id": "price", "changes": ["fixer:528", "fixer:592"], "supported": "Uniform price styling was replaced by segmented styling, with an intermediate strategy replaced later. Slice8 had received relevant price source before producing a still-uniform output; earliest unique author and deeper mechanism are not proven.", "reject": "Slice8 never received relevant source, or the last whole-file writer is therefore the proven first cause."},
+        {"id": "price", "changes": ["fixer:528", "fixer:592"], "supported": "Uniform price styling was replaced by segmented styling, with an intermediate strategy replaced later. Slice8 had received relevant price source before producing a still-uniform output. An earlier visible converter Write can be identified, but unique causal responsibility and deeper input mechanism are not established.", "reject": "Slice8 never received relevant source, or the last whole-file writer is therefore the proven first cause."},
         {"id": "indicator", "changes": ["fixer:528", "fixer:532"], "supported": "Swiper indicator styling/configuration was added or adjusted; the exact prior input/actor that should have supplied all values is not established.", "reject": "Exact missing indicator values are proven to have been explicitly supplied to the first generator without evidence."},
-        {"id": "repair-compile", "changes": ["fixer:592", "builder:32", "builder:34"], "supported": "The later fixed-Span helper strategy introduced private priceDigits/priceSuffix; cross-struct access failed compilation and removing private corrected that build error. This is repair-induced, not initial generation.", "reject": "These private helpers were introduced by the initial generator or by fixer:528."}
+        {"id": "repair-compile", "changes": ["fixer:592", "builder:32", "builder:34"], "supported": "The later fixed-Span strategy introduced private priceDigits/priceSuffix; cross-struct access failed compilation and removing private corrected that build error. Other private helpers already existed in the earlier repair strategy, so generic repair-induced helper explanations are acceptable. This is repair-induced, not initial generation.", "reject": "The named priceDigits/priceSuffix were introduced by the initial generator or specifically by fixer:528; generic mention of earlier private helpers is not this error."}
       ]
     },
     {

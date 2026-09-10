@@ -1,6 +1,6 @@
 # 十个困难被修文件：先核事实，再用原始组诊断工具需求
 
-2026-09-10。状态：**十文件入选资格已核实，参考草稿与反证已落盘；评分参考尚未冻结，尚未启动本轮 Luna 实验。**
+2026-09-10。状态：**十文件原始组基线已冻结并启动；尚无完整十文件最终分数。** 当前入口见 [baseline-v1-status.md](baseline-v1-status.md)，运行状态以产物目录的队列日志为准。
 
 本目录是审阅端材料，不能进入被测调查员上下文。它取代旧八候选计划的执行顺序，不改写旧实验产物和分数。
 
@@ -76,13 +76,13 @@
 
 - [十文件参考概要](reference-overview.md)：每个文件目前能说什么、不能说什么。
 - [selection.json](selection.json)：十文件、三原始池、阶段边界、开发暴露、候选淘汰理由。
-- [reference-units.json](reference-units.json)：28 个**审阅端**归因单元草稿，尚未冻结；不是给调查员的28道题。模型可以合并或拆分描述，按实质原因匹配，不按段落数匹配。
+- [reference-units.json](reference-units.json)：28 个**审阅端**归因单元支持材料；已与 [scoring-core.json](scoring-core.json) 一起冻结至baseline。后者决定核心评分，不要求复述前者每个分句；不是给调查员的28道题。
 - [公共任务模板](task-template.md)：没有缺陷标题、数量、责任人或关键答案线索；两个模型组共享语义任务。
 - 新增底稿：[0723](candidate-0723.md)、[Dice](candidate-dice.md)、[Codex](candidate-codex.md)。旧三文件底稿保留在 `file-first-luna/review-v2`。
 - 设计备忘：[design-hypotheses.md](design-hypotheses.md)，只登记待验证假设，没有据此继续重构生产代码。
 
 不依赖 migloop 的原始核验：`audit_reference.py` 对三池 146 + 80 + 2 份原始 JSONL 扫描；十文件均有后置 native 更新/patch 成功回执。结果在 `C:/Users/hongy/projects/_migloop-eval-20260909/file-first-10/audit-v2/{0723,dice,codex}.json`。v1 是扫描器开发产物（遗漏可选成功标志与 code-host 内部事件），保留但不用作资格结论。自动 native 清单不包含手审 Bash 效应，不当作全修改清单。
 
-父审阅者另复查了 0723 的15条关键原始字段/调用 id/时间，Codex 的35条位置/行哈希/时间与文字或结构字段；Dice 两文件的内存文本复原与晚期源读回一致，脚本 `replay-dice-snapshots.cjs` 可复现。这些不是完整的语义真值认证；交叉审阅和评分冻结仍是下一道关。
+父审阅者另复查了 0723 的16条关键原始字段/调用 id/时间，Codex 的35条位置/行哈希/时间与文字或结构字段；Dice 两文件的内存文本复原与晚期源读回一致，脚本 `replay-dice-snapshots.cjs` 可复现。冻结前又完成三份 [0723复核](review-final-0723.md)、[Dice复核](review-final-dice.md)、[评分复核](review-final-rubric.md)。这些是有限范围交叉核验，不是完整独立金标认证。
 
-评测基础设施相关99条测试通过（`test_file_first_10_audit.py`、`test_file_first_baseline.py`、`test_pair_harness.py`），其中21条新增。没有据测试通过宣称归因准确率提高。没有重跑真实迁移、没有启动新 Luna 原始组/工具组、没有修改生产 MCP/UI 或覆盖旧实验产物。
+第一批评测基础设施99条测试通过；运行器冻结时相关108条通过，评分器另9条通过。没有据测试通过宣称归因准确率提高。只启动了原始组；没有重跑真实迁移、没有启动工具组、没有修改生产 MCP/UI 或覆盖旧实验产物。
