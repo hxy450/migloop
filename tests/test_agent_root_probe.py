@@ -6,13 +6,20 @@ import json
 import pytest
 
 from migloop import atoms, probe, verdict
-from tests.test_codex_message_evidence import TARGET, build, message
+from tests.test_codex_message_evidence import TARGET, at, build, message
 from tests.test_trajectory import _run_dir
 
 
 @pytest.mark.parametrize("opened", [False, True])
 def test_report_only_file_uses_real_agent_root_without_inventing_file_version(tmp_path, opened):
-    led, owner = build(tmp_path, [message(3, "review", f"claim about {TARGET}", sender="/root/reviewer")])
+    # A real native dispatch, not an unexecuted code-host seed, supplies v1.
+    dispatch = [
+        {"timestamp": at(1), "type": "response_item", "payload": {"type": "function_call", "name": "spawn_agent",
+         "call_id": "dispatch", "arguments": json.dumps({"task_name": "reviewer", "message": "Review independently"})}},
+        {"timestamp": at(2), "type": "response_item", "payload": {"type": "function_call_output",
+         "call_id": "dispatch", "output": json.dumps({"task_name": "/root/reviewer"})}},
+    ]
+    led, owner = build(tmp_path, [*dispatch, message(3, "review", f"claim about {TARGET}", sender="/root/reviewer")])
     assert not led.stories[TARGET].versions
     agent_spec = f"agent:{owner.id}@v1"
     report = "```json\n" + json.dumps({"schema": "migloop-verdict/1", "ledger": atoms.ledger_identity(led),

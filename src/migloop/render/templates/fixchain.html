@@ -341,6 +341,11 @@
   .argument-cards { display: grid; grid-template-columns: repeat(2, minmax(190px, 1fr)); gap: 44px 70px; position: relative; z-index: 1; }
   .argument-card { text-align: left; min-width: 0; overflow-wrap: anywhere; border-left: 3px solid var(--c-file) !important; padding: 9px !important; }
   .argument-card[data-kind="agent"] { border-left-color: var(--c-gen) !important; }
+  .argument-card[data-role="origin"] { background: #fff0ef; border-color: #d4443e; box-shadow: 0 0 0 2px #d4443e33; }
+  .argument-card[data-role="propagated"] { background: #fff4f2; border-color: #de7770; }
+  .argument-card[data-role="context"] { background: var(--wash); }
+  .argument-card[data-role="repaired"] { background: #eef8f1; border-color: #75ad86; }
+  .argument-card[data-binding="unbound"], .argument-card[data-binding="unlocated"], .argument-card[data-binding="invalid"] { border-style: dashed; }
   .argument-card.selected { outline: 2px solid var(--c-spec); }
   .argument-card .argument-key { font: 11px var(--mono); display: block; margin: 4px 0; }
   .argument-card .argument-state { display: block; color: var(--ink-3); margin-top: 4px; }
@@ -1629,6 +1634,13 @@
       clearBtn.classList.add("show");
       host.appendChild(el("h3", null, "事后可核论证链"));
       host.appendChild(el("div", "argument-note", "节点原因是模型主张；定位与关系核验另列。只画明确提供且已定位的关系，缺边保持断点，独立材料不要求连通。"));
+      if (graph.partial_document) {
+        host.appendChild(el("div", "argument-note argument-unbound", "局部预览：原稿仍未通过严格格式校验。有效节点单独核验；无效声明保留，不能视为完整合规结论。"));
+        argumentDetails(host, "原稿格式诊断", graph.diagnostics);
+        argumentDetails(host, "模型备注（不参与关系核验）", graph.model_remarks);
+        argumentDetails(host, "未绑定的节点声明", (graph.node_declarations || []).filter(function (n) { return !n.binding || n.binding.status !== "matched"; }));
+        argumentDetails(host, "无效关系声明（不绘制连边）", (graph.edge_declarations || []).filter(function (e) { return !e.drawable; }));
+      }
       if (!argumentBound()) host.appendChild(el("div", "argument-note argument-unbound", "文稿或查询身份未绑定当前账本：保留主张，不画历史关系或提供原文导航。"));
       argumentDetails(host, "文稿来源与身份（非语义认证）", {identity: graph.identity, document_source: graph.document_source, document_sha256: graph.document_sha256});
       var chips = el("div", "argument-findings");
@@ -1645,7 +1657,8 @@
       var nodes = findingNodes(graph, finding), edges = findingEdges(graph, finding, nodes), byId = Object.create(null), buttons = Object.create(null);
       nodes.forEach(function (n) { byId[n.id] = n; });
       var drawable = edges.filter(function (e) { return argumentEdgeDrawable(e, byId); });
-      host.appendChild(el("div", "argument-note", "实线：已定位关系 · 虚线：候选关系 · 箭头：声明方向。关系定位不认证节点原因。"));
+      host.appendChild(el("div", "argument-note", "红框：模型认定的问题引入点 · 浅红：模型认定的传播节点 · 灰：背景 · 绿：修后节点。颜色不代表归因已被验证。"));
+      host.appendChild(el("div", "argument-note", "实线：已定位关系 · 虚线：候选关系 · 箭头：声明方向。关系定位不认证节点原因；布局不表示模型查阅顺序。"));
       var network = el("div", "argument-network"), cards = el("div", "argument-cards");
       var wires = document.createElementNS("http://www.w3.org/2000/svg", "svg"); wires.setAttribute("class", "argument-wires");
       network.appendChild(wires); network.appendChild(cards); host.appendChild(network);
@@ -1653,13 +1666,40 @@
         var linked = drawable.some(function (e) { return e.from === n.id || e.to === n.id; });
         var card = el("button", "argument-card"); card.dataset.nodeId = n.id; card.dataset.kind = n.kind;
         card.dataset.role = n.role || ""; card.dataset.binding = (n.binding || {}).status || "unrecorded";
-        card.appendChild(el("b", null, (n.kind || "实体") + " · " + (n.role || "未填写角色")));
+        var roleLabels = {origin: "问题引入（模型主张）", propagated: "问题传播（模型主张）", context: "相关背景", repaired: "修后纠正（模型主张）"};
+        card.appendChild(el("b", null, (n.kind === "file" ? "文件" : n.kind === "agent" ? "代理" : "实体") + " · " + (roleLabels[n.role] || "未填写角色")));
         card.appendChild(el("span", "argument-key", n.key || n.id));
         card.appendChild(el("span", "argument-state", "截至 " + (n.at || "未知")));
         card.appendChild(el("span", "argument-state", "定位 " + card.dataset.binding + (linked ? "" : " · 独立材料 / 断点")));
         card.onclick = function () { showArgumentNode(n, finding, edges); };
         cards.appendChild(card); buttons[n.id] = card;
       });
+      // Geometry only. Rank existing drawable relations, never turn visit
+      // order or a missing intermediate node into a historical edge.
+      var ranks = Object.create(null), indegree = Object.create(null), following = Object.create(null);
+      nodes.forEach(function (n) { ranks[n.id] = 0; indegree[n.id] = 0; following[n.id] = []; });
+      drawable.forEach(function (e) { indegree[e.to]++; following[e.from].push(e.to); });
+      var ready = nodes.filter(function (n) { return indegree[n.id] === 0; }).map(function (n) { return n.id; }), visited = new Set();
+      for (var qi = 0; qi < ready.length; qi++) {
+        var currentId = ready[qi]; visited.add(currentId);
+        following[currentId].forEach(function (next) {
+          ranks[next] = Math.max(ranks[next], ranks[currentId] + 1);
+          if (--indegree[next] === 0) ready.push(next);
+        });
+      }
+      if (visited.size !== nodes.length) {
+        var fallback = nodes.reduce(function (v, n) { return Math.max(v, ranks[n.id]); }, 0) + 1;
+        nodes.forEach(function (n) { if (!visited.has(n.id)) ranks[n.id] = fallback; });
+        host.appendChild(el("div", "argument-note", "部分声明含回环或依赖回环，置于同列保留原箭头；没有补造中间节点来强行画成树。"));
+      }
+      var columns = Object.create(null), maxRank = 0;
+      nodes.forEach(function (n) {
+        var rank = ranks[n.id]; maxRank = Math.max(maxRank, rank);
+        columns[rank] = (columns[rank] || 0) + 1;
+        buttons[n.id].style.gridColumn = String(rank + 1); buttons[n.id].style.gridRow = String(columns[rank]);
+      });
+      cards.style.gridTemplateColumns = "repeat(" + (maxRank + 1) + ", minmax(190px, 240px))";
+      cards.style.width = "max-content";
       function draw() {
         if (!network.isConnected) return;
         wires.textContent = ""; wires.setAttribute("width", network.scrollWidth); wires.setAttribute("height", network.scrollHeight);
@@ -1764,7 +1804,7 @@
           body: JSON.stringify({draft: draftInput, file: draftFile || null})}).then(function (r) { return r.json(); }).then(function (data) {
             if (ticket !== probeRequest) return;
             if (!data.argument_graph || data.argument_graph.schema !== "migloop-argument-graph/1") throw Error(argumentText(data.error || data.diagnostics || data));
-            draftMessage = "已载入人工文稿；机械定位不是语义验证。";
+            draftMessage = data.partial_document ? "已载入局部预览；原稿格式仍未通过，未替你修改声明。" : "已载入人工文稿；机械定位不是语义验证。";
             PROBE = {argument_graph: data.argument_graph, argument_document: data, manual_input: true, run: "人工载入", steps: []};
             argumentFinding = null; argumentSelected = null; renderArgumentView();
           }).catch(function (error) { if (ticket === probeRequest) draftMessage = "载入失败：" + error; })

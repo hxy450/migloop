@@ -203,10 +203,11 @@ def expand(ledger, refs, current, *, offset=0, max_chars=12000, include_undated=
             "note": "部分返回不等于整次调用已读；拒绝的另一侧不泄漏正文。"}
 
 
-def changes(ledger, path, at, since_ts=None, offset=0, limit=40):
+def changes(ledger, path, at, since_ts=None, offset=0, limit=40, related_offset=0, related_limit=8):
     from . import change_inventory
     current = scope(ledger, "file", path, at, since_ts)
-    return change_inventory.build(ledger, current, offset, limit)
+    return change_inventory.build(ledger, current, offset, limit,
+                                  related_offset=related_offset, related_limit=related_limit)
 
 
 def query(ledger, tool, supplied):
@@ -242,25 +243,29 @@ def _delivery(data):
         ref = value.get("ref")
         if isinstance(ref, str) and ref.startswith(("raw:", "#")) and any(k in value for k in ("text", "preview", "diff")):
             records.append({"ref": ref, "extent": ("derived_diff" if "diff" in value else "derived_line" if "line" in value and ref.startswith("#")
-                                                    else "raw_field_segment" if value.get("pointer") is not None
+                                                    else "raw_field_segment" if "text" in value and value.get("pointer") is not None
                                                     else "raw_segment" if "text" in value else "preview_or_pointer"),
                             "pointer": value.get("pointer"),
                             "offset": value.get("offset"), "chars": len(value.get("text", value.get("preview", value.get("diff", "")))),
                             "next_offset": value.get("next_offset")})
-        for name in ("rows", "items", "records", "results"):
+        for name in ("rows", "items", "records", "results", "pointers"):
             for item in value.get(name, []) if isinstance(value.get(name), list) else []:
                 visit(item)
+        for name in ("unclassified_related", "undated", "unknown_records"):
+            if isinstance(value.get(name), dict):
+                visit(value[name])
     visit(data)
     return {"records": records, "scope": data.get("scope"), "data_schema": data.get("schema"),
             "semantic_checked": False, "navigation_is_relation": False}
 
 
 def batch(ledger, requests, max_chars=100000):
+    from . import delivery_budget
     if not isinstance(requests, list) or not 1 <= len(requests) <= 24:
         raise ValueError("requests需要1–24项；批量不使用隐式当前节点")
     if type(max_chars) is not int or not 1000 <= max_chars <= 400000:
         raise ValueError("max_chars数据正文预算为1000–400000；查询/凭据封装另计")
-    items, used = [], 0
+    items, selected = [], {}
     for i, request in enumerate(requests):
         item = {"item_index": i, "tool": request.get("tool") if isinstance(request, dict) else None,
                 "args": request.get("args", {}) if isinstance(request, dict) else {}}
@@ -273,19 +278,41 @@ def batch(ledger, requests, max_chars=100000):
                     raise ValueError("重复scope冲突")
                 args["scope"] = request["scope"]
             data = query(ledger, item["tool"], args)
-            size = len(json.dumps(data, ensure_ascii=False, separators=(",", ":")))
             item["scope"] = data["scope"]
-            if used + size > max_chars:
-                item.update(status="deferred", error="本批交付预算不足；此项正文未交付，请缩limit/max_chars或单独重查", delivery={"records": []})
-            else:
-                item.update(status="ok", data=data, delivery=_delivery(data))
-                used += size
+            selected[i] = data
         except (ValueError, TypeError, KeyError, OSError, UnicodeError) as exc:
             item.update(status="error", error=str(exc), delivery={"records": []})
         items.append(item)
+    # First give every successful query a share; then return unused capacity.
+    # Query order is not importance, and an early large result must not starve
+    # every later source. All receipts describe this projected body only.
+    fitted, used = {}, 0
+    positions = list(selected)
+    for ordinal, i in enumerate(positions):
+        result = delivery_budget.fit(selected[i], (max_chars - used) // (len(positions) - ordinal))
+        fitted[i] = result
+        used += result["data_chars"]
+    for i in positions:
+        if used >= max_chars:
+            break
+        old = fitted[i]
+        if old["budget_adjusted"]:
+            result = delivery_budget.fit(selected[i], old["data_chars"] + max_chars - used)
+            if result["data_chars"] >= old["data_chars"]:
+                fitted[i] = result
+                used += result["data_chars"] - old["data_chars"]
+    for i, result in fitted.items():
+        item = items[i]
+        item.update(status=result["status"], budget_adjusted=result["budget_adjusted"],
+                    original_data_chars=result["original_data_chars"], continuations=result["continuations"])
+        if result["data"] is not None:
+            item.update(data=result["data"], delivery=_delivery(result["data"]))
+        else:
+            item.update(error="首个不可拆元数据超过交付预算；请用续取入口、较小limit或details=false。" + str(result["reason"] or ""),
+                        delivery={"records": []})
     return {"schema": SCHEMA, "ledger": atoms.ledger_identity(ledger), "items": items,
             "data_chars": used, "max_chars": max_chars, "budget_scope": "serialized_data_only",
-            "note": "逐项独立取证；相邻项目不生成历史边。deferred/error项目不算已交付。max_chars计data，封装另计。"}
+            "note": "逐项独立取证，不生成历史边。ok也可能部分交付：按next_offset/continuations续读；deferred/error无正文。max_chars计data，封装另计。"}
 
 
 def render_batch(ledger, requests, max_chars=100000):
@@ -300,6 +327,7 @@ def render_query(ledger, tool, args):
     data = {**query(ledger, tool, args), "ledger": atoms.ledger_identity(ledger)}
     body = json.dumps(data, ensure_ascii=False, separators=(",", ":"))
     receipt = {"schema": "migloop-investigation-receipt/1", "ledger": atoms.ledger_identity(ledger),
+               "argument_normalization": "time-query/2",
                "tool": tool, "request_sha256": digest(_receipt_args(tool, args)), "body_sha256": digest(body)}
     return body + MARKER + json.dumps(receipt, separators=(",", ":"))
 
@@ -324,7 +352,7 @@ def _receipt_args(tool, supplied):
     if tool == "batch":
         return batch_parameters(args)
     defaults = {
-        "changes": {"at": "latest", "since_ts": None, "offset": 0, "limit": 40},
+        "changes": {"at": "latest", "since_ts": None, "offset": 0, "limit": 40, "related_offset": 0, "related_limit": 8},
         "expand": {"offset": 0, "max_chars": 12000, "include_undated": False},
     }
     return {**defaults.get(tool, {}), **args}
@@ -337,10 +365,19 @@ def parse_receipt(tool, args, text):
         return None
     try:
         receipt, data = json.loads(tail), json.loads(body)
+        normalized = _receipt_args(tool, args)
+        normalization = receipt.get("argument_normalization")
+        if tool == "changes" and normalization is None:
+            # Original receipts predate the optional remainder-page defaults.
+            # Do not rewrite recorded requests or invalidate their old hashes.
+            for key in ("related_offset", "related_limit"):
+                if key not in args:
+                    normalized.pop(key, None)
         valid = (receipt["schema"] == "migloop-investigation-receipt/1"
+                 and normalization in (None, "time-query/2")
                  and receipt["ledger"] == data["ledger"]
                  and receipt["body_sha256"] == digest(body)
-                 and receipt["request_sha256"] == digest(_receipt_args(tool, args))
+                 and receipt["request_sha256"] == digest(normalized)
                  and (tool == "batch" or receipt.get("tool") == tool))
         return {"receipt": receipt, "data": data} if valid else None
     except (ValueError, TypeError, KeyError):

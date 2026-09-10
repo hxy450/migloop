@@ -2010,6 +2010,114 @@ def _codex_stdout(out_text: str) -> tuple[bool, str]:
     return ok, body
 
 
+def _codex_command_name(name: str) -> bool:
+    return name in {"exec_command", "shell_command", "functions.exec_command", "functions.shell_command"}
+
+
+def _codex_native_pair_ids(path: str) -> set[str]:
+    """Only unique native use/result IDs in this original source can authenticate a call."""
+    uses: dict[str, int] = {}
+    results: dict[str, int] = {}
+    native: set[str] = set()
+    with open(path, encoding="utf-8", errors="ignore") as stream:
+        for line in stream:
+            try:
+                record = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if not isinstance(record, dict) or record.get("type") != "response_item":
+                continue
+            payload = record.get("payload")
+            if not isinstance(payload, dict):
+                continue
+            cid = payload.get("call_id")
+            if not isinstance(cid, str) or not cid.strip():
+                continue
+            if payload.get("type") in {"function_call", "custom_tool_call"}:
+                uses[cid] = uses.get(cid, 0) + 1
+                if _codex_command_name(str(payload.get("name"))):
+                    native.add(cid)
+            elif payload.get("type") in {"function_call_output", "custom_tool_call_output"}:
+                results[cid] = results.get(cid, 0) + 1
+    return {cid for cid in native if uses.get(cid) == results.get(cid) == 1}
+
+
+def _codex_result_failed(value: Any) -> bool:
+    return isinstance(value, dict) and (value.get("isError") is True or value.get("is_error") is True
+                                       or bool(value.get("error")) or value.get("success") is False)
+
+
+def _codex_native_command_ops(raw_arg: Any, raw_output: Any, cwd: object,
+                              scripts: dict[str, Any], *, completed: bool = True,
+                              ts: str | None = None,
+                              envelope: dict[str, Any] | None = None) -> tuple[list[FileOp], dict[str, Any], bool | None]:
+    """Direct command call/result, not JavaScript that happens to mention a call.
+
+    Only an explicit terminal exit code and string output enable the same shell
+    admission rules as CC. Unsupported envelopes remain raw evidence, not a
+    success heuristic or a source of fabricated file content.
+    """
+    args = _json_args(raw_arg)
+    cmd = args.get("cmd") if "cmd" in args else args.get("command")
+    workdir = args.get("workdir") if args.get("workdir") is not None else cwd
+    if (not isinstance(cmd, str) or not cmd.strip()
+            or ("cmd" in args and "command" in args and args["cmd"] != args["command"])
+            or (workdir is not None and not isinstance(workdir, str))):
+        return [], {"unresolved": "原生命令参数形状未知,未认证执行效应",
+                    "unsupported_execution": ["native_command_arguments_unknown"]}, None
+    workdir = _resolve(workdir, _resolve(cwd, None)) if workdir else None
+    result = raw_output
+    if (isinstance(result, list) and len(result) == 1 and isinstance(result[0], dict)
+            and result[0].get("type") in {"text", "input_text", "output_text"}):
+        result = result[0].get("text")
+    result = _json_args(result)
+    code = result.get("exit_code")
+    body = result.get("output")
+    ok: bool | None = None
+    if completed:
+        if _codex_result_failed(result) or _codex_result_failed(envelope) or (type(code) is int and code != 0):
+            ok = False
+        elif type(code) is int and isinstance(body, str) and result.get("session_id") is None:
+            ok = True
+    detail: dict[str, Any] = {"cmd": " ".join(cmd.split())[:200], "call_basis": "native_command"}
+    if ok:
+        # A truncated tool envelope does not deliver a complete cat snapshot.
+        truncated = (result.get("truncated") is True or (envelope or {}).get("truncated") is True
+                     or bool(re.search(r"(?im)^(?:Warning: truncated output\b|\[?\.?\.\.?\s*\d+ (?:tokens|characters) truncated\b)", body)))
+        visible = "" if truncated else body
+        ops, more = _file_ops("Bash", {"command": cmd}, visible, None, workdir, scripts, ts=ts)
+        detail.update(more)
+        if truncated:
+            detail["output_delivery"] = "truncated_body_unbound"
+    else:
+        possible, capable, undetermined, touched, hints = _shell_analyze(cmd, workdir, scripts, "", ts=ts, success=False)
+        ops = _admit_ops(possible, detail, succeeded=False)
+        _note_touched(detail, touched, [])
+        for key, values in hints.items():
+            if values:
+                detail[key] = list(dict.fromkeys(values))
+        if capable:
+            detail["write_capable"] = True
+        if undetermined:
+            detail["undetermined_scripts"] = undetermined
+        detail["unresolved"] = ("原生命令失败,效应未知(可能已部分执行)" if ok is False else
+                                "原生命令未完成,效应未知" if not completed else
+                                "原生命令回执未提供明确终态exit_code/output,效应未知")
+    partials = [pw for script_body in _strip_heredocs(cmd.replace("\\\n", " "))[1]
+                for pw in _py_partial_writes(script_body)]
+    if partials:
+        detail["partials"] = partials
+    mentions, trunc = _path_mentions(cmd, scripts, workdir, ts, audit=detail)
+    if ok:
+        output_mentions, output_trunc = _path_mentions(body, {}, workdir, ts, where="out", audit=detail)
+        mentions, trunc = mentions + output_mentions, trunc + output_trunc
+    if mentions:
+        detail["mentions"] = mentions
+    if trunc:
+        detail["mentions_truncated"] = trunc
+    return ops, detail, ok
+
+
 def _patch_ops(patch: str, cwd: object) -> list[FileOp]:
     """apply_patch(V4A)→ 文件读写:Add File = 全文写,Update File 每个 hunk = edit(与 Edit 工具同档),
     Delete File = 删除;无上下文的纯追加锚不住,降级为内容未知的写。"""
@@ -2050,14 +2158,20 @@ def _patch_ops(patch: str, cwd: object) -> list[FileOp]:
 def _codex_exec_ops(raw_arg: Any, out_text: str, cwd: object,
                     scripts: dict[str, Any], *, completed: bool = True,
                     ts: str | None = None) -> tuple[list[FileOp], dict[str, Any], bool]:
-    """一次 exec:解 JS → shell 命令(复用 CC 的解析 + stdout 对账)+ apply_patch。返回 (ops, detail, ok)。"""
+    """Code-host JS provides intent, not proof that any nested call executed.
+
+    Outer completion/output may come from a different branch, an uncalled
+    function, a caught failure, or another nested call. No regex-extracted shell
+    or patch operation becomes a FileRef here. Raw output stays available through
+    its source record; independent native effects are handled by raw inventory.
+    """
     from migloop.adapters import codex
 
     if isinstance(raw_arg, str) and raw_arg.lstrip().startswith("{"):
         js = str(codex._decode_arguments(raw_arg).get("input") or raw_arg)
     else:
         js = str(raw_arg or "")
-    ok, stdout = _codex_stdout(out_text) if completed else (False, "")
+    ok, _stdout = _codex_stdout(out_text) if completed else (False, "")
     detail: dict[str, Any] = {}
     ops: list[FileOp] = []
     shell_calls = codex._extract_shell_calls(js, str(cwd) if cwd else None)
@@ -2065,10 +2179,11 @@ def _codex_exec_ops(raw_arg: Any, out_text: str, cwd: object,
         cmd = str(sc.get("command") or "")
         wdir = sc.get("workdir") or cwd
         detail.setdefault("cmd", " ".join(cmd.split())[:200])
-        # 单条 shell 调用时 stdout 就是它的:目录 grep / 多文件 head 按 stdout 反证(与 CC 的 Bash 同一套)
+        # Even a single textual occurrence can be in a dead branch or an
+        # uncalled function. Do not associate wrapper stdout with that file.
         single = len(shell_calls) == 1 and ok
-        sub_ops, capable, undetermined, touched, hints = _shell_analyze(cmd, wdir, scripts, stdout if single else "",
-                                                                       success=single, ts=ts)
+        sub_ops, capable, undetermined, touched, hints = _shell_analyze(cmd, wdir, scripts, "",
+                                                                       success=False, ts=ts)
         if capable:
             detail["write_capable"] = True
         if single and not any(not op.conditional for op in sub_ops):
@@ -2090,27 +2205,36 @@ def _codex_exec_ops(raw_arg: Any, out_text: str, cwd: object,
         for key in ("probed", "out_dirs"):
             if hints[key]:
                 detail[key] = list(dict.fromkeys((detail.get(key) or []) + hints[key]))
-        if len(shell_calls) == 1 and ok:
-            tgt = _clean_single_cat(cmd)
-            if tgt and stdout.strip() and not stdout.lower().startswith(_ERRISH):
-                _attach_single_cat(tgt, stdout, sub_ops, wdir, cmd)
-            else:
-                _attach_stdout(cmd, _strip_heredocs(cmd.replace("\\\n", " "))[0], stdout, sub_ops)
         conditional = {o.path for o in sub_ops if o.conditional and o.op != "read"}
         conditional_reads = {o.path for o in sub_ops if o.conditional and o.op == "read"}
         for key, paths in (("conditional", conditional), ("conditional_reads", conditional_reads)):
             if paths:
                 detail[key] = sorted(set(detail.get(key) or []) | paths)
-        _admit_ops([o for o in sub_ops if o.conditional], detail, succeeded=ok)
-        ops += [o for o in sub_ops if not (o.conditional and (o.op != "read" or o.path in conditional_reads))]
+        ops += sub_ops
     for patch in codex._extract_apply_patches(js):
         detail.setdefault("cmd", "apply_patch")
         ops += _patch_ops(patch, cwd)
     if not ok:
         detail["touched"] = sorted(set(detail.get("touched") or []) | {o.path for o in ops if o.op != "read"})
         detail["unresolved"] = "调用失败,效应未知(可能已部分执行)" if completed else "调用未完成,效应未知"
-    ops = _admit_ops(ops, detail, succeeded=ok) if ok else ops  # retain failed operation kind; caller admits no files
-    return ops, detail, ok
+    for op in ops:
+        proof = FileProof("code_host_intent", "unknown", "unknown", "unknown", "code_host_text:" + op.op)
+        intent = {"path": op.path, "op": op.op, "proof": proof_payload(proof),
+                  "execution_observed": False, "author_status": "unknown"}
+        detail.setdefault("code_host_intents", []).append(intent)
+        if op.op == "read":
+            detail.setdefault("read_candidates", []).append({"path": op.path, "via": "code_host_intent",
+                "start": op.start, "n": op.n, "seen": None, "proof": proof_payload(proof)})
+        else:
+            _note_touched(detail, [op.path], [])
+    if shell_calls or detail.get("code_host_intents"):
+        detail["operation_basis"] = "code_host_intent"
+        detail["execution"] = "unknown"
+        detail["output_association"] = "unverified_outer_output"
+        detail["unsupported_execution"] = list(dict.fromkeys(
+            [*(detail.get("unsupported_execution") or []), "code_host_nested_execution_unverified"]))
+        detail["intent_note"] = "内嵌调用仅由外层 JS 文本抽取；outer 完成不证明执行、文件读取、写入或作者。原文需按 raw ref 展开。"
+    return [], detail, ok
 
 
 def _walk_codex(path: str, agent_id: str, session: str, seq: list[int], scripts: dict[str, Any],
@@ -2120,6 +2244,7 @@ def _walk_codex(path: str, agent_id: str, session: str, seq: list[int], scripts:
     pend: dict[str, tuple[str, str, Any, Any, int]] = {}   # call_id -> (ts, name, raw_arg, cwd, 行号)
     cwd: Any = None
     last_text: str | None = None
+    native_pairs = _codex_native_pair_ids(path)
 
     def nxt() -> int:
         seq[0] += 1
@@ -2195,10 +2320,18 @@ def _walk_codex(path: str, agent_id: str, session: str, seq: list[int], scripts:
                 out_text = _text_of(pl.get("output"))
                 ops: list[FileOp] = []
                 detail: dict[str, Any] = {}
-                ok: bool = True
+                ok: bool | None = True
                 kind = "other"
-                if name == "exec":
-                    full_ops, detail, ok = _codex_exec_ops(raw_arg, out_text, ucwd, scripts)
+                if _codex_command_name(name):
+                    paired = cid in native_pairs
+                    ops, detail, ok = _codex_native_command_ops(raw_arg, pl.get("output"), ucwd, scripts,
+                                                               ts=uts, completed=paired, envelope=pl)
+                    detail["pairing"] = "unique_call_id" if paired else "ambiguous_or_missing_call_id"
+                    if not paired:
+                        detail["unresolved"] = "原生命令call_id缺失或定义/回执不唯一,未认证执行效应"
+                    kind = _kind_of(name, ops)
+                elif name == "exec":
+                    full_ops, detail, ok = _codex_exec_ops(raw_arg, out_text, ucwd, scripts, ts=uts)
                     kind = _kind_of("exec", full_ops)
                     mentions, trunc = _path_mentions(raw_arg if isinstance(raw_arg, str)
                                                      else json.dumps(raw_arg, ensure_ascii=False), scripts, ucwd, uts, audit=detail)
@@ -2239,7 +2372,10 @@ def _walk_codex(path: str, agent_id: str, session: str, seq: list[int], scripts:
     for cid, (uts, name, raw_arg, ucwd, use_line) in pend.items():
         arg_text = raw_arg if isinstance(raw_arg, str) else json.dumps(raw_arg, ensure_ascii=False)
         detail = {"unfinished": True, "args": arg_text[:200]}
-        if name == "exec":
+        if _codex_command_name(name):
+            _possible, hints, _ok = _codex_native_command_ops(raw_arg, None, ucwd, scripts, completed=False, ts=uts)
+            detail.update(hints)
+        elif name == "exec":
             # 仅静态提取候选目标;没有结果就不立正式读写,也不把输入脚本认作成功落盘。
             _possible, hints, _ok = _codex_exec_ops(raw_arg, "", ucwd, scripts, completed=False, ts=uts)
             detail.update(hints)

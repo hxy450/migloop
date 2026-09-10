@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import os
+from datetime import datetime, timedelta
 from typing import Any
 
 import pytest
@@ -566,6 +567,17 @@ def _cexec(ts: str, cid: str, js: str, out_text: str, ok: bool = True) -> list[d
                                                                {"type": "input_text", "text": body}]})]
 
 
+def _ccommand(ts: str, cid: str, command: str, output: str = "", *, exit_code: int = 0,
+              name: str = "exec_command", workdir: str = "/proj") -> list[dict[str, Any]]:
+    """A real native command pair, deliberately distinct from the JS wrapper fixture."""
+    done = (datetime.fromisoformat(ts.replace("Z", "+00:00")) + timedelta(seconds=1)).isoformat().replace("+00:00", "Z")
+    argument_key = "command" if name.endswith("shell_command") else "cmd"
+    return [_crec(ts, "response_item", {"type": "function_call", "call_id": cid, "name": name,
+                  "arguments": json.dumps({argument_key: command, "workdir": workdir})}),
+            _crec(done, "response_item", {"type": "function_call_output", "call_id": cid,
+                  "output": json.dumps({"exit_code": exit_code, "output": output})})]
+
+
 def _cfn(ts: str, cid: str, name: str, args: dict[str, Any], out: dict[str, Any]) -> list[dict[str, Any]]:
     return [_crec(ts, "response_item", {"type": "function_call", "call_id": cid, "name": name,
                                          "namespace": "collaboration", "arguments": json.dumps(args)}),
@@ -612,7 +624,7 @@ def _codex_tree(tmp_path: Any) -> str:
     return str(d / f"rollout-{CROOT}.jsonl")
 
 
-def test_codex_collector_matches_cc_semantics(tmp_path: Any) -> None:
+def test_codex_collector_keeps_code_host_intent_distinct_from_native_cc_execution(tmp_path: Any) -> None:
     root = _codex_tree(tmp_path)
     agents = atoms_collect.collect_codex(root, seq=[0], sessions_root=str(tmp_path / "sessions"))
     led = atoms.build_ledger(agents)
@@ -620,21 +632,22 @@ def test_codex_collector_matches_cc_semantics(tmp_path: Any) -> None:
     assert set(led.agents) == {main_id, child_id}
     m = led.agents[main_id]
     assert [(a.kind, a.ver, a.ok) for a in m.actions if a.kind not in ("inbox", "say")] == [
-        ("read", None, True), ("write", 1, True), ("dispatch", 2, True), ("message", 3, True), ("write", None, False)]
+        ("other", None, True), ("other", None, True), ("dispatch", 1, True), ("message", 2, True), ("other", None, False)]
     assert m.actions[1].detail["cmd"].startswith("cd /proj && grep")
-    rd = led.stories["/proj/spec/a.md"].reads[0]
-    assert rd.seen == ((3, "foo bar"),) and rd.by == main_id                      # stdout 对账穿过 exec 外壳
-    assert led.stories["/proj/b.ets"].versions[0].content == "line1\n"             # apply_patch Add File
-    assert len(led.stories["/proj/b.ets"].versions) == 1                           # Script failed 的 patch 不落账
+    assert all(not a.files for a in m.actions if a.tool == "exec")
+    assert not led.stories["/proj/b.ets"].versions                               # Outer success is not patch success.
+    assert led.stories["/proj/b.ets"].touches                                    # Intent/failure stays navigable.
     c = led.agents[child_id]
-    assert (c.parent, c.parent_ver, c.name, c.kind) == (main_id, 2, "Wk", "worker")
+    assert (c.parent, c.parent_ver, c.name, c.kind) == (main_id, 1, "Wk", "worker")
     assert c.prompt == "任务:实现 B" and c.result == "B 完成"
     assert [a.detail["text"] for a in c.actions if a.kind == "inbox"] == ["任务:实现 B"]   # fork 复制的父消息不算收件
     disp = next(a for a in m.actions if a.kind == "dispatch")
     assert disp.detail["child"] == child_id and disp.detail["name"] == "worker1"
     raw = atoms.action_raw(led, main_id, m.actions[1].seq)
     assert raw is not None and "exec_command" in json.dumps(raw["input"]) and "foo bar" in raw["output"]
-    assert led.stories["/proj/c.ets"].versions[0].by == child_id
+    assert not led.stories["/proj/c.ets"].versions
+    assert all(i["proof"]["operation_basis"] == "code_host_intent"
+               for agent in (m, c) for a in agent.actions for i in a.detail.get("code_host_intents", []))
 
 
 def test_file_atom_resolves_basename_hint_and_lists_names(tmp_path: Any) -> None:
@@ -904,23 +917,21 @@ def _codex_staged_tree(tmp_path: Any) -> str:
 
 
 def test_codex_stage_backfilled_from_skill_reads(tmp_path: Any) -> None:
-    """codex 与 CC 对齐:主会话每笔动作按适配器的阶段区间回填 stage,子 rollout 继承派发时阶段,
-    版本文件由此有阶段 → 主会话在 verify 亲手改的也是修复方。"""
+    """Legacy stage hints remain navigation; wrapper intent does not create versions or fixers."""
     root = _codex_staged_tree(tmp_path)
     agents = atoms_collect.collect_codex(root, seq=[0], sessions_root=str(tmp_path / "sessions"))
     led = atoms.build_ledger(agents)
     main_id, child_id = "__main__:" + CROOT[:8], "agent-" + CCHILD[:12]
     m = led.agents[main_id]
     assert [(a.kind, a.stage) for a in m.actions if a.kind in ("dispatch", "write")] == [
-        ("dispatch", "a2h-execute"), ("write", "arkts-visual-verify")]
+        ("dispatch", "a2h-execute")]
     assert led.agents[child_id].stage == "a2h-execute"
     st = led.stories["/proj/entry/A.ets"]
-    assert [(v.by, v.stage) for v in st.versions] == [
-        (child_id, "a2h-execute"), (main_id, "arkts-visual-verify")]
+    assert not st.versions and st.touches
     chains = filestory.build_fix_chains(led.stories, {}, {})
-    assert [c["fixer"]["id"] for c in chains] == [main_id]
-    assert chains[0]["generator"]["id"] == child_id
-    assert chains[0]["fixers_all"][0]["vers"] == [2]      # 主会话 v1 派发、v2 改 A
+    assert chains == []
+    patch_intents = [a for a in m.actions if a.detail.get("cmd") == "apply_patch"]
+    assert len(patch_intents) == 1 and patch_intents[0].stage == "arkts-visual-verify"
 
 
 def test_agent_atom_since_window_and_seen_summary(tmp_path: Any) -> None:
@@ -1054,7 +1065,7 @@ def test_actions_carry_relative_time_from_pool_start(tmp_path: Any) -> None:
 
 
 def test_codex_exec_shares_stdout_reconciliation_and_unresolved_marks(tmp_path: Any) -> None:
-    """codex 的 exec 与 CC 的 Bash 同一套:目录 grep 按 stdout 反证成读;解析不了的标 unresolved。"""
+    """Wrapper stdout stays raw evidence, never a nested read or file snapshot."""
     d = tmp_path / "sessions"
     d.mkdir()
 
@@ -1076,12 +1087,12 @@ def test_codex_exec_shares_stdout_reconciliation_and_unresolved_marks(tmp_path: 
     led = atoms.build_ledger(agents)
     m = led.agents["__main__:" + CROOT[:8]]
     reads = sorted((ref.path, ref.ev.seen) for act in m.actions for ref in act.files if ref.op == "read")
-    assert reads == []  # stdout locators remain evidence, not confirmed file-content reads.
+    assert reads == []
     candidates = [candidate for act in m.actions for candidate in act.detail.get("read_candidates", [])]
-    assert sorted((r["path"], r["seen"]) for r in candidates) == [
-        ("/proj/app/src/A.kt", [[12, "val mHttpUrl = x"]]), ("/proj/app/src/B.kt", [[40, "mHttpUrl"]])]
-    assert all(r["proof"]["operation_basis"] == "output_locator" and r["proof"]["execution"] == "unknown" for r in candidates)
+    assert candidates == []  # Filename-bearing output is not attached to a regex-discovered grep call.
     assert [a.detail.get("unresolved") for a in m.actions if a.tool == "exec"] == [None, "命令替换路径"]
+    raw = atoms.action_raw(led, m.id, next(a.seq for a in m.actions if a.tool == "exec"))
+    assert "val mHttpUrl = x" in raw["output"]
 
 
 # ═══════════════ 调查 agent 的 token 画像驱动的两刀(0723 基线:sessions 每次 9.5K 字符占 11%,

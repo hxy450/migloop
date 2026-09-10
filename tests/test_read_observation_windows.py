@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from migloop import atoms, atoms_collect, filestory
-from tests.test_atoms import CROOT, _call, _cexec, _crec, _ledger, _rec, _res, _use, _write_jsonl
+from tests.test_atoms import CROOT, _call, _ccommand, _cexec, _crec, _ledger, _rec, _res, _use, _write_jsonl
 
 PATH = "/proj/A.ets"
 
@@ -32,10 +32,8 @@ def collected(tmp_path: Path, backend: str, *, partial: bool = False, read_start
     calls = [(0, 1, "initial", f"cat > {PATH} <<'EOF'\n{old}EOF", ""),
              (read_start, 20, "read", f"head -n 1 {PATH}" if partial else f"cat {PATH}", "old\n" if partial else old),
              (10, 11, "write", f"false && printf 'maybe\\n' > {PATH}; true" if candidate else f"cat > {PATH} <<'EOF'\n{new}EOF", "")]
-    import json
     for use, done, cid, command, output in calls:
-        js = "const r=await tools.exec_command(" + json.dumps({"cmd": command, "workdir": "/proj"}) + ");text(JSON.stringify(r));"
-        pair = _cexec(at(use), cid, js, output)
+        pair = _ccommand(at(use), cid, command, output)
         pair[1]["timestamp"] = at(done)
         records.extend(pair)
     root = tmp_path / f"rollout-{CROOT}.jsonl"
@@ -183,12 +181,10 @@ def test_unfinished_shell_call_reaches_the_ledger_as_an_open_candidate_window(tm
                    *_call(at(15), "read", "Bash", {"command": f"cat {PATH}"}, "old\n")]
         ledger = _ledger(tmp_path, records)
     else:
-        import json
         records = [_crec(at(0), "session_meta", {"id": CROOT, "cwd": "/proj", "source": "cli"})]
         for second, cid, cmd, output in [(0, "initial", f"cat > {PATH} <<'EOF'\nold\nEOF", ""),
                                          (3, "pending", command, ""), (15, "read", f"cat {PATH}", "old\n")]:
-            js = "const r=await tools.exec_command(" + json.dumps({"cmd": cmd, "workdir": "/proj"}) + ");text(JSON.stringify(r));"
-            pair = _cexec(at(second), cid, js, output)
+            pair = _ccommand(at(second), cid, cmd, output)
             pair[1]["timestamp"] = at(second + 1)
             records.extend(pair[:1] if cid == "pending" else pair)
         root = tmp_path / f"rollout-{CROOT}.jsonl"
@@ -213,13 +209,11 @@ def test_concat_with_concurrently_written_source_does_not_invent_target_content(
                    _rec(at(30), "user", [_res("concat", "")])]
         ledger = _ledger(tmp_path, records)
     else:
-        import json
         records = [_crec(at(0), "session_meta", {"id": CROOT, "cwd": "/proj", "source": "cli"})]
         for second, done, cid, cmd in [(0, 1, "initial", f"cat > {PATH} <<'EOF'\nold\nEOF"),
                                        (5, 30, "concat", f"cat {PATH} > {target}"),
                                        (10, 11, "change", f"cat > {PATH} <<'EOF'\nnew\nEOF")]:
-            js = "const r=await tools.exec_command(" + json.dumps({"cmd": cmd, "workdir": "/proj"}) + ");text(JSON.stringify(r));"
-            pair = _cexec(at(second), cid, js, "")
+            pair = _ccommand(at(second), cid, cmd, "")
             pair[1]["timestamp"] = at(done)
             records.extend(pair)
         root = tmp_path / f"rollout-{CROOT}.jsonl"
@@ -265,8 +259,7 @@ def test_created_at_read_endpoint_never_erases_actually_returned_content(observa
 def test_codex_pending_call_preserves_raw_pointer_without_inventing_effects(tmp_path: Path, kind: str) -> None:
     import json
     records = [_crec(at(0), "session_meta", {"id": CROOT, "cwd": "/proj", "source": "cli"})]
-    initial_js = "text(await tools.exec_command(" + json.dumps({"cmd": f"cat > {PATH} <<'EOF'\nold\nEOF", "workdir": "/proj"}) + "));"
-    records += _cexec(at(0), "initial", initial_js, "")
+    records += _ccommand(at(0), "initial", f"cat > {PATH} <<'EOF'\nold\nEOF")
     if kind == "read":
         js = "text(await tools.exec_command(" + json.dumps({"cmd": f"cat {PATH}", "workdir": "/proj"}) + "));"
     else:

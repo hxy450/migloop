@@ -24,9 +24,15 @@ file/agent/search关系注释默认摘要；omitted计数可用同查询details=
 摘要、历史报告、实际操作回执、构建成功、特定产物行为验证分开看；别把worker报告扩大成全阶段事实。
 
 先自由调查，再组织论证。系统记录实际调用及交付，不需要你回忆路线；搜索跳转不构成历史读写边。
-按changes核对还有哪些操作未解释；一个原因可以解释多笔修改，候选可保留未决，不能为了清零编原因。
+按changes核对操作及unclassified_related余项；后者不是写入认证，但不能看完已识别操作就把余项当不存在。
+候选/未分类是工具的识别边界，不是历史上没发生。可展开原始请求和回执自行论证，不能用“工具未确认”代替调查。
+code_host_intent仅是外层脚本文字中的调用意图，outer成功不证明内部调用执行；独立原生补丁仍可由changes/diff展开，但作者和完整文件状态可能未知。
+一个原因可以关联多笔修改，同一操作也可关联多个原因；findings[].changes记录这些关系，不必再重复一张coverage表。
 归责某个agent需核当时相关输入、实际输出和反证。池内存在正确spec不等于该agent读到；读写链存在不等于错误沿链传播。
 分清已证局部原因、待验证机制、优化建议。可以停在证据边界，不强迫归因到skill或唯一最初作者。
+后期源码只能直接证明观察时存在该内容；要说生成结束时就如此，需核截止前的写入/观察或可靠变化链，不能把首次读到的位置当首次引入。
+这是历史归因，不要求重跑原工程。已有的原始编译/测试回执可作证据，不能因自己没重跑就宣称记录中没有验证。
+“我未展开”“工具未识别”“全池不存在”是三种不同断言；前两种不证明第三种。避免每个节点重复“本次未重跑”的套话。
 
 最终给 migloop-verdict/3 YAML，模板用 guide(topic="verdict") 展开。每个相关节点有原因，边有原始依据及传播主张；断链明确保留。
 可用check(sid,draft=完整稿)核身份/时间/引用/关系/覆盖；不要求先check才能提交，也不认证原因真假。不要把格式工作当调查主体。
@@ -38,6 +44,8 @@ VERDICT = """\
 调查结束后整理，不必重复查询路线。ledger照抄batch返回；节点key照抄真实file/agent身份，at填明确ISO，不填latest/v。
 每个节点at表示证据历史截止，需涵盖你引用的操作回执；生成输入是否当时可用仍按相应调用发起前的读取返回核对。
 target.since_ts只限制修改对账，不能截掉节点的生成期输入。节点role为origin/propagated/context/repaired；status为explained/unknown/not_generation_error。
+origin指问题引入环节，不是修复写者或证据出处；propagated指携带问题，repaired指修后纠正，context是相关背景。
+read只连file→agent，write只连agent→file；agent→agent不能写成write，没有中间文件依据就保留断链。
 reason/claim等自由文本建议用 |-；原始引用整体加引号。只列判断所需节点，不强求正常上游全部展开。
 
 ```yaml
@@ -83,16 +91,13 @@ findings:
     hypothesis: "<可选：更深机制假设，不是已证事实>"
     recommendation: "<可选：可执行改进>"
     validation: "<可选：怎样检验机制与改进效果>"
-coverage:
-  - event: "<changes事件id>"
-    status: explained
-    finding: A
-    reason: "<说明对应哪项解释>"
 ```
 
 nodes/edges可为空但要明确未知边界。read边为file→agent，write为agent→file；possible_read/possible_write须有候选操作证据。
 没有检测到不等于未发生：可以提交原文支持的关系待核，不能以纯文件名提及或查询先后补边。反证同样用可定位引用。
-coverage可用unresolved/not_repair（需理由）；已分配finding不代表语义解释一定正确。工具会显示遗漏/未知事件，不预设缺陷数量。
+通常省略coverage，系统按findings[].changes反查关联；这只证明你给了关联，不认证整段修改已解释正确。
+只有要专门声明未决或非修复时，可加coverage:[{event:"事件id",status:unresolved或not_repair,reason:"理由"}]，一个event只一条。
+节点/边反证用可定位引用；无法定位的解释写finding.unknown，不把一段中文解释拼到raw引用后面。
 最终只需完整文稿和可选一小段摘要，不再复制一份同义散文。旧schema1/2仍可读，但新时间调查不用旧版本坐标。
 """
 

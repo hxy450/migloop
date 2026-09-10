@@ -9,9 +9,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from . import atoms, transcript_store as store
-from .evidence import proof_payload, CONFIRMED_BASES
-from .time_scope import _time, _iso
+from . import atoms
+from . import transcript_store as store
+from .evidence import CONFIRMED_BASES, proof_payload
+from .time_scope import _iso, _time
 
 SCHEMA = "migloop-time-view/1"
 
@@ -96,6 +97,13 @@ def _annotations(ledger: atoms.Ledger, window: Window, agent_ids: set[str] | Non
                     "delivery": proof["delivery"] if completed else "not_yet_returned",
                     "version_binding": "not_used_in_time_view", "legacy_v": None})
             for target in sorted(_targets(ledger, act) - {r.path for r in act.files}) if completed else []:
+                intents = [r for r in act.detail.get("code_host_intents") or [] if r.get("path") == target]
+                if intents:
+                    relations.append({"kind": "code_host_intent", "path": target,
+                                      "status": "unverified_intent", "execution": "unknown",
+                                      "operation_basis": "code_host_intent",
+                                      "note": "脚本中声明了此目标；未核实内部调用曾执行，不是历史读写边"})
+                    continue
                 possible = target in (set(act.detail.get("touched") or []) | set(
                     act.detail.get("conditional") or []) | set(act.detail.get("effect_candidates") or []))
                 relations.append({"kind": "possible_access" if possible else "mention", "path": target,
@@ -208,15 +216,23 @@ def query(ledger: atoms.Ledger, *, kind: str, key: str | None = None, at: str = 
                 else:
                     counts["in_scope"] += 1
                 text = text if text is not None else record.text
-                matched = [term for term, needle in zip(terms, needles) if needle in text.casefold()]
+                folded = text.casefold()
+                matched = [term for term, needle in zip(terms, needles) if needle in folded]
                 if needles and not matched:
                     continue
-                position = min((text.casefold().find(needle) for needle in needles if needle in text.casefold()), default=0)
-                preview = text[max(0, position - 60):max(0, position - 60) + 240]
+                preview_text = text
+                if not needles and kind != "file" and isinstance(record.value, dict):
+                    message = record.value.get("message")
+                    payload = message.get("content") if isinstance(message, dict) else record.value.get("payload")
+                    if payload is not None:
+                        preview_text = store.readable(payload)
+                previews = needles or ([needle_file] if kind == "file" and needle_file else [])
+                position = min((folded.find(needle) for needle in previews if needle in folded), default=0)
+                preview = preview_text[max(0, position - 60):max(0, position - 60) + 240]
                 shown, omitted = _annotation_view(annotation, kind, key, details)
                 row = {**record.address(), "agents": sorted(owners), "annotations": shown,
                        "annotations_omitted": omitted,
-                       "preview": preview, "chars": len(text), "matched": matched,
+                       "preview": preview, "preview_kind": "decoded_field_excerpt", "chars": len(text), "matched": matched,
                        "reference_status": "ambiguous_source" if source_counts[store.source_key(path)] > 1 else "addressable",
                        "association": "agent_transcript" if kind == "agent" else
                            "indexed_or_lexical_not_causal" if kind == "file" else "pool_record"}
@@ -273,8 +289,8 @@ def render(data: dict[str, Any]) -> str:
     node, counts = data["node"], data["counts"]
     out = [f"# 时间原子 {node['kind']}:{node['key'] or '*'} · 截至 {node['at']}",
            "范围 " + json.dumps(data["scope"], ensure_ascii=False),
-           f"匹配 {data['total']} 条；本页 {len(data['rows'])} 条；next_offset={data['next_offset']}；"
-           f"未知时间 {counts['undated']}；源缺口 {len(data['gaps'])}", data["note"]]
+           (f"匹配 {data['total']} 条；本页 {len(data['rows'])} 条；next_offset={data['next_offset']}；"
+            f"未知时间 {counts['undated']}；源缺口 {len(data['gaps'])}"), data["note"]]
     for label, rows in (("已记录时间", data["rows"]), ("时间未知·不属于截止前证据", data["undated"]["rows"])):
         if rows:
             out.append("## " + label)

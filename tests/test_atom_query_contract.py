@@ -46,6 +46,35 @@ def test_validated_agent_alias_is_canonicalized_for_both_projections(tmp_path):
     assert atom_queries.json_data(ledger, "agent", {"id": alias, "v": 1})["id"] == MAIN_ID
 
 
+@pytest.mark.parametrize("tool", ["diff", "blame"])
+def test_uncertainty_window_pagination_has_the_same_time_only_contract(tool):
+    args = atom_queries.parameters(tool, {"path": "A.ets", "at": "2026-01-01T02:00:00Z",
+                                         "window_offset": "4", "window_limit": "2"})
+    assert args["window_offset"] == 4 and args["window_limit"] == 2
+    with pytest.raises(ValueError, match="仅用于"):
+        atom_queries.parameters(tool, {"path": "A.ets", "v": 2, "window_offset": 4})
+    with pytest.raises(ValueError, match="整数"):
+        atom_queries.parameters(tool, {"path": "A.ets", "at": "latest", "window_limit": True})
+
+
+@pytest.mark.parametrize("tool", ["diff", "blame"])
+def test_uncertainty_cursor_is_executable_through_the_shared_query_kernel(tool):
+    from migloop import atoms, investigation
+    from tests.test_temporal_state import call, ledger
+    from tests.test_temporal import ts
+    led = ledger([call(1, 0, 1, "wfull", content="old\n", created=True), *[
+        atoms.Action(ts(i), i + 2, "Bash", "other", done_ts=ts(i), detail={"unresolved": "opaque execution"})
+        for i in range(2, 8)]])
+    request = {"tool": tool, "args": {"path": "/p/A.ets", "at": ts(10), "window_limit": 2}}
+    found = []
+    while request:
+        data = investigation.query(led, request["tool"], request["args"])
+        assert not data["known"] and not data["current_state_certified"]
+        found.extend(row["id"] for row in data["unclassified_execution_windows"])
+        request = data["unclassified_execution_window_page"]["next_query"]
+    assert len(found) == len(set(found)) == 6
+
+
 def test_json_file_is_compact_by_default_and_expansion_is_explicit(tmp_path):
     ledger = _pool(tmp_path)
     compact = atom_queries.json_data(ledger, "file", {"path": "A.ets", "v": 2})

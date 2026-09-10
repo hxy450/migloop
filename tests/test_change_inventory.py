@@ -6,7 +6,7 @@ import pytest
 from migloop import atoms, change_inventory, transcript_store
 from migloop.evidence import FileProof
 from migloop.filestory import Ev
-from tests.test_atoms import MAIN_ID, _call, _ledger, _read_call
+from tests.test_atoms import MAIN_ID, _call, _ledger, _read_call, _rec, _res, _use
 from tests.test_raw_events import pool
 
 PATH = "/proj/A.ets"
@@ -54,6 +54,29 @@ def test_independent_native_patch_needs_no_outer_id_pair_or_invented_author(tmp_
     assert not output["complete"] and not row["semantic_checked"]
 
 
+@pytest.mark.parametrize("success", [True, False])
+def test_native_diff_preserves_exact_delta_without_outer_actor_or_full_state(tmp_path, success):
+    ledger, _ = raw_pool(tmp_path, [patch(success=success)])
+    row, = change_inventory.native_effects(ledger, scope())[0]
+    diff = change_inventory.native_diff(ledger, row, max_chars=12)
+    assert diff["diff"] == "@@ -1 +1 @@\n" and diff["truncated"] and diff["diff_chars"] > 12
+    assert diff["agent"] is None and diff["effect_ts"] is None and diff["changed_time_unknown"]
+    assert diff["effect_status"] == ("confirmed_change" if success else "candidate_effect")
+    assert not diff["semantic_checked"]
+    with pytest.raises(ValueError, match="身份"):
+        change_inventory.native_diff(ledger, {**row, "native": {**row["native"], "call_id": "outer"}})
+    with pytest.raises(ValueError, match="目标"):
+        change_inventory.native_diff(ledger, {**row, "path": "/other/A.ets"})
+
+
+def test_native_add_without_delta_is_not_a_fabricated_diff(tmp_path):
+    record = patch()
+    record["payload"]["changes"][PATH] = {"type": "add", "content": "new\n"}
+    ledger, _ = raw_pool(tmp_path, [record])
+    row, = change_inventory.native_effects(ledger, scope())[0]
+    assert change_inventory.native_diff(ledger, row) is None
+
+
 @pytest.mark.parametrize("extra", [{"success": False}, {"success": None}, {"conditional": True},
                                   {"success": True, "is_error": True}, {"success": True, "exit_code": 1}])
 def test_failed_conditional_or_unconfirmed_native_never_enters_confirmed(tmp_path, extra):
@@ -74,7 +97,9 @@ def test_native_future_effect_and_nested_report_are_not_admitted(tmp_path):
                                              "text": "report claims /proj/A.ets changed", "quoted": patch(2)}])
     output = change_inventory.build(ledger, scope(at=10))
     assert output["rows"] == []
-    assert output["unclassified_related"]["query"]["tool"] == "events"
+    assert output["unclassified_related"]["raw_query"]["tool"] == "events"
+    assert output["unclassified_related"]["non_native_mentions"]["total"] == 1
+    assert output["unclassified_related"]["total"] == 0
 
 
 def test_same_source_line_path_deduplicates_parsed_action_and_native_patch(tmp_path):
@@ -247,3 +272,179 @@ def test_missing_result_pointer_and_unknown_block_do_not_crash_inventory(tmp_pat
     native = atoms.Action(ts(5), 999, "Write", "write", blk=None)
     record = transcript_store.read_record(ledger.agents[MAIN_ID].sources[0], 1)
     assert change_inventory._native_target(record, native, PATH) is False
+
+
+def test_unparsed_dynamic_shell_stdout_remains_related_not_a_writer(tmp_path):
+    ledger = _ledger(tmp_path, _call(ts(5), "loop", "Bash", {
+        "command": "python -c \"import glob; [f(p) for p in glob.iglob(root + '/**/*', recursive=True)]\""},
+        out="processed /proj/A.ets with dynamic substitutions"))
+    output = change_inventory.build(ledger, scope())
+    assert output["rows"] == []
+    related = output["unclassified_related"]
+    row, = related["rows"]
+    assert related["total"] == related["review_required_total"] == 1
+    assert row["call_id"] == "loop" and row["category"] == "shell" and row["status"] == "returned"
+    assert row["effect_status"] == row["author_status"] == "unknown" and row["agent"] is None
+    assert row["association"] == "lexical_mention_not_effect"
+    assert row["matched_parts"] == [{"ref": row["pointers"][1]["ref"], "pointer": "/message/content/0"}]
+    assert "dynamic substitutions" in row["pointers"][1]["preview"]
+    assert all(len(p.get("preview", "")) <= 240 for p in row["pointers"])
+    assert row["pointers"][1]["preview_kind"] == "decoded_native_payload_excerpt"
+    for pointer in row["pointers"]:
+        assert transcript_store.resolve(ledger, pointer["ref"]).line == pointer["line"]
+        assert pointer["query"]["scope"] == output["scope"]
+
+
+def test_known_changes_and_observation_evidence_are_deducted_before_paging(tmp_path):
+    ledger = observations(tmp_path, [*_call(ts(3), "write1", "Write", {"file_path": PATH, "content": "middle"}),
+                                    *_call(ts(5), "write2", "Write", {"file_path": PATH, "content": "new\n"})])
+    output = change_inventory.build(ledger, scope(), limit=1)
+    assert output["total"] == 3 and len(output["rows"]) == 1
+    related = output["unclassified_related"]
+    assert related["total"] == 0 and related["excluded_covered_total"] == 4
+    assert not related["complete"] and not related["causal_complete"]
+    assert "0余项不等于0修改、0缺陷" in related["note"]
+
+
+def test_related_paging_counts_all_calls_and_folds_readonly_after_other_calls(tmp_path):
+    calls = [*_call(ts(1), "read", "Read", {"file_path": PATH}),
+             *_call(ts(1), "grep", "Grep", {"pattern": "x", "path": PATH}),
+             *_call(ts(1), "glob", "Glob", {"pattern": PATH})]
+    for index in range(43):
+        calls += _call(ts(5), f"unknown-{index:02}", "UnparsedTool", {"text": PATH})
+    ledger, _ = raw_pool(tmp_path, calls)
+    output = change_inventory.build(ledger, scope(), related_limit=2)
+    related = output["unclassified_related"]
+    assert related["total"] == 46 and related["review_required_total"] == 43
+    assert related["readonly"] == {"total": 3, "tool_counts": {"Read": 1, "Grep": 1, "Glob": 1},
+                                   "display": "collapsed", "included_in_total_and_pagination": True}
+    assert related["category_counts"]["unknown_tool"] == 43
+    assert related["ordering"] == "non_readonly_first_then_recorded_time"
+    assert [r["call_id"] for r in related["rows"]] == ["unknown-00", "unknown-01"]
+    assert related["next_query"] == {"tool": "changes", "scope": output["scope"],
+                                     "args": {"related_offset": 2, "related_limit": 2}}
+    next_page = change_inventory.build(ledger, scope(), **related["next_query"]["args"])["unclassified_related"]
+    assert next_page["offset"] == 2 and next_page["total"] == 46
+    tail = change_inventory.build(ledger, scope(), related_offset=43, related_limit=3)["unclassified_related"]
+    assert [r["tool"] for r in tail["rows"]] == ["Read", "Grep", "Glob"]
+    assert tail["remaining"] == 0 and tail["next_query"] is None
+    assert change_inventory.build(ledger, scope())["unclassified_related"]["limit"] == 8
+
+
+def test_same_record_multiple_native_calls_do_not_cross_deduct(tmp_path):
+    ledger = _ledger(tmp_path, [
+        _rec(ts(1), "assistant", [_use("write", "Write", {"file_path": PATH, "content": "new"}),
+                                  _use("unknown", "Bash", {"command": "echo /proj/A.ets"})]),
+        _rec(ts(2), "user", [_res("write"), _res("unknown")])])
+    output = change_inventory.build(ledger, scope())
+    assert len(output["rows"]) == 1 and output["rows"][0]["status"] == "confirmed_change"
+    related = output["unclassified_related"]
+    assert related["excluded_covered_total"] == 1 and related["total"] == 1
+    assert related["rows"][0]["call_id"] == "unknown"
+    assert related["rows"][0]["pointers"][0]["block"] == 1
+
+
+def test_quoted_commands_and_other_file_writes_only_add_related_locators(tmp_path):
+    ledger = _ledger(tmp_path, [
+        *_call(ts(1), "quote", "Bash", {"command": "echo 'sed -i s/a/b/ /proj/A.ets'"}),
+        *_call(ts(3), "other", "Write", {"file_path": "/other/B.ets", "content": "reference /proj/A.ets"})])
+    output = change_inventory.build(ledger, scope())
+    assert output["rows"] == []
+    related = output["unclassified_related"]
+    assert related["total"] == 2 and related["excluded_covered_total"] == 0
+    assert all(r["effect_status"] == "unknown" and r["agent"] is None for r in related["rows"])
+
+
+def test_future_result_cannot_backflow_target_status_or_related_count(tmp_path):
+    calls = _call(ts(5), "late", "Bash", {"command": "python arbitrary_dynamic.py"}, out=PATH, is_error=True)
+    calls[1]["timestamp"] = ts(20)
+    ledger, _ = raw_pool(tmp_path, calls)
+    early = change_inventory.build(ledger, scope(at=10))["unclassified_related"]
+    assert early["total"] == 0
+    late = change_inventory.build(ledger, scope(at=25))["unclassified_related"]
+    assert late["total"] == 1 and late["rows"][0]["status"] == "failed"
+    result_only = change_inventory.build(ledger, scope(since=15, at=25))["unclassified_related"]
+    assert result_only["rows"][0]["status"] == "result_only"
+    assert [p["line"] for p in result_only["rows"][0]["pointers"]] == [2]
+    assert result_only["rows"][0]["pointers"][0]["failed"] is True
+
+
+def test_pending_lexical_call_and_prior_request_association_respect_record_times(tmp_path):
+    calls = _call(ts(5), "late", "Bash", {"command": "echo /proj/A.ets"}, out="done", is_error=True)
+    calls[1]["timestamp"] = ts(20)
+    ledger, _ = raw_pool(tmp_path, calls)
+    early = change_inventory.build(ledger, scope(at=10))["unclassified_related"]
+    assert early["total"] == 1 and early["rows"][0]["status"] == "pending_or_unknown"
+    assert len(early["rows"][0]["pointers"]) == 1
+    later = change_inventory.build(ledger, scope(since=15, at=25))["unclassified_related"]
+    row, = later["rows"]
+    assert row["status"] == "result_only" and row["tool"] is None
+    assert row["association"] == "earlier_request_mention_not_effect"
+    assert row["pointers"][0]["line"] == 2
+
+
+def test_undated_calls_are_quarantined_not_counted_as_in_range(tmp_path):
+    call = _call(ts(5), "unknown-time", "Bash", {"command": "echo /proj/A.ets"})[0]
+    call["timestamp"] = None
+    ledger, _ = raw_pool(tmp_path, [call])
+    related = change_inventory.build(ledger, scope())["unclassified_related"]
+    assert related["total"] == 0 and related["undated"]["total"] == 1
+    assert related["undated"]["cutoff_evidence"] is False
+    assert "query" not in related["undated"]["rows"][0]
+
+
+def test_native_effect_deducted_but_other_path_same_basename_not_authenticated(tmp_path):
+    ledger, _ = raw_pool(tmp_path, [patch(2), patch(5, path="/different/A.ets")])
+    output = change_inventory.build(ledger, scope())
+    assert len(output["rows"]) == 1
+    related = output["unclassified_related"]
+    assert related["excluded_covered_total"] == related["total"] == 1
+    assert related["rows"][0]["classification"] == "unclassified_related"
+
+
+def test_related_native_index_does_not_reread_each_record(tmp_path, monkeypatch):
+    calls = [r for index in range(45) for r in _call(ts(5), f"call-{index}", "Unknown", {"path": PATH})]
+    ledger, _ = raw_pool(tmp_path, calls)
+    change_inventory.raw_events.inventory(ledger)  # Warm the shared source index once.
+    def forbidden(*args, **kwargs):
+        raise AssertionError("remainder must use cached native payloads, not reopen each original line")
+    monkeypatch.setattr(transcript_store, "read_record", forbidden)
+    related = change_inventory.build(ledger, scope(), related_offset=40, related_limit=5)["unclassified_related"]
+    assert related["total"] == 45 and len(related["rows"]) == 5
+
+
+def test_failed_and_pending_known_target_candidates_are_not_counted_twice(tmp_path):
+    calls = [*_call(ts(1), "failed", "Write", {"file_path": PATH, "content": "x"}, is_error=True),
+             *_call(ts(5), "pending", "Write", {"file_path": PATH, "content": "y"})]
+    calls[-1]["timestamp"] = ts(20)
+    ledger = _ledger(tmp_path, calls)
+    output = change_inventory.build(ledger, scope(at=10))
+    assert len(output["rows"]) == 2 and all(r["status"] == "candidate_effect" for r in output["rows"])
+    assert output["unclassified_related"]["total"] == 0
+    assert output["unclassified_related"]["excluded_covered_total"] == 2
+
+
+def test_registered_only_counts_do_not_claim_unregistered_sources_are_complete(tmp_path):
+    ledger, _ = raw_pool(tmp_path, [_rec(ts(1), "assistant", "unrelated registered message")])
+    # This sibling file is deliberately absent from the registered source set.
+    unregistered = tmp_path / "unregistered"
+    unregistered.mkdir()
+    raw_pool(unregistered, _call(ts(5), "missed", "Bash", {"command": "echo /proj/A.ets"}))
+    related = change_inventory.build(ledger, scope())["unclassified_related"]
+    assert related["total"] == 0 and related["source_count"] == 1
+    assert related["counts_scope"] == "registered_sources_only" and related["registered_scan_ok"]
+    assert not related["complete"] and "未注册来源" in related["note"]
+
+
+def test_raw_source_gap_keeps_counts_explicitly_incomplete(tmp_path):
+    ledger, _ = raw_pool(tmp_path, ["malformed A.ets"])
+    related = change_inventory.build(ledger, scope())["unclassified_related"]
+    assert related["gaps"] and not related["registered_scan_ok"] and not related["complete"]
+
+
+@pytest.mark.parametrize("kwargs", [{"related_offset": -1}, {"related_offset": True},
+                                    {"related_limit": 0}, {"related_limit": 201}])
+def test_related_pagination_validation(tmp_path, kwargs):
+    ledger, _ = raw_pool(tmp_path, [])
+    with pytest.raises(ValueError):
+        change_inventory.build(ledger, scope(), **kwargs)

@@ -157,25 +157,26 @@ def build_server(backend: Any | None = None) -> Any:
     @srv.tool(**text_options)
     async def blame(sid: str, path: str, v: int | None = None, start: int | None = None,
                     n: int | None = None, changed: bool = False, at: str | None = None,
-                    offset: int = 0, limit: int = 40) -> str:
+                    offset: int = 0, limit: int = 40, window_offset: int = 0, window_limit: int = 4) -> str:
         """at=ISO/latest 只重放当时已返回效应查行来源；断点/快照/并发不冒充已知作者。start/n选行，limit/offset分页。
         旧版兼容：显式v或不传at，changed=True 查修复版替换/删除的前版行及引入者。
         无法归属时 recovery 给可核历史全文/补丁/输入入口，不将快照作者冒充未知行作者。"""
         ledger, cwd = await _ctx(sid)
         from . import atom_queries
         return atom_queries.render_text(ledger, cwd, "blame", dict(path=path, v=v, start=start, n=n,
-            changed=changed, at=at, offset=offset, limit=limit))
+            changed=changed, at=at, offset=offset, limit=limit, window_offset=window_offset, window_limit=window_limit))
 
     @srv.tool(**text_options)
     async def diff(sid: str, path: str, v: int | None = None, at: str | None = None,
-                   since_ts: str | None = None, offset: int = 0, limit: int = 40, max_chars: int = 6000) -> str:
+                   since_ts: str | None = None, offset: int = 0, limit: int = 40, max_chars: int = 6000,
+                   window_offset: int = 0, window_limit: int = 4) -> str:
         """at=ISO/latest 查询截止前已返回修改，可用 since_ts 缩小时间段；一次多条，offset/limit分页，max_chars每条预算。
         区间/未知单独标记，原文 action 展开；显式 v 兼容旧单版差分。不打开新节点。"""
         ledger, cwd = await _ctx(sid)
         from . import atom_queries
         return atom_queries.render_text(ledger, cwd, "diff", dict(path=path, v=v,
             at=at if at is not None or v is not None else "latest", since_ts=since_ts,
-            offset=offset, limit=limit, max_chars=max_chars))
+            offset=offset, limit=limit, max_chars=max_chars, window_offset=window_offset, window_limit=window_limit))
 
     @srv.tool(**text_options)
     async def search(sid: str, q: str = "", agent: str | None = None, v: int | None = None,
@@ -247,12 +248,13 @@ def build_server(backend: Any | None = None) -> Any:
 
     @srv.tool(**text_options)
     async def changes(sid: str, path: str, at: str = "latest", since_ts: str | None = None,
-                      offset: int = 0, limit: int = 40) -> str:
+                      offset: int = 0, limit: int = 40, related_offset: int = 0, related_limit: int = 8) -> str:
         """按时间对账该文件的已确认写入/删除与未决效应；给稳定event id和原文引用，不预设缺陷。
         写入不必然是净修改或生成错误；原始未分类调用用batch(tool=events)展开。分页未完不能称查全。"""
         ledger, cwd = await _ctx(sid)
         from . import atom_queries
-        return atom_queries.render_text(ledger, cwd, "changes", dict(path=path, at=at, since_ts=since_ts, offset=offset, limit=limit))
+        return atom_queries.render_text(ledger, cwd, "changes", dict(path=path, at=at, since_ts=since_ts, offset=offset, limit=limit,
+            related_offset=related_offset, related_limit=related_limit))
 
     @srv.tool(**text_options)
     async def expand(sid: str, refs: list[str | dict[str, str]], scope: dict[str, Any], offset: int = 0,

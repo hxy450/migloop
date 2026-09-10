@@ -296,6 +296,11 @@ def _edge_binding(ledger: atoms.Ledger, edge: dict[str, Any], left: dict[str, An
             # FileRefs can be discovered only in the eventual result. Do not
             # leak their path association into a pre-return time scope.
             continue
+        if action.detail.get("code_host_intents"):
+            # Text extracted from an outer JavaScript call is not an executed
+            # inner call. Even a dotted historical edge would overstate this.
+            out["diag"] = "引用仅核出外层脚本中的调用意图，不能确认内部调用曾执行或绑定读写者；保留断链"
+            continue
         for file_ref in action.files:
             if file_ref.path != path or file_ref.op != operation:
                 continue
@@ -328,7 +333,7 @@ def check(ledger: atoms.Ledger, data: dict[str, Any], draft: str, *, with_graph:
     issues = [{"code": row["code"], "severity": "error" if row["code"] in
                ("schema", "identity_unbound", "evidence_unbound") else "warning",
                "where": row.get("node") or row.get("edge") or row.get("finding") or "",
-               "detail": str(row.get("detail") or "")[:650]} for row in built["diagnostics"]]
+               "detail": str(row.get("detail") or "")[:650]} for row in built["diagnostics"] if row.get("severity") != "info"]
     result = {"schema": "migloop-draft-check/1", "source_schema": SCHEMA,
             "draft_sha256": hashlib.sha256(draft.encode("utf-8")).hexdigest(),
             "document_sha256": built["document_sha256"], "ledger": atoms.ledger_identity(ledger),
@@ -338,6 +343,8 @@ def check(ledger: atoms.Ledger, data: dict[str, Any], draft: str, *, with_graph:
             "counts": {"errors": sum(r["severity"] == "error" for r in issues),
                        "warnings": sum(r["severity"] == "warning" for r in issues), "total": len(issues)},
             "coverage": deepcopy(built["coverage"]),
+            "unclassified_related": [deepcopy(row["detail"]) for row in built["diagnostics"]
+                                     if row["code"] == "unclassified_operation_inventory"],
             "scope": "只核身份、坐标、时间、原文及声明关系；不认证原因、实际看过或因果完备",
             "next": "保留无法确认的链和反证；机械核验通过不证明问题传播成立。"}
     if with_graph:
@@ -353,6 +360,11 @@ def _changes(ledger: atoms.Ledger, target: dict[str, Any]) -> tuple[list[dict[st
         page = investigation.changes(ledger, target["file"], target["at"], target.get("since_ts"), offset=offset, limit=200)
         rows.extend(page.get("rows") or [])
         diagnostics.extend({"code": "change_source_gap", "detail": gap} for gap in page.get("gaps") or [])
+        if offset == 0 and isinstance(page.get("unclassified_related"), dict):
+            remainder = page["unclassified_related"]
+            diagnostics.append({"code": "unclassified_operation_inventory", "severity": "info", "detail": {
+                key: deepcopy(remainder.get(key)) for key in ("total", "review_required_total", "readonly", "query", "counts_scope")},
+                "note": "工具未分类余项，不等于模型未阅读，也不是未解释缺陷数；可沿query核查。"})
         next_offset = page.get("next_offset")
         if next_offset is None:
             break
@@ -435,9 +447,17 @@ def build(ledger: atoms.Ledger, data: dict[str, Any] | None, errors: list[str] |
             diagnostics.append({"code": "change_inventory_unavailable", "detail": str(exc)})
     by_id = {r.get("id") or r.get("event_id"): r for r in inventory}
     declared_coverage = {r["event"]: r for r in data.get("coverage", [])}
-    for event in list(dict.fromkeys([*by_id, *declared_coverage])):
-        row = deepcopy(declared_coverage.get(event) or {"event": event, "status": "unresolved", "reason": "清单事件未声明结论"})
-        row.update(declared=event in declared_coverage, source="model" if event in declared_coverage else "system",
+    finding_events = [event for finding in data["findings"] for event in finding.get("changes", [])]
+    for event in list(dict.fromkeys([*by_id, *declared_coverage, *finding_events])):
+        linked = [finding for finding in data["findings"] if event in finding.get("changes", [])]
+        implicit = {"event": event, "status": "unresolved", "reason": "清单事件未声明结论"}
+        if linked:
+            implicit.update(status="unresolved" if any(f["status"] == "unknown" for f in linked) else "explained",
+                            referenced_findings=[f["id"] for f in linked],
+                            assignment_mode="explicit_finding_change_links",
+                            reason="模型通过 findings.changes 关联此操作；这不认证整段差分已被正确解释。")
+        row = deepcopy(declared_coverage.get(event) or implicit)
+        row.update(declared=event in declared_coverage or bool(linked), source="model" if event in declared_coverage or linked else "system",
                    semantic_checked=False, binding={"status": "matched" if event in by_id else "unlocated", "event": deepcopy(by_id.get(event))})
         graph["coverage"].append(row)
         if event not in by_id:

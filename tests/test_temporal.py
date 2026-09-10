@@ -55,6 +55,14 @@ def test_agent_time_searches_raw_not_only_actions(tmp_path):
     assert not result["undated"]["rows"] and not result["causal_complete"]
 
 
+def test_default_preview_prefers_content_over_envelope_uuids(tmp_path):
+    ledger, agent, _ = corpus(tmp_path)
+    data = temporal.query(ledger, kind="agent", key=agent, at=ts(10))
+    assert data["rows"][0]["preview"] == "spec: 数值应该为42"
+    assert data["rows"][1]["preview"] == "unparsed\nLONGTAIL needle"
+    assert data["rows"][0]["preview_kind"] == "decoded_field_excerpt"
+
+
 def test_late_return_is_not_available_at_call_time(tmp_path):
     ledger, agent, _ = corpus(tmp_path)
     result = temporal.query(ledger, kind="agent", key=agent, at=ts(10))

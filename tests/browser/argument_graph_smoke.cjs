@@ -21,7 +21,7 @@ function node(id, kind, key, role, time = at) {
 const graph = {schema:'migloop-argument-graph/1',identity:{bound:true},target:{file:scope.key,since_ts:since,at},
   nodes:[node('A/input','file','/fixture/input.md','context',upstreamScope.at),
     node('A/author','agent','author-a','origin'),node('A/output','file',scope.key,'repaired'),
-    node('A/isolated','file','/fixture/independent.md','context'),
+    node('A/isolated','file','/fixture/independent.md','propagated'),
     node('B/only','file',scope.key,'context','2026-01-02T00:00:20Z')],
   edges:[{finding:'A',from:'A/input',to:'A/author',relation:'read',claim:'explicit read claim',evidence:[ref],binding:{status:'confirmed',evidence:[ref]}},
     {finding:'A',from:'A/author',to:'A/output',relation:'possible_write',claim:'possible write only',evidence:[ref],binding:{status:'candidate',evidence:[ref]}},
@@ -41,6 +41,9 @@ const queryTrace = {schema:'migloop-query-trace/1',steps:[
   {step:5,tool:'changes',args:{path:scope.key,at,since_ts:since},scope,status:'recorded_response',delivery:{records:[]}}
 ]};
 const probe = {run:'fixture-v3',argument_graph:graph,query_trace:queryTrace,steps:[],trajectory:{nodes:[],visits:[],transitions:[]}};
+const cycleGraph=JSON.parse(JSON.stringify(graph));
+cycleGraph.edges.push({finding:'A',from:'A/output',to:'A/author',relation:'read',claim:'explicit cycle, never inferred',
+  evidence:[ref],binding:{status:'confirmed',evidence:[ref]}});
 graph.nodes.at(-1).evidence=[{...ref,ref:'#author:1@L3',original_ref:'#author:1@L3',raw_ref:ref.ref,type:'legacy'}];
 const backendProjection=JSON.parse(execFileSync(process.env.PYTHON || 'python',['-c',[
   'import json,tempfile,sys', 'sys.path.insert(0,"src")', 'from pathlib import Path', 'from migloop import verdict_v3',
@@ -49,7 +52,11 @@ const backendProjection=JSON.parse(execFileSync(process.env.PYTHON || 'python',[
   ' ledger=_pool(Path(d))', ' print(json.dumps(verdict_v3.build(ledger,document(ledger))))'
 ].join('\n')],{cwd:path.resolve(__dirname,'../..'),encoding:'utf8',env:{...process.env,PYTHONDONTWRITEBYTECODE:'1',PYTHONUTF8:'1'}}));
 const data = {sid:'fixture',sid8:'fixture',project:'V3 UI',urls:{data:'/data',atom:'/atom',probe:'/probe',report:null}};
-const template = fs.readFileSync(path.join(__dirname,'../../src/migloop/render/templates/fixchain.html'),'utf8');
+// Optional read-only projection produced by real_partial_preview.py. Do not edit
+// its ledger identity to bind an old report to a different current corpus.
+const recordedProjection=process.env.MIGLOOP_BROWSER_REAL_PROBE
+  ? JSON.parse(fs.readFileSync(process.env.MIGLOOP_BROWSER_REAL_PROBE,'utf8')) : null;
+const template = fs.readFileSync(process.env.MIGLOOP_BROWSER_TEMPLATE || path.join(__dirname,'../../src/migloop/render/templates/fixchain.html'),'utf8');
 const page = template.replace('__FIXCHAIN_JSON__',JSON.stringify(data));
 const requests = [];
 const server = http.createServer(async (req,res) => {
@@ -70,6 +77,8 @@ const server = http.createServer(async (req,res) => {
   else if(url.pathname === '/atom/index') body={files:[],agents:[]};
   else if(url.pathname === '/probe') body=url.searchParams.get('run')==='legacy'
     ? {run:'legacy',steps:[],links:[],roles:{},defects:{},legacy:true}
+    : url.searchParams.get('run')==='recorded' && recordedProjection ? {...recordedProjection,run:'recorded'}
+    : url.searchParams.get('run')==='cycle' ? {...probe,run:'cycle',argument_graph:cycleGraph}
     : url.searchParams.get('run')==='backend' ? {...backendProjection,run:'backend',query_trace:{steps:[]}}
     : url.searchParams.get('run')==='unbound' ? {...probe,run:'unbound',trace_identity:{bound:false}} : probe;
   else body={error:'Unexpected GET'};
@@ -102,6 +111,20 @@ async function main() {
     assert.equal(await evaluate("document.querySelector('#graph').classList.contains('argument-mode')"),true);
     const snapshot=()=>evaluate("JSON.stringify({graph:__mig.probe().argument_graph,trace:__mig.probe().query_trace,trajectory:__mig.probe().trajectory})");
     const before=await snapshot();
+    const presentation=await evaluate("Object.fromEntries([...document.querySelectorAll('.argument-card')].map(n=>[n.dataset.nodeId,{role:n.dataset.role,column:Number(n.style.gridColumn),background:getComputedStyle(n).backgroundColor,label:n.querySelector('b').textContent}]))");
+    assert.equal(presentation['A/author'].role,'origin');
+    assert.equal(presentation['A/author'].background,'rgb(255, 240, 239)');
+    assert.equal(presentation['A/isolated'].background,'rgb(255, 244, 242)');
+    assert.equal(presentation['A/output'].background,'rgb(238, 248, 241)');
+    assert.notEqual(presentation['A/input'].background,presentation['A/author'].background);
+    assert(presentation['A/author'].label.includes('问题引入（模型主张）'));
+    assert(presentation['A/isolated'].label.includes('问题传播（模型主张）'));
+    assert(presentation['A/input'].label.includes('相关背景'));
+    assert(presentation['A/output'].label.includes('修后纠正（模型主张）'));
+    assert(presentation['A/input'].column<presentation['A/author'].column);
+    assert(presentation['A/author'].column<presentation['A/output'].column,'existing read/write edges determine different display columns');
+    assert(await evaluate("document.querySelector('#argument-view').textContent.includes('颜色不代表归因已被验证')"));
+    assert.equal(await snapshot(),before,'colors and topology ranks do not rewrite graph data');
     assert.deepEqual(await evaluate("[...document.querySelectorAll('.argument-wire')].map(n=>({from:n.dataset.from,to:n.dataset.to,status:n.dataset.status})).sort((a,b)=>a.from.localeCompare(b.from))"),
       [{from:'A/author',to:'A/output',status:'candidate'},{from:'A/input',to:'A/author',status:'confirmed'}]);
     assert.equal(await evaluate("document.querySelectorAll('.argument-break').length"),2,'unobserved and invalid edges stay visible breaks');
@@ -158,12 +181,52 @@ async function main() {
     assert.deepEqual(await evaluate("[...document.querySelectorAll('.argument-card')].map(n=>n.dataset.nodeId)"),backendProjection.argument_graph.nodes.map(n=>n.id));
     assert(await evaluate("document.querySelectorAll('#side .argument-open-original').length>=2"),'nested operation evidence from real backend is expandable');
     assert.equal(await evaluate("document.querySelector('#side .argument-detail').dataset.semanticChecked"),'false');
+    await evaluate("__mig.load('cycle')");
+    await until("__mig.probe().run==='cycle'&&document.querySelectorAll('.argument-card').length===4&&document.querySelectorAll('.argument-wire').length===3",'explicit cycle stays a cycle');
+    assert(await evaluate("document.querySelector('#argument-view').textContent.includes('部分声明含回环')"));
+    assert.equal(await evaluate("JSON.stringify(__mig.probe().argument_graph)"),JSON.stringify(cycleGraph),'cycle layout does not mutate or invent graph nodes/edges');
+    const cycleColumns=await evaluate("Object.fromEntries([...document.querySelectorAll('.argument-card')].map(n=>[n.dataset.nodeId,n.style.gridColumn]))");
+    assert.equal(cycleColumns['A/author'],cycleColumns['A/output'],'cycle nodes retain original arrows in the fallback column');
     await evaluate("__mig.load('unbound')");
     await until("__mig.probe().run==='unbound' && document.querySelector('.argument-unbound')",'identity conflict');
     assert.equal(await evaluate("document.querySelectorAll('.argument-wire,.argument-open-original,.argument-inspect-node').length"),0,'identity conflict cannot promote stale positive bindings');
     assert.equal(await evaluate("document.querySelectorAll('.argument-card').length"),4,'unbound model material remains visible');
+    let recorded=null;
+    if(recordedProjection){
+      const realGraph=recordedProjection.argument_graph;
+      assert.equal(recordedProjection.partial_document,true);
+      assert.equal(recordedProjection.native_report.verified,true,'real native final must authenticate without rewriting identity');
+      assert.equal(realGraph.identity.bound,true);
+      assert.equal(realGraph.original_schema_valid,false);
+      const first=realGraph.findings[0],nodes=realGraph.nodes.filter(n=>n.finding===first.id);
+      const rejected=realGraph.edge_declarations.filter(e=>e.finding===first.id&&!e.drawable);
+      assert(nodes.length>0&&rejected.length>0,'real first finding must retain nodes and reject at least one declaration');
+      assert(rejected.some(e=>{
+        const left=nodes.find(n=>n.local_id===e.declaration.from),right=nodes.find(n=>n.local_id===e.declaration.to);
+        return e.declaration.relation==='write'&&left?.kind==='agent'&&right?.kind==='agent';
+      }),'real report contains the invalid agent-agent write case');
+      await evaluate("__mig.load('recorded')");
+      await until(`__mig.probe().run==='recorded'&&document.querySelectorAll('.argument-card').length===${nodes.length}`,'real invalid final preview');
+      assert(await evaluate("document.querySelector('#argument-view').textContent.includes('局部预览：原稿仍未通过严格格式校验')"));
+      assert(await evaluate("document.querySelector('#argument-view').textContent.includes('原稿格式诊断')"));
+      assert.equal(await evaluate("document.querySelectorAll('.argument-wire').length"),0,'invalid agent-agent declarations never become visual edges');
+      assert(await evaluate(`document.querySelector('#side .argument-node-reason').textContent.includes(${JSON.stringify(nodes[0].reason.trim().slice(0,60))})`));
+      const original=await evaluate("JSON.stringify(__mig.probe().argument_graph)");
+      if(process.env.MIGLOOP_BROWSER_SCREENSHOT_DIR){
+        const directory=path.resolve(process.env.MIGLOOP_BROWSER_SCREENSHOT_DIR);
+        fs.mkdirSync(directory,{recursive:true});
+        const save=async name=>{const shot=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
+          fs.writeFileSync(path.join(directory,name),Buffer.from(shot.data,'base64'),{flag:'wx'});};
+        await save('real-partial-preview.png');
+        await evaluate("[...document.querySelectorAll('#argument-view details')].find(e=>e.querySelector('summary')?.textContent==='原稿格式诊断').open=true");
+        await save('real-partial-schema-errors.png');
+      }
+      assert.equal(await evaluate("JSON.stringify(__mig.probe().argument_graph)"),original,'rendering never repairs original graph');
+      recorded={nativeFinalVerified:true,originalSchemaValid:false,nodes:nodes.length,drawnEdges:0,
+        rejectedDeclarations:rejected.length,semanticChecked:false};
+    }
     assert.deepEqual(errors,[],'no browser exceptions');
-    console.log(JSON.stringify({passed:true,checks:['v3 graph','finding isolation','explicit edges only','independent material','escaped text','record scope and pagination','search/diff/batch replay','immutable trace','manual paste','legacy compatibility','actual backend projection shape'],requests:requests.length}));
+    console.log(JSON.stringify({passed:true,checks:['v3 graph','model role colors','display-only topology columns','explicit cycle preserved','finding isolation','explicit edges only','independent material','escaped text','record scope and pagination','search/diff/batch replay','immutable trace','manual paste','legacy compatibility','actual backend projection shape'],requests:requests.length,recorded}));
   } finally {if(socket)socket.close();if(target)await fetch(endpoint+'/json/close/'+target.id).catch(()=>{});await new Promise(resolve=>server.close(resolve));}
 }
 main().catch(error=>{console.error(error);process.exitCode=1;});

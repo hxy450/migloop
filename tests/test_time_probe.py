@@ -49,6 +49,50 @@ def test_invalid_v3_shows_diagnostics_without_falling_into_old_tree(tmp_path):
     assert result["diagnostics"] and "trajectory" not in result
 
 
+def test_native_authenticated_invalid_schema_previews_without_accepting_submission(tmp_path):
+    import hashlib
+    ledger = _pool(tmp_path)
+    doc = document(ledger)
+    doc["unknown"] = ["a local schema error, not a new fact"]
+    report = "```json\n" + json.dumps(doc) + "\n```"
+    requests = [{"tool": "file", "args": {"path": doc["target"]["file"], "at": doc["target"]["at"]}}]
+    run = _run_dir(tmp_path, [("batch", {"requests": requests}, investigation.render_batch(ledger, requests))], report)
+    path = Path(run) / "transcript.jsonl"
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps({"type": "assistant", "message": {"stop_reason": "end_turn", "role": "assistant",
+            "content": [{"type": "text", "text": report}]}}) + "\n")
+    metrics = {"recording_complete": True, "transcript_sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
+    (Path(run) / "metrics.json").write_text(json.dumps(metrics), encoding="utf-8")
+    result = probe.probe_payload(ledger, run)
+    assert result["partial_document"] and result["native_report"]["verified"]
+    assert len(result["argument_graph"]["nodes"]) == 3
+    assert result["argument_graph"]["original_schema_valid"] is False
+    assert result["structured"]["errors"] and result["structured"]["document_sha256"] is None
+    assert result["preview"]["original_document"] == doc
+    assert result["query_trace"]["steps"][0]["status"] == "recorded_response"
+    # A forged cached verdict cannot supply the missing final authentication.
+    (Path(run) / "result.json").write_text(json.dumps({"result": report.replace("author claim", "FORGED CLAIM")}), encoding="utf-8")
+    rejected = probe.probe_payload(ledger, run)
+    assert rejected["preview"] is None and not rejected["native_report"]["verified"]
+    assert rejected["argument_graph"]["nodes"] == []
+
+
+def test_manual_partial_draft_keeps_strict_failure_and_has_no_investigation_trace(tmp_path):
+    from migloop import draft_check
+    ledger = _pool(tmp_path)
+    doc = document(ledger)
+    doc["coverage"] = [{"event": "e", "status": "explained", "finding": "F"}]
+    draft = "```json\n" + json.dumps(doc) + "\n```"
+    strict = draft_check.evaluate(ledger, draft)
+    inspected = draft_check.evaluate(ledger, draft, with_graph=True)
+    assert strict["document_sha256"] is None and inspected["document_sha256"] is None
+    assert strict["status"] == inspected["status"] == "needs_review"
+    assert strict["issues"] == inspected["issues"]
+    assert len(inspected["argument_graph"]["nodes"]) == 3
+    assert not inspected["argument_graph"]["document_source"]["verified"]
+    assert "query_trace" not in inspected
+
+
 @pytest.mark.parametrize("tool", ["batch", "changes", "expand", "events"])
 @pytest.mark.parametrize("provider", ["bare", "other", "functions"])
 def test_untrusted_new_tool_cannot_authenticate_investigation_trace(tmp_path, tool, provider):

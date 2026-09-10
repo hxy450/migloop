@@ -1,5 +1,4 @@
 """File facts do not inherit execution or body visibility from lexical hints."""
-import json
 from copy import deepcopy
 from dataclasses import replace
 from pathlib import Path
@@ -8,7 +7,7 @@ import pytest
 
 from migloop import atoms, atoms_collect, verdict
 from migloop.evidence import FileProof, read_basis
-from tests.test_atoms import CROOT, _call, _cexec, _crec, _ledger, _write_jsonl
+from tests.test_atoms import CROOT, _call, _ccommand, _crec, _ledger, _write_jsonl
 
 
 TARGET = "/proj/Example.ets"
@@ -32,8 +31,7 @@ def build(tmp_path, mode, commands, *, seed=False, tail=True):
     else:
         rows = [_crec("2026-01-01T00:00:00Z", "session_meta", {"id": CROOT, "cwd": "/proj", "source": "cli"})]
         for i, (command, output) in enumerate(commands):
-            js = "text(await tools.exec_command(" + json.dumps({"cmd": command, "workdir": "/proj"}) + "));"
-            pair = _cexec(f"2026-01-01T00:00:{i * 5:02d}Z", f"call-{i}", js, output)
+            pair = _ccommand(f"2026-01-01T00:00:{i * 5:02d}Z", f"call-{i}", command, output)
             pair[1]["timestamp"] = f"2026-01-01T00:00:{i * 5 + 1:02d}Z"
             rows += pair
         root = Path(tmp_path) / f"rollout-{CROOT}.jsonl"

@@ -11,9 +11,8 @@ from typing import Any
 
 from . import atoms, time_scope
 
-
 _INTS = frozenset({"v", "since", "until", "start", "n", "v_from", "v_to", "diff_chars",
-                   "m_from", "m_n", "max_chars", "offset", "seq", "limit", "summary_chars"})
+                   "m_from", "m_n", "max_chars", "offset", "seq", "limit", "summary_chars", "window_offset", "window_limit"})
 _BOOLS = frozenset({"content", "diff", "readers", "m_all", "reads", "seen", "after", "scope_only", "changed", "include_undated", "details"})
 _DEFAULTS: dict[str, dict[str, Any]] = {
     "sessions": {"file": None},
@@ -36,6 +35,8 @@ for _tool in ("file", "agent", "search", "diff", "blame"):
     _DEFAULTS[_tool].update(at=None, offset=0, limit=40, include_undated=False)
     _DEFAULTS[_tool].setdefault("since_ts", None)
 _DEFAULTS["diff"]["max_chars"] = 6000
+for _tool in ("diff", "blame"):
+    _DEFAULTS[_tool].update(window_offset=0, window_limit=4)
 for _tool in ("file", "agent", "search"):
     _DEFAULTS[_tool]["details"] = False
 _REQUIRED = {"file": ("path",), "agent": ("id",), "blame": ("path",),
@@ -122,13 +123,16 @@ def parameters(tool: str, supplied: dict[str, Any], *, validate_search_scope: bo
             raise ValueError("search 的 agent 与 file 范围互斥")
         common = {"at", "since_ts", "offset", "limit", "include_undated"}
         fields = {"agent": {"id", "details"}, "file": {"path", "details"}, "search": {"q", "q_any", "agent", "file", "details"},
-                  "record": {"ref", "max_chars"}, "diff": {"path", "max_chars"}, "blame": {"path", "start", "n"}}
+                  "record": {"ref", "max_chars"}, "diff": {"path", "max_chars", "window_offset", "window_limit"},
+                  "blame": {"path", "start", "n", "window_offset", "window_limit"}}
         ignored = [k for k in out if k not in common | fields[tool] and out[k] != _DEFAULTS[tool][k]]
         if ignored:
             raise ValueError("时间查询不支持这些旧展示参数: " + ", ".join(sorted(ignored)))
         return out
     if tool == "diff" and out["v"] is None:
         raise ValueError("diff 需要 at 时刻或旧 v 版本")
+    if tool in ("diff", "blame") and (out["window_offset"] != 0 or out["window_limit"] != 4):
+        raise ValueError("window_offset/window_limit 仅用于 at 时间状态查询")
     if out.get("details"):
         raise ValueError("details 仅用于 at 时间证据查询")
     if tool == "search" and validate_search_scope:
@@ -267,7 +271,7 @@ def render_text(ledger: atoms.Ledger, root: str, tool: str, supplied: dict[str, 
         else:
             text = temporal.render(data)
         return time_receipts.append(ledger, tool, args, text, data)
-    for key in ("at", "offset", "limit", "include_undated", "since_ts", "details"):
+    for key in ("at", "offset", "limit", "include_undated", "since_ts", "details", "window_offset", "window_limit"):
         if tool in ("file", "agent", "diff", "blame") or tool == "search" and key != "since_ts":
             args.pop(key, None)
     if tool == "diff":
@@ -385,7 +389,8 @@ def temporal_data_core(ledger: atoms.Ledger, tool: str, args: dict[str, Any]) ->
         from . import temporal_state
         return temporal_state.query(ledger, tool, args["path"], args["at"], since_ts=args["since_ts"],
             start=args.get("start"), n=args.get("n"), offset=args["offset"], limit=args["limit"],
-            max_chars=args.get("max_chars", 6000))
+            max_chars=args.get("max_chars", 6000), window_offset=args.get("window_offset", 0),
+            window_limit=args.get("window_limit", 4))
     if tool == "record":
         return temporal.record_data(ledger, **args)
     if tool not in ("file", "agent", "search"):

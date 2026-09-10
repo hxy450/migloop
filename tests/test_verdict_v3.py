@@ -116,6 +116,22 @@ def test_pure_mention_does_not_become_possible_operation(tmp_path):
     assert all("不等于" in e["binding"]["diag"] for e in graph["edges"])
 
 
+def test_code_host_intent_is_not_even_a_dotted_historical_read_write_edge(tmp_path):
+    ledger = _pool(tmp_path)
+    doc = document(ledger)
+    for action in ledger.agents["agent-c"].actions:
+        if action.tool in ("Read", "Write"):
+            action.detail["code_host_intents"] = [{"path": r.path, "op": r.op} for r in action.files]
+            action.detail["effect_candidates"] = [r.path for r in action.files if r.op == "write"]
+            action.detail["read_candidates"] = [{"path": r.path} for r in action.files if r.op == "read"]
+            action.files = []
+    for edge in doc["findings"][0]["edges"]:
+        edge["relation"] = "possible_" + edge["relation"]
+    graph = verdict_v3.build(ledger, doc)["argument_graph"]
+    assert all(e["binding"]["status"] == "not_observed" for e in graph["edges"])
+    assert all("意图" in e["binding"]["diag"] for e in graph["edges"])
+
+
 def test_relation_direction_actor_and_source_are_not_inferred_from_prose(tmp_path):
     ledger = _pool(tmp_path)
     doc = document(ledger)
@@ -194,9 +210,27 @@ def test_coverage_reads_all_pages_and_keeps_unknown_event_declarations(tmp_path,
     monkeypatch.setattr(investigation, "changes", changes)
     graph = verdict_v3.build(ledger, doc)["argument_graph"]
     assert offsets == [0, 200]
-    assert [(r["event"], r["status"]) for r in graph["coverage"]] == [("e1", "not_repair"), ("e2", "unresolved"), ("missing", "unresolved")]
+    assert [(r["event"], r["status"]) for r in graph["coverage"]] == [("e1", "not_repair"), ("e2", "explained"), ("missing", "unresolved")]
+    assert graph["coverage"][1]["assignment_mode"] == "explicit_finding_change_links"
+    assert graph["coverage"][1]["semantic_checked"] is False
     assert graph["findings"][0]["change_bindings"][1]["status"] == "unlocated"
     assert graph["complete"] is False
+
+
+def test_shared_change_links_do_not_require_redundant_coverage_or_certify_truth(tmp_path, monkeypatch):
+    from copy import deepcopy
+    ledger = _pool(tmp_path)
+    doc = document(ledger)
+    doc["findings"][0]["changes"] = ["event"]
+    other = deepcopy(doc["findings"][0])
+    other.update(id="G", status="unknown")
+    doc["findings"].append(other)
+    monkeypatch.setattr(investigation, "changes", lambda *a, **k: {"rows": [{"id": "event"}], "next_offset": None})
+    graph = verdict_v3.build(ledger, doc)["argument_graph"]
+    row, = graph["coverage"]
+    assert row["referenced_findings"] == ["F", "G"]
+    assert row["status"] == "unresolved" and row["source"] == "model"
+    assert row["binding"]["status"] == "matched" and not row["semantic_checked"]
 
 
 def test_coverage_limit_reports_incomplete_instead_of_silently_using_first_page(tmp_path, monkeypatch):

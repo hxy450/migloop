@@ -106,10 +106,13 @@ def test_codex_known_script_write_and_unknown_execution_match_cc_semantics() -> 
     assert not any(op.path.endswith(".ets") for op in ops)
 
 
-def test_codex_multiple_shell_calls_keep_known_effects_and_all_unknown_scripts() -> None:
+def test_codex_multiple_shell_calls_keep_unknown_intents_and_all_unknown_scripts() -> None:
     js = codex_wrapper("cat /proj/input.md", "python3 /tmp/external.py", "python3 /tmp/other.py", "python3 /tmp/external.py")
     ops, detail, ok = codex_ops(js)
-    assert ok and [(op.op, op.path) for op in ops] == [("read", "/proj/input.md")]
+    assert ok and ops == []
+    read, = [r for r in detail["read_candidates"] if r["path"] == "/proj/input.md"]
+    assert read["seen"] is None and read["via"] == "code_host_intent"
+    assert read["proof"]["execution"] == read["proof"]["delivery"] == read["proof"]["snapshot"] == "unknown"
     assert detail["unknown_scripts"] == ["/tmp/external.py", "/tmp/other.py"]
     assert detail["unresolved"].count("脚本执行效应未解析") == 1
 
@@ -120,10 +123,13 @@ def test_codex_script_only_unknown_and_other_unresolved_reason_both_survive() ->
     assert "变量路径" in detail["unresolved"] and "脚本执行效应未解析" in detail["unresolved"]
 
 
-def test_codex_known_script_execution_remains_resolved() -> None:
+def test_codex_known_script_body_does_not_prove_the_wrapper_executed_it() -> None:
     scripts = {"/tmp/known.py": "open('/proj/output.md','w').write('ok')\n"}
     ops, detail, ok = codex_ops(codex_wrapper("python3 /tmp/known.py"), scripts)
-    assert ok and [(op.op, op.path, op.content) for op in ops] == [("write", "/proj/output.md", "ok")]
+    assert ok and ops == [] and detail["effect_candidates"] == ["/proj/output.md"]
+    write, = [i for i in detail["code_host_intents"] if i["path"] == "/proj/output.md"]
+    assert write["op"] == "write" and write["execution_observed"] is False
+    assert write["proof"]["operation_basis"] == "code_host_intent" and write["proof"]["execution"] == "unknown"
     assert not detail.get("unknown_scripts") and not detail.get("unresolved")
 
 

@@ -69,6 +69,21 @@ def evaluate(ledger: atoms.Ledger, draft: str, chain_payload: dict[str, Any] | N
     if errors:
         for error in errors:
             add("schema", error)
+        if with_graph:
+            # Manual inspection is not submission acceptance. Parse the actual
+            # input again only to preserve independently checkable declarations;
+            # strict document_sha256/status/identity_bound remain unchanged.
+            block = verdict.extract_block(draft) if draft.lstrip().startswith("```") else (
+                "json" if draft.lstrip().startswith("{") else "yaml", draft)
+            candidate, parse_errors = verdict.parse_block(*block) if block else (None, ["no block"])
+            if not parse_errors and isinstance(candidate, dict) and candidate.get("schema") == "migloop-verdict/3":
+                from . import verdict_preview
+                preview = verdict_preview.build(ledger, candidate, raw=block[1])
+                preview["document_source"] = {"kind": "manual_draft", "verified": False,
+                    "semantic_checked": False, "note": "用户提交的草稿预览，不声称是一次模型运行的最终输出。"}
+                preview["argument_graph"]["document_source"] = preview["document_source"]
+                out.update(preview=preview, argument_graph=preview["argument_graph"], partial_document=True,
+                           original_schema_valid=False)
         return finish()
     out["document_sha256"] = document_hash(data)
     bound = verdict.build(ledger, data, [], {})

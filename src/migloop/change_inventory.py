@@ -74,6 +74,149 @@ def _apply_single(before: str, ref: atoms.FileRef) -> str | None:
     return None
 
 
+def _action_address(action: atoms.Action) -> tuple[Any, ...] | None:
+    if not action.src or action.src[1] is None:
+        return None
+    return (_source(action.src[0]), action.src[1] + 1, action.blk, action.tuid)
+
+
+def _related_inventory(ledger: atoms.Ledger, current: dict[str, Any],
+                       associated: set[tuple[Any, ...]], covered: set[tuple[Any, ...]],
+                       native_covered: set[tuple[str, str]], offset: int, limit: int) -> dict[str, Any]:
+    """Mechanical remainder of registered calls, not another effect detector.
+
+    Use the same cached native index and per-part time projection as events.
+    No per-result read_record calls or repeated 40-row rescans are needed. An
+    earlier request can associate an in-range result, but a later result never
+    associates an earlier request. Whole-line refs cannot authenticate a block.
+    """
+    window = temporal.Window.parse(current["at"], current.get("since_ts"))
+    normalized = current["key"].replace("\\", "/").casefold()
+    basename = normalized.rsplit("/", 1)[-1]
+    data = raw_events._scan(ledger)
+    links: dict[tuple[str, int], list[tuple[Any, ...]]] = {}
+    for address in associated | covered:
+        links.setdefault(address[:2], []).append(address)
+
+    def matches(value: Any) -> bool:
+        text = store.readable(value).replace("\\", "/").casefold()
+        return normalized in text or bool(basename and basename in text)
+
+    def bindings(event, parts) -> set[tuple[Any, ...]]:
+        found = set()
+        for part in parts:
+            if part.direction != "use":
+                continue
+            for address in links.get((_source(event.source), part.record.line), []):
+                _, _, block, call_id = address
+                # A precise use block or explicit native ID is required. Never
+                # remove another call just because it shares a physical line.
+                if (type(block) is int and block == part.block and
+                        (not call_id or call_id == event.call_id)) or (
+                        block is None and call_id and call_id == event.call_id):
+                    found.add(address)
+        return found
+
+    def locator(part) -> dict[str, Any]:
+        result = {"ref": part.record.ref, "line": part.record.line, "ts": part.record.ts,
+                "block": part.block, "pointer": part.pointer, "direction": part.direction,
+                "failed": raw_events._failed(part.payload) if part.direction != "use" else None,
+                "fields": deepcopy(part.fields),
+                "query": {"tool": "record", "args": {"ref": part.record.ref}, "scope": deepcopy(current)}}
+        if part.record.ts and window.contains(part.record.ts):
+            text = store.readable(part.payload)
+            position = text.casefold().find(basename) if basename else -1
+            start = max(0, position - 60) if position >= 0 else 0
+            result.update(preview=text[start:start + 240], preview_kind="decoded_native_payload_excerpt")
+        return result
+
+    rows, undated = [], []
+    excluded = 0
+    categories = {"shell": 0, "unknown_tool": 0, "other_native": 0, "readonly": 0}
+    statuses: dict[str, int] = {}
+    readonly_tools: dict[str, int] = {}
+    for event in data["events"]:
+        known = [p for p in event.parts if p.record.ts and window.ended(p.record.ts)]
+        visible = [p for p in known if window.contains(p.record.ts)]
+        for part in event.parts:
+            if part.record.ts is None and matches(part.payload):
+                entry = locator(part)
+                entry.pop("query")  # Unknown-time locators cannot inherit a cutoff as evidence.
+                undated.append({**entry, "source": os.path.basename(event.source), "time_status": "unknown"})
+        if not visible:
+            continue
+        matched = [p for p in visible if matches(p.payload)]
+        earlier = [p for p in known if p.direction == "use" and not window.contains(p.record.ts)
+                   and matches(p.payload)]
+        addresses = bindings(event, known)
+        if not matched and not earlier and not addresses & associated:
+            continue
+        projected = raw_events._project(event, visible, scoped=True)
+        known_projection = raw_events._project(event, known, scoped=True)
+        unambiguous = event.addressable and not any(
+            anomaly in known_projection["anomalies"] for anomaly in ("duplicate_use", "duplicate_result", "out_of_order"))
+        if unambiguous and (addresses & covered or
+                            (_source(event.source), projected["id"]) in native_covered):
+            excluded += 1
+            continue
+        tool = projected["tool"]
+        if tool in ("Read", "Grep", "Glob") and unambiguous:
+            category = "readonly"
+            readonly_tools[tool] = readonly_tools.get(tool, 0) + 1
+        elif tool in ("Bash", "bash", "exec_command", "functions.exec_command", "shell_command", "run_shell_command"):
+            category = "shell"
+        elif tool in ("Write", "Edit", "MultiEdit", "Task", "Agent", "apply_patch", "patch_apply_end"):
+            category = "other_native"
+        else:
+            category = "unknown_tool"
+        categories[category] += 1
+        statuses[projected["status"]] = statuses.get(projected["status"], 0) + 1
+        rows.append({"id": projected["id"], "source": projected["source"],
+                     "protocol": projected["protocol"], "call_id": projected["call_id"], "tool": tool,
+                     "status": projected["status"], "category": category,
+                     "classification": "unclassified_related", "effect_status": "unknown",
+                     "agent": None, "author_status": "unknown", "source_agents": projected["agents"],
+                     "reference_status": projected["reference_status"], "anomalies": projected["anomalies"],
+                     "association": "lexical_mention_not_effect" if matched else
+                                    "earlier_request_mention_not_effect" if earlier else "parsed_association_not_effect",
+                     "pointers": [locator(p) for p in visible],
+                     "matched_parts": [{"ref": p.record.ref, "pointer": p.pointer} for p in matched],
+                     "semantic_checked": False})
+    rows.sort(key=lambda row: (row["category"] == "readonly",
+                              min((p["ts"], row["source"], p["line"], p["block"] or 0) for p in row["pointers"]),
+                              row["id"]))
+    undated.sort(key=lambda row: (row["source"], row["line"], row["block"] or 0))
+    non_native = sum(1 for item in data["unknown"] if item["_record"].ts
+                     and window.contains(item["_record"].ts) and matches(raw_events._unknown_payload(item)))
+    page = temporal._page(rows, offset, limit)
+
+    def query(start):
+        return {"tool": "changes", "scope": deepcopy(current),
+                "args": {"related_offset": start, "related_limit": limit}}
+
+    undated_page = temporal._page(undated, offset, limit)
+    return {**page, "category_counts": categories, "status_counts": statuses,
+            "review_required_total": page["total"] - categories["readonly"],
+            "ordering": "non_readonly_first_then_recorded_time",
+            "readonly": {"total": categories["readonly"], "tool_counts": readonly_tools,
+                         "display": "collapsed", "included_in_total_and_pagination": True},
+            "excluded_covered_total": excluded,
+            "query": query(offset), "next_query": query(page["next_offset"]) if page["next_offset"] is not None else None,
+            "raw_query": {"tool": "events", "scope": deepcopy(current)},
+            "undated": {**undated_page, "cutoff_evidence": False,
+                        "query": query(offset), "next_query": query(undated_page["next_offset"])
+                        if undated_page["next_offset"] is not None else None},
+            "non_native_mentions": {"total": non_native, "native_calls": False,
+                                    "query": {"tool": "events", "scope": deepcopy(current)}},
+            "source_count": data["source_count"], "gaps": data["gaps"],
+            "registered_scan_ok": bool(data["source_count"]) and not data["gaps"],
+            "counts_scope": "registered_sources_only",
+            "complete": False, "causal_complete": False,
+            "note": "全范围注册原生调用余项，按调用身份扣除已列修改/候选/观察的依据；只读调用后排并可折叠，仍在分页内。"
+                    "词法或关联命中不是写者、候选写入或修改认证；返回状态也不是脚本效应证明。"
+                    "未注册来源不在本清单，0余项不等于0修改、0缺陷或调查完备；未知时间定位不算截止证据。"}
+
+
 def native_effects(ledger: atoms.Ledger, current_scope: dict[str, Any]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Independent patch effects for one file or all files in a pool time scope.
 
@@ -147,13 +290,48 @@ def native_effects(ledger: atoms.Ledger, current_scope: dict[str, Any]) -> tuple
     return rows, gaps
 
 
+def native_diff(ledger: atoms.Ledger, row: dict[str, Any], max_chars: int = 6000) -> dict[str, Any] | None:
+    """An independently located native delta, never an inferred full snapshot.
+
+    Keep large patch bodies out of the modification inventory. Consumers ask
+    for this projection explicitly; the raw reference opens the whole event.
+    """
+    if type(max_chars) is not int or not 1 <= max_chars <= 120000:
+        raise ValueError("max_chars 必须在 1–120000 之间")
+    ref = next(iter(row.get("evidence") or []), None)
+    if not isinstance(ref, str):
+        return None
+    original = store.resolve(ledger, ref)
+    payload = original.value.get("payload") if isinstance(original.value, dict) else None
+    native = row.get("native") or {}
+    if (not isinstance(payload, dict) or original.value.get("type") != "event_msg"
+            or payload.get("type") != "patch_apply_end" or payload.get("call_id") != native.get("call_id")
+            or payload.get("success") != native.get("success")):
+        raise ValueError("原生补丁身份或回执状态不匹配，未提供推断diff")
+    changes = payload.get("changes")
+    matches = [value for path, value in changes.items() if isinstance(path, str) and _path(path) == row.get("path")] if isinstance(changes, dict) else []
+    if len(matches) != 1 or not isinstance(matches[0], dict):
+        raise ValueError("原生补丁目标未唯一定位")
+    delta = matches[0].get("unified_diff")
+    if not isinstance(delta, str):
+        return None  # Add/delete may record only a content body; raw still opens.
+    return {"ts": row["observation_ts"], "effect_ts": None, "ref": ref, "agent": None,
+            "event_id": row["id"], "author_status": "unknown", "changed_time_unknown": True,
+            "basis": "native_effect_observation", "effect_status": row["status"],
+            "diff": delta[:max_chars], "diff_chars": len(delta), "truncated": len(delta) > max_chars,
+            "native": deepcopy(native), "semantic_checked": False,
+            "note": "原生事件的目标补丁；时间为观察可用时刻，不认证外层作者、完整前后状态或缺陷原因。"
+                    + ("回执未确认执行：此处仅为所报补丁，不能当实际已生效差异。" if row["status"] != "confirmed_change" else "")}
+
+
 def build(ledger: atoms.Ledger, current_scope: dict[str, Any], offset: int = 0,
-          limit: int = 40) -> dict[str, Any]:
+          limit: int = 40, related_offset: int = 0, related_limit: int = 8) -> dict[str, Any]:
     """Return the selected page only after discovering the whole bounded inventory."""
     if not isinstance(current_scope, dict) or current_scope.get("kind") != "file" or not current_scope.get("key"):
         raise ValueError("修改清单需要明确 file scope/key")
     window = temporal.Window.parse(current_scope.get("at"), current_scope.get("since_ts"))
     temporal._page([], offset, limit)
+    temporal._page([], related_offset, related_limit)
     _check_sources(ledger)
     canonical = temporal.resolve_file(ledger, current_scope["key"])
     current = {**deepcopy(current_scope), "key": canonical, "at": window.at, "since_ts": window.since}
@@ -164,6 +342,9 @@ def build(ledger: atoms.Ledger, current_scope: dict[str, Any], offset: int = 0,
     gaps: list[dict[str, Any]] = []
     pointers: dict[tuple[str, int], store.Record | None] = {}
     covered: dict[tuple[str, int, str], dict[str, Any]] = {}
+    associated: set[tuple[Any, ...]] = set()
+    row_addresses: dict[str, set[tuple[Any, ...]]] = {}
+    row_native_ids: dict[str, set[tuple[str, str]]] = {}
 
     def record(path: str, line: int) -> store.Record | None:
         key = (_source(path), line)
@@ -199,6 +380,9 @@ def build(ledger: atoms.Ledger, current_scope: dict[str, Any], offset: int = 0,
             if not window.ended(use):
                 continue
             returned = bool(done and use <= done and window.ended(done))
+            address = _action_address(action)
+            if returned and address:
+                associated.add(address)
             raw_refs = evidence(action, returned)
             if returned and action.src and action.src[2] is None:
                 gaps.append({"source": action.src[0], "agent": agent.id, "seq": action.seq,
@@ -212,7 +396,8 @@ def build(ledger: atoms.Ledger, current_scope: dict[str, Any], offset: int = 0,
                 result = record(action.src[0], action.src[2] + 1) if action.src and action.src[2] is not None else None
                 if reliable and result and result.ts and window.ended(result.ts):
                     snapshots.append({"use_ts": use, "done_ts": done, "content": ref.ev.content,
-                                      "evidence": raw_refs, "result_ref": result.ref, "block": action.blk})
+                                      "evidence": raw_refs, "result_ref": result.ref, "block": action.blk,
+                                      "address": address})
             if not refs and canonical not in candidates:
                 continue
             if not returned:
@@ -226,7 +411,9 @@ def build(ledger: atoms.Ledger, current_scope: dict[str, Any], offset: int = 0,
             identity = atoms.event_id(ledger, agent.id, action.seq) or "operation:" + _digest(
                 [canonical, raw_refs, action.tuid, action.blk])
             row = {"id": identity, "event_id": identity,
-                   "status": "confirmed_change" if confirmed else "candidate_effect", "agent": agent.id,
+                   "status": "confirmed_change" if confirmed else "candidate_effect", "agent": agent.id if confirmed else None,
+                   "author_status": "operation_actor" if confirmed else "unknown", "source_agents": [agent.id],
+                   "operation_basis": "code_host_intent" if action.detail.get("code_host_intents") else "parsed_operation",
                    "use_ts": use, "done_ts": done if returned else None, "tool": action.tool,
                    "evidence": raw_refs, "evidence_scope": deepcopy(evidence_scope),
                    "legacy_ref": atoms.format_ref(action.seq, ledger.locs.get(action.seq)),
@@ -234,6 +421,7 @@ def build(ledger: atoms.Ledger, current_scope: dict[str, Any], offset: int = 0,
                    "summary": f"{action.tool}: " + ("已确认写入/删除操作；是否语义修复待判" if confirmed else "效应未决，不认证实际改动或问题作者"),
                    "semantic_checked": False}
             all_effects.append({"row": row, "refs": confirmed_refs})
+            row_addresses[identity] = {address} if address else set()
             if window.contains(use) or returned and window.contains(done):
                 rows.append(row)
             if action.src:
@@ -246,6 +434,7 @@ def build(ledger: atoms.Ledger, current_scope: dict[str, Any], offset: int = 0,
     for row in native_rows:
         previous = covered.get((_source(row["source_path"]), row["source_line"], canonical))
         if previous is not None:
+            row_native_ids.setdefault(previous["id"], set()).add((_source(row["source_path"]), row["event_id"]))
             previous.setdefault("native_corroboration", []).append(deepcopy(row["native"]))
             previous["evidence"] = list(dict.fromkeys(previous["evidence"] + row["evidence"]))
             if row["status"] == "confirmed_change" and previous["status"] != "confirmed_change":
@@ -255,6 +444,7 @@ def build(ledger: atoms.Ledger, current_scope: dict[str, Any], offset: int = 0,
                 gaps.append({"source": row["native"]["source"], "line": row["source_line"], "reason": "native_action_status_conflict"})
             continue
         all_effects.append({"row": row, "refs": []})
+        row_native_ids[row["id"]] = {(_source(row["source_path"]), row["event_id"])}
         if window.contains(row["observation_ts"]):
             rows.append(row)
 
@@ -283,6 +473,7 @@ def build(ledger: atoms.Ledger, current_scope: dict[str, Any], offset: int = 0,
         crossing = window.since is not None and before["use_ts"] < window.since
         identity = "observed-change:" + _digest([canonical, before["result_ref"], before["block"],
                                                 after["result_ref"], after["block"]])
+        row_addresses[identity] = {item["address"] for item in (before, after) if item["address"]}
         def side(item):
             return {key: deepcopy(item[key]) for key in ("use_ts", "done_ts", "evidence")}
         rows.append({"id": identity, "event_id": identity, "status": "observed_change", "agent": None,
@@ -299,9 +490,12 @@ def build(ledger: atoms.Ledger, current_scope: dict[str, Any], offset: int = 0,
                                 + ("；区间跨越查询起点，不能声称确定在修复期发生" if crossing else ""),
                      "semantic_checked": False})
     rows.sort(key=lambda r: (r.get("observed_at") or r.get("done_ts") or r.get("use_ts") or "", r["id"]))
+    related = _related_inventory(ledger, current, associated,
+                                 set().union(*(row_addresses.get(row["id"], set()) for row in rows)),
+                                 set().union(*(row_native_ids.get(row["id"], set()) for row in rows)),
+                                 related_offset, related_limit)
     return {"schema": SCHEMA, "scope": current, **temporal._page(rows, offset, limit),
             "gaps": gaps, "complete": False, "causal_complete": False,
-            "unclassified_related": {"query": {"tool": "events", "scope": current},
-                                     "note": "纯提及/未分类原文另查，不升级为候选写者"},
+            "unclassified_related": related,
             "note": "已解析操作、独立原生效应与完整快照差异分列；确认写入不保证净内容变化或语义修复。"
                     "observed_change没有唯一作者/精确修改时间，跨起点区间不证明修复期发生；不宣称穷尽所有修改。"}

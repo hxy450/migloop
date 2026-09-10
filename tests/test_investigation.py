@@ -163,6 +163,14 @@ def test_field_expansion_is_time_scoped_paged_and_explicit(tmp_path):
     assert later["items"][0]["status"] == "error" and "旧内容" not in str(later)
 
 
+def test_related_locator_preview_is_not_certified_as_a_raw_field_segment():
+    data = {"unclassified_related": {"rows": [{"pointers": [
+        {"ref": "raw:source:L1:hash", "pointer": "/payload", "preview": "short excerpt"}
+    ]}]}}
+    row, = investigation._delivery(data)["records"]
+    assert row["extent"] == "preview_or_pointer" and row["offset"] is None
+
+
 @pytest.mark.parametrize("pointer,expected", [("", {"a/b": {"~": ["x", "y"]}}), ("/a~1b/~0/1", "y")])
 def test_json_pointer_selection(pointer, expected):
     assert investigation._field({"a/b": {"~": ["x", "y"]}}, pointer) == expected
@@ -172,3 +180,33 @@ def test_json_pointer_selection(pointer, expected):
 def test_json_pointer_does_not_guess(pointer):
     with pytest.raises(ValueError):
         investigation._field({"a": ["x", "y"]}, pointer)
+
+
+def test_batch_delivers_prefixes_fairly_and_receipt_mentions_only_delivered_rows(tmp_path):
+    from migloop import atoms
+    from tests.test_temporal import source
+    path = source(tmp_path, [{"timestamp": ts(i), "text": "payload " + "x" * 600} for i in range(30)])
+    ledger = atoms.build_ledger({"a": atoms.AgentRec("a", "s", sources=[path])})
+    requests = [{"tool": "agent", "args": {"id": "a", "at": ts(29)}} for _ in range(2)]
+    data = investigation.batch(ledger, requests, max_chars=12000)
+    assert data["data_chars"] <= 12000
+    for item in data["items"]:
+        assert item["status"] == "ok" and item["budget_adjusted"]
+        page = item["data"]
+        assert 0 < len(page["rows"]) < page["total"] == 30
+        assert page["next_offset"] == len(page["rows"])
+        assert [r["ref"] for r in item["delivery"]["records"]] == [r["ref"] for r in page["rows"]]
+        assert item["continuations"][0]["offset"] == page["next_offset"]
+
+
+def test_original_changes_receipt_survives_new_optional_pagination_defaults(tmp_path):
+    from migloop import atoms
+    ledger, _, _ = corpus(tmp_path)
+    args = {"path": "A.ets", "at": ts(10)}
+    body = json.dumps({"ledger": atoms.ledger_identity(ledger), "rows": [], "schema": "migloop-time-changes/1"})
+    old = {"at": "latest", "since_ts": None, "offset": 0, "limit": 40, **args}
+    receipt = {"schema": "migloop-investigation-receipt/1", "ledger": atoms.ledger_identity(ledger),
+               "tool": "changes", "request_sha256": investigation.digest(old), "body_sha256": investigation.digest(body)}
+    text = body + investigation.MARKER + json.dumps(receipt)
+    assert investigation.parse_receipt("changes", args, text)
+    assert investigation.parse_receipt("changes", {**args, "related_offset": 8}, text) is None
