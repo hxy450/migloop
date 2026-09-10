@@ -1,0 +1,77 @@
+{
+  "schema": "migloop-file-first-reference-spec/1",
+  "visibility": "adjudicator_only_do_not_pass_to_investigators",
+  "version": "bounded-v1",
+  "completeness": "Known, independently inspected change families; not proof of all opaque command effects. Unclassified write-capable calls remain explicit gaps. Novel supported findings require symmetric reference revision, never automatic false-positive grading.",
+  "scoring": {
+    "unit": "Semantic change family, not number of YAML entries, calls, versions, or diffs. Splitting/merging is allowed if facts are preserved.",
+    "discovery": "Each unit 0/1: actual change and scope recovered. Report generation-defect and non-generation-change strata separately.",
+    "attribution": "Each required fact scores 0/0.5/1 for absent-or-wrong/partial/supported. Unit passes only if all required facts recovered without a contradictory material claim. Equivalent evidence accepted.",
+    "mechanism": "Known mechanism vs supported unknown vs unsupported certainty, separately scored. A plausible intervention is not evidence that its historical cause occurred.",
+    "recommendation": "0..4 for specific intervention target, connection to proven problem, executable acceptance check, and scope/regression risk. No claim of actual migration improvement.",
+    "material_errors": ["wrong author", "later input attributed to earlier actor", "invented read/write", "participant claim presented as independently verified", "phase expansion presented as proven generation violation"],
+    "audit": "Citation validity and UI faithful projection are independent gates, not semantic correctness. Raw reports need original-file references but no graph coordinates.",
+    "aggregation": "Report per-file and equal-file macro averages plus issue counts; never use many small edits to inflate one file's weight. Failed/timeout runs remain in denominators with unknown semantic result where no report exists."
+  },
+  "aliases": {
+    "gen": "9b3105a2-85ec-4889-9786-b3c220f06754.jsonl",
+    "mc": "9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aconv-member-08b3dcf6deb3c515.jsonl",
+    "m8": "9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aslice8-pay-80bbb1f44b77da0f.jsonl",
+    "sc": "9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aconv-splash-9d5902d803bbcde6.jsonl",
+    "se": "9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aentry-setup-07108f5df45c357c.jsonl",
+    "s11": "9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aslice11-startup-50a0622bcfe4a588.jsonl",
+    "fix": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+    "build": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-af0e3d2ae54dbf769.jsonl",
+    "dg": "81e0a463-c9d3-4a7a-a671-b7f064830af1.jsonl",
+    "dc": "81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a349784d2663f1f0a.jsonl",
+    "df": "81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a4874344c8fb6228d.jsonl",
+    "di": "81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-aa1ccf93d575837a2.jsonl",
+    "de": "2f01bcdc-0a92-4961-a64d-5b181f03b3d3/subagents/agent-a228e9716d833cbf3.jsonl",
+    "db": "2f01bcdc-0a92-4961-a64d-5b181f03b3d3/subagents/agent-a635575c78cd15ff6.jsonl"
+  },
+  "cases": [
+    {
+      "id": "FF01", "case": "member-center", "parent": "member-center", "inventory": "member.json",
+      "target_file": "entry/src/main/ets/pages/MemberCenterPage.ets",
+      "generation_anchor": ["gen", 4958],
+      "anchor_kind": "Original completion announcement, not a source-code snapshot; corroborated by FV-2 completion announcement at L4940.",
+      "legacy_cases": ["S3", "S4"],
+      "issues": [
+        {"id":"M1","title":"弹窗遮罩及 loading 例外","class":"generation_gap_input_responsibility_bounded","required":["实际批量补三处：AppLoad 透明、PayAgreement 与 RenewRule 深色；H5 原有透明被跳过。","不能从三处写入推成三个深色弹窗或三个设备问题闭环。","生成责任需核对应控制器的写前输入，不能把批量脚本当作原作者证明。"],"refs":[["m8",264],["fix",81],["fix",103],["fix",104]],"changes":[["fix",103]],"mechanism":"原生默认遮罩不等于源平台业务契约；初始输入责任仍需限定，不指定唯一 skill。"},
+        {"id":"M2","title":"两张挽留图片补足尺寸约束","class":"generation_visual_correction","required":["img3 宽280补 aspectRatio(840/942)；img1 宽254、底padding35补 height(366+35)。","初版 converter 和 Slice8 写入均含这些只给宽度的形状，不能只因后者全文件重写就说它首次引入。","修复脚本及成功返回证明实际改动；数值与平台语义的解释来自修复者，未独立认证全部像素。"],"refs":[["mc",61],["m8",264],["fix",233],["fix",234]],"changes":[["fix",233]],"mechanism":"跨平台 intrinsic/adjustViewBounds 与容器尺寸约束的映射不充分；精确责任规则未完全复原。"},
+        {"id":"M3","title":"开通按钮宽度与横向间距","class":"generation_visual_correction","required":["修复前宽100%同时加左右margin20，修复把横向间距移到外层Row padding20。","保留按钮高度、渐变、动画scale和点击处理，不能说删除动画修复。","识别为布局约束修正；未经写前输入核对，不指定最后写者为首次引入者。"],"refs":[["mc",61],["m8",264],["fix",436],["fix",437]],"changes":[["fix",436]],"mechanism":"宽度与外边距组合没有在生成验证中闭合；未验证某个 skill 必然诱发它。"},
+        {"id":"M4","title":"非滚动价格数字与后缀分字号","class":"generation_input_not_implemented","required":["Slice8 写入之前收到 Kotlin replaceSpan 数字段实现，但其写入仍把非滚动价格数字和后缀统一30。","后修先ForEach(splitPriceRuns)，再变为固定 priceDigits/priceSuffix 两个Span；不把中间态当最终。","已有正确源码输入未落实是有证据的近因，不证明注意力或上下文超载。"],"refs":[["m8",24],["m8",264],["fix",528],["fix",529],["fix",592],["fix",593]],"changes":[["fix",528],["fix",592]],"mechanism":"收到的源字符串局部样式逻辑没有落实到生成组件；更早初版是否同源违反须分别核。"},
+        {"id":"M5","title":"轮播指示器颜色与位置","class":"generation_visual_correction","required":["此前有dot的尺寸配置，不是完全没有指示器。","后修增加普通/选中颜色及left定位，再补颜色常量和left18。","初版与Slice8都保留缺颜色/定位的形状；不能据后期writer直接指定首次引入者，灰色和18的精确视觉真值未独立认证。"],"refs":[["mc",61],["m8",264],["fix",528],["fix",529],["fix",532],["fix",533]],"changes":[["fix",528],["fix",532]],"mechanism":"第三方指示器外观映射缺项；特定规则责任未知。"},
+        {"id":"M6","title":"修复新增 private helper 编译错误","class":"repair_introduced_regression","required":["视觉修复的最终两Span方案新增private static helpers，兄弟组件调用产生private access错误。","后置builder两次Edit去掉priceDigits/priceSuffix的private，随后EXIT=0及BUILD SUCCESSFUL。","这次编译错误不能归给原生成者；构建通过不认证全价格格式视觉正确。"],"refs":[["fix",592],["build",24],["build",32],["build",33],["build",34],["build",35],["build",37]],"changes":[["build",32],["build",34]],"mechanism":"修复跨struct访问可见性未自洽，属于新引入回归。"}
+      ]
+    },
+    {
+      "id":"FF02","case":"splash","parent":"splash","inventory":"splash.json",
+      "target_file":"entry/src/main/ets/pages/SplashPage.ets",
+      "generation_anchor":["gen",4958],"anchor_kind":"Original execute completion announcement; not a source snapshot.",
+      "legacy_cases":["S1","S2"],
+      "issues":[
+        {"id":"S1","title":"隐私弹窗返回拦截","class":"generation_contract_lost_and_wrong_api_assumption","required":["初版已获返回禁用契约并实现onBackPressed；entry-setup装配Navigation时删除，不能说初版没实现。","Slice11把isModal解释为吞BACK；D-020外壳差异不自动豁免隐私弹窗。","后修加onWillDismiss吞关闭请求；历史finding和代码补丁不等于本次独立设备认证。"],"refs":[["sc",9],["sc",71],["se",123],["se",124],["s11",1],["s11",236],["fix",346],["fix",347],["build",37]],"changes":[["fix",346]],"mechanism":"阶段装配改变事件承载点，后续以错误API语义说明关闭契约；不能统归初版。"},
+        {"id":"S2","title":"协议网页返回后恢复隐私弹窗","class":"generation_behavior_correction_bounded","required":["后修增加onNavBarStateChange，首屏重新可见且privacyDialogVisible时openPrivacyDialog。","修复者解释旧路径仅依赖pushPathByName的onPop，WebView无result pop可能未触发；这是参与者解释，不是已独立证实的API定理。","与系统BACK关闭隐私弹窗有关但不是同一个补丁；需覆盖恢复场景且保留未知。"],"refs":[["fix",352],["fix",353]],"changes":[["fix",352]],"mechanism":"恢复条件依赖单一路由回调，补生命周期/可见性兜底；确切最早引入者未完成认证。"},
+        {"id":"S3","title":"进度条盒高与条厚","class":"generation_visual_correction","required":["初版已有Progress与height13，不是缺少进度条。","后修在保留height13等属性时增加style.strokeWidth13及enableScanEffect:false。","修复者解释height只改变盒子未改变绘制条厚；可确认API映射补丁，不能称恢复丢失的业务进度更新或已完备设备验证。"],"refs":[["sc",71],["fix",346],["fix",347]],"changes":[["fix",346]],"mechanism":"组件外盒尺寸和绘制样式语义不同；原始生成已有盒高，后期作者非首次引入者。"},
+        {"id":"S4","title":"开屏系统栏隐藏及跳转恢复","class":"generation_requirement_transmission_gap","required":["生成写入前主会话Read已有windowFullscreen=true，不能说需求到后期才出现。","生成侧已有full_screen/沉浸式信息，不等于已建立主题细节实际传入页面作者的证据。","补入页隐藏、离页恢复，随后追加onRoute恢复；Navigation宿主跳子页不能只指望销毁。"],"refs":[["gen",404],["sc",9],["sc",71],["fix",485],["fix",486],["fix",488],["fix",489]],"changes":[["fix",485],["fix",488]],"mechanism":"上游有主题要求而页面传递路径未完全复原；不能强行给某个skill唯一责任。"},
+        {"id":"S5","title":"开屏名称图片尺寸","class":"generation_visual_correction","required":["后修给icon_splash_app_name加width185/height125，保留Contain。","初版已有图片但没有这一显式宽高组合，不是后期新加业务图。","555x375@3x到185x125为修复者采用的尺寸依据，补丁成功不认证全部视觉比例。"],"refs":[["sc",71],["fix",233],["fix",234]],"changes":[["fix",233]],"mechanism":"背景layer-list固有尺寸到ArkUI布局约束的映射缺项；规则责任未完整认证。"},
+        {"id":"S6","title":"隐私弹窗显式遮罩","class":"generation_gap_input_responsibility_bounded","required":["批量mask脚本在Splash记录一处修改并添加Palette依赖。","区分普通弹窗Palette.DIALOG_MASK和AppLoad透明例外，不把全池51处算该文件。","实际写入与设备修后验证分开，不能只由脚本倒推唯一生成责任。"],"refs":[["fix",81],["fix",103],["fix",104]],"changes":[["fix",103]],"mechanism":"跨平台默认遮罩契约未显式实现；写前输入责任需限定。"}
+      ]
+    },
+    {
+      "id":"FF03","case":"dice-index","parent":"dice-entry","inventory":"dice-index.json",
+      "target_file":"entry/src/main/ets/pages/Index.ets",
+      "generation_anchor":["dg",1521],"anchor_kind":"Successful mark-stage a2h-execute return, corroborated by L1526 completion announcement.",
+      "oracle_cases":["H3-D1"],
+      "issues":[
+        {"id":"D1","title":"按钮呈现大小写","class":"generation_conflicting_inputs","required":["初版资源Roll直排；生成者已读Material主题及通用allCaps映射，但具体AC14明确写显示Roll，保留冲突。","更晚Android dump见ROLL，后修新增rollLabel/aboutToAppear读取资源再toUpperCase，没把资源值改为ROLL。","后续另一root回放记录ROLL和10/10、21/21，同时保留7不可观测项。"],"refs":[["dc",24],["dc",40],["dc",54],["dc",75],["dc",76],["df",1],["df",66],["df",67],["df",68],["df",69],["df",70],["df",71]],"changes":[["df",66],["df",68],["df",70]],"mechanism":"源资源字面值和运行时主题呈现被具体规格混淆；不等于生成者完全没读正确输入。"},
+        {"id":"D2","title":"按钮类型圆角和投影","class":"generation_visual_correction","required":["初版没有显式type/borderRadius/shadow，不能误说显式指定了Capsule。","实际补ButtonType.Normal、圆角4和shadow radius6/offsetY2/黑0.26；字号36、minWidth88/top16等保留。","来源是后期视觉差异和补丁，精确阴影像素与全生命周期未被独立认证。"],"refs":[["dc",75],["df",1],["df",37],["df",70],["df",71],["df",75]],"changes":[["df",70]],"mechanism":"两平台按钮默认外观不等价；不要求凭补丁倒推唯一skill原因。"},
+        {"id":"D3","title":"Dice类开放单测访问","class":"later_test_infrastructure","required":["execute结束后主会话把class Dice改成export class Dice。","原事件说明为arkxtest可见性，不是修改掷骰算法或拆分文件。","不能由后置单测需要直接判定原生成违反早期要求。"],"refs":[["dg",3231],["dg",3233]],"changes":[["dg",3231]],"mechanism":"测试接入所需可见性调整，非已证业务生成错误。"},
+        {"id":"D4","title":"UI测试锚点补齐","class":"later_test_infrastructure","required":["新增main_root、main_toolbar_title、main_dice_placeholder三个id。","原有button/imageView与首屏语义不因此缺失；新增定位锚点不是补造页面。","按后置id-inject测试阶段扩展归类，不能强行归罪初始生成。"],"refs":[["di",1],["di",22],["di",23],["di",25],["di",26],["di",28],["di",29]],"changes":[["di",22],["di",25],["di",28]],"mechanism":"测试定位契约后置注入。"},
+        {"id":"D5","title":"视觉修复新增日志迁为hilog","class":"repair_added_code_later_quality_rule","required":["console.error在视觉修复新增的aboutToAppear异常分支，不在最初Write里。","ECAT派发要求改hilog，实际新增import与DOMAIN/TAG并替换调用。","不能把这条console违规归给初版生成者；构建通过不证明异常分支被触发。"],"refs":[["dc",75],["df",68],["de",1],["de",40],["de",41],["de",57],["de",58],["db",48]],"changes":[["de",40],["de",57]],"mechanism":"后期视觉修复代码与后续日志质量约定不一致。"},
+        {"id":"D6","title":"注释卫生与合法TODO登记","class":"later_quality_gate_and_false_positive_control","required":["ECAT任务要求改写注释中的Android来源及TODO/占位词，但保留语义、id与资源键。","代码accessibilityText(app.string.todo)是D-002批准的忠实复刻，合法登记不是删除功能桩。","实际多次Edit主要改注释，不能按Edit数量算业务缺陷，也不能称未实现骰子显示。"],"refs":[["de",1],["de",40],["de",44],["de",46],["de",49],["de",51],["de",53],["de",55],["de",60],["de",62],["de",64],["de",66],["de",68],["de",85]],"changes":[["de",40],["de",44],["de",46],["de",49],["de",51],["de",53],["de",55],["de",60],["de",62],["de",64],["de",66],["de",68]],"mechanism":"静态词法门禁和真实实现/已批准保留行为不等价；判词本身不能充当缺陷事实。"}
+      ]
+    }
+  ]
+}

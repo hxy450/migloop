@@ -1,0 +1,123 @@
+{
+  "schema": "migloop-file-first-selection/1",
+  "status": "first_three_baseline_completed_adjudicated_not_product_acceptance",
+  "visibility": "developer_and_adjudicator_only",
+  "not_for_investigator_context": true,
+  "pool_base": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v1",
+  "baseline_directory": "C:/Users/hongy/projects/_migloop-eval-20260909/file-first-luna/baseline-v1",
+  "expected": {
+    "backend": "codex",
+    "model": "gpt-5.6-luna",
+    "effort": "medium",
+    "tool_transport": "code-host",
+    "automatic_model_fallback": false,
+    "runtime_model_verified": true
+  },
+  "run_policy": {
+    "repetitions_per_arm": 2,
+    "arms": ["raw", "tools"],
+    "initial_subset": ["FF01", "FF02", "FF03"],
+    "freeze_raw_after_matched_luna_baseline": true,
+    "reuse_old_gpt55_baseline_as_paired_control": false,
+    "stop_queue_on_quota_or_model_unavailable": true,
+    "no_model_runs_in_selection_step": true,
+    "needs_before_run": [
+      "original_event_generation_and_end_anchors",
+      "independent_file_change_inventory_and_gaps",
+      "private_issue_and_mechanism_reference",
+      "frozen_common_task_and_scoring_contract",
+      "frozen_source_pool_and_runner_hashes",
+      "runtime_model_effort_and_transport_smoke"
+    ]
+  },
+  "cases": [
+    {
+      "id": "FF01",
+      "project": "aippt_0723",
+      "target_file": "entry/src/main/ets/pages/MemberCenterPage.ets",
+      "source_parent_case": "member-center",
+      "stratum": "mechanism_priority",
+      "selection_basis": ["S3", "S4"],
+      "reference_status": "bounded_v1_frozen_opaque_effect_completeness_not_proven",
+      "generation_anchor": "9b3105a2-85ec-4889-9786-b3c220f06754.jsonl@L4958",
+      "observation_end": "2026-07-26T21:48:57.793Z"
+    },
+    {
+      "id": "FF02",
+      "project": "aippt_0723",
+      "target_file": "entry/src/main/ets/pages/SplashPage.ets",
+      "source_parent_case": "splash",
+      "stratum": "mechanism_priority",
+      "selection_basis": ["S1", "S2"],
+      "reference_status": "bounded_v1_frozen_opaque_effect_completeness_not_proven",
+      "generation_anchor": "9b3105a2-85ec-4889-9786-b3c220f06754.jsonl@L4958",
+      "observation_end": "2026-07-26T21:48:57.793Z"
+    },
+    {
+      "id": "FF03",
+      "project": "DiceRoller",
+      "target_file": "entry/src/main/ets/pages/Index.ets",
+      "source_parent_case": "dice-entry",
+      "stratum": "mechanism_priority",
+      "selection_basis": ["H3-D1"],
+      "reference_status": "bounded_v1_frozen_opaque_effect_completeness_not_proven",
+      "generation_anchor": "81e0a463-c9d3-4a7a-a671-b7f064830af1.jsonl@L1521",
+      "observation_end": "2026-09-03T22:09:07.188Z"
+    },
+    {
+      "id": "FF04",
+      "project": "AIPPT_830_test_codex",
+      "target_file": "build-profile.json5",
+      "source_parent_case": "codex-c1",
+      "stratum": "mechanism_priority",
+      "selection_basis": ["H3-C2"],
+      "reference_status": "bounded_issue_witnesses_only_full_file_pending",
+      "generation_anchor": null,
+      "observation_end": null
+    },
+    {
+      "id": "FF05",
+      "project": "AIPPT_830_test_codex",
+      "target_file": "entry/src/main/ets/pages/GuidePage.ets",
+      "source_parent_case": "codex-c3",
+      "stratum": "evidence_insufficiency",
+      "selection_basis": ["C3"],
+      "reference_status": "bounded_issue_witnesses_only_full_file_pending",
+      "generation_anchor": null,
+      "observation_end": null
+    },
+    {
+      "id": "FF06",
+      "project": "AIPPT_830_test_codex",
+      "target_file": "entry/src/main/ets/viewmodels/PptGenerationViewModel.ets",
+      "source_parent_case": "codex-c2",
+      "stratum": "evidence_insufficiency",
+      "selection_basis": ["C2"],
+      "reference_status": "bounded_issue_witnesses_only_full_file_pending",
+      "generation_anchor": null,
+      "observation_end": null
+    },
+    {
+      "id": "FF07",
+      "project": "aippt_0723",
+      "target_file": "entry/src/main/ets/components/PushDetailRouter.ets",
+      "source_parent_case": "member-center",
+      "stratum": "phase_and_scope_control",
+      "selection_basis": ["H3-P2"],
+      "reference_status": "bounded_issue_witnesses_only_full_file_pending",
+      "generation_anchor": null,
+      "observation_end": null
+    },
+    {
+      "id": "FF08",
+      "project": "DiceRoller",
+      "target_file": "entry/src/main/ets/entryability/EntryAbility.ets",
+      "source_parent_case": "dice-entry",
+      "stratum": "phase_and_scope_control",
+      "selection_basis": ["D1", "D2"],
+      "reference_status": "bounded_issue_witnesses_only_full_file_pending",
+      "generation_anchor": null,
+      "observation_end": null
+    }
+  ]
+}

@@ -1,0 +1,194 @@
+{
+  "schema": "migloop-file-first-adjudication/1",
+  "status": "manual_adjudication_v1_complete_not_blinded",
+  "reference_sha256": "60a00a8193b02dbb3cbc3dad2013074de8ec1f32b78ec7afd1c096a5e76567e6",
+  "reviewer": "Reference-author manual review against original records; not blinded and not an independent device re-execution.",
+  "score_basis": "Each three-element fact vector follows that issue's frozen required order. Fractional values mean partly recovered. Topic matching is reported separately from fully supported attribution. A located citation alone does not earn semantic credit.",
+  "runs": [
+    {
+      "case": "member-center", "arm": "raw", "rep": 1,
+      "issues": [
+        {"id":"M1","topic_found":false,"facts":[0,0,0],"note":"No mask discussion."},
+        {"id":"M2","topic_found":false,"facts":[0,0,0],"note":"No campaign image changes."},
+        {"id":"M3","topic_found":true,"facts":[0.5,1,1],"note":"Describes Row/padding and retained animation/safe area, bounds author responsibility. Repeated L402 citation is old finding, not the actual L436 patch or later decision not to reduce height."},
+        {"id":"M4","topic_found":true,"facts":[0,0.5,0],"note":"Finds final two-Span typography but not prior ForEach step or Slice8's actual pre-write source delivery. L402 does not contain price facts."},
+        {"id":"M5","topic_found":true,"facts":[0.5,0.5,0],"note":"Finds default indicator vs gray/left and reports intended changes but claims no direct patch found; L528/L532 exist. No recovery of initial-plus-Slice8 propagation."},
+        {"id":"M6","topic_found":true,"facts":[1,1,1],"note":"Correct repair-origin private visibility problem, two edits and subsequent build, no visual-pass inflation."}
+      ],
+      "material_errors": [],
+      "citation_support_errors": ["L402 is cited for price/indicator and later CTA repair judgment but contains none of those claims; it contains TemplatePreview findings and the old Member CTA finding."],
+      "mechanism_note":"Useful proposed tests, but price delivered-input mechanism not recovered. Later visual discovery is not by itself a newly introduced requirement.",
+      "recommendation_checks":[1,1,1,1]
+    },
+    {
+      "case":"member-center","arm":"tools","rep":1,
+      "issues":[
+        {"id":"M1","topic_found":false,"facts":[0,0,0],"note":"Candidates left uninvestigated; no mask family."},
+        {"id":"M2","topic_found":false,"facts":[0,0,0],"note":"No image dimension family."},
+        {"id":"M3","topic_found":true,"facts":[1,0,1],"note":"Correct original shape and Row/padding patch, early writer identified with source. Does not recover preserved height/gradient/scale/handler invariants."},
+        {"id":"M4","topic_found":true,"facts":[0,0.5,0],"note":"Finds original uniform Text and intermediate splitPriceRuns, misses final fixed two-Span rewrite and Slice8's pre-write Kotlin input."},
+        {"id":"M5","topic_found":true,"facts":[1,1,0.5],"note":"Correct original size-only indicator and actual colors/left patch. Does not distinguish preservation by Slice8; does bound exact visual validation."},
+        {"id":"M6","topic_found":true,"facts":[0.5,1,1],"note":"Correct repair actor/stage and private removal/build; wrong concrete introduction event/version: L528 is splitPriceRuns, priceDigits/priceSuffix introduced at L592, not earlier v14/agent@v33."}
+      ],
+      "material_errors":[{"issue":"M6","kind":"wrong_event_or_version","claim":"v14 private priceDigits/priceSuffix attributed to visual-fixer@v33 with L528 evidence","counterevidence":"fixer L528 vs L592: different helpers and later rewrite; compile-time snapshot does not establish earlier code state."}],
+      "citation_support_errors":["Existence-valid L528 does not support introduction of priceDigits/priceSuffix at the attributed node."],
+      "mechanism_note":"Source-to-current snapshots are still confused with precise introduction history; correct known Slice8 input not investigated.",
+      "recommendation_checks":[1,1,1,0],
+      "ui_data_audit":"Matched identity; 39 MCP calls plus20 wrappers. Two file opens; three agent opens rejected. No actual read/write route established, and projection correctly adds no synthetic read/write edge. Browser layout not yet tested."
+    },
+    {
+      "case":"splash","arm":"raw","rep":1,
+      "issues":[
+        {"id":"S1","topic_found":true,"facts":[0,0.5,0.5],"note":"Identifies wrong isModal assumption and D020 tension, but misses initial interception, entry-setup deletion, Slice11 actor and actual onWillDismiss patch; bounds device validation."},
+        {"id":"S2","topic_found":false,"facts":[0,0,0],"note":"No NavBar visibility restore patch."},
+        {"id":"S3","topic_found":false,"facts":[0,0,0],"note":"No Progress strokeWidth patch."},
+        {"id":"S4","topic_found":false,"facts":[0,0,0],"note":"No fullscreen hide/restore attribution."},
+        {"id":"S5","topic_found":false,"facts":[0,0,0],"note":"No image explicit dimensions."},
+        {"id":"S6","topic_found":true,"facts":[0,0.5,0.5],"note":"Mentions mask as candidate with loading exception and no device validation, but misses actual one-site script output, Palette dependency and specific effect."}
+      ],
+      "material_errors":[{"kind":"false_material_absence","claim":"同名子目录为空；完整生成快照和fixer前后diff未被转录保存","counterevidence":"Frozen pool has146 JSONLs including converter and fixer subagents. sc L71 contains initial Write; fix L103/L233/L346/L352/L485/L488 contain actual target patches."}],
+      "citation_support_errors":[],
+      "extra_topics":[{"topic":"PPTFilePage casing","status":"related but not a target-file change","note":"Actual native patch is in WorksComponent, whose typo is corrected to existing Splash registration. Do not add a new Splash modification unit."}],
+      "recommendation_checks":[1,0.5,1,0.5],
+      "mechanism_note":"Conclusions constrained by a false belief that child transcripts are absent, not genuine absence of supplied evidence."
+    },
+    {
+      "case":"splash","arm":"tools","rep":1,
+      "issues":[
+        {"id":"S1","topic_found":true,"facts":[0.5,0,0.5],"note":"Knows initial onBackPressed but misses its deletion/actor change, and attributes later modal behavior to initial converter. Does not confirm onWillDismiss patch at L346 although present."},
+        {"id":"S2","topic_found":true,"facts":[0.5,0,1],"note":"Finds L352 onNavBarStateChange restore but omits privacyDialogVisible condition and prior onPop vs pop explanation; does distinguish restore effect from BACK prevention."},
+        {"id":"S3","topic_found":false,"facts":[0,0,0],"note":"No progress drawing-thickness family."},
+        {"id":"S4","topic_found":true,"facts":[0,1,0.5],"note":"Bounds unknown transmission, but omits earlier root theme read L404 and declines to establish L485 actual hide/restore script; identifies later onRoute addition."},
+        {"id":"S5","topic_found":false,"facts":[0,0,0],"note":"No image dimensions."},
+        {"id":"S6","topic_found":false,"facts":[0,0,0],"note":"No mask family."}
+      ],
+      "material_errors":[{"issue":"S1","kind":"wrong_origin_node","claim":"Privacy modal/Navigation composition failure assigned to original converter@v1","counterevidence":"Original onBackPressed was later removed at entry-setup L123; Slice11 L236 writes the isModal claim. Later finding does not prove behavior of initial snapshot."}],
+      "citation_support_errors":["Initial Write plus later finding does not establish the named initial writer as the modal failure entry."],
+      "recommendation_checks":[1,1,1,0.5],
+      "mechanism_note":"Mechanical certainty preference skips several verifiable literal script effects; later failure is still projected onto earlier author without transition recovery."
+    },
+    {
+      "case":"dice-index","arm":"raw","rep":1,
+      "issues":[
+        {"id":"D1","topic_found":true,"facts":[0.5,0.5,0],"note":"Finds original resource label and actual uppercase edit, but omits delivered allCaps mapping versus specific AC14 Roll conflict, original Android dump timing, and later replay output."},
+        {"id":"D2","topic_found":true,"facts":[1,0.5,0.5],"note":"Correct unspecified original defaults and Normal/radius/shadow patch; no unchanged size invariants or detailed shadow. Distinguishes fixer claims, but does not recover later verification scope."},
+        {"id":"D3","topic_found":true,"facts":[1,1,1],"note":"Correct export for test visibility, unchanged algorithm, later-stage rather than original violation. Short call IDs at L3231 verified against actual prefix."},
+        {"id":"D4","topic_found":true,"facts":[1,1,1],"note":"Three IDs, original IDs and behavior preserved, later test injection correctly classified; original L22 call prefix verified."},
+        {"id":"D5","topic_found":false,"facts":[0,0,0],"note":"No console-to-hilog change or repair provenance."},
+        {"id":"D6","topic_found":true,"facts":[0,0.5,0],"note":"Knows legitimate TODO resource from later discriminator, but misses actual comment rewrites and ECAT task scope; no full change attribution."}
+      ],
+      "material_errors":[],
+      "citation_support_errors":[],
+      "recommendation_checks":[1,1,1,0.5],
+      "mechanism_note":"Recognizes later test requirements but misses explicit conflicting generation input, ECAT changes and known replay record. Does not establish a unique skill mechanism."
+    },
+    {
+      "case":"dice-index","arm":"tools","rep":1,
+      "issues":[
+        {"id":"D1","topic_found":true,"facts":[0.5,0.5,0],"note":"Finds original Roll and resource-preserving uppercase path, but only cites prompt/later finding for requirement; actual general mapping/AC14 conflict and later replay missing."},
+        {"id":"D2","topic_found":true,"facts":[1,0.5,1],"note":"Correct original unspecified type and Normal/radius/shadow patch with visual uncertainty; no detailed retained attributes."},
+        {"id":"D3","topic_found":false,"facts":[0,0,0],"note":"v6 explicitly left unresolved."},
+        {"id":"D4","topic_found":false,"facts":[0,0,0],"note":"v7-v9 explicitly left unresolved."},
+        {"id":"D5","topic_found":false,"facts":[0,0,0],"note":"ECAT versions left unresolved; no logging provenance."},
+        {"id":"D6","topic_found":true,"facts":[0.5,0,0.5],"note":"Notes v22 is comment-only, but no full comment hygiene/approved TODO rationale. Most corresponding versions unresolved."}
+      ],
+      "material_errors":[{"issue":"D2","kind":"wrong_defect_event_mapping","claim":"coverage v4 is explained by defect B (button shape)","counterevidence":"v4/L68 adds aboutToAppear uppercase path, which belongs to defect A; shape change is L70/v5. Node IDs being real does not make this defect mapping correct."}],
+      "citation_support_errors":[],
+      "recommendation_checks":[1,1,1,1],
+      "mechanism_note":"Most observed native versions left unresolved despite explicit file-first task; weaker semantic coverage cannot justify claimed cost savings as quality-equivalent."
+    },
+    {
+      "case":"member-center","arm":"raw","rep":2,
+      "issues":[
+        {"id":"M1","topic_found":false,"facts":[0,0,0],"note":"No mask changes."},
+        {"id":"M2","topic_found":true,"facts":[0.5,0,1],"note":"Finds image script family but no two concrete image constraints and no initial-plus-Slice8 propagation. Correctly limits pixel validation."},
+        {"id":"M3","topic_found":true,"facts":[0,0.5,0],"note":"Mistakes unchanged height/safe-area padding for no CTA repair at all, missing actual horizontal Row/padding fix in cited L436."},
+        {"id":"M4","topic_found":true,"facts":[0.5,1,0.5],"note":"Correct old Text and ForEach-to-fixed-Span changes, source replaceSpan and no context-overload inference. Missing Slice8's actual pre-write input delivery."},
+        {"id":"M5","topic_found":true,"facts":[1,1,0.5],"note":"Original dot defaults and actual colors/left constants recovered; no Slice8 preservation. L402 falsely cited as indicator fix summary."},
+        {"id":"M6","topic_found":true,"facts":[1,1,1],"note":"Correct repair-origin private helpers, removal and subsequent build with device boundary."}
+      ],
+      "material_errors":[{"issue":"M3","kind":"false_effect_absence","claim":"CTA最终未修改、不应计入已修复问题","counterevidence":"Cited fixer L436 contains the actual width/margin to outer Row/padding patch, paired L437 succeeds. Retaining height and safe area is a separate decision."}],
+      "citation_support_errors":["L402 does not contain the claimed banner indicator findings or repair summary."],
+      "recommendation_checks":[1,1,1,0.5],
+      "mechanism_note":"Improves image discovery and price chronology over rep1, but incorrectly eliminates an actual layout repair."
+    },
+    {
+      "case":"member-center","arm":"tools","rep":2,
+      "issues":[
+        {"id":"M1","topic_found":false,"facts":[0,0,0],"note":"All candidates left unresolved, no mask family."},
+        {"id":"M2","topic_found":false,"facts":[0,0,0],"note":"No image dimensions family."},
+        {"id":"M3","topic_found":true,"facts":[1,0,1],"note":"Correct initial shape and later parent padding, but no retained animation/height/handler invariants."},
+        {"id":"M4","topic_found":true,"facts":[0,0.5,0],"note":"Only identifies patch at L528; says original price line not opened and cannot bind generation responsibility; misses Slice8 delivered source and final fixed-Span sequence."},
+        {"id":"M5","topic_found":true,"facts":[1,0.5,0.5],"note":"Correct size-only original, explicit colors and left alignment but no exact left18 or Slice8 propagation. Device uncertainty preserved."},
+        {"id":"M6","topic_found":true,"facts":[0.5,1,1],"note":"Locates true late L592 and subsequent compile/edit/build events, but says no formal version means introduction actor cannot be bound; actor/event can be established without inventing an agent version."}
+      ],
+      "material_errors":[{"kind":"wrong_defect_event_mapping","claim":"Every v10-v16 is explained by all A/B/C/D, always citing L528","counterevidence":"v10 is CTA L436; indicator is L528/L532; final visibility is builder L32/L34; L528 does not support all these changes or all four defects at every version."}],
+      "citation_support_errors":["Uniform L528 evidence on every coverage row and uniform L592 evidence on unrelated candidates do not establish those mappings."],
+      "recommendation_checks":[0.5,1,0.5,0],
+      "mechanism_note":"More calls and schema-repair iterations did not produce better coverage; final prose became more generic and coverage mapping became less discriminating."
+    },
+    {
+      "case":"splash","arm":"raw","rep":2,
+      "issues":[
+        {"id":"S1","topic_found":true,"facts":[0,0.5,0.5],"note":"Finds actual D020 dispatch and correctly distinguishes shell exemption from privacy permission, but no initial-to-entry-setup-to-Slice11 code history or exact onWillDismiss patch."},
+        {"id":"S2","topic_found":false,"facts":[0,0,0],"note":"No specific restore fallback patch."},
+        {"id":"S3","topic_found":false,"facts":[0,0,0],"note":"No progress strokeWidth change."},
+        {"id":"S4","topic_found":false,"facts":[0,0,0],"note":"No fullscreen/system bars change."},
+        {"id":"S5","topic_found":false,"facts":[0,0,0],"note":"No image dimensions."},
+        {"id":"S6","topic_found":true,"facts":[0,0.5,0.5],"note":"Mask family and loading exception found, but no specific script one-site/Palette effect. Generation-input responsibility is asserted without reconstruction."}
+      ],
+      "material_errors":[{"kind":"false_material_absence","claim":"当前转录没有提供SplashPage精确diff","counterevidence":"Fixer child transcript contains explicit target patches at L103/L233/L346/L352/L485/L488. Failure to open these records is not absent material."}],
+      "citation_support_errors":[],
+      "recommendation_checks":[1,1,1,0.5],
+      "mechanism_note":"Improves phase-policy distinction but still infers too much from root reports without opening supplied child effects."
+    },
+    {
+      "case":"splash","arm":"tools","rep":2,
+      "delivery_failure":true,
+      "semantic_status":"not_scored_no_valid_final_submission",
+      "score_note":"Zero delivered credit in end-to-end denominator; not a claim that every statement in the unsubmitted draft was false. Do not substitute an intermediate draft as final report.",
+      "issues":[
+        {"id":"S1","topic_found":false,"facts":[0,0,0],"note":"No authenticated final report."},
+        {"id":"S2","topic_found":false,"facts":[0,0,0],"note":"No authenticated final report."},
+        {"id":"S3","topic_found":false,"facts":[0,0,0],"note":"No authenticated final report."},
+        {"id":"S4","topic_found":false,"facts":[0,0,0],"note":"No authenticated final report."},
+        {"id":"S5","topic_found":false,"facts":[0,0,0],"note":"No authenticated final report."},
+        {"id":"S6","topic_found":false,"facts":[0,0,0],"note":"No authenticated final report."}
+      ],
+      "material_errors":[],
+      "citation_support_errors":["Final draft_sha256 has62 rather than64 hex characters and does not match the last check. Harness rejected it; no verdict.yaml was accepted."],
+      "recommendation_checks":[0,0,0,0],
+      "mechanism_note":"Output protocol failure, not a lack of stored draft. Kept separately from semantic correctness; all actual token/time costs retained."
+    },
+    {
+      "case":"dice-index","arm":"tools","rep":2,
+      "issues":[
+        {"id":"D1","topic_found":true,"facts":[0.5,0.5,0],"note":"Original resource binding and later uppercase path found, but generation mapping/AC14 conflict and later replay output missing; relies on post-generation finding."},
+        {"id":"D2","topic_found":true,"facts":[1,0.5,1],"note":"Correct unspecified initial type/radius/shadow and later explicit shape; no detailed retained attributes. Limits actual visual certification."},
+        {"id":"D3","topic_found":true,"facts":[1,1,1],"note":"Coverage correctly identifies export Dice as later unit-test visibility, not business repair."},
+        {"id":"D4","topic_found":true,"facts":[0.5,0.5,1],"note":"Classifies three ids as UI test instrumentation with unchanged behavior, but does not enumerate IDs or distinguish already existing button/imageView anchors."},
+        {"id":"D5","topic_found":true,"facts":[1,0.5,1],"note":"Correct visual-fix console introduction and later hilog conversion; no import/constants details. Does not accuse initial generator or claim runtime exception test."},
+        {"id":"D6","topic_found":true,"facts":[0.5,0,0.5],"note":"Correct v22 comment-only fact; misses broader comment hygiene and approved TODO resource reason."}
+      ],
+      "material_errors":[],
+      "citation_support_errors":[],
+      "recommendation_checks":[1,1,1,1],
+      "mechanism_note":"Best tools run so far: recovers later testing and logging chronology. Still misses conflicting generation input and the subsequent native replay result, substituting a stale terminal report's UI TDD status."
+    },
+    {
+      "case":"dice-index","arm":"raw","rep":2,
+      "issues":[
+        {"id":"D1","topic_found":true,"facts":[0.5,0.5,0],"note":"Finds label transformation but not generator's actual theme/mapping/AC14 input conflict, original Android dump timing or later replay output."},
+        {"id":"D2","topic_found":true,"facts":[0.5,0.5,1],"note":"Correct visual-before default style and actual Normal/radius/shadow repair; no independent initial Write reconstruction or retained property details. Distinguishes finding's unimplemented RoundedRect suggestion from actual patch."},
+        {"id":"D3","topic_found":true,"facts":[1,1,1],"note":"Correct export event, same-file cohesion and UT visibility rather than original business error."},
+        {"id":"D4","topic_found":true,"facts":[1,1,1],"note":"Correct three new and two existing IDs, behavior retained and test-stage classification. Cited child root is wrong but full tool IDs and unique basename allow original event recovery."},
+        {"id":"D5","topic_found":true,"facts":[0,1,0.5],"note":"Correct hilog/import/constants edits, but incorrectly treats visual-fixer introduction as unknowable despite L68 and initial L75; refrains from blaming initial generator as certain."},
+        {"id":"D6","topic_found":true,"facts":[1,1,1],"note":"Recovers comment cleanup, approved TODO use-site registration and absence of a business placeholder; does not multiply comment edits into defects."}
+      ],
+      "material_errors":[],
+      "citation_support_errors":["ID-injection child is under81e0..., not the cited2f01... root. Its full tool_use_ids are correct and uniquely recoverable; report path still requires correction."],
+      "recommendation_checks":[1,1,1,1],
+      "mechanism_note":"Best raw coverage, including ECAT comment/logging changes, but no exact console introduction or generation input conflict. Recovers original native UI TDD failure without later separate replay; do not conflate those two test harnesses."
+    }
+  ]
+}
