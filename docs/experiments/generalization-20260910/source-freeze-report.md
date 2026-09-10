@@ -149,3 +149,11 @@ readability检查只对已注册文件做UTF-8增量解码计数，不输出文�
 `smoke-source-v2.json`（SHA `e99f7636252853a4f11801f254c821ddb53fa0d2844615830ba6d31ddd9b17f3`）使用同样 100,000 字符预算、同样默认 overview 和首附件选择规则：两队列 file/search/record 全部 `ok`、`budget_adjusted=false`；overview 原始 data 分别为10,239和10,156字符。dynamic1 不再是 v1 的3,650,409字符 deferred。两份样本附件的原始引用及内容哈希保持一致，分别48/135字符、各1物理行完整往返；时间仍未知，owners仍为空。未认证所有附件逐份完整交付或任何因果主张。
 
 源与代码前后哈希稳定；原始 source manifest、旧失败产物及 run_transfer 字节未变，自有进程均已退出。门通过后才授权新13文件的参考建立；先取原始修改及间隔/候选命令，再独立复核和冻结 core，尚未运行新调查模型。候选代码不能依据这些新答案调整。
+
+## 全部 13 个公开目标的真实 MCP 入口检查
+
+2026-09-10 21:30:35–21:33:31 UTC，仍使用冻结 candidate-source-v2，通过真实 stdio MCP 对两个队列各做一批（6/7 项）默认 file overview：每项 limit=1，at=observation_end，since_ts=generation_end，批量 max_chars=100000。未提供参考答案、原因关键词或定制 view。全部13项为 ok；返回目标和时间范围精确，无 partial/deferred/error，无需单项重试，也未提高预算。
+
+dynamic1 批耗时42.24秒，工具文本73,109字符，完整 decoded MCP result JSON 81,635字节；arch11 批127.73秒，工具文本77,688字符，完整 decoded result JSON 86,812字节。100000依旧是 data 预算，不是完整传输硬上限。每个目标交付至少一条 writes；route_map 没有 reads，其余各交付一条 reads。这些是分页入口检查，不是完整修改覆盖检查。
+
+审计为本地 `source-freeze-1/all-targets-source-v2-smoke.json`，SHA `082fd4b30a2e23e84d998feedefadd72e2609c5b0acc5a2445f89de1b3bc9931`；独立脚本为 `generalization-20260910/all_targets_source_v2_smoke.py`，SHA `567bbdac521951ab340510a2e7007c94ac385900aae7e4513a7a41ce4148b03c`。回执由冻结 parser 校验，554份源、代码、脚本和 Python 前后哈希一致；两个自有 MCP 进程均 exit0 并确认已退出。没有以本地 ledger 查询代替 MCP 投递，也没有执行模型。此门不证明归因正确，不能作为工具组准确率。
