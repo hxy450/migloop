@@ -1,6 +1,6 @@
 {
   "schema": "migloop-file-first-10-selection/1",
-  "status": "baseline_v1_frozen_raw_queue_started",
+  "status": "baseline_v1_raw_completed_and_adjudicated",
   "visibility": "reviewers_only_never_investigator_context",
   "selected_without_new_model_results": true,
   "investigations_scheduled": 20,
