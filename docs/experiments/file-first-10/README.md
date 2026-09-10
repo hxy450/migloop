@@ -1,6 +1,6 @@
 # 十个困难被修文件：先核事实，再用原始组诊断工具需求
 
-2026-09-10。状态：**原始组与自由时间工具第一版各20跑，均已结束并完成裁决。** [原始结果](baseline-v1-results.md)及[工具对照结果](tools-v1-results.md)：文件等权正确归因覆盖73.8%→66.8%，实质主张精确率73.6%→84.8%，整文件通过8/20→7/20；总token下降63.6%但端到端时间增加16.6%，尚未达到正确性目标。第二版据已复现的交付、原生效应、状态与展示问题修正，待同条件验证。
+2026-09-10。状态：**原始组、自由时间工具v1/v2各20跑，全部完成裁决。** [原始结果](baseline-v1-results.md)、[v1结果](tools-v1-results.md)、[v2结果](tools-v2-results.md)：文件等权正确归因覆盖73.8%→66.8%→62.0%，整文件通过8/20→7/20→7/20。v2总token较原始少65.4%，含后处理平均时间多4.1%，但正确性仍不达标。下一版先修实际交付障碍，不重跑/改分母来美化原始对照。
 
 本目录是审阅端材料，不能进入被测调查员上下文。它取代旧八候选计划的执行顺序，不改写旧实验产物和分数。
 
@@ -79,7 +79,7 @@
 - [reference-units.json](reference-units.json)：28 个**审阅端**归因单元支持材料；已与 [scoring-core.json](scoring-core.json) 一起冻结至baseline。后者决定核心评分，不要求复述前者每个分句；不是给调查员的28道题。
 - [公共任务模板](task-template.md)：没有缺陷标题、数量、责任人或关键答案线索；两个模型组共享语义任务。
 - 新增底稿：[0723](candidate-0723.md)、[Dice](candidate-dice.md)、[Codex](candidate-codex.md)。旧三文件底稿保留在 `file-first-luna/review-v2`。
-- 设计备忘：[design-hypotheses.md](design-hypotheses.md)，只登记待验证假设，没有据此继续重构生产代码。
+- 设计备忘：[design-hypotheses.md](design-hypotheses.md)，含最初登记、自由时间实现后的实验反馈和下一版待验证假设；不把实现完成当正确率改善。
 
 不依赖 migloop 的原始核验：`audit_reference.py` 对三池 146 + 80 + 2 份原始 JSONL 扫描；十文件均有后置 native 更新/patch 成功回执。结果在 `C:/Users/hongy/projects/_migloop-eval-20260909/file-first-10/audit-v2/{0723,dice,codex}.json`。v1 是扫描器开发产物（遗漏可选成功标志与 code-host 内部事件），保留但不用作资格结论。自动 native 清单不包含手审 Bash 效应，不当作全修改清单。
 
