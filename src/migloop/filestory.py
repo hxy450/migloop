@@ -109,6 +109,8 @@ class Version:
     conditional: bool = False       # 写它的命令在条件分支里(评审反例 false && cp:记了,但不当事实)
     state_gap: bool = False         # 此前有未证实效应,两端同文也只能跨断点推定
     proof: FileProof | None = None
+    content_ts: str | None = None       # When this body became observable; may be later than ts.
+    content_seq: int | None = None      # Event supplying that body, not necessarily its writer.
 
 
 @dataclass
@@ -156,6 +158,9 @@ class FileStory:
     reads: list[ReadRec] = field(default_factory=list)
     breaks: list[Break] = field(default_factory=list)
     touches: list[Touch] = field(default_factory=list)
+    # Final replay state can be unknown even when the last formal version has
+    # content (e.g. an unversioned candidate write after that version).
+    current_content: str | None = field(default=None, repr=False)
 
 
 def _udiff(a: str | None, b: str | None) -> str | None:
@@ -240,6 +245,8 @@ def build_stories(events: list[Ev]) -> dict[str, FileStory]:
                     source=source, content=content, diff=diff, diff_kind=diff_kind,
                     by_ver=e.aver if own else None, via=e.via if own else "observe",
                     stage=e.stage if own else None, conditional=e.conditional if own else False, proof=e.proof)
+        if content is not None:
+            v.content_ts, v.content_seq = e.done_ts or e.ts, e.seq
         st.versions.append(v)
         return v
 
@@ -402,6 +409,7 @@ def build_stories(events: list[Ev]) -> dict[str, FileStory]:
                     ver = st.versions[idx]
                     ver.content = snap
                     ver.sealed = True
+                    ver.content_ts, ver.content_seq = e.ts, e.seq
                     ver.diff = _udiff(s.interval_base, snap)
                     ver.diff_kind = "interval" if len(s.pending) == 1 else "collapsed"
                     s.pending = []
@@ -415,6 +423,7 @@ def build_stories(events: list[Ev]) -> dict[str, FileStory]:
                     # (DiceRoller app.json5 的模板默认值曾因此成了 v2 断点后的「归属未知」)
                     st.versions[-1].content = snap
                     st.versions[-1].sealed = True
+                    st.versions[-1].content_ts, st.versions[-1].content_seq = e.ts, e.seq
                     s.content = snap
                     s.interval_base = snap
                     self_read_version = len(st.versions)
@@ -451,6 +460,8 @@ def build_stories(events: list[Ev]) -> dict[str, FileStory]:
                                     use_ts=e.use_ts, observation_uncertain=observation_uncertain, proof=e.proof))
         else:
             raise ValueError(f"未知事件类型: {e.kind}")
+    for path, state in states.items():
+        stories[path].current_content = state.content if not state.uncertain else None
     return stories
 
 

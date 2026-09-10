@@ -382,6 +382,16 @@ const server=http.createServer((req,res)=>{
   }
   else if(url.searchParams.get('scope_only')==='1')body=activeFixture==='time-scope-failure'?{error:'fixture scope unavailable'}:
     {time_scope:timeScopeFixture(Number(url.searchParams.get('v')||3),url.searchParams.get('id'))};
+  else if(url.pathname==='/atom/record')body={schema:'migloop-raw-record/1',text:'<b>RAW_TIME_EVIDENCE</b> (plain text)',chars:41,next_offset:null};
+  else if(url.searchParams.has('at')){
+    const kind=url.pathname.endsWith('/agent')||url.searchParams.has('agent')?'agent':'file';
+    body={schema:'migloop-time-view/1',node:{kind,key:kind==='agent'?'agent-a':file,at:url.searchParams.get('at')},
+      total:1,offset:Number(url.searchParams.get('offset')||0),limit:30,remaining:0,next_offset:null,
+      counts:{undated:0},gaps:[],stale_annotation_sources:[],undated:{rows:[],next_offset:null},
+      note:'fixture time scope: query is not a read/write edge',
+      rows:[{ref:'raw:00000000000000000000:L1:11111111111111111111',ts:'2026-01-01T00:00:01Z',kind:'tool_result',
+        source:'fixture.jsonl',line:1,preview:'TIME_WINDOW_PROOF',agents:['agent-a'],annotations:[]}]};
+  }
   else if(url.pathname==='/atom/file'){
     const reader=(by,at,seq,extra={})=>({by,by_name:by,at,seq,v:1,ts:'2026-01-01T00:00:05Z',full:false,certain:true,...extra});
     const readers=activeFixture==='tail-readers' ? [
@@ -833,6 +843,18 @@ async function main(){
     await evaluate(clickAgent+";document.querySelector('#side .rootbtn').click()");
     await until("__mig.xt().walk!==true && document.querySelectorAll('.wire.relation-uncertain').length===2");
     await check('read proof and lifetime self-written label do not claim execution, delivery or order',"document.querySelector('#canvas').textContent.includes('执行依据未核') && document.querySelector('#canvas').textContent.includes('正文交付未核') && document.querySelector('#canvas').textContent.includes('旧记录·执行/交付依据未记录') && document.querySelector('#canvas').textContent.includes('同代理也写过') && !document.body.textContent.includes('写前读') && !document.querySelector('.wire.chain')");
+    await evaluate(clickAgent);
+    await until("document.querySelector('#side .time-evidence')");
+    await evaluate("window.timeOriginalTrace=JSON.stringify(__mig.probe().trajectory);window.timeOriginalNodes=JSON.stringify(Object.keys(__mig.xt().byId));document.querySelector('#side .time-evidence').open=true");
+    await until("document.querySelector('#side .time-evidence').textContent.includes('TIME_WINDOW_PROOF')");
+    await evaluate("(()=>{const box=document.querySelector('#side .time-evidence'),inputs=box.querySelectorAll('.time-controls input');inputs[0].value='2026-01-01T00:00:10Z';inputs[1].value='2026-01-01T00:00:00Z';inputs[2].value='needle';box.querySelector('.time-controls button').click()})()");
+    await until("performance.getEntriesByType('resource').some(r=>r.name.includes('/atom/search?')&&new URL(r.name).searchParams.get('q')==='needle') && document.querySelector('#side .time-record')");
+    await check('time search preserves cutoff and start in the actual HTTP query',"performance.getEntriesByType('resource').some(r=>{const u=new URL(r.name);return u.pathname==='/atom/search'&&u.searchParams.get('at')==='2026-01-01T00:00:10Z'&&u.searchParams.get('since_ts')==='2026-01-01T00:00:00Z'&&u.searchParams.get('agent')==='agent-a'})");
+    await evaluate("document.querySelector('#side .time-record').open=true;document.querySelector('#side .time-record button').click()");
+    await until("document.querySelector('#side .time-record').textContent.includes('RAW_TIME_EVIDENCE')");
+    await check('raw expansion remains scoped and treats transcript markup as text',"performance.getEntriesByType('resource').some(r=>{const u=new URL(r.name);return u.pathname==='/atom/record'&&u.searchParams.get('at')==='2026-01-01T00:00:10Z'}) && !document.querySelector('#side .time-record pre b')");
+    await check('time viewer expansion never changes model visits nodes or graph edges',"JSON.stringify(__mig.probe().trajectory)===window.timeOriginalTrace && JSON.stringify(Object.keys(__mig.xt().byId))===window.timeOriginalNodes");
+    await evaluate("document.querySelector('#side .time-evidence').scrollIntoView({block:'start'})");
     const output=process.env.MIGLOOP_BROWSER_SCREENSHOT_DIR||path.join(repo,'docs/experiments/2026-09-09-trace-fidelity/screenshots');
     fs.mkdirSync(output,{recursive:true});
     const screenshot=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});

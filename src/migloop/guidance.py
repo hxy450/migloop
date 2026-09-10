@@ -270,7 +270,36 @@ _TOPIC_HEADINGS = {
     "navigation": ("位置与来处",),
     "verdict": ("结构化结论", "提交前草稿核查"),
 }
-TOPICS = ("core", *_TOPIC_HEADINGS, "full")
+TOPICS = ("time", "core", *_TOPIC_HEADINGS, "full")
+
+TIME_GUIDE = """\
+# MigLoop 时间调查接口
+两种入口：file(sid,path,at) 与 agent(sid,id,at)。at 为带时区 ISO 时刻，省略为 latest。
+它们表示“截至这一时刻的已保存证据”，不是一个版本，也不是精确磁盘快照。
+
+1. sessions(sid,file=目标) 找修复范围；file(sid,path=目标,at="latest") 看文件历史。
+2. diff(sid,path,at="latest",since_ts=生成结束时刻) 一次看多笔已记录修改。
+3. 相关调用发起前的输入，用 agent(sid,id,at=调用发起时刻) 查。别用修复后读回代替生成期输入。
+4. search(sid,agent=同一id,at=同一截止,q=词) 搜整个范围，不受当前页面/摘要截断影响。
+   也可 file=路径，或不传两者查全池；q_any 是字面量 OR。file 的关联仍可能不完整，全池/agent 原文是兜底。
+5. record(sid,ref=返回的raw引用,at=同一截止) 展开原始 JSONL。offset/max_chars 翻页。
+   未分类的调用、失败、未完成、普通消息、已保存摘要等都保留。元数据存在不证明全部进入模型上下文。
+   记录在该 agent 的转录中不等于它原创/执行（fork 可复制父记录）；保存过也不证明当时仍保留或实际采纳。
+6. blame(sid,path,at=截止) 仅用当时已返回效应重放文本来源；未知/并发/候选屏障不猜作者。
+
+file/agent/search 的 limit/offset 只控制披露；since_ts 是真正缩小调查范围，不能据缩小后的零命中声称从没读过。
+未知时间默认计数，include_undated=true 单独展开；不能当作截止前输入。时间相同不证明先后。
+读请求在截止前、结果在截止后：只可见请求，不可见结果和由结果解析出的关系。
+时刻不能证明因果。confirmed/candidate 指操作证据，不认证版本绑定、责任或归因正确。
+
+无需 via，也不要求模型抄查询路线。工具调用输入和返回由运行记录保存。
+从搜索找到 spec 可直接打开：独立查阅不是读写边，绝不把查询先后画成因果。
+UI 的时间证据面板与 MCP 使用同一个查询核心，原文摘要可展开；旧版本树/旧报告仍明确按旧协议读取。
+
+兼容边界：显式 v 才使用旧 file/agent 版本接口（旧 via 规则）；旧 action/diff/blame 仍可读取原有证据。
+目前结论 check/YAML 和旧调查树使用 migloop-verdict/2 坐标，不接受 raw: 当旧 # 引用。
+不要伪造 v 或把时间查询冒充版本访问；新时间轨迹单独保存/显示。最终结论协议迁移完成前不以本接口重跑正式对照实验。
+"""
 
 
 def _reference_topic(topic: str) -> str:
@@ -292,7 +321,7 @@ def verdict_version() -> str:
     return version
 
 
-def guide_text(final_mode: str | None = None, topic: str = "core") -> str:
+def guide_text(final_mode: str | None = None, topic: str = "time") -> str:
     """Short default entry; full evidence rules and schema expand on demand."""
     import os
     mode = final_mode if final_mode is not None else os.environ.get("MIGLOOP_FINAL_MODE", "document")
@@ -300,6 +329,8 @@ def guide_text(final_mode: str | None = None, topic: str = "core") -> str:
         raise ValueError("MIGLOOP_FINAL_MODE must be document or reference")
     if not isinstance(topic, str) or topic not in TOPICS:
         raise ValueError("guide topic must be one of: " + ", ".join(TOPICS))
+    if topic == "time":
+        return TIME_GUIDE
     text = CORE if topic == "core" else _reference_topic(topic)
     version = verdict_version()
     if version == "2":

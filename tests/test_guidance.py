@@ -7,7 +7,7 @@ from migloop import guidance, mcp_server, service
 
 def test_short_entry_defers_schema_without_deleting_original_reference(monkeypatch):
     monkeypatch.setenv("MIGLOOP_VERDICT_VERSION", "1")
-    core = guidance.guide_text("document")
+    core = guidance.guide_text("document", "core")
     assert len(core) < len(guidance.GUIDE) * 0.25
     assert 'guide(topic="verdict")' in core
     assert "basis:" not in core
@@ -54,7 +54,7 @@ def test_short_entry_keeps_nonnegotiable_evidence_and_time_boundaries():
 
 def test_v2_is_explicit_and_preserves_v1_guide_as_a_legacy_mode(monkeypatch):
     monkeypatch.delenv("MIGLOOP_VERDICT_VERSION", raising=False)
-    core = guidance.guide_text("document")
+    core = guidance.guide_text("document", "core")
     assert "migloop-verdict/2" in core and "event_claims" in core
     assert "schema: migloop-verdict/2" in guidance.guide_text("document", "verdict")
     assert "schema: migloop-verdict/1" not in guidance.guide_text("document", "full")

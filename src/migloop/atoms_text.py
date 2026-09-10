@@ -41,10 +41,7 @@ def _who(ledger: atoms.Ledger, by: str, ver: int | None) -> str:
 def _core(seq: Any, loc: int | str | None) -> str:
     """引用主体 #转录标识:n@L行[/块]:标识在前,是坐标的一部分,截不掉(放后缀时模型抄的时候丢了七成)。
     #n 给 action 展开用,是本次建账的句柄,账本重建后会漂;标识 + 行 + 块是转录里的位置,不漂,核验按它。"""
-    if isinstance(loc, str) and "·" in loc:
-        pos, tag = loc.split("·", 1)
-        return f"#{tag}:{seq}@L{pos}"
-    return f"#{seq}@L{loc}" if loc else f"#{seq}"
+    return atoms.format_ref(seq, loc)
 
 
 def _ref(seq: Any, t: str | None, line: int | str | None = None) -> str:
@@ -1159,6 +1156,8 @@ def _next_hint(h: dict[str, Any], root: str) -> str:
     if h["kind"] == "prompt":
         return "→ agent(派发者, since=派发时的版本) 看它凭什么这么派"
     if h["kind"] == "read" and h.get("target"):
+        if not h.get("target_certain") or h.get("target_observation_uncertain"):
+            return f"→ action(#{h['seq']}) 核读取原文；版本未确认，不可据就近版本归作者"
         return f"→ file({rel(h['target'], root)}, v={h.get('target_v')}) 看这一版是谁写的;action(#{h['seq']}) 看它读到的原文"
     if h["kind"] in ("write", "delete") and h.get("target"):
         return f"→ diff({rel(h['target'], root)}, v={h.get('target_v')}) / blame 看这几行的归属"
@@ -1298,6 +1297,10 @@ def render_search(ledger: atoms.Ledger, q: str, agent: str | None = None, v: int
                 if h["kind"] in ("read", "write", "delete") and h.get("target"):
                     _navigation_hit(ledger, navigation_hits, "file", h["target"], h.get("target_v"), h.get("seq"), h["field"])
                     where = f" {rel(h['target'], root)}@v{h.get('target_v')}"
+                    if h["kind"] == "read" and not h.get("target_certain"):
+                        where += " · 就近绑定，版本未确认"
+                    if h.get("target_observation_uncertain"):
+                        where += " · 读写窗口重叠"
                 elif h.get("targets"):
                     where = " " + ", ".join(rel(p, root) for p in h["targets"][:3])
                 if h.get("possible"):

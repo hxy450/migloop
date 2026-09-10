@@ -321,6 +321,12 @@
   .time-scope summary { cursor: pointer; }
   .time-scope-root { margin-top: 7px; padding-top: 5px; border-top: 1px solid var(--ring); }
   .time-scope-note { margin-top: 5px; color: var(--ink-3); white-space: pre-wrap; }
+  .time-evidence, .time-trace { margin: 10px 0; padding: 8px; border: 1px solid var(--ring); border-radius: 8px; overflow-wrap: anywhere; }
+  .time-evidence summary, .time-trace summary { cursor: pointer; }
+  .time-controls { display: flex; flex-wrap: wrap; gap: 5px; margin: 8px 0; }
+  .time-controls input { width: 100%; min-width: 0; padding: 5px; border: 1px solid var(--ring); border-radius: 4px; }
+  .time-controls label { display: block; width: 100%; color: var(--ink-2); font-size: 11.5px; }
+  .time-record { margin: 7px 0; padding-top: 5px; border-top: 1px solid var(--ring); font-size: 11.5px; }
 </style>
 
 <header>
@@ -547,6 +553,115 @@
     function atomAgent(aid, cb) {
       var key = agentKey(aid);
       lazyFetch(ENG.ag, ENG.agCb, key, API + "/agent?id=" + encodeURIComponent(key), cb);
+    }
+    // A time view is an independent evidence scope, never a substituted @v.
+    // Same HTTP query core as MCP; expanding this panel adds no historical edge
+    // and does not modify the recorded model investigation.
+    function temporalSection(container, kind, key, initialAt, initialQuery) {
+      initialQuery = initialQuery || {};
+      var box = el("details", "time-evidence"), title = el("summary", null, "时间证据 · 原文全集，可搜索/展开");
+      box.appendChild(title); container.appendChild(box);
+      var controls = el("div", "time-controls"), at = el("input"), since = el("input"), q = el("input");
+      at.value = initialAt || "latest"; at.placeholder = "截至：带时区 ISO / latest";
+      at.setAttribute("aria-label", "时间证据截止时刻");
+      since.placeholder = "起始时刻（可选；会缩小范围）"; q.placeholder = "搜索完整原文（不受本页限制）";
+      since.value = initialQuery.since_ts || ""; q.value = initialQuery.q || "";
+      var presetTerms = Array.isArray(initialQuery.q_any) ? initialQuery.q_any : null;
+      if (presetTerms && presetTerms.length) {
+        controls.appendChild(el("div", "pnote", "原查询 OR 词：" + JSON.stringify(presetTerms) + "；输入新词会替换它们。"));
+        q.oninput = function () { presetTerms = null; };
+      }
+      [["截至（at）", at], ["起始（可选，会缩小范围）", since], ["搜索完整原文", q]].forEach(function (field) {
+        var label = el("label", null, field[0]); label.appendChild(field[1]); controls.appendChild(label);
+      });
+      var go = el("button", null, "查询"), body = el("div", "time-evidence-body"), request = 0;
+      controls.appendChild(go); box.appendChild(controls); box.appendChild(body);
+      box.appendChild(el("div", "pnote", "独立时间范围，不继承旧版本锚点。查看器展开不等于模型查过，也不会新增读写边。"));
+      function fetchJSON(tool, args, cb) {
+        var url = API + "/" + tool + "?" + Object.keys(args).filter(function (k) { return args[k] != null; })
+          .map(function (k) { return encodeURIComponent(k) + "=" + encodeURIComponent(args[k]); }).join("&");
+        fetch(url, { credentials: "include" }).then(function (r) { return r.json(); })
+          .then(function (data) { cb(data, data.error); }).catch(function (error) { cb(null, String(error)); });
+      }
+      function openRecord(row, target, cutoff, undated) {
+        target.textContent = "原文加载中…";
+        function page(offset) {
+          fetchJSON("record", {ref: row.ref, at: cutoff, offset: offset, max_chars: 12000, include_undated: undated ? "true" : "false"}, function (data, error) {
+            if (error) { target.textContent = error; return; }
+            if (!offset) target.textContent = "";
+            target.appendChild(el("pre", "diffblock", data.text));
+            if (data.next_offset != null) {
+              var more = el("button", null, "继续展开 · 共 " + data.chars + " 字");
+              more.onclick = function () { more.remove(); page(data.next_offset); }; target.appendChild(more);
+            }
+          });
+        }
+        page(0);
+      }
+      function load(offset, includeUndated) {
+        var ticket = ++request, tool = q.value || presetTerms && presetTerms.length ? "search" : kind;
+        var args = {at: at.value || "latest", offset: offset || 0, limit: 30, include_undated: !!includeUndated};
+        args[tool === "search" ? kind : kind === "file" ? "path" : "id"] = key;
+        if (since.value) args.since_ts = since.value;
+        if (q.value) args.q = q.value;
+        if (presetTerms && presetTerms.length) args.q_any = JSON.stringify(presetTerms);
+        body.textContent = "搜索原始记录…";
+        fetchJSON(tool, args, function (data, error) {
+          if (ticket !== request) return;
+          body.textContent = "";
+          if (error) { body.textContent = error; return; }
+          body.appendChild(el("div", "kv", "截至 " + data.node.at + " · 匹配 " + data.total + " · 本页 " + data.rows.length
+            + " · 未定时 " + data.counts.undated + " · 源缺口 " + data.gaps.length));
+          body.appendChild(el("div", "pnote", data.note));
+          if (data.stale_annotation_sources.length) body.appendChild(el("div", "warn", "源文件变化，已停用旧账本关系标签；需要重新建账。"));
+          data.rows.concat(data.undated.rows).forEach(function (row) {
+            var item = el("details", "time-record"), head = el("summary", null, (row.ts || "时间未知·不计入截止前") + " · " + row.kind + " · " + row.source + ":" + row.line);
+            item.appendChild(head); item.appendChild(el("div", "kv", row.preview));
+            var raw = el("div"), button = el("button", null, "展开原始记录");
+            button.onclick = function () { button.disabled = true; openRecord(row, raw, data.node.at, !row.ts); };
+            item.appendChild(button); item.appendChild(raw);
+            (row.annotations || []).forEach(function (a) {
+              var tags = el("details"), tagHead = el("summary", null, a.tool + " · " + a.state + " · 解析关系（不是归因）");
+              tags.appendChild(tagHead);
+              (a.relations || []).forEach(function (r) {
+                tags.appendChild(el("div", "kv", r.kind + " · " + r.status + " · " + r.path));
+                if (kind === "file" && r.path === key) return;
+                var inspectFile = el("button", null, "查此文件 · " + r.status);
+                inspectFile.onclick = function () { inspectFile.disabled = true; temporalSection(tags, "file", r.path, data.node.at); };
+                tags.appendChild(inspectFile);
+              });
+              if (a.use_ts) {
+                var inputs = el("button", null, "查此调用发起时的 agent 输入");
+                inputs.onclick = function () { inputs.disabled = true; temporalSection(tags, "agent", a.agent, a.use_ts); };
+                tags.appendChild(inputs);
+              }
+              item.appendChild(tags);
+            });
+            (row.agents || []).forEach(function (aid) {
+              if (kind === "agent" && aid === key) return;
+              var inspect = el("button", null, "另查 agent：" + agentLabelOf(aid));
+              inspect.onclick = function () { inspect.disabled = true; temporalSection(item, "agent", aid, data.node.at); };
+              item.appendChild(inspect);
+            });
+            body.appendChild(item);
+          });
+          if (data.next_offset != null) {
+            var next = el("button", null, "下一页 · 余 " + data.remaining); next.onclick = function () { load(data.next_offset, includeUndated); }; body.appendChild(next);
+          }
+          if (data.offset > 0) {
+            var previous = el("button", null, "上一页"); previous.onclick = function () { load(Math.max(0, data.offset - data.limit), includeUndated); }; body.appendChild(previous);
+          }
+          if (data.counts.undated && !includeUndated) {
+            var unknown = el("button", null, "另列未知时间记录（不归入截止前）"); unknown.onclick = function () { load(0, true); }; body.appendChild(unknown);
+          }
+          if (data.undated.next_offset != null) {
+            var unknownNext = el("button", null, "未知时间下一页"); unknownNext.onclick = function () { load(data.undated.next_offset, true); }; body.appendChild(unknownNext);
+          }
+          if (data.gaps.length) body.appendChild(el("pre", "diffblock", JSON.stringify(data.gaps, null, 2)));
+        });
+      }
+      go.onclick = function () { load(0, false); };
+      box.addEventListener("toggle", function () { if (box.open && !body.childNodes.length) load(0, !!initialQuery.include_undated); });
     }
     function timeScopeSection(container, kind, key, anchor) {
       var section = sec("全池时间边界 · 仅元数据"), body = el("div", "time-scope", "范围加载中…");
@@ -1317,6 +1432,26 @@
       });
       host.appendChild(details);
     }
+    function renderTimeTrace(host) {
+      var trace = PROBE.time_trace;
+      if (!trace || !trace.steps || !trace.steps.length) return;
+      var box = el("details", "time-trace"); box.open = true;
+      box.appendChild(el("summary", null, "已记录时间查询 · " + trace.steps.length + " 步（独立于旧版本树）"));
+      box.appendChild(el("div", "pnote", trace.note));
+      trace.steps.forEach(function (step) {
+        var row = el("details"), node = step.node;
+        row.appendChild(el("summary", null, "#" + step.step + " " + step.tool + " · " + step.status));
+        row.appendChild(el("pre", "diffblock", JSON.stringify({scope: node, request: step.args, delivered_records: step.records}, null, 2)));
+        row.appendChild(el("div", "pnote", step.note));
+        if (node && (node.kind === "file" || node.kind === "agent")) {
+          var inspect = el("button", null, "按原时段/筛选复查（从第一页；不新增模型访问）");
+          inspect.onclick = function () { inspect.disabled = true; temporalSection(row, node.kind, node.key, node.at, step.args); };
+          row.appendChild(inspect);
+        }
+        box.appendChild(row);
+      });
+      host.appendChild(box);
+    }
     function renderProbe() {
       probeEl.hidden = false;
       probeEl.innerHTML = "";
@@ -1365,6 +1500,7 @@
                         + (PROBE.links || []).filter(function (l) { return l.verdict && l.onTree; }).length + "/"
                         + (PROBE.links || []).filter(function (l) { return l.verdict; }).length + "</b> 环" : "");
       probeEl.appendChild(sum);
+      renderTimeTrace(probeEl);
       renderTraceIdentity(probeEl);
       renderDocumentSource(probeEl);
       renderRepairCoverage(probeEl);
@@ -3045,6 +3181,7 @@
       side.appendChild(head("file", "文件原子" + (node.anchorV ? " · 截至 @v" + node.anchorV : ""), baseName(node.path), node.path, rootSpec));
       var body = el("div", "body");
       side.appendChild(body);
+      temporalSection(body, "file", node.path);
       if (node.badges && node.badges.length) {
         var s0 = sec("这条边的标签");
         s0.appendChild(pills(node.badges.map(function (b) { return { cls: b.cls === "stale" ? "warn" : ["via", "navigation", "relation-candidate"].indexOf(b.cls) >= 0 ? b.cls : "", t: b.t }; })));
@@ -3236,6 +3373,7 @@
         ]));
         body.appendChild(s0);
         timeScopeSection(body, "agent", ag.id, anchor);
+        temporalSection(body, "agent", ag.id);
         if (ag.parent) {
           var s1 = sec("派发自");
           s1.appendChild(lnk((ag.parent.name || agentLabelOf(ag.parent.id)) + (ag.parent.ver != null ? " @v" + ag.parent.ver : ""), "", function () { openRoot({ kind: "agent", id: ag.parent.id, v: ag.parent.ver }); }));

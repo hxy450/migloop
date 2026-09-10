@@ -1,4 +1,6 @@
-"""两原子基座:版本文件 × 版本 agent。
+"""推导账本与兼容版本投影；新调查范围由 temporal 的原始记录时间层决定。
+
+以下 file@v / agent@v 是旧查询与历史报告的兼容定义，不是新的证据可见性边界。
 
 底层只有一本账:build_stories 的文件编年史 + 每个 agent 的动作时间线。两原子是
 账上的两个查询,互相以 (path, v) / (agent, ver) 引用,不靠时间戳比较:
@@ -92,6 +94,9 @@ class AgentRec:
     result: str | None = None          # 收尾输出(最后一段正文)
     stage: str | None = None           # 子 agent 的阶段(自己记录的戳,否则派发时父的阶段);主会话横跨全程,无
     actions: list[Action] = field(default_factory=list)
+    # Source ownership is independent of successful action classification. A
+    # transcript with zero recognized operations must still be investigable.
+    sources: list[str] = field(default_factory=list)
 
     @property
     def n_versions(self) -> int:
@@ -119,6 +124,9 @@ class Ledger:
     agents: dict[str, AgentRec]
     #: (path, 读事件 seq) → 这条读喂养的 agent 版本;文件原子列读者(下游)时用
     feeds: dict[tuple[str, int], int] = field(default_factory=dict)
+    # Staleness guard for inferred annotations when live JSONL files change.
+    # Raw record references still authenticate their own content independently.
+    source_stats: dict[str, tuple[int, int]] = field(default_factory=dict, init=False)
     #: 池子里最早一条动作的时刻(迁移开始)—— T+ 相对时刻的零点
     t0: str = ""
     #: execute 阶段结束时刻(run 级 stage-marks 给的;用户口径:之后的写全是修复)。None = 没有 marks,
@@ -155,7 +163,7 @@ class Ledger:
     _identity: str | None = field(default=None, init=False, repr=False)
 
 
-LEDGER_CODE_VERSION = "atoms-2026-09-09-file-evidence5"
+LEDGER_CODE_VERSION = "atoms-2026-09-10-temporal1"
 
 
 @cache
@@ -189,6 +197,13 @@ def ledger_identity(ledger: Ledger) -> str:
 
     sources = [(tag, source) for tag, path in ledger.tag_paths.items()
                for source in ledger.tag_conflicts.get(tag, [path])]
+    indexed = {os.path.normcase(os.path.abspath(path)) for _, path in sources}
+    for agent in ledger.agents.values():
+        for path in agent.sources:
+            key = os.path.normcase(os.path.abspath(path))
+            if key not in indexed:
+                sources.append((transcript_tag(path), path))
+                indexed.add(key)
     for tag, path in sorted(sources):
         source = hashlib.sha256()
         try:
@@ -196,12 +211,14 @@ def ledger_identity(ledger: Ledger) -> str:
                 for chunk in iter(lambda: fh.read(1024 * 1024), b""):
                     source.update(chunk)
             signature = source.hexdigest()
+            stat = os.stat(path)
+            ledger.source_stats[os.path.normcase(os.path.abspath(path))] = (stat.st_mtime_ns, stat.st_size)
         except OSError:
             signature = "missing"
         add(["source", tag, os.path.basename(path), signature])
     for aid, agent in sorted(ledger.agents.items()):
         add(["agent", aid, agent.session, agent.name, agent.parent, agent.parent_ver,
-             digest(agent.prompt), digest(agent.result)])
+             digest(agent.prompt), digest(agent.result), [os.path.basename(p) for p in agent.sources]])
         for act in agent.actions:
             add(["action", act.seq, act.ver, act.at, act.ts, act.done_ts, act.kind, act.tool, act.ok,
                  act.tuid, act.blk, ledger.locs.get(act.seq), act.detail])
@@ -264,6 +281,14 @@ def event_id(ledger: Ledger, agent_id: str, seq: int) -> str | None:
             f"message:{act.detail['source_event_id']}" if act.detail.get("source_event_id") else
             f"L{act.src[1] + 1}/{act.blk}" if act.src else f"seq{act.seq}")
     return f"{a.session}:{stem}:{tail}"
+
+
+def format_ref(seq: Any, loc: int | str | None) -> str:
+    """Canonical legacy action address; shared by evidence and presentation."""
+    if isinstance(loc, str) and "·" in loc:
+        pos, tag = loc.split("·", 1)
+        return f"#{tag}:{seq}@L{pos}"
+    return f"#{seq}@L{loc}" if loc else f"#{seq}"
 
 
 def rel_time(ts: str | None, t0: str | None) -> str:
@@ -1467,6 +1492,9 @@ def search_agent(ledger: Ledger, agent_id: str, q: str, v: int | None = None, si
                          "source_event_id": act.detail.get("source_event_id"),
                          "targets": rs if fld == "output" else ws,
                          "target_v": next((ref.v for ref in act.files if ref.path == target), None),
+                         "target_certain": next((ref.certain for ref in act.files if ref.path == target), False),
+                         "target_observation_uncertain": next((ref.observation_uncertain for ref in act.files if ref.path == target), False),
+                         "target_proof": next((proof_payload(ref.proof) for ref in act.files if ref.path == target), None),
                          "possible": ([p for p in ledger.mention_seq.get(act.seq, [])
                                        if mention_effect(ledger, p, act.seq) is None]
                                       if fld == "input" and not ws else []),

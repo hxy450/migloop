@@ -14,7 +14,7 @@ def test_mcp_queries_advertise_read_only_evidence_access():
     from migloop.mcp_server import build_server
 
     tools = asyncio.run(build_server().list_tools())
-    assert len(tools) == 10
+    assert len(tools) == 11
     for tool in tools:
         assert tool.annotations.readOnlyHint is True
         assert tool.annotations.destructiveHint is False
@@ -115,7 +115,11 @@ def test_mcp_tools_enforce_via(tmp_path: Any) -> None:
     srv = mcp_server.build_server(Backend())
     tools = {t.name: t for t in asyncio.run(srv.list_tools())}
     assert "via" in tools["file"].inputSchema["properties"] and "via" in tools["agent"].inputSchema["properties"]
-    assert "v" in tools["file"].inputSchema["required"] and "v" in tools["agent"].inputSchema["required"]   # 版本必填
+    # Explicit v selects the legacy protocol below. New temporal entrypoints
+    # default to latest without model-authored via bookkeeping.
+    for name in ("file", "agent"):
+        assert "v" not in tools[name].inputSchema["required"]
+        assert "at" in tools[name].inputSchema["properties"]
     for name in ("blame", "diff", "action", "search"):
         assert "via" not in tools[name].inputSchema["properties"], name
 

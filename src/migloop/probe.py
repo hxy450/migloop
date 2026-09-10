@@ -113,6 +113,8 @@ def _int(x: Any) -> int | None:
 
 
 def _step_node(ledger: atoms.Ledger, tool: str, inp: dict[str, Any]) -> dict[str, Any] | None:
+    if inp.get("at") is not None or tool == "record":
+        return None  # Time ranges never become latest/nearest version visits.
     fk = lambda h: filestory.find_story_path(ledger.stories, str(h)) if h else None  # noqa: E731
     ak = lambda h: ledger.agents.get(via.resolve_key(ledger, "agent", str(h)) or "") if h else None  # noqa: E731
     if tool in ("file", "diff", "blame"):
@@ -215,6 +217,13 @@ def probe_payload(ledger: atoms.Ledger, run_dir: str, chain_payload: dict[str, A
                       "delivery_truncated": bool(s.get("delivery_truncated")),
                       "identity_unbound": trace_identity["bound"] is False,
                       "via": str(inp.get("via") or "")})
+    from . import time_receipts
+    time_trace = time_receipts.project(ledger, calls or [])
+    for visit in time_trace["steps"]:
+        step = steps[visit["step"] - 1]
+        step["time_query"] = visit
+        step["node"] = None
+        step["scope"] = "时间证据查询 · " + str(visit.get("node") or visit["args"].get("at") or "范围未核")
     entries = _entries(report)
     entry_no = entries[0] if entries else None
     links: list[dict[str, Any]] = []
@@ -298,7 +307,7 @@ def probe_payload(ledger: atoms.Ledger, run_dir: str, chain_payload: dict[str, A
             "repair_manifest_origin": manifest_origin, "draft_check": checked_draft,
             "roles": (structured or {}).get("roles") or {}, "fixed": (structured or {}).get("fixed") or [],
             "trajectory": trajectory, "evidence_graph": _evidence_graph(ledger, trajectory, trace_identity, structured),
-            "findings": findings.project(structured)}
+            "findings": findings.project(structured), "time_trace": time_trace}
 
 
 def _structured(ledger: atoms.Ledger, run_dir: str, report: str,
@@ -418,7 +427,7 @@ def _structured(ledger: atoms.Ledger, run_dir: str, report: str,
 # 「出现于 #j」只说明第 j 次返回文本含精确坐标,不推出模型为何选择下一跳。
 
 
-_MIGLOOP_TOOLS = frozenset(("guide", "sessions", "index", "file", "agent", "search", "blame", "diff", "action", "check"))
+_MIGLOOP_TOOLS = frozenset(("guide", "sessions", "index", "file", "agent", "search", "blame", "diff", "action", "record", "check"))
 
 
 def _tool_origin(name: Any, namespace: Any = None, server: Any = None) -> dict[str, Any]:
@@ -1446,6 +1455,8 @@ def _trajectory_walk(ledger: atoms.Ledger, steps: list[dict[str, Any]], texts: l
     received: dict[str, int] = {}
     received_ms: dict[str, float] = {}
     for s in steps:
+        if s.get("time_query"):
+            continue
         if s.get("tool") == "search":
             i = int(s["i"])
             text = texts[i - 1] if i - 1 < len(texts) else ""
@@ -1664,6 +1675,10 @@ def _trajectory(ledger: atoms.Ledger, run_dir: str, steps: list[dict[str, Any]],
     if calls is None:
         return None
     texts = [c["text"] for c in calls]
+    if any(s.get("time_query") for s in steps):
+        # Temporal calls have a separate authenticated trace. In particular do
+        # not fall back to a legacy ledger BFS and call it the model's route.
+        return _trajectory_walk(ledger, steps, texts, structured, verdicts, trace_identity)
     if any((c.get("provenance") or {}).get("degraded") for c in calls):
         tree = _trajectory_walk(ledger, steps, texts, structured, verdicts, trace_identity)
         tree.update(trace_source="codex_exec_events", source_path="events.jsonl")

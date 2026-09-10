@@ -37,7 +37,7 @@ def build_server(backend: Any | None = None) -> Any:
     srv = FastMCP("migloop-atoms",
                   # Codex prepends these instructions to every deferred tool description.
                   # Repeating another tool's name here makes description-based discovery ambiguous.
-                  instructions="MigLoop 只读返修调查工具。节点为版本文件与版本 agent;"
+                  instructions="MigLoop 只读返修调查工具。用文件/agent + at 时刻查询原始证据；不必填写 via。"
                                "索引与模型主张不等于已经核实的原文事实。")
     # These tools return rendered text, not a second structured data interface.
     # New FastMCP versions otherwise emit the SAME string in content AND
@@ -61,8 +61,8 @@ def build_server(backend: Any | None = None) -> Any:
         return await rt.get_ledger(sid), await rt.get_session_cwd(sid)
 
     @srv.tool(**text_options)
-    def guide(topic: str = "core") -> str:
-        """首次读 core；按需 evidence/search/investigation/navigation/verdict/full。提交前读 verdict。"""
+    def guide(topic: str = "time") -> str:
+        """首次读 time（时间查询）；旧版本协议帮助为 core/evidence/search/investigation/navigation/verdict/full。"""
         return guide_text(topic=topic)
 
     @srv.tool(**text_options)
@@ -84,14 +84,25 @@ def build_server(backend: Any | None = None) -> Any:
         return atom_queries.render_text(ledger, cwd, "index", dict(kind=kind, query=query, limit=limit))
 
     @srv.tool(**text_options)
-    async def file(sid: str, path: str, v: int, content: bool = False,
+    async def file(sid: str, path: str, v: int | None = None, content: bool = False,
                    diff: bool = False, start: int | None = None, n: int | None = None,
                    readers: bool = False, v_from: int | None = None, v_to: int | None = None,
-                   diff_chars: int | None = None, m_from: int = 1, m_n: int = 0, m_all: bool = False, via: str = "") -> str:
-        """打开 file@v：≤v 写者脊柱与证据标签。v/via 必填；via 照抄已打开节点或 search 精确凭据，首次可 sessions。
+                   diff_chars: int | None = None, m_from: int = 1, m_n: int = 0, m_all: bool = False, via: str = "",
+                   at: str | None = None, since_ts: str | None = None, offset: int = 0, limit: int = 40,
+                   include_undated: bool = False) -> str:
+        """默认按时间打开文件证据历史：at=带时区ISO/latest，since_ts 可缩窗口，offset/limit 分页；不需要 via。
+        包含确定/候选操作和词法记录；不是精确磁盘快照。record 展开原文，search(file=...,at=...) 查完整同范围。
+        兼容旧版：显式 v 改用 file@v，旧 v/via 规则仍适用，不可混用 at。
         content=True+start/n 展开复原行；diff=True 看该版，v_from/v_to 展开锚点内区间(每页40版)。
         readers 展开读者；词法候选默认只计数，m_n=40/m_from 翻页、m_all 铺只读提及，均非确定读写。"""
         ledger, cwd = await _ctx(sid)
+        from . import atom_queries
+        if v is None or at is not None:
+            if via:
+                return "⛔ 时间查询不接受 via；独立查阅不伪造历史边。"
+            return atom_queries.render_text(ledger, cwd, "file", dict(path=path, v=v, at=at or "latest",
+                since_ts=since_ts, offset=offset, limit=limit, include_undated=include_undated,
+                content=content, diff=diff, readers=readers, v_from=v_from, v_to=v_to, m_n=m_n, m_all=m_all))
         st = via_state(ledger)
         node, target_error = via_mod.target(ledger, "file", path, v)
         err = via_mod.check(ledger, st, via, node)
@@ -109,15 +120,25 @@ def build_server(backend: Any | None = None) -> Any:
         return out
 
     @srv.tool(**text_options)
-    async def agent(sid: str, id: str, v: int, since: int | None = None,
+    async def agent(sid: str, id: str, v: int | None = None, since: int | None = None,
                     reads: bool | None = None, seen: bool = False, until: int | None = None, via: str = "",
-                    summary_chars: int = 96) -> str:
-        """打开 agent@v 的累计输入/效应索引(不是全文)。v/via 必填，同 file 导航规则。
+                    summary_chars: int = 96, at: str | None = None, since_ts: str | None = None,
+                    offset: int = 0, limit: int = 40, include_undated: bool = False) -> str:
+        """默认打开 agent 截至 at 的所有已保存原始记录索引；at 省略=latest，不需 via。解析失败/未知工具也可查。
+        limit/offset 只控制展示，不限制 search(agent=...,at=...) 搜索范围；record 展开原文。
+        请求早于 at、返回晚于 at，只给请求不泄漏返回。未知时间单列（include_undated），不算已知输入。
+        兼容旧版：显式 v 改用 agent@v（旧 v/via 规则），不可混用 at。
         since 只看(since,v]，主会话宜缩窗口；早期输入索引可另开，不能据窗口断言没读。
         reads 默认自动折叠大代理，True 显式展开、False 只计数；seen 展开已见片段。
         summary_chars=32..600 控制每条动作摘要(默认96字)，不删动作；长摘要仍非原文。
         until=#调用号按发起时刻截已返回输入，未完成读取不算当时已知；原文用 action。"""
         ledger, cwd = await _ctx(sid)
+        from . import atom_queries
+        if v is None or at is not None:
+            if via:
+                return "⛔ 时间查询不接受 via；独立查阅不伪造历史边。"
+            return atom_queries.render_text(ledger, cwd, "agent", dict(id=id, v=v, at=at or "latest",
+                since_ts=since_ts, offset=offset, limit=limit, include_undated=include_undated, since=since, until=until))
         st = via_state(ledger)
         node, target_error = via_mod.target(ledger, "agent", id, v)
         err = via_mod.check(ledger, st, via, node)
@@ -135,28 +156,37 @@ def build_server(backend: Any | None = None) -> Any:
 
     @srv.tool(**text_options)
     async def blame(sid: str, path: str, v: int | None = None, start: int | None = None,
-                    n: int | None = None, changed: bool = False) -> str:
-        """逐行来源；start/n 选行。changed=True 查修复版替换/删除的前版行及引入者。
+                    n: int | None = None, changed: bool = False, at: str | None = None,
+                    offset: int = 0, limit: int = 40) -> str:
+        """at=ISO/latest 只重放当时已返回效应查行来源；断点/快照/并发不冒充已知作者。start/n选行，limit/offset分页。
+        旧版兼容：显式v或不传at，changed=True 查修复版替换/删除的前版行及引入者。
         无法归属时 recovery 给可核历史全文/补丁/输入入口，不将快照作者冒充未知行作者。"""
         ledger, cwd = await _ctx(sid)
         from . import atom_queries
-        return atom_queries.render_text(ledger, cwd, "blame", dict(path=path, v=v, start=start, n=n, changed=changed))
+        return atom_queries.render_text(ledger, cwd, "blame", dict(path=path, v=v, start=start, n=n,
+            changed=changed, at=at, offset=offset, limit=limit))
 
     @srv.tool(**text_options)
-    async def diff(sid: str, path: str, v: int) -> str:
-        """第 v 版的 diff；保留原生补丁或复原差分的来源与未知边界，不打开节点。"""
+    async def diff(sid: str, path: str, v: int | None = None, at: str | None = None,
+                   since_ts: str | None = None, offset: int = 0, limit: int = 40, max_chars: int = 6000) -> str:
+        """at=ISO/latest 查询截止前已返回修改，可用 since_ts 缩小时间段；一次多条，offset/limit分页，max_chars每条预算。
+        区间/未知单独标记，原文 action 展开；显式 v 兼容旧单版差分。不打开新节点。"""
         ledger, cwd = await _ctx(sid)
         from . import atom_queries
-        return atom_queries.render_text(ledger, cwd, "diff", dict(path=path, v=v))
+        return atom_queries.render_text(ledger, cwd, "diff", dict(path=path, v=v,
+            at=at if at is not None or v is not None else "latest", since_ts=since_ts,
+            offset=offset, limit=limit, max_chars=max_chars))
 
     @srv.tool(**text_options)
     async def search(sid: str, q: str = "", agent: str | None = None, v: int | None = None,
                      since: int | None = None, file: str | None = None, after: bool = False,
                      since_ts: str | None = None, until_ts: str | None = None, kind: str | None = None,
-                     q_any: list[str] | None = None) -> str:
+                     q_any: list[str] | None = None, at: str | None = None, offset: int = 0,
+                     limit: int = 40, include_undated: bool = False) -> str:
         """q 是不区分大小写的字面子串（| 不作正则）；q_any 可给 2–8 个字面量 OR，与非空 q 互斥，总展示预算固定。
         agent+v/since 查该代理输入效应；file+v 查文件生命周期内容。多词逐项列命中/展示/省略，命中不等于历史读写。
-        全池必须 until_ts，可加 since_ts；kind=write 查写能力候选。after=True 才列锚点后结果。
+        新查询用 at=ISO/latest，搜完整原始转录，可选 agent/file，不依赖动作解析或摘要；limit/offset 翻页。
+        旧查询全池必须 until_ts，可加 since_ts；kind=write 查写能力候选。after=True 才列锚点后结果。
         返回范围/缺口；零命中不证明不存在。hits 中精确 via 凭据可独立打开命中节点，不证明历史读写。"""
         ledger, cwd = await _ctx(sid)
         args = dict(q=q, agent=agent, v=v, since=since, file=file, after=after,
@@ -165,8 +195,21 @@ def build_server(backend: Any | None = None) -> Any:
             args["q_any"] = q_any
         hits: list[dict[str, Any]] = []
         from . import atom_queries
+        if at is not None:
+            args.update(at=at, offset=offset, limit=limit, include_undated=include_undated)
+            return atom_queries.render_text(ledger, cwd, "search", args)
         out = atom_queries.render_text(ledger, cwd, "search", args, navigation_hits=hits)
         return via_mod.search_return(ledger, via_state(ledger), args, out, hits)
+
+    @srv.tool(**text_options)
+    async def record(sid: str, ref: str, at: str = "latest", offset: int = 0,
+                     max_chars: int = 20000, include_undated: bool = False) -> str:
+        """展开时间查询返回的 raw: 引用；原始JSONL，不要求解析成 action。at 保持调查截止，晚到结果拒绝返回。
+        offset/max_chars 分页；未知时间须显式 include_undated，不作为截止前事实。不是读写跳转。"""
+        ledger, cwd = await _ctx(sid)
+        from . import atom_queries
+        return atom_queries.render_text(ledger, cwd, "record", dict(ref=ref, at=at, offset=offset,
+            max_chars=max_chars, include_undated=include_undated))
 
     @srv.tool(**text_options)
     async def action(sid: str, id: str | None = None, seq: int | None = None, max_chars: int = 20000,

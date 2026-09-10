@@ -14,7 +14,7 @@ from . import atoms, time_scope
 
 _INTS = frozenset({"v", "since", "until", "start", "n", "v_from", "v_to", "diff_chars",
                    "m_from", "m_n", "max_chars", "offset", "seq", "limit", "summary_chars"})
-_BOOLS = frozenset({"content", "diff", "readers", "m_all", "reads", "seen", "after", "scope_only", "changed"})
+_BOOLS = frozenset({"content", "diff", "readers", "m_all", "reads", "seen", "after", "scope_only", "changed", "include_undated"})
 _DEFAULTS: dict[str, dict[str, Any]] = {
     "sessions": {"file": None},
     "index": {"kind": None, "query": None, "limit": 0},
@@ -30,9 +30,14 @@ _DEFAULTS: dict[str, dict[str, Any]] = {
     "action": {"id": None, "seq": None, "ref": None, "max_chars": 20000, "offset": 0, "find": "", "part": None,
                "m_n": 0, "m_from": 1},
     "check": {"draft": None, "file": None},
+    "record": {"ref": None, "at": "latest", "offset": 0, "max_chars": 20000, "include_undated": False},
 }
+for _tool in ("file", "agent", "search", "diff", "blame"):
+    _DEFAULTS[_tool].update(at=None, offset=0, limit=40, include_undated=False)
+    _DEFAULTS[_tool].setdefault("since_ts", None)
+_DEFAULTS["diff"]["max_chars"] = 6000
 _REQUIRED = {"file": ("path",), "agent": ("id",), "blame": ("path",),
-             "diff": ("path", "v")}
+             "diff": ("path",), "record": ("ref",)}
 
 
 def optional_int(args: dict[str, Any], key: str) -> int | None:
@@ -94,6 +99,34 @@ def parameters(tool: str, supplied: dict[str, Any], *, validate_search_scope: bo
             raise ValueError(key)
     if tool == "agent" and not 32 <= out["summary_chars"] <= 600:
         raise ValueError("summary_chars 必须在 32–600 之间；完整原文用 action")
+    if tool in ("file", "agent", "search", "record", "diff", "blame") and out.get("at") is not None:
+        from .temporal import Window
+        Window.parse(out["at"], out.get("since_ts"))
+        # Two contracts, never silently widen or reinterpret a legacy window.
+        legacy = ("v", "since", "until", "v_from", "v_to", "until_ts")
+        if any(out.get(k) is not None for k in legacy) or out.get("after"):
+            raise ValueError("at 时间查询与版本/旧 until 窗口不能混用")
+        if tool == "file" and any(out.get(k) for k in ("content", "diff", "readers", "m_all", "m_n")):
+            raise ValueError("时间文件是证据历史，不是假定的快照；用 record 展开原文，旧快照请显式 v")
+        if tool in ("agent", "file") and any(out.get(k) is not None for k in ("start", "n")):
+            raise ValueError("时间原文按 record 的字符分页，不接受版本行窗口 start/n")
+        if tool in ("agent", "file") and (out.get("scope_only") or out.get("seen") or out.get("reads") is not None):
+            raise ValueError("时间查询始终索引完整原文；分页控制披露，不使用旧 reads/seen/scope_only 开关")
+        if tool == "blame" and out.get("changed"):
+            raise ValueError("时间 blame 是截止时刻来源；changed 旧版行比较须显式 v，原生改动用时间 diff")
+        if tool == "search" and out.get("kind") is not None:
+            raise ValueError("at 查完整原文，不按解析出的动作种类删记录；kind=write 仍属旧接口")
+        if tool == "search" and out.get("agent") and out.get("file"):
+            raise ValueError("search 的 agent 与 file 范围互斥")
+        common = {"at", "since_ts", "offset", "limit", "include_undated"}
+        fields = {"agent": {"id"}, "file": {"path"}, "search": {"q", "q_any", "agent", "file"},
+                  "record": {"ref", "max_chars"}, "diff": {"path", "max_chars"}, "blame": {"path", "start", "n"}}
+        ignored = [k for k in out if k not in common | fields[tool] and out[k] != _DEFAULTS[tool][k]]
+        if ignored:
+            raise ValueError("时间查询不支持这些旧展示参数: " + ", ".join(sorted(ignored)))
+        return out
+    if tool == "diff" and out["v"] is None:
+        raise ValueError("diff 需要 at 时刻或旧 v 版本")
     if tool == "search" and validate_search_scope:
         from .search_terms import normalize, valid_time
         out["q_any"] = normalize(out["q"], out["q_any"])
@@ -217,6 +250,20 @@ def render_text(ledger: atoms.Ledger, root: str, tool: str, supplied: dict[str, 
                 chains: dict[str, Any] | None = None, navigation_hits: list[dict[str, Any]] | None = None) -> str:
     from . import atoms_text, draft_check
     args = validate_target(ledger, tool, parameters(tool, supplied))
+    if args.get("at") is not None:
+        from . import temporal, time_receipts
+        data = temporal_data(ledger, tool, args)
+        if tool in ("diff", "blame"):
+            from . import temporal_state
+            text = temporal_state.render(data)
+        else:
+            text = temporal.render(data)
+        return time_receipts.append(ledger, tool, args, text, data)
+    for key in ("at", "offset", "limit", "include_undated", "since_ts"):
+        if tool in ("file", "agent", "diff", "blame") or tool == "search" and key != "since_ts":
+            args.pop(key, None)
+    if tool == "diff":
+        args.pop("max_chars", None)
     if tool == "sessions":
         if chains is None:
             raise ValueError("sessions 需要链清单")
@@ -267,6 +314,8 @@ def render_text(ledger: atoms.Ledger, root: str, tool: str, supplied: dict[str, 
 def json_data(ledger: atoms.Ledger, tool: str, supplied: dict[str, Any], *,
               chains: dict[str, Any] | None = None) -> dict[str, Any] | None:
     args = validate_target(ledger, tool, parameters(tool, supplied))
+    if args.get("at") is not None:
+        return temporal_data(ledger, tool, args)
     # JSON exposes raw structured collections, not text pagination. Never accept
     # a text window and then quietly send a larger raw body to its caller.
     supported = {
@@ -307,3 +356,21 @@ def json_data(ledger: atoms.Ledger, tool: str, supplied: dict[str, Any], *,
         from . import draft_check
         return draft_check.evaluate(ledger, args["draft"], chains, args["file"])
     raise ValueError(f"工具无 JSON 投影: {tool}")
+
+
+def temporal_data(ledger: atoms.Ledger, tool: str, args: dict[str, Any]) -> dict[str, Any]:
+    from . import temporal
+    if tool in ("diff", "blame"):
+        from . import temporal_state
+        return temporal_state.query(ledger, tool, args["path"], args["at"], since_ts=args["since_ts"],
+            start=args.get("start"), n=args.get("n"), offset=args["offset"], limit=args["limit"],
+            max_chars=args.get("max_chars", 6000))
+    if tool == "record":
+        return temporal.record_data(ledger, **args)
+    if tool not in ("file", "agent", "search"):
+        raise ValueError("该工具没有时间投影")
+    kind = tool if tool != "search" else "agent" if args["agent"] else "file" if args["file"] else "pool"
+    key = args.get("path") or args.get("id") if tool != "search" else args.get("agent") or args.get("file")
+    return temporal.query(ledger, kind=kind, key=key, at=args["at"], since_ts=args.get("since_ts"),
+                          q=args.get("q"), q_any=args.get("q_any"), offset=args["offset"],
+                          limit=args["limit"], include_undated=args["include_undated"])

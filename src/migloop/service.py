@@ -831,7 +831,7 @@ def atom_text(path: str, tool: str, args: dict[str, Any]) -> str:
     if tool == "guide":
         if set(args) - {"topic"}:
             raise ValueError("unsupported guide parameters: " + ", ".join(sorted(set(args) - {"topic"})))
-        return mcp_server.guide_text(topic=args.get("topic", "core"))
+        return mcp_server.guide_text(topic=args.get("topic", "time"))
     try:
         return atom_queries.render_text(session_ledger(path), session_cwd(path), tool, args,
             chains=fixchain_payload(path) if tool in ("sessions", "check") else None)

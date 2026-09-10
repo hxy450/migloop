@@ -1657,7 +1657,7 @@ def fix_boundary(intervals: list[dict[str, Any]]) -> str | None:
 
 def _walk(path: str, agent_id: str, session: str, seq: list[int],
           scripts: dict[str, Any], stage_intervals: list[dict[str, Any]] | None = None) -> AgentRec:
-    rec = AgentRec(id=agent_id, session=session)
+    rec = AgentRec(id=agent_id, session=session, sources=[path])
     pend: dict[str, tuple[str, str, Any, Any, int, str | None, int]] = {}   # id -> (ts, name, inp, cwd, 行号, 阶段, 块号)
 
     def nxt() -> int:
@@ -1684,6 +1684,8 @@ def _walk(path: str, agent_id: str, session: str, seq: list[int],
                 r = json.loads(line)
             except Exception:
                 continue
+            if not isinstance(r, dict):
+                continue  # Raw time corpus retains non-object JSON records.
             ts = str(r.get("timestamp") or "")
             cwd = r.get("cwd")
             attr = str(r.get("attributionSkill") or "").split(":")[-1]
@@ -2113,7 +2115,7 @@ def _codex_exec_ops(raw_arg: Any, out_text: str, cwd: object,
 
 def _walk_codex(path: str, agent_id: str, session: str, seq: list[int], scripts: dict[str, Any],
                 seen_ids: set[str]) -> AgentRec:
-    rec = AgentRec(id=agent_id, session=session)
+    rec = AgentRec(id=agent_id, session=session, sources=[path])
     is_sub = not agent_id.startswith("__main__")
     pend: dict[str, tuple[str, str, Any, Any, int]] = {}   # call_id -> (ts, name, raw_arg, cwd, 行号)
     cwd: Any = None
@@ -2138,6 +2140,8 @@ def _walk_codex(path: str, agent_id: str, session: str, seq: list[int], scripts:
                 r = json.loads(line)
             except Exception:
                 continue
+            if not isinstance(r, dict):
+                continue  # Raw time corpus retains non-object JSON records.
             pl = r.get("payload") if isinstance(r.get("payload"), dict) else {}
             ts = str(r.get("timestamp") or "")
             if r.get("type") in ("session_meta", "turn_context") and pl.get("cwd"):

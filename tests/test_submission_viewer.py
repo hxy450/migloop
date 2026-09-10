@@ -56,7 +56,8 @@ def test_final_mode_is_explicit_and_keeps_the_full_reference_available(monkeypat
     with pytest.raises(ValueError): mcp_server.guide_text("typo")
     monkeypatch.setenv("MIGLOOP_FINAL_MODE", "reference")
     expected = mcp_server.guide_text()
-    assert "migloop-verdict-ref/1" in expected
+    assert "时间调查接口" in expected
+    assert "migloop-verdict-ref/1" in mcp_server.guide_text(topic="core")
     assert service.atom_text("unused", "guide", {}) == expected
     pytest.importorskip("mcp")
     blocks = asyncio.run(mcp_server.build_server().call_tool("guide", {}))

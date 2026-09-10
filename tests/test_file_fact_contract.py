@@ -164,7 +164,7 @@ def test_file_fact_proof_is_identity_bearing(tmp_path):
     ref = right.agents[owner.id].actions[0].files[0]
     ref.ev = replace(ref.ev, proof=replace(ref.proof, execution="unknown"))
     assert atoms.ledger_identity(left) != atoms.ledger_identity(right)
-    assert atoms.ledger_identity(left).startswith("atoms-2026-09-09-file-evidence5:")
+    assert atoms.ledger_identity(left).startswith(atoms.LEDGER_CODE_VERSION + ":")
 
 
 def test_unknown_legacy_proof_cannot_certify_a_write(tmp_path):
