@@ -211,7 +211,7 @@ def build_server(backend: Any | None = None) -> Any:
                      limit: int = 40, include_undated: bool = False, details: bool = False,
                      annotation_offset: int = 0, annotation_limit: int | None = None,
                      relation_offset: int = 0, relation_limit: int | None = None) -> str:
-        """q 是不区分大小写的字面子串（| 不作正则）；q_any 可给 2–8 个字面量 OR，与非空 q 互斥，总展示预算固定。
+        """q 是不区分大小写的字面子串（| 不作正则）；q_any 可给 1–8 个字面量 OR，大小写重复自动去重，与非空 q 互斥，总展示预算固定。
         agent+v/since 查该代理输入效应；file+v 查文件生命周期内容。多词逐项列命中/展示/省略，命中不等于历史读写。
         新查询用 at=ISO/latest，搜完整原始转录，可选 agent/file，不依赖动作解析或摘要；limit/offset 翻页。
         旧查询全池必须 until_ts，可加 since_ts；kind=write 查写能力候选。after=True 才列锚点后结果。

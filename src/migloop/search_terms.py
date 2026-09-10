@@ -27,16 +27,20 @@ def normalize(q: Any, q_any: Any, *, http_json: bool = False) -> list[str] | Non
             q_any = json.loads(q_any)
         except (ValueError, TypeError):
             raise ValueError("q_any 必须是 JSON 字符串数组") from None
-    if not isinstance(q_any, list) or not 2 <= len(q_any) <= MAX_TERMS:
-        raise ValueError("q_any 必须含 2–8 个非空字面量")
+    if not isinstance(q_any, list) or not 1 <= len(q_any) <= MAX_TERMS:
+        raise ValueError("q_any 必须含 1–8 个非空字面量")
     if any(not isinstance(t, str) or not t.strip() or len(t) > MAX_TERM_CHARS for t in q_any) \
             or sum(len(t) for t in q_any) > MAX_QUERY_CHARS:
         raise ValueError("q_any 每项须为非空字符串且不超过 256 字；总计不超过 1024 字")
     if q not in (None, ""):
         raise ValueError("非空 q 与 q_any 互斥")
-    if len({t.lower() for t in q_any}) != len(q_any):
-        raise ValueError("q_any 字面量不能重复（按 lower 匹配）")
-    return list(q_any)
+    # OR is idempotent. Back/BACK is a normal request for a case-insensitive
+    # search, not a reason to abort the investigation. Preserve first spelling
+    # and order, and allow the normalized one-term list through repeated layers.
+    unique = {}
+    for term in q_any:
+        unique.setdefault(term.lower(), term)
+    return list(unique.values())
 
 
 def literal_span(text: str, needle: str, offset: int = 0) -> tuple[int, int] | None:

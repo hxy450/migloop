@@ -10,7 +10,7 @@ from migloop import atom_queries, atoms, atoms_text, probe, via
 from tests.test_atoms import MAIN_ID, _call, _ledger, _rec
 
 
-@pytest.mark.parametrize("terms", [[], ["a"], ["a"] * 9, ["a", ""], ["a", "  "],
+@pytest.mark.parametrize("terms", [[], ["a"] * 9, ["a", ""], ["a", "  "],
                                   ["a", 1], ["a", True], "a|b", ["x" * 257, "b"],
                                   [str(i) + "x" * 200 for i in range(8)]])
 def test_invalid_or_arguments_fail_before_search(terms):
@@ -144,8 +144,7 @@ def test_literal_or_has_no_regex_casefold_or_whitespace_reinterpretation(tmp_pat
     assert result["matched_terms"] == ["ος", "σίγμα"]
     assert {t for e in result["excerpts"] for t in e["matched_terms"]} == {"ος", "σίγμα"}
     assert all(e["text"] == text[e["start"]:e["end"]] for e in result["excerpts"])
-    with pytest.raises(ValueError, match="重复"):
-        atom_queries.parameters("search", {"q_any": ["Alpha", "ALPHA"]})
+    assert atom_queries.parameters("search", {"q_any": ["Alpha", "ALPHA"]})["q_any"] == ["Alpha"]
 
 
 def test_file_and_pool_or_do_not_compress_away_later_term(tmp_path):
