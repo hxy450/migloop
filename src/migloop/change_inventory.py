@@ -80,6 +80,118 @@ def _action_address(action: atoms.Action) -> tuple[Any, ...] | None:
     return (_source(action.src[0]), action.src[1] + 1, action.blk, action.tuid)
 
 
+def _matches_action(event, part, action: atoms.Action) -> bool:
+    address = _action_address(action)
+    if address is None or address[:2] != (_source(event.source), part.record.line):
+        return False
+    block, call_id = address[2:]
+    if event.protocol == "codex" and part.block is None:
+        return bool(call_id) and call_id == event.call_id
+    return ((type(block) is int and block == part.block and
+             (not call_id or call_id == event.call_id)) or
+            (block is None and bool(call_id) and call_id == event.call_id))
+
+
+def _part_preview(part, current: dict[str, Any], window: temporal.Window) -> dict[str, Any]:
+    """Actual decoded native text, never an operation/effect paraphrase."""
+    fields = deepcopy(part.fields)
+    selected = fields.get("input" if part.direction == "use" else "output")
+    pointer = selected["pointer"] if selected else part.pointer
+    value = part.payload
+    if selected:
+        name = pointer.rsplit("/", 1)[-1]
+        value = part.payload[name]
+    text = store.readable(value)
+    basename = current.get("key", "").replace("\\", "/").rsplit("/", 1)[-1]
+    position = text.casefold().find(basename.casefold()) if basename else -1
+    start = max(0, position - 60) if position >= 0 else 0
+    in_range = window.contains(part.record.ts)
+    query_scope = deepcopy(current)
+    if not in_range:
+        # This is explicit independent antecedent context, not an inherited
+        # request window. A scope ID authenticates its bounds and cannot follow
+        # a changed since_ts into the new scope.
+        query_scope.pop("id", None)
+        query_scope["since_ts"] = None
+    return {"ref": part.record.ref, "line": part.record.line, "ts": part.record.ts,
+            "block": part.block, "pointer": pointer, "direction": part.direction,
+            "fields": fields, "preview": text[start:start + 240],
+            "preview_kind": "decoded_native_payload_excerpt", "preview_start": start,
+            "preview_chars": len(text), "preview_truncated": start > 0 or len(text) > 240,
+            "in_requested_range": in_range,
+            "scope_relation": "inherited" if in_range else "independent_antecedent",
+            "scope_note": "继承原查询范围" if in_range else "独立查看起点前的请求/回执；不是原since窗口内的证据",
+            "expand_query": {"tool": "expand", "scope": query_scope,
+                             "args": {"refs": [{"ref": part.record.ref, "pointer": pointer}],
+                                      "max_chars": 4000}}}
+
+
+def _call_presentation(event, window: temporal.Window, current: dict[str, Any],
+                       action: atoms.Action | None = None) -> dict[str, Any]:
+    # Both pairing and previews use only facts available at the requested cutoff.
+    parts = [part for part in event.parts if part.record.ts and window.ended(part.record.ts)]
+    projection = raw_events._project(event, parts, scoped=True)
+    uses = [part for part in parts if part.direction == "use"]
+    results = [part for part in parts if part.direction != "use"]
+    independent = event.protocol == "codex_patch"
+    anomalies = projection["anomalies"]
+    unambiguous = event.addressable and not any(a in anomalies for a in (
+        "duplicate_use", "duplicate_result", "out_of_order", *(() if independent else ("missing_call_id",))))
+    outer = bool(action and action.detail.get("code_host_intents")) or (
+        len(uses) == 1 and uses[0].payload.get("name") in ("exec", "functions.exec", "functions"))
+    basis, success = "no_return_at_cutoff", None
+    if not unambiguous:
+        status, basis = "ambiguous", "native_pairing_ambiguity"
+    elif independent:
+        status, basis = "independent_event", "independent_patch_observation_not_call_pair"
+        if len(results) == 1:
+            payload = results[0].payload
+            success = False if raw_events._failed(payload) else True if payload.get("success") is True else None
+    elif len(uses) != 1:
+        status, basis = "returned_unknown", "no_unique_request_at_cutoff"
+    elif not results:
+        status = "pending"
+    else:
+        payload = results[0].payload
+        # Parsed Action.ok belongs to this exact native call, not to nested code.
+        action_returned = bool(action and _time(action.ts) and action.done_ts and window.ended(action.done_ts)
+                               and _time(action.done_ts) >= _time(action.ts))
+        if raw_events._failed(payload):
+            success, basis = False, "native_structured_failure"
+        elif action_returned and action.ok is not None:
+            success, basis = action.ok is True, "same_native_call_action_ok"
+        elif event.protocol == "cc":
+            success, basis = True, "cc_tool_result_default_non_error"
+        elif any(p.get("success") is True or type(p.get("exit_code")) is int and p["exit_code"] == 0
+                 for p in [payload] + ([payload["output"]] if isinstance(payload.get("output"), dict) else [])):
+            success, basis = True, "native_structured_success"
+        else:
+            basis = "returned_without_success_status"
+        status = "returned_success" if success is True else "returned_failed" if success is False else "returned_unknown"
+    return {
+        "call_return": {"status": status, "unambiguous": unambiguous, "success": success,
+                        "basis": basis, "subject": "recorded_outer_call" if outer else
+                        "independent_patch_observation" if independent else "recorded_native_call",
+                        "nested_execution": "unverified" if outer else "not_inferred",
+                        "effect_certified": False,
+                        "note": "调用回执状态不等于目标文件效应、净变化、内部调用成功或行为验证。"},
+        "native_io": {"source": projection["source"], "protocol": event.protocol,
+                      "call_id": event.call_id, "native_status": projection["status"],
+                      "anomalies": anomalies, "request_total": len(uses), "result_total": len(results),
+                      "requests": [_part_preview(part, current, window) for part in uses[:2]],
+                      "results": [_part_preview(part, current, window) for part in results[:2]],
+                      "parts_omitted": max(0, len(uses) - 2) + max(0, len(results) - 2)}}
+
+
+def _related_page(rows: list[dict[str, Any]], offset: int, limit: int) -> dict[str, Any]:
+    if type(limit) is not int or not 0 <= limit <= 200:
+        raise ValueError("related_limit 必须在 0–200 之间")
+    page = temporal._page(rows, offset, max(1, limit))
+    if limit == 0:
+        page.update(limit=0, rows=[], remaining=max(0, len(rows) - offset), next_offset=None)
+    return page
+
+
 def _related_inventory(ledger: atoms.Ledger, current: dict[str, Any],
                        associated: set[tuple[Any, ...]], covered: set[tuple[Any, ...]],
                        native_covered: set[tuple[str, str]], offset: int, limit: int) -> dict[str, Any]:
@@ -135,6 +247,13 @@ def _related_inventory(ledger: atoms.Ledger, current: dict[str, Any],
     categories = {"shell": 0, "unknown_tool": 0, "other_native": 0, "readonly": 0}
     statuses: dict[str, int] = {}
     readonly_tools: dict[str, int] = {}
+    actions_by_use: dict[tuple[str, int], list[atoms.Action]] = {}
+    for owner in ledger.agents.values():
+        for action in owner.actions:
+            address = _action_address(action)
+            if address:
+                actions_by_use.setdefault(address[:2], []).append(action)
+    presentations = {}
     for event in data["events"]:
         known = [p for p in event.parts if p.record.ts and window.ended(p.record.ts)]
         visible = [p for p in known if window.contains(p.record.ts)]
@@ -171,6 +290,15 @@ def _related_inventory(ledger: atoms.Ledger, current: dict[str, Any],
             category = "unknown_tool"
         categories[category] += 1
         statuses[projected["status"]] = statuses.get(projected["status"], 0) + 1
+        matched_actions = [action for part in known if part.direction == "use"
+                           for action in actions_by_use.get((_source(event.source), part.record.line), [])
+                           if _matches_action(event, part, action)]
+        action = matched_actions[0] if len(matched_actions) == 1 else None
+        # Existing collector signal only, scoped to the call, never this target's
+        # effect. A future result's Action metadata must not change early order.
+        write_capable = bool(unambiguous and action and action.done_ts and window.ended(action.done_ts)
+                             and action.detail.get("write_capable") is True)
+        presentations[projected["id"], projected["source_path"]] = (event, action)
         rows.append({"id": projected["id"], "source": projected["source"],
                      "protocol": projected["protocol"], "call_id": projected["call_id"], "tool": tool,
                      "status": projected["status"], "category": category,
@@ -181,23 +309,33 @@ def _related_inventory(ledger: atoms.Ledger, current: dict[str, Any],
                                     "earlier_request_mention_not_effect" if earlier else "parsed_association_not_effect",
                      "pointers": [locator(p) for p in visible],
                      "matched_parts": [{"ref": p.record.ref, "pointer": p.pointer} for p in matched],
+                     "write_capable": write_capable, "signal_scope": "call_not_target_effect",
+                     "ordering_basis": "existing_action_detail_write_capable" if write_capable else "no_write_capable_signal",
+                     "_source_path": projected["source_path"],
                      "semantic_checked": False})
-    rows.sort(key=lambda row: (row["category"] == "readonly",
+    rows.sort(key=lambda row: (not row["write_capable"], row["category"] == "readonly",
                               min((p["ts"], row["source"], p["line"], p["block"] or 0) for p in row["pointers"]),
                               row["id"]))
     undated.sort(key=lambda row: (row["source"], row["line"], row["block"] or 0))
     non_native = sum(1 for item in data["unknown"] if item["_record"].ts
                      and window.contains(item["_record"].ts) and matches(raw_events._unknown_payload(item)))
-    page = temporal._page(rows, offset, limit)
+    page = _related_page(rows, offset, limit)
+    for row in page["rows"]:
+        event, action = presentations[row["id"], row["_source_path"]]
+        row.update(_call_presentation(event, window, current, action))
+        row.pop("_source_path")
 
     def query(start):
         return {"tool": "changes", "scope": deepcopy(current),
                 "args": {"related_offset": start, "related_limit": limit}}
 
-    undated_page = temporal._page(undated, offset, limit)
+    undated_page = _related_page(undated, offset, limit)
     return {**page, "category_counts": categories, "status_counts": statuses,
             "review_required_total": page["total"] - categories["readonly"],
-            "ordering": "non_readonly_first_then_recorded_time",
+            "ordering": "write_capable_first_then_non_readonly_then_recorded_time",
+            "count_only": limit == 0,
+            "resume_query": {"tool": "changes", "scope": deepcopy(current),
+                             "args": {"related_offset": offset, "related_limit": 8}} if limit == 0 else None,
             "readonly": {"total": categories["readonly"], "tool_counts": readonly_tools,
                          "display": "collapsed", "included_in_total_and_pagination": True},
             "excluded_covered_total": excluded,
@@ -212,7 +350,7 @@ def _related_inventory(ledger: atoms.Ledger, current: dict[str, Any],
             "registered_scan_ok": bool(data["source_count"]) and not data["gaps"],
             "counts_scope": "registered_sources_only",
             "complete": False, "causal_complete": False,
-            "note": "全范围注册原生调用余项，按调用身份扣除已列修改/候选/观察的依据；只读调用后排并可折叠，仍在分页内。"
+            "note": "全范围注册原生调用余项，按调用身份扣除已列修改/候选/观察的依据；已有write_capable信号只用于排序，非目标效应证明；只读调用后排并可折叠。"
                     "词法或关联命中不是写者、候选写入或修改认证；返回状态也不是脚本效应证明。"
                     "未注册来源不在本清单，0余项不等于0修改、0缺陷或调查完备；未知时间定位不算截止证据。"}
 
@@ -331,7 +469,7 @@ def build(ledger: atoms.Ledger, current_scope: dict[str, Any], offset: int = 0,
         raise ValueError("修改清单需要明确 file scope/key")
     window = temporal.Window.parse(current_scope.get("at"), current_scope.get("since_ts"))
     temporal._page([], offset, limit)
-    temporal._page([], related_offset, related_limit)
+    _related_page([], related_offset, related_limit)
     _check_sources(ledger)
     canonical = temporal.resolve_file(ledger, current_scope["key"])
     current = {**deepcopy(current_scope), "key": canonical, "at": window.at, "since_ts": window.since}
@@ -345,6 +483,7 @@ def build(ledger: atoms.Ledger, current_scope: dict[str, Any], offset: int = 0,
     associated: set[tuple[Any, ...]] = set()
     row_addresses: dict[str, set[tuple[Any, ...]]] = {}
     row_native_ids: dict[str, set[tuple[str, str]]] = {}
+    row_actions: dict[str, atoms.Action] = {}
 
     def record(path: str, line: int) -> store.Record | None:
         key = (_source(path), line)
@@ -421,6 +560,7 @@ def build(ledger: atoms.Ledger, current_scope: dict[str, Any], offset: int = 0,
                    "summary": f"{action.tool}: " + ("已确认写入/删除操作；是否语义修复待判" if confirmed else "效应未决，不认证实际改动或问题作者"),
                    "semantic_checked": False}
             all_effects.append({"row": row, "refs": confirmed_refs})
+            row_actions[identity] = action
             row_addresses[identity] = {address} if address else set()
             if window.contains(use) or returned and window.contains(done):
                 rows.append(row)
@@ -494,7 +634,40 @@ def build(ledger: atoms.Ledger, current_scope: dict[str, Any], offset: int = 0,
                                  set().union(*(row_addresses.get(row["id"], set()) for row in rows)),
                                  set().union(*(row_native_ids.get(row["id"], set()) for row in rows)),
                                  related_offset, related_limit)
-    return {"schema": SCHEMA, "scope": current, **temporal._page(rows, offset, limit),
+    page = temporal._page(rows, offset, limit)
+    # Enrich only delivered rows; the native index is shared/cached and no
+    # payload is copied into the full inventory or used to infer a new effect.
+    native = raw_events._scan(ledger)
+    by_line: dict[tuple[str, int], list[Any]] = {}
+    for event in native["events"]:
+        for part in event.parts:
+            if part.record.ts and window.ended(part.record.ts):
+                by_line.setdefault((_source(event.source), part.record.line), []).append(event)
+    for row in page["rows"]:
+        action = row_actions.get(row["id"])
+        address = _action_address(action) if action else None
+        candidates = by_line.get(address[:2], []) if address else by_line.get(
+            (_source(row["source_path"]), row["source_line"]), []) if row.get("source_path") else []
+        matches = [event for event in candidates if action and any(
+            _matches_action(event, part, action) for part in event.parts if part.direction == "use")]
+        if not action:
+            matches = [event for event in candidates if event.protocol == "codex_patch"
+                       and event.call_id == (row.get("native") or {}).get("call_id")]
+        elif not matches and row.get("native_corroboration"):
+            # An Action backed by an independent patch record is still only
+            # an observation: do not fabricate a request for that record.
+            matches = [event for event in candidates if event.protocol == "codex_patch"
+                       and event.call_id == action.tuid]
+            if matches:
+                action = None
+        matches = list({id(event): event for event in matches}.values())
+        if len(matches) == 1:
+            row.update(_call_presentation(matches[0], window, current, action))
+        elif action:
+            row.update(call_return={"status": "ambiguous", "unambiguous": False, "success": None,
+                                    "basis": "native_call_not_uniquely_located", "effect_certified": False},
+                       native_io={"requests": [], "results": [], "request_total": None, "result_total": None})
+    return {"schema": SCHEMA, "scope": current, **page,
             "gaps": gaps, "complete": False, "causal_complete": False,
             "unclassified_related": related,
             "note": "已解析操作、独立原生效应与完整快照差异分列；确认写入不保证净内容变化或语义修复。"

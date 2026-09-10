@@ -12,7 +12,8 @@ from typing import Any
 from . import atoms, time_scope
 
 _INTS = frozenset({"v", "since", "until", "start", "n", "v_from", "v_to", "diff_chars",
-                   "m_from", "m_n", "max_chars", "offset", "seq", "limit", "summary_chars", "window_offset", "window_limit"})
+                   "m_from", "m_n", "max_chars", "offset", "seq", "limit", "summary_chars", "window_offset", "window_limit",
+                   "annotation_offset", "annotation_limit", "relation_offset", "relation_limit"})
 _BOOLS = frozenset({"content", "diff", "readers", "m_all", "reads", "seen", "after", "scope_only", "changed", "include_undated", "details"})
 _DEFAULTS: dict[str, dict[str, Any]] = {
     "sessions": {"file": None},
@@ -37,8 +38,10 @@ for _tool in ("file", "agent", "search", "diff", "blame"):
 _DEFAULTS["diff"]["max_chars"] = 6000
 for _tool in ("diff", "blame"):
     _DEFAULTS[_tool].update(window_offset=0, window_limit=4)
-for _tool in ("file", "agent", "search"):
+for _tool in ("file", "agent", "search", "diff", "blame"):
     _DEFAULTS[_tool]["details"] = False
+for _tool in ("file", "agent", "search"):
+    _DEFAULTS[_tool].update(annotation_offset=0, annotation_limit=None, relation_offset=0, relation_limit=None)
 _REQUIRED = {"file": ("path",), "agent": ("id",), "blame": ("path",),
              "diff": ("path",), "record": ("ref",)}
 
@@ -102,6 +105,11 @@ def parameters(tool: str, supplied: dict[str, Any], *, validate_search_scope: bo
             raise ValueError(key)
     if tool == "agent" and not 32 <= out["summary_chars"] <= 600:
         raise ValueError("summary_chars 必须在 32–600 之间；完整原文用 action")
+    if tool in ("file", "agent", "search"):
+        from . import temporal_annotation
+        temporal_annotation.validate(**{key: out[key] for key in temporal_annotation.FIELDS})
+        if out.get("at") is None and any(out[k] != default for k, default in temporal_annotation.FIELDS.items()):
+            raise ValueError("annotation_offset/annotation_limit/relation_offset/relation_limit仅用于at时间查询")
     if tool in ("file", "agent", "search", "record", "diff", "blame") and out.get("at") is not None:
         from .temporal import Window
         Window.parse(out["at"], out.get("since_ts"))
@@ -121,7 +129,9 @@ def parameters(tool: str, supplied: dict[str, Any], *, validate_search_scope: bo
             raise ValueError("at 查完整原文，不按解析出的动作种类删记录；kind=write 仍属旧接口")
         if tool == "search" and out.get("agent") and out.get("file"):
             raise ValueError("search 的 agent 与 file 范围互斥")
-        common = {"at", "since_ts", "offset", "limit", "include_undated"}
+        common = {"at", "since_ts", "offset", "limit", "include_undated", "details"}
+        if tool in ("file", "agent", "search"):
+            common.update(temporal_annotation.FIELDS)
         fields = {"agent": {"id", "details"}, "file": {"path", "details"}, "search": {"q", "q_any", "agent", "file", "details"},
                   "record": {"ref", "max_chars"}, "diff": {"path", "max_chars", "window_offset", "window_limit"},
                   "blame": {"path", "start", "n", "window_offset", "window_limit"}}
@@ -271,7 +281,8 @@ def render_text(ledger: atoms.Ledger, root: str, tool: str, supplied: dict[str, 
         else:
             text = temporal.render(data)
         return time_receipts.append(ledger, tool, args, text, data)
-    for key in ("at", "offset", "limit", "include_undated", "since_ts", "details", "window_offset", "window_limit"):
+    for key in ("at", "offset", "limit", "include_undated", "since_ts", "details", "window_offset", "window_limit",
+                "annotation_offset", "annotation_limit", "relation_offset", "relation_limit"):
         if tool in ("file", "agent", "diff", "blame") or tool == "search" and key != "since_ts":
             args.pop(key, None)
     if tool == "diff":
@@ -399,4 +410,6 @@ def temporal_data_core(ledger: atoms.Ledger, tool: str, args: dict[str, Any]) ->
     key = args.get("path") or args.get("id") if tool != "search" else args.get("agent") or args.get("file")
     return temporal.query(ledger, kind=kind, key=key, at=args["at"], since_ts=args.get("since_ts"),
                           q=args.get("q"), q_any=args.get("q_any"), offset=args["offset"],
-                          limit=args["limit"], include_undated=args["include_undated"], details=args["details"])
+                          limit=args["limit"], include_undated=args["include_undated"], details=args["details"],
+                          annotation_offset=args.get("annotation_offset", 0), annotation_limit=args.get("annotation_limit"),
+                          relation_offset=args.get("relation_offset", 0), relation_limit=args.get("relation_limit"))

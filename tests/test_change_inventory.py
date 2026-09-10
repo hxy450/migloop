@@ -319,7 +319,7 @@ def test_related_paging_counts_all_calls_and_folds_readonly_after_other_calls(tm
     assert related["readonly"] == {"total": 3, "tool_counts": {"Read": 1, "Grep": 1, "Glob": 1},
                                    "display": "collapsed", "included_in_total_and_pagination": True}
     assert related["category_counts"]["unknown_tool"] == 43
-    assert related["ordering"] == "non_readonly_first_then_recorded_time"
+    assert related["ordering"] == "write_capable_first_then_non_readonly_then_recorded_time"
     assert [r["call_id"] for r in related["rows"]] == ["unknown-00", "unknown-01"]
     assert related["next_query"] == {"tool": "changes", "scope": output["scope"],
                                      "args": {"related_offset": 2, "related_limit": 2}}
@@ -443,7 +443,7 @@ def test_raw_source_gap_keeps_counts_explicitly_incomplete(tmp_path):
 
 
 @pytest.mark.parametrize("kwargs", [{"related_offset": -1}, {"related_offset": True},
-                                    {"related_limit": 0}, {"related_limit": 201}])
+                                    {"related_limit": -1}, {"related_limit": True}, {"related_limit": 201}])
 def test_related_pagination_validation(tmp_path, kwargs):
     ledger, _ = raw_pool(tmp_path, [])
     with pytest.raises(ValueError):

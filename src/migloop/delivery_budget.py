@@ -28,7 +28,7 @@ def _integer(value: Any) -> bool:
 
 
 def _pages(data: dict) -> list[tuple[str, dict, str]]:
-    main = "events" if data.get("schema") == "migloop-raw-event-query/1" else "rows"
+    main = ("source_rows" if data.get("view") == "sources" else "events") if data.get("schema") == "migloop-raw-event-query/1" else "rows"
     result = [(main, data, main)]
     for name in ("undated", "unknown_records"):
         if name in data:
@@ -138,6 +138,11 @@ def _page_fit(data: dict, budget: int) -> dict | None:
     output_pages = _pages(output)
     for (name, page, key), (_, original, _) in zip(output_pages, original_pages):
         _set_page(page, key, [], original, name)
+    # Small body navigation is not the body itself. Fold its entries before
+    # allowing navigation metadata to displace an actual evidence row.
+    navigation = output.get("body_sources")
+    if isinstance(navigation, dict) and isinstance(navigation.get("entries"), list) and isinstance(navigation.get("query"), dict):
+        navigation.update(entries=[], remaining=navigation["total"], budget_folded=True)
     _receipt(output)
     if size(output) > budget:
         return None
@@ -160,6 +165,12 @@ def _page_fit(data: dict, budget: int) -> dict | None:
                 return candidate
 
             candidate = append(deepcopy(row))
+            if size(candidate) > budget:
+                from . import temporal_annotation
+                compact = temporal_annotation.compact(row)
+                if compact is not None and size(compact) < size(row):
+                    row = compact
+                    candidate = append(row)
             if size(candidate) > budget:
                 field = ("diff" if data["schema"] == "migloop-time-state/1" and data.get("tool") == "diff"
                          and isinstance(row.get("diff"), str) and _integer(row.get("diff_chars")) else
@@ -246,6 +257,8 @@ def _continuations(original: dict, delivered: dict | None) -> list[dict]:
                 result.append(continuation)
             for number, row in enumerate(rows):
                 source = page[key][number]
+                from . import temporal_annotation
+                result.extend(temporal_annotation.continuations(row))
                 if isinstance(row.get("diff"), str) and (row.get("truncated") or len(row["diff"]) < source.get("diff_chars", 0)):
                     result.append({"kind": "derived_diff_requery", "page": name, "ref": row.get("ref"),
                         "scope": deepcopy(scope), "delivered_chars": len(row["diff"]), "diff_chars": row.get("diff_chars"),
@@ -255,6 +268,10 @@ def _continuations(original: dict, delivered: dict | None) -> list[dict]:
                 if row.get("preview_budget_truncated"):
                     result.append({"kind": "raw_requery", "ref": row.get("ref"), "offset": 0,
                                    "scope": deepcopy(scope), "note": "preview position is not a raw text offset"})
+        navigation = delivered.get("body_sources") if delivered else None
+        if isinstance(navigation, dict) and navigation.get("budget_folded"):
+            result.append({"kind": "body_navigation", "next_query": deepcopy(navigation["query"]),
+                           "remaining": navigation["remaining"], "note": "仅导航未交付；没有认证正文已读"})
         return result
     if schema in RECORD_SCHEMAS and _record_safe(original):
         row = delivered or original

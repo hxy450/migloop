@@ -6,6 +6,8 @@ Query order is not an edge. A file view is evidence history, not a disk snapshot
 """
 from __future__ import annotations
 
+import ntpath
+import posixpath
 from dataclasses import dataclass
 from typing import Any
 
@@ -19,8 +21,12 @@ SCHEMA = "migloop-time-view/1"
 
 def resolve_file(ledger: atoms.Ledger, hint: str) -> str:
     """Never disambiguate a file by whichever happens to have more versions."""
-    path = hint.replace("\\", "/")
+    path = posixpath.normpath(hint.replace("\\", "/"))
     if path in ledger.stories:
+        return path
+    # An explicit root is not a basename hint. /A.ets must not silently select
+    # /project/A.ets; remote Windows drives and UNC roots are literal as well.
+    if path.startswith("/") or ntpath.splitdrive(path)[0]:
         return path
     suffix = path.lstrip("/")
     matches = [p for p in ledger.stories if p == suffix or p.endswith("/" + suffix)]
@@ -151,9 +157,14 @@ def _annotation_view(annotations: list[dict[str, Any]], kind: str, key: str | No
 def query(ledger: atoms.Ledger, *, kind: str, key: str | None = None, at: str = "latest",
           since_ts: str | None = None, q: str | None = None, q_any: list[str] | None = None,
           offset: int = 0, limit: int = 40, include_undated: bool = False,
-          details: bool = False) -> dict[str, Any]:
+          details: bool = False, annotation_offset: int = 0, annotation_limit: int | None = None,
+          relation_offset: int = 0, relation_limit: int | None = None) -> dict[str, Any]:
     """Search all selected raw content; disclosure budgets affect only output."""
     from .search_terms import normalize
+    from . import temporal_annotation
+    annotation_options = dict(annotation_offset=annotation_offset, annotation_limit=annotation_limit,
+                              relation_offset=relation_offset, relation_limit=relation_limit)
+    temporal_annotation.validate(**annotation_options)
     window = Window.parse(at, since_ts)
     if type(details) is not bool:
         raise ValueError("details 必须是布尔值")
@@ -229,9 +240,8 @@ def query(ledger: atoms.Ledger, *, kind: str, key: str | None = None, at: str = 
                 previews = needles or ([needle_file] if kind == "file" and needle_file else [])
                 position = min((folded.find(needle) for needle in previews if needle in folded), default=0)
                 preview = preview_text[max(0, position - 60):max(0, position - 60) + 240]
-                shown, omitted = _annotation_view(annotation, kind, key, details)
-                row = {**record.address(), "agents": sorted(owners), "annotations": shown,
-                       "annotations_omitted": omitted,
+                row = {**record.address(), "agents": sorted(owners), "annotations": annotation,
+                       "annotations_omitted": 0,
                        "preview": preview, "preview_kind": "decoded_field_excerpt", "chars": len(text), "matched": matched,
                        "reference_status": "ambiguous_source" if source_counts[store.source_key(path)] > 1 else "addressable",
                        "association": "agent_transcript" if kind == "agent" else
@@ -240,6 +250,26 @@ def query(ledger: atoms.Ledger, *, kind: str, key: str | None = None, at: str = 
         except (OSError, UnicodeError, ValueError) as exc:
             gaps.append({"source": path, "error": str(exc)})
     rows.sort(key=lambda row: (row["ts"], row["source"], row["line"]))
+    query_kind = "search" if terms or kind == "pool" else kind
+    query_args = {"at": window.at, "since_ts": window.since, "include_undated": include_undated}
+    if query_kind == "search":
+        if len(terms) > 1:
+            query_args["q_any"] = terms
+        else:
+            query_args["q"] = terms[0] if terms else ""
+        if kind in ("file", "agent"):
+            query_args[kind] = key
+    else:
+        query_args["path" if kind == "file" else "id"] = key
+    annotation_query = {"tool": query_kind, "args": query_args,
+                        "scope": {"kind": kind, "key": key, "at": window.at, "since_ts": window.since}}
+    for page_rows in (rows, undated):
+        for row_offset, row in enumerate(page_rows[offset:offset + limit], offset):
+            if row["annotations"]:
+                shown, omitted, annotation_page = temporal_annotation.project(row["annotations"], kind, key,
+                                                                             details, **annotation_options)
+                row.update(annotations=shown, annotations_omitted=omitted, annotation_page=annotation_page)
+                temporal_annotation.bind(row, annotation_query, row_offset)
     counts["matched"] = len(rows)
     body = _page(rows, offset, limit)
     body.update(schema=SCHEMA, node={"kind": kind, "key": key, "at": window.at,
@@ -252,7 +282,7 @@ def query(ledger: atoms.Ledger, *, kind: str, key: str | None = None, at: str = 
                 causal_complete=False,
                 note="时间只限定已记录证据，不证明因果或磁盘状态。相同时刻不推断先后；"
                      "未知时间单列，不作为截止前输入。摘要可展开；搜索不受分页/摘要限制。"
-                     "关系注释默认摘要；annotations_omitted/relations_omitted可用同查询details=true、较小limit展开。"
+                     "关系注释默认摘要；annotation_page/relation_page提供同范围独立续读，details=true也可按预算折叠。"
                      "文件入口含已索引关系与文件名提及，不能证明所有未识别效应都已关联到文件。")
     body["receipt"] = {"schema": "migloop-query-receipt/1", "node": body["node"],
                        "scope": body["scope"], "records": [r["ref"] for r in body["rows"]],

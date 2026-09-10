@@ -71,6 +71,12 @@ def scope(ledger: atoms.Ledger, kind: str = "pool", key: str | None = None,
 
 def _bound(ledger, tool, supplied):
     args = dict(supplied)
+    if tool in ("events", "search") and "path" in args:
+        alias = args.pop("path")
+        if args.get("file") and alias and temporal.resolve_file(ledger, args["file"]) != temporal.resolve_file(ledger, alias):
+            raise ValueError("file与path别名冲突；未执行查询")
+        if not args.get("file"):
+            args["file"] = alias
     declared = args.pop("scope", None)
     if any(args.get(k) is not None for k in ("v", "since", "until", "v_from", "v_to", "until_ts")) or args.get("via"):
         raise ValueError("新调查仅用时间scope，不接受版本窗口或via；旧报告请用兼容接口")
@@ -147,7 +153,9 @@ def _record(ledger, ref, current, *, offset=0, max_chars=12000, include_undated=
         exact = any(r["path"] == current["key"] for a in annotations for r in a["relations"])
         name = current["key"].rsplit("/", 1)[-1].casefold()
         if not exact and name not in record.text.replace("\\", "/").casefold():
-            raise ValueError("记录不在继承文件的已索引/词法范围；可独立打开pool范围核实")
+            from . import body_sources
+            if not body_sources.admits_record(ledger, current, record.ref):
+                raise ValueError("记录不在继承文件的已索引/原生正文/词法范围；可独立打开pool范围核实")
     data = temporal.record_data(ledger, ref, at=current["at"], offset=offset,
                                 max_chars=max_chars, include_undated=include_undated)
     if pointer is not None:
@@ -215,6 +223,10 @@ def query(ledger, tool, supplied):
     if tool not in TOOLS or not isinstance(supplied, dict):
         raise ValueError("未知调查操作或args不是映射")
     current, args = _bound(ledger, tool, supplied)
+    # Presentation is one contract, independent of the selected evidence query.
+    # Diff/record already expand their selected material. A request for more
+    # annotation detail must not make those otherwise valid queries fail.
+    details = atom_queries.boolean(args.pop("details", False), "details")
     if tool == "changes":
         data = changes(ledger, **args)
     elif tool == "events":
@@ -230,8 +242,17 @@ def query(ledger, tool, supplied):
         args.pop("since_ts", None)
         data = _record(ledger, current=current, **args)
     else:
+        if tool in ("file", "agent", "search"):
+            args["details"] = details
         normalized = atom_queries.parameters(tool, args)
         data = atom_queries.temporal_data_core(ledger, tool, normalized)
+    if details and tool not in ("file", "agent", "search"):
+        data = {**data, "details": True,
+                "details_effect": "此查询没有折叠的关系注释；正文及分页不因details改变，原始记录用expand展开。"}
+    if tool == "file":
+        from . import body_sources
+        data = {**data, "body_sources": body_sources.navigation(ledger, current["key"], current["at"],
+            current["since_ts"], show=args.get("offset", 0) == 0)}
     return {**data, "scope": current}
 
 
@@ -248,10 +269,10 @@ def _delivery(data):
                             "pointer": value.get("pointer"),
                             "offset": value.get("offset"), "chars": len(value.get("text", value.get("preview", value.get("diff", "")))),
                             "next_offset": value.get("next_offset")})
-        for name in ("rows", "items", "records", "results", "pointers"):
+        for name in ("rows", "items", "records", "requests", "results", "pointers", "events"):
             for item in value.get(name, []) if isinstance(value.get(name), list) else []:
                 visit(item)
-        for name in ("unclassified_related", "undated", "unknown_records"):
+        for name in ("unclassified_related", "undated", "unknown_records", "native_io"):
             if isinstance(value.get(name), dict):
                 visit(value[name])
     visit(data)
@@ -310,7 +331,19 @@ def batch(ledger, requests, max_chars=100000):
         else:
             item.update(error="首个不可拆元数据超过交付预算；请用续取入口、较小limit或details=false。" + str(result["reason"] or ""),
                         delivery={"records": []})
-    return {"schema": SCHEMA, "ledger": atoms.ledger_identity(ledger), "items": items,
+    # Put failures ahead of large successful bodies. Partial expansions need
+    # separate counts: an outer successful transport is not a successful read.
+    summary = {key: sum(item["status"] == key for item in items) for key in ("ok", "error", "deferred")}
+    summary["budget_adjusted"] = sum(bool(item.get("budget_adjusted")) for item in items)
+    summary["withheld_records"] = sum(len(part.get("withheld", []))
+        for item in items for part in item.get("data", {}).get("items", []))
+    summary["empty_expansions"] = sum(not part.get("records")
+        for item in items if item.get("data", {}).get("schema") == "migloop-evidence-expansion/1"
+        for part in item["data"].get("items", []))
+    attention = [{"item_index": item["item_index"], "tool": item["tool"], "status": item["status"],
+                  "reason": item.get("error")} for item in items if item["status"] != "ok"]
+    return {"schema": SCHEMA, "ledger": atoms.ledger_identity(ledger), "delivery_summary": summary,
+            "attention": attention, "items": items,
             "data_chars": used, "max_chars": max_chars, "budget_scope": "serialized_data_only",
             "note": "逐项独立取证，不生成历史边。ok也可能部分交付：按next_offset/continuations续读；deferred/error无正文。max_chars计data，封装另计。"}
 

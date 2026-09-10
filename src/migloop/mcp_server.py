@@ -89,7 +89,9 @@ def build_server(backend: Any | None = None) -> Any:
                    readers: bool = False, v_from: int | None = None, v_to: int | None = None,
                    diff_chars: int | None = None, m_from: int = 1, m_n: int = 0, m_all: bool = False, via: str = "",
                    at: str | None = None, since_ts: str | None = None, offset: int = 0, limit: int = 40,
-                   include_undated: bool = False, details: bool = False) -> str:
+                   include_undated: bool = False, details: bool = False,
+                   annotation_offset: int = 0, annotation_limit: int | None = None,
+                   relation_offset: int = 0, relation_limit: int | None = None) -> str:
         """默认按时间打开文件证据历史：at=带时区ISO/latest，since_ts 可缩窗口，offset/limit 分页；不需要 via。
         包含确定/候选操作和词法记录；不是精确磁盘快照。record 展开原文，search(file=...,at=...) 查完整同范围。
         兼容旧版：显式 v 改用 file@v，旧 v/via 规则仍适用，不可混用 at。
@@ -97,12 +99,17 @@ def build_server(backend: Any | None = None) -> Any:
         readers 展开读者；词法候选默认只计数，m_n=40/m_from 翻页、m_all 铺只读提及，均非确定读写。"""
         ledger, cwd = await _ctx(sid)
         from . import atom_queries
+        disclosure = {"annotation_offset": annotation_offset, "annotation_limit": annotation_limit,
+                      "relation_offset": relation_offset, "relation_limit": relation_limit}
+        if v is not None and at is None and (annotation_offset != 0 or relation_offset != 0
+                                             or annotation_limit is not None or relation_limit is not None):
+            return "⛔ 注释分页仅用于at时间查询。"
         if v is None or at is not None:
             if via:
                 return "⛔ 时间查询不接受 via；独立查阅不伪造历史边。"
             return atom_queries.render_text(ledger, cwd, "file", dict(path=path, v=v, at=at or "latest",
                 since_ts=since_ts, offset=offset, limit=limit, include_undated=include_undated, details=details,
-                content=content, diff=diff, readers=readers, v_from=v_from, v_to=v_to, m_n=m_n, m_all=m_all))
+                content=content, diff=diff, readers=readers, v_from=v_from, v_to=v_to, m_n=m_n, m_all=m_all, **disclosure))
         st = via_state(ledger)
         node, target_error = via_mod.target(ledger, "file", path, v)
         err = via_mod.check(ledger, st, via, node)
@@ -123,7 +130,9 @@ def build_server(backend: Any | None = None) -> Any:
     async def agent(sid: str, id: str, v: int | None = None, since: int | None = None,
                     reads: bool | None = None, seen: bool = False, until: int | None = None, via: str = "",
                     summary_chars: int = 96, at: str | None = None, since_ts: str | None = None,
-                    offset: int = 0, limit: int = 40, include_undated: bool = False, details: bool = False) -> str:
+                    offset: int = 0, limit: int = 40, include_undated: bool = False, details: bool = False,
+                    annotation_offset: int = 0, annotation_limit: int | None = None,
+                    relation_offset: int = 0, relation_limit: int | None = None) -> str:
         """默认打开 agent 截至 at 的所有已保存原始记录索引；at 省略=latest，不需 via。解析失败/未知工具也可查。
         limit/offset 只控制展示，不限制 search(agent=...,at=...) 搜索范围；record 展开原文。
         请求早于 at、返回晚于 at，只给请求不泄漏返回。未知时间单列（include_undated），不算已知输入。
@@ -134,11 +143,17 @@ def build_server(backend: Any | None = None) -> Any:
         until=#调用号按发起时刻截已返回输入，未完成读取不算当时已知；原文用 action。"""
         ledger, cwd = await _ctx(sid)
         from . import atom_queries
+        disclosure = {"annotation_offset": annotation_offset, "annotation_limit": annotation_limit,
+                      "relation_offset": relation_offset, "relation_limit": relation_limit}
+        if v is not None and at is None and (annotation_offset != 0 or relation_offset != 0
+                                             or annotation_limit is not None or relation_limit is not None):
+            return "⛔ 注释分页仅用于at时间查询。"
         if v is None or at is not None:
             if via:
                 return "⛔ 时间查询不接受 via；独立查阅不伪造历史边。"
             return atom_queries.render_text(ledger, cwd, "agent", dict(id=id, v=v, at=at or "latest",
-                since_ts=since_ts, offset=offset, limit=limit, include_undated=include_undated, details=details, since=since, until=until))
+                since_ts=since_ts, offset=offset, limit=limit, include_undated=include_undated, details=details,
+                since=since, until=until, **disclosure))
         st = via_state(ledger)
         node, target_error = via_mod.target(ledger, "agent", id, v)
         err = via_mod.check(ledger, st, via, node)
@@ -157,33 +172,38 @@ def build_server(backend: Any | None = None) -> Any:
     @srv.tool(**text_options)
     async def blame(sid: str, path: str, v: int | None = None, start: int | None = None,
                     n: int | None = None, changed: bool = False, at: str | None = None,
-                    offset: int = 0, limit: int = 40, window_offset: int = 0, window_limit: int = 4) -> str:
+                    offset: int = 0, limit: int = 40, window_offset: int = 0, window_limit: int = 4,
+                    details: bool = False) -> str:
         """at=ISO/latest 只重放当时已返回效应查行来源；断点/快照/并发不冒充已知作者。start/n选行，limit/offset分页。
         旧版兼容：显式v或不传at，changed=True 查修复版替换/删除的前版行及引入者。
         无法归属时 recovery 给可核历史全文/补丁/输入入口，不将快照作者冒充未知行作者。"""
         ledger, cwd = await _ctx(sid)
         from . import atom_queries
         return atom_queries.render_text(ledger, cwd, "blame", dict(path=path, v=v, start=start, n=n,
-            changed=changed, at=at, offset=offset, limit=limit, window_offset=window_offset, window_limit=window_limit))
+            changed=changed, at=at, offset=offset, limit=limit, window_offset=window_offset, window_limit=window_limit,
+            details=details))
 
     @srv.tool(**text_options)
     async def diff(sid: str, path: str, v: int | None = None, at: str | None = None,
                    since_ts: str | None = None, offset: int = 0, limit: int = 40, max_chars: int = 6000,
-                   window_offset: int = 0, window_limit: int = 4) -> str:
+                   window_offset: int = 0, window_limit: int = 4, details: bool = False) -> str:
         """at=ISO/latest 查询截止前已返回修改，可用 since_ts 缩小时间段；一次多条，offset/limit分页，max_chars每条预算。
         区间/未知单独标记，原文 action 展开；显式 v 兼容旧单版差分。不打开新节点。"""
         ledger, cwd = await _ctx(sid)
         from . import atom_queries
         return atom_queries.render_text(ledger, cwd, "diff", dict(path=path, v=v,
             at=at if at is not None or v is not None else "latest", since_ts=since_ts,
-            offset=offset, limit=limit, max_chars=max_chars, window_offset=window_offset, window_limit=window_limit))
+            offset=offset, limit=limit, max_chars=max_chars, window_offset=window_offset, window_limit=window_limit,
+            details=details))
 
     @srv.tool(**text_options)
     async def search(sid: str, q: str = "", agent: str | None = None, v: int | None = None,
                      since: int | None = None, file: str | None = None, after: bool = False,
                      since_ts: str | None = None, until_ts: str | None = None, kind: str | None = None,
                      q_any: list[str] | None = None, at: str | None = None, offset: int = 0,
-                     limit: int = 40, include_undated: bool = False, details: bool = False) -> str:
+                     limit: int = 40, include_undated: bool = False, details: bool = False,
+                     annotation_offset: int = 0, annotation_limit: int | None = None,
+                     relation_offset: int = 0, relation_limit: int | None = None) -> str:
         """q 是不区分大小写的字面子串（| 不作正则）；q_any 可给 2–8 个字面量 OR，与非空 q 互斥，总展示预算固定。
         agent+v/since 查该代理输入效应；file+v 查文件生命周期内容。多词逐项列命中/展示/省略，命中不等于历史读写。
         新查询用 at=ISO/latest，搜完整原始转录，可选 agent/file，不依赖动作解析或摘要；limit/offset 翻页。
@@ -196,8 +216,13 @@ def build_server(backend: Any | None = None) -> Any:
             args["q_any"] = q_any
         hits: list[dict[str, Any]] = []
         from . import atom_queries
+        disclosure = {"annotation_offset": annotation_offset, "annotation_limit": annotation_limit,
+                      "relation_offset": relation_offset, "relation_limit": relation_limit}
+        if at is None and (annotation_offset != 0 or relation_offset != 0
+                           or annotation_limit is not None or relation_limit is not None):
+            return "⛔ 注释分页仅用于at时间查询。"
         if at is not None:
-            args.update(at=at, offset=offset, limit=limit, include_undated=include_undated, details=details)
+            args.update(at=at, offset=offset, limit=limit, include_undated=include_undated, details=details, **disclosure)
             return atom_queries.render_text(ledger, cwd, "search", args)
         out = atom_queries.render_text(ledger, cwd, "search", args, navigation_hits=hits)
         return via_mod.search_return(ledger, via_state(ledger), args, out, hits)
@@ -241,6 +266,7 @@ def build_server(backend: Any | None = None) -> Any:
         changes给确认操作与未决效应清单，events给未依赖读写解析的原生调用；纯提及不认证写者。
         scope={kind:file|agent|pool,key:路径或id,at:ISO,since_ts:ISO或null}，默认latest会固定为当前已知时间。
         max_chars限制data正文字符（封装另计）；默认关系摘要，details=true与较小limit可展开完整注释。
+        details是统一的关系注释开关；没有额外注释层的查询也接受它，正文/时间范围不变。
         每项显示ok/error/deferred。未交付不能当查过；有依赖的下一批应等返回，查询顺序不生成历史边。"""
         ledger, cwd = await _ctx(sid)
         from . import atom_queries

@@ -351,7 +351,8 @@ def inventory(ledger: atoms.Ledger) -> dict[str, Any]:
 
 
 def query(ledger: atoms.Ledger, at: str, since_ts: str | None = None, path: str | None = None,
-          agent: str | None = None, offset: int = 0, limit: int = 40) -> dict[str, Any]:
+          agent: str | None = None, offset: int = 0, limit: int = 40,
+          view: str = "events") -> dict[str, Any]:
     """Select native *record* times inclusively; never leak later return status.
 
     Parts outside the window are not delivered. A result with its request outside
@@ -362,6 +363,8 @@ def query(ledger: atoms.Ledger, at: str, since_ts: str | None = None, path: str 
     from .temporal import Window, _page
     window = Window.parse(at, since_ts)
     _page([], offset, limit)
+    if view not in ("events", "sources", "bodies"):
+        raise ValueError("view 必须是 events/sources/bodies")
     if path is not None and (not isinstance(path, str) or not path):
         raise ValueError("path must be a nonempty string")
     owner = atoms.resolve_agent(ledger, agent) if agent is not None else None
@@ -369,6 +372,11 @@ def query(ledger: atoms.Ledger, at: str, since_ts: str | None = None, path: str 
         raise ValueError("unknown or ambiguous agent")
     if path is not None and agent is not None:
         raise ValueError("path and agent scopes are mutually exclusive")
+    if view == "bodies":
+        if path is None:
+            raise ValueError("view=bodies 需要path文件范围")
+        from . import body_sources
+        return body_sources.query(ledger, path, at, since_ts, offset, limit)
     normalized = path.replace("\\", "/").casefold() if path else None
     basename = normalized.rsplit("/", 1)[-1] if normalized else None
 
@@ -379,6 +387,33 @@ def query(ledger: atoms.Ledger, at: str, since_ts: str | None = None, path: str 
         return normalized in text or bool(basename and basename in text)
 
     data = _scan(ledger, owner.id if owner else None)
+    source_args = {"at": window.at, "since_ts": window.since, "view": "sources", "offset": 0, "limit": 40}
+    if path is not None:
+        source_args["path"] = path
+    if owner is not None:
+        source_args["agent"] = owner.id
+    source_query = {"tool": "events", "args": source_args}
+    signatures = {"count": len(data["source_signatures"]),
+                  "digest": _digest(sorted(data["source_signatures"].items())),
+                  "observation": "current_registry_not_historical_cutoff",
+                  "query": source_query,
+                  "note": "签名为本次registry的mtime_ns/size，不是历史截点已知来源；不证明文件内容或历史因果。"}
+    if view == "sources":
+        source_rows = [{"source_path": source, "signature": list(signature)}
+                       for source, signature in sorted(data["source_signatures"].items())]
+        source_page = _page(source_rows, offset, limit)
+        request = {"tool": "events", "args": {**source_args, "offset": offset, "limit": limit}}
+        return {"schema": "migloop-raw-event-query/1", "view": "sources", "events": [],
+                "source_rows": source_page.pop("rows"), **source_page,
+                "scope": {"at": window.at, "since_ts": window.since, "path": path,
+                          "agent": owner.id if owner else None, "bounds": "inclusive"},
+                "source_signatures": signatures, "source_count": data["source_count"],
+                "gaps": data["gaps"], "cache": data["cache"],
+                "complete": bool(data["source_count"]) and not data["gaps"], "causal_complete": False,
+                "query": request,
+                "next_query": {"tool": "events", "args": {**request["args"], "offset": source_page["next_offset"]}}
+                              if source_page["next_offset"] is not None else None,
+                "note": signatures["note"]}
     events, unknown, undated = [], [], []
     for event in data["events"]:
         if owner is not None and owner.id not in event.agents:
@@ -414,13 +449,13 @@ def query(ledger: atoms.Ledger, at: str, since_ts: str | None = None, path: str 
     events.sort(key=order)
     unknown.sort(key=lambda r: (r["ts"], r["source_path"], r["line"]))
     page = _page(events, offset, limit)
-    return {"schema": "migloop-raw-event-query/1", "events": page.pop("rows"), **page,
+    return {"schema": "migloop-raw-event-query/1", "view": "events", "events": page.pop("rows"), **page,
             "scope": {"at": window.at, "since_ts": window.since, "path": path,
                       "agent": owner.id if owner else None, "bounds": "inclusive",
                       "path_match": "full_path_or_basename_lexical" if path else None},
             "unknown_records": _page(unknown, offset, limit), "undated": _page(undated, offset, limit),
             "gaps": data["gaps"], "source_count": data["source_count"],
-            "source_signatures": data["source_signatures"],
+            "source_signatures": signatures,
             "cache": data["cache"],
             "complete": bool(data["source_count"]) and not data["gaps"],
             "causal_complete": False,
