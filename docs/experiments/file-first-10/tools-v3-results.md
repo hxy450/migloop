@@ -100,6 +100,8 @@ v3队列16:59:41.275Z—17:39:55.900Z，约40分15秒；调查累计4422.42秒�
 
 审计目录：`tools-v3-production-ui-20260910/`，含`browser-summary.json`、形式统计、截图、真实HTTP请求及清理记录。首次Chrome尚未就绪的连接失败单独保留，之后重试的是浏览器审计，不是模型实验。临时HTTP与浏览器均关闭。该验收证明这两份真实文稿的展示边界，不证明全部用户会话所有交互无缺陷。
 
+对20份严格或局部投影统一计数：122个节点中106 matched、6 unlocated、10 unbound；60条声明边中21 confirmed、1 candidate、22 not_observed、8 invalid、5 unbound、3 conflicting。406次引用出现为324 ok、47 outside_scope、8 invalid、27 unbound。这个独立预览统计包含七份严格失败稿，故分母不同于冻结评分器的252次，不能混算或反向改写评分。matched/confirmed仍不是因果验证。调查轨迹所在左栏滚动区较短，属于仍存在的可用性限制。
+
 当前工作区（包含冻结后两个小修复）完整回归：2362 passed、2 skipped；不能用测试数量代替上述模型归因评测。后续设计审阅见[原始证据包与轻量复核](post-v3-design-review.md)，仍是未验证提案，不算已实现或已提高分数。
 
 ## 不可变产物与复现
