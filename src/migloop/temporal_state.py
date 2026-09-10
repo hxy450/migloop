@@ -92,6 +92,7 @@ def replay(ledger: atoms.Ledger, at: str, path: str | None = None) -> tuple[dict
                     event = replace(ref.ev, ts=done, use_ts=start, done_ts=done)
                     events.append(event)
                     owners[event.seq] = {"agent": agent.id, "seq": action.seq,
+                                         "event_id": atoms.event_id_for_action(agent, action),
                                          "ref": atoms.format_ref(action.seq, ledger.locs.get(action.seq)),
                                          "event": event}
                 elif ref.op != "read":
@@ -250,6 +251,7 @@ def query(ledger: atoms.Ledger, tool: str, path: str, at: str, *, since_ts: str 
             evidence_source = owners.get(version.content_seq) if observed else source
             rows.append({"ts": available, "effect_ts": version.ts,
                          "ref": evidence_source["ref"] if evidence_source else None,
+                         "event_id": source.get("event_id") if source and not observed else None,
                          "agent": source["agent"] if source and not observed else None,
                          "basis": "observed_interval_not_single_writer" if observed else version.diff_kind,
                          "diff": (version.diff or "")[:max_chars],
@@ -293,6 +295,7 @@ def query(ledger: atoms.Ledger, tool: str, path: str, at: str, *, since_ts: str 
         if version and version.v == 1 and source and not source["event"].created:
             trusted = False
         rows.append({"line": number, "text": text, "agent": source["agent"] if trusted else None,
+                     "event_id": source.get("event_id") if trusted else None,
                      "introduced_at": version.ts if trusted else None,
                      "ref": source["ref"] if trusted else None,
                      "status": "supported_text_origin" if trusted else "unknown_origin"})

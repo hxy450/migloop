@@ -276,6 +276,16 @@ def event_id(ledger: Ledger, agent_id: str, seq: int) -> str | None:
     act = next((x for x in a.actions if x.seq == seq), None) if a else None
     if a is None or act is None:
         return None
+    return event_id_for_action(a, act)
+
+
+def event_id_for_action(a: AgentRec, act: Action) -> str:
+    """Same source-event identity for callers already holding the Action.
+
+    Avoid another linear action lookup inside whole-agent projections. One
+    native call may have several file effects; pair this ID with a target/op
+    when a consumer needs a relation identity, not a different event spelling.
+    """
     stem = os.path.splitext(os.path.basename(act.src[0]))[0] if act.src else a.id
     tail = (act.tuid if act.tuid else
             f"message:{act.detail['source_event_id']}" if act.detail.get("source_event_id") else

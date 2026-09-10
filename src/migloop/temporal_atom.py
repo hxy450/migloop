@@ -141,8 +141,8 @@ def _actions(ledger, kind, key, window, scope, include_undated, stale):
                     operation["execution"] = "unknown"
                 section = ("reads" if relation["kind"] == "read" else "writes") if confirmed and relation["kind"] in (
                     "read", "write", "delete") else "candidates"
-                row = {"id": projected["id"] + ":" + raw_events._digest([agent.id, relation["kind"], relation.get("path")]),
-                    "id_scope": "source_local_native_call_and_indexed_relation",
+                row = {"id": atoms.event_id_for_action(agent, action),
+                    "id_scope": "source_event_shared_with_changes; target_and_operation_separate",
                     "agent": agent.id, "seq": action.seq, "call_id": event.call_id, "tool": action.tool,
                     "ts": stamp, "use_ts": use.record.ts, "done_ts": result.record.ts if completed else None,
                     "time_status": "recorded" if stamp else "undated_not_cutoff_evidence",

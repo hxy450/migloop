@@ -32,6 +32,7 @@ def test_later_snapshot_cannot_close_earlier_time_query():
     assert interval["total"] == 1
     assert interval["rows"][0]["ts"] == "2026-09-10T10:16:00.000000Z"
     assert interval["rows"][0]["agent"] is None
+    assert interval["rows"][0]["event_id"] is None
 
 
 def test_candidate_between_versions_invalidates_state_at_read_cutoff():
@@ -130,6 +131,7 @@ def test_later_reliable_read_recovers_observed_content_but_not_patch_author(tmp_
     assert after["known"] and after["rows"][0]["text"] == "new"
     assert after["rows"][0]["agent"] is None and after["rows"][0]["introduced_at"] is None
     assert after["rows"][0]["status"] == "unknown_origin"
+    assert after["rows"][0]["event_id"] is None
 
 
 def test_undated_native_effect_is_path_scoped_unknown_not_keyerror(tmp_path):

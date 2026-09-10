@@ -547,8 +547,7 @@ def build(ledger: atoms.Ledger, current_scope: dict[str, Any], offset: int = 0,
                               and proof_payload(r.proof)["execution"] == "confirmed"
                               and proof_payload(r.proof)["operation_basis"] in CONFIRMED_BASES]
             confirmed = bool(confirmed_refs and raw_refs and action.src and action.src[2] is not None)
-            identity = atoms.event_id(ledger, agent.id, action.seq) or "operation:" + _digest(
-                [canonical, raw_refs, action.tuid, action.blk])
+            identity = atoms.event_id_for_action(agent, action)
             row = {"id": identity, "event_id": identity,
                    "status": "confirmed_change" if confirmed else "candidate_effect", "agent": agent.id if confirmed else None,
                    "author_status": "operation_actor" if confirmed else "unknown", "source_agents": [agent.id],
