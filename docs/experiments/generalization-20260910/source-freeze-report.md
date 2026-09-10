@@ -139,3 +139,13 @@ readability检查只对已注册文件做UTF-8增量解码计数，不输出文�
 真实失败定位后，非 JSONL 附件统一作为可定位的原始物理文本行读取，而不是逐行尝试解释为 JSONL 事件。正文、内容哈希、旧/新原文引用和分页保留；JSON 外观的文本也不获得事件时间、actor 或 JSON Pointer。真正损坏的 JSONL 和 UTF-8 解码失败继续显式报告 gap。独立回归还发现并修复了去掉虚假 JSON Pointer 后文件相关文本被 unknown payload 过滤的问题：相关提及可查，但不因此成为读写事实。
 
 最新完整测试结果为 2,653 passed、9 skipped、1 warning，229.98 秒；warning 来自 ZIP 重复成员反例。原默认 pytest 临时目录权限错误未被掩盖或修权限，本次使用单独新建且范围受控的 basetemp。测试通过不替代真实 MCP 门，下一候选必须使用相同 100,000 字符预算重新验证；candidate-source-v1 及所有失败产物保持不变。尚未建立新 13 文件因果参考答案，也未启动其模型调查。
+
+## candidate-source-v2 真实门通过，随后开放参考取证
+
+修复提交为 `6953972`，另保留已有用户工作区改动；准确运行身份以完整冻结包而非单个 commit 为准。candidate-source-v2 manifest SHA 为 `19d9a70955694ce4c9fce5aaedf77dcfa80ffe6f7e66a21eac74cc9b8367434b`，code digest 为 `50c63af5702f8671811833bf3bf38720d766cecc41f18859a88e25b27434786d`。
+
+`registry-validation-source-v2.json`（SHA `29ec08759b6cd53e6fae015916282e7180dbfa73381bd2b94727aedf46211830`）全门通过：dynamic1 169/169、JSONL78；arch11 385/385、JSONL193；缺、额外、UTF-8 decode gaps 均为0。
+
+`smoke-source-v2.json`（SHA `e99f7636252853a4f11801f254c821ddb53fa0d2844615830ba6d31ddd9b17f3`）使用同样 100,000 字符预算、同样默认 overview 和首附件选择规则：两队列 file/search/record 全部 `ok`、`budget_adjusted=false`；overview 原始 data 分别为10,239和10,156字符。dynamic1 不再是 v1 的3,650,409字符 deferred。两份样本附件的原始引用及内容哈希保持一致，分别48/135字符、各1物理行完整往返；时间仍未知，owners仍为空。未认证所有附件逐份完整交付或任何因果主张。
+
+源与代码前后哈希稳定；原始 source manifest、旧失败产物及 run_transfer 字节未变，自有进程均已退出。门通过后才授权新13文件的参考建立；先取原始修改及间隔/候选命令，再独立复核和冻结 core，尚未运行新调查模型。候选代码不能依据这些新答案调整。

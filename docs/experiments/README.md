@@ -2,6 +2,12 @@
 
 背景、目的与结论见 [../fixchain-research.md](../fixchain-research.md)。这里只说每个文件是什么。会话本体不在仓里,位置见那份文档 §3。
 
+## file-first-10 / generalization-20260910 —— 整文件 Luna 对照与跨运行验证
+
+- [十个困难文件与冻结参考](file-first-10/README.md)：不是预置缺陷问句，调查员自行发现实际修改和原因；原始组固定，不反复重跑挑低分。
+- [最新 v4 完整结果](file-first-10/tools-v4-results.md)：正确归因覆盖67.0%，低于v3的75.7%及原始73.8%，不晋升；token仍少63.8%，时间多29.6%。语义、原文/图核验、成本分别报告，保留失败。
+- [跨运行计划](generalization-20260910/plan.md)、[来源门与失败记录](generalization-20260910/source-freeze-report.md)、[参考协议](generalization-20260910/reference-protocol.md)：dynamic1六文件、arch11七文件；先固定完整源与候选再核参考。不是完全未见业务泛化，也不把源注册或MCP可用当成归因正确。
+
 ## 2026-09-09-attribution10/ —— 历史归因与审计分开验收
 
 - [09-10检查点](2026-09-09-attribution10/2026-09-10-checkpoint.md)：V10跨过开发集token门槛但归因仍有实质错误；V11/V12因额度中断，完整收益保持未知。列明代码、评分和恢复范围。
