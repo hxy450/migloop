@@ -127,6 +127,7 @@ CREATE TABLE visible(run TEXT,offset INT,complete INT,observed TEXT);
 CREATE TABLE handles(id TEXT PRIMARY KEY,kind TEXT,payload TEXT);
 CREATE TABLE calls(record TEXT,slot INT,tool TEXT,read_basis TEXT,PRIMARY KEY(record,slot));
 CREATE TABLE input_messages(record TEXT PRIMARY KEY,role TEXT);
+CREATE TABLE tool_returns(record TEXT,slot INT,family TEXT,success INT,PRIMARY KEY(record,slot));
 """
 
 
@@ -271,7 +272,7 @@ class Store:
         )
         self.db.create_function("literal_any", 2, literal_any, deterministic=True)
         schema = self.db.execute("SELECT value FROM meta WHERE key='schema'").fetchone()
-        if schema is None or schema[0] != "inquiry/index/3":
+        if schema is None or schema[0] != "inquiry/index/4":
             self.db.close()
             raise ValueError(
                 "incomplete or incompatible index; import into a new path or use its frozen code"
@@ -301,7 +302,7 @@ class Store:
             for source in sources:
                 cls._import(db, source)
             cls._effects(db)
-            db.execute("INSERT INTO meta VALUES(?,?)", ("schema", "inquiry/index/3"))
+            db.execute("INSERT INTO meta VALUES(?,?)", ("schema", "inquiry/index/4"))
             db.commit()
         finally:
             db.close()
@@ -381,6 +382,11 @@ class Store:
                 if role:
                     db.execute("INSERT INTO input_messages VALUES(?,?)", (ref, role))
                 for slot, family, role, cid, tool, payload, success in parts(record):
+                    if role in ("result", "patch"):
+                        db.execute(
+                            "INSERT INTO tool_returns VALUES(?,?,?,?)",
+                            (ref, slot, family, success),
+                        )
                     if role in ("request", "patch"):
                         db.execute(
                             "INSERT INTO calls VALUES(?,?,?,?)",

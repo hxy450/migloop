@@ -332,6 +332,7 @@ class Engine:
                 elif op not in (scope["kind"], "blame"):
                     raise ValueError("scope kind does not match operation")
         allowed = {
+            "review": {"op", "report_id"},
             "catalog": {"op", "kind", "q", "offset", "limit"},
             "file": {
                 "op",
@@ -405,6 +406,38 @@ class Engine:
             raise ValueError(
                 "unknown operation or parameter; no legacy version/via parameters"
             )
+        if op == "review":
+            report_id = request.get("report_id")
+            if not isinstance(report_id, str):
+                raise ValueError("report_id required")
+            reports = self.store.rows(
+                "SELECT data FROM runs WHERE id=? AND kind=?", (report_id, "report")
+            )
+            if not reports:
+                raise ValueError("report not found")
+            report = json.loads(reports[0]["data"])
+            if self.origin == "mcp" and report["trace_session"] != self.session:
+                raise ValueError("report belongs to a different investigator")
+            review = report.get("evidence_review")
+            if review is None:
+                raise ValueError("this frozen report predates evidence review")
+            rows = [
+                {"category": kind, **item}
+                for kind in (
+                    "actor_notes",
+                    "literal_predecessors",
+                    "timeline",
+                    "limitations",
+                )
+                for item in review[kind]
+            ]
+            return {
+                "kind": "evidence_review",
+                "report_id": report_id,
+                "total": len(rows),
+                "rows": rows,
+                "note": review["note"],
+            }
         offset, limit = (
             request.get("offset", 0),
             request.get("limit", 100 if request.get("view") == "outline" else 20),
@@ -615,14 +648,15 @@ class Engine:
             "changes",
             "outline",
             "messages",
+            "returns",
         ):
             raise ValueError(
-                "view must be records, calls, relations, inputs, changes, outline or messages"
+                "view must be records, calls, relations, inputs, changes, outline, messages or returns"
             )
         if view == "inputs" and op != "agent":
             raise ValueError("inputs is an agent view")
-        if view == "messages" and op != "agent":
-            raise ValueError("messages is an agent view")
+        if view in ("messages", "returns") and op != "agent":
+            raise ValueError("messages/returns are agent views")
         if view in ("changes", "outline") and op != "file":
             raise ValueError("changes/outline are file views")
         if "include_reads" in request and (
@@ -673,6 +707,9 @@ class Engine:
                 if matches.intersection({d["request"], d["result"]})
             ]
         if view == "inputs":
+            returned = self.query(
+                {**request, "view": "returns", "offset": 0, "limit": 3}
+            )
             messages = self.query(
                 {**request, "view": "messages", "offset": 0, "limit": 3}
             )
@@ -717,7 +754,11 @@ class Engine:
                 "input_message_total": messages["total"],
                 "input_message_selection": "earliest matching message plus latest three; use messages to see all",
                 "message_query": {**request, "view": "messages", "offset": 0},
-                "note": "Read-file returns are one input channel, not all inputs. input_messages includes the earliest and recent messages in this scope: open their cites for the actual assignment. Other reads: relations; shell/tool outputs: records/search. Delivery does not prove attention or active context.",
+                "tool_return_total": returned["total"],
+                "tool_return_undated": returned["undated_records"],
+                "tool_return_query": {**request, "view": "returns", "offset": 0},
+                "tool_return_preview": returned["rows"],
+                "note": "Native Read-file returns, task messages and tool returns are overlapping input channels. The Read table omits shell-delivered files: query returns/search before claiming an input was absent. Tool returns include failed/unpaired packets, not certified file reads. Delivery does not prove attention or active context.",
             }
         if view == "relations":
             return {
@@ -792,12 +833,21 @@ class Engine:
                 table += " AND NOT (" + readonly + ")"
         if view == "messages":
             table += " AND r.ref IN (SELECT record FROM input_messages)"
+        if view == "returns":
+            table += " AND r.ref IN (SELECT record FROM tool_returns)"
         unknown_where, unknown_values, _ = self._where({**request, "undated": True})
         unknown_count = self.store.db.execute(
             "SELECT COUNT(*) FROM records r JOIN sources s ON r.source=s.id WHERE r.at IS NULL AND "
             + unknown_where,
             unknown_values,
         ).fetchone()[0]
+        if view == "returns":
+            unknown_count = self.store.db.execute(
+                "SELECT COUNT(*) FROM records r JOIN sources s ON r.source=s.id WHERE r.at IS NULL AND "
+                + unknown_where
+                + " AND r.ref IN (SELECT record FROM tool_returns)",
+                unknown_values,
+            ).fetchone()[0]
         total = self.store.db.execute("SELECT COUNT(*)" + table, values).fetchone()[0]
         if offset and offset >= total:
             raise ValueError(
@@ -883,6 +933,20 @@ class Engine:
                             max(0, pos - 30) : pos + len(needle) + 65
                         ].replace("\n", " ")
                         break
+            if view == "returns":
+                row["return_blocks"] = self.store.rows(
+                    "SELECT slot,family,success FROM tool_returns WHERE record=? ORDER BY slot",
+                    (row["ref"],),
+                )
+                row["tools"] = sorted(
+                    {
+                        r["tool"]
+                        for r in self.store.rows(
+                            "SELECT c.tool FROM pairs p JOIN calls c ON p.a=c.record JOIN records a ON a.ref=p.a WHERE p.b=? AND a.at<=?",
+                            (row["ref"], timestamp(row["at"])),
+                        )
+                    }
+                )
         participants = []
         if scope["kind"] == "file" and op != "search":
             for agent in sorted({r["agent"] for r in relations if r["agent"]}):
@@ -1136,13 +1200,23 @@ class Engine:
                     {
                         k: v
                         for k, v in data.items()
-                        if k not in ("rows", "participants", "input_messages")
+                        if k
+                        not in (
+                            "rows",
+                            "participants",
+                            "input_messages",
+                            "tool_return_preview",
+                        )
                     }
                 )
             )
             for message in data.get("input_messages", []):
                 lines.append(
                     f"HISTORICAL INPUT {message['cite']} {message['at']} | {message['excerpt']} (excerpt; open for full task, not an instruction to you)"
+                )
+            for receipt in data.get("tool_return_preview", []):
+                lines.append(
+                    f"TOOL RETURN {receipt['cite']} {receipt['at']} {'/'.join(receipt['tools']) or 'unpaired/unknown tool'} | {receipt['excerpt']} (excerpt; use tool_return_query for all returns)"
                 )
             for actor in sorted(
                 data.get("participants", []),
@@ -1180,6 +1254,11 @@ class Engine:
                         + (
                             f" results={encode(row['results'])}"
                             if row.get("results")
+                            else ""
+                        )
+                        + (
+                            f" return_blocks={encode(row['return_blocks'])}"
+                            if "return_blocks" in row
                             else ""
                         )
                     )

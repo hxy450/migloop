@@ -9,6 +9,7 @@ import uuid
 from .coverage import reconcile
 from .engine import bounds, in_scope
 from .evidence_graph import attach
+from .evidence_review import review
 from .store import digest, encode, iso, timestamp
 
 
@@ -371,6 +372,7 @@ def check(engine, text, *, save=False):
         else "valid",
         "missing_evidence_links": missing_links,
         "coverage": coverage,
+        "evidence_review": review(engine, document, target, nodes),
         "source_sha256": digest(text.encode()),
         "trace_session": engine.session,
         "note": "Reasons are model claims. Bound references/operations are not causal proof.",

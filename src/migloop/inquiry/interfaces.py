@@ -32,6 +32,7 @@ agent视图是保存的历史记录，不保证全部旧输入在某次写入时
 每个WRITER的input_scope是该文件最后一次写调用发起前的agent范围，批量打开{op:agent,scope:input_scope,view:inputs}：按路径列实际返回过的原生Read引用，再展开相关源码/规格片段。
 这不是完整输入集：派工、消息、shell读和可能读取仍在records/search/relations。不要只开第一个WRITER就结束，后续生成写者可能改变了数据/业务语义。
 inputs给范围内首条消息和最近消息，避免后加载的skill说明淹没初始任务。原文确认实际派工；“加载了某skill”不等于“这次修改由该skill要求”。
+inputs的tool_return_total/tool_return_query单列全部已记录工具返回入口（含Bash、失败、未配对返回，与Read表有重叠）。view:returns按返回时间筛，可多词检索正文。不能以Read文件表没有某路径就说生成者没收到它；先查returns/search。收到返回不证明有效上下文或注意到，不自动形成文件读边。
 初版骨架不等于后续业务接线，最后写者也不等于首因；生成输入用生成截止scope，别在修复窗口里搜索后宣布输入不存在。
 4. 把事实、竞争解释和机制假设分开。全池出现不证明交付；局部搜索无结果不证明全阶段没有检查。
 “检查报告只提结构”只能证明报告这么写，不能据此认证“仅做结构检查/确认漏验”。数量须对照实际修改和回执，不拿待处理对象总数当改动数。
@@ -40,6 +41,7 @@ inputs给范围内首条消息和最近消息，避免后加载的skill说明淹
 你只需给真正要归因的节点填scope、role、reason、evidence。原文引用e-...、agent范围s-agent-...、文件范围s-file-...各有不同类型，不能换前缀猜ID。
 mechanical_status只核坐标/引用/原生关系及原生写对账，不是正确率、全文覆盖或因果认证。needs_revision须处理错误，不靠删证据回避。
 机械通过也不证明因果正确；“没查到检查”不能写成“确认遗漏检查”，这也适用于最后的简短摘要。
+submit还有evidence_review和review_query：收尾打开{op:review,report_id:自己刚提交的ID}，按END FRAME续完。timeline列自己引用的实际发生时间，别把节点查询截止当证据发生时间。actor_notes指出节点引用的原生目标写实际由其它actor执行：先核身份，协调责任不能冒充执行作者。literal_predecessors给尚未引用的较早Edit/patch中相同新增行：核原文，区分返修中新添与生成遗留。它只是字面前序线索，不证明首作者/连续状态/因果；不会替你改报告或加边。核对后需要改的由你自行重提，不为了清空提示凭空补链。
 coverage.unattributed_native_writes是未归因的已记录原生写，需用view:changes核原文并并入finding.changes；原因未明可在对应finding里限定未知，不能用reviewed:unknown把已经可展开的修改藏掉。
 coverage.unassessed是未判明效应的相关调用，不代表全是修改；它们留在UI和文件calls，不要求逐条写没有改文件的套话。
 reviewed:no_target_change表示该事件实际只查询或改了别的对象；不能用“Bash不是native write”作为排除理由。已有脚本正文和写后观察支持目标修改时，应解释该修改，关系不能机检则留未知边。
@@ -53,7 +55,7 @@ limit范围1–100，默认20；terms最多8个非空字面词，每词<=500字�
 outline默认100项，旧view默认20项；仍看next续完。它只缩短原生参数的重复上下文，不重放前版文件，不证明脚本没改，也不替代原始changes全文。actor_scope保留当前观察截止，不能误当写前输入范围。
 calls仅筛原生工具调用入口，包含无法判断效应的脚本，results给已到达的回执引用；terms同时匹配调用及截止前已返回结果，不自动把相关调用认证为写。
 默认折叠原生只读工具和有限的完整标准只读命令形状，folded_read_calls给数量，unfold给完整查询；include_reads:true可展开全部。折叠不推断运行时效应，不假设复杂脚本无写，不影响records/search。
-agent：把op改成agent、key改成目录中的agent身份。默认records是全文索引，不是全部原文。view:inputs同时给原生读文件清单和最近任务消息入口，二者都要看；view:messages专看收到的非工具消息，可分页和多词terms过滤。Shell/工具输出仍在records/calls/search，inputs不是完整有效上下文。
+agent：把op改成agent、key改成目录中的agent身份。默认records是全文索引，不是全部原文。view:inputs给原生读文件、任务消息和工具返回三个有重叠的渠道；view:messages查非工具消息，view:returns查工具返回，都可分页和多词terms过滤。records/search仍搜整个范围，inputs不是完整有效上下文。
 检索：{op:search,kind:pool|agent|file,key:可选范围,at:ISO,terms:[字面词1,词2],offset:0,limit:20}，多词OR。
 展开：{op:open,ref:照抄记录ID,at:ISO,pointer:可选JSONPointer}；也可用source:逻辑源名称,line:物理行号代替ref。
 每个file/agent视图返回scope_id=s-file-...或s-agent-...，锁定kind/key/at/since。后续可用{op:search,scope:已返回的scope_id,terms:[...]}
@@ -199,6 +201,37 @@ def build_mcp(path):
                 for r in graph["missing_evidence_links"]
             ]
             c = graph["coverage"]
+            review = graph["evidence_review"]
+            summary["evidence_review"] = {
+                "counts": {
+                    k: len(review[k])
+                    for k in (
+                        "timeline",
+                        "actor_notes",
+                        "literal_predecessors",
+                        "limitations",
+                    )
+                },
+                "actor_notes": [
+                    {k: r[k] for k in ("node", "actual_actors")}
+                    for r in review["actor_notes"][:4]
+                ],
+                "literal_predecessors": [
+                    {
+                        k: r[k]
+                        for k in (
+                            "finding",
+                            "current_at",
+                            "earlier_at",
+                            "earlier_evidence",
+                        )
+                    }
+                    for r in review["literal_predecessors"][:4]
+                ],
+                "preview_limit_per_kind": 4,
+                "note": "Open review_query for all notes and actual cited times. Hints are not authorship or causal proof; only this investigator may revise the original.",
+            }
+            summary["review_query"] = {"op": "review", "report_id": graph["report_id"]}
             summary["coverage"] = {
                 "explained": len(c["explained"]),
                 "model_excluded": len(c["model_excluded"]),

@@ -207,6 +207,25 @@ async function main() {
         assert.equal(await evaluate('JSON.stringify({graph,trace})'),initial);
         fs.writeFileSync(path.join(out,'outline.json'),JSON.stringify(outline,null,2));
       }
+      if (process.argv.includes('--evidence-review')) {
+        const checked=await evaluate(`(async()=>{
+          const section=document.getElementById('evidence-review');
+          if(!section) throw Error('missing mechanical review');
+          section.open=true;
+          const node=graph.nodes.find(n=>graph.evidence_review.timeline.some(t=>t.node===n.id));
+          showNode(node);
+          const timelineShown=document.getElementById('reason').innerText.includes('实际发生于');
+          const input=await query({op:'agent',key:graph.nodes.find(n=>n.kind==='agent').key,at:graph.target.at,view:'inputs'});
+          const returns=await query(input.tool_return_query);
+          return {timelineShown,returnTotal:returns.total,expected:input.tool_return_total,
+            visibleRows:[...document.querySelectorAll('#records button')].filter(b=>b.textContent==='展开原文').length,expectedRows:returns.rows.length};
+        })()`);
+        assert(checked.timelineShown);
+        assert.equal(checked.returnTotal,checked.expected);
+        assert.equal(checked.visibleRows,checked.expectedRows);
+        assert.equal(await evaluate('JSON.stringify({graph,trace})'),initial);
+        fs.writeFileSync(path.join(out,'evidence-review.json'),JSON.stringify(checked,null,2));
+      }
       assert.equal(errors.length, 0);
       const result = {passed:true, url, errors, model_report:true, report_mutated:false,
         checks:["all findings match submitted graph", "node reason", "manual query isolation", "raw expansion"]};

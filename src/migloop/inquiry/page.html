@@ -161,6 +161,7 @@
         ><button id="history">片段修改历史</button
         ><button id="inputs">查 Agent 已收输入</button
         ><button id="messages">查 Agent 任务消息</button
+        ><button id="returns">查 Agent 工具返回</button
         ><button id="agents">Agent目录</button
         ><button id="files">文件目录</button>
         <div id="status" class="small muted"></div>
@@ -349,6 +350,15 @@
           button('展开历史任务原文',box,()=>open(row.cite,at));
         }
         button('查看全部消息',group,()=>query(data.message_query));
+      }
+      if (data.tool_return_query) {
+        const group=element('details','',$('records'));
+        element('summary',`工具返回 ${data.tool_return_total} 条（与Read表有重叠；未知时间 ${data.tool_return_undated} 条）`,group);
+        for(const row of data.tool_return_preview) {
+          const box=element('div',`${row.at} · ${row.excerpt}`,group,'row small');
+          button('展开返回原文',box,()=>open(row.cite,at,q.undated));
+        }
+        button('查看全部工具返回',group,()=>query(data.tool_return_query));
       }
       if (data.next !== null && data.next !== undefined)
         button("下一页", $("records"), () =>
@@ -557,6 +567,23 @@
       }
       for (const row of graph.missing_evidence_links || [])
         element('div', `已引用但未接入图：${row.op} · ${row.path} · ${row.link}`, $('gaps'),'error small');
+      renderReview(graph.evidence_review, $('gaps'));
+    }
+    function renderReview(review, container) {
+      if(!review) return;
+      const group=element('details','',container);
+      group.id='evidence-review';
+      element('summary',`事实对账（不是归因认证）：执行者提示 ${review.actor_notes.length}，片段前序 ${review.literal_predecessors.length}，时间范围 ${review.timeline.length}`,group);
+      element('p','以下是独立于模型原因的原始记录对账；不修改节点判定，不新增因果边。',group,'small muted');
+      for(const [title,rows] of [['执行者提示',review.actor_notes],['片段前序线索',review.literal_predecessors],['引用实际时间',review.timeline],['核验限制',review.limitations]]) {
+        for(const row of rows) {
+          const box=element('details','',group);
+          element('summary',`${title} · ${row.node || row.finding || row.operation}`,box);
+          element('pre',JSON.stringify(row,null,2),box);
+          const refs=new Set([...(row.evidence||[]),...(row.earlier_evidence||[]),...(row.current_evidence||[]),...(row.operations||[]).flatMap(op=>op.evidence)]);
+          for(const ref of refs) button(ref,box,()=>open(ref,graph.target.at));
+        }
+      }
     }
     function showNode(n) {
       $("reasonTitle").textContent = n.key;
@@ -564,6 +591,11 @@
       element("span", n.generated_context ? "自动证据节点，模型未归因" : "模型主张，不是因果认证", $("reason"), "badge");
       element("p", `历史范围：${n.since || "未限定起点"} → ${n.at}；不是完整文件快照`, $("reason"), "small");
       element("p", n.reason, $("reason"));
+      const time=graph.evidence_review?.timeline.find(t=>t.node===n.id);
+      if(time) element('p',`所引记录实际发生于 ${time.first} → ${time.last}（不是查询截止；不认证原因）`,$('reason'),'small muted');
+      for(const note of graph.evidence_review?.actor_notes||[]) {
+        if(note.node===n.id) element('p',`执行者待核：所引原生目标写的实际actor是 ${note.actual_actors.join(', ')}，不是这个节点。协调责任须另证。`,$('reason'),'badge');
+      }
       button("独立打开节点", $("reason"), () => {
         $("kind").value = n.kind;
         $("key").value = n.key;
@@ -652,6 +684,7 @@
     });
     $("inputs").onclick = () => guard(() => query(request("inputs")));
     $("messages").onclick = () => guard(() => query(request("messages")));
+    $("returns").onclick = () => guard(() => query(request("returns")));
     $("agents").onclick = () =>
       guard(() => query({ op: "catalog", kind: "agent", limit: 20 }));
     $("files").onclick = () =>
