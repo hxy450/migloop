@@ -6,6 +6,7 @@ import difflib
 import json
 import posixpath
 import uuid
+from bisect import bisect_right
 from functools import wraps
 
 from .native_text import change_outline, change_payloads, render_payloads, term_deltas
@@ -134,25 +135,48 @@ def content_windows(text, terms, context):
     if type(context) is not int or not 0 <= context <= 50:
         raise ValueError("context must be 0–50 lines")
     lines = text.splitlines()
+    # Offsets refer to the casefolded payload, including original line breaks.
+    # This also finds multiline literals and Unicode folds without misplacing
+    # windows against the original (possibly different-length) characters.
+    folded_lines = [line.casefold() for line in text.splitlines(keepends=True)]
+    starts, size = [], 0
+    for line in folded_lines:
+        starts.append(size)
+        size += len(line)
+    folded = "".join(folded_lines)
+    matched, spans, counts = set(), [], []
+    for term in terms:
+        needle, pos, occurrences, term_lines = term.casefold(), 0, 0, set()
+        while (pos := folded.find(needle, pos)) >= 0:
+            first = bisect_right(starts, pos) - 1
+            last = bisect_right(starts, pos + len(needle) - 1) - 1
+            term_lines.update(range(first, last + 1))
+            spans.append((first, last))
+            occurrences += 1
+            pos += len(needle)
+        matched.update(term_lines)
+        counts.append(
+            {"term": term, "matched_lines": len(term_lines), "occurrences": occurrences}
+        )
     ranges = []
-    hits = 0
-    for i, line in enumerate(lines):
-        if any(t.casefold() in line.casefold() for t in terms):
-            hits += 1
-            start, end = max(0, i - context), min(len(lines), i + context + 1)
-            if ranges and start <= ranges[-1][1]:
-                ranges[-1][1] = max(end, ranges[-1][1])
-            else:
-                ranges.append([start, end])
+    for first, last in sorted(set(spans)):
+        start, end = max(0, first - context), min(len(lines), last + context + 1)
+        if ranges and start <= ranges[-1][1]:
+            ranges[-1][1] = max(end, ranges[-1][1])
+        else:
+            ranges.append([start, end])
     selected = "\n\n".join(
         f"CONTENT LINES {start + 1}–{end}\n" + "\n".join(lines[start:end])
         for start, end in ranges
     )
     return selected, {
-        "matched_lines": hits,
+        "matched_lines": len(matched),
+        "literal_counts": counts,
+        "literal_count_basis": "Casefolded, non-overlapping literals in the entire selected payload, before windowing; not syntax, runtime or other-record facts. An explicit pointer still limits the payload.",
         "content_line_ranges": [[a + 1, b] for a, b in ranges],
         "original_content_lines": len(lines),
-        "selection": "literal windows, not whole record or absence proof",
+        "window_omitted_content_lines": len(lines) - sum(b - a for a, b in ranges),
+        "selection": "literal windows, not whole record or absence proof; not a syntax block. Nearby lines can omit later properties/branches. To test whether X occurs, search X itself in this source, not only its enclosing symbol. Counts certify literal matches only.",
     }
 
 

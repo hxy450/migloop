@@ -1,0 +1,24 @@
+{
+  "schema": "inquiry-developer-score/1",
+  "round": "i15-high",
+  "model": "gpt-5.6-luna",
+  "effort": "high",
+  "reference": "../file-first-10/scoring-core.json",
+  "grading": "Two predeclared pilots, original final submissions. Developer source review, not blind or exhaustive claim precision. A read-only independent Luna review of F04 found no clear major error; it did not rewrite the investigator report. Raw and gold unchanged.",
+  "cases": [
+    {"id":"F10-01","report_id":"49b51b3b1c73496a","units":{"mask":"wrong","images":"correct","cta":"correct","price":"correct","indicator":"correct","repair-compile":"correct"},"basis":"Five local causes recovered. Mask claim contradicts the existing transparent H5 exception and actual three-site repair receipt. Extra unsupported pipeline mechanism is separate below. Repair-compile cites both L528 and actual fixed-Span/private helper rewrite L592/e-0f9baa368ae9, so it is not the earlier erroneous attribution to L528 alone."},
+    {"id":"F10-04","report_id":"9088a259ce3c4490","units":{"debug-wiring":"correct","wrong-class-repair":"correct"},"basis":"Same investigator's first submission ceff479989cb4004 denied a post-fix build; post_write_returns exposed actual L5131. Investigator then opened e-7ddd5193b460 and e-d8166837de95 and corrected its own final report. Actual successful build distinguished from unproven runtime behavior. Minor imprecise import wording is not a major causal error: first import edit adds HttpLog, F013Service was already imported, AppTrackConfig is added later."}
+  ],
+  "summary":{"correct":7,"partial":0,"omitted":0,"wrong":1,"total":8,"unit_weighted_percent":87.5,"files_run":2,"files_not_run":8},
+  "core_counterevidence":[
+    {"case":"F10-01","unit":"mask","quote":"四个 CustomDialogController 初始化块没有 maskColor…四个控制器的蒙层及 import","source":"Slice8 agent-aslice8-pay-80bbb1f44b77da0f.jsonl L264/e-c56d4d99ddee, 2026-07-24T16:04:37.440Z, already has maskColor: Color.Transparent for H5Pay. Repair agent-a68daf720e780b4c2.jsonl L104/e-827ccccf4976 says 3 sites for MemberCenterPage, not four.","investigation_failure":"Saved query 9574709c20db4b47 searched CustomDialogController with context=6. Those snippets omit the H5 mask property, outside the requested windows. The model treated partial context as property absence; original bytes and search access were not missing."}
+  ],
+  "additional_errors":[
+    {"case":"F10-01","major":true,"quote":"验收边界未随整文件重写失效，旧 PASS 覆盖了新输出","repeated_in":"C.reason says F010 task simultaneously requires compile PASS and forbids compilation, then treats older PASS plus no file-indexed later receipt as an acceptance failure. C.unknown qualifies pool completeness, but does not support the asserted causal title.","counterevidence":"Actual F010 task e-a9db17678c73 L1 has no asserted compile-PASS acceptance clause. Separate final build actor afv2-final-build-22bc48713d20efdf has native task L1, real build command L127 (2026-07-24T22:13:26.260Z), paired receipt L128 (22:13:44.444Z), BUILD_EXIT=0 and BUILD SUCCESSFUL. All after the 16:04 whole-file Write and before generation end 22:16:20.102Z. Raw refs 42835b3e4cfaeb34:1:3f69fa9dd2563dc6, :127:d8e3f4b4517bd10e, :128:52d377e7792410cb. Root L4938 peer summary was only a navigation lead, not independent build proof. These facts do not certify visual behavior or exact workspace hash; neither do they support an old-PASS acceptance mechanism."}
+  ],
+  "mechanical":{"valid":2,"frames_sent":168,"frames_visible_complete":168,"final_binding_errors":0,"semantic_verified":false},
+  "cost":{"input_plus_output":7039937,"input_total":6999926,"cached_input":6644480,"uncached_input":355446,"output":40011,"model_seconds_sum":885.4164299,"by_case":{"F10-01":{"tokens":5724351,"seconds":643.6773047},"F10-04":{"tokens":1315586,"seconds":241.7391252}},"accounting":"Both investigator runs, including own revisions. Import and developer/independent grading separate. Only two cases: not a ten-file or raw cost comparison."},
+  "accepted":false,
+  "why_not":"One core contradiction and one major unsupported causal mechanism. Do not run the other eight just to dilute failures; no stability claim.",
+  "next":"Improve generic excerpt/negative-claim discipline and cross-agent phase checks, not case-specific answers. Freeze before fresh Member and Splash pilots; keep i15 intact."
+}
