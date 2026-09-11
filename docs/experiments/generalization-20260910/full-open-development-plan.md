@@ -40,3 +40,17 @@ Luna独立阅读旧说明，误把expand_query字段理解成工具名；据此�
 最终全仓验证：2891 passed、12 skipped，247.31秒（1条测试夹具重复ZIP名警告）。此前第二次全仓的1项失败来自并行修改运行器导致冻结哈希漂移；停止并行编辑后通过。开发路由的正向实际冻结/假队列及源、答案、问题、候选、注册表漂移拒绝均纳入回归，不仅检查函数存在。
 
 最后一次 Luna 只读试读正确识别了参数对象与声明的证据边界，但把多条原文续取错误地合用同一offset；据此补充“每条记录独立续取，可拆成多个batch项”，并加了不同offset批量拼回原文的测试。该试读没有真实MCP调用，不把它当端到端调查成功。
+
+## 已冻结身份
+
+代码提交 `6f2e1ef`（未push）；全仓之后仅补续读说明和对应回归，相关25项通过。用户原有service.py改动保留且不并入本提交，候选按实际完整运行时代码的字节哈希冻结。
+
+产物根目录 `C:/Users/hongy/projects/_migloop-eval-20260909/generalization-20260910/`：
+
+- `candidate-full-open-v1/manifest.json`：`9eead80f783ba9f7867434f31de4541b5c58f0911150541e1d4ce073636cd5c8`
+- 候选code digest：`f6309e9b7370d480e1182a7df21f4703729c460563369310f45ac6ba69744c68`
+- 冻结运行器：`e4e6a0664f3e5c3dea8c45f415b23f36de3bbca0a285a2766dbf11553f6ac535`
+- `source-freeze-1/registry-validation-full-open-v1.json`：`f69f266f907353ad58751cf0619e1be713c1cf79b94aa9f543dd3ae53bfc5d46`，dynamic1 169/169、arch11 385/385源登记且文本可解码；不是模型已读或归因正确证明。
+- `development-full-open-v1/manifest.json`：`85f1a1b19b322184542bfe0a6dfb3ce50d9bb07602a64dfe5f7fec189da95f65`，13文件仅tools配置与原父包逐字相同的工具组问题，原始组启动被运行器拒绝。
+
+2026-09-11 02:24:11 UTC：两池真实MCP离线连通、概览交付回执及完整注册核验通过，model_calls=0。02:24:55 UTC启动工具队列：26跑、并发2，首先DYNAMIC1-01/02 rep1。此刻仅已启动，尚无本轮归因分数；计分继续使用原固定core，不能以测试全绿或进程启动替代准确率。
