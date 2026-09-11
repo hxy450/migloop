@@ -5,6 +5,7 @@ const path = require("node:path");
 const child = require("node:child_process");
 const url = process.argv[2];
 const out = process.argv[3];
+const modelReport = process.argv.includes("--model-report");
 const endpoint = "http://127.0.0.1:19653";
 
 async function main() {
@@ -95,16 +96,37 @@ async function main() {
       mobile: false,
     });
     await send("Page.navigate", { url });
-    await wait('document.querySelectorAll("#graph .node").length === 3');
+    await wait(modelReport
+      ? 'typeof graph !== "undefined" && graph?.nodes?.length > 0'
+      : 'document.querySelectorAll("#graph .node").length === 3');
+    if (modelReport) {
+      const ids = await evaluate('graph.document.findings.map(f=>f.id)');
+      for (const id of ids) {
+        const counts = await evaluate(`(() => {
+          document.getElementById('findings').value=${JSON.stringify(id)};
+          document.getElementById('findings').dispatchEvent(new Event('change'));
+          const id=${JSON.stringify(id)};
+          return {expectedNodes:graph.nodes.filter(n=>n.finding===id).length,
+            actualNodes:document.querySelectorAll('#graph .node').length,
+            expectedEdges:graph.edges.filter(e=>e.finding===id).length,
+            actualEdges:document.querySelectorAll('#graph path[marker-end]').length};
+        })()`);
+        assert.equal(counts.actualNodes, counts.expectedNodes);
+        assert.equal(counts.actualEdges, counts.expectedEdges);
+        const shot = await send("Page.captureScreenshot", { format: "png" });
+        fs.writeFileSync(path.join(out, `finding-${id.replace(/[^a-zA-Z0-9_-]/g, "_")}.png`), Buffer.from(shot.data, "base64"));
+      }
+      await evaluate(`document.getElementById('findings').value=${JSON.stringify(ids[0])};draw()`);
+    }
     assert.equal(
       await evaluate(
         'document.querySelectorAll("#graph path[marker-end]").length',
       ),
-      2,
+      modelReport ? await evaluate('graph.edges.filter(e=>e.finding===document.getElementById("findings").value).length') : 2,
     );
     const initial = await evaluate("JSON.stringify({graph,trace})");
     await evaluate(
-      'document.querySelectorAll("#graph .node")[1].dispatchEvent(new MouseEvent("click", {bubbles:true}))',
+      `document.querySelectorAll("#graph .node")[${modelReport ? 0 : 1}].dispatchEvent(new MouseEvent("click", {bubbles:true}))`,
     );
     assert(
       (await evaluate('document.getElementById("reason").innerText')).includes(
@@ -127,6 +149,14 @@ async function main() {
       path.join(out, "inquiry-valid.png"),
       Buffer.from(validImage.data, "base64"),
     );
+    if (modelReport) {
+      assert.equal(errors.length, 0);
+      const result = {passed:true, url, errors, model_report:true, report_mutated:false,
+        checks:["all findings match submitted graph", "node reason", "manual query isolation", "raw expansion"]};
+      fs.writeFileSync(path.join(out, "audit.json"), JSON.stringify(result,null,2));
+      console.log(JSON.stringify(result));
+      return;
+    }
     const before = await evaluate("graph.edges.length");
     const diagnostic = await evaluate(`(async()=>{
       const doc=structuredClone(graph.document);

@@ -1,0 +1,44 @@
+{
+  "schema": "inquiry-developer-score/1",
+  "case": "F10-01",
+  "file": "entry/src/main/ets/pages/MemberCenterPage.ets",
+  "model": "gpt-5.6-luna",
+  "effort": "medium",
+  "sessions": 1,
+  "reference": "../file-first-10/scoring-core.json",
+  "grading": "Developer checks against original records; not independent or blind. Cite/boundary validity separate from causal correctness.",
+  "report_id": "6836bdb6fb4c4524",
+  "report_sha256": "9b035739464e21a976402932eda426632c9cb7a1305497e96c60ee217170bc7a",
+  "units": [
+    {"id": "mask", "raw": "omitted", "inquiry": "omitted", "basis": "No explanation of fixer L103/104 mask changes."},
+    {"id": "images", "raw": "correct", "inquiry": "omitted", "basis": "No explanation of fixer L233/234 retention image layout."},
+    {"id": "cta", "raw": "correct", "inquiry": "correct", "finding": "F2-pay-button-margin", "basis": "Explains width plus margin to outer Row padding; retained vertical/animation/safe-area behavior."},
+    {"id": "price", "raw": "partial", "inquiry": "partial", "finding": "F1-price-suffix", "basis": "Explains text runs, but misses Slice8 L24 delivered source and L264 output. Converter input/first-cause conclusion does not substitute for that supported chain."},
+    {"id": "indicator", "raw": "wrong", "inquiry": "correct", "finding": "F3-banner-indicator", "basis": "Explains color/position patch and explicitly bounds whether exact earlier input was delivered."},
+    {"id": "repair-compile", "raw": "correct", "inquiry": "correct", "finding": "F1-price-suffix", "basis": "Identifies repair-created private helpers, cross-struct compilation failure and removal of private. Existing core does not require listing every helper or build receipt."}
+  ],
+  "strict_correct": {"raw": 3, "inquiry": 3, "denominator": 6},
+  "additional_risks": [
+    {"quote": "因此最早偏离确定发生在生成 Write", "status": "unsupported_asserted_as_fact", "basis": "Earliest visible uniform 30 Text is real, but initial interface described numeric rolling text and had no stripCurrency; actual field wiring and delivered span source in Slice8 were not investigated. First cause of suffix mismatch not established."},
+    {"quote": "也没有生成阶段的视觉验收", "status": "unsupported_asserted_as_fact", "basis": "Limited paginated searches do not establish absence throughout generation."},
+    {"quote": "返修结果进入编译检查，暴露 helper 可见性问题。", "status": "graph_relation_unsupported", "basis": "This statement does not prove the declared fixer-agent to builder-agent dispatch edge; rejected by graph checker."}
+  ],
+  "audit": {
+    "native_submit_and_final_bound": true,
+    "target_since_drift_ms": 1,
+    "graph_nodes": 11,
+    "declared_edges": 8,
+    "verified_edges": 0,
+    "graph_issues": 26,
+    "frames_sent": 39,
+    "frames_visible_complete": 39,
+    "host_truncated_wrappers": 0,
+    "query_batches": 21,
+    "batches_read_complete": 4,
+    "subqueries_complete": 17,
+    "subqueries_partial": 17,
+    "subqueries_not_delivered": 19,
+    "query_errors": 5
+  },
+  "conclusion": "Not accepted: no local causal-score advantage, greater token/time cost, incomplete evidence graph. One-file diagnostic only."
+}
