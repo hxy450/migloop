@@ -1,11 +1,13 @@
 """Native operation boundaries, not guessed file-state or causal authors."""
 
 import json
+import re
 
 import pytest
 
 from migloop.inquiry.native_text import term_deltas
 from migloop.inquiry.report import check
+from migloop.inquiry.store import timestamp
 from tests.test_inquiry_core import build, record, result, ts, use
 
 
@@ -152,3 +154,95 @@ def test_patch_context_is_not_a_removal_and_multiedit_steps_remain_separate():
     hits = term_deltas(edits, ["token"])
     assert [h["step"] for h in hits] == [0, 1]
     assert [h["delta"] for h in hits] == ["added_in_payload", "removed_in_payload"]
+
+
+def test_pool_does_not_silently_ignore_an_agent_key(tmp_path):
+    engine = build(tmp_path, [record(1, use("s", "Bash", command="echo needle"))])
+    with pytest.raises(ValueError, match="pool search does not accept key"):
+        engine.query({"op": "search", "kind": "pool", "key": "a", "at": ts(2)})
+    assert (
+        engine.query({"op": "search", "kind": "agent", "key": "a", "at": ts(2)})[
+            "total"
+        ]
+        == 1
+    )
+    engine.store.close()
+
+
+def test_call_terms_include_returned_output_but_not_future_output(tmp_path):
+    engine = build(
+        tmp_path,
+        [
+            record(1, use("s", "Bash", command="python mystery.py A.ets")),
+            record(4, result("s", "updated mask in A.ets")),
+        ],
+    )
+    query = {
+        "op": "file",
+        "key": "A.ets",
+        "at": ts(2),
+        "view": "calls",
+        "terms": ["mask"],
+    }
+    assert engine.query(query)["total"] == 0
+    assert engine.query({**query, "at": ts(5)})["total"] == 1
+    assert engine.store.rows("SELECT * FROM effects") == []
+    assert engine.query({**query, "op": "agent", "key": "a", "at": ts(5)})["total"] == 1
+    engine.store.close()
+
+
+def test_native_node_presence_does_not_scan_text_and_keeps_time_boundaries(tmp_path):
+    engine = build(
+        tmp_path,
+        [
+            record(2, use("r", "Read", file_path="A.ets")),
+            record(5, result("r", "late observation")),
+        ],
+    )
+
+    def no_text_scan(*_):
+        raise AssertionError("native existence must not scan transcript text")
+
+    engine.store.db.create_function("literal_contains", 2, no_text_scan)
+    assert not engine.store.has_records("file", "/proj/A.ets", timestamp(ts(1)))
+    assert engine.store.has_records("file", "/proj/A.ets", timestamp(ts(3)))
+    assert engine.store.has_records("agent", "a", timestamp(ts(3)))
+    assert not engine.store.has_records("agent", "a", timestamp(ts(1)))
+    engine.store.close()
+
+
+def test_lexical_presence_requires_full_path_and_does_not_include_future(tmp_path):
+    engine = build(
+        tmp_path, [record(2, use("s", "Bash", command="python unknown.py /real/B.ets"))]
+    )
+    assert engine.store.has_records("file", "/real/B.ets", timestamp(ts(3)))
+    assert not engine.store.has_records("file", "/wrong/B.ets", timestamp(ts(3)))
+    assert not engine.store.has_records("file", "/real/B.ets", timestamp(ts(1)))
+    assert engine.store.rows("SELECT * FROM effects") == []
+    engine.store.close()
+
+
+def test_reused_offset_cannot_masquerade_as_a_zero_match_search(tmp_path):
+    engine = build(tmp_path, [record(1, {"type": "text", "text": "needle"})])
+    with pytest.raises(ValueError, match="restart at offset=0"):
+        engine.query({"op": "search", "at": ts(2), "terms": ["needle"], "offset": 100})
+    assert (
+        engine.query({"op": "search", "at": ts(2), "terms": ["absent"]})["total"] == 0
+    )
+    engine.store.close()
+
+
+def test_continuation_repeats_the_actual_record_identity_and_time(tmp_path):
+    engine = build(
+        tmp_path, [record(1, use("w", file_path="A.ets", content="x" * 30000))]
+    )
+    ref = engine.store.locate("a.jsonl", 1)
+    frame = engine.investigate([{"op": "open", "ref": ref, "at": ts(5)}])
+    identity = re.search(r"RESULT (\w+)", frame)[1]
+    offset = int(re.search(r"END FRAME next=(\d+)", frame)[1])
+    context = json.loads(frame.rsplit("; CONTEXT ", 1)[1])
+    assert context["record_owner"] == "a" and context["source"] == "a.jsonl"
+    assert timestamp(context["at"]) == timestamp(ts(1))
+    second = engine.page(identity, offset)
+    assert json.loads(second.rsplit("; CONTEXT ", 1)[1]) == context
+    engine.store.close()

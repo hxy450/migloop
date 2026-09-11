@@ -100,6 +100,8 @@ async function main() {
       ? 'typeof graph !== "undefined" && graph?.nodes?.length > 0'
       : 'document.querySelectorAll("#graph .node").length === 3');
     if (modelReport) {
+      assert.equal(await evaluate('document.getElementById("reports").value'),
+        await evaluate('graph.report_id'), 'selector differs from the displayed report');
       const ids = await evaluate('graph.document.findings.map(f=>f.id)');
       for (const id of ids) {
         const counts = await evaluate(`(() => {

@@ -587,6 +587,46 @@ class Store:
     def rows(self, sql, values=()):
         return [dict(row) for row in self.db.execute(sql, values)]
 
+    def has_records(self, kind, key, at):
+        """Does this node have dated evidence? Not proof of a disk state/author.
+
+        Do not run a full search/count/participant expansion to answer existence.
+        Native paths are canonical; lexical fallback must still check full paths.
+        """
+        if kind == "agent":
+            return bool(
+                self.db.execute(
+                    "SELECT 1 FROM sources s JOIN records r ON r.source=s.id WHERE s.agent=? AND r.at<=? LIMIT 1",
+                    (key, at),
+                ).fetchone()
+            )
+        if kind != "file":
+            raise ValueError("node kind must be file or agent")
+        key = self.resolve_file(key)
+        if self.db.execute(
+            "SELECT 1 FROM effects e LEFT JOIN records r ON r.ref=e.request WHERE e.path=? AND (e.at<=? OR r.at<=?) LIMIT 1",
+            (key, at, at),
+        ).fetchone():
+            return True
+        name = posixpath.basename(key).casefold()
+        candidates = "records r"
+        where, values = "r.at<=?", [at]
+        if _FILE_TOKEN.fullmatch(name):
+            candidates = "mentions m JOIN records r ON r.ref=m.record"
+            where += " AND m.name=?"
+            values.append(name)
+        # Filename-only navigation is permitted, but an invented full path must
+        # not be certified merely because another file has the same basename.
+        if "/" in key or candidates == "records r":
+            where += " AND (literal_contains(r.body,?) OR literal_contains(r.body,?))"
+            values.extend([key.casefold(), key.replace("/", "\\").casefold()])
+        return bool(
+            self.db.execute(
+                "SELECT 1 FROM " + candidates + " WHERE " + where + " LIMIT 1",
+                values,
+            ).fetchone()
+        )
+
     def source_record(self, ref):
         if isinstance(ref, str) and ref.startswith("e-"):
             ref = self.handle_value(ref, "e")["ref"]

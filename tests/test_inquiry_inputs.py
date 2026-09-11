@@ -52,3 +52,25 @@ def test_empty_native_read_list_does_not_hide_task_inputs(tmp_path):
     )
     assert opened["text"] == "Later quality check requests a comment-only change"
     engine.store.close()
+
+
+def test_initial_assignment_is_not_displaced_by_later_skill_messages(tmp_path):
+    engine = build(
+        tmp_path,
+        [
+            message(1, "Actual assignment"),
+            *(message(i, f"Loaded skill {i}") for i in range(2, 7)),
+            message(9, "Future task"),
+        ],
+    )
+    data = engine.query({"op": "agent", "key": "a", "at": ts(7), "view": "inputs"})
+    assert data["input_message_total"] == 6
+    excerpts = [r["excerpt"] for r in data["input_messages"]]
+    assert len(excerpts) == 4 and "Actual assignment" in excerpts[0]
+    assert "Loaded skill 6" in excerpts[1]
+    assert not any("Future" in text for text in excerpts)
+    filtered = engine.query(
+        {"op": "agent", "key": "a", "at": ts(7), "view": "inputs", "terms": ["Loaded"]}
+    )
+    assert "Loaded skill 2" in filtered["input_messages"][0]["excerpt"]
+    engine.store.close()

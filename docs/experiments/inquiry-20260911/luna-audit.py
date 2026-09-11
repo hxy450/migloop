@@ -93,7 +93,7 @@ def audit(out):
         if event.get('type') == 'item.completed' and item.get('type') == 'mcp_tool_call':
             for _, text in views(item.get('result')):
                 owned.update(re.findall(r'^RESULT ([0-9a-f]{16}) ', text, re.M))
-    frames, bodies = [], []
+    frames, bodies, observations = [], [], []
     for frame in store.rows("SELECT * FROM frames ORDER BY run,offset"):
         if frame['run'] not in owned:
             continue
@@ -101,9 +101,9 @@ def audit(out):
                       if frame["text"] in text), None)
         if match:
             wrapper, path, text = match
-            engine.observe_visibility(frame["run"], frame["offset"], text)
         else:
-            engine.observe_visibility(frame["run"], frame["offset"], "No complete frame in recorded model-visible outputs")
+            text = "No complete frame in recorded model-visible outputs"
+        observations.append((frame["run"], frame["offset"], int(match is not None), text))
         span = re.match(r'RESULT [0-9a-f]+ chars=\d+ range=(\d+):(\d+)\n', frame['text'])
         if not span:
             raise ValueError('Unknown recorded frame format')
@@ -137,6 +137,11 @@ def audit(out):
                        "body_sent_complete": covered(all_ranges, length),
                        "body_visible_complete": covered(visible_ranges, length),
                        "queries": parts})
+    # Matching is read-only. Persist its observations in one short transaction,
+    # rather than competing with another investigator once per frame.
+    store.db.execute("PRAGMA busy_timeout=30000")
+    with store.db:
+        store.db.executemany("INSERT INTO visible VALUES(?,?,?,?)", observations)
     completed = [e["item"] for e in events if e.get("type") == "item.completed"]
     submissions = [i for i in completed if i.get("type") == "mcp_tool_call" and i.get("tool") == "submit"]
     final = (run / "report.md").read_text(encoding="utf-8")

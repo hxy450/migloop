@@ -337,7 +337,7 @@
       if (data.input_messages) {
         const group=element('details','',$('records'));
         group.open=true;
-        element('summary',`收到的历史消息 ${data.input_message_total} 条，最近 ${data.input_messages.length} 条入口`,group);
+        element('summary',`收到的历史消息 ${data.input_message_total} 条，首条及最近共 ${data.input_messages.length} 条入口`,group);
         for(const row of data.input_messages) {
           const box=element('div',row.excerpt,group,'row small');
           button('展开历史任务原文',box,()=>open(row.cite,at));
@@ -569,6 +569,12 @@
     }
     async function loadGraph(data) {
       graph = data;
+      if (data.report_id) {
+        if (![...$('reports').options].some(o=>o.value===data.report_id)) {
+          const option=element('option',data.report_id,$('reports')); option.value=data.report_id;
+        }
+        $('reports').value=data.report_id;
+      }
       $("kind").value = "file";
       $("reasonTitle").textContent = "节点原因 / 原始证据";
       $("reason").replaceChildren();
@@ -595,6 +601,7 @@
         const option = element("option", r.id, $("reports"));
         option.value = r.id;
       }
+      if(graph?.report_id) $('reports').value=graph.report_id;
       await reloadTrace();
     }
     async function reloadTrace() {

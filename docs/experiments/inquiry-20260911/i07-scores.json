@@ -1,0 +1,29 @@
+{
+  "schema":"inquiry-developer-score/1",
+  "round":"i07",
+  "model":"gpt-5.6-luna",
+  "effort":"medium",
+  "reference":"../file-first-10/scoring-core.json",
+  "grading":"Developer semantic review, not independent/blind. Grouping is free; partial credit labels do not count as correct. Generic post-quality cleanup is sufficient for comment-policy; naming the ECAT task verbatim is not required. Mechanical delivery and additional false claims remain separate.",
+  "cases":[
+    {"id":"F10-01","report_id":"8c2f6ed05d3e47e0","units":{"mask":"omitted","images":"omitted","cta":"omitted","price":"partial","indicator":"omitted","repair-compile":"correct"},"basis":"Only private-helper repair is a complete attribution. Its upstream discussion partially describes the price split but lacks generation rich-text input/output attribution. Bash price write is falsely excluded as not a native write. Offline audit initially hit a lock, then succeeded with the original frozen auditor after models finished; no model rerun."},
+    {"id":"F10-02","report_id":"60ab3fb8f1b04dbb","units":{"mask":"omitted","icon":"omitted","back-gate":"omitted","progress":"omitted","system-bars":"correct"},"basis":"Explains system-bar restoration at onRoute/Navigation lifetime only and incorrectly says no other target modifications need explaining.","delivery":"Final ID selects an actual native submission, but final SHA does not match. Semantic review uses that original submission in SQLite; delivery-audit failure is retained, not silently repaired."},
+    {"id":"F10-03","report_id":"cd34c65a54b245bd","units":{"label":"partial","button-style":"correct","test-integration":"correct","logging":"partial","comment-policy":"correct"},"basis":"Recovers visual shape, later test access/ids and post-quality maintenance rather than business completion. Still misses explicit Roll contract and visual-repair birth of console.error; source task specificity remains weak. Origin role wrongly assigned to the visual fixer in finding A."},
+    {"id":"F10-04","report_id":"5baf0f34a89a484a","units":{"debug-wiring":"correct","wrong-class-repair":"correct"},"basis":"Explains startup debug enablement and repair-created wrong class call. Also contradicts that explanation by claiming the read signature is F013Service.setDebug; actual owner is AppTrackConfig."},
+    {"id":"F10-05","report_id":"e280351481a9427b","units":{"android-id-unblock":"correct"},"basis":"Understands explicit pending decision, backend nonempty constraint and later persistent-hex testing workaround; does not certify final Android equivalence."},
+    {"id":"F10-06","report_id":"63393aa855284379","units":{"back-image-box":"correct","track-vs-control":"partial","bottom-inset":"correct"},"basis":"Correct frame/padding and host Swiper inset. Track geometry is explained but independent drawable/mapping transfer and later generation rewrite are not recovered. Same partial boundary as earlier rounds/raw Guide rep1. Generation-end output is still conflated with the early 40vp scaffold in narrative."},
+    {"id":"F10-07","report_id":"9ac26a397fcc4686","units":{"test-bridge":"correct","error-observer":"correct"},"basis":"Both later test bridge and ECAT observer contract boundaries are explained; initial immersive/window implementation retained as context, not treated as missing business."},
+    {"id":"F10-08","report_id":"1d30e724962c42e6","units":{"identity-phase-and-conflict":"correct","icon-scope":"partial"},"basis":"Finds explicit dev-identity scope and later task. Does not recover entry-layered assets copied into AppScope; treats absence of native file writes as inability to resolve the available script-copy evidence. Final mechanical status remains needs_revision."},
+    {"id":"F10-09","report_id":"deef419c22a74a13","units":{"hit-test":"correct"},"basis":"Block to Default and child event routing local cause correct, first author bounded unknown. Repaired output is wrongly labelled propagated in the model's node roles."},
+    {"id":"F10-10","report_id":"bb55cc1d2c2041b0","units":{"signing-reference":"correct"},"basis":"Correctly distinguishes product reference from existing material and uncertain initial author. False absence of later signed/build receipt remains an additional error."}
+  ],
+  "summary":{"correct":15,"partial":5,"omitted":8,"wrong":0,"total":28,"unit_weighted_percent":53.5714285714,"file_weighted_percent":71.3333333333},
+  "additional_errors":[
+    {"case":"F10-02","major":true,"quote":"本次窗口未发现 SplashPage.ets 的其他原生修改；因此没有其他目标文件修改需要归因","counterevidence":"Window includes the mask, image, back-gate and progress script modifications documented in the frozen Splash reference. Native-op absence cannot establish absence of target script writes."},
+    {"case":"F10-04","major":true,"quote":"源码签名显示 F013Service.setDebug 实际把状态写入 AppTrackConfig.isDebug","counterevidence":"The method is owned by class AppTrackConfig, not class F013Service. Root transcript L5110 compiler error and L5115 class discovery, followed by L5126/5127 corrected call."},
+    {"case":"F10-10","major":true,"quote":"未见观察截止前 signed HAP 的成功回执","counterevidence":"Repair rollout 01a021e5 at L7694 contains later successful build/install evidence before cutoff. Native query trace shows all-pool/agent searches within the correct end time, but incomplete result inspection; not a time-cutoff exclusion."},
+    {"case":"F10-03","major":true,"quote":"finding A / origin_visual_gap: role=origin; 修复者收到构建/修复入口并读取两份 round-1 缺陷记录","counterevidence":"These are the visual fixer's inputs, not evidence it introduced the initial button error. The report schema defines origin as problem introduction, not discovery. Faithful red rendering would expose a wrong model attribution, not certify it."}
+  ],
+  "cost":{"model_seconds_sum":2056.6732334,"input_plus_output":9112826,"accounting":"Cached input included once; thinking not double counted. Offline audit/import separate."},
+  "accepted":false
+}

@@ -1,0 +1,14 @@
+{
+  "schema":"inquiry-developer-score/1",
+  "round":"i08","model":"gpt-5.6-luna","effort":"medium",
+  "reference":"../file-first-10/scoring-core.json",
+  "grading":"Developer review of two original submissions, not blind and not a full-cohort result.",
+  "cases":[
+    {"id":"F10-01","report_id":"bebb905b00da47ef","units":{"mask":"omitted","images":"correct","cta":"correct","price":"partial","indicator":"correct","repair-compile":"wrong"},"basis":"Calls-first recovers image/CTA/indicator script changes. Price remains incompletely grounded. Crucially invents private price helpers in the initial converter and attributes the error to later Slice8 wiring, contradicting their actual repair-time creation. No acceptance despite more topics found."},
+    {"id":"F10-03","report_id":"79213e43fc4e4cc7","units":{"label":"partial","button-style":"correct","test-integration":"correct","logging":"partial","comment-policy":"correct"},"basis":"Post-platform hygiene explanation is sufficient at the frozen comment core level, but explicit Roll oracle and visual-repair console birth still missing. One emitted frame is not fully present in host output."}
+  ],
+  "summary":{"correct":6,"partial":3,"omitted":1,"wrong":1,"total":11},
+  "additional_errors":[{"case":"F10-01","major":true,"quote":"初版含 private static priceDigits/priceSuffix；Slice 8 任务要求接线已有 MemberCenterPage","counterevidence":"Initial converter Write L61 has no such helper. Visual fixer agent-a68daf720e780b4c2 L592 introduces private helpers on July 26; build-verify agent-af0e3d2ae54dbf769 then reports/fixes visibility. Slice8 is July 24 generation, not their creator/user."}],
+  "cost":{"model_seconds_sum":729.7298197,"input_plus_output":2754762},
+  "accepted":false
+}

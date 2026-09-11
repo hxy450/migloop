@@ -183,16 +183,7 @@ def check(engine, text, *, save=False):
                 else node["key"]
             )
             try:
-                existence_query = {
-                    "op": node["kind"],
-                    "key": key,
-                    "at": node["at"],
-                    "limit": 1,
-                }
-                if node["kind"] == "file" and "/" in key:
-                    # Basename hits are useful navigation, not proof of a claimed full path.
-                    existence_query["terms"] = [key, key.replace("/", "\\")]
-                exists = engine.query(existence_query)["total"] > 0
+                exists = engine.store.has_records(node["kind"], key, at)
             except ValueError:
                 exists = False
             refs = verify_refs(node.get("evidence", []), at, f"{fid}.{nid}")

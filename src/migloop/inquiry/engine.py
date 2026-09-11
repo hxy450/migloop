@@ -141,7 +141,7 @@ def selected(value, pointer):
 
 
 class Engine:
-    FRAME = 6000
+    FRAME = 9000
 
     def __init__(self, store: Store, *, session="diagnostic", origin="manual"):
         self.store = store
@@ -164,6 +164,10 @@ class Engine:
         if kind not in ("file", "agent", "pool"):
             raise ValueError("scope kind must be file, agent or pool")
         key = request.get("key")
+        if kind == "pool" and key is not None:
+            raise ValueError(
+                "pool search does not accept key; use kind=agent or file for a bounded search"
+            )
         if kind == "agent":
             if not isinstance(key, str) or not key:
                 raise ValueError("agent key required")
@@ -203,10 +207,16 @@ class Engine:
                 "terms must contain 0–8 nonempty literal strings, each <=500 chars"
             )
         if terms:
-            clauses.append(
-                "(" + " OR ".join("literal_contains(r.body,?)" for _ in terms) + ")"
-            )
+            match = " OR ".join("literal_contains(r.body,?)" for _ in terms)
             values.extend(t.casefold() for t in terms)
+            if request.get("view") == "calls":
+                match += (
+                    " OR EXISTS (SELECT 1 FROM pairs p JOIN records o ON p.b=o.ref WHERE p.a=r.ref AND o.at<=? AND ("
+                    + " OR ".join("literal_contains(o.body,?)" for _ in terms)
+                    + "))"
+                )
+                values.extend([at, *(t.casefold() for t in terms)])
+            clauses.append("(" + match + ")")
         return (
             " AND ".join(clauses),
             values,
@@ -577,6 +587,16 @@ class Engine:
             messages = self.query(
                 {**request, "view": "messages", "offset": 0, "limit": 3}
             )
+            if messages["total"] > len(messages["rows"]):
+                first = self.query(
+                    {
+                        **request,
+                        "view": "messages",
+                        "offset": messages["total"] - 1,
+                        "limit": 1,
+                    }
+                )
+                messages["rows"] = first["rows"] + messages["rows"]
             grouped = {}
             other = 0
             for relation in relations:
@@ -606,8 +626,9 @@ class Engine:
                     for r in messages["rows"]
                 ],
                 "input_message_total": messages["total"],
+                "input_message_selection": "earliest matching message plus latest three; use messages to see all",
                 "message_query": {**request, "view": "messages", "offset": 0},
-                "note": "Read-file returns are one input channel, not all inputs. input_messages gives recent recorded task/follow-up messages: open their cites for the actual assignment. Other reads: relations; shell/tool outputs: records/search. Delivery does not prove attention or active context.",
+                "note": "Read-file returns are one input channel, not all inputs. input_messages includes the earliest and recent messages in this scope: open their cites for the actual assignment. Other reads: relations; shell/tool outputs: records/search. Delivery does not prove attention or active context.",
             }
         if view == "relations":
             return {
@@ -658,6 +679,10 @@ class Engine:
             unknown_values,
         ).fetchone()[0]
         total = self.store.db.execute("SELECT COUNT(*)" + table, values).fetchone()[0]
+        if offset and offset >= total:
+            raise ValueError(
+                f"offset {offset} is outside this query's {total} matches; restart at offset=0 after changing scope or terms"
+            )
         rows = self.store.rows(
             "SELECT r.ref,r.at,r.kind,r.body,r.summary,s.name,s.agent,r.line"
             + table
@@ -906,6 +931,20 @@ class Engine:
             except (ValueError, KeyError, IndexError, TypeError, OSError) as exc:
                 results.append({"query": request, "ok": False, "error": str(exc)})
             body = self.render(1, results[0])
+            data = results[0].get("data", {})
+            context = {
+                k: data[k]
+                for k in (
+                    "cite",
+                    "source",
+                    "line",
+                    "at",
+                    "record_owner",
+                    "scope_id",
+                    "scope",
+                )
+                if k in data
+            }
             identity = uuid.uuid4().hex[:16]
             with self.store.db:
                 self.store.db.execute(
@@ -920,6 +959,7 @@ class Engine:
                                 "queries": [request],
                                 "batch": batch,
                                 "item": number,
+                                "context": context,
                             }
                         ),
                         encode(results),
@@ -1039,11 +1079,13 @@ class Engine:
         chunk = body[offset : offset + (_limit if _limit is not None else self.FRAME)]
         end = offset + len(chunk)
         next_offset = end if end < len(body) else None
+        context = json.loads(rows[0]["request"]).get("context")
         frame = (
             f"RESULT {identity} chars={len(body)} range={offset}:{end}\n"
             + chunk
             + f"\nEND FRAME next={next_offset if next_offset is not None else 'none'}; "
             "server_sent_only; not proof of model visibility or understanding"
+            + ("; CONTEXT " + encode(context) if context else "")
         )
         with self.store.db:
             self.store.db.execute(
