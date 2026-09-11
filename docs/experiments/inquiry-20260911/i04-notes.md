@@ -20,3 +20,17 @@
 ## 尚未解决
 
 机械校验不检查每个因果句子的真实性；自由正文中的伪造e-引用仍有校验空洞。原生读清单不包含全部shell/派发/消息输入。中间未知脚本不重放，也不根据目录猜作者。上述边界不能由“79测试通过”消除，需看实际Luna输出。
+
+## 三跑结果：不接受
+
+开发者按冻结核心和原文核验，非盲评。F10-01核心4/6（images/cta/indicator/repair-compile覆盖，price partial，mask wrong：未区分透明/深色且错误说4处统一补Palette）；F10-03核心2/5（button-style/comment-policy覆盖，label/logging partial，test-integration wrong：声称export后来撤回）；F10-09局部核心1/1。共3文件12核心中的7项，不是整个10文件分数。两个较复杂文件没有达标，不以Token下降作收益结论。
+
+| 文件 | 秒数 | 总token | 帧完整呈现 | report_id | 状态 |
+|---|---:|---:|---:|---|---|
+| 会员页 | 402.08 | 1,704,437 | 72/74 | 85ed61ec3f174d23 | needs_revision |
+| Dice Index | 236.58 | 1,762,730 | 88/88 | fb65e8319e044d66 | needs_revision |
+| Codex Launch | 164.53 | 1,101,130 | 42/42 | fea3534b124c44ac | valid，仅机械 |
+
+原文反证：Dice报告“之后整理撤回该导出”对应`agent-a228e9716d833cbf3.jsonl:L85`，原始diff中`export class Dice`是带空格的未变上下文，未被删除。会员页“回执明确报告本页4 sites”对应fixer L104原文3 sites；价格仍未使用Slice8 L24输入/L264输出。其query日志已实际列出Slice8输入清单，包括MemberCenterActivitiy.kt，但发现清单不等于展开并完成归因。Codex“没有修复后的新HAP”应限定当次修补，不能对完整观察窗口作无条件否定；报告把generated_dialog放到了agent scope上，节点主语仍有歧义。
+
+真实Chrome载入Dice原稿通过：各finding节点/边与服务端图一致，显示原因、原文，手动探索不改调查轨迹；只读折叠前后数量一致，写前输入保留相同agent和时间。图6条可核边，不绘另外2条未核边，仍明确needs_revision。截图与审计`_migloop-scratch/inquiry-i04-dice-browser`，不是成功归因示范。

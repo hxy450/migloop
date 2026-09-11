@@ -156,7 +156,10 @@
         <button id="query">查原文索引</button
         ><button id="relations">查读写关系</button
         ><button id="calls">查相关调用</button
+        ><button id="changes">展开原生修改</button
+        ><button id="history">片段修改历史</button
         ><button id="inputs">查 Agent 已收输入</button
+        ><button id="messages">查 Agent 任务消息</button
         ><button id="agents">Agent目录</button
         ><button id="files">文件目录</button>
         <div id="status" class="small muted"></div>
@@ -308,6 +311,17 @@
           element('div', `${row.path} · 返回 ${row.deliveries} 次`, box);
           for (const ref of row.results)
             button(ref,box,()=>open(ref,at));
+        } else if (data.kind === 'changes' || data.kind === 'blame') {
+          element('div',`${row.at} · ${row.agent||'未知归属'} · ${row.strength}`,box,'small');
+          for(const payload of row.payloads || []) {
+            element('div',`${payload.tool} · 原记录块 ${payload.block}（请求正文不等于效果认证）`,box,'small');
+            element('pre',typeof payload.body==='string'?payload.body:JSON.stringify(payload.body,null,2),box);
+          }
+          for(const hit of row.term_deltas || []) {
+            element('div',`${hit.term} · ${hit.delta} · 块 ${hit.block} / 步 ${hit.step}`,box,'small');
+            element('pre',`OLD\n${hit.old_lines.join('\n')}\nNEW\n${hit.new_lines.join('\n')}`,box);
+          }
+          for(const ref of [row.request,row.result].filter(Boolean)) button('原始依据',box,()=>open(ref,at));
         } else {
           element("div", `${row.op} · ${row.strength} · ${row.status}`, box);
           element("div", row.agent || "作者未知", box, "small");
@@ -319,6 +333,16 @@
             button('打开该次文件',box,()=>query({op:'file',scope:row.op==='read'?row.from_scope:row.to_scope}));
           }
         }
+      }
+      if (data.input_messages) {
+        const group=element('details','',$('records'));
+        group.open=true;
+        element('summary',`收到的历史消息 ${data.input_message_total} 条，最近 ${data.input_messages.length} 条入口`,group);
+        for(const row of data.input_messages) {
+          const box=element('div',row.excerpt,group,'row small');
+          button('展开历史任务原文',box,()=>open(row.cite,at));
+        }
+        button('查看全部消息',group,()=>query(data.message_query));
       }
       if (data.next !== null && data.next !== undefined)
         button("下一页", $("records"), () =>
@@ -356,37 +380,18 @@
     }
     async function open(ref, at, undated = false) {
       const data = await api("/api/query", { op: "open", ref, at, undated });
-      let decoded = data.text;
-      try {
-        const raw = JSON.parse(data.text);
-        const blocks = raw.message?.content;
-        if (Array.isArray(blocks)) {
-          decoded = blocks
-            .map((block) => {
-              const value =
-                block.input?.content ??
-                block.input?.command ??
-                block.text ??
-                block.content ??
-                block;
-              return typeof value === "string"
-                ? value
-                : JSON.stringify(value, null, 2);
-            })
-            .join("\n\n");
-        } else if (raw.payload) {
-          const value =
-            raw.payload.output ??
-            raw.payload.input ??
-            raw.payload.arguments ??
-            raw.payload;
-          decoded =
-            typeof value === "string" ? value : JSON.stringify(value, null, 2);
-        }
-      } catch {}
-      $("rawRecord").textContent = data.text;
+      $("rawRecord").textContent = '展开此处读取完整原始记录。';
+      $('rawRecord').dataset.ref=ref;
       $("original").textContent =
-        `${data.source}:${data.line}\n${data.at || "时间未知"} · 正文字段解码显示\n\n${decoded}`;
+        `${data.source}:${data.line}\n${data.at || "时间未知"} · 与MCP共用的原生正文\n\n${data.text}`;
+      const detail=$('rawRecord').closest('details');
+      const loadRaw=async()=>{
+        if(!detail.open) return;
+        const raw=await api('/api/query',{op:'open',ref,at,undated,pointer:''});
+        if($('rawRecord').dataset.ref===ref) $('rawRecord').textContent=raw.text;
+      };
+      detail.ontoggle=()=>guard(loadRaw);
+      if(detail.open) await loadRaw();
     }
     function svg(tag, attrs, parent) {
       const e = document.createElementNS(NS, tag);
@@ -456,7 +461,7 @@
         const a = positions.get(e.from),
           b = positions.get(e.to);
         if (!a || !b) continue;
-        svg(
+        const wire=svg(
           "path",
           {
             d: `M${a.x + 245},${a.y + 34} C${a.x + 265},${a.y + 34} ${b.x - 20},${b.y + 34} ${b.x},${b.y + 34}`,
@@ -468,6 +473,7 @@
           },
           root,
         );
+        svg('title',{},wire).textContent=e.claim;
       }
       for (const n of nodes) {
         const p = positions.get(n.id),
@@ -501,7 +507,7 @@
           { x: 10, y: 43, "font-size": 11, fill: "#65748b" },
           g,
         ).textContent =
-          `${{ origin: "问题进入", propagated: "问题保留", context: "输入/背景", repaired: "修复", unknown: "未定" }[n.role]} · 模型主张${n.exists ? "" : " · 节点未核"}`;
+          n.generated_context ? '原生证据端点 · 未归因' : `${{ origin: "问题进入", propagated: "问题保留", context: "输入/背景", repaired: "修复", unknown: "未定" }[n.role]} · 模型主张${n.exists ? "" : " · 节点未核"}`;
         svg(
           "text",
           { x: 10, y: 58, "font-size": 10, fill: "#65748b" },
@@ -529,9 +535,18 @@
           element('summary','展开只读形状依据（不认证运行效应）',detail);
           for (const row of c.read_only_shapes) button(row.ref,detail,()=>open(row.ref,(graph.target||graph.document.target).at));
         }
-        for (const row of [...c.unassessed,...c.unknown]) {
-          const box=element('div', row.reason || row.summary, $('gaps'),'row small');
-          button(row.ref,box,()=>open(row.ref,(graph.target||graph.document.target).at));
+        for (const [label,rows] of [['未判明调用',c.unassessed],['模型明确保留未知',c.unknown]]) {
+          if(!rows.length) continue;
+          const group=element('details','',$('gaps'));
+          element('summary',`${label} ${rows.length} 条（展开全部）`,group);
+          for(const row of rows) {
+            const box=element('div',row.reason||row.summary,group,'row small');
+            button(row.ref,box,()=>open(row.ref,(graph.target||graph.document.target).at));
+          }
+        }
+        for (const row of c.unattributed_native_writes||[]) {
+          const box=element('div','尚未归因的原生写入',$('gaps'),'error small');
+          for(const ref of row.refs) button(ref,box,()=>open(ref,(graph.target||graph.document.target).at));
         }
       }
       for (const row of graph.missing_evidence_links || [])
@@ -540,7 +555,7 @@
     function showNode(n) {
       $("reasonTitle").textContent = n.key;
       $("reason").replaceChildren();
-      element("span", "模型主张，不是因果认证", $("reason"), "badge");
+      element("span", n.generated_context ? "自动证据节点，模型未归因" : "模型主张，不是因果认证", $("reason"), "badge");
       element("p", n.reason, $("reason"));
       button("独立打开节点", $("reason"), () => {
         $("kind").value = n.kind;
@@ -615,7 +630,13 @@
     $("query").onclick = () => guard(() => query(request()));
     $("relations").onclick = () => guard(() => query(request("relations")));
     $("calls").onclick = () => guard(() => query(request("calls")));
+    $("changes").onclick = () => guard(() => query(request("changes")));
+    $("history").onclick = () => guard(() => {
+      if ($('kind').value !== 'file') throw new Error('片段历史需要选择文件');
+      const q=request(); delete q.view; q.op='blame'; return query(q);
+    });
     $("inputs").onclick = () => guard(() => query(request("inputs")));
+    $("messages").onclick = () => guard(() => query(request("messages")));
     $("agents").onclick = () =>
       guard(() => query({ op: "catalog", kind: "agent", limit: 20 }));
     $("files").onclick = () =>

@@ -177,7 +177,8 @@ def test_coverage_surfaces_opaque_call_without_assuming_a_modification(tmp_path)
         "findings": [],
     }
     graph = report.check(engine, json.dumps(doc))
-    assert graph["mechanical_status"] == "needs_revision"
+    assert graph["mechanical_status"] == "valid"
+    assert not graph["coverage"]["complete"]
     gap = graph["coverage"]["unassessed"][0]
     assert gap["recorded_effects"] == []
     doc["reviewed"] = [
@@ -230,16 +231,22 @@ def test_writer_scope_does_not_include_inputs_received_after_its_write(tmp_path)
     file = engine.query({"op": "file", "key": "A.ets", "at": ts(15)})
     actor = next(p for p in file["participants"] if p["writes"])
     search = engine.query(
-        {"op": "search", "scope": actor["scope"], "terms": ["FUTURE INPUT"]}
+        {"op": "search", "scope": actor["input_scope"], "terms": ["FUTURE INPUT"]}
     )
     assert search["total"] == 0
-    assert engine.store.handle_value(actor["scope"], "s")["at"].startswith(
+    assert engine.store.handle_value(actor["write_scope"], "s")["at"].startswith(
         "2026-01-01T00:00:02"
+    )
+    assert (
+        engine.query(
+            {"op": "search", "scope": actor["scope"], "terms": ["FUTURE INPUT"]}
+        )["total"]
+        == 1
     )
     ref = engine.store.locate("a.jsonl", 1)
     opened = engine.query({"op": "open", "ref": ref, "at": ts(15)})
     assert engine.store.handle_value(opened["record_owner_scope"], "s")["key"] == "a"
-    assert opened["native_links"][0]["from_scope"] == actor["scope"]
+    assert opened["native_links"][0]["from_scope"] == actor["write_scope"]
     engine.store.close()
 
 

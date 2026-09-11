@@ -21,7 +21,8 @@ def reconcile(engine, target, document, explained):
         calls.extend(part["rows"])
         offset = part["next"]
     by_request = {}
-    for effect in engine.relations("pool", None, timestamp(at, required=True)):
+    effects = engine.relations("pool", None, timestamp(at, required=True))
+    for effect in effects:
         by_request.setdefault(effect["request"], []).append(effect)
     dispositions, errors = {}, []
     for value in document.get("reviewed", []):
@@ -99,12 +100,36 @@ def reconcile(engine, target, document, explained):
             unknown.append({**summary, "reason": assessment["reason"]})
         else:
             excluded.append({**summary, "reason": assessment["reason"]})
+    native_gaps = []
+    for effect in effects:
+        refs = {effect["request"], effect["result"]} - {None}
+        if (
+            effect["path"] != key
+            or effect["op"] not in ("write", "delete")
+            or effect["strength"] != "confirmed"
+            or effect["at"] is None
+            or (since is not None and effect["at"] < timestamp(since, required=True))
+            or refs.intersection(explained)
+        ):
+            continue
+        native_gaps.append(
+            {
+                "operation": effect["id"],
+                "at": effect["at"],
+                "op": effect["op"],
+                "refs": [
+                    engine.store.handle("e", {"ref": ref}) for ref in sorted(refs)
+                ],
+            }
+        )
     return {
         "explained": covered,
         "unassessed": missing,
         "unknown": unknown,
         "model_excluded": excluded,
         "read_only_shapes": readonly,
+        "unattributed_native_writes": native_gaps,
+        "complete": not (missing or unknown or native_gaps or errors),
         "issues": errors,
-        "note": "Call candidates are not confirmed modifications. read_only_shapes assumes standard tool/command semantics, not observed filesystem effects; include_reads=true unfolds them. Model exclusions/reasons are not certified effects.",
+        "note": "Accounting only, not causal/effect certification. Unassessed opaque calls remain visible but are not automatically modifications; native writes require attribution or an explicit qualified disposition. read_only_shapes assumes standard semantics; include_reads=true unfolds them. Model exclusions/reasons are not certified effects.",
     }

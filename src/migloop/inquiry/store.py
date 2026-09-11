@@ -105,7 +105,7 @@ CREATE TEMP TABLE parts(record TEXT,source TEXT,slot INT,family TEXT,role TEXT,c
 CREATE INDEX pair_calls ON parts(source,family,call_id);
 CREATE TABLE pairs(a TEXT,b TEXT,PRIMARY KEY(a,b));
 CREATE TABLE effects(id TEXT PRIMARY KEY,path TEXT,agent TEXT,op TEXT,strength TEXT,at INT,
- request TEXT,result TEXT,status TEXT,basis TEXT);
+ request TEXT,result TEXT,status TEXT,basis TEXT,request_slot INT,result_slot INT);
 CREATE INDEX effect_path ON effects(path,at);
 CREATE INDEX effect_agent ON effects(agent,at);
 CREATE TABLE dispatches(id TEXT PRIMARY KEY,parent TEXT,child TEXT,at INT,request TEXT,result TEXT);
@@ -115,7 +115,39 @@ CREATE TABLE frames(run TEXT,offset INT,text TEXT,sha TEXT,PRIMARY KEY(run,offse
 CREATE TABLE visible(run TEXT,offset INT,complete INT,observed TEXT);
 CREATE TABLE handles(id TEXT PRIMARY KEY,kind TEXT,payload TEXT);
 CREATE TABLE calls(record TEXT,slot INT,tool TEXT,read_basis TEXT,PRIMARY KEY(record,slot));
+CREATE TABLE input_messages(record TEXT PRIMARY KEY,role TEXT);
 """
+
+
+def input_role(record):
+    message = record.get("message")
+    if not isinstance(message, dict):
+        payload = record.get("payload")
+        if (
+            record.get("type") == "event_msg"
+            and isinstance(payload, dict)
+            and payload.get("type") == "user_message"
+        ):
+            return "user"
+        message = (
+            payload
+            if isinstance(payload, dict) and payload.get("type") == "message"
+            else {}
+        )
+    role = message.get("role", record.get("type"))
+    content = message.get("content")
+    if role in ("user", "system", "developer") and (
+        isinstance(content, str)
+        and bool(content)
+        or isinstance(content, list)
+        and any(
+            isinstance(b, dict)
+            and b.get("type") in ("text", "input_text", "image", "input_image")
+            for b in content
+        )
+    ):
+        return role
+    return None
 
 
 def parts(record):
@@ -227,7 +259,7 @@ class Store:
             deterministic=True,
         )
         schema = self.db.execute("SELECT value FROM meta WHERE key='schema'").fetchone()
-        if schema is None or schema[0] != "inquiry/index/2":
+        if schema is None or schema[0] != "inquiry/index/3":
             self.db.close()
             raise ValueError(
                 "incomplete or incompatible index; import into a new path or use its frozen code"
@@ -257,7 +289,7 @@ class Store:
             for source in sources:
                 cls._import(db, source)
             cls._effects(db)
-            db.execute("INSERT INTO meta VALUES(?,?)", ("schema", "inquiry/index/2"))
+            db.execute("INSERT INTO meta VALUES(?,?)", ("schema", "inquiry/index/3"))
             db.commit()
         finally:
             db.close()
@@ -333,6 +365,9 @@ class Store:
                     "INSERT OR IGNORE INTO mentions VALUES(?,?)",
                     [(name.casefold(), ref) for name in set(_FILE_TOKEN.findall(body))],
                 )
+                role = input_role(record)
+                if role:
+                    db.execute("INSERT INTO input_messages VALUES(?,?)", (ref, role))
                 for slot, family, role, cid, tool, payload, success in parts(record):
                     if role in ("request", "patch"):
                         db.execute(
@@ -360,14 +395,30 @@ class Store:
 
     @staticmethod
     def _effects(db):
-        def effect(path, owner, op, strength, at, request, result, status, basis):
+        def effect(
+            path,
+            owner,
+            op,
+            strength,
+            at,
+            request,
+            result,
+            status,
+            basis,
+            request_slot,
+            result_slot,
+        ):
             if not isinstance(path, str) or not path:
                 return
             normalized = path_key(path, owner["cwd"])
-            identity = digest(encode([normalized, op, request, result]).encode())[:24]
+            identity = digest(
+                encode(
+                    [normalized, op, request, request_slot, result, result_slot]
+                ).encode()
+            )[:24]
             db.execute("INSERT OR IGNORE INTO files VALUES(?)", (normalized,))
             db.execute(
-                "INSERT OR IGNORE INTO effects VALUES(?,?,?,?,?,?,?,?,?,?)",
+                "INSERT OR IGNORE INTO effects VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
                 (
                     identity,
                     normalized,
@@ -379,6 +430,8 @@ class Store:
                     result,
                     status,
                     basis,
+                    request_slot,
+                    result_slot,
                 ),
             )
 
@@ -503,6 +556,8 @@ class Store:
                 result["record"] if ordered else None,
                 "copied_owner" if copied else status,
                 "native_tool",
+                request["slot"],
+                result["slot"] if ordered else None,
             )
         for part in db.execute("SELECT * FROM parts WHERE role='patch'").fetchall():
             changes = json.loads(part["payload"])
@@ -525,6 +580,8 @@ class Store:
                         part["record"],
                         "native_observation",
                         "patch_apply_end",
+                        None,
+                        part["slot"],
                     )
 
     def rows(self, sql, values=()):
@@ -534,7 +591,7 @@ class Store:
         if isinstance(ref, str) and ref.startswith("e-"):
             ref = self.handle_value(ref, "e")["ref"]
         rows = self.rows(
-            "SELECT r.*,s.path,s.name,s.agent FROM records r JOIN sources s ON r.source=s.id WHERE ref=?",
+            "SELECT r.*,s.path,s.name,s.agent,s.cwd FROM records r JOIN sources s ON r.source=s.id WHERE ref=?",
             (ref,),
         )
         if not rows:
@@ -550,7 +607,8 @@ class Store:
     def handle(self, kind, payload):
         """Short, content-addressed coordinates; never generated claims or facts."""
         body = encode(payload)
-        identity = kind + "-" + digest(body.encode())[:12]
+        prefix = kind + ("-" + payload["kind"] if kind == "s" else "")
+        identity = prefix + "-" + digest(body.encode())[:12]
         old = self.rows("SELECT kind,payload FROM handles WHERE id=?", (identity,))
         if old and (old[0]["kind"] != kind or old[0]["payload"] != body):
             raise ValueError("coordinate hash collision")

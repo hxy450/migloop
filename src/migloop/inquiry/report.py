@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import json
+import re
 import uuid
 
 from .coverage import reconcile
 from .engine import bounds, in_scope
+from .evidence_graph import attach
 from .store import digest, encode, iso, timestamp
 
 
@@ -80,6 +82,13 @@ def check(engine, text, *, save=False):
                 issues.append({"where": where, "ref": ref, "error": str(exc)})
         return valid
 
+    def verify_text(value, at, where):
+        if isinstance(value, str):
+            verify_refs(re.findall(r"\be-[0-9a-f]{8,64}\b", value), at, where)
+        elif isinstance(value, list):
+            for item in value:
+                verify_text(item, at, where)
+
     seen_findings = set()
     for index, finding in enumerate(document["findings"]):
         if not isinstance(finding, dict) or set(finding) - {
@@ -98,6 +107,21 @@ def check(engine, text, *, save=False):
         if not isinstance(fid, str) or not fid or fid in seen_findings:
             raise ValueError("finding IDs must be nonempty and unique")
         seen_findings.add(fid)
+        if not isinstance(finding.get("nodes", []), list) or any(
+            not isinstance(n, dict) for n in finding.get("nodes", [])
+        ):
+            raise TypeError("nodes must be a list of objects")
+        original_node_ids = {
+            n.get("id") for n in finding.get("nodes", []) if isinstance(n, dict)
+        }
+        automatic_edges = "edges" not in finding
+        finding = attach(engine, finding, target)
+        for field in ("title", "reason", "unknown", "hypothesis", "recommendation"):
+            verify_text(
+                finding.get(field),
+                timestamp(target["at"], required=True),
+                f"{fid}.{field}",
+            )
         if any(
             not isinstance(finding.get(k), str) or not finding[k].strip()
             for k in ("title", "reason")
@@ -172,6 +196,7 @@ def check(engine, text, *, save=False):
             except ValueError:
                 exists = False
             refs = verify_refs(node.get("evidence", []), at, f"{fid}.{nid}")
+            verify_text(node["reason"], at, f"{fid}.{nid}.reason")
             if not exists:
                 issues.append(
                     {
@@ -187,10 +212,12 @@ def check(engine, text, *, save=False):
                 "exists": exists,
                 "valid_refs": sorted(refs),
                 "semantic_verified": False,
+                "generated_context": nid not in original_node_ids,
             }
             local[nid] = bound
             nodes.append(bound)
         for edge in finding.get("edges", []):
+            operation_id = None
             if not isinstance(edge, dict) or set(edge) - {
                 "from",
                 "to",
@@ -206,6 +233,7 @@ def check(engine, text, *, save=False):
                         "edge uses link or explicit evidence/relation, not both"
                     )
                 coordinate = engine.store.handle_value(edge["link"], "l")
+                operation_id = coordinate["operation"]
                 edge = {**edge, **{k: coordinate[k] for k in ("relation", "evidence")}}
             if edge.get("relation") not in (
                 "read",
@@ -263,28 +291,43 @@ def check(engine, text, *, save=False):
                     and origin["exists"]
                     and destination["exists"]
                 ):
+                    matches = []
                     for operation in engine.relations("file", file["key"], cutoff):
                         expected = {operation["request"], operation["result"]} - {None}
                         if (
                             operation["agent"] == agent["key"]
+                            and (
+                                operation_id is None or operation["id"] == operation_id
+                            )
                             and operation["op"] == op
                             and expected
                             and expected <= refs
                         ):
-                            bound = {
-                                **edge,
-                                "from": origin["id"],
-                                "to": destination["id"],
-                                "finding": fid,
-                                "strength": operation["strength"],
-                                "operation": operation["id"],
-                                "semantic_verified": False,
-                            }
-                            break
+                            matches.append(
+                                {
+                                    **edge,
+                                    "from": origin["id"],
+                                    "to": destination["id"],
+                                    "finding": fid,
+                                    "strength": operation["strength"],
+                                    "operation": operation["id"],
+                                    "semantic_verified": False,
+                                }
+                            )
+                    if len(matches) == 1:
+                        bound = matches[0]
+                    elif len(matches) > 1:
+                        reason = "multiple operations share these record references; use the returned link to select its exact block"
             if bound:
+                bound["source"] = "native_evidence" if automatic_edges else "model_edge"
                 edges.append(bound)
             else:
                 unverified.append({**edge, "finding": fid, "diagnostic": reason})
+    verify_text(
+        document.get("unexplained"),
+        timestamp(target["at"], required=True),
+        "unexplained",
+    )
     missing_links = []
     paths = {n["key"] for n in nodes if n["kind"] == "file"} | {
         engine.store.resolve_file(target["file"])
@@ -318,7 +361,7 @@ def check(engine, text, *, save=False):
         if issues
         or unverified
         or missing_links
-        or coverage["unassessed"]
+        or coverage["unattributed_native_writes"]
         or coverage["issues"]
         else "valid",
         "missing_evidence_links": missing_links,

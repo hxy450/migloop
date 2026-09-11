@@ -1,0 +1,29 @@
+{
+  "schema": "inquiry-developer-score/1",
+  "round": "i05",
+  "model": "gpt-5.6-luna",
+  "effort": "medium",
+  "reference": "../file-first-10/scoring-core.json",
+  "grading": "Developer review against frozen core and original evidence, cross-checked against baseline adjudication interpretation. Not independent/blind. Extra false claims remain separate and disqualify no-error acceptance.",
+  "cases": [
+    {"id":"F10-01","report_id":"0b4c3e7d2e5c44a4","units":{"mask":"correct","images":"correct","cta":"correct","price":"partial","indicator":"correct","repair-compile":"correct"},"basis":"Distinguishes transparent/dark masks, image ratio/height, indicator configuration, outer padding and repair-created private helpers. Still no Slice8 delivered Kotlin L24 to output L264 attribution; early converter inputs cannot substitute. Four-controller wording does not establish four actual repairs."},
+    {"id":"F10-02","report_id":"57ba7c1f3bdb421c","units":{"mask":"omitted","icon":"correct","back-gate":"partial","progress":"correct","system-bars":"correct"},"basis":"Explains image dimensions, existing Progress styling, hide/restore lifecycle. Back-gate stops at Slice11 isModal assertion, misses initial handler followed by assembly removal; no target mask attribution."},
+    {"id":"F10-03","report_id":"81587d2d11524624","units":{"label":"partial","button-style":"correct","test-integration":"correct","logging":"omitted","comment-policy":"omitted"},"basis":"Explains button shape and later export/UI ids with bounded phase responsibility. Does not recover explicit AC14 Roll oracle. Thirteen native edits are parked as reviewed unknown, not explained; console repair origin and quality/comment cleanup absent."},
+    {"id":"F10-04","report_id":"c56c538f26cf4f45","units":{"debug-wiring":"correct","wrong-class-repair":"correct"},"basis":"Existing runtime branch needs entry debug setup; F013Service.setDebug is a repair-created error corrected to AppTrackConfig. False denial of subsequent successful build is separately recorded."},
+    {"id":"F10-05","report_id":"6c32008722e742a7","units":{"android-id-unblock":"correct"},"basis":"D-010 instruction requires remaining pending; empty id blocks backend, later persistent hex unblocks testing but is not certified Android/product equivalence."},
+    {"id":"F10-06","report_id":"a382f354eb4f4e51","units":{"back-image-box":"correct","track-vs-control":"partial","bottom-inset":"correct"},"basis":"Image frame/padding and host Swiper inset are correct. Track identifies 20 vs 4 but not bounded generation drawable/mapping handoff and later propagation; same partial interpretation as raw F10-06 rep1. False missing WindowModel/native-write claim remains separate."},
+    {"id":"F10-07","report_id":"1310b4833cfe4ba4","units":{"test-bridge":"correct","error-observer":"correct"},"basis":"Both later test bridge and ECAT observer phase boundaries are explained; not assumed original required business. Overly narrow initial import summary is an extra factual error, not a new core unit."},
+    {"id":"F10-08","report_id":"9216780f7f154d30","units":{"identity-phase-and-conflict":"correct","icon-scope":"partial"},"basis":"Dev-identity explicitly prohibits bundle/vendor changes; later task broadens scope. Icon switch found but entry assets copied into AppScope and resource scope relationship not explained."},
+    {"id":"F10-09","report_id":"0e19bdd9b15a4924","units":{"hit-test":"correct"},"basis":"Block to Default and child-hit mechanism covered, initial author unknown. Calling repair-time read generation-time original is a separate phase error."},
+    {"id":"F10-10","report_id":"a59b23565d294adf","units":{"signing-reference":"correct"},"basis":"Product reference to existing default configuration explains unsigned output; no confusion with API request signing, original author bounded unknown."}
+  ],
+  "summary":{"correct":20,"partial":5,"omitted":3,"wrong":0,"total":28,"unit_weighted_percent":71.4285714286,"file_weighted_percent":80.0},
+  "additional_errors":[
+    {"case":"F10-04","major":true,"quote":"材料没有给出修复后针对该文件的成功编译回执","counterevidence":"9b3105a2-85ec-4889-9786-b3c220f06754.jsonl:L5131, 2026-07-25T01:56:28.547Z, BUILD SUCCESSFUL in 5 s 498 ms. Last-write default scope clipped this later receipt."},
+    {"case":"F10-06","major":true,"quote":"修复记录中 windowModel 的声明/导入来源及其与现有页面状态模型的接线未被原生写入证据覆盖","counterevidence":"agent-aslice15-guide-a061e53a1d9503b4.jsonl:L181/182 successful whole-file generation rewrite includes WindowModel; early UI placeholder is not final generation output."},
+    {"case":"F10-09","major":true,"quote":"生成阶段的文件原文在行109使用","counterevidence":"The cited rollout A:L8027 read occurs after generation cutoff A:L7687. Earliest Block insertion actor/time is not recorded; the post-cutoff read cannot be relabelled generation original."},
+    {"case":"F10-07","major":false,"quote":"生成期EntryAbility输出仅导入UIAbility/AbilityConstant/Want、window和hilog","counterevidence":"agent-a349784d2663f1f0a.jsonl:L71 initial Write also imports display, AppStorageV2, BusinessError and WindowModel and implements immersive/avoid-area setup. Extra only claim is inaccurate."}
+  ],
+  "cost":{"model_seconds_sum":1992.33,"input_plus_output":9094412,"accounting":"Includes cached input in input total once; thinking not added twice. Import and offline audit separate. Not a bill estimate."},
+  "accepted":false
+}

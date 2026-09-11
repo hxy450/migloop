@@ -71,8 +71,8 @@ def prepare(root, effort='medium'):
         BASE.RAW.command(case['pool'], config)
         BASE.save(out / 'settings.json', config)
         prompt = task + ('\n本轮操作面与交付补充：保留只读shell，额外提供inquiry MCP。不要调用第二模型；'
-            '由你自己调查并submit完整inquiry/1原稿，查看诊断，必要时自行补查。最终只返回最后一次submit的report_id、source_sha256及简短摘要，'
-            '不重复长稿、不提交未经submit的新原因。以下通用GUIDE不含本题答案。\n\n') + guide
+            '由你自己调查并submit完整inquiry/1原稿，查看诊断，必要时自行补查。最终只返回最后一次submit的report_id、source_sha256两个字段，'
+            '原因和摘要只放submit原稿，不另写散文结论，避免交付两份不同的原因。以下通用GUIDE不含本题答案。\n\n') + guide
         (out / 'prompt.md').write_text(prompt, encoding='utf-8')
         BASE.save(out / 'manifest.json', {'schema': 'inquiry-iteration-case/1', 'case': case,
             'code_root': str(root / 'code/src'), 'index_path': pool['index_path'], 'import_seconds': pool['seconds'],
