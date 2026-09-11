@@ -1,0 +1,21 @@
+{
+  "schema":"inquiry-developer-score/1",
+  "round":"i14-high","model":"gpt-5.6-luna","effort":"high",
+  "reference":"../file-first-10/scoring-core.json",
+  "grading":"Developer semantic review of two final originals, not blind or a whole-cohort acceptance. Frozen core unchanged; source coordinates and literal payloads checked, not inferred from prior handoff summaries.",
+  "cases":[
+    {"id":"F10-03","report_id":"ee3a53d4ddb64bb4","units":{"label":"correct","button-style":"correct","test-integration":"correct","logging":"correct","comment-policy":"correct"},"basis":"Delivered AC14 Roll versus later ROLL oracle conflict is explicit. Native generation Write L75 has no console.error; visual fixer L68 adds it and ECAT L57 replaces it. The report now distinguishes that repair-born logging issue from original generation and the later test/export/id contract. Original task/results checked for these claims."},
+    {"id":"F10-05","report_id":"b53bbc89121d4f8a","units":{"android-id-unblock":"correct"},"basis":"Correctly places failed/successful probes on July23 before generation July24. Actual writer task L1 explicitly supplies the successful test value while forbidding an unapproved D010 solution; generated Write L193 deliberately retains empty ID. Later July25 L5214/L5221 import/inject persistent test ID, not a certified production equivalent."}
+  ],
+  "summary":{"correct":6,"partial":0,"omitted":0,"wrong":0,"total":6,"unit_weighted_percent":100.0},
+  "residual_limits":[
+    {"case":"F10-03","quote":"没有直接记录证明生成者是否读取过 themes.xml…不能据此断言其未读主题","assessment":"Incomplete investigation: generator L40/e-b36ea4332843 contains day/night themes before the Write; its L61 reasoning explicitly discusses the textAllCaps conflict. Unlike i13, this final report does not assert the generator never read the theme. Retain the evidence gap; do not certify all inputs investigated or the hypothesized pipeline mechanism."},
+    {"case":"F10-05","assessment":"Three failed review requests: extra offset/limit, then op=review_query, then key instead of report_id. No successful review query. Final native binding is valid after its own resubmission removes a fabricated redundant citation; real initial Write evidence remains. Error feedback is too generic; don't attribute the correct chronology to this unused review feature."}
+  ],
+  "additional_verified_major_errors":[],
+  "audit_limits":"No identified hard major counterexample in these two final reports is not exhaustive proof of zero false/unsupported claims. Both logging and probe chronology were already correct in the first submissions; no isolated causal claim that the new post-submit hints produced them. The next eight cases use the same frozen candidate, no best-of selection.",
+  "delivery":{"F10-03":{"frames_sent":94,"frames_visible_complete":94,"mechanical_status":"valid","nodes":36,"edges":28},"F10-05":{"frames_sent":97,"frames_visible_complete":97,"mechanical_status":"valid","nodes":6,"edges":3},"semantic_verified":false},
+  "cost":{"model_seconds_sum":817.1146652000025,"input_plus_output":6432033,"by_case":{"F10-03":{"seconds":375.66072220006026,"tokens":3232346},"F10-05":{"seconds":441.4539429999422,"tokens":3199687}}},
+  "accepted":false,
+  "next":"Complete the remaining eight existing files on this frozen candidate before judging cohort acceptance or cost. Do not rerun raw."
+}

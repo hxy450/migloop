@@ -15,7 +15,7 @@
 | [i11-high](i11-high-scores.json) | Splash、Dice Index / high | 8/10 | 返回历史仍缺，日志又被错归初版 |
 | [i12-high](i12-high-scores.json) | 同两题 / high，仅改GUIDE | 8/10 | 无该轮已核核心错归，但仍缺两段历史 |
 | [i13-high](i13-high-scores.json) | 同两题 / high，原生增删清单 | 8/10 | 两段历史仍缺，另有主题输入误判 |
-| [i14-high](i14-plan.md) | Dice Index、F003Repository / high，证据对账与工具返回渠道 | 运行中 | 不预报正确率 |
+| [i14-high](i14-high-pilot-scores.json) | high，证据对账与工具返回渠道 | pilot 6/6；其余8文件运行中 | 不能把两例当整轮通过 |
 
 这些是开发者对冻结核心和原始证据的核验，不是独立盲评。泛化未证。字段/引用/历史边机械valid不是语义正确率。high若有收益，单列模型深度变化，不归功于工具结构。
 
@@ -25,9 +25,9 @@ i11新内核另对i09-high十份原稿重核：原稿全不变，十份仍可机
 
 工程侧：独立内核132项回归通过。Guide真实报告的18节点/11边核验从33.798秒降至0.488秒，结果/原稿一致；原文仍核字节，完整路径和时间边界仍核验。网页的载入、节点原因、原文展开、手动探索与模型轨迹隔离通过，报告选择框也同步当前报告。范围查询现在先用source/ref索引再匹配文本，三个真实查询的完整JSON摘要相同；局部性能不冒充模型端到端收益。新增since下界核验、同actor多个节点按实际引用优先接边、Codex嵌套回执可读投影、批量续页及原生增删概要；未认证原因真假。
 
-i14新增工具返回输入渠道及结论事实对账，浏览器实测通过（`C:/Users/hongy/projects/_migloop-scratch/inquiry-i14-ui-smoke2`），原稿和实际轨迹不被手动查看改写；这是旧i13报告重核的工程检查，不计新模型成绩。独立临时8879测试服务已停止，保留原8878预览。人工评审的错actor与颠倒日志引用已撤回，详见[评审更正](i14-adjudication-corrections.md)，核心标准与分数未变；不能把撤回扣分说成工具修好了模型。
+i14新增工具返回输入渠道及结论事实对账，浏览器实测通过（`C:/Users/hongy/projects/_migloop-scratch/inquiry-i14-ui-smoke2`），原稿和实际轨迹不被手动查看改写；这是旧i13报告重核的工程检查，不计新模型成绩。独立临时8879测试服务已停止。人工评审的错actor与颠倒日志引用已撤回，详见[评审更正](i14-adjudication-corrections.md)，核心标准与分数未变；不能把撤回扣分说成工具修好了模型。
 
-当前预览（服务运行时可用）：http://127.0.0.1:8878/?report=0cbca8a673d74a46 。这是i10的真实Luna Splash原稿，由冻结i13内核重核/展示，不是把旧报告冒充新模型结果。该报告仍有部分归因不足。最新浏览器产物：`C:/Users/hongy/projects/_migloop-scratch/inquiry-i13-frozen-i10-splash`。修改前/后的真实截图都保留，已验证写边不再被同actor的输入背景节点抢走；脚本修复仍没有伪造原生写边。新“原生增删清单”实测52行原生操作与接口52项一致，长Write明确折叠并保留原文入口。
+当前预览（服务运行时可用）：http://127.0.0.1:8878/?report=ee3a53d4ddb64bb4 。已切换为i14-high真实Luna Dice报告与其实际查询轨迹，由冻结i14内核展示。该例核心5/5，但主题输入取证仍不完整；不是全稿语义认证。最新浏览器产物：`C:/Users/hongy/projects/_migloop-scratch/inquiry-i14-real-dice-ui`。各finding节点/边数量、原因、原文、实际工具轨迹与手动探索隔离均通过，未自动补没有依据的读写边。旧i10 Splash截图和原稿仍保留，不覆盖历史实验。
 
 运行产物根目录：`C:/Users/hongy/projects/_migloop-eval-20260909/file-first-10/inquiry-iterations-20260911`。验收门槛见 [iteration-plan.md](iteration-plan.md)。
 
