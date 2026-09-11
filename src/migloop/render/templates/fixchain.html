@@ -1846,7 +1846,7 @@
         host.appendChild(box); return;
       }
       box.appendChild(el("div", "argument-note", "保留实际调用与批内 item；交付材料不要求额外 file/agent 调用。返回定位不证明模型采用或归因成立。"));
-      function row(step, parentStep, parentAuthenticated) {
+      function row(step, parentStep, parentAuthenticated, parentBoundary) {
         var item = el("details", "query-item"), tool = step.tool || "未知", number = step.step == null ? parentStep : step.step;
         var authenticated = step.status === "recorded_response" || (parentAuthenticated === true && step.status === "ok");
         item.dataset.tool = tool; item.dataset.step = number == null ? "" : number;
@@ -1855,6 +1855,16 @@
         argumentDetails(item, "原请求", step.args || step.request || {});
         argumentDetails(item, "实际范围", step.scope);
         argumentDetails(item, "交付与截断状态（非全文阅读证明）", step.delivery);
+        var boundary = step.delivery_boundary || parentBoundary || {status: "unknown", model_visible: null};
+        var boundaryLabel = boundary && boundary.status === "runtime_only"
+          ? "仅服务端返回；模型可见内容未核"
+          : boundary && boundary.status === "model_output_recorded"
+            ? "模型输出记录已配对（不代表全文/理解）"
+            : boundary && boundary.status === "unknown"
+              ? "模型可见边界未知（旧记录未记录）" : "模型输出配对未核";
+        item.dataset.deliveryBoundary = boundary.status;
+        if (boundaryLabel) item.appendChild(el("div", "argument-note delivery-boundary", boundaryLabel));
+        if (boundary) argumentDetails(item, "交付边界/provenance", boundary);
         argumentDetails(item, "调用定位", {call_id: step.call_id, use_line: step.use_line, result_line: step.result_line});
         var requestList = null;
         if (tool === "batch") {
@@ -1878,7 +1888,7 @@
           button.onclick = function () { button.disabled = true; independentlyQuery(requestList, target, tool === "batch" ? (step.args || {}).max_chars : null); };
           item.appendChild(button); item.appendChild(target);
         }
-        (step.items || []).forEach(function (child) { item.appendChild(row(child, number, authenticated)); });
+        (step.items || []).forEach(function (child) { item.appendChild(row(child, number, authenticated, boundary)); });
         return item;
       }
       (trace.steps || []).forEach(function (step) { box.appendChild(row(step)); }); host.appendChild(box);

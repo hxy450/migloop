@@ -489,6 +489,7 @@ def _parse_wire_receipt(tool, args, text):
 def project_trace(ledger, calls):
     from . import time_receipts
     from .probe import _unwrap_result
+    from .delivery_boundary import derive, inherited
     rows = []
     legacy = {r["step"]: r for r in time_receipts.project(ledger, calls)["steps"]}
     for number, call in enumerate(calls, 1):
@@ -497,7 +498,8 @@ def project_trace(ledger, calls):
         text = _unwrap_result(call.get("text") or "")
         row = {"step": number, "tool": tool, "args": args, "status": "unverified_response",
                "scope": None, "delivery": {"records": []}, "items": [],
-               "call_id": call.get("call_id"), "use_line": call.get("use_line"), "result_line": call.get("result_line")}
+               "call_id": call.get("call_id"), "use_line": call.get("use_line"), "result_line": call.get("result_line"),
+               "delivery_boundary": derive(call)}
         provenance = call.get("provenance") or {}
         recorded = bool(call.get("has_result") and not call.get("is_error") and not call.get("delivery_truncated")
                         and not provenance.get("origin_unverified") and provenance.get("complete_pair") is not False)
@@ -507,7 +509,11 @@ def project_trace(ledger, calls):
                 data = saved["data"]
                 row.update(status="recorded_response")
                 if tool == "batch":
-                    row["items"] = [{k: v for k, v in item.items() if k != "data"} for item in data["items"]]
+                    row["items"] = []
+                    for item in data["items"]:
+                        child = {k: v for k, v in item.items() if k != "data"}
+                        child["delivery_boundary"] = inherited(call, child)
+                        row["items"].append(child)
                 else:
                     row.update(scope=data.get("scope"), delivery=_delivery(data))
         elif number in legacy:
@@ -516,4 +522,5 @@ def project_trace(ledger, calls):
                        delivery={"records": [{"ref": r, "extent": "recorded_pointer"} for r in saved["records"]]})
         rows.append(row)
     return {"schema": "migloop-investigation-trace/1", "steps": rows, "edges": [],
-            "note": "真实录制调用；事后文稿不增加访问。相邻查询不是历史读写关系。"}
+            "note": "真实录制调用；事后文稿不增加访问，相邻查询不是历史读写关系。"
+                    "recorded_response仅表示记录中的返回凭据可核；delivery_boundary单列是否有配对的模型输出记录，不认证全文或理解。"}

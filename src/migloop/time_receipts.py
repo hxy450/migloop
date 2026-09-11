@@ -101,6 +101,7 @@ def parse(ledger: atoms.Ledger, tool: str, request: dict[str, Any], text: str) -
 
 def project(ledger: atoms.Ledger, calls: list[dict[str, Any]]) -> dict[str, Any]:
     from .probe import _unwrap_result
+    from .delivery_boundary import derive
     rows = []
     for number, call in enumerate(calls, 1):
         args, text = call.get("input") or {}, _unwrap_result(call.get("text") or "")
@@ -115,6 +116,7 @@ def project(ledger: atoms.Ledger, calls: list[dict[str, Any]]) -> dict[str, Any]
                      "status": "recorded_response" if verified else "unverified_response",
                      "node": receipt["node"] if verified else None,
                      "records": receipt["records"] if verified else [], "relation": None,
-                     "note": "记录查询范围和交付原文入口；不是读写边，不认证归因"})
+                     "note": "记录查询范围和交付原文入口；不是读写边，不认证归因",
+                     "delivery_boundary": derive(call)})
     return {"schema": "migloop-time-trace/1", "steps": rows, "edges": [],
             "note": "实际调用序列；不把相邻查阅推断成历史关系，也不映射为最近版本。"}
