@@ -59,6 +59,27 @@ def flatten(value):
     return value if isinstance(value, str) else encode(value)
 
 
+def native_brief(record, fallback):
+    """A labelled call description is navigation, not proof its intent succeeded."""
+    descriptions = []
+    for _, _, role, _, tool, payload, _ in parts(record):
+        if role not in ("request", "patch"):
+            continue
+        if isinstance(payload, dict):
+            fields = [
+                str(payload[k])
+                for k in ("description", "file_path", "path")
+                if payload.get(k)
+            ]
+            command = payload.get("command", payload.get("cmd", ""))
+            if command:
+                fields.append(str(command).replace("\n", " ")[:140])
+            descriptions.append(tool + " | " + " | ".join(fields))
+        else:
+            descriptions.append(tool + " | " + str(payload).replace("\n", " ")[:180])
+    return " ; ".join(descriptions)[:350] if descriptions else fallback
+
+
 @dataclass(frozen=True)
 class Source:
     path: str
@@ -90,6 +111,8 @@ CREATE TABLE files(path TEXT PRIMARY KEY);
 CREATE TABLE runs(id TEXT PRIMARY KEY,kind TEXT,request TEXT,data TEXT,body TEXT);
 CREATE TABLE frames(run TEXT,offset INT,text TEXT,sha TEXT,PRIMARY KEY(run,offset));
 CREATE TABLE visible(run TEXT,offset INT,complete INT,observed TEXT);
+CREATE TABLE handles(id TEXT PRIMARY KEY,kind TEXT,payload TEXT);
+CREATE TABLE calls(record TEXT,slot INT,tool TEXT,PRIMARY KEY(record,slot));
 """
 
 
@@ -282,6 +305,7 @@ class Store:
                 summary = (flatten(main) if main is not None else text)[:260].replace(
                     "\n", " "
                 )
+                summary = native_brief(record, summary)
                 sha = digest(raw)
                 ref = f"{sid}:{line}:{sha[:16]}"
                 native = record.get("uuid")
@@ -306,6 +330,8 @@ class Store:
                     [(name.casefold(), ref) for name in set(_FILE_TOKEN.findall(body))],
                 )
                 for slot, family, role, cid, tool, payload, success in parts(record):
+                    if role in ("request", "patch"):
+                        db.execute("INSERT INTO calls VALUES(?,?,?)", (ref, slot, tool))
                     db.execute(
                         "INSERT INTO parts VALUES(?,?,?,?,?,?,?,?,?,?)",
                         (
@@ -498,6 +524,8 @@ class Store:
         return [dict(row) for row in self.db.execute(sql, values)]
 
     def source_record(self, ref):
+        if isinstance(ref, str) and ref.startswith("e-"):
+            ref = self.handle_value(ref, "e")["ref"]
         rows = self.rows(
             "SELECT r.*,s.path,s.name,s.agent FROM records r JOIN sources s ON r.source=s.id WHERE ref=?",
             (ref,),
@@ -511,6 +539,30 @@ class Store:
         if digest(raw) != record["sha"]:
             raise ValueError("original bytes changed; reference no longer valid")
         return record, raw.decode("utf-8", errors="replace")
+
+    def handle(self, kind, payload):
+        """Short, content-addressed coordinates; never generated claims or facts."""
+        body = encode(payload)
+        identity = kind + "-" + digest(body.encode())[:12]
+        old = self.rows("SELECT kind,payload FROM handles WHERE id=?", (identity,))
+        if old and (old[0]["kind"] != kind or old[0]["payload"] != body):
+            raise ValueError("coordinate hash collision")
+        if not old:
+            managed = self.db.in_transaction
+            self.db.execute("INSERT INTO handles VALUES(?,?,?)", (identity, kind, body))
+            if not managed:
+                self.db.commit()
+        return identity
+
+    def handle_value(self, identity, kind):
+        if not isinstance(identity, str):
+            raise TypeError("coordinate must be a returned handle")
+        found = self.rows(
+            "SELECT payload FROM handles WHERE id=? AND kind=?", (identity, kind)
+        )
+        if len(found) != 1:
+            raise ValueError("unknown coordinate; use an actual returned handle")
+        return json.loads(found[0]["payload"])
 
     def locate(self, source, line):
         if type(line) is not int or line < 1:

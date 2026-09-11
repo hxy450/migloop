@@ -51,7 +51,8 @@ def covered(ranges, total):
 
 def audit(out):
     started = time.perf_counter()
-    sys.path.insert(0, str(out / "code/src"))
+    manifest = json.loads((out / 'manifest.json').read_text(encoding='utf-8'))
+    sys.path.insert(0, str(manifest.get('code_root', out / "code/src")))
     from migloop.inquiry.engine import Engine
     from migloop.inquiry.store import Store
 
@@ -82,10 +83,20 @@ def audit(out):
         elif typ == "message" and payload.get("role") == "assistant" and payload.get("phase") == "final_answer":
             finals.append("\n".join(item.get("text", "") for item in payload.get("content", []) if isinstance(item, dict)))
 
-    store = Store(out / "index.sqlite")
+    store = Store(manifest.get('index_path', out / "index.sqlite"))
     engine = Engine(store, origin="offline_audit")
+    # Shared immutable source index may contain other investigators' logs. Only
+    # results actually returned by this native run enter its delivery audit.
+    owned = set()
+    for event in events:
+        item = event.get('item', {})
+        if event.get('type') == 'item.completed' and item.get('type') == 'mcp_tool_call':
+            for _, text in views(item.get('result')):
+                owned.update(re.findall(r'^RESULT ([0-9a-f]{16}) ', text, re.M))
     frames, bodies = [], []
     for frame in store.rows("SELECT * FROM frames ORDER BY run,offset"):
+        if frame['run'] not in owned:
+            continue
         match = next(((wrapper, path, text) for wrapper in wrappers for path, text in wrapper["views"]
                       if frame["text"] in text), None)
         if match:
@@ -93,15 +104,20 @@ def audit(out):
             engine.observe_visibility(frame["run"], frame["offset"], text)
         else:
             engine.observe_visibility(frame["run"], frame["offset"], "No complete frame in recorded model-visible outputs")
-        frames.append({"run": frame["run"], "offset": frame["offset"], "sha256": frame["sha"],
+        span = re.match(r'RESULT [0-9a-f]+ chars=\d+ range=(\d+):(\d+)\n', frame['text'])
+        if not span:
+            raise ValueError('Unknown recorded frame format')
+        frames.append({"run": frame["run"], "offset": frame["offset"], "end": int(span[2]), "sha256": frame["sha"],
                        "visible_complete": match is not None,
                        "wrapper_line": match[0]["line"] if match else None,
                        "decoded_path": match[1] if match else None})
     for query in store.rows("SELECT * FROM runs WHERE kind='query' ORDER BY rowid"):
+        if query['id'] not in owned:
+            continue
         length = len(query["body"])
         returned = [f for f in frames if f["run"] == query["id"]]
-        all_ranges = [(f["offset"], min(f["offset"] + engine.FRAME, length)) for f in returned]
-        visible_ranges = [(f["offset"], min(f["offset"] + engine.FRAME, length)) for f in returned if f["visible_complete"]]
+        all_ranges = [(f["offset"], f['end']) for f in returned]
+        visible_ranges = [(f["offset"], f['end']) for f in returned if f["visible_complete"]]
         data = json.loads(query["data"])
         parts, cursor = [], 0
         for number, item in enumerate(data, 1):
@@ -148,7 +164,7 @@ def audit(out):
         if not native_bound:
             errors.append("No matching native MCP submit input/result")
         manifest = json.loads((out / "manifest.json").read_text(encoding="utf-8"))
-        target = graph["document"]["target"]
+        target = graph.get('target', graph["document"]["target"])
         case = manifest["case"]
         if not target["file"].replace("\\", "/").endswith(case["file"]):
             errors.append("Target file differs from frozen task")
@@ -170,12 +186,15 @@ def audit(out):
                           "bodies": len(bodies), "bodies_visible_complete": sum(b["body_visible_complete"] for b in bodies),
                           "host_truncated_wrappers": sum(w["truncated"] for w in wrappers)},
               "limit": "Recorded presentation only, not model attention or semantic correctness; no service packet used to fill visible gaps."}
-    for filename, value in (("delivery-audit.json", result), ("verdict.json", graph), ("query-trace.json", engine.trace())):
+    trace = [entry for entry in engine.trace() if entry['id'] in owned]
+    for filename, value in (("delivery-audit.json", result), ("verdict.json", graph), ("query-trace.json", trace)):
         with (run / filename).open("x", encoding="utf-8") as stream:
             json.dump(value, stream, ensure_ascii=False, indent=2)
     store.close()
     metric = json.loads((run / "metrics.json").read_text(encoding="utf-8"))
-    import_cost = json.loads((out / "import.json").read_text(encoding="utf-8"))["seconds"]
+    import_cost = manifest.get('import_seconds')
+    if import_cost is None:
+        import_cost = json.loads((out / "import.json").read_text(encoding="utf-8"))["seconds"]
     elapsed = time.perf_counter() - started
     with (run / "system-cost.json").open("x", encoding="utf-8") as stream:
         json.dump({"offline_audit_seconds": elapsed, "model_calls": 0, "import_seconds": import_cost,
@@ -183,6 +202,10 @@ def audit(out):
                    "cold_end_to_end_seconds": import_cost + metric["elapsed_seconds"] + elapsed}, stream, indent=2)
     return {"errors": errors, "report_id": result["report_id"], "summary": result["summary"],
             "nodes": len(graph["nodes"]) if graph else 0, "edges": len(graph["edges"]) if graph else 0,
+            "mechanical_status": graph.get('mechanical_status') if graph else None,
+            "unassessed_calls": len(graph.get('coverage', {}).get('unassessed', [])) if graph else None,
+            "unknown_calls": len(graph.get('coverage', {}).get('unknown', [])) if graph else None,
+            "missing_evidence_links": len(graph.get('missing_evidence_links', [])) if graph else None,
             "graph_issues": graph["issues"] if graph else [], "offline_audit_seconds": elapsed}
 
 

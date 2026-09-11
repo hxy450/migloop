@@ -6,8 +6,100 @@ import difflib
 import json
 import posixpath
 import uuid
+from functools import wraps
 
 from .store import Store, digest, encode, iso, timestamp
+
+
+def coordinate_transaction(method):
+    @wraps(method)
+    def query(self, request):
+        if self.store.db.in_transaction:
+            return method(self, request)
+        with self.store.db:
+            self.store.db.execute("BEGIN")
+            return method(self, request)
+
+    return query
+
+
+def content_text(raw):
+    """Decode native content once; metadata remains available via pointer=''."""
+    try:
+        value = json.loads(raw)
+    except ValueError:
+        return raw
+    if not isinstance(value, dict):
+        return raw
+    blocks = (
+        (value.get("message") or {}).get("content")
+        if isinstance(value.get("message"), dict)
+        else None
+    )
+    if isinstance(blocks, list):
+        texts = []
+        for i, block in enumerate(blocks):
+            if not isinstance(block, dict):
+                texts.append(str(block))
+                continue
+            kind = block.get("type", "content")
+            if kind == "tool_use":
+                data = block.get("input")
+                text = encode(data)
+                if isinstance(data, dict):
+                    text = "\n".join(
+                        k + ": " + (v if isinstance(v, str) else encode(v))
+                        for k, v in data.items()
+                    )
+                texts.append(f"BLOCK {i} tool={block.get('name')}\n{text}")
+            else:
+                data = block.get(
+                    "content", block.get("text", block.get("thinking", block))
+                )
+                texts.append(
+                    f"BLOCK {i} {kind}\n"
+                    + (data if isinstance(data, str) else encode(data))
+                )
+        return "\n\n".join(texts)
+    payload = value.get("payload")
+    if isinstance(payload, dict):
+        for key in ("output", "input", "arguments", "message", "content"):
+            if key in payload:
+                data = payload[key]
+                return data if isinstance(data, str) else encode(data)
+    return raw
+
+
+def content_windows(text, terms, context):
+    if (
+        not isinstance(terms, list)
+        or not 1 <= len(terms) <= 8
+        or any(not isinstance(t, str) or not t or len(t) > 500 for t in terms)
+    ):
+        raise ValueError("open terms must be 1–8 literal strings of at most 500 chars")
+    if type(context) is not int or not 0 <= context <= 50:
+        raise ValueError("context must be 0–50 lines")
+    lines = text.splitlines()
+    ranges = []
+    hits = 0
+    for i, line in enumerate(lines):
+        if any(t.casefold() in line.casefold() for t in terms):
+            hits += 1
+            start, end = max(0, i - context), min(len(lines), i + context + 1)
+            if ranges and start <= ranges[-1][1]:
+                ranges[-1][1] = max(end, ranges[-1][1])
+            else:
+                ranges.append([start, end])
+    selected = "\n\n".join(
+        f"CONTENT LINES {start + 1}–{end}\n" + "\n".join(lines[start:end])
+        for start, end in ranges
+    )
+    return selected, {
+        "matched_lines": hits,
+        "content_line_ranges": [[a + 1, b] for a, b in ranges],
+        "original_content_lines": len(lines),
+        "selection": "literal windows, not whole record or absence proof",
+    }
 
 
 def bounds(request):
@@ -153,10 +245,25 @@ class Engine:
                 )
         return sorted(result, key=lambda r: (r["at"] is None, r["at"] or 0, r["id"]))
 
+    @coordinate_transaction
     def query(self, request):
         if not isinstance(request, dict):
             raise TypeError("query must be an object")
         op = request.get("op")
+        if "scope" in request:
+            scope = self.store.handle_value(request["scope"], "s")
+            if any(k in request for k in ("key", "at", "since")):
+                raise ValueError("use scope or explicit coordinates, not both")
+            request = {k: v for k, v in request.items() if k != "scope"}
+            request.update(
+                {k: scope[k] for k in ("at", "since") if scope.get(k) is not None}
+            )
+            if op in ("file", "agent", "search", "blame"):
+                request["key"] = scope["key"]
+                if op == "search":
+                    request["kind"] = scope["kind"]
+                elif op not in (scope["kind"], "blame"):
+                    raise ValueError("scope kind does not match operation")
         allowed = {
             "catalog": {"op", "kind", "q", "offset", "limit"},
             "file": {
@@ -201,6 +308,8 @@ class Engine:
                 "since",
                 "undated",
                 "pointer",
+                "terms",
+                "context",
             },
             "diff": {
                 "op",
@@ -261,16 +370,30 @@ class Engine:
             if "pointer" in request:
                 value = selected(json.loads(text), request["pointer"])
                 text = value if isinstance(value, str) else encode(value)
+            else:
+                text = content_text(text)
+            selection = {}
+            if "terms" in request:
+                text, selection = content_windows(
+                    text, request["terms"], request.get("context", 6)
+                )
+            elif "context" in request:
+                raise ValueError("context requires terms")
             return {
                 "kind": "original",
                 "ref": ref,
+                "cite": self.store.handle("e", {"ref": record["ref"]}),
                 "source": record["name"],
                 "line": record["line"],
                 "at": iso(record["at"]),
                 "pointer": request.get("pointer"),
                 "text": text,
+                **selection,
                 "chars": len(text),
                 "complete_selected_text": True,
+                "projection": "json_pointer"
+                if "pointer" in request
+                else 'native_content; pointer="" opens whole record',
             }
         if op == "diff":
             common = {k: request[k] for k in ("at", "since", "undated") if k in request}
@@ -315,8 +438,9 @@ class Engine:
             }
         where, values, scope = self._where(request)
         view = request.get("view", "records")
-        if view not in ("records", "relations"):
-            raise ValueError("view must be records or relations")
+        if view not in ("records", "relations", "calls"):
+            raise ValueError("view must be records, calls or relations")
+        scope_id = self.store.handle("s", scope)
         at, since = bounds(request)
         relations = (
             self.relations(
@@ -342,10 +466,15 @@ class Engine:
             return {
                 "kind": "relations",
                 "scope": scope,
+                "scope_id": scope_id,
                 "dispatches": dispatches,
-                **self._page([self._relation(r) for r in relations], offset, limit),
+                **self._page(
+                    [self.link_view(r, scope["at"]) for r in relations], offset, limit
+                ),
             }
         table = " FROM records r JOIN sources s ON r.source=s.id WHERE " + where
+        if view == "calls":
+            table += " AND r.ref IN (SELECT record FROM calls)"
         unknown_where, unknown_values, _ = self._where({**request, "undated": True})
         unknown_count = self.store.db.execute(
             "SELECT COUNT(*) FROM records r JOIN sources s ON r.source=s.id WHERE r.at IS NULL AND "
@@ -370,24 +499,113 @@ class Engine:
             start = max(0, match - 60)
             row.update(
                 at=iso(row["at"]),
-                excerpt=text[start : start + 260].replace("\n", " ")
-                if terms
-                else summary,
+                excerpt=summary
+                if view == "calls" or not terms or not any(p >= 0 for p in positions)
+                else text[start : start + 260].replace("\n", " "),
                 excerpt_offset=start if terms else None,
                 chars=len(text),
                 is_full_original=False,
+                cite=self.store.handle("e", {"ref": row["ref"]}),
+                tools=[
+                    c["tool"]
+                    for c in self.store.rows(
+                        "SELECT tool FROM calls WHERE record=?", (row["ref"],)
+                    )
+                ],
             )
+            if view == "calls":
+                row["results"] = [
+                    self.store.handle("e", {"ref": r["ref"]})
+                    for r in self.store.rows(
+                        "SELECT r.ref FROM pairs p JOIN records r ON r.ref=p.b WHERE p.a=? AND r.at<=? AND r.ref NOT IN (SELECT record FROM calls)",
+                        (row["ref"], at),
+                    )
+                ]
+                related = self.store.rows(
+                    "SELECT r.body FROM pairs p JOIN records r ON p.b=r.ref WHERE p.a=? AND r.at<=?",
+                    (row["ref"], at),
+                )
+                needle = (
+                    posixpath.basename(scope["key"])
+                    if scope["kind"] == "file"
+                    else None
+                )
+                for other in related:
+                    pos = (
+                        other["body"].casefold().find(needle.casefold())
+                        if needle
+                        else -1
+                    )
+                    if pos >= 0:
+                        row["excerpt"] += " | RESULT: " + other["body"][
+                            max(0, pos - 30) : pos + len(needle) + 65
+                        ].replace("\n", " ")
+                        break
+        participants = []
+        if scope["kind"] == "file" and op != "search":
+            for agent in sorted({r["agent"] for r in relations if r["agent"]}):
+                own = [r for r in relations if r["agent"] == agent]
+                participants.append(
+                    {
+                        "agent": agent,
+                        "scope": self.store.handle(
+                            "s",
+                            {
+                                "kind": "agent",
+                                "key": agent,
+                                "at": scope["at"],
+                                "since": None,
+                            },
+                        ),
+                        "reads": sum(r["op"] == "read" for r in own),
+                        "writes": sum(r["op"] != "read" for r in own),
+                        "candidates": sum(r["strength"] == "candidate" for r in own),
+                    }
+                )
         return {
             "kind": "records",
             "scope": scope,
+            "scope_id": scope_id,
             "total": total,
             "rows": rows,
             "next": offset + len(rows) if offset + len(rows) < total else None,
             "related_operations": len(relations) if op != "search" else None,
             "undated_records": unknown_count,
             "dispatches": dispatches,
+            "participants": participants,
             "note": "Related records, not certified reads/writes. Unknown tool bodies remain searchable; open refs for originals.",
         }
+
+    def link_view(self, row, at):
+        edge = self._relation(row)
+        if row["op"] not in ("read", "write") or not row["agent"]:
+            return edge
+        agent = self.store.handle(
+            "s", {"kind": "agent", "key": row["agent"], "at": at, "since": None}
+        )
+        file = self.store.handle(
+            "s", {"kind": "file", "key": row["path"], "at": at, "since": None}
+        )
+        origin, destination = (file, agent) if row["op"] == "read" else (agent, file)
+        payload = {
+            "relation": row["op"],
+            "evidence": [r for r in (row["request"], row["result"]) if r],
+            "operation": row["id"],
+            "from_scope": origin,
+            "to_scope": destination,
+        }
+        edge.update(
+            link=self.store.handle("l", payload),
+            from_scope=origin,
+            to_scope=destination,
+        )
+        edge["request"] = (
+            self.store.handle("e", {"ref": row["request"]}) if row["request"] else None
+        )
+        edge["result"] = (
+            self.store.handle("e", {"ref": row["result"]}) if row["result"] else None
+        )
+        return edge
 
     @staticmethod
     def _page(rows, offset, limit):
@@ -418,67 +636,109 @@ class Engine:
     def investigate(self, requests):
         if not isinstance(requests, list) or not 1 <= len(requests) <= 24:
             raise ValueError("batch must contain 1–24 queries")
-        results = []
-        for request in requests:
+        frames = []
+        batch = uuid.uuid4().hex[:16]
+        budget = max(40, self.FRAME // len(requests) - 225)
+        for number, request in enumerate(requests, 1):
+            results = []
             try:
                 results.append(
                     {"query": request, "ok": True, "data": self.query(request)}
                 )
             except (ValueError, KeyError, IndexError, TypeError, OSError) as exc:
                 results.append({"query": request, "ok": False, "error": str(exc)})
-        body = "\n\n".join(self.render(i + 1, r) for i, r in enumerate(results))
-        identity = uuid.uuid4().hex[:16]
-        with self.store.db:
-            self.store.db.execute(
-                "INSERT INTO runs VALUES(?,?,?,?,?)",
-                (
-                    identity,
-                    "query",
-                    encode(
-                        {
-                            "session": self.session,
-                            "origin": self.origin,
-                            "queries": requests,
-                        }
+            body = self.render(1, results[0])
+            identity = uuid.uuid4().hex[:16]
+            with self.store.db:
+                self.store.db.execute(
+                    "INSERT INTO runs VALUES(?,?,?,?,?)",
+                    (
+                        identity,
+                        "query",
+                        encode(
+                            {
+                                "session": self.session,
+                                "origin": self.origin,
+                                "queries": [request],
+                                "batch": batch,
+                                "item": number,
+                            }
+                        ),
+                        encode(results),
+                        body,
                     ),
-                    encode(results),
-                    body,
-                ),
+                )
+            frames.append(
+                self.page(
+                    identity, 0, _limit=self.FRAME if len(requests) == 1 else budget
+                )
             )
-        return self.page(identity, 0)
+        return "\n\n".join(frames)
 
     @staticmethod
     def render(number, result):
         if not result["ok"]:
             return f"[{number}] ERROR {result['error']}"
         data = result["data"]
-        lines = [f"[{number}] {encode(result['query'])}"]
+        lines = [
+            f"[{number}] {result['query'].get('op')} total={data.get('total', '-')} scope={data.get('scope_id', '-')}"
+        ]
+        lines.append("QUERY " + encode(result["query"]))
         if data["kind"] in ("original", "diff"):
             lines += [
                 encode({k: v for k, v in data.items() if k != "text"}),
                 data["text"],
             ]
         else:
-            lines.append(encode({k: v for k, v in data.items() if k != "rows"}))
+            lines.append(
+                encode(
+                    {k: v for k, v in data.items() if k not in ("rows", "participants")}
+                )
+            )
+            for actor in sorted(
+                data.get("participants", []),
+                key=lambda a: (not a["writes"], a["agent"]),
+            ):
+                lines.append(
+                    ("WRITER " if actor["writes"] else "READER ")
+                    + actor["agent"].split(":")[-1]
+                    + f" scope={actor['scope']} writes={actor['writes']} reads={actor['reads']} candidates={actor['candidates']}"
+                )
             for row in data.get("rows", []):
                 if "excerpt" in row:
                     lines.append(
-                        f"{row['ref']} {row['at'] or 'UNDATED'} {row['agent'] or 'UNKNOWN OWNER'} | {row['excerpt']}"
+                        f"{row.get('cite', row['ref'])} {row['at'] or 'UNDATED'} {'/'.join(row.get('tools', []))} {row['agent'] or 'UNKNOWN OWNER'} | {row['excerpt']}"
+                        + (
+                            f" results={encode(row['results'])}"
+                            if row.get("results")
+                            else ""
+                        )
                     )
                 else:
                     lines.append(encode(row))
         return "\n".join(lines)
 
-    def page(self, identity, offset=0):
+    def page(self, identity, offset=0, *, _limit=None):
         if type(offset) is not int or offset < 0:
             raise ValueError("offset must be nonnegative")
         rows = self.store.rows(
-            "SELECT body FROM runs WHERE id=? AND kind=?", (identity, "query")
+            "SELECT body,request FROM runs WHERE id=? AND kind=?", (identity, "query")
         )
         if not rows or offset > len(rows[0]["body"]):
             raise ValueError("result or offset does not exist")
+        if (
+            self.origin == "mcp"
+            and json.loads(rows[0]["request"])["session"] != self.session
+        ):
+            raise ValueError("result belongs to a different investigator")
         body = rows[0]["body"]
-        chunk = body[offset : offset + self.FRAME]
+        # An emitted (result,offset) is immutable, including a short batch preview.
+        saved = self.store.rows(
+            "SELECT text FROM frames WHERE run=? AND offset=?", (identity, offset)
+        )
+        if saved:
+            return saved[0]["text"]
+        chunk = body[offset : offset + (_limit if _limit is not None else self.FRAME)]
         end = offset + len(chunk)
         next_offset = end if end < len(body) else None
         frame = (

@@ -489,6 +489,16 @@
         );
       for (const issue of graph.issues)
         element("div", JSON.stringify(issue), $("gaps"), "error small");
+      if (graph.coverage) {
+        const c=graph.coverage;
+        element('p', `调用对账：已解释 ${c.explained.length}，模型排除 ${c.model_excluded.length}，未定 ${c.unknown.length}，未处理 ${c.unassessed.length}。排除/原因仍是模型主张。`, $('gaps'), 'small');
+        for (const row of [...c.unassessed,...c.unknown]) {
+          const box=element('div', row.reason || row.summary, $('gaps'),'row small');
+          button(row.ref,box,()=>open(row.ref,(graph.target||graph.document.target).at));
+        }
+      }
+      for (const row of graph.missing_evidence_links || [])
+        element('div', `已引用但未接入图：${row.op} · ${row.path} · ${row.link}`, $('gaps'),'error small');
     }
     function showNode(n) {
       $("reasonTitle").textContent = n.key;
@@ -517,9 +527,10 @@
         const option = element("option", `${f.id} · ${f.title}`, $("findings"));
         option.value = f.id;
       }
-      $("at").value = data.document.target.at;
-      $("since").value = data.document.target.since || "";
-      $("key").value = data.document.target.file;
+      const target = data.target || data.document.target;
+      $("at").value = target.at;
+      $("since").value = target.since || "";
+      $("key").value = target.file;
       draw();
       await reloadTrace();
     }
