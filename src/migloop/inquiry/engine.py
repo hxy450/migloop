@@ -24,6 +24,57 @@ def coordinate_transaction(method):
     return query
 
 
+def packet_text(value, *, receipt=False, depth=0):
+    """Display structured fields; decoding a receipt never creates an event."""
+    if depth >= 8:
+        return value if isinstance(value, str) else encode(value)
+    if isinstance(value, str):
+        if receipt:
+            try:
+                decoded = json.loads(value)
+            except ValueError:
+                decoded = None
+            text_blocks = (
+                isinstance(decoded, list)
+                and bool(decoded)
+                and all(
+                    isinstance(block, dict)
+                    and block.get("type")
+                    in {"text", "input_text", "output_text", "image", "input_image"}
+                    for block in decoded
+                )
+            )
+            tool_receipt = (
+                isinstance(decoded, dict)
+                and isinstance(decoded.get("output"), str)
+                and bool(
+                    {"exit_code", "chunk_id", "session_id", "wall_time_seconds"}
+                    & decoded.keys()
+                )
+            )
+            if text_blocks or tool_receipt:
+                return "DECODED RECEIPT TEXT (display only)\n" + packet_text(
+                    decoded, receipt=True, depth=depth + 1
+                )
+        return value
+    if isinstance(value, (dict, list)):
+        if not value:
+            return encode(value)
+        fields = value.items() if isinstance(value, dict) else enumerate(value)
+        return "\n".join(
+            str(key)
+            + ": "
+            + packet_text(
+                part,
+                receipt=receipt
+                and (isinstance(value, list) or key in {"text", "output", "content"}),
+                depth=depth + 1,
+            )
+            for key, part in fields
+        )
+    return encode(value)
+
+
 def content_text(raw):
     """Decode native content once; metadata remains available via pointer=''."""
     try:
@@ -48,12 +99,7 @@ def content_text(raw):
             kind = block.get("type", "content")
             if kind == "tool_use":
                 data = block.get("input")
-                text = encode(data)
-                if isinstance(data, dict):
-                    text = "\n".join(
-                        k + ": " + (v if isinstance(v, str) else encode(v))
-                        for k, v in data.items()
-                    )
+                text = packet_text(data)
                 texts.append(f"BLOCK {i} tool={block.get('name')}\n{text}")
             else:
                 data = block.get(
@@ -61,7 +107,7 @@ def content_text(raw):
                 )
                 texts.append(
                     f"BLOCK {i} {kind}\n"
-                    + (data if isinstance(data, str) else encode(data))
+                    + packet_text(data, receipt=kind == "tool_result")
                 )
         return "\n\n".join(texts)
     payload = value.get("payload")
@@ -69,7 +115,12 @@ def content_text(raw):
         for key in ("output", "input", "arguments", "message", "content"):
             if key in payload:
                 data = payload[key]
-                return data if isinstance(data, str) else encode(data)
+                if key == "arguments" and isinstance(data, str):
+                    try:
+                        data = json.loads(data)
+                    except ValueError:
+                        pass
+                return packet_text(data, receipt=key == "output")
     return raw
 
 

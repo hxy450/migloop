@@ -556,12 +556,13 @@
       $("reasonTitle").textContent = n.key;
       $("reason").replaceChildren();
       element("span", n.generated_context ? "自动证据节点，模型未归因" : "模型主张，不是因果认证", $("reason"), "badge");
+      element("p", `历史范围：${n.since || "未限定起点"} → ${n.at}；不是完整文件快照`, $("reason"), "small");
       element("p", n.reason, $("reason"));
       button("独立打开节点", $("reason"), () => {
         $("kind").value = n.kind;
         $("key").value = n.key;
         $("at").value = n.at;
-        $("since").value = "";
+        $("since").value = n.since || "";
         return query(request());
       });
       for (const ref of n.evidence || [])

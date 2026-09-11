@@ -599,7 +599,7 @@ class Store:
     def rows(self, sql, values=()):
         return [dict(row) for row in self.db.execute(sql, values)]
 
-    def has_records(self, kind, key, at):
+    def has_records(self, kind, key, at, *, since=None):
         """Does this node have dated evidence? Not proof of a disk state/author.
 
         Do not run a full search/count/participant expansion to answer existence.
@@ -608,21 +608,25 @@ class Store:
         if kind == "agent":
             return bool(
                 self.db.execute(
-                    "SELECT 1 FROM sources s JOIN records r ON r.source=s.id WHERE s.agent=? AND r.at<=? LIMIT 1",
-                    (key, at),
+                    "SELECT 1 FROM sources s JOIN records r ON r.source=s.id WHERE s.agent=? AND r.at<=? AND (? IS NULL OR r.at>=?) LIMIT 1",
+                    (key, at, since, since),
                 ).fetchone()
             )
         if kind != "file":
             raise ValueError("node kind must be file or agent")
         key = self.resolve_file(key)
         if self.db.execute(
-            "SELECT 1 FROM effects e LEFT JOIN records r ON r.ref=e.request WHERE e.path=? AND (e.at<=? OR r.at<=?) LIMIT 1",
-            (key, at, at),
+            "SELECT 1 FROM effects e LEFT JOIN records r ON r.ref=e.request WHERE e.path=? AND "
+            "((e.at<=? AND (? IS NULL OR e.at>=?)) OR (r.at<=? AND (? IS NULL OR r.at>=?))) LIMIT 1",
+            (key, at, since, since, at, since, since),
         ).fetchone():
             return True
         name = posixpath.basename(key).casefold()
         candidates = "records r"
         where, values = "r.at<=?", [at]
+        if since is not None:
+            where += " AND r.at>=?"
+            values.append(since)
         if _FILE_TOKEN.fullmatch(name):
             candidates = "mentions m JOIN records r ON r.ref=m.record"
             where += " AND m.name=?"

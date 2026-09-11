@@ -152,6 +152,19 @@ async function main() {
       Buffer.from(validImage.data, "base64"),
     );
     if (modelReport) {
+      if (process.argv.includes('--scope-interval')) {
+        // Synthetic display fixture only: no report resubmit or stored graph mutation.
+        const interval = await evaluate(`(async()=>{
+          const node=graph.nodes.find(n=>!n.generated_context);
+          const since=new Date(Date.parse(node.at)-60000).toISOString();
+          showNode({...node,since});
+          document.querySelector('#reason button').click();
+          return {expected:since,actual:document.getElementById('since').value};
+        })()`);
+        assert.equal(interval.actual,interval.expected,'node exploration dropped since');
+        assert.equal(await evaluate('JSON.stringify({graph,trace})'),initial);
+        fs.writeFileSync(path.join(out,'scope-interval.json'),JSON.stringify(interval,null,2));
+      }
       if (process.argv.includes('--input-views')) {
         const views = await evaluate(`(async()=>{
           const target=graph.target;

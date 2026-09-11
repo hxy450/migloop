@@ -13,7 +13,7 @@ def attach(engine, finding, target):
         return finding
     cutoff = timestamp(target["at"], required=True)
     nodes = [dict(node) for node in finding.get("nodes", [])]
-    refs = set()
+    refs, citations = set(), {}
     for ref in [
         *finding.get("changes", []),
         *(ref for n in nodes for ref in n.get("evidence", [])),
@@ -22,6 +22,7 @@ def attach(engine, finding, target):
             record, _ = engine.store.source_record(ref)
             if record["at"] is not None and record["at"] <= cutoff:
                 refs.add(record["ref"])
+                citations[ref] = record["ref"]
         except (ValueError, OSError, TypeError):
             pass  # The regular report checker diagnoses the original reference.
 
@@ -40,10 +41,22 @@ def attach(engine, finding, target):
                 else value["key"]
             )
             when = timestamp(value["at"], required=True)
-            if value["kind"] == kind and actual_key == key and at <= when <= cutoff:
-                matches.append((when, node))
+            start = timestamp(value.get("since"))
+            if (
+                value["kind"] == kind
+                and actual_key == key
+                and at <= when <= cutoff
+                and (start is None or start <= at)
+            ):
+                cited_here = bool(
+                    set(evidence)
+                    & {citations.get(ref, ref) for ref in node.get("evidence", [])}
+                )
+                matches.append((not cited_here, when, node))
         if matches:
-            return min(matches, key=lambda item: item[0])[1]["id"]
+            # A background/input node with an earlier cutoff must not steal
+            # the edge from a later claim citing this actual write (or read).
+            return min(matches, key=lambda item: item[:2])[2]["id"]
         scope = engine.store.handle(
             "s", {"kind": kind, "key": key, "at": iso(at), "since": None}
         )

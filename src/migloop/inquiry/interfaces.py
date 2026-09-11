@@ -70,6 +70,7 @@ diff明确比较两个原始引用：{op:diff,before:ref,after:ref,before_pointe
 按时间列原生补丁中的added/removed/unchanged及old_lines/new_lines。后期Write包含某词不等于它首次引入，读回更不是作者；若要称初版就有，须核初版实际写出。未知脚本仍须查calls/search，零命中不能证明历史没有。blame不认证完整历史中的行作者。relations中的candidate不是确定读写。
 
 每项完整结果在服务器保存，文本按帧返回（最多9000字符）。END FRAME next不是none时调用page(result_id,offset)。
+可批量续不同结果：page(requests:[{result_id:上个RESULT,offset:它的next},{result_id:另一个RESULT,offset:它的next}])。每批1–4项，建议2项；不与单条参数混用。每帧仍是原结果，不新增查询、不混接正文。
 索引next是记录列表下一页，frame next是本批已保存正文的字符续帧，二者不要混淆。
 改变搜索词/范围时offset归零；每帧末尾CONTEXT重复原文引用/归属/时刻或查询范围，不能把不同记录的续帧混成同一作者输出。
 传输建议直接转发MCP content.text，不再把整个MCP对象JSON转义包一遍。续读每次只打印1–2帧，避免宿主二次截断。
@@ -101,6 +102,7 @@ origin是写出坏结果的环节，不是发现问题/提出修复的环节；p
 仍可显式给target:{file,at,since}、节点{kind,key,at}，或边{relation,evidence:[请求,返回]}；
 但不能同一对象混合scope与显式坐标，或link与显式relation/evidence。时间必须涵盖实际引用。
 节点截止必须涵盖引用。read从file到agent、write从agent到file；没有原生依据就保留未核关系，不编边。
+节点scope若带since则下界也保留；不要拿修复区间scope引用生成期事件。需要更早证据时打开相应历史范围。连边按实际操作时刻核两端区间，而不是按报告排列顺序接线。
 多个修改可合并原因，但未解释的必须说明；引用可定位与原因正确不同。submit保存同一调查员的原稿，返回页面report_id。
 """
 
@@ -132,9 +134,43 @@ def build_mcp(path):
         return execute(lambda engine: engine.investigate(requests))
 
     @server.tool(**options)
-    def page(result_id: str, offset: int) -> str:
-        """按上一帧END FRAME next继续读取同一已保存结果；不是重新查询，范围与正文不会漂移。"""
-        return execute(lambda engine: engine.page(result_id, offset))
+    def page(
+        result_id: str | None = None,
+        offset: int = 0,
+        requests: list[dict] | None = None,
+    ) -> str:
+        """续已保存正文：单条result_id/offset，或requests批量1–4项（建议2项）；不新增查询。"""
+        if requests is None:
+            return execute(lambda engine: engine.page(result_id, offset))
+        if result_id is not None or offset != 0:
+            raise ValueError("use either requests or single result_id/offset")
+        if not 1 <= len(requests) <= 4:
+            raise ValueError("page batch must contain 1–4 entries")
+        if any(set(r) != {"result_id", "offset"} for r in requests):
+            raise ValueError("each page entry requires result_id and offset only")
+        if any(
+            not isinstance(r["result_id"], str)
+            or not r["result_id"]
+            or type(r["offset"]) is not int
+            or r["offset"] < 0
+            for r in requests
+        ):
+            raise ValueError(
+                "page entries require a nonempty id and nonnegative integer offset"
+            )
+
+        def continuation(engine):
+            frames = []
+            for request in requests:
+                try:
+                    frames.append(engine.page(request["result_id"], request["offset"]))
+                except (ValueError, TypeError) as exc:
+                    frames.append(
+                        "PAGE ERROR " + encode({**request, "error": str(exc)})
+                    )
+            return "\n\n".join(frames)
+
+        return execute(continuation)
 
     @server.tool(**options)
     def submit(document: str) -> str:

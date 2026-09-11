@@ -1,0 +1,17 @@
+{
+  "schema":"inquiry-developer-score/1",
+  "round":"i10-high","model":"gpt-5.6-luna","effort":"high",
+  "reference":"../file-first-10/scoring-core.json",
+  "grading":"Developer review of one original Splash submission, not blind, not a full-cohort score. Compare same task/model effort to i09-high; one run cannot isolate stochastic effects.",
+  "cases":[
+    {"id":"F10-02","report_id":"0cbca8a673d74a46","units":{"mask":"correct","icon":"correct","back-gate":"partial","progress":"correct","system-bars":"correct"},"basis":"Whole command presentation exposes Progress strokeWidth/scan-effect edit in the same script as onWillDismiss. All five change families found. Still no initial handler then assembly-removal history; no blame call and no generation target search for return-handler history in the trace."}
+  ],
+  "summary":{"correct":4,"partial":1,"omitted":0,"wrong":0,"total":5,"unit_weighted_percent":80.0},
+  "additional_errors":[
+    {"case":"F10-02","major":false,"quote":"后续脚本批量加入 Palette.DIALOG_MASK，回执包含 SplashPage（e-b8ad2c92a1c0、e-cb24bdb91948）。","counterevidence":"e-b8ad2c92a1c0 is the actual mask script, but e-cb24bdb91948 is the image-size script's return, not its paired mask receipt e-827ccccf4976. Local mask modification is true; cited corroboration is mismatched. Citation existence alone cannot certify support."}
+  ],
+  "display_counterexample":"In finding F, the prior renderer attached the initial native Write to the same actor's earlier input-context node, leaving the model's write-citing origin node detached. This is a graph-binding bug, not a missing native edge. Next kernel prioritizes a node's citation to the exact indexed operation; original report is retained.",
+  "cost":{"model_seconds_sum":712.4354993000161,"input_plus_output":5863295,"accounting":"Cached input included once. i09-high Splash was 4638134 tokens / 768.9744 seconds: this run uses more total tokens despite shorter elapsed time, not an efficiency win."},
+  "delivery":{"frames_sent":140,"frames_visible_complete":138,"mechanical_status":"valid","semantic_verified":false},
+  "accepted":false
+}

@@ -1,6 +1,7 @@
 import asyncio
 import http.client
 import json
+import re
 import threading
 
 import pytest
@@ -9,6 +10,59 @@ from migloop.inquiry import interfaces, report
 from migloop.inquiry.engine import Engine
 from migloop.inquiry.store import Source, Store
 from tests.test_inquiry_core import build, record, result, ts, use, valid_report
+
+
+def test_mcp_continuations_batch_without_rewriting_frames_or_queries(tmp_path):
+    engine = build(
+        tmp_path,
+        [
+            record(1, {"type": "text", "text": "A" * 20000}),
+            record(2, {"type": "text", "text": "B" * 20000}),
+        ],
+    )
+    path = engine.store.path
+    engine.store.close()
+    server = interfaces.build_mcp(path)
+
+    async def run():
+        first = await server.call_tool(
+            "investigate",
+            {
+                "requests": [
+                    {"op": "open", "source": "a.jsonl", "line": line, "at": ts(3)}
+                    for line in (1, 2)
+                ]
+            },
+        )
+        ids = re.findall(r"RESULT ([0-9a-f]+) chars=\d+ range=0:(\d+)", first[0].text)
+        requests = [
+            {"result_id": identity, "offset": int(offset)} for identity, offset in ids
+        ]
+        assert len(requests) == 2
+        batch = await server.call_tool("page", {"requests": requests})
+        singles = [await server.call_tool("page", item) for item in requests]
+        assert batch[0].text == "\n\n".join(item[0].text for item in singles)
+        assert batch[0].text.count("; CONTEXT ") == 2
+        assert "A" * 1000 in batch[0].text and "B" * 1000 in batch[0].text
+        invalid = await server.call_tool(
+            "page",
+            {
+                "requests": [
+                    {"result_id": "not-owned", "offset": 0},
+                    requests[1],
+                ]
+            },
+        )
+        assert "PAGE ERROR" in invalid[0].text and singles[1][0].text in invalid[0].text
+        with pytest.raises(Exception, match="either"):
+            await server.call_tool(
+                "page", {"result_id": ids[0][0], "requests": requests}
+            )
+
+    asyncio.run(run())
+    reopened = Store(path)
+    assert len(Engine(reopened).trace()) == 2  # continuations are not new searches
+    reopened.close()
 
 
 def test_mcp_emits_one_readable_body_and_owns_its_trace_session(tmp_path):

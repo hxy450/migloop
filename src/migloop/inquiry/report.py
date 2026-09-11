@@ -75,19 +75,19 @@ def check(engine, text, *, save=False):
             try:
                 record, _ = engine.store.source_record(ref)
                 if not in_scope(record["at"], at, since):
-                    raise ValueError("evidence outside node cutoff or undated")
+                    raise ValueError("evidence outside node time range or undated")
                 valid.add(record["ref"])
                 referenced.add(record["ref"])
             except (ValueError, OSError) as exc:
                 issues.append({"where": where, "ref": ref, "error": str(exc)})
         return valid
 
-    def verify_text(value, at, where):
+    def verify_text(value, at, where, since=None):
         if isinstance(value, str):
-            verify_refs(re.findall(r"\be-[0-9a-f]{8,64}\b", value), at, where)
+            verify_refs(re.findall(r"\be-[0-9a-f]{8,64}\b", value), at, where, since)
         elif isinstance(value, list):
             for item in value:
-                verify_text(item, at, where)
+                verify_text(item, at, where, since)
 
     seen_findings = set()
     for index, finding in enumerate(document["findings"]):
@@ -146,6 +146,7 @@ def check(engine, text, *, save=False):
                 "kind",
                 "key",
                 "at",
+                "since",
                 "role",
                 "reason",
                 "evidence",
@@ -156,12 +157,16 @@ def check(engine, text, *, save=False):
             if not isinstance(nid, str) or not nid or nid in local:
                 raise ValueError("node IDs must be unique within a finding")
             if "scope" in node:
-                if any(k in node for k in ("kind", "key", "at")):
+                if any(k in node for k in ("kind", "key", "at", "since")):
                     raise ValueError(
                         "node uses scope or explicit coordinates, not both"
                     )
                 coordinate = engine.store.handle_value(node["scope"], "s")
-                node = {**node, **{k: coordinate[k] for k in ("kind", "key", "at")}}
+                node = {
+                    **node,
+                    **{k: coordinate[k] for k in ("kind", "key", "at")},
+                    "since": coordinate.get("since"),
+                }
             if node.get("kind") not in ("file", "agent") or not isinstance(
                 node.get("key"), str
             ):
@@ -176,18 +181,18 @@ def check(engine, text, *, save=False):
                 raise ValueError("invalid node role")
             if not isinstance(node.get("reason"), str) or not node["reason"].strip():
                 raise ValueError("every node requires its original reason")
-            at = timestamp(node.get("at"), required=True)
+            at, since = bounds(node)
             key = (
                 engine.store.resolve_file(node["key"])
                 if node["kind"] == "file"
                 else node["key"]
             )
             try:
-                exists = engine.store.has_records(node["kind"], key, at)
+                exists = engine.store.has_records(node["kind"], key, at, since=since)
             except ValueError:
                 exists = False
-            refs = verify_refs(node.get("evidence", []), at, f"{fid}.{nid}")
-            verify_text(node["reason"], at, f"{fid}.{nid}.reason")
+            refs = verify_refs(node.get("evidence", []), at, f"{fid}.{nid}", since)
+            verify_text(node["reason"], at, f"{fid}.{nid}.reason", since)
             if not exists:
                 issues.append(
                     {
@@ -254,6 +259,12 @@ def check(engine, text, *, save=False):
                     timestamp(origin["at"], required=True),
                     timestamp(destination["at"], required=True),
                 )
+                starts = [
+                    timestamp(n["since"], required=True)
+                    for n in (origin, destination)
+                    if n.get("since") is not None
+                ]
+                start = max(starts) if starts else None
                 refs = verify_refs(edge.get("evidence", []), cutoff, f"{fid}.edge")
                 reason = "no matching indexed operation; independent lookup is not a read/write edge"
                 if (
@@ -264,6 +275,8 @@ def check(engine, text, *, save=False):
                         "SELECT * FROM dispatches WHERE parent=? AND child=? AND at<=?",
                         (origin["key"], destination["key"], cutoff),
                     ):
+                        if not in_scope(dispatch["at"], cutoff, start):
+                            continue
                         if {dispatch["request"], dispatch["result"]} <= refs:
                             bound = {
                                 **edge,
@@ -291,6 +304,7 @@ def check(engine, text, *, save=False):
                                 operation_id is None or operation["id"] == operation_id
                             )
                             and operation["op"] == op
+                            and in_scope(operation["at"], cutoff, start)
                             and expected
                             and expected <= refs
                         ):
