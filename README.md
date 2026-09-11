@@ -1,6 +1,6 @@
 # MigLoop Trace Viewer (PoC)
 
-把 Claude Code 或 Codex 迁移会话的 JSONL transcript 一键变成可交互的轨迹页面:
+把 Claude Code / Codex / DevEco Code 迁移会话的记录一键变成可交互的轨迹页面:
 执行拓扑 / Git 式执行流(主干=主会话,分支=子代理)/ 主线上下文占用曲线 / 阶段对比 / 阶段明细 + 点击详情抽屉。
 
 ## 文档
@@ -19,15 +19,17 @@ py migloop-lineage.pyz                 # 列出本机最近的 session
 py migloop-lineage.pyz f3bb027a        # 按 session-id 前缀生成
 py migloop-lineage.pyz arch9 --open    # 按项目名片段生成并在浏览器打开
 py migloop-lineage.pyz 01a0048b        # Codex session-id 前缀同样可用
+py migloop-lineage.pyz ses_f7b82dfa4ffeoDHQp0A0yEEKqB   # DevEco Code:完整 session id,直读本机 deveco.db
 
 # macOS / Linux
 python3 migloop-lineage.pyz <目标> [-o out.html] [--open]
 ```
 
-`<目标>` 三种写法任选:
-1. `.jsonl` 文件完整路径(拿到别人分享的文件时用这个)
-2. session-id 前缀(自动在 `~/.claude/projects` 与 `~/.codex/sessions` 下查找)
+`<目标>` 四种写法任选:
+1. `.jsonl` 文件完整路径(拿到别人分享的 Claude / Codex 文件时用这个);DevEco 的 `.json` 导出文件同理
+2. session-id 前缀(自动在 `~/.claude/projects`、`~/.codex/sessions` 与本机 DevEco 库下查找)
 3. 项目目录名片段(取该项目最新 session)
+4. DevEco Code 的完整 session id(`ses_` 开头):直接读本机 SQLite 库还原,子会话一并带出,不用先导出
 
 输出为**完全自包含**的 HTML(字体、数据全部内嵌),可以直接发给任何人用浏览器打开,不需要网络。
 
@@ -91,6 +93,18 @@ Codex 主线程与子 Agent 分别落在按日期分区的 rollout 文件中：
 `functions.exec` 内的 `shell_command` / `apply_patch` 归一到现有 trace。Codex 目前支持离线 HTML
 和 `--compare`；增量 `--live` reducer 仍只支持 Claude Code。
 
+## DevEco Code session
+
+DevEco Code(华为基于 opencode 的 CLI)把会话存在本机 SQLite 库里,主会话与子会话同库、按 `parent_id` 关联:
+
+```
+~/.local/share/deveco/deveco.db        (Windows 即 C:\Users\<用户名>\.local\share\deveco\)
+```
+
+给出完整 session id(`ses_...`)即可;库不在默认位置时加 `--deveco-db <deveco.db 路径或其目录>`。
+`deveco export` 出来的单会话 `.json` 也能作为目标,但不含子会话。TUI 里 `/export` 出来的 markdown
+只有最后 100 条消息、没有时间戳,不能当输入。DevEco 目前支持离线 HTML 与 `--compare`,不支持 `--live`。
+
 ## 跨机器分享 session
 
 Claude Code 的一个 session 由两部分组成,分享时要一起拷:
@@ -101,6 +115,15 @@ Claude Code 的一个 session 由两部分组成,分享时要一起拷:
 ```
 
 对方拿到后:`py migloop-lineage.pyz 路径/到/<session-id>.jsonl`。
+
+DevEco Code 的会话在 SQLite 库里,分享时把三个同名文件一起拷、别改名(或先退出 DevEco 再拷,
+否则 wal 里还没落盘的尾段会丢):
+
+```
+deveco.db   deveco.db-wal   deveco.db-shm
+```
+
+对方拿到后:`py migloop-lineage.pyz --deveco-db 路径/到/deveco.db ses_<完整id>`。
 
 ## 开发
 
@@ -134,15 +157,17 @@ python scripts/build_pyz.py
 ## 已知边界
 
 - JSONL 格式属于 Claude Code / Codex 内部实现,官方不保证稳定;Claude 已在 v2.1.170 ~ v2.1.220、Codex 已在 rollout schema `session_meta` / `response_item` / `event_msg` 上验证
-- 阶段切分针对 a2h 管线 skill(mig-arch / a2h-spec / plan / execute / verify / retrospect);
+- 阶段切分针对 a2h 管线 skill(mig-arch / a2h-spec / plan / execute / verify / arkts-visual-verify / retrospect);
   未调用管线 skill 的通用会话会整体作为单一 "Session" 阶段展示
+- DevEco 会话的阶段入口有两种:`skill` 工具调用,或 `/<skill>` 命令把 SKILL.md 展开成的 user 消息
+  (按第一个一级标题认技能名)。模型跳过技能加载、只跑技能脚本的那段没有入口证据,会留在前一阶段
 - token 统计按 message.id 去重、过滤 `<synthetic>` 本地合成记录（细节见 `adapters/claude.py` 注释）
 
 ## 代码结构
 
 | 目录 | 说明 |
 |---|---|
-| `src/migloop/adapters/` | Claude、Codex 等输入格式 → 统一 trace；registry 也在这里 |
+| `src/migloop/adapters/` | Claude、Codex、DevEco 输入格式 → 统一 trace；registry 也在这里 |
 | `src/migloop/render/` | 静态 HTML、对比页面和模板，完全不关心输入来源 |
 | `src/migloop/live/` | 增量 cursor、checkpoint 和本地 live server |
 | `src/migloop/chat/` | Codex / Anthropic / OpenAI-compatible 分析助手 |

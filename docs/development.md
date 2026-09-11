@@ -15,7 +15,8 @@ src/migloop/
 ├── adapters/       # 来源专属：发现、识别、解析并归一化 session
 │   ├── base.py     # SourceAdapter / SessionCandidate 契约
 │   ├── claude.py
-│   └── codex.py
+│   ├── codex.py
+│   └── deveco.py   # DevEco Code:本机 SQLite 库 / JSON 导出
 ├── render/         # 来源无关：静态报告、compare、HTML templates
 ├── live/           # 增量 cursor、checkpoint、本地 HTTP server
 ├── chat/           # 页面分析助手 provider
@@ -129,6 +130,11 @@ Live 模式不是定时从头重跑 extractor。它为主会话和每个子 agen
 
 Codex 离线报告使用 `~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl`。主线程与子 Agent 是独立
 rollout，通过 `parent_thread_id` 回链；当前支持静态 HTML 与跨 session 对比，暂不支持 `--live`。
+
+DevEco Code 离线报告直接读本机 SQLite 库 `~/.local/share/deveco/deveco.db`(或 `--deveco-db` 指定的库),
+主会话与子会话同库、按 `parent_id` 回链;也接受 `deveco export` 的单会话 `.json`(不含子会话)。阶段边界
+有两种入口:`skill` 工具调用,以及 `/<skill>` 命令展开成 user 消息的 SKILL.md 正文(取第一个一级标题的
+技能名,见 `deveco._prompt_skill`)。暂不支持 `--live`。
 
 > Workflow 子代理的 transcript **不写 `toolUseResult`**,读取行数从结果正文的 `N⇥内容`
 > 行号前缀还原;末条记录是 tool_result 而非 assistant,所以收尾**必须**看编排状态——
