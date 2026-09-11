@@ -2,6 +2,8 @@
 
 2026-09-11，运行 `development-full-open-v1`；不是全轮胜负报告。
 
+更新：26 份已全部完成并裁决，见 [完整结果](full-open-results.md)。下文“三份已评”和“原实验继续”保留为当时进度，不是当前状态。
+
 ## 已复核的交付事实
 
 首批 dynamic1 六文件 rep1 均已完成。只读 `audit_host_delivery.py` 检查冻结转录，产物在 GEN 下 `delivery-audits-full-open-v1/`，每份绑定完整转录SHA。它不建账、不调用模型、不改原记录，不按相邻事件/相似参数推断父子。
