@@ -8,7 +8,7 @@ import posixpath
 import uuid
 from functools import wraps
 
-from .native_text import change_payloads, render_payloads, term_deltas
+from .native_text import change_outline, change_payloads, render_payloads, term_deltas
 from .store import Store, digest, encode, iso, timestamp
 
 
@@ -405,7 +405,10 @@ class Engine:
             raise ValueError(
                 "unknown operation or parameter; no legacy version/via parameters"
             )
-        offset, limit = request.get("offset", 0), request.get("limit", 20)
+        offset, limit = (
+            request.get("offset", 0),
+            request.get("limit", 100 if request.get("view") == "outline" else 20),
+        )
         if (
             type(offset) is not int
             or offset < 0
@@ -610,17 +613,18 @@ class Engine:
             "calls",
             "inputs",
             "changes",
+            "outline",
             "messages",
         ):
             raise ValueError(
-                "view must be records, calls, relations, inputs, changes or messages"
+                "view must be records, calls, relations, inputs, changes, outline or messages"
             )
         if view == "inputs" and op != "agent":
             raise ValueError("inputs is an agent view")
         if view == "messages" and op != "agent":
             raise ValueError("messages is an agent view")
-        if view == "changes" and op != "file":
-            raise ValueError("changes is a file view")
+        if view in ("changes", "outline") and op != "file":
+            raise ValueError("changes/outline are file views")
         if "include_reads" in request and (
             view != "calls" or type(request["include_reads"]) is not bool
         ):
@@ -647,7 +651,9 @@ class Engine:
             for d in dispatches
             if since is None or d["at"] >= since
         ]
-        if view in ("relations", "inputs", "changes") and request.get("terms"):
+        if view in ("relations", "inputs", "changes", "outline") and request.get(
+            "terms"
+        ):
             matches = {
                 r["ref"]
                 for r in self.store.rows(
@@ -723,17 +729,48 @@ class Engine:
                     [self.link_view(r, scope["at"]) for r in relations], offset, limit
                 ),
             }
-        if view == "changes":
+        if view in ("changes", "outline"):
             page = self._page(
                 [r for r in relations if r["op"] != "read"], offset, limit
             )
-            page["rows"] = [
-                {
-                    **self.link_view(r, scope["at"]),
-                    "payloads": change_payloads(self.store, r),
+            rows = []
+            for r in page["rows"]:
+                payloads = change_payloads(self.store, r)
+                row = self.link_view(r, scope["at"])
+                if view == "outline":
+                    row["outline"] = change_outline(payloads)
+                    row["actor_scope"] = (
+                        self.store.handle(
+                            "s",
+                            {
+                                "kind": "agent",
+                                "key": r["agent"],
+                                "at": scope["at"],
+                                "since": None,
+                            },
+                        )
+                        if r["agent"]
+                        else None
+                    )
+                else:
+                    row["payloads"] = payloads
+                rows.append(row)
+            page["rows"] = rows
+            if view == "outline":
+                return {
+                    "kind": "outline",
+                    "scope": scope,
+                    "scope_id": scope_id,
+                    **page,
+                    "opaque_query": {
+                        "op": "file",
+                        "scope": scope_id,
+                        "view": "calls",
+                        "limit": 100,
+                    },
+                    "filtered_by_terms": bool(request.get("terms")),
+                    "note": "Native operation outline, not complete file history. All selected Edit argument deltas/patches shown; whole-write bodies explicitly folded with raw references. Not state replay or causal authorship; repeated replacement counts not certified. Unknown scripts still require calls/search. actor_scope uses the view cutoff, not just write time.",
                 }
-                for r in page["rows"]
-            ]
             return {
                 "kind": "changes",
                 "scope": scope,
@@ -1122,7 +1159,22 @@ class Engine:
                     )
                 )
             for row in data.get("rows", []):
-                if "excerpt" in row:
+                if "outline" in row:
+                    lines.append(
+                        f"NATIVE {row['at']} {row['op']}/{row['strength']} {row['agent']} actor_scope={row['actor_scope']} request={row['request']} result={row['result']}"
+                    )
+                    for item in row["outline"]:
+                        lines.append(
+                            encode({k: v for k, v in item.items() if k != "text"})
+                        )
+                        lines.append(
+                            item["text"]
+                            or "No line delta in these literal arguments; not a file-state assertion."
+                        )
+                    lines.append(
+                        f"END NATIVE {row['request'] or row['result']} @ {row['at']}"
+                    )
+                elif "excerpt" in row:
                     lines.append(
                         f"{row.get('cite', row['ref'])} {row['at'] or 'UNDATED'} {'/'.join(row.get('tools', []))} {row['agent'] or 'UNKNOWN OWNER'} owner_scope={row.get('agent_scope') or '-'} | {row['excerpt']}"
                         + (

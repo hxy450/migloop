@@ -1,5 +1,6 @@
 """Select protocol-native change payloads; never interpret arbitrary scripts."""
 
+import difflib
 import json
 
 from .store import encode, parts, path_key
@@ -51,6 +52,72 @@ def render_payloads(payloads):
         for name, value in fields:
             lines += [name.upper(), value if isinstance(value, str) else encode(value)]
     return "\n".join(lines)
+
+
+def change_outline(payloads):
+    """Complete within-call deltas; whole writes are explicitly folded, not diffed."""
+    rows = []
+    for payload in payloads:
+        body = payload["body"]
+        if not isinstance(body, dict):
+            rows.append(
+                {
+                    "kind": "metadata",
+                    "text": encode(body),
+                    "block": payload["block"],
+                    "step": 0,
+                    "tool": payload["tool"],
+                }
+            )
+            continue
+        edits = body.get("edits") if isinstance(body.get("edits"), list) else [body]
+        for step, edit in enumerate(edits):
+            row = {"block": payload["block"], "step": step, "tool": payload["tool"]}
+            if (
+                isinstance(edit, dict)
+                and isinstance(edit.get("old_string"), str)
+                and isinstance(edit.get("new_string"), str)
+            ):
+                old, new = (
+                    edit["old_string"].splitlines(),
+                    edit["new_string"].splitlines(),
+                )
+                row.update(
+                    kind="edit_delta",
+                    old_lines=len(old),
+                    new_lines=len(new),
+                    replace_all=edit.get("replace_all", False),
+                    literal_equal=edit["old_string"] == edit["new_string"],
+                    only_line_endings_changed=old == new
+                    and edit["old_string"] != edit["new_string"],
+                    text="\n".join(
+                        difflib.unified_diff(
+                            old,
+                            new,
+                            fromfile="old argument",
+                            tofile="new argument",
+                            n=0,
+                            lineterm="",
+                        )
+                    ),
+                )
+                if row["only_line_endings_changed"]:
+                    row["text"] = (
+                        "Only line endings differ in the literal arguments; open the full native payload to inspect bytes."
+                    )
+            elif isinstance(edit, dict) and isinstance(edit.get("unified_diff"), str):
+                row.update(kind="native_patch", text=edit["unified_diff"])
+            elif isinstance(edit, dict) and isinstance(edit.get("content"), str):
+                row.update(
+                    kind="snapshot_folded",
+                    snapshot_lines=len(edit["content"].splitlines()),
+                    snapshot_chars=len(edit["content"]),
+                    text="Whole write body folded; open request/result for full content. Not a diff against a known previous state or proof of first introduction.",
+                )
+            else:
+                row.update(kind="metadata", text=encode(edit))
+            rows.append(row)
+    return rows
 
 
 def term_deltas(payloads, terms):

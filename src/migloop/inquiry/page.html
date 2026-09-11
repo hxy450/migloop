@@ -157,6 +157,7 @@
         ><button id="relations">查读写关系</button
         ><button id="calls">查相关调用</button
         ><button id="changes">展开原生修改</button
+        ><button id="outline">原生增删清单</button
         ><button id="history">片段修改历史</button
         ><button id="inputs">查 Agent 已收输入</button
         ><button id="messages">查 Agent 任务消息</button
@@ -311,8 +312,13 @@
           element('div', `${row.path} · 返回 ${row.deliveries} 次`, box);
           for (const ref of row.results)
             button(ref,box,()=>open(ref,at));
-        } else if (data.kind === 'changes' || data.kind === 'blame') {
+        } else if (data.kind === 'changes' || data.kind === 'blame' || data.kind === 'outline') {
           element('div',`${row.at} · ${row.agent||'未知归属'} · ${row.strength}`,box,'small');
+          for(const item of row.outline || []) {
+            element('div',`${item.tool} · ${item.kind} · 块 ${item.block} / 步 ${item.step}${item.snapshot_lines!=null?' · 快照 '+item.snapshot_lines+' 行（正文可展开）':''}`,box,'small');
+            element('pre',item.text || '本次字面参数无行差异；不代表完整文件状态',box);
+          }
+          if(row.actor_scope) button('打开该actor完整截止范围',box,()=>query({op:'agent',scope:row.actor_scope}));
           for(const payload of row.payloads || []) {
             element('div',`${payload.tool} · 原记录块 ${payload.block}（请求正文不等于效果认证）`,box,'small');
             element('pre',typeof payload.body==='string'?payload.body:JSON.stringify(payload.body,null,2),box);
@@ -639,6 +645,7 @@
     $("relations").onclick = () => guard(() => query(request("relations")));
     $("calls").onclick = () => guard(() => query(request("calls")));
     $("changes").onclick = () => guard(() => query(request("changes")));
+    $("outline").onclick = () => guard(() => query(request("outline")));
     $("history").onclick = () => guard(() => {
       if ($('kind').value !== 'file') throw new Error('片段历史需要选择文件');
       const q=request(); delete q.view; q.op='blame'; return query(q);

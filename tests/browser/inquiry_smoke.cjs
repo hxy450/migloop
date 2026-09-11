@@ -192,6 +192,21 @@ async function main() {
         assert.equal(await evaluate('JSON.stringify({graph,trace})'),initial);
         fs.writeFileSync(path.join(out,'input-views.json'),JSON.stringify(views,null,2));
       }
+      if (process.argv.includes('--outline')) {
+        const outline = await evaluate(`(async()=>{
+          const q={op:'file',key:graph.target.file,at:graph.target.at,view:'outline',limit:100};
+          const data=await api('/api/query',q);await query(q);
+          return {expected:data.rows.length,actual:document.querySelectorAll('#records .row').length,
+            snapshots:data.rows.flatMap(r=>r.outline).filter(r=>r.kind==='snapshot_folded').length,
+            foldedLabel:document.getElementById('records').innerText.includes('快照'),
+            opaqueQuery:data.opaque_query};
+        })()`);
+        assert.equal(outline.actual,outline.expected);
+        if(outline.snapshots) assert(outline.foldedLabel);
+        assert.equal(outline.opaqueQuery.view,'calls');
+        assert.equal(await evaluate('JSON.stringify({graph,trace})'),initial);
+        fs.writeFileSync(path.join(out,'outline.json'),JSON.stringify(outline,null,2));
+      }
       assert.equal(errors.length, 0);
       const result = {passed:true, url, errors, model_report:true, report_mutated:false,
         checks:["all findings match submitted graph", "node reason", "manual query isolation", "raw expansion"]};

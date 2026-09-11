@@ -22,6 +22,7 @@ agent视图是保存的历史记录，不保证全部旧输入在某次写入时
 
 调查建议（不是固定路线）：
 1. 先用文件的修复区间view:calls建立修改清单，展开相关命令及回执，未知项另列。不能把机器识别出的原生写清单当成用户要调查的全部修改。清单来自实际内容，不来自预设的缺陷数。
+同时用view:outline看不带terms的原生增删清单：Edit显示去掉重复上下文的实际行增删，patch显示原生补丁，整文件Write只列快照大小并给全文入口。分别看修复区间和生成截止范围，能发现名字不同的中间删除、改写和返修新增，再按相关符号深查；不要一开始就用修复方的关键词过滤所有历史。
 2. 修复calls有两层续读：列表next=null但END FRAME next仍是数字时，还没看完该页。先把清单读完整，再对每类修改往生成期追。Bash脚本同样是证据，出现未解析写不能只看原生Write/Edit。
 需要看原生补丁时用view:changes批量取完整old/new；它只是一种展开，不是完整修复清单，也不应决定报告只解释哪几项。
 对每类修改也查修复者实际收到的任务/检查输入：agent的inputs给消息入口，view:messages可看历史任务/追问（最近的在前）。任务提出X证明当时要求了X，不证明X原先就是运行缺陷。
@@ -48,7 +49,8 @@ investigate(requests=[...])每次1–24项批量独立查阅，不需要via。�
 每项都会返回独立RESULT及正文片段，不会被前一项挡住。page只续该项，不需要翻过同批其它项。
 limit范围1–100，默认20；terms最多8个非空字面词，每词<=500字符。查询是OR，别混入大量泛词把相关证据淹没。
 目录：{op:catalog,kind:agent|file|source,q:字面子串,offset:0,limit:20}，目录不是历史时点事实。
-文件：{op:file,key:完整或唯一后缀路径,at:带时区ISO,since:可选ISO,view:records|calls|relations|changes,offset:0,limit:20}。
+文件：{op:file,key:完整或唯一后缀路径,at:带时区ISO,since:可选ISO,view:records|calls|relations|changes|outline,offset:0,limit:20}。
+outline默认100项，旧view默认20项；仍看next续完。它只缩短原生参数的重复上下文，不重放前版文件，不证明脚本没改，也不替代原始changes全文。actor_scope保留当前观察截止，不能误当写前输入范围。
 calls仅筛原生工具调用入口，包含无法判断效应的脚本，results给已到达的回执引用；terms同时匹配调用及截止前已返回结果，不自动把相关调用认证为写。
 默认折叠原生只读工具和有限的完整标准只读命令形状，folded_read_calls给数量，unfold给完整查询；include_reads:true可展开全部。折叠不推断运行时效应，不假设复杂脚本无写，不影响records/search。
 agent：把op改成agent、key改成目录中的agent身份。默认records是全文索引，不是全部原文。view:inputs同时给原生读文件清单和最近任务消息入口，二者都要看；view:messages专看收到的非工具消息，可分页和多词terms过滤。Shell/工具输出仍在records/calls/search，inputs不是完整有效上下文。
