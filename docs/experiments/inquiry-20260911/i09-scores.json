@@ -1,0 +1,19 @@
+{
+  "schema":"inquiry-developer-score/1",
+  "round":"i09","model":"gpt-5.6-luna","effort":"medium",
+  "reference":"../file-first-10/scoring-core.json",
+  "grading":"Developer semantic review of the two original submissions, not blind and not a full-cohort result. Core and extra false assertions are counted separately; no best-of selection.",
+  "cases":[
+    {"id":"F10-01","report_id":"376a7e9fe49846de","units":{"mask":"correct","images":"correct","cta":"correct","price":"omitted","indicator":"correct","repair-compile":"wrong"},"basis":"Recovers purpose-specific masks, image constraints, outer-padding CTA and indicator styling. Mask's wrong site count is an additional error, not grounds to erase the otherwise identified local cause. Price split/input-output cause absent. Private helpers still falsely attributed to generation Slice8 instead of visual repair."},
+    {"id":"F10-03","report_id":"6fa0a707d55948c5","units":{"label":"partial","button-style":"correct","test-integration":"correct","logging":"partial","comment-policy":"correct"},"basis":"Button geometry, later testing contract and post-platform/comment cleanup explained. Explicit delivered Roll versus later ROLL oracle missing. Logging change found but visual-repair introduction of console.error not recovered. Generic quality cleanup meets the frozen comment core; lack of ECAT name alone is not failure."}
+  ],
+  "summary":{"correct":7,"partial":2,"omitted":1,"wrong":1,"total":11,"unit_weighted_percent":63.6363636364},
+  "additional_errors":[
+    {"case":"F10-01","major":true,"quote":"后续 Slice 8 接线引入 helper 可见性编译错误","counterevidence":"Slice8 native Write is July 24. Visual fixer agent-a68daf720e780b4c2 L592 first adds private priceDigits/priceSuffix on July 26, then builder reports and removes private. This is repair-created, not Slice8-generated."},
+    {"case":"F10-01","major":true,"quote":"未见修复后 BUILD SUCCESSFUL","counterevidence":"agent-af0e3d2ae54dbf769.jsonl L37, e-67b279e75764, 2026-07-26T21:46:28.608Z, is BUILD SUCCESSFUL before observation cutoff."},
+    {"case":"F10-01","major":false,"quote":"脚本报告本页 4 sites/import 并成功返回","counterevidence":"Actual repair return L104/e-827ccccf4976 says MemberCenterPage 3 sites. There are four controllers but H5 already has a transparent mask."},
+    {"case":"F10-03","major":true,"quote":"finding A node f: 后续视觉任务完成修复。","counterevidence":"Node s-agent-eb3f1b28c6e5 is the visual finding author, not the actual code repair writer s-agent-b7cac272cfd0. Its owned references can validate the source identity without establishing the claimed repair responsibility."}
+  ],
+  "cost":{"model_seconds_sum":680.3560739000095,"input_plus_output":3176104,"accounting":"Cached input included once; reasoning is not double counted. Import/offline audit separate."},
+  "accepted":false
+}

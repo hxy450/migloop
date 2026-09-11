@@ -62,6 +62,7 @@ undated:true可纳入未知时间，但不能当已证早期输入。
 open默认返回完整原生正文，去掉重复usage/uuid等封装；pointer:""可看完整原记录。
 大段源码可显式选字面窗口：{op:open,ref:e-...,at:ISO,terms:[关键词1,关键词2],context:6}。
 这返回所有匹配行的上下文（context为0–50行），标出正文行范围；不是全文。可用它对照长源码的输入与输出，避免为价格字段读完整千行文件。
+例外：Edit/MultiEdit/patch和未证明只读的Bash/exec_command请求可能一次包含多项修改；对此不按关键词裁剪已选参数，返回whole_argument_packet并明确标记。一个关键词命中不能代表该调用其余修改也看完了。读取结果/源码/规格仍可按词窗口查看。
 也可只取需要的字段，例如Claude正文/message/content/0/input/content，读取结果/message/content/0/content；
 Codex请求/payload/input或/payload/arguments、结果/payload/output。字段依原始结构，不要盲猜。
 diff明确比较两个原始引用：{op:diff,before:ref,after:ref,before_pointer:字段,after_pointer:字段,at:ISO}。

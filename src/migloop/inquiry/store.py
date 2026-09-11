@@ -9,6 +9,7 @@ import re
 import sqlite3
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from functools import lru_cache
 from pathlib import Path
 
 from .command_shape import call_read_basis
@@ -22,6 +23,16 @@ def digest(value: bytes) -> str:
 
 def encode(value) -> str:
     return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+
+
+@lru_cache(maxsize=64)
+def search_terms(encoded):
+    return tuple(json.loads(encoded))
+
+
+def literal_any(body, encoded):
+    folded = body.casefold()
+    return any(term in folded for term in search_terms(encoded))
 
 
 def timestamp(value, *, required=False):
@@ -258,6 +269,7 @@ class Store:
             lambda body, needle: needle in body.casefold(),
             deterministic=True,
         )
+        self.db.create_function("literal_any", 2, literal_any, deterministic=True)
         schema = self.db.execute("SELECT value FROM meta WHERE key='schema'").fetchone()
         if schema is None or schema[0] != "inquiry/index/3":
             self.db.close()

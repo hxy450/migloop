@@ -171,30 +171,33 @@ class Engine:
         if kind == "agent":
             if not isinstance(key, str) or not key:
                 raise ValueError("agent key required")
-            if not self.store.rows("SELECT id FROM sources WHERE agent=?", (key,)):
+            sources = self.store.rows("SELECT id FROM sources WHERE agent=?", (key,))
+            if not sources:
                 raise ValueError("agent not registered")
-            clauses.append("s.agent=?")
-            values.append(key)
+            # Bind the record_scope(source,at) key directly. Filtering s.agent
+            # after the join lets SQLite scan unrelated record bodies first.
+            clauses.append("r.source IN (" + ",".join("?" for _ in sources) + ")")
+            values.extend(row["id"] for row in sources)
         if kind == "file":
             key = self.store.resolve_file(key)
             token = posixpath.basename(key).casefold()
             # Lexical associations are navigation only, not an inferred file operation.
-            member = (
-                "r.ref IN (SELECT record FROM mentions WHERE name=?)"
+            members = (
+                "SELECT record FROM mentions WHERE name=?"
                 if "." in token
-                else "literal_contains(r.body,?)"
+                else "SELECT ref FROM records WHERE literal_contains(body,?)"
             )
-            partner = (
-                "o.ref IN (SELECT record FROM mentions WHERE name=?)"
-                if "." in token
-                else "literal_contains(o.body,?)"
-            )
+            # Materialize the sparse reference union before reading/matching
+            # bodies. OR-ing joins previously let SQLite filter the whole pool.
             clauses.append(
-                "(" + member + " OR instr(lower(s.name),?)>0 OR "
-                "r.ref IN (SELECT p.b FROM pairs p JOIN records o ON p.a=o.ref "
-                "WHERE " + partner + " AND o.at<=?) OR "
-                "r.ref IN (SELECT request FROM effects WHERE path=?) OR "
-                "r.ref IN (SELECT result FROM effects WHERE path=? AND at<=?))"
+                "r.ref IN ("
+                + members
+                + " UNION SELECT ref FROM records WHERE source IN (SELECT id FROM sources WHERE instr(lower(name),?)>0)"
+                " UNION SELECT p.b FROM pairs p JOIN records o ON p.a=o.ref WHERE o.ref IN ("
+                + members
+                + ") AND o.at<=?"
+                " UNION SELECT request FROM effects WHERE path=?"
+                " UNION SELECT result FROM effects WHERE path=? AND at<=?)"
             )
             values.extend([token, token, token, at, key, key, at])
         terms = request.get("terms", [])
@@ -207,15 +210,12 @@ class Engine:
                 "terms must contain 0–8 nonempty literal strings, each <=500 chars"
             )
         if terms:
-            match = " OR ".join("literal_contains(r.body,?)" for _ in terms)
-            values.extend(t.casefold() for t in terms)
+            encoded_terms = encode([t.casefold() for t in terms])
+            match = "literal_any(r.body,?)"
+            values.append(encoded_terms)
             if request.get("view") == "calls":
-                match += (
-                    " OR EXISTS (SELECT 1 FROM pairs p JOIN records o ON p.b=o.ref WHERE p.a=r.ref AND o.at<=? AND ("
-                    + " OR ".join("literal_contains(o.body,?)" for _ in terms)
-                    + "))"
-                )
-                values.extend([at, *(t.casefold() for t in terms)])
+                match += " OR EXISTS (SELECT 1 FROM pairs p JOIN records o ON p.b=o.ref WHERE p.a=r.ref AND o.at<=? AND literal_any(o.body,?))"
+                values.extend([at, encoded_terms])
             clauses.append("(" + match + ")")
         return (
             " AND ".join(clauses),
@@ -401,9 +401,41 @@ class Engine:
                 text = content_text(text)
             selection = {}
             if "terms" in request:
-                text, selection = content_windows(
+                narrowed, selection = content_windows(
                     text, request["terms"], request.get("context", 6)
                 )
+                packet = any(
+                    call["read_basis"] is None
+                    and (call["tool"] or "").split(".")[-1].casefold()
+                    in {
+                        "bash",
+                        "exec_command",
+                        "edit",
+                        "multiedit",
+                        "apply_patch",
+                        "delete_file",
+                    }
+                    for call in self.store.rows(
+                        "SELECT tool,read_basis FROM calls WHERE record=?",
+                        (record["ref"],),
+                    )
+                )
+                if packet:
+                    # Matching one edit does not account for other edits in a
+                    # compound argument packet. Do not infer execution/effects.
+                    selection["requested_window_ranges"] = selection[
+                        "content_line_ranges"
+                    ]
+                    selection["content_line_ranges"] = (
+                        [[1, selection["original_content_lines"]]]
+                        if selection["original_content_lines"]
+                        else []
+                    )
+                    selection["selection"] = (
+                        "whole_argument_packet: keyword narrowing not applied to an edit/unclassified command request; it may contain additional changes. No execution/effect certification. Explicit pointer selection still applies."
+                    )
+                else:
+                    text = narrowed
             elif "context" in request:
                 raise ValueError("context requires terms")
             owner_scope = (

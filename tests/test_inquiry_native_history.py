@@ -7,7 +7,7 @@ import pytest
 
 from migloop.inquiry.native_text import term_deltas
 from migloop.inquiry.report import check
-from migloop.inquiry.store import timestamp
+from migloop.inquiry.store import encode, literal_any, timestamp
 from tests.test_inquiry_core import build, record, result, ts, use
 
 
@@ -245,4 +245,166 @@ def test_continuation_repeats_the_actual_record_identity_and_time(tmp_path):
     assert timestamp(context["at"]) == timestamp(ts(1))
     second = engine.page(identity, offset)
     assert json.loads(second.rsplit("; CONTEXT ", 1)[1]) == context
+    engine.store.close()
+
+
+def test_multiterm_search_folds_once_and_retains_unicode_literal_semantics(tmp_path):
+    class CountedText(str):
+        folds = 0
+
+        def casefold(self):
+            self.folds += 1
+            return super().casefold()
+
+    text = CountedText("Straße has 100% literal _ marks")
+    assert literal_any(text, encode(["absent", "strasse", "100%", "_"]))
+    assert text.folds == 1
+    engine = build(
+        tmp_path,
+        [
+            record(1, {"type": "text", "text": text}),
+            record(2, {"type": "text", "text": "other"}),
+        ],
+    )
+    result = engine.query(
+        {"op": "search", "at": ts(3), "terms": ["STRASSE", "never", "100%", "_"]}
+    )
+    assert result["total"] == 1
+    assert (
+        engine.query({"op": "search", "at": ts(3), "terms": ["100_", "%absent%"]})[
+            "total"
+        ]
+        == 0
+    )
+    engine.store.close()
+
+
+def test_agent_search_does_not_filter_other_agents_text(tmp_path):
+    engine = build(
+        tmp_path,
+        [record(1, {"type": "text", "text": "irrelevant " * 100}) for _ in range(100)],
+        [record(1, {"type": "text", "text": "needle"})],
+    )
+    calls = []
+
+    def counted(body, terms):
+        calls.append(body)
+        return literal_any(body, terms)
+
+    engine.store.db.create_function("literal_any", 2, counted, deterministic=True)
+    data = engine.query(
+        {
+            "op": "search",
+            "kind": "agent",
+            "key": "b",
+            "at": ts(2),
+            "terms": ["needle", "absent"],
+        }
+    )
+    assert data["total"] == 1
+    assert all("irrelevant" not in body for body in calls)
+    engine.store.close()
+
+
+def test_file_search_filters_its_indexed_candidates_before_matching_text(tmp_path):
+    engine = build(
+        tmp_path,
+        [
+            record(1, use(f"other-{i}", "Bash", command="python script.py Other.ets"))
+            for i in range(100)
+        ]
+        + [record(1, use("target", "Bash", command="python script.py A.ets"))],
+    )
+    calls = []
+
+    def counted(body, terms):
+        calls.append(body)
+        return literal_any(body, terms)
+
+    engine.store.db.create_function("literal_any", 2, counted, deterministic=True)
+    data = engine.query(
+        {
+            "op": "file",
+            "key": "A.ets",
+            "at": ts(2),
+            "view": "calls",
+            "terms": ["script.py"],
+        }
+    )
+    assert data["total"] == 1
+    assert all("Other.ets" not in body for body in calls)
+    engine.store.close()
+
+
+def test_command_window_does_not_hide_a_second_change_in_the_same_packet(tmp_path):
+    engine = build(
+        tmp_path,
+        [
+            record(
+                1,
+                use(
+                    "s",
+                    "Bash",
+                    command="python - <<'PY'\nfirst = 'needleA'\nsecond = 'collateralB'\nPY",
+                ),
+            ),
+            record(2, result("s", "needleA\nother output\ncollateralB")),
+        ],
+    )
+    data = engine.query(
+        {
+            "op": "open",
+            "ref": engine.store.locate("a.jsonl", 1),
+            "at": ts(3),
+            "terms": ["needleA"],
+            "context": 0,
+        }
+    )
+    assert "needleA" in data["text"] and "collateralB" in data["text"]
+    assert data["selection"].startswith("whole_argument_packet")
+    assert data["requested_window_ranges"] != data["content_line_ranges"]
+    output = engine.query(
+        {
+            "op": "open",
+            "ref": engine.store.locate("a.jsonl", 2),
+            "at": ts(3),
+            "terms": ["needleA"],
+            "context": 0,
+        }
+    )
+    assert "collateralB" not in output["text"]
+    assert engine.store.rows("SELECT * FROM effects") == []
+    engine.store.close()
+
+
+def test_multiedit_parameters_remain_complete_but_pointer_stays_explicit(tmp_path):
+    engine = build(
+        tmp_path,
+        [
+            record(
+                1,
+                use(
+                    "m",
+                    "MultiEdit",
+                    file_path="A.ets",
+                    edits=[
+                        {"old_string": "one", "new_string": "needle"},
+                        {"old_string": "two", "new_string": "collateral"},
+                    ],
+                ),
+            )
+        ],
+    )
+    q = {
+        "op": "open",
+        "ref": engine.store.locate("a.jsonl", 1),
+        "at": ts(2),
+        "terms": ["needle"],
+        "context": 0,
+    }
+    assert "collateral" in engine.query(q)["text"]
+    explicit = engine.query(
+        {**q, "pointer": "/message/content/0/input/edits/0/new_string"}
+    )
+    assert explicit["text"] == "needle" and explicit["projection"] == "json_pointer"
     engine.store.close()
