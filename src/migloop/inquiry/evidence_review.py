@@ -4,11 +4,72 @@ No prose classification, state replay, new edges, or model-authored corrections.
 Literal predecessors are deliberately weaker than line authorship.
 """
 
-import re
 from collections import defaultdict
 
+from .citations import cited_refs
 from .native_text import change_outline, change_payloads
 from .store import iso, timestamp
+
+
+def post_write_returns(engine, operations, target, limitations):
+    """Literal markers in later same-actor returns, NOT target validation facts."""
+    start = timestamp(target.get("since"))
+    latest = {}
+    for op in operations:
+        if op["op"] == "write" and op["agent"] and (start is None or op["at"] >= start):
+            latest[op["agent"]] = max(op["at"], latest.get(op["agent"], op["at"]))
+    rows = []
+    for agent, at in sorted(latest.items()):
+        all_returns = {
+            "op": "agent",
+            "key": agent,
+            "since": iso(at),
+            "at": target["at"],
+            "view": "returns",
+            "offset": 0,
+            "limit": 20,
+        }
+        query = {
+            **all_returns,
+            "limit": 5,
+            "terms": [
+                "BUILD SUCCESSFUL",
+                "BUILD FAILED",
+                "BUILD_EXIT_CODE",
+                "install bundle successfully",
+                "INSTALL_FAILED",
+                "tests passed",
+                "tests failed",
+                "test result",
+            ],
+        }
+        data = engine.query(query)
+        matches = []
+        for row in data["rows"]:
+            try:
+                engine.store.source_record(row["ref"])
+            except (ValueError, OSError) as exc:
+                limitations.append({"ref": row["cite"], "error": str(exc)})
+                continue
+            matches.append(
+                {k: row[k] for k in ("cite", "at", "name", "line", "tools", "excerpt")}
+            )
+        rows.append(
+            {
+                "agent": agent,
+                "since": iso(at),
+                "at": target["at"],
+                "total": data["total"],
+                "matches": matches,
+                "next": data["next"],
+                "query": query,
+                "all_returns_query": all_returns,
+                "not_validation_proof": True,
+                "not_absence_proof": True,
+                "note": "Server lookup, not a model-opened source. Markers in recorded tool returns may be quoted docs, old logs or another target. Received after the last indexed target write does not prove the command started after it, built that state, or passed behavior tests. Open originals and paired commands; zero hits does not prove no validation.",
+            }
+        )
+    return rows
 
 
 def review(engine, document, target, nodes):
@@ -23,28 +84,18 @@ def review(engine, document, target, nodes):
     limitations, timeline, actor_notes = [], [], []
     checked_refs = {}
 
-    def refs(value):
+    def refs(finding):
         found = set()
-        if isinstance(value, dict):
-            for part in value.values():
-                found.update(refs(part))
-        elif isinstance(value, list):
-            for part in value:
-                found.update(refs(part))
-        elif isinstance(value, str):
-            candidates = re.findall(r"\be-[0-9a-f]{8,64}\b", value)
-            if not candidates:
-                candidates = [value]
-            for candidate in candidates:
-                if candidate not in checked_refs:
-                    try:
-                        record, _ = store.source_record(candidate)
-                        checked_refs[candidate] = record
-                    except (ValueError, OSError, TypeError):
-                        checked_refs[candidate] = None
-                record = checked_refs[candidate]
-                if record and record["at"] is not None and record["at"] <= cutoff:
-                    found.add(record["ref"])
+        for candidate in cited_refs(finding, store):
+            if candidate not in checked_refs:
+                try:
+                    record, _ = store.source_record(candidate)
+                    checked_refs[candidate] = record
+                except (ValueError, OSError, TypeError):
+                    checked_refs[candidate] = None
+            record = checked_refs[candidate]
+            if record and record["at"] is not None and record["at"] <= cutoff:
+                found.add(record["ref"])
         return found
 
     def operation_refs(op):
@@ -194,6 +245,9 @@ def review(engine, document, target, nodes):
         "timeline": sorted(timeline, key=lambda n: (n["first"], n["node"])),
         "actor_notes": actor_notes,
         "literal_predecessors": predecessors,
+        "post_write_returns": post_write_returns(
+            engine, operations, target, limitations
+        ),
         "limitations": limitations,
         "semantic_verified": False,
         "note": "Target-file native facts and literal navigation hints only. Timeline is cited record time, not query cutoff or proof the claim occurred then. No prose verified, report changed, or causal edge added.",

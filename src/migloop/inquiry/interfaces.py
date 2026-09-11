@@ -41,7 +41,8 @@ inputs的tool_return_total/tool_return_query单列全部已记录工具返回入
 你只需给真正要归因的节点填scope、role、reason、evidence。原文引用e-...、agent范围s-agent-...、文件范围s-file-...各有不同类型，不能换前缀猜ID。
 mechanical_status只核坐标/引用/原生关系及原生写对账，不是正确率、全文覆盖或因果认证。needs_revision须处理错误，不靠删证据回避。
 机械通过也不证明因果正确；“没查到检查”不能写成“确认遗漏检查”，这也适用于最后的简短摘要。
-submit还有evidence_review和review_query：收尾打开{op:review,report_id:自己刚提交的ID}，按END FRAME续完。timeline列自己引用的实际发生时间，别把节点查询截止当证据发生时间。actor_notes指出节点引用的原生目标写实际由其它actor执行：先核身份，协调责任不能冒充执行作者。literal_predecessors给尚未引用的较早Edit/patch中相同新增行：核原文，区分返修中新添与生成遗留。它只是字面前序线索，不证明首作者/连续状态/因果；不会替你改报告或加边。核对后需要改的由你自行重提，不为了清空提示凭空补链。
+submit还有evidence_review和review_query：收尾打开{op:review,report_id:自己刚提交的ID,offset:0,limit:100}，按列表next和END FRAME续完。timeline列自己引用的实际发生时间，别把节点查询截止当证据发生时间。actor_notes指出节点引用的原生目标写实际由其它actor执行：先核身份，协调责任不能冒充执行作者。literal_predecessors给尚未引用的较早Edit/patch中相同新增行：核原文，区分返修中新添与生成遗留。它只是字面前序线索，不证明首作者/连续状态/因果；不会替你改报告或加边。核对后需要改的由你自行重提，不为了清空提示凭空补链。
+post_write_returns给已确认目标写者最后写入之后、截至观察结束的工具返回入口，并列构建/安装/测试字面词候选。项目级回执不一定含目标文件名，不能只看file列表就断言没有。候选可能只是读到的文档或其它构建，时间相邻也不认证目标版本/真实行为；打开原文及对应命令再裁定。零命中不是没有验证的证明，仍可用all_returns_query或全池截时搜索。
 coverage.unattributed_native_writes是未归因的已记录原生写，需用view:changes核原文并并入finding.changes；原因未明可在对应finding里限定未知，不能用reviewed:unknown把已经可展开的修改藏掉。
 coverage.unassessed是未判明效应的相关调用，不代表全是修改；它们留在UI和文件calls，不要求逐条写没有改文件的套话。
 reviewed:no_target_change表示该事件实际只查询或改了别的对象；不能用“Bash不是native write”作为排除理由。已有脚本正文和写后观察支持目标修改时，应解释该修改，关系不能机检则留未知边。
@@ -61,6 +62,7 @@ agent：把op改成agent、key改成目录中的agent身份。默认records是�
 每个file/agent视图返回scope_id=s-file-...或s-agent-...，锁定kind/key/at/since。后续可用{op:search,scope:已返回的scope_id,terms:[...]}
 或{op:agent,scope:s-...,view:relations}，不能再混写key/at/since。PARTICIPANT的scope可直接打开agent。
 原文引用优先照抄短cite=e-...，不能用RESULT id、agent名或注释拼进ref。原始长ref也可用。
+若误把RESULT id加e-当引用，submit会在精确对应你自己已打开的单条原文时给resolution_hints[错误ref].source_cite；按ref去重但保留全部issues位置。这只是指路，错误仍须你核原文后修稿。不会静默替换或从search聚合结果猜出处。
 调用行的owner_scope和open的record_owner_scope给这段转录所属agent坐标，可直接打开，不用借用别的写者坐标。
 所属会话不是被转述内容的作者。WRITER.scope继承当前观察截止，便于查写后检查和构建；input_scope才截在最后写调用发起前，write_scope给最后写入时刻。不能用写前窗口否定写后结果。
 原生link的file端默认是该次内容观察/写入时刻，写者端默认是该次写入时刻；从写者scope开输入关系可接起精确时序。
@@ -196,6 +198,21 @@ def build_mcp(path):
                     "mechanical_status",
                 )
             } | {"nodes": len(graph["nodes"]), "bound_edges": len(graph["edges"])}
+            summary["resolution_hints"] = {
+                issue["ref"]: {
+                    k: v for k, v in issue["resolution_hint"].items() if k != "note"
+                }
+                for issue in graph["issues"]
+                if "resolution_hint" in issue
+            }
+            summary["issues"] = [
+                {k: v for k, v in issue.items() if k != "resolution_hint"}
+                for issue in graph["issues"]
+            ]
+            if summary["resolution_hints"]:
+                summary["resolution_hint_note"] = (
+                    "Exact owned original-query matches only. All errors remain; reopen each suggested source and correct your own report. No automatic rewriting or semantic proof."
+                )
             summary["missing_evidence_links"] = [
                 {k: r.get(k) for k in ("link", "op", "path", "from_scope", "to_scope")}
                 for r in graph["missing_evidence_links"]
@@ -209,6 +226,7 @@ def build_mcp(path):
                         "timeline",
                         "actor_notes",
                         "literal_predecessors",
+                        "post_write_returns",
                         "limitations",
                     )
                 },
@@ -227,6 +245,17 @@ def build_mcp(path):
                         )
                     }
                     for r in review["literal_predecessors"][:4]
+                ],
+                "post_write_returns": [
+                    {
+                        "agent": r["agent"],
+                        "since": r["since"],
+                        "total": r["total"],
+                        "matches": r["matches"],
+                        "not_validation_proof": True,
+                        "not_absence_proof": True,
+                    }
+                    for r in review["post_write_returns"][:4]
                 ],
                 "preview_limit_per_kind": 4,
                 "note": "Open review_query for all notes and actual cited times. Hints are not authorship or causal proof; only this investigator may revise the original.",

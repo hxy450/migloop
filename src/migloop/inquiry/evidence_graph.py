@@ -5,6 +5,7 @@ byte-checked indexed operations on the graph. Added endpoints stay neutral;
 query order, copied summaries and lexical mentions never create connections.
 """
 
+from .citations import cited_refs
 from .store import iso, timestamp
 
 
@@ -14,10 +15,7 @@ def attach(engine, finding, target):
     cutoff = timestamp(target["at"], required=True)
     nodes = [dict(node) for node in finding.get("nodes", [])]
     refs, citations = set(), {}
-    for ref in [
-        *finding.get("changes", []),
-        *(ref for n in nodes for ref in n.get("evidence", [])),
-    ]:
+    for ref in cited_refs(finding, engine.store):
         try:
             record, _ = engine.store.source_record(ref)
             if record["at"] is not None and record["at"] <= cutoff:

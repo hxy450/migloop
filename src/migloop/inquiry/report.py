@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import json
-import re
 import uuid
 
+from .citations import inline_refs, reference_hint
 from .coverage import reconcile
 from .engine import bounds, in_scope
 from .evidence_graph import attach
@@ -80,15 +80,15 @@ def check(engine, text, *, save=False):
                 valid.add(record["ref"])
                 referenced.add(record["ref"])
             except (ValueError, OSError) as exc:
-                issues.append({"where": where, "ref": ref, "error": str(exc)})
+                issue = {"where": where, "ref": ref, "error": str(exc)}
+                hint = reference_hint(engine, ref)
+                if hint:
+                    issue["resolution_hint"] = hint
+                issues.append(issue)
         return valid
 
     def verify_text(value, at, where, since=None):
-        if isinstance(value, str):
-            verify_refs(re.findall(r"\be-[0-9a-f]{8,64}\b", value), at, where, since)
-        elif isinstance(value, list):
-            for item in value:
-                verify_text(item, at, where, since)
+        verify_refs(inline_refs(value), at, where, since)
 
     seen_findings = set()
     for index, finding in enumerate(document["findings"]):

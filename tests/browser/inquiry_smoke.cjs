@@ -217,12 +217,21 @@ async function main() {
           const timelineShown=document.getElementById('reason').innerText.includes('实际发生于');
           const input=await query({op:'agent',key:graph.nodes.find(n=>n.kind==='agent').key,at:graph.target.at,view:'inputs'});
           const returns=await query(input.tool_return_query);
+          const visibleReturns=[...document.querySelectorAll('#records button')].filter(b=>b.textContent==='展开原文').length;
+          const review=await query({op:'review',report_id:graph.report_id,offset:0,limit:1});
+          const reviewVisible=document.querySelectorAll('#records .row').length;
+          const post=graph.evidence_review.post_write_returns?.[0];
+          let postSince=null;
+          if(post) {const later=await query(post.all_returns_query);postSince=later.scope.since;}
           return {timelineShown,returnTotal:returns.total,expected:input.tool_return_total,
-            visibleRows:[...document.querySelectorAll('#records button')].filter(b=>b.textContent==='展开原文').length,expectedRows:returns.rows.length};
+            visibleRows:visibleReturns,expectedRows:returns.rows.length,
+            reviewVisible,reviewExpected:review.rows.length,postSince,expectedSince:post?.since||null};
         })()`);
         assert(checked.timelineShown);
         assert.equal(checked.returnTotal,checked.expected);
         assert.equal(checked.visibleRows,checked.expectedRows);
+        assert.equal(checked.reviewVisible,checked.reviewExpected);
+        assert.equal(checked.postSince,checked.expectedSince);
         assert.equal(await evaluate('JSON.stringify({graph,trace})'),initial);
         fs.writeFileSync(path.join(out,'evidence-review.json'),JSON.stringify(checked,null,2));
       }

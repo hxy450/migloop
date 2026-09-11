@@ -332,7 +332,7 @@ class Engine:
                 elif op not in (scope["kind"], "blame"):
                     raise ValueError("scope kind does not match operation")
         allowed = {
-            "review": {"op", "report_id"},
+            "review": {"op", "report_id", "offset", "limit"},
             "catalog": {"op", "kind", "q", "offset", "limit"},
             "file": {
                 "op",
@@ -402,10 +402,29 @@ class Engine:
                 "limit",
             },
         }
-        if op not in allowed or set(request) - allowed[op]:
+        if op not in allowed:
             raise ValueError(
-                "unknown operation or parameter; no legacy version/via parameters"
+                f"unknown operation {op!r}; use one of {', '.join(allowed)}; no legacy version/via parameters"
             )
+        extra = set(request) - allowed[op]
+        if extra:
+            raise ValueError(
+                f"unknown parameters {sorted(extra)}; {op} accepts {sorted(allowed[op])}; no legacy version/via parameters"
+            )
+        offset, limit = (
+            request.get("offset", 0),
+            request.get(
+                "limit",
+                100 if op == "review" or request.get("view") == "outline" else 20,
+            ),
+        )
+        if (
+            type(offset) is not int
+            or offset < 0
+            or type(limit) is not int
+            or not 1 <= limit <= 100
+        ):
+            raise ValueError("offset >=0 and limit 1–100 required")
         if op == "review":
             report_id = request.get("report_id")
             if not isinstance(report_id, str):
@@ -426,29 +445,18 @@ class Engine:
                 for kind in (
                     "actor_notes",
                     "literal_predecessors",
+                    "post_write_returns",
                     "timeline",
                     "limitations",
                 )
-                for item in review[kind]
+                for item in review.get(kind, [])
             ]
             return {
                 "kind": "evidence_review",
                 "report_id": report_id,
-                "total": len(rows),
-                "rows": rows,
+                **self._page(rows, offset, limit),
                 "note": review["note"],
             }
-        offset, limit = (
-            request.get("offset", 0),
-            request.get("limit", 100 if request.get("view") == "outline" else 20),
-        )
-        if (
-            type(offset) is not int
-            or offset < 0
-            or type(limit) is not int
-            or not 1 <= limit <= 100
-        ):
-            raise ValueError("offset >=0 and limit 1–100 required")
         if op == "catalog":
             kind = request.get("kind", "agent")
             queries = {
