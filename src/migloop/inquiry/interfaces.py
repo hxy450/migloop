@@ -22,9 +22,12 @@ agent视图是保存的历史记录，不保证全部旧输入在某次写入时
 调查建议（不是固定路线）：
 1. 先开文件在生成截止的视图，以及生成截止到观察截止的view:calls。前者WRITER/READER给原生读写参与者，后者按时序列相关调用。
 2. 修复calls要翻到next=null，逐类核命令与返回，先列改动再归因；Bash脚本同样要看，不仅看Write/Edit或修复总结。
-3. 对认定的生成问题，核相关生成写者的实际输出以及写前输入。不要只开第一个WRITER就结束，后续生成写者可能改变了数据/业务语义。
+3. 对认定的生成问题，核相关生成写者的实际输出以及写前输入。每个WRITER的input_scope是该文件最后一次写调用发起前的agent范围，批量打开{op:agent,scope:input_scope,view:inputs}：按路径列实际返回过的原生Read引用，再展开相关源码/规格片段。
+这不是完整输入集：派工、消息、shell读和可能读取仍在records/search/relations。不要只开第一个WRITER就结束，后续生成写者可能改变了数据/业务语义。
 初版骨架不等于后续业务接线，最后写者也不等于首因；生成输入用生成截止scope，别在修复窗口里搜索后宣布输入不存在。
 4. 把事实、竞争解释和机制假设分开。全池出现不证明交付；局部搜索无结果不证明全阶段没有检查。
+“检查报告只提结构”只能证明报告这么写，不能据此认证“仅做结构检查/确认漏验”。数量须对照实际修改和回执，不拿待处理对象总数当改动数。
+声称某阶段没有成功回执/输入/检查前，在该阶段完整范围搜索并展开正反例；写前范围不能用于否定写后检查。停止时对照原文核结论中的确定性句子，不把hypothesis搬成最终摘要中的事实。
 5. 最后提交节点原因与有据关系，先看submit的mechanical_status。needs_revision不是合格交付；诊断本身不给归因答案。
 missing_evidence_links是你已引用、但还没接入图的原生关系。用其中link和两端scope接入图、解释节点作用；不能通过删边把不合格变成合格。
 机械通过也不证明因果正确；“没查到检查”不能写成“确认遗漏检查”，这也适用于最后的简短摘要。
@@ -37,12 +40,16 @@ limit范围1–100，默认20；terms最多8个非空字面词，每词<=500字�
 目录：{op:catalog,kind:agent|file|source,q:字面子串,offset:0,limit:20}，目录不是历史时点事实。
 文件：{op:file,key:完整或唯一后缀路径,at:带时区ISO,since:可选ISO,view:records|calls|relations,offset:0,limit:20}。
 calls仅筛原生工具调用入口，包含无法判断效应的脚本，results给已到达的回执引用；不自动把相关调用认证为写。
-agent：把op改成agent、key改成目录中的agent身份。默认records是全文索引，不是全部原文。
+默认折叠原生只读工具和有限的完整标准只读命令形状，folded_read_calls给数量，unfold给完整查询；include_reads:true可展开全部。折叠不推断运行时效应，不假设复杂脚本无写，不影响records/search。
+agent：把op改成agent、key改成目录中的agent身份。默认records是全文索引，不是全部原文。额外view:inputs按路径归组已返回的原生读，results保留每次原文，可多词terms过滤。
 检索：{op:search,kind:pool|agent|file,key:可选范围,at:ISO,terms:[字面词1,词2],offset:0,limit:20}，多词OR。
 展开：{op:open,ref:照抄记录ID,at:ISO,pointer:可选JSONPointer}；也可用source:逻辑源名称,line:物理行号代替ref。
 每个file/agent视图返回scope_id=s-...，锁定kind/key/at/since。后续可用{op:search,scope:s-...,terms:[...]}
 或{op:agent,scope:s-...,view:relations}，不能再混写key/at/since。PARTICIPANT的scope可直接打开agent。
 原文引用优先照抄短cite=e-...，不能用RESULT id、agent名或注释拼进ref。原始长ref也可用。
+调用行的owner_scope和open的record_owner_scope给这段转录所属agent坐标，可直接打开，不用借用别的写者坐标。
+所属会话不是被转述内容的作者。WRITER的scope默认截至该文件最后一次可见写入；更晚输入不会混进去。
+原生link的file端默认是该次内容观察/写入时刻，写者端默认是该次写入时刻；从写者scope开输入关系可接起精确时序。
 相同范围统一at/since；生成输入另开早期范围。闭区间边界原样使用，不要加减1毫秒。
 undated:true可纳入未知时间，但不能当已证早期输入。
 open默认返回完整原生正文，去掉重复usage/uuid等封装；pointer:""可看完整原记录。
@@ -144,6 +151,7 @@ def build_mcp(path):
                 "explained": len(c["explained"]),
                 "model_excluded": len(c["model_excluded"]),
                 "unknown": len(c["unknown"]),
+                "read_only_shapes": len(c["read_only_shapes"]),
                 "issues": c["issues"],
                 "unassessed": [
                     {

@@ -150,6 +150,33 @@ async function main() {
       Buffer.from(validImage.data, "base64"),
     );
     if (modelReport) {
+      if (process.argv.includes('--input-views')) {
+        const views = await evaluate(`(async()=>{
+          const target=graph.target;
+          const request={op:'file',key:target.file,at:target.at,view:'calls',limit:100};
+          const folded=await api('/api/query',request);
+          await query(request);
+          const unfold=[...document.querySelectorAll('#records button')].find(b=>b.textContent.includes('只读形状调用'));
+          if(folded.folded_read_calls && !unfold) throw Error('missing unfold control');
+          const all=await api('/api/query',{...request,include_reads:true});
+          if(folded.unfold) await query(folded.unfold);
+          const owner=folded.participants.find(p=>p.input_scope);
+          if(!owner) throw Error('no input owner');
+          const inputRequest={op:'agent',scope:owner.input_scope,view:'inputs'};
+          const inputs=await api('/api/query',inputRequest);
+          await query(inputRequest);
+          return {folded:folded.folded_read_calls,visible:folded.total,all:all.total,
+            inputTotal:inputs.total,expectedAt:inputs.scope.at,actualAt:document.getElementById('at').value,
+            expectedAgent:inputs.scope.key,actualAgent:document.getElementById('key').value,
+            resultButtons:document.querySelectorAll('#records .row button').length};
+        })()`);
+        assert.equal(views.visible+views.folded,views.all);
+        assert.equal(views.actualAt,views.expectedAt);
+        assert.equal(views.actualAgent,views.expectedAgent);
+        if(views.inputTotal) assert(views.resultButtons>0);
+        assert.equal(await evaluate('JSON.stringify({graph,trace})'),initial);
+        fs.writeFileSync(path.join(out,'input-views.json'),JSON.stringify(views,null,2));
+      }
       assert.equal(errors.length, 0);
       const result = {passed:true, url, errors, model_report:true, report_mutated:false,
         checks:["all findings match submitted graph", "node reason", "manual query isolation", "raw expansion"]};

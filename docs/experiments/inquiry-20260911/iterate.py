@@ -31,7 +31,7 @@ def command(root, db):
             '--db', str(db)]
 
 
-def prepare(root):
+def prepare(root, effort='medium'):
     if root.exists():
         raise FileExistsError(root)
     old = BASE.RAW.verify_manifest(BASELINE)
@@ -66,7 +66,7 @@ def prepare(root):
         case = {**original, 'generation_end': generation, 'observation_end': end}
         pool = pools[case['pool']]
         cmd = command(root, pool['index_path'])
-        config = {**raw, 'mcp_servers': {'inquiry': {'command': cmd[0], 'args': cmd[1:] + ['mcp'],
+        config = {**raw, 'model_reasoning_effort': effort, 'mcp_servers': {'inquiry': {'command': cmd[0], 'args': cmd[1:] + ['mcp'],
                    'required': True, 'startup_timeout_sec': 45, 'tool_timeout_sec': 120}}}
         BASE.RAW.command(case['pool'], config)
         BASE.save(out / 'settings.json', config)
@@ -76,11 +76,11 @@ def prepare(root):
         (out / 'prompt.md').write_text(prompt, encoding='utf-8')
         BASE.save(out / 'manifest.json', {'schema': 'inquiry-iteration-case/1', 'case': case,
             'code_root': str(root / 'code/src'), 'index_path': pool['index_path'], 'import_seconds': pool['seconds'],
-            'model': BASE.MODEL, 'effort': BASE.EFFORT, 'timeout_seconds': 1800,
+            'model': BASE.MODEL, 'effort': effort, 'timeout_seconds': 1800,
             'prompt_sha256': BASE.sha(out / 'prompt.md'), 'settings_sha256': BASE.sha(out / 'settings.json'),
             'automatic_retry': False, 'format_repair': False})
         cases.append(case)
-    BASE.save(root / 'manifest.json', {'schema': 'inquiry-iteration/1', 'created': BASE.now(), 'cases': cases,
+    BASE.save(root / 'manifest.json', {'schema': 'inquiry-iteration/1', 'created': BASE.now(), 'cases': cases, 'effort': effort,
         'code': BASE.tree_manifest(package), 'pools': pools, 'raw_manifest_sha256': BASE.sha(BASELINE / 'manifest.json'),
         'driver_sha256': BASE.sha(HERE / 'iterate.py'),
         'artifacts': {str(p.relative_to(root)): BASE.sha(p) for p in root.rglob('*')
@@ -108,12 +108,13 @@ def main():
     parser.add_argument('mode', choices=('prepare', 'verify', 'run'))
     parser.add_argument('round')
     parser.add_argument('--case')
+    parser.add_argument('--effort', choices=('medium', 'high'), default='medium', help='prepare only; frozen per round')
     args = parser.parse_args()
     if not re.fullmatch(r'[a-z0-9-]+', args.round):
         raise ValueError('Simple round label required')
     root = ROOT / args.round
     if args.mode == 'prepare':
-        prepare(root)
+        prepare(root, args.effort)
         return
     manifest = verify(root)
     if args.mode == 'verify':
@@ -121,6 +122,7 @@ def main():
         return
     case = next(c for c in manifest['cases'] if c['id'] == args.case)
     out = root / case['id']
+    BASE.RAW.EFFORT = BASE.read(out / 'manifest.json')['effort']
     print(json.dumps({'started': case['id'], 'round': args.round, 'model': BASE.MODEL}), flush=True)
     metrics = BASE.RAW.launch(case['pool'], out / 'runs/inquiry/rep1',
                              (out / 'prompt.md').read_text(encoding='utf-8'), BASE.read(out / 'settings.json'), 1800)

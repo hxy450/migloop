@@ -12,6 +12,7 @@ def reconcile(engine, target, document, explained):
         "at": at,
         "since": since,
         "view": "calls",
+        "include_reads": True,
         "limit": 100,
     }
     calls, offset = [], 0
@@ -41,10 +42,11 @@ def reconcile(engine, target, document, explained):
             dispositions[record["ref"]] = value
         except (ValueError, OSError) as error:
             errors.append({"ref": value["ref"], "error": str(error)})
-    missing, covered, unknown, excluded = [], [], [], []
+    missing, covered, unknown, excluded, readonly = [], [], [], [], []
     for call in calls:
         names = {tool.casefold() for tool in call["tools"]}
-        if names and names <= {"read", "read_file", "glob", "grep", "ls", "list_files"}:
+        if call["read_basis"] and all(call["read_basis"]):
+            readonly.append({"ref": call["cite"], "basis": call["read_basis"]})
             continue
         native = by_request.get(call["ref"], [])
         if (
@@ -102,6 +104,7 @@ def reconcile(engine, target, document, explained):
         "unassessed": missing,
         "unknown": unknown,
         "model_excluded": excluded,
+        "read_only_shapes": readonly,
         "issues": errors,
-        "note": "Call candidates are not confirmed modifications. Exclusions/reasons are model claims, not certified effects.",
+        "note": "Call candidates are not confirmed modifications. read_only_shapes assumes standard tool/command semantics, not observed filesystem effects; include_reads=true unfolds them. Model exclusions/reasons are not certified effects.",
     }

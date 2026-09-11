@@ -215,3 +215,122 @@ def test_deleting_edges_does_not_complete_native_evidence_graph(tmp_path):
     assert graph["edges"] == []
     assert graph["document"] == doc
     engine.store.close()
+
+
+def test_writer_scope_does_not_include_inputs_received_after_its_write(tmp_path):
+    engine = build(
+        tmp_path,
+        [
+            record(1, use("w", file_path="/proj/A.ets", content="one")),
+            record(2, result("w")),
+            record(3, use("r", "Read", file_path="/proj/spec.md")),
+            record(9, result("r", "FUTURE INPUT")),
+        ],
+    )
+    file = engine.query({"op": "file", "key": "A.ets", "at": ts(15)})
+    actor = next(p for p in file["participants"] if p["writes"])
+    search = engine.query(
+        {"op": "search", "scope": actor["scope"], "terms": ["FUTURE INPUT"]}
+    )
+    assert search["total"] == 0
+    assert engine.store.handle_value(actor["scope"], "s")["at"].startswith(
+        "2026-01-01T00:00:02"
+    )
+    ref = engine.store.locate("a.jsonl", 1)
+    opened = engine.query({"op": "open", "ref": ref, "at": ts(15)})
+    assert engine.store.handle_value(opened["record_owner_scope"], "s")["key"] == "a"
+    assert opened["native_links"][0]["from_scope"] == actor["scope"]
+    engine.store.close()
+
+
+def test_read_and_write_witnesses_do_not_collapse_file_states(tmp_path):
+    engine = build(
+        tmp_path,
+        [
+            record(1, use("r", "Read", file_path="/proj/A.ets")),
+            record(2, result("r", "old")),
+            record(3, use("w", file_path="/proj/A.ets", content="new")),
+            record(4, result("w")),
+        ],
+    )
+    links = engine.query({"op": "agent", "key": "a", "at": ts(4), "view": "relations"})[
+        "rows"
+    ]
+    read, write = links
+    assert read["from_scope"] != write["to_scope"]
+    assert read["to_scope"] == write["from_scope"]
+    engine.store.close()
+
+
+def test_input_inventory_groups_returned_reads_and_preserves_all_evidence(tmp_path):
+    engine = build(
+        tmp_path,
+        [
+            record(1, use("r1", "Read", file_path="/proj/Input.kt")),
+            record(2, result("r1", "first actual input")),
+            record(3, use("r2", "Read", file_path="/proj/Input.kt")),
+            record(4, result("r2", "second actual input")),
+            record(5, use("r3", "Read", file_path="/proj/future.md")),
+            record(9, result("r3", "not received at 6")),
+        ],
+    )
+    data = engine.query({"op": "agent", "key": "a", "at": ts(6), "view": "inputs"})
+    assert data["total"] == 1 and data["other_read_operations"] == 1
+    row = data["rows"][0]
+    assert row["path"] == "/proj/Input.kt" and row["deliveries"] == 2
+    assert len(row["results"]) == 2
+    assert all(
+        engine.store.source_record(ref)[0]["line"] in (2, 4) for ref in row["results"]
+    )
+    assert (
+        "actual input"
+        in engine.query({"op": "open", "ref": row["results"][0], "at": ts(6)})["text"]
+    )
+    assert (
+        engine.query(
+            {
+                "op": "agent",
+                "key": "a",
+                "at": ts(6),
+                "view": "inputs",
+                "terms": ["ABSENT"],
+            }
+        )["total"]
+        == 0
+    )
+    engine.store.close()
+
+
+def test_writer_input_cutoff_is_request_not_completion(tmp_path):
+    engine = build(
+        tmp_path,
+        [
+            record(1, use("r", "Read", file_path="/proj/Input.kt")),
+            record(2, use("w", file_path="/proj/A.ets", content="output")),
+            record(3, result("r", "arrived after write started")),
+            record(4, result("w")),
+        ],
+    )
+    actor = engine.query({"op": "file", "key": "A.ets", "at": ts(8)})["participants"][0]
+    data = engine.query(
+        {"op": "agent", "scope": actor["input_scope"], "view": "inputs"}
+    )
+    assert data["total"] == 0
+    assert engine.store.handle_value(actor["input_scope"], "s")["at"] == ts(2).replace(
+        "Z", "+00:00"
+    )
+    engine.store.close()
+
+
+def test_relation_terms_filter_evidence_instead_of_silently_ignoring_them(tmp_path):
+    engine = build(
+        tmp_path,
+        [
+            record(1, use("r", "Read", file_path="/proj/Input.kt")),
+            record(2, result("r", "UNIQUE-CONTENT")),
+        ],
+    )
+    query = {"op": "agent", "key": "a", "at": ts(3), "view": "relations"}
+    assert engine.query({**query, "terms": ["UNIQUE-CONTENT"]})["total"] == 1
+    assert engine.query({**query, "terms": ["ABSENT"]})["total"] == 0
+    engine.store.close()

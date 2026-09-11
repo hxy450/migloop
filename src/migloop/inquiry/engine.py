@@ -17,7 +17,7 @@ def coordinate_transaction(method):
         if self.store.db.in_transaction:
             return method(self, request)
         with self.store.db:
-            self.store.db.execute("BEGIN")
+            self.store.db.execute("BEGIN IMMEDIATE")
             return method(self, request)
 
     return query
@@ -276,6 +276,7 @@ class Engine:
                 "limit",
                 "terms",
                 "view",
+                "include_reads",
             },
             "agent": {
                 "op",
@@ -287,6 +288,7 @@ class Engine:
                 "limit",
                 "terms",
                 "view",
+                "include_reads",
             },
             "search": {
                 "op",
@@ -379,6 +381,28 @@ class Engine:
                 )
             elif "context" in request:
                 raise ValueError("context requires terms")
+            owner_scope = (
+                self.store.handle(
+                    "s",
+                    {
+                        "kind": "agent",
+                        "key": record["agent"],
+                        "at": iso(at),
+                        "since": None,
+                    },
+                )
+                if record["agent"]
+                else None
+            )
+            native = (
+                [
+                    r
+                    for r in self.relations("agent", record["agent"], at)
+                    if record["ref"] in (r["request"], r["result"])
+                ]
+                if record["agent"]
+                else []
+            )
             return {
                 "kind": "original",
                 "ref": ref,
@@ -386,6 +410,11 @@ class Engine:
                 "source": record["name"],
                 "line": record["line"],
                 "at": iso(record["at"]),
+                "record_owner": record["agent"],
+                "record_owner_scope": owner_scope,
+                "native_links": [self.link_view(r, iso(at)) for r in native[:8]],
+                "native_links_total": len(native),
+                "owner_note": "Transcript owner/caller, not automatically the author of quoted material. More links: agent(scope=record_owner_scope,view=relations).",
                 "pointer": request.get("pointer"),
                 "text": text,
                 **selection,
@@ -438,8 +467,14 @@ class Engine:
             }
         where, values, scope = self._where(request)
         view = request.get("view", "records")
-        if view not in ("records", "relations", "calls"):
-            raise ValueError("view must be records, calls or relations")
+        if view not in ("records", "relations", "calls", "inputs"):
+            raise ValueError("view must be records, calls, relations or inputs")
+        if view == "inputs" and op != "agent":
+            raise ValueError("inputs is an agent view")
+        if "include_reads" in request and (
+            view != "calls" or type(request["include_reads"]) is not bool
+        ):
+            raise ValueError("include_reads is a boolean for view=calls only")
         scope_id = self.store.handle("s", scope)
         at, since = bounds(request)
         relations = (
@@ -462,6 +497,52 @@ class Engine:
             for d in dispatches
             if since is None or d["at"] >= since
         ]
+        if view in ("relations", "inputs") and request.get("terms"):
+            matches = {
+                r["ref"]
+                for r in self.store.rows(
+                    "SELECT r.ref FROM records r JOIN sources s ON r.source=s.id WHERE "
+                    + where,
+                    values,
+                )
+            }
+            relations = [
+                r
+                for r in relations
+                if matches.intersection({r["request"], r["result"]})
+            ]
+            dispatches = [
+                d
+                for d in dispatches
+                if matches.intersection({d["request"], d["result"]})
+            ]
+        if view == "inputs":
+            grouped = {}
+            other = 0
+            for relation in relations:
+                if relation["op"] != "read":
+                    continue
+                if relation["strength"] != "confirmed" or not relation["result"]:
+                    other += 1
+                    continue
+                group = grouped.setdefault(
+                    relation["path"],
+                    {"path": relation["path"], "deliveries": 0, "results": []},
+                )
+                group["deliveries"] += 1
+                group["results"].append(
+                    self.store.handle("e", {"ref": relation["result"]})
+                )
+            return {
+                "kind": "inputs",
+                "scope": scope,
+                "scope_id": scope_id,
+                **self._page(
+                    sorted(grouped.values(), key=lambda g: g["path"]), offset, limit
+                ),
+                "other_read_operations": other,
+                "note": "Confirmed native read returns, grouped by path. Not proof of full file delivery, attention or active context. Other reads: view=relations. Shell/dispatch/message inputs: records/search; zero here does not mean no input.",
+            }
         if view == "relations":
             return {
                 "kind": "relations",
@@ -473,8 +554,17 @@ class Engine:
                 ),
             }
         table = " FROM records r JOIN sources s ON r.source=s.id WHERE " + where
+        folded_reads = 0
         if view == "calls":
             table += " AND r.ref IN (SELECT record FROM calls)"
+            if not request.get("include_reads", False):
+                readonly = (
+                    "r.ref NOT IN (SELECT record FROM calls WHERE read_basis IS NULL)"
+                )
+                folded_reads = self.store.db.execute(
+                    "SELECT COUNT(*)" + table + " AND " + readonly, values
+                ).fetchone()[0]
+                table += " AND NOT (" + readonly + ")"
         unknown_where, unknown_values, _ = self._where({**request, "undated": True})
         unknown_count = self.store.db.execute(
             "SELECT COUNT(*) FROM records r JOIN sources s ON r.source=s.id WHERE r.at IS NULL AND "
@@ -506,6 +596,17 @@ class Engine:
                 chars=len(text),
                 is_full_original=False,
                 cite=self.store.handle("e", {"ref": row["ref"]}),
+                agent_scope=self.store.handle(
+                    "s",
+                    {
+                        "kind": "agent",
+                        "key": row["agent"],
+                        "at": scope["at"],
+                        "since": None,
+                    },
+                )
+                if row["agent"]
+                else None,
                 tools=[
                     c["tool"]
                     for c in self.store.rows(
@@ -514,6 +615,12 @@ class Engine:
                 ],
             )
             if view == "calls":
+                row["read_basis"] = [
+                    r["read_basis"]
+                    for r in self.store.rows(
+                        "SELECT read_basis FROM calls WHERE record=?", (row["ref"],)
+                    )
+                ]
                 row["results"] = [
                     self.store.handle("e", {"ref": r["ref"]})
                     for r in self.store.rows(
@@ -545,6 +652,23 @@ class Engine:
         if scope["kind"] == "file" and op != "search":
             for agent in sorted({r["agent"] for r in relations if r["agent"]}):
                 own = [r for r in relations if r["agent"] == agent]
+                written_at = max(
+                    (
+                        r["at"]
+                        for r in own
+                        if r["op"] == "write" and r["at"] is not None
+                    ),
+                    default=None,
+                )
+                last_write = next(
+                    (
+                        r
+                        for r in reversed(own)
+                        if r["op"] == "write" and r["at"] == written_at
+                    ),
+                    None,
+                )
+                input_at = last_write["requested_at"] if last_write else None
                 participants.append(
                     {
                         "agent": agent,
@@ -553,13 +677,29 @@ class Engine:
                             {
                                 "kind": "agent",
                                 "key": agent,
-                                "at": scope["at"],
+                                "at": iso(written_at)
+                                if written_at is not None
+                                else scope["at"],
                                 "since": None,
                             },
                         ),
                         "reads": sum(r["op"] == "read" for r in own),
                         "writes": sum(r["op"] != "read" for r in own),
                         "candidates": sum(r["strength"] == "candidate" for r in own),
+                        "scope_basis": "latest recorded write in this view"
+                        if written_at is not None
+                        else "view cutoff",
+                        "input_scope": self.store.handle(
+                            "s",
+                            {
+                                "kind": "agent",
+                                "key": agent,
+                                "at": iso(input_at),
+                                "since": None,
+                            },
+                        )
+                        if input_at is not None
+                        else None,
                     }
                 )
         return {
@@ -573,6 +713,10 @@ class Engine:
             "undated_records": unknown_count,
             "dispatches": dispatches,
             "participants": participants,
+            "folded_read_calls": folded_reads,
+            "unfold": {**request, "include_reads": True, "offset": 0}
+            if folded_reads
+            else None,
             "note": "Related records, not certified reads/writes. Unknown tool bodies remain searchable; open refs for originals.",
         }
 
@@ -581,10 +725,24 @@ class Engine:
         if row["op"] not in ("read", "write") or not row["agent"]:
             return edge
         agent = self.store.handle(
-            "s", {"kind": "agent", "key": row["agent"], "at": at, "since": None}
+            "s",
+            {
+                "kind": "agent",
+                "key": row["agent"],
+                "at": iso(row["at"])
+                if row["op"] == "write" and row["at"] is not None
+                else at,
+                "since": None,
+            },
         )
         file = self.store.handle(
-            "s", {"kind": "file", "key": row["path"], "at": at, "since": None}
+            "s",
+            {
+                "kind": "file",
+                "key": row["path"],
+                "at": iso(row["at"]) if row["at"] is not None else at,
+                "since": None,
+            },
         )
         origin, destination = (file, agent) if row["op"] == "read" else (agent, file)
         payload = {
@@ -686,9 +844,32 @@ class Engine:
         lines.append("QUERY " + encode(result["query"]))
         if data["kind"] in ("original", "diff"):
             lines += [
-                encode({k: v for k, v in data.items() if k != "text"}),
+                encode(
+                    {
+                        k: v
+                        for k, v in data.items()
+                        if k
+                        not in (
+                            "text",
+                            "native_links",
+                            "owner_note",
+                            "ref",
+                            "complete_selected_text",
+                        )
+                    }
+                ),
                 data["text"],
             ]
+            for relation in data.get("native_links", []):
+                lines.append(
+                    "NATIVE_LINK "
+                    + encode(
+                        {
+                            k: relation.get(k)
+                            for k in ("link", "op", "path", "from_scope", "to_scope")
+                        }
+                    )
+                )
         else:
             lines.append(
                 encode(
@@ -703,11 +884,16 @@ class Engine:
                     ("WRITER " if actor["writes"] else "READER ")
                     + actor["agent"].split(":")[-1]
                     + f" scope={actor['scope']} writes={actor['writes']} reads={actor['reads']} candidates={actor['candidates']}"
+                    + (
+                        f" input_scope={actor['input_scope']} (agent view=inputs; before latest write request)"
+                        if actor.get("input_scope")
+                        else ""
+                    )
                 )
             for row in data.get("rows", []):
                 if "excerpt" in row:
                     lines.append(
-                        f"{row.get('cite', row['ref'])} {row['at'] or 'UNDATED'} {'/'.join(row.get('tools', []))} {row['agent'] or 'UNKNOWN OWNER'} | {row['excerpt']}"
+                        f"{row.get('cite', row['ref'])} {row['at'] or 'UNDATED'} {'/'.join(row.get('tools', []))} {row['agent'] or 'UNKNOWN OWNER'} owner_scope={row.get('agent_scope') or '-'} | {row['excerpt']}"
                         + (
                             f" results={encode(row['results'])}"
                             if row.get("results")

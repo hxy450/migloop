@@ -155,6 +155,8 @@
         />
         <button id="query">查原文索引</button
         ><button id="relations">查读写关系</button
+        ><button id="calls">查相关调用</button
+        ><button id="inputs">查 Agent 已收输入</button
         ><button id="agents">Agent目录</button
         ><button id="files">文件目录</button>
         <div id="status" class="small muted"></div>
@@ -266,6 +268,14 @@
     async function query(q) {
       $("status").textContent = "查询中…";
       const data = await api("/api/query", q);
+      const at = data.scope?.at || q.at;
+      if (data.scope) {
+        $('kind').value=data.scope.kind;
+        $('key').value=data.scope.key || '';
+        $('at').value=data.scope.at;
+        $('since').value=data.scope.since || '';
+        $('terms').value=(q.terms || []).join(',');
+      }
       $("records").replaceChildren();
       $("status").className = "small muted";
       $("status").textContent =
@@ -291,19 +301,41 @@
             "small muted",
           );
           element("div", row.excerpt, box);
-          button("展开原文", box, () => open(row.ref, q.at, q.undated));
+          button("展开原文", box, () => open(row.ref, at, q.undated));
+          if (row.agent_scope)
+            button('打开所属agent',box,()=>query({op:'agent',scope:row.agent_scope}));
+        } else if (data.kind === 'inputs') {
+          element('div', `${row.path} · 返回 ${row.deliveries} 次`, box);
+          for (const ref of row.results)
+            button(ref,box,()=>open(ref,at));
         } else {
           element("div", `${row.op} · ${row.strength} · ${row.status}`, box);
           element("div", row.agent || "作者未知", box, "small");
           element("div", row.path, box, "small");
           for (const ref of [row.request, row.result].filter(Boolean))
-            button("原始依据", box, () => open(ref, q.at, q.undated));
+            button("原始依据", box, () => open(ref, at, q.undated));
+          if (row.from_scope && row.to_scope) {
+            button('打开该次agent',box,()=>query({op:'agent',scope:row.op==='read'?row.to_scope:row.from_scope}));
+            button('打开该次文件',box,()=>query({op:'file',scope:row.op==='read'?row.from_scope:row.to_scope}));
+          }
         }
       }
       if (data.next !== null && data.next !== undefined)
         button("下一页", $("records"), () =>
           query({ ...q, offset: data.next }),
         );
+      if (data.participants?.length) {
+        const group=element('details','',$('records'));
+        element('summary',`原生参与者 ${data.participants.length}（不代表唯一责任人）`,group);
+        for (const actor of data.participants) {
+          button(`${actor.agent} · 写 ${actor.writes} / 读 ${actor.reads}`,group,()=>query({op:'agent',scope:actor.scope}));
+          if (actor.input_scope)
+            button('写调用发起前的输入',group,()=>query({op:'agent',scope:actor.input_scope,view:'inputs'}));
+        }
+      }
+      if (data.unfold)
+        button(`展开 ${data.folded_read_calls} 条只读形状调用（不认证运行效应）`,$('records'),()=>query(data.unfold));
+      if (data.note) element('p',data.note,$('records'),'small muted');
       for (const dispatch of data.dispatches || []) {
         const box = element("div", "", $("records"), "row");
         element(
@@ -318,7 +350,7 @@
           return query(request());
         });
         for (const ref of [dispatch.request, dispatch.result])
-          button("派发原文", box, () => open(ref, q.at));
+          button("派发原文", box, () => open(ref, at));
       }
       return data;
     }
@@ -491,7 +523,12 @@
         element("div", JSON.stringify(issue), $("gaps"), "error small");
       if (graph.coverage) {
         const c=graph.coverage;
-        element('p', `调用对账：已解释 ${c.explained.length}，模型排除 ${c.model_excluded.length}，未定 ${c.unknown.length}，未处理 ${c.unassessed.length}。排除/原因仍是模型主张。`, $('gaps'), 'small');
+        element('p', `调用对账：已解释 ${c.explained.length}，模型排除 ${c.model_excluded.length}，未定 ${c.unknown.length}，未处理 ${c.unassessed.length}，只读形状 ${c.read_only_shapes?.length||0}。排除/原因仍是模型主张。`, $('gaps'), 'small');
+        if(c.read_only_shapes?.length) {
+          const detail=element('details','',$('gaps'));
+          element('summary','展开只读形状依据（不认证运行效应）',detail);
+          for (const row of c.read_only_shapes) button(row.ref,detail,()=>open(row.ref,(graph.target||graph.document.target).at));
+        }
         for (const row of [...c.unassessed,...c.unknown]) {
           const box=element('div', row.reason || row.summary, $('gaps'),'row small');
           button(row.ref,box,()=>open(row.ref,(graph.target||graph.document.target).at));
@@ -577,6 +614,8 @@
     }
     $("query").onclick = () => guard(() => query(request()));
     $("relations").onclick = () => guard(() => query(request("relations")));
+    $("calls").onclick = () => guard(() => query(request("calls")));
+    $("inputs").onclick = () => guard(() => query(request("inputs")));
     $("agents").onclick = () =>
       guard(() => query({ op: "catalog", kind: "agent", limit: 20 }));
     $("files").onclick = () =>

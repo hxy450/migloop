@@ -11,6 +11,8 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
+from .command_shape import call_read_basis
+
 _FILE_TOKEN = re.compile(r"(?<![\w.])[\w@+-][\w@+.-]*\.[A-Za-z][A-Za-z0-9]{0,15}(?!\w)")
 
 
@@ -112,7 +114,7 @@ CREATE TABLE runs(id TEXT PRIMARY KEY,kind TEXT,request TEXT,data TEXT,body TEXT
 CREATE TABLE frames(run TEXT,offset INT,text TEXT,sha TEXT,PRIMARY KEY(run,offset));
 CREATE TABLE visible(run TEXT,offset INT,complete INT,observed TEXT);
 CREATE TABLE handles(id TEXT PRIMARY KEY,kind TEXT,payload TEXT);
-CREATE TABLE calls(record TEXT,slot INT,tool TEXT,PRIMARY KEY(record,slot));
+CREATE TABLE calls(record TEXT,slot INT,tool TEXT,read_basis TEXT,PRIMARY KEY(record,slot));
 """
 
 
@@ -225,9 +227,11 @@ class Store:
             deterministic=True,
         )
         schema = self.db.execute("SELECT value FROM meta WHERE key='schema'").fetchone()
-        if schema is None or schema[0] != "inquiry/1":
+        if schema is None or schema[0] != "inquiry/index/2":
             self.db.close()
-            raise ValueError("incomplete or incompatible index")
+            raise ValueError(
+                "incomplete or incompatible index; import into a new path or use its frozen code"
+            )
 
     def close(self):
         self.db.close()
@@ -253,7 +257,7 @@ class Store:
             for source in sources:
                 cls._import(db, source)
             cls._effects(db)
-            db.execute("INSERT INTO meta VALUES(?,?)", ("schema", "inquiry/1"))
+            db.execute("INSERT INTO meta VALUES(?,?)", ("schema", "inquiry/index/2"))
             db.commit()
         finally:
             db.close()
@@ -331,7 +335,10 @@ class Store:
                 )
                 for slot, family, role, cid, tool, payload, success in parts(record):
                     if role in ("request", "patch"):
-                        db.execute("INSERT INTO calls VALUES(?,?,?)", (ref, slot, tool))
+                        db.execute(
+                            "INSERT INTO calls VALUES(?,?,?,?)",
+                            (ref, slot, tool, call_read_basis(tool, payload)),
+                        )
                     db.execute(
                         "INSERT INTO parts VALUES(?,?,?,?,?,?,?,?,?,?)",
                         (
