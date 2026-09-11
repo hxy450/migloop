@@ -64,8 +64,11 @@ Key differences from Claude Code / Codex that this adapter absorbs:
   a ``wf:<name>`` stage; a pipeline ``skill`` tool call (``a2h-spec`` /
   ``a2h-plan`` / ``a2h-execute`` / ...) opens a pipeline stage (aligned with
   ``claude.py``).  There is no ``attributionSkill`` field here, so the ``skill``
-  tool call is the *only* pipeline signal; non-pipeline ``skill`` calls remain
-  helper markers.
+  tool call is one pipeline signal; non-pipeline ``skill`` calls remain
+  helper markers.  The other one is a **user message that is itself a SKILL.md
+  body**: DevEco's ``/<skill>`` command expands the skill text into the user
+  prompt without any ``skill`` tool call, so the first H1 heading (``# a2h-spec — …``)
+  is taken as the skill name (see :func:`_prompt_skill`).
 
 Known limitation (not a bug in this module): ``build_lineage`` classifies an
 Android source file as "Android reference" only when its path stays **absolute
@@ -422,6 +425,23 @@ def _user_prompt(parts):
     return "\n".join(chunks)
 
 
+_FIRST_H1_RE = re.compile(r"^#[ \t]+(\S+)", re.MULTILINE)
+
+
+def _prompt_skill(text):
+    """user 消息本身是一篇 SKILL.md 时返回管线技能名,否则 None。
+
+    DevEco 的 ``/<skill>`` 命令把整篇技能正文展开成 user 消息,没有 skill 工具调用
+    (wugang 09-09 的会话:a2h-spec 与 arkts-visual-verify 都是这样进来的,报告只切出
+    Setup → Plan)。只看第一个一级标题的首个词,且必须命中管线技能名:正文里顺带提到
+    别的技能、或标题不是技能名(a2h-functional-registry 的「§M 合账段」)都不算。"""
+    m = _FIRST_H1_RE.search(text or "")
+    if not m:
+        return None
+    name = m.group(1)
+    return name if name in common.PIPELINE_SKILLS else None
+
+
 def _session_model(info):
     m = info.get("model")
     if isinstance(m, dict):
@@ -507,24 +527,31 @@ def _workflow_key(t):
     return None
 
 
-def _stage_boundaries(tools):
-    # 两条阶段信号(DevEco 没有 attributionSkill,Skill 工具调用即唯一管线信号,
-    # 故用 codex 的 current 变更检测——正确处理 execute→verify→execute 回环):
+def _stage_boundaries(tools, prompt_skills=()):
+    # 三条阶段信号(DevEco 没有 attributionSkill,故用 codex 的 current 变更检测——
+    # 正确处理 execute→verify→execute 回环):
     #   1) 管线 skill(Skill 工具调用,归一后命中 common.PIPELINE_SKILLS)= 阶段边界,段名取 skill 名;
-    #   2) workflow 模式(Workflow 工具调用)= 一个阶段,段名取 wf:<workflow name>。
-    # 两条边界按 message idx 合并、去重,setup 兜底逻辑不变。
-    transitions = []
-    current = None
+    #   2) user 消息就是管线技能正文(/<skill> 命令展开,见 _prompt_skill)= 同 1),
+    #      prompt_skills 为 [(message idx, skill)];
+    #   3) workflow 模式(Workflow 工具调用)= 一个阶段,段名取 wf:<workflow name>。
+    # 三条边界按 message idx 合并(稳定排序,同 idx 保持原顺序)、去重,setup 兜底逻辑不变。
+    events = []
     for t in tools:
         if t["name"] == "Skill" and t.get("skill"):
-            nskill = (t["skill"] or "").split(":")[-1]
-            if nskill in common.PIPELINE_SKILLS and nskill != current:
-                transitions.append((t["idx"], nskill))
-                current = nskill
+            events.append((t["idx"], "skill", (t["skill"] or "").split(":")[-1]))
         elif t["name"] == "Workflow":
-            key = _workflow_key(t)
-            if key:
-                transitions.append((t["idx"], "wf:" + key))
+            events.append((t["idx"], "wf", _workflow_key(t)))
+    events.extend((idx, "skill", skill) for idx, skill in prompt_skills if skill)
+    events.sort(key=lambda e: e[0])
+    transitions = []
+    current = None
+    for idx, kind, key in events:
+        if kind == "skill":
+            if key in common.PIPELINE_SKILLS and key != current:
+                transitions.append((idx, key))
+                current = key
+        elif key:
+            transitions.append((idx, "wf:" + key))
     if not transitions:
         return [(0, "session")]
     # 去重(保留先出现者),避免退化出空段(对齐 claude 的 dedup):
@@ -1382,6 +1409,7 @@ def _parse(data, storage_root=None, source_file=None):
         m["_idx"] = i
 
     tools, prompts = [], []
+    prompt_skills = []  # [(message idx, 管线技能名)]:/<skill> 命令展开成的 user 消息
     workflow_calls = []
     billing, context_timeline = {}, []
     text_chars = tool_chars = reasoning_tokens = main_out = 0
@@ -1418,6 +1446,9 @@ def _parse(data, storage_root=None, source_file=None):
             if txt.strip():
                 prompts.append({"idx": m["_idx"], "ts": ts, "wait_ms": 0,
                                 "text": " ".join(txt.split())[:400]})
+                skill = _prompt_skill(txt)
+                if skill:
+                    prompt_skills.append((m["_idx"], skill))
             continue
 
         # assistant
@@ -1460,7 +1491,7 @@ def _parse(data, storage_root=None, source_file=None):
 
     # ---- stages ----
     max_idx = len(messages) - 1
-    boundaries = _stage_boundaries(tools)
+    boundaries = _stage_boundaries(tools, prompt_skills)
     points = []
     for m in messages:
         n = _to_num(((m.get("info") or {}).get("time") or {}).get("created"))

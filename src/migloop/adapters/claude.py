@@ -68,7 +68,8 @@ def iter_sessions(root):
 
 PIPELINE_SKILLS = ["a2h-run", "a2h-run-zh", "a2h-init-zh", "a2h-build-zh",
                    "mig-arch", "a2h-arch-scaffold", "a2h-spec", "a2h-plan",
-                   "a2h-execute", "a2h-verify", "a2h-retrospect"]
+                   "a2h-execute", "a2h-verify", "a2h-retrospect",
+                   "arkts-visual-verify"]
 
 STAGE_LABELS = {
     "setup": "Setup",
@@ -82,6 +83,7 @@ STAGE_LABELS = {
     "a2h-plan": "Plan",
     "a2h-execute": "Execute",
     "a2h-verify": "Verify",
+    "arkts-visual-verify": "Visual Verify",
     "a2h-retrospect": "Retrospect",
     "session": "Session",
 }
