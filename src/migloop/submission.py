@@ -160,3 +160,23 @@ def load_submission(report: str, ledger: atoms.Ledger, calls: list[dict[str, Any
                 check_status=last.get("status"), check_counts=last.get("counts"),
                 check_issues=list(last.get("issues") or []),
                 check_omitted_issues=last.get("omitted_issues"), binding=binding)}
+
+
+def load_checked_submission(report: str, ledger: atoms.Ledger, calls: list[dict[str, Any]] | None,
+                            trace_identity: dict[str, Any] | None,
+                            harness_identity: str | None = None) -> dict[str, Any]:
+    """Submission policy for a single-investigator run, not a legacy-viewer rule.
+
+    Require the explicit commitment to this run's check, without requiring a
+    connected graph or a clean diagnostic list. No second model or fallback
+    from prose/inline YAML; old saved reports remain readable via load_submission.
+    """
+    loaded = load_submission(report, ledger, calls, trace_identity, harness_identity)
+    if loaded["submission"]["mode"] != "checked_draft_ref":
+        return _ref_error(loaded["kind"], loaded["raw"], [*loaded["errors"],
+            "本工作流须由同一调查员 check 后显式提交 submission_ref；不能用未提交的草稿或 inline 报告代替"],
+            policy="same_investigator_checked_reference")
+    if loaded.get("data") is not None and loaded["data"].get("schema") != "migloop-verdict/3":
+        return _ref_error(loaded["kind"], loaded["raw"], ["本工作流只接受时间论证 v3"],
+                          policy="same_investigator_checked_reference")
+    return loaded

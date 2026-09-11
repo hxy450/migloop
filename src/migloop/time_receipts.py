@@ -31,6 +31,12 @@ def canonical(tool: str, request: dict[str, Any]) -> dict[str, Any]:
     # Explicit record/section selectors belong to the new request identity.
     if tool in ("file", "agent") and args.get("view") is None:
         normalized.pop("view", None)
+    if tool == "record":
+        # New optional location/lower-bound fields do not change old ref-only
+        # receipt identities. Explicit values remain bound to the request.
+        for key in ("source", "line", "since_ts"):
+            if normalized.get(key) is None:
+                normalized.pop(key, None)
     return normalized
 
 

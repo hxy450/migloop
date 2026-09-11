@@ -1143,6 +1143,22 @@
                 " 条。",
             ),
           );
+          if (data.participants) {
+            const directory = el("details");
+            directory.dataset.section = "participants";
+            directory.open = true;
+            directory.append(el("summary", null, "全范围索引参与者 · " + data.participants.total));
+            directory.append(el("div", "subtle", data.participants.note));
+            for (const actor of data.participants.rows) {
+              const row = el("div", "row");
+              row.append(el("span", null, actor.agent + " · 写 " + actor.writes +
+                " / 读 " + actor.reads + " / 候选 " + actor.candidates));
+              button(row, "独立打开", () => openRoot({kind: "agent", key: actor.agent,
+                at: actor.query.args.at, since_ts: actor.query.args.since_ts}));
+              directory.append(row);
+            }
+            side.append(directory);
+          }
           for (const name of Object.keys(data.sections)) {
             const page = data.sections[name],
               d = el("details");

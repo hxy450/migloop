@@ -170,6 +170,31 @@ def _actions(ledger, kind, key, window, scope, include_undated, stale):
     return groups, counts, native["gaps"]
 
 
+def _participants(groups, window, include_undated):
+    """Complete compact directory of indexed actors, independent of row pages.
+
+    No raw I/O, ranking, inference from mentions, or author promotion. An
+    explicit wire budget must keep this directory or defer the atom, never
+    silently make its earliest displayed writer stand for the whole history.
+    """
+    actors = {}
+    for section in ("writes", "reads", "candidates"):
+        for row in groups.get(section, []):
+            entry = actors.setdefault(row["agent"], {"writes": set(), "reads": set(), "candidates": set(), "times": []})
+            entry[section].add(row["id"])
+            if row.get("ts"):
+                entry["times"].append(row["ts"])
+    rows = []
+    for aid, entry in actors.items():
+        rows.append({"agent": aid, **{name: len(entry[name]) for name in ("writes", "reads", "candidates")},
+                     "first_ts": min(entry["times"], default=None), "last_ts": max(entry["times"], default=None),
+                     "query": _request("agent", aid, window, "overview", 0, 40, include_undated, False)})
+    rows.sort(key=lambda row: (row["first_ts"] or "~", row["agent"]))
+    return {"rows": rows, "total": len(rows), "complete_for": "indexed_time_scoped_operations",
+            "historical_authorship_certified": False,
+            "note": "全范围索引参与者，不受操作offset/limit影响；不是全部历史作者。候选仍未确认，未分类原文另查。"}
+
+
 def _text_fields(record):
     """Original message fields only; tool-result user envelopes are not tasks."""
     value = record.value
@@ -283,6 +308,7 @@ def query(ledger: atoms.Ledger, *, kind: str, key: str, at: str, since_ts: str |
         warnings.append("Registered sources changed: indexed Action relations suppressed; original raw/body indexes remain available.")
     return {"schema": SCHEMA, "node": raw["node"], "scope": scope, "view": view,
             "query": _request(kind, key, window, view, offset, limit, include_undated, details),
+            "participants": _participants(groups, window, include_undated) if kind == "file" and view == "overview" else None,
             "body_sources": body_sources.navigation(ledger, key, window.at, window.since,
                 show=view == "overview" and offset == 0) if kind == "file" else None,
             "sections": sections,

@@ -240,15 +240,18 @@ def build_server(backend: Any | None = None) -> Any:
         return via_mod.search_return(ledger, via_state(ledger), args, out, hits)
 
     @srv.tool(**text_options)
-    async def record(sid: str, ref: str, at: str = "latest", offset: int = 0,
-                     max_chars: int | None = None, include_undated: bool = False) -> str:
-        """展开时间查询返回的 raw: 引用；原始JSONL，不要求解析成 action。at 保持调查截止，晚到结果拒绝返回。
+    async def record(sid: str, ref: str | None = None, at: str = "latest", offset: int = 0,
+                     max_chars: int | None = None, include_undated: bool = False,
+                     source: str | None = None, line: int | None = None, since_ts: str | None = None) -> str:
+        """展开 raw: 引用，或将自由调查发现的 source+line 绑定成原始证据，二选一；不要求解析成 action。
+        source 只接受登记池内的完整路径、logical_name或唯一完整文件名；line为物理行号，不猜缩写、不读取池外文件。
+        at/since_ts 保持调查范围，晚到结果拒绝返回；多条地址可用batch(tool=record)批量核回。
         默认完整原始记录；正整数max_chars才显式字符分页。complete/returned_chars/next_offset说明实际原文范围。
         未知时间须显式 include_undated，不作为截止前事实。不是读写跳转。"""
         ledger, cwd = await _ctx(sid)
         from . import atom_queries
         return atom_queries.render_text(ledger, cwd, "record", dict(ref=ref, at=at, offset=offset,
-            max_chars=max_chars, include_undated=include_undated))
+            max_chars=max_chars, include_undated=include_undated, source=source, line=line, since_ts=since_ts))
 
     @srv.tool(**text_options)
     async def action(sid: str, id: str | None = None, seq: int | None = None, max_chars: int = 20000,
@@ -265,6 +268,8 @@ def build_server(backend: Any | None = None) -> Any:
     @srv.tool(**text_options)
     async def check(sid: str, draft: str, file: str | None = None) -> str:
         """核完整 YAML/JSON 草稿(≤120000字符)：身份/节点/引用/显式边/覆盖/basis，不核原因真假、不打开节点。
+        v3同时构建解释图，返回presentation摘要与submission_ref；最终可原样提交该引用，无需再抄长稿或换模型。
+        未确认关系保留断点，不删除节点原因、不认证未发生。候选/定位/传播主张是不同层。
         file 为对账目标；反馈最多40项并标省略数。改稿须再查，mechanical_clear 不代表语义正确。"""
         from . import atom_queries
         ledger, _cwd = await _ctx(sid)

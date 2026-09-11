@@ -63,11 +63,13 @@ def test_v2_is_explicit_and_preserves_v1_guide_as_a_legacy_mode(monkeypatch):
     assert guidance.guide_text("document", "full") == guidance.GUIDE
 
 
-def test_default_v3_keeps_free_queries_and_posthoc_arguments(monkeypatch):
+def test_default_v3_keeps_free_queries_but_requires_same_investigator_checked_submission(monkeypatch):
     monkeypatch.delenv("MIGLOOP_VERDICT_VERSION", raising=False)
     core = guidance.guide_text("document", "time")
     assert "migloop-verdict/3" in core and "batch" in core
-    assert "不填写via" in core and "不要求先check才能提交" in core
+    assert "不填写via" in core and "正式提交前必须check" in core
+    assert "同一个调查员" in core and "不另交第二个模型" in core
+    assert "不要求凑够跳数" in core and "未识别不等于没发生" in core
     template = guidance.guide_text("document", "verdict")
     assert "counterevidence" in template and "claim:" in template
     assert "schema: migloop-verdict/3" in template

@@ -27,6 +27,8 @@ def render(data):
     out = [f"# 时间原子 {node['kind']}:{node['key']} · 截至 {node['at']}",
            "范围 " + _json(data["scope"]),
            "视图 " + data["view"] + "；分组是索引，不是因果链；原文入口不等于全文已读。"]
+    if data.get("participants"):
+        out += ["## 全范围参与者目录（确认操作与候选分列，不是根因判定）", _json(data["participants"])]
     navigation = data.get("body_sources")
     if navigation:
         out += ["## 历史正文入口（不是当前快照；正文另行展开）", _json(navigation)]

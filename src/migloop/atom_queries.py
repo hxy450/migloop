@@ -13,7 +13,7 @@ from . import atoms, time_scope
 
 _INTS = frozenset({"v", "since", "until", "start", "n", "v_from", "v_to", "diff_chars",
                    "m_from", "m_n", "max_chars", "offset", "seq", "limit", "summary_chars", "window_offset", "window_limit",
-                   "annotation_offset", "annotation_limit", "relation_offset", "relation_limit"})
+                   "annotation_offset", "annotation_limit", "relation_offset", "relation_limit", "line"})
 _BOOLS = frozenset({"content", "diff", "readers", "m_all", "reads", "seen", "after", "scope_only", "changed", "include_undated", "details"})
 _DEFAULTS: dict[str, dict[str, Any]] = {
     "sessions": {"file": None},
@@ -30,7 +30,8 @@ _DEFAULTS: dict[str, dict[str, Any]] = {
     "action": {"id": None, "seq": None, "ref": None, "max_chars": 20000, "offset": 0, "find": "", "part": None,
                "m_n": 0, "m_from": 1},
     "check": {"draft": None, "file": None},
-    "record": {"ref": None, "at": "latest", "offset": 0, "max_chars": None, "include_undated": False},
+    "record": {"ref": None, "source": None, "line": None, "at": "latest", "since_ts": None,
+               "offset": 0, "max_chars": None, "include_undated": False},
 }
 for _tool in ("file", "agent", "search", "diff", "blame"):
     _DEFAULTS[_tool].update(at=None, offset=0, limit=40, include_undated=False)
@@ -44,8 +45,7 @@ for _tool in ("file", "agent", "search"):
     _DEFAULTS[_tool].update(annotation_offset=0, annotation_limit=None, relation_offset=0, relation_limit=None)
 for _tool in ("file", "agent"):
     _DEFAULTS[_tool]["view"] = None
-_REQUIRED = {"file": ("path",), "agent": ("id",), "blame": ("path",),
-             "diff": ("path",), "record": ("ref",)}
+_REQUIRED = {"file": ("path",), "agent": ("id",), "blame": ("path",), "diff": ("path",)}
 
 
 def optional_int(args: dict[str, Any], key: str) -> int | None:
@@ -107,6 +107,12 @@ def parameters(tool: str, supplied: dict[str, Any], *, validate_search_scope: bo
             raise ValueError(key)
     if tool == "agent" and not 32 <= out["summary_chars"] <= 600:
         raise ValueError("summary_chars 必须在 32–600 之间；完整原文用 action")
+    if tool == "record":
+        if out["ref"] is not None:
+            if not out["ref"] or out["source"] is not None or out["line"] is not None:
+                raise ValueError("record 的 ref 与 source+line 二选一")
+        elif not out["source"] or type(out["line"]) is not int or out["line"] < 1:
+            raise ValueError("record 需要 ref 或 source+line(正整数物理行号)")
     if tool in ("file", "agent", "search"):
         from . import temporal_annotation
         temporal_annotation.validate(**{key: out[key] for key in temporal_annotation.FIELDS})
@@ -148,7 +154,7 @@ def parameters(tool: str, supplied: dict[str, Any], *, validate_search_scope: bo
         if tool in ("file", "agent", "search"):
             common.update(temporal_annotation.FIELDS)
         fields = {"agent": {"id", "details"}, "file": {"path", "details"}, "search": {"q", "q_any", "agent", "file", "details"},
-                  "record": {"ref", "max_chars"}, "diff": {"path", "max_chars", "window_offset", "window_limit"},
+                  "record": {"ref", "source", "line", "max_chars"}, "diff": {"path", "max_chars", "window_offset", "window_limit"},
                   "blame": {"path", "start", "n", "window_offset", "window_limit"}}
         ignored = [k for k in out if k not in common | fields[tool] and out[k] != _DEFAULTS[tool][k]]
         if ignored:
@@ -410,7 +416,7 @@ def json_data(ledger: atoms.Ledger, tool: str, supplied: dict[str, Any], *,
 def temporal_data(ledger: atoms.Ledger, tool: str, args: dict[str, Any]) -> dict[str, Any]:
     """Scalar time endpoints and batch endpoints share the same scope semantics."""
     from . import investigation
-    if tool in ("file", "agent", "search", "diff", "blame"):
+    if tool in ("file", "agent", "search", "diff", "blame", "record"):
         return investigation.query(ledger, tool, args)
     return temporal_data_core(ledger, tool, args)
 
@@ -425,7 +431,8 @@ def temporal_data_core(ledger: atoms.Ledger, tool: str, args: dict[str, Any]) ->
             max_chars=args.get("max_chars"), window_offset=args.get("window_offset", 0),
             window_limit=args.get("window_limit", 4))
     if tool == "record":
-        return temporal.record_data(ledger, **args)
+        from . import investigation
+        return investigation.query(ledger, tool, args)
     if tool not in ("file", "agent", "search"):
         raise ValueError("该工具没有时间投影")
     kind = tool if tool != "search" else "agent" if args["agent"] else "file" if args["file"] else "pool"

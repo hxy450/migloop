@@ -246,7 +246,14 @@ def _source_index(path: str, registry_key: str, source: store.SourceSpec | None 
     index, signature, cache_status = _source_index_global(path, registry_key, source)
     if skipped is None and _signature(path) == signature:
         remaining = max(0, _REQUEST_SCAN_BUDGET - state["retained_bytes"])
-        size = _retained_size((path, signature, index, source), remaining)
+        # Global admission has already weighed this immutable index, including
+        # a wrapper that contains every object retained by the request entry.
+        # A known lower bound is enough to reject admission; don't traverse all
+        # decoded bodies again merely to decide whether to keep the same data.
+        size, measured_to = index.get("_retained_bytes"), index.get("_weighed_to")
+        if (type(size) is not int or type(measured_to) is not int
+                or size > measured_to and remaining > measured_to):
+            size = _retained_size((path, signature, index, source), remaining)
         if size <= remaining:
             state["indexes"][path] = (signature, index, source, size)
             state["retained_bytes"] += size
@@ -294,9 +301,17 @@ def _source_index_global(path: str, registry_key: str, source: store.SourceSpec 
             unknown.append({**record.address(), "fields": [] if record.textual else other, "_record": record})
     if _signature(path) != before:
         raise ValueError("source changed during inventory; retry with a stable source")
-    index = {"native": native, "unknown": unknown, "gaps": gaps}
+    # Private, not part of any returned inventory or evidence. The accounting
+    # walker includes these slots before their values are installed; its fixed
+    # overhead covers the two newly allocated small integer values.
+    index = {"native": native, "unknown": unknown, "gaps": gaps,
+             "_retained_bytes": None, "_weighed_to": None}
     ceiling = min(_CACHE_BUDGET, _MAX_SOURCE_CACHE_BYTES)
-    size = _retained_size((registry_key, before, path, index), ceiling)
+    state = _request_state()
+    request_remaining = max(0, _REQUEST_SCAN_BUDGET - state["retained_bytes"]) if state else 0
+    measured_to = max(ceiling, request_remaining)
+    size = _retained_size((registry_key, before, path, index), measured_to)
+    index.update(_retained_bytes=size, _weighed_to=measured_to)
     if size > ceiling:
         return index, before, "oversize_not_cached"
     with _CACHE_LOCK:

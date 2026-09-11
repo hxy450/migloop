@@ -143,8 +143,12 @@ def _field(value, pointer):
     return value
 
 
-def _record(ledger, ref, current, *, offset=0, max_chars=None, include_undated=False, pointer=None):
-    record = store.resolve(ledger, ref)
+def _record(ledger, ref=None, current=None, *, source=None, line=None, offset=0, max_chars=None,
+            include_undated=False, pointer=None):
+    if ref is not None and (source is not None or line is not None):
+        raise ValueError("ref 与 source+line 二选一；不以新地址覆盖失效引用")
+    record = store.resolve(ledger, ref) if ref is not None else store.locate(ledger, source, line)
+    ref = record.ref
     window = temporal.Window.parse(current["at"], current["since_ts"])
     if record.ts is not None and not window.contains(record.ts):
         raise ValueError("记录不在继承时间范围内")

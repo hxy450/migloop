@@ -223,7 +223,9 @@ def test_first_fit_retains_earlier_indexes_and_accounts_skip_guard(tmp_path, mon
         ledger.agents[name] = atoms.AgentRec(name, "session", sources=[str(path)])
     measure = raw_events._retained_size
     def fixed_cost(value, ceiling):
-        if isinstance(value, tuple) and len(value) == 4 and isinstance(value[2], dict) and "native" in value[2]:
+        # Global and request admission now share the same conservative weight;
+        # test first-fit behavior, not the private wrapper's field position.
+        if isinstance(value, tuple) and len(value) == 4 and any(isinstance(v, dict) and "native" in v for v in value):
             return 100
         if isinstance(value, tuple) and len(value) == 2:
             return 20

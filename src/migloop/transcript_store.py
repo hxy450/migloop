@@ -229,3 +229,31 @@ def resolve(ledger: Any, ref: str) -> Record:
     if record.ref != ref:
         raise ValueError("raw reference content changed; refusing stale evidence")
     return record
+
+
+def locate(ledger: Any, source: str, line: int) -> Record:
+    """Bind an independently discovered physical address inside the registry.
+
+    Accept an exact registered local path, portable logical name, or unique
+    basename. Never search arbitrary host files or guess by a partial name.
+    This certifies current recorded bytes, not execution, authorship or a claim.
+    """
+    if not isinstance(source, str) or not source.strip():
+        raise ValueError("source 必须是登记源的路径、logical_name 或唯一完整文件名")
+    if type(line) is not int or line < 1:
+        raise ValueError("line 必须是从 1 开始的物理行号")
+    spelling = source.replace("\\", "/")
+    if ".." in spelling.split("/"):
+        raise ValueError("source 不接受父路径跳转")
+    registry = sources(ledger)
+    exact = os.path.normcase(os.path.abspath(source)) if os.path.isabs(source) else None
+    matches = [path for path in registry if path == exact or
+               source_spec(ledger, path).logical_name == spelling or
+               ("/" not in spelling and os.path.basename(path) == spelling)]
+    if len(matches) != 1:
+        raise ValueError("source 在登记池内不存在或不唯一；请用完整登记路径/名称，不猜作者")
+    path = matches[0]
+    record = read_record(path, line, source=source_spec(ledger, path))
+    # Legacy basename-only source identities can still collide even after an
+    # exact local path lookup. Never hand out a reference that cannot roundtrip.
+    return resolve(ledger, record.ref)

@@ -81,6 +81,21 @@ def real_http(tmp_path, monkeypatch):
     assert ledgers == original_ledgers, "query POSTs may not rewrite ledger actions, versions or source identities"
 
 
+def test_post_batch_record_source_line_matches_shared_scope_and_rejects_future(real_http):
+    ledger = real_http["ledgers"]["time"]
+    args = {"source": real_http["paths"]["time"], "line": 1, "at": ts(10)}
+    status, response, _ = real_http["post"]("batch", {"requests": [{"tool": "record", "args": args}]})
+    assert status == 200
+    assert response["items"][0]["status"] == "ok"
+    payload = response["items"][0]["data"]
+    assert payload == atom_queries.json_data(ledger, "record", args)
+    assert payload["ref"].startswith("raw:")
+    status, rejected, _ = real_http["post"]("batch", {"requests": [
+        {"tool": "record", "args": {**args, "at": "2020-01-01T00:00:00Z"}}]})
+    assert status == 200 and rejected["items"][0]["status"] == "error"
+    assert "data" not in rejected["items"][0]
+
+
 def test_post_batch_matches_actual_mcp_and_shared_json_core(real_http):
     pytest.importorskip("mcp")
     from migloop import mcp_server

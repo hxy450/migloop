@@ -8,6 +8,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+from collections import Counter
 from copy import deepcopy
 from typing import Any
 
@@ -338,7 +339,7 @@ def check(ledger: atoms.Ledger, data: dict[str, Any], draft: str, *, with_graph:
     """Bounded mechanical feedback; no graph traversal or semantic adjudication."""
     built = build(ledger, data)
     issues = [{"code": row["code"], "severity": "error" if row["code"] in
-               ("schema", "identity_unbound", "evidence_unbound") else "warning",
+               ("schema", "identity_unbound", "evidence_unbound", "edge_evidence_unbound") else "warning",
                "where": row.get("node") or row.get("edge") or row.get("finding") or "",
                "detail": str(row.get("detail") or "")[:650]} for row in built["diagnostics"] if row.get("severity") != "info"]
     result = {"schema": "migloop-draft-check/1", "source_schema": SCHEMA,
@@ -353,7 +354,23 @@ def check(ledger: atoms.Ledger, data: dict[str, Any], draft: str, *, with_graph:
             "unclassified_related": [deepcopy(row["detail"]) for row in built["diagnostics"]
                                      if row["code"] == "unclassified_operation_inventory"],
             "scope": "只核身份、坐标、时间、原文及声明关系；不认证原因、实际看过或因果完备",
-            "next": "保留无法确认的链和反证；机械核验通过不证明问题传播成立。"}
+            "next": "保留无法确认的链和反证；机械核验通过不证明问题传播成立。"
+                    "未识别/未核实不是未发生：不要仅为清除诊断删除有原文支持的主张。"}
+    graph = built["argument_graph"]
+    result["presentation"] = {
+        "schema": graph["schema"], "document_sha256": built["document_sha256"],
+        "nodes": len(graph["nodes"]), "edges": len(graph["edges"]),
+        "relation_bindings": dict(Counter(edge["binding"]["status"] for edge in graph["edges"])),
+        "claims_preserved": True, "query_route_inferred": False, "semantic_checked": False,
+        "note": "工具已构建本稿解释图；仅有依据的关系可画历史边，其他保留断点。原因仍是本调查员主张。"}
+    result["evidence_policy"] = {
+        "unrecognized_means_absent": False, "unverified_means_false": False,
+        "located_means_supported": False, "relation_means_causality": False}
+    if built["identity"]["bound"] and built["document_sha256"]:
+        from .submission import SCHEMA as REFERENCE_SCHEMA
+        result["submission_ref"] = {"schema": REFERENCE_SCHEMA, "ledger": result["ledger"],
+                                    "draft_sha256": result["draft_sha256"],
+                                    "document_sha256": result["document_sha256"]}
     if with_graph:
         result["argument_graph"] = built["argument_graph"]
     return result
@@ -440,6 +457,11 @@ def build(ledger: atoms.Ledger, data: dict[str, Any] | None, errors: list[str] |
                     "evidence": refs, "source": "model", "semantic_checked": False,
                     "binding": _edge_binding(ledger, declared, left, right, refs, bound),
                     "propagation": {"claim": declared["claim"], "source": "model", "semantic_checked": False}}
+            for ref in refs:
+                if ref["status"] != "ok":
+                    diagnostics.append({"code": "edge_evidence_unbound", "edge": edge["id"],
+                        "ref": ref["ref"], "detail": f"{ref['ref']}: {ref['status']} — {ref['diag']}; "
+                        "这是引用/范围问题，不是关系被否定。可用 record(source=完整登记源,line=物理行号,at=截止)核回。"})
             if edge["binding"]["status"] != "confirmed":
                 diagnostics.append({"code": "relation_unconfirmed", "edge": edge["id"], "detail": edge["binding"]["diag"]})
             built["edges"].append(edge)
