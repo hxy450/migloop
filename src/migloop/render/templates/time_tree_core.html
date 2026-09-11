@@ -133,6 +133,16 @@
         invalid("An indexed operation id and kind are required");
       }
       var path = row.operation.path;
+      if (row.operation.kind === "dispatch") {
+        if (!text(row.operation.parent) || !text(row.operation.child))
+          invalid("Dispatch endpoints required");
+        return JSON.stringify([
+          row.id,
+          "dispatch",
+          row.operation.parent,
+          row.operation.child,
+        ]);
+      }
       if (path != null && !text(path)) invalid("Invalid operation target");
       // One event id can be shared by several targets and operation kinds.
       return JSON.stringify([
@@ -196,6 +206,48 @@
         if (parent.kind === "pool" || !object(row) || !object(row.operation))
           return null;
         var op = row.operation;
+        if (op.kind === "dispatch") {
+          if (
+            section !== "dispatches" ||
+            parent.kind !== "agent" ||
+            !text(op.parent) ||
+            !text(op.child) ||
+            op.parent === op.child ||
+            row.agent !== op.parent ||
+            ![op.parent, op.child].includes(parent.key) ||
+            !["confirmed", "candidate"].includes(op.status) ||
+            row.call_state !== "returned" ||
+            row.reference_status !== "addressable" ||
+            op.execution !== "confirmed"
+          )
+            return null;
+          var began = normalizeTime(row.use_ts),
+            ended = normalizeTime(row.done_ts);
+          if (
+            began > ended ||
+            ended > parent.at ||
+            normalizeTime(row.ts) !== ended ||
+            (parent.since_ts !== null && ended < parent.since_ts)
+          )
+            return null;
+          var upstream = parent.key === op.child;
+          return {
+            target: queryTarget(
+              row.agent_query,
+              "agent",
+              upstream ? op.parent : op.child,
+              ended,
+            ),
+            kind: "dispatch",
+            status: op.status,
+            evidence: row,
+            direction: upstream ? "upstream" : "downstream",
+            label:
+              op.status === "confirmed"
+                ? "历史派发 · 原生子代理身份可核"
+                : "候选派发 · 身份匹配未独立确认",
+          };
+        }
         if (
           ["read", "write", "delete"].indexOf(op.kind) < 0 ||
           !text(op.path) ||
@@ -307,9 +359,14 @@
           edge.drawable === false ||
           !object(edge.binding) ||
           ["confirmed", "candidate"].indexOf(edge.binding.status) < 0 ||
-          ["read", "write", "possible_read", "possible_write"].indexOf(
-            edge.relation,
-          ) < 0 ||
+          [
+            "read",
+            "write",
+            "possible_read",
+            "possible_write",
+            "dispatch",
+            "possible_dispatch",
+          ].indexOf(edge.relation) < 0 ||
           !text(edge.from) ||
           !text(edge.to) ||
           edge.from === edge.to
@@ -330,10 +387,13 @@
           return false;
         var source = left[0],
           target = right[0],
-          read = edge.relation === "read" || edge.relation === "possible_read";
+          read = edge.relation === "read" || edge.relation === "possible_read",
+          dispatch =
+            edge.relation === "dispatch" ||
+            edge.relation === "possible_dispatch";
         if (
           source.kind !== (read ? "file" : "agent") ||
-          target.kind !== (read ? "agent" : "file")
+          target.kind !== (read || dispatch ? "agent" : "file")
         )
           return false;
         if (

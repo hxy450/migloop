@@ -10,7 +10,8 @@ CORE = """\
 - file args={path,at,since_ts?,view?,offset?,limit?}；agent用id代path。at为含时区ISO或latest；latest返回时固定成实际已知截止。
   默认overview先给已索引读写、候选与原生正文入口；agent同时给有时间的任务/消息。每组独立计数和续读，不是原始记录前缀。
   overview的任务预览最多4096字符；显式view=messages返回选中消息的完整原始字段。chars是原长，preview_span是实际片段。
-  view=writes/reads/candidates分页操作索引；它们仍是导航，原文用expand。view=records分页全部原始记录的索引。视图不改变search范围。
+  view=writes/reads/candidates分页操作索引；agent另含dispatches父子派发，可按同名view分页并沿agent_query跳转。
+  派发也区分原生身份可核与匹配候选；这些仍是导航，原文用expand。view=records分页全部原始记录的索引。视图不改变search范围。
 - search args={q,at,file?或agent?,since_ts?,offset?,limit?}；全池省略file/agent。q_any=[词1,词2]是字面量OR，与q互斥，不是正则。
   全池还保留已登记的workflow/journal、工具输出与脚本等附件原文，不将附件伪装成agent转录。include_undated=true可检索未知时间资料；附件内的timestamp不是它进入上下文的证据。
 - changes args={path,at,since_ts}列已确认操作/未决效应；diff同样时间范围看内容变化。写入可能无净变化，修改不必然是缺陷。
@@ -74,7 +75,8 @@ VERDICT = """\
 每个节点at表示证据历史截止，需涵盖你引用的操作回执；生成输入是否当时可用仍按相应调用发起前的读取返回核对。
 target.since_ts只限制修改对账，不能截掉节点的生成期输入。节点role为origin/propagated/context/repaired；status为explained/unknown/not_generation_error。
 origin指问题引入环节，不是修复写者或证据出处；propagated指携带问题，repaired指修后纠正，context是相关背景。
-read只连file→agent，write只连agent→file；agent→agent不能写成write，没有中间文件依据就保留断链。
+read只连file→agent，write只连agent→file；dispatch连父agent→子agent，可能派发用possible_dispatch。
+agent→agent不能写成write，独立搜索或先后查阅不构成派发。
 reason/claim等自由文本建议用 |-；原始引用整体加引号。只列判断所需节点，不强求正常上游全部展开。
 
 ```yaml
@@ -122,7 +124,10 @@ findings:
     validation: "<可选：怎样检验机制与改进效果>"
 ```
 
-nodes/edges可为空但要明确未知边界。read边为file→agent，write为agent→file；possible_read/possible_write须有候选操作证据。
+nodes/edges可为空但要明确未知边界。read边为file→agent，write为agent→file，dispatch为父agent→子agent。
+possible_read/possible_write/possible_dispatch须有候选关系证据，不能把独立查阅连成历史边。
+agent概览含dispatches，view=dispatches分页父子派发；沿返回agent_query打开，expand_query核原始派发调用。
+原生子代理ID与旧名称/派工文本匹配分档，后者只支持possible_dispatch；派发不证明任务被理解或执行。
 没有检测到不等于未发生：可以提交原文支持的关系待核，不能以纯文件名提及或查询先后补边。反证同样用可定位引用。
 通常省略coverage，系统按findings[].changes反查关联；这只证明你给了关联，不认证整段修改已解释正确。
 只有要专门声明未决或非修复时，可加coverage:[{event:"事件id",status:unresolved或not_repair,reason:"理由"}]，一个event只一条。

@@ -775,6 +775,8 @@
             n.expanded = true;
             const primary = n.scope.kind === "file" ? "writes" : "reads";
             pageRows(n, primary, data.sections[primary]);
+            if (n.scope.kind === "agent" && data.sections.dispatches)
+              pageRows(n, "dispatches", data.sections.dispatches);
             render(focusTicket === intent ? n : null);
             if (focusTicket === intent) await select(n);
           } finally {
@@ -1022,7 +1024,9 @@
                         ? "写入"
                         : name === "reads"
                           ? "读取"
-                          : "候选") +
+                          : name === "dispatches"
+                            ? "派发"
+                            : "候选") +
                       "未展开",
                   );
                 stub.style.left = n.x - 326 + "px";
@@ -1151,6 +1155,7 @@
                   writes: "历史写入",
                   reads: "已返回读取",
                   candidates: "候选操作（未确认）",
+                  dispatches: "父子派发（含候选）",
                   messages: "原始消息 / 输入",
                 }[name] +
                   " · " +
@@ -1302,7 +1307,9 @@
                 null,
                 (row.tool || row.message_kind || "记录") +
                   " · " +
-                  (row.operation?.path || row.agent || row.ts || ""),
+                  (row.operation?.kind === "dispatch"
+                    ? row.operation.parent + " → " + row.operation.child
+                    : row.operation?.path || row.agent || row.ts || ""),
               ),
             );
             if (name === "messages") {
@@ -1595,8 +1602,8 @@
               model: true,
               direction: "upstream",
               label: candidate
-                ? "模型声明的候选关系 · 未证明读写发生"
-                : "模型声明的关系 · 读写定位已核，传播原因未验证",
+                ? "模型声明的候选关系 · 未确认为历史事实"
+                : "模型声明的关系 · 定位已核，传播原因未验证",
               evidence: e,
             };
             parent.children.push(child);

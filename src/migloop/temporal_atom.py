@@ -14,8 +14,8 @@ from typing import Any
 from . import atoms, body_sources, raw_events, temporal, transcript_store as store
 
 SCHEMA = "migloop-time-atom/1"
-_SECTIONS = ("writes", "reads", "candidates", "messages")
-_OVERVIEW_LIMITS = {"writes": 3, "reads": 3, "candidates": 2, "messages": 2}
+_SECTIONS = ("writes", "reads", "candidates", "messages", "dispatches")
+_OVERVIEW_LIMITS = {"writes": 3, "reads": 3, "candidates": 2, "messages": 2, "dispatches": 3}
 # Task constraints are original input, not a generated summary. Let short
 # fields fit whole; batch delivery still applies its independent total budget.
 _MESSAGE_PREVIEW_CHARS = 4096
@@ -227,9 +227,9 @@ def query(ledger: atoms.Ledger, *, kind: str, key: str, at: str, since_ts: str |
           view: str = "overview", offset: int = 0, limit: int = 40,
           include_undated: bool = False, details: bool = False) -> dict[str, Any]:
     if kind not in ("file", "agent") or view not in ("overview", *_SECTIONS):
-        raise ValueError("time atom kind must be file/agent; view must be overview/writes/reads/candidates/messages")
-    if kind == "file" and view == "messages":
-        raise ValueError("messages view requires an agent scope")
+        raise ValueError("time atom kind must be file/agent; view must be overview/writes/reads/candidates/messages/dispatches")
+    if kind == "file" and view in ("messages", "dispatches"):
+        raise ValueError("messages/dispatches view requires an agent scope")
     if type(details) is not bool or type(include_undated) is not bool:
         raise ValueError("details/include_undated must be booleans")
     temporal._page([], offset, limit)
@@ -245,8 +245,12 @@ def query(ledger: atoms.Ledger, *, kind: str, key: str, at: str, since_ts: str |
     message_gaps = []
     if kind == "agent":
         groups["messages"], message_gaps = _messages(ledger, key, window, scope, explicit=view == "messages")
+        if not raw["stale_annotation_sources"]:
+            from . import dispatch_scope
+            groups["dispatches"] = dispatch_scope.rows(ledger, key, window)
     else:
         del groups["messages"]
+        del groups["dispatches"]
     # A source might change between the raw-count pass and native-index access.
     # Never combine new bytes with stale Action annotations in that case.
     for path, expected in ledger.source_stats.items():
@@ -258,8 +262,9 @@ def query(ledger: atoms.Ledger, *, kind: str, key: str, at: str, since_ts: str |
         if changed and path not in raw["stale_annotation_sources"]:
             raw["stale_annotation_sources"].append(path)
     if raw["stale_annotation_sources"]:
-        for name in ("writes", "reads", "candidates"):
-            groups[name] = []
+        for name in ("writes", "reads", "candidates", "dispatches"):
+            if name in groups:
+                groups[name] = []
     sections = {}
     for name, rows in groups.items():
         page_limit = min(limit, _OVERVIEW_LIMITS[name]) if view == "overview" else limit

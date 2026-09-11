@@ -36,6 +36,43 @@ const at = "2026-09-10T10:00:04.000002Z";
 const use = "2026-09-10T10:00:01.000001Z";
 const fileScope = { kind: "file", key: "/project/A.ets", at, since_ts: null };
 const agentScope = { kind: "agent", key: "agent-a", at, since_ts: null };
+test("dispatch navigation is agent-to-agent, time bounded, and candidates stay candidates", () => {
+  const row = {
+    id: "dispatch-1",
+    agent: "parent",
+    ts: at,
+    use_ts: use,
+    done_ts: at,
+    call_state: "returned",
+    reference_status: "addressable",
+    operation: {
+      kind: "dispatch",
+      parent: "parent",
+      child: "child",
+      status: "candidate",
+      execution: "confirmed",
+    },
+    agent_query: {
+      tool: "agent",
+      args: { id: "parent", at, since_ts: null, view: "overview" },
+    },
+  };
+  const child = { kind: "agent", key: "child", at, since_ts: null };
+  const rel = core.relation(child, row, "dispatches");
+  assert.equal(rel.target.key, "parent");
+  assert.equal(rel.direction, "upstream");
+  assert.equal(rel.status, "candidate");
+  assert.equal(core.relation(fileScope, row, "dispatches"), null);
+  assert.equal(core.relation({ ...child, at: use }, row, "dispatches"), null);
+  assert.equal(
+    core.relation(child, { ...row, call_state: "failed" }, "dispatches"),
+    null,
+  );
+  const other = copy(row);
+  other.operation.child = "different";
+  assert.notEqual(core.operationKey(row), core.operationKey(other));
+  assert.equal(core.relation(child, other, "dispatches"), null);
+});
 function operation(kind = "read") {
   return {
     id: "event-shared",
@@ -84,6 +121,25 @@ function modelGraph() {
     edges: [],
   };
 }
+test("model dispatch edges need two bound agents and cannot masquerade as writes", () => {
+  const graph = {
+    identity: { bound: true },
+    nodes: [claim("p", "agent", "parent"), claim("c", "agent", "child")],
+  };
+  const edge = {
+    from: "p",
+    to: "c",
+    relation: "dispatch",
+    binding: { status: "candidate" },
+  };
+  assert.equal(core.modelEdgeAllowed(graph, edge), true);
+  assert.equal(
+    core.modelEdgeAllowed(graph, { ...edge, relation: "write" }),
+    false,
+  );
+  graph.nodes[1].binding.status = "unlocated";
+  assert.equal(core.modelEdgeAllowed(graph, edge), false);
+});
 
 test("UTC canonicalization preserves microseconds and timezone rollover", () => {
   assert.equal(core.normalizeTime("2026-09-10T12:00:04.000002+02:00"), at);

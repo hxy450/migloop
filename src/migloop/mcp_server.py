@@ -138,7 +138,8 @@ def build_server(backend: Any | None = None) -> Any:
                     annotation_offset: int = 0, annotation_limit: int | None = None,
                     relation_offset: int = 0, relation_limit: int | None = None, view: str | None = None) -> str:
         """默认打开 agent 截至 at 的输入、产出、任务及候选概览；at 省略=latest，不需 via。
-        view=reads/writes/messages/candidates 分页所选组；messages逐条给完整原始字段，总览仅预览4096字符。
+        view=reads/writes/messages/candidates/dispatches 分页所选组；dispatches含父子派发及证据强度。
+        messages逐条给完整原始字段，总览仅预览4096字符。
         expand_query是返回的{tool,args,scope}参数对象，不是工具名；调用它的tool=expand以展开该项原文。
         显式batch预算或宿主截断时仍须续取；消息行offset不等于原文字段字符offset。
         view=records 分页全部原始记录，未知工具也保留。

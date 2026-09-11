@@ -139,12 +139,12 @@ def parameters(tool: str, supplied: dict[str, Any], *, validate_search_scope: bo
             # a raw cursor to an indexed-operation page.
             annotation_page = any(out[k] != default for k, default in temporal_annotation.FIELDS.items())
             out["view"] = out["view"] or ("records" if annotation_page else "overview")
-            if out["view"] not in ("overview", "records", "writes", "reads", "candidates", "messages"):
-                raise ValueError("view 必须为 overview/records/writes/reads/candidates/messages")
+            if out["view"] not in ("overview", "records", "writes", "reads", "candidates", "messages", "dispatches"):
+                raise ValueError("view 必须为 overview/records/writes/reads/candidates/messages/dispatches")
             if annotation_page and out["view"] != "records":
                 raise ValueError("注释分页属于 view=records 原始记录视图，不是读写概览的游标")
-            if tool == "file" and out["view"] == "messages":
-                raise ValueError("messages 仅用于 agent；文件相关消息在 view=records 中")
+            if tool == "file" and out["view"] in ("messages", "dispatches"):
+                raise ValueError("messages/dispatches 仅用于 agent；文件相关消息在 view=records 中")
         if tool in ("file", "agent", "search"):
             common.update(temporal_annotation.FIELDS)
         fields = {"agent": {"id", "details"}, "file": {"path", "details"}, "search": {"q", "q_any", "agent", "file", "details"},

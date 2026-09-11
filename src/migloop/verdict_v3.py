@@ -19,7 +19,7 @@ SCHEMA = "migloop-verdict/3"
 GRAPH_SCHEMA = "migloop-argument-graph/1"
 STATUSES = {"explained", "unknown", "not_generation_error"}
 ROLES = {"origin", "propagated", "context", "repaired"}
-RELATIONS = {"read", "write", "possible_read", "possible_write"}
+RELATIONS = {"read", "write", "possible_read", "possible_write", "dispatch", "possible_dispatch"}
 MAX_CHANGE_ROWS = 10000
 _TOP = {"schema", "ledger", "target", "findings", "coverage"}
 _FINDING = {"id", "title", "reason", "status", "nodes", "edges", "changes",
@@ -135,7 +135,7 @@ def validate(data: Any) -> list[str]:
             for field in ("from", "to", "claim"):
                 text(edge, field, at)
             if not _choice(edge.get("relation"), RELATIONS):
-                errors.append(at + ".relation: 必须是 read/write/possible_read/possible_write")
+                errors.append(at + ".relation: 必须是 read/write/dispatch/possible_read/possible_write/possible_dispatch")
             refs(edge.get("evidence", []), at + ".evidence")
     coverage = data.get("coverage", [])
     if not isinstance(coverage, list):
@@ -268,6 +268,12 @@ def _edge_binding(ledger: atoms.Ledger, edge: dict[str, Any], left: dict[str, An
     if any(n["binding"]["status"] != "matched" for n in (left, right)):
         return {**out, "status": "invalid", "diag": "端点身份/时间未绑定"}
     operation = edge["relation"].removeprefix("possible_")
+    if operation == "dispatch":
+        if left["kind"] != "agent" or right["kind"] != "agent":
+            return {**out, "status": "conflicting", "diag": "派发为父 agent→子 agent，不是文件读写"}
+        from . import dispatch_scope
+        return dispatch_scope.binding(ledger, left["binding"]["canonical_key"], right["binding"]["canonical_key"],
+                                      refs, min(left["binding"]["at"], right["binding"]["at"]))
     expected = ("file", "agent") if operation == "read" else ("agent", "file")
     if (left["kind"], right["kind"]) != expected:
         return {**out, "status": "conflicting", "diag": "读为 file→agent，写为 agent→file；声明方向不符"}
