@@ -1,0 +1,597 @@
+<!doctype html>
+<html lang="zh-CN">
+  <meta charset="utf-8" /><meta
+    name="viewport"
+    content="width=device-width,initial-scale=1"
+  />
+  <title>Migloop · 返修调查内核</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      background: #f4f6fa;
+      color: #243042;
+      font:
+        14px system-ui,
+        sans-serif;
+    }
+    header {
+      padding: 20px 28px;
+      background: #fff;
+      border-bottom: 1px solid #dde3ee;
+    }
+    h1 {
+      margin: 0 0 8px;
+      font-size: 22px;
+    }
+    main {
+      display: grid;
+      grid-template-columns: minmax(300px, 360px) minmax(500px, 1fr);
+      gap: 16px;
+      padding: 16px;
+    }
+    section {
+      background: white;
+      border: 1px solid #dde3ee;
+      border-radius: 9px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+    h2 {
+      font-size: 16px;
+      margin: 0 0 12px;
+    }
+    button,
+    input,
+    select,
+    textarea {
+      font: inherit;
+    }
+    button {
+      cursor: pointer;
+      border: 1px solid #cad4e3;
+      background: #fff;
+      border-radius: 5px;
+      padding: 6px 10px;
+      margin: 3px;
+    }
+    button:hover {
+      background: #eef3fb;
+    }
+    input,
+    textarea,
+    select {
+      border: 1px solid #cad4e3;
+      border-radius: 5px;
+      padding: 8px;
+      max-width: 100%;
+    }
+    textarea {
+      width: 100%;
+      min-height: 120px;
+      font-family: monospace;
+    }
+    .muted {
+      color: #69778a;
+    }
+    .error {
+      color: #b42318;
+      white-space: pre-wrap;
+    }
+    .row {
+      border-top: 1px solid #e9edf4;
+      padding: 8px 0;
+      overflow-wrap: anywhere;
+    }
+    pre {
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      font:
+        12px/1.55 ui-monospace,
+        monospace;
+      max-height: 65vh;
+      overflow: auto;
+    }
+    #graph {
+      width: 100%;
+      min-height: 240px;
+      overflow: auto;
+    }
+    svg {
+      display: block;
+    }
+    details {
+      margin: 8px 0;
+    }
+    .node {
+      cursor: pointer;
+    }
+    .small {
+      font-size: 12px;
+    }
+    .badge {
+      display: inline-block;
+      background: #fff2df;
+      color: #925100;
+      border-radius: 4px;
+      padding: 3px 6px;
+    }
+  </style>
+  <header>
+    <h1>返修调查 · 事件内核</h1>
+    <div id="info" class="muted">读取索引…</div>
+    <div class="small muted">
+      原因是模型主张；原始引用、历史关系和因果正确性分开。当前页面不会修改旧调查记录。
+    </div>
+  </header>
+  <main>
+    <aside>
+      <section>
+        <h2>手动取证</h2>
+        <select id="kind">
+          <option value="file">文件</option>
+          <option value="agent">Agent</option>
+          <option value="pool">全池搜索</option>
+        </select>
+        <input
+          id="key"
+          placeholder="文件路径或 agent 身份"
+          style="width: 100%; margin-top: 8px"
+        /><input
+          id="at"
+          placeholder="截至时间（带时区 ISO）"
+          style="width: 100%; margin-top: 8px"
+        />
+        <input
+          id="since"
+          placeholder="起始时间（可空）"
+          style="width: 100%; margin-top: 8px"
+        /><input
+          id="terms"
+          placeholder="搜索词，逗号分隔（OR）"
+          style="width: 100%; margin-top: 8px"
+        />
+        <button id="query">查原文索引</button
+        ><button id="relations">查读写关系</button
+        ><button id="agents">Agent目录</button
+        ><button id="files">文件目录</button>
+        <div id="status" class="small muted"></div>
+        <div id="records"></div>
+      </section>
+      <section>
+        <h2>载入模型结论</h2>
+        <select id="reports"></select
+        ><button id="load">载入</button>
+        <details>
+          <summary>粘贴 inquiry/1 YAML / JSON</summary>
+          <textarea id="draft"></textarea
+          ><button id="submit">核验并载入</button>
+        </details>
+      </section>
+    </aside>
+    <article>
+      <section>
+        <h2>
+          结论证据图
+          <select id="findings"></select>
+        </h2>
+        <div class="small muted">
+          红色：模型主张有问题 · 实线：原生关系可核 · 虚线：有依据的候选 ·
+          未核关系不画连线
+        </div>
+        <div id="graph"></div>
+        <div id="gaps"></div>
+      </section>
+      <section>
+        <h2 id="reasonTitle">节点原因 / 原始证据</h2>
+        <div id="reason"></div>
+        <pre id="original"></pre>
+        <details>
+          <summary>完整原始记录（未改写）</summary>
+          <pre id="rawRecord"></pre>
+        </details>
+      </section>
+      <section>
+        <h2>实际调查工具调用</h2>
+        <div class="small muted">
+          仅记录真实工具调用。服务端已发送 ≠ 宿主完整呈现 ≠
+          模型理解。手动取证不加入此列表。
+        </div>
+        <div id="trace"></div>
+      </section>
+    </article>
+  </main>
+  <script>
+    "use strict";
+    const $ = (id) => document.getElementById(id),
+      NS = "http://www.w3.org/2000/svg";
+    let graph = null,
+      trace = [];
+    async function api(path, body) {
+      const response = await fetch(
+        path,
+        body === undefined
+          ? {}
+          : {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(body),
+            },
+      );
+      const data = await response.json();
+      if (!response.ok) throw Error(data.error || response.status);
+      return data;
+    }
+    function element(tag, text, parent, cls) {
+      const e = document.createElement(tag);
+      if (text !== undefined) e.textContent = text;
+      if (cls) e.className = cls;
+      if (parent) parent.append(e);
+      return e;
+    }
+    function button(text, parent, fn) {
+      const e = element("button", text, parent);
+      e.onclick = () => guard(fn);
+      return e;
+    }
+    async function guard(fn) {
+      try {
+        await fn();
+      } catch (error) {
+        $("status").textContent = error.message;
+        $("status").className = "error";
+      }
+    }
+    function request(view = "records") {
+      const kind = $("kind").value,
+        q = {
+          op: kind === "pool" ? "search" : kind,
+          at: $("at").value,
+          limit: 20,
+        };
+      if (kind !== "pool") {
+        q.key = $("key").value;
+        q.view = view;
+      }
+      if ($("since").value) q.since = $("since").value;
+      if ($("terms").value)
+        q.terms = $("terms")
+          .value.split(",")
+          .map((x) => x.trim())
+          .filter(Boolean);
+      return q;
+    }
+    async function query(q) {
+      $("status").textContent = "查询中…";
+      const data = await api("/api/query", q);
+      $("records").replaceChildren();
+      $("status").className = "small muted";
+      $("status").textContent =
+        `共 ${data.total ?? 0} 条；当前 ${data.rows?.length ?? 0} 条（索引，不是全文）` +
+        (data.undated_records
+          ? `；未知时间 ${data.undated_records} 条${q.undated ? "（已纳入）" : "（未默认纳入）"}`
+          : "");
+      for (const row of data.rows || []) {
+        const box = element("div", "", $("records"), "row");
+        if (data.kind === "catalog") {
+          button(row.key, box, () => {
+            $("kind").value = data.catalog_kind;
+            $("key").value = row.key;
+            return query(request());
+          });
+          continue;
+        }
+        if (row.ref) {
+          element(
+            "div",
+            `${row.at || "时间未知"} · ${row.name}:${row.line}`,
+            box,
+            "small muted",
+          );
+          element("div", row.excerpt, box);
+          button("展开原文", box, () => open(row.ref, q.at, q.undated));
+        } else {
+          element("div", `${row.op} · ${row.strength} · ${row.status}`, box);
+          element("div", row.agent || "作者未知", box, "small");
+          element("div", row.path, box, "small");
+          for (const ref of [row.request, row.result].filter(Boolean))
+            button("原始依据", box, () => open(ref, q.at, q.undated));
+        }
+      }
+      if (data.next !== null && data.next !== undefined)
+        button("下一页", $("records"), () =>
+          query({ ...q, offset: data.next }),
+        );
+      for (const dispatch of data.dispatches || []) {
+        const box = element("div", "", $("records"), "row");
+        element(
+          "div",
+          `原生派发：${dispatch.parent} → ${dispatch.child}`,
+          box,
+          "small",
+        );
+        button("独立打开子代理", box, () => {
+          $("kind").value = "agent";
+          $("key").value = dispatch.child;
+          return query(request());
+        });
+        for (const ref of [dispatch.request, dispatch.result])
+          button("派发原文", box, () => open(ref, q.at));
+      }
+      return data;
+    }
+    async function open(ref, at, undated = false) {
+      const data = await api("/api/query", { op: "open", ref, at, undated });
+      let decoded = data.text;
+      try {
+        const raw = JSON.parse(data.text);
+        const blocks = raw.message?.content;
+        if (Array.isArray(blocks)) {
+          decoded = blocks
+            .map((block) => {
+              const value =
+                block.input?.content ??
+                block.input?.command ??
+                block.text ??
+                block.content ??
+                block;
+              return typeof value === "string"
+                ? value
+                : JSON.stringify(value, null, 2);
+            })
+            .join("\n\n");
+        } else if (raw.payload) {
+          const value =
+            raw.payload.output ??
+            raw.payload.input ??
+            raw.payload.arguments ??
+            raw.payload;
+          decoded =
+            typeof value === "string" ? value : JSON.stringify(value, null, 2);
+        }
+      } catch {}
+      $("rawRecord").textContent = data.text;
+      $("original").textContent =
+        `${data.source}:${data.line}\n${data.at || "时间未知"} · 正文字段解码显示\n\n${decoded}`;
+    }
+    function svg(tag, attrs, parent) {
+      const e = document.createElementNS(NS, tag);
+      for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+      parent.append(e);
+      return e;
+    }
+    function draw() {
+      const host = $("graph");
+      host.replaceChildren();
+      $("gaps").replaceChildren();
+      if (!graph) {
+        element("p", "尚未载入结论。可先手动取证。", host, "muted");
+        return;
+      }
+      const fid = $("findings").value,
+        nodes = graph.nodes.filter((n) => n.finding === fid),
+        edges = graph.edges.filter((e) => e.finding === fid),
+        depth = new Map(nodes.map((n) => [n.id, 0]));
+      // Finite layout even for cyclic/shared model arguments; drawing never invents relations.
+      for (let i = 0; i < nodes.length; i++) {
+        let changed = false;
+        for (const e of edges) {
+          if (e.from === e.to) continue;
+          const d = Math.min(nodes.length - 1, (depth.get(e.from) || 0) + 1);
+          if (d > (depth.get(e.to) || 0)) {
+            depth.set(e.to, d);
+            changed = true;
+          }
+        }
+        if (!changed) break;
+      }
+      const counts = new Map(),
+        positions = new Map();
+      for (const n of nodes) {
+        const d = depth.get(n.id),
+          r = counts.get(d) || 0;
+        counts.set(d, r + 1);
+        positions.set(n.id, { x: 20 + d * 285, y: 25 + r * 105 });
+      }
+      const width = Math.max(
+          600,
+          ...[...positions.values()].map((p) => p.x + 270),
+        ),
+        height = Math.max(230, ...[...positions.values()].map((p) => p.y + 90));
+      const root = svg(
+        "svg",
+        { width, height, viewBox: `0 0 ${width} ${height}` },
+        host,
+      );
+      const defs = svg("defs", {}, root),
+        marker = svg(
+          "marker",
+          {
+            id: "arrow",
+            viewBox: "0 0 10 10",
+            refX: 9,
+            refY: 5,
+            markerWidth: 6,
+            markerHeight: 6,
+            orient: "auto-start-reverse",
+          },
+          defs,
+        );
+      svg("path", { d: "M 0 0 L 10 5 L 0 10 z", fill: "#77869a" }, marker);
+      for (const e of edges) {
+        const a = positions.get(e.from),
+          b = positions.get(e.to);
+        if (!a || !b) continue;
+        svg(
+          "path",
+          {
+            d: `M${a.x + 245},${a.y + 34} C${a.x + 265},${a.y + 34} ${b.x - 20},${b.y + 34} ${b.x},${b.y + 34}`,
+            fill: "none",
+            stroke: "#77869a",
+            "stroke-width": 1.5,
+            "stroke-dasharray": e.strength === "candidate" ? "5 4" : "",
+            "marker-end": "url(#arrow)",
+          },
+          root,
+        );
+      }
+      for (const n of nodes) {
+        const p = positions.get(n.id),
+          g = svg(
+            "g",
+            { class: "node", transform: `translate(${p.x},${p.y})` },
+            root,
+          );
+        const bad = ["origin", "propagated"].includes(n.role);
+        svg(
+          "rect",
+          {
+            width: 245,
+            height: 68,
+            rx: 8,
+            fill: bad ? "#fff0ef" : "#f4f7fb",
+            stroke: bad ? "#d94d45" : "#9aa9ba",
+            "stroke-width": n.role === "origin" ? 2.5 : 1,
+          },
+          g,
+        );
+        svg(
+          "text",
+          { x: 10, y: 22, "font-size": 12, fill: "#283444" },
+          g,
+        ).textContent = (
+          n.kind === "file" ? n.key.split("/").pop() : n.key.split(":").pop()
+        ).slice(0, 34);
+        svg(
+          "text",
+          { x: 10, y: 43, "font-size": 11, fill: "#65748b" },
+          g,
+        ).textContent =
+          `${{ origin: "问题进入", propagated: "问题保留", context: "输入/背景", repaired: "修复", unknown: "未定" }[n.role]} · 模型主张${n.exists ? "" : " · 节点未核"}`;
+        svg(
+          "text",
+          { x: 10, y: 58, "font-size": 10, fill: "#65748b" },
+          g,
+        ).textContent = n.at;
+        svg("title", {}, g).textContent = n.key;
+        g.onclick = () => showNode(n);
+      }
+      for (const edge of graph.unverified_edges.filter(
+        (e) => e.finding === fid,
+      ))
+        element(
+          "div",
+          `未核连接（不画边）：${edge.from} → ${edge.to}；${edge.diagnostic}`,
+          $("gaps"),
+          "row small",
+        );
+      for (const issue of graph.issues)
+        element("div", JSON.stringify(issue), $("gaps"), "error small");
+    }
+    function showNode(n) {
+      $("reasonTitle").textContent = n.key;
+      $("reason").replaceChildren();
+      element("span", "模型主张，不是因果认证", $("reason"), "badge");
+      element("p", n.reason, $("reason"));
+      button("独立打开节点", $("reason"), () => {
+        $("kind").value = n.kind;
+        $("key").value = n.key;
+        $("at").value = n.at;
+        $("since").value = "";
+        return query(request());
+      });
+      for (const ref of n.evidence || [])
+        button(ref, $("reason"), () => open(ref, n.at));
+    }
+    async function loadGraph(data) {
+      graph = data;
+      $("kind").value = "file";
+      $("reasonTitle").textContent = "节点原因 / 原始证据";
+      $("reason").replaceChildren();
+      $("original").textContent = "";
+      $("rawRecord").textContent = "";
+      $("findings").replaceChildren();
+      for (const f of data.document.findings) {
+        const option = element("option", `${f.id} · ${f.title}`, $("findings"));
+        option.value = f.id;
+      }
+      $("at").value = data.document.target.at;
+      $("since").value = data.document.target.since || "";
+      $("key").value = data.document.target.file;
+      draw();
+      await reloadTrace();
+    }
+    async function reload() {
+      const info = await api("/api/info");
+      $("info").textContent =
+        `${info.sources} 个登记源 · ${info.records} 条原始记录 · 新内核（独立入口）`;
+      $("reports").replaceChildren();
+      for (const r of info.reports) {
+        const option = element("option", r.id, $("reports"));
+        option.value = r.id;
+      }
+      await reloadTrace();
+    }
+    async function reloadTrace() {
+      trace = await api(
+        "/api/trace" +
+          (graph ? "?session=" + encodeURIComponent(graph.trace_session) : ""),
+      );
+      $("trace").replaceChildren();
+      for (const run of trace) {
+        const box = element("details", "", $("trace"));
+        element(
+          "summary",
+          `${run.id} · 来源 ${run.origin} · ${run.queries.length} 个查询 · 已发送 ${run.frames.length} 帧`,
+          box,
+        );
+        element("pre", JSON.stringify(run.queries, null, 2), box);
+        element(
+          "div",
+          run.visibility.length
+            ? "宿主观察：" + JSON.stringify(run.visibility)
+            : "宿主可见性：未记录，不能算完整已读",
+          box,
+          "muted",
+        );
+        for (const f of run.frames)
+          button(`帧 ${f.offset}`, box, async () => {
+            $("original").textContent = (
+              await api(`/api/frame?id=${run.id}&offset=${f.offset}`)
+            ).text;
+          });
+      }
+    }
+    $("query").onclick = () => guard(() => query(request()));
+    $("relations").onclick = () => guard(() => query(request("relations")));
+    $("agents").onclick = () =>
+      guard(() => query({ op: "catalog", kind: "agent", limit: 20 }));
+    $("files").onclick = () =>
+      guard(() =>
+        query({ op: "catalog", kind: "file", q: $("key").value, limit: 20 }),
+      );
+    $("load").onclick = () =>
+      guard(async () =>
+        loadGraph(
+          await api("/api/report?id=" + encodeURIComponent($("reports").value)),
+        ),
+      );
+    $("submit").onclick = () =>
+      guard(async () => {
+        await loadGraph(
+          await api("/api/report", { document: $("draft").value }),
+        );
+        await reload();
+      });
+    $("findings").onchange = draw;
+    guard(async () => {
+      await reload();
+      const id = new URLSearchParams(location.search).get("report");
+      if (id)
+        await loadGraph(await api("/api/report?id=" + encodeURIComponent(id)));
+      else draw();
+    });
+  </script>
+</html>
