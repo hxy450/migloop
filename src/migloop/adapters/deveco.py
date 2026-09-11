@@ -1292,8 +1292,10 @@ def _build_db_agents(db, session_id, stages, cwd, model, billing, wf_index, task
             "_write_lines": {}, "_write_events": [],
         }
         _aggregate_reads(entry, tools)
-        # bill subagent tokens
-        key = model or "unknown"
+        # bill subagent tokens:按子会话自己的模型入账。0905 的会话 63 个子代理里 13 个跑在
+        # provider=deveco 的 GLM-5.3 上,原来全记到主线的 glm-5.3,表里「使用方」却按各自模型数出
+        # 「主线 + 50 个子代理」,请求数 281 对不上。
+        key = ch.get("model") or model or "unknown"
         b = billing.setdefault(key, {"req": 0, "inp": 0, "cread": 0, "cw5": 0, "cw1h": 0, "out": 0})
         b["req"] += 1
         b["inp"] += tk["input"]

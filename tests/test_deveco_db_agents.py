@@ -1,5 +1,5 @@
 """task 派发的 DevEco 子会话(SQLite 子会话 + 主线 task 工具),按 wugang 0905 的会话形态造最小库:
-子会话结束时刻、类型/描述、task 对账与中断、主线 task 跨度不计活跃、合成通知不算人输入。"""
+子会话结束时刻、类型/描述、task 对账与中断、主线 task 跨度不计活跃、合成通知不算人输入、按各自模型计费。"""
 from __future__ import annotations
 
 import json
@@ -16,6 +16,9 @@ TOUCHED = T0 + 5 * 24 * 60 * MIN  # 整库被批量 touch 的时刻(5 天后)
 PARENT = "ses_parent"
 CHILD_OK = "ses_child_ok"
 CHILD_ABORT = "ses_child_abort"
+CHILD_OTHER = "ses_child_other"   # 跑在另一家 provider 的模型上
+MAIN_MODEL = '{"id":"glm-5.3","providerID":"zhipuai","variant":"default"}'
+OTHER_MODEL = '{"id":"GLM-5.3","providerID":"deveco","variant":"default"}'
 
 
 def _msg(idx, role, parts, created, completed=None):
@@ -64,10 +67,9 @@ def _make_db(path):
             time_created INT, time_updated INT);
     """)
 
-    def child(sid, title, agent, created, work_end):
+    def child(sid, title, agent, created, work_end, model=MAIN_MODEL):
         con.execute("INSERT INTO session VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
-                    (sid, PARENT, title, agent, '{"modelID":"glm-5.3","providerID":"zhipuai"}',
-                     1000, 500, 200, 0, 0, 0.0, created, TOUCHED))
+                    (sid, PARENT, title, agent, model, 1000, 500, 200, 0, 0, 0.0, created, TOUCHED))
         mid = sid + "-m1"
         con.execute("INSERT INTO message VALUES (?,?,?,?,?)",
                     (mid, sid, json.dumps({"role": "assistant", "time": {"created": created + 1000, "completed": work_end},
@@ -86,6 +88,8 @@ def _make_db(path):
 
     child(CHILD_OK, "Batch 1 closer (@a2h-closer subagent)", "a2h-closer", T0 + 5 * MIN, T0 + 9 * MIN)
     child(CHILD_ABORT, "FV-1 closer iter1 (@a2h-closer subagent)", "a2h-closer", T0 + 20 * MIN, T0 + 24 * MIN)
+    child(CHILD_OTHER, "Base-5 build gate (@hmos-builder subagent)", "hmos-builder", T0 + 30 * MIN, T0 + 34 * MIN,
+          model=OTHER_MODEL)
     con.commit()
     con.close()
 
@@ -108,7 +112,8 @@ class DevEcoDbAgentsTest(unittest.TestCase):
                       status="error", interrupted=True),
             ], T0 + 20 * MIN),
             _msg(4, "user", [_text("retry")], T0 + 25 * MIN),
-            _msg(5, "assistant", [_tool("bash", T0 + 26 * MIN, T0 + 26 * MIN + 1000, {"command": "ls"})],
+            _msg(5, "assistant", [_tool("bash", T0 + 26 * MIN, T0 + 26 * MIN + 1000, {"command": "ls"}),
+                                  _task(T0 + 30 * MIN, T0 + 34 * MIN, "Base-5 build gate", CHILD_OTHER)],
                  T0 + 26 * MIN),
         ]), storage_root=self.db)
 
@@ -124,7 +129,7 @@ class DevEcoDbAgentsTest(unittest.TestCase):
         self.assertEqual(a["dur_ms"], 4 * MIN)
         # 阶段墙钟不再被子代理拖到 5 天后
         for s in self.trace["stages"]:
-            self.assertLessEqual(deveco._iso_ms(s["end_ts"]), T0 + 30 * MIN)
+            self.assertLessEqual(deveco._iso_ms(s["end_ts"]), T0 + 40 * MIN)
 
     def test_type_and_desc_from_task_title(self):
         a = self._agent(CHILD_OK)
@@ -144,14 +149,22 @@ class DevEcoDbAgentsTest(unittest.TestCase):
         self.assertEqual(self.trace["totals"]["waste_output_tokens"], 700)   # 500 out + 200 reasoning
 
     def test_task_wait_not_counted_as_main_activity(self):
-        # 主线:reasoning 1s + bash 1s;子会话各 1s reasoning + (4min-4s) bash
-        child_work = 2 * (1000 + (4 * MIN - 4000))
+        # 主线:reasoning 1s + bash 1s;三个子会话各 1s reasoning + (4min-4s) bash
+        child_work = 3 * (1000 + (4 * MIN - 4000))
         self.assertEqual(self.trace["totals"]["active_ms"], 2000 + child_work)
 
     def test_synthetic_task_notice_is_not_a_user_prompt(self):
         self.assertEqual(self.trace["totals"]["user_prompts"], 2)
         self.assertEqual([p["idx"] for p in self.trace["prompts"]], [0, 4])
         self.assertEqual(self.trace["meta"]["record_count"], 6)   # 消息本身还在
+
+    def test_subagent_billed_under_its_own_model(self):
+        self.assertEqual(self._agent(CHILD_OTHER)["model"], "GLM-5.3")
+        billing = self.trace["billing"]
+        self.assertEqual(billing["GLM-5.3"]["req"], 1)
+        self.assertEqual(billing["GLM-5.3"]["out"], 700)
+        self.assertEqual(billing["glm-5.3"]["req"], 2)            # 2 个同模型子代理(夹具的主线消息没带 tokens,不计请求)
+        self.assertEqual(billing["glm-5.3"]["out"], 1400)
 
     def test_without_db_task_spans_stand_in_for_child_activity(self):
         trace = deveco._parse(_export([
