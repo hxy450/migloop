@@ -758,12 +758,16 @@
         async function expand(n) {
           if (n.loop) return select(n);
           if (n.expanded) return select(n);
-          const ticket = epoch,
-            focusTicket = ++intent;
+          const ticket = epoch;
           selected = n;
           n.busy = true;
           render();
           try {
+            // Replace the drawer's identity/claims synchronously, before the
+            // potentially slow evidence request. Never show A beside tree B.
+            const selection = select(n),
+              focusTicket = intent;
+            await selection;
             const data = n.data || (await atom(n.scope));
             if (ticket !== epoch || !contains(n)) return;
             n.scope = C.scope(data.scope);
@@ -1047,6 +1051,7 @@
           render();
           const ticket = ++detailEpoch;
           const side = $("side");
+          side.dataset.scope = C.scopeKey(n.scope);
           side.replaceChildren();
           side.append(
             el("h2", null, label(n.scope)),
@@ -1751,7 +1756,10 @@
             (r.key + " " + (r.title || "")).toLowerCase().includes(q),
           );
           if (!q) {
-            const fixed = new Set([probe?.target?.file, ...(DATA.fixes || []).map((f) => f.id)]);
+            const fixed = new Set([
+              probe?.target?.file,
+              ...(DATA.fixes || []).map((f) => f.id),
+            ]);
             rows.sort(
               (a, b) => (fixed.has(b.key) ? 1 : 0) - (fixed.has(a.key) ? 1 : 0),
             );

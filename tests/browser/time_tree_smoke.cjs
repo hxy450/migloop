@@ -114,6 +114,14 @@ async function main() {
     );
   async function record(name) {
     await delay(200);
+    if (name !== "failure")
+      assert.equal(
+        await ev(
+          `(()=>{const s=__timeTree.state(),n=s.nodes.find(n=>n.id===s.selected);return !n||document.querySelector('#side').dataset.scope===MigloopTimeTree.scopeKey(n.scope);})()`,
+        ),
+        true,
+        "Drawer must match the selected time node",
+      );
     steps.push({ name, ...(await state()) });
     const shot = await send("Page.captureScreenshot", { format: "png" });
     fs.writeFileSync(
@@ -232,8 +240,9 @@ async function main() {
     await click(
       '[...document.querySelectorAll("#model-list details")].find(d=>d.querySelector(":scope > summary")?.textContent.startsWith("D ·")).querySelector("button")',
     );
+    assert.equal(await ev(`(()=>{const s=__timeTree.state(),n=s.nodes.find(n=>n.id===s.selected);return !!n&&document.querySelector('#side').dataset.scope===MigloopTimeTree.scopeKey(n.scope);})()`), true, 'Switching finding must replace drawer identity before I/O completes');
     await wait(
-      '!!document.querySelector("#canvas .wire.model") && !!document.querySelector("#side .claim-detail")',
+      '!!document.querySelector("#canvas .wire.model") && !!document.querySelector("#side .claim-detail[data-claim-id^="+JSON.stringify("D/")+"]") && __timeTree.state().nodes.some(n=>n.scope.kind==="file"&&n.expanded)',
     );
     await record("10-verified-model-edge");
     const done = await state();
