@@ -130,6 +130,11 @@ TOOL_MAP = {
 # 阶段展示标签统一复用 claude 的 common.STAGE_LABELS(setup/session/管线 skill 全覆盖),
 # workflow 阶段用 ``wf:<name>`` 命名(见 _build_stages),故此处不再维护本地映射。
 
+#: 跨度不算「活跃」的工具:workflow 的活是子代理的;question 是停下来等用户点选,
+#: state.time 跨的是人回答的时间(wugang 09-10 的会话一夜 8 小时全算成了活跃)。
+#: 对齐 claude.py 对 AskUserQuestion 的处理。
+NO_ACTIVITY_TOOLS = {"workflow", "question"}
+
 #: ``read`` output is XML-wrapped with ``N: text`` line prefixes.  Parse those
 #: back into precise read spans (mirrors Claude's ``_spans_from_numbered_text``
 #: but for the ``N:`` delimiter instead of ``N\\t``).
@@ -1180,8 +1185,8 @@ def _build_db_agents(db, session_id, stages, cwd, model, billing, wf_index):
             name, call_id, inp, output, state = tool
             st = (state or {}).get("time") or {}
             ts = _ms_to_iso(st.get("start")) if isinstance(st.get("start"), (int, float)) else None
-            # 工具执行区间:workflow 工具自身不算(它的活是子代理),其余算活动。
-            if name.lower() != "workflow" and isinstance(st.get("start"), (int, float)) \
+            # 工具执行区间:见 NO_ACTIVITY_TOOLS,其余算活动。
+            if name.lower() not in NO_ACTIVITY_TOOLS and isinstance(st.get("start"), (int, float)) \
                     and isinstance(st.get("end"), (int, float)) and st["end"] > st["start"]:
                 child_act.append((float(st["start"]), float(st["end"])))
             tools.append(_build_tool_entry(i, 0, ts, name, inp, call_id, output, state, cwd))
@@ -1481,8 +1486,8 @@ def _parse(data, storage_root=None, source_file=None):
                 len(tools), m["_idx"], ts, name, inp, call_id, output, state, cwd)
             if entry["name"] == "Workflow":
                 workflow_calls.append((entry, output))
-            else:
-                # 工具执行区间:workflow 工具自身不算(它的活是子代理),其余工具算活动。
+            elif name.lower() not in NO_ACTIVITY_TOOLS:
+                # 工具执行区间:见 NO_ACTIVITY_TOOLS,其余工具算活动。
                 st = (state or {}).get("time") or {}
                 if isinstance(st.get("start"), (int, float)) \
                         and isinstance(st.get("end"), (int, float)) and st["end"] > st["start"]:
