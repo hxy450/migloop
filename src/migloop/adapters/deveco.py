@@ -374,6 +374,13 @@ def _build_tool_entry(seq, idx, ts, name, inp, call_id, output, state, cwd):
         _attach_bash(entry, inp, output, cwd)
     elif display == "Skill" and isinstance(inp, dict):
         entry["skill"] = inp.get("name") or inp.get("skill")
+    elif display == "task" and isinstance(inp, dict):
+        # 具名子代理派发:metadata.sessionId 就是子会话 id,用来把 task 调用和子会话对上
+        meta = state.get("metadata") if isinstance(state.get("metadata"), dict) else {}
+        entry["agent_type"] = inp.get("subagent_type") or ""
+        entry["agent_desc"] = (inp.get("description") or "")[:240]
+        entry["child_session"] = meta.get("sessionId") or ""
+        entry["_interrupted"] = bool(meta.get("interrupted")) or state.get("status") == "error"
     elif display == "Workflow" and isinstance(inp, dict):
         # 对应 Claude 的 Agent/Task 与 Codex 的 spawn_agent:派发工具携带 agent_type/
         # agent_desc,供 tooltip 显示「Workflow → <类型>」。DevEco 的 workflow 工具即
@@ -1025,6 +1032,28 @@ def _load_child_sessions(db, session_id):
     return rows
 
 
+def _child_end_ms(db, child_id):
+    """子会话真正的结束时刻 = 自己消息 completed/created 与 part 行的最大时间。
+
+    不能用 session.time_updated:wugang 的库里 93 个会话有 82 个的 time_updated 是同一秒
+    (整库被批量 touch),63 个子代理全被算成跑了 3.7 天,甘特条拖到底、阶段墙钟也跟着撑大。"""
+    cur = db.cursor()
+    best = None
+    try:
+        for sql in (
+            "SELECT MAX(json_extract(data,'$.time.completed')), MAX(json_extract(data,'$.time.created')) "
+            "FROM message WHERE session_id=?",
+            "SELECT MAX(time_updated), MAX(time_created) FROM part WHERE session_id=?",
+        ):
+            for v in cur.execute(sql, (child_id,)).fetchone() or ():
+                n = _to_num(v)
+                if n is not None and (best is None or n > best):
+                    best = n
+    except sqlite3.Error:
+        return None
+    return best
+
+
 def _load_child_parts(db, child_id):
     cur = db.cursor()
     try:
@@ -1096,13 +1125,23 @@ def _stage_of_time(stages, ts):
 
 
 _TITLE_RE = re.compile(r"^\[([^\]]+)\]\s*(.+)$")
+_TASK_TITLE_RE = re.compile(r"^(.*?)\s*\(@([^)\s]+) subagent\)\s*$")
 
 
 def _parse_title(title):
-    """拆子会话 title(如 '[Implement (2 units)] B01实体模型')为 (工作流类型, 单元 label)。"""
-    m = _TITLE_RE.match((title or "").strip())
+    """拆子会话 title 为 (类型, label)。
+
+    两种派发形态:workflow 的 '[Implement (2 units)] B01实体模型' → ('implement', 'B01实体模型');
+    task 的 'Convert page 0001 MainPage (@a2h-activity-converter subagent)' →
+    ('a2h-activity-converter', 'Convert page 0001 MainPage')。类型是页面上分色/分组的键,
+    原来 task 派发的一律落成 "workflow",63 个子代理一个颜色。"""
+    title = (title or "").strip()
+    mt = _TASK_TITLE_RE.match(title)
+    if mt:
+        return mt.group(2), mt.group(1).strip()
+    m = _TITLE_RE.match(title)
     if not m:
-        return "workflow", (title or "").strip()
+        return "workflow", title
     head = m.group(1).lower()
     label = m.group(2).strip()
     if head.startswith("explore"):
@@ -1161,10 +1200,11 @@ def _workflow_result_index(workflow_calls):
     return index
 
 
-def _build_db_agents(db, session_id, stages, cwd, model, billing, wf_index):
+def _build_db_agents(db, session_id, stages, cwd, model, billing, wf_index, task_index=None):
     children = _load_child_sessions(db, session_id)
     if not children:
         return [], []
+    task_index = task_index or {}
     agents = []
     sub_act = []  # 子代理活动区间 [(stage_id, start_ms, end_ms)]
     for ch in children:
@@ -1192,7 +1232,8 @@ def _build_db_agents(db, session_id, stages, cwd, model, billing, wf_index):
             tools.append(_build_tool_entry(i, 0, ts, name, inp, call_id, output, state, cwd))
         tk = ch["tokens"]
         created = _ms_to_iso(ch["created"])
-        updated = _ms_to_iso(ch["updated"])
+        end_num = _child_end_ms(db, ch["id"])
+        updated = _ms_to_iso(end_num if end_num is not None else ch["updated"])
         stage = _stage_of_time(stages, created)
         for s0, s1 in child_act:
             sub_act.append((stage["id"], s0, s1))
@@ -1215,7 +1256,10 @@ def _build_db_agents(db, session_id, stages, cwd, model, billing, wf_index):
                 skill_calls.append({"skill": sk, "ts": t.get("ts"),
                                     "ok": t.get("ok"), "dur_ms": t.get("dur_ms")})
         wtype, label = _parse_title(ch["title"])
+        if wtype == "workflow" and ch.get("agent") and ch["agent"] not in ("build", "plan", "general"):
+            wtype = ch["agent"]
         info = wf_index.get(label) if wf_index else None
+        task_call = task_index.get(ch["id"])
         # 最终产出:优先取子代理 transcript 的末条 text(排除 workflow 注入的 prompt,
         # 以 "Workflow phase:" 开头),退回 workflow 结果 JSON 的 summary(导出里常被截断)。
         _texts = [(p.get("text") or "").strip() for p in child_parts
@@ -1226,19 +1270,19 @@ def _build_db_agents(db, session_id, stages, cwd, model, billing, wf_index):
         entry = {
             "agent_id": "subagent:" + ch["id"],
             "type": wtype,
-            "desc": ch["title"][:240],
+            "desc": (label if _TASK_TITLE_RE.match(ch["title"].strip()) else ch["title"])[:240],
             "wf_run": (info or {}).get("run_name"),
             "wf_name": (info or {}).get("name"),
             "wf_phase": None,
-            "tuid": None,
+            "tuid": (task_call or {}).get("tuid"),
             "stage": stage["stage"], "seg": stage["id"],
             "start_ts": created, "end_ts": updated,
             "dur_ms": common.ms_between(created, updated),
             "output_tokens": tk["output"] + reasoning,
             "tool_uses": len(tools),
             "tool_counts": dict(Counter(t["name"] for t in tools)),
-            "status": "completed",
-            "aborted": None,
+            "status": "aborted" if (task_call or {}).get("_interrupted") else "completed",
+            "aborted": "interrupted" if (task_call or {}).get("_interrupted") else None,
             "model": ch.get("model") or model,
             "result": result[:300],
             "skills": skills, "skill_calls": skill_calls,
@@ -1420,6 +1464,8 @@ def _parse(data, storage_root=None, source_file=None):
     text_chars = tool_chars = reasoning_tokens = main_out = 0
     first_num = last_num = None
     main_act = []  # 主代理活动区间 [(消息 idx, start_ms, end_ms)]
+    task_act = []  # 主线 task 工具的跨度 = 等子代理;只在没有子会话数据时才当活跃(见下)
+    task_index = {}  # 子会话 id -> task 工具条目
 
     for m in messages:
         mi = m.get("info") or {}
@@ -1446,6 +1492,11 @@ def _parse(data, storage_root=None, source_file=None):
             # 摘要(summary 被填了 title/body),据此对齐 Claude 的 typed 语义。
             summary = mi.get("summary")
             if isinstance(summary, dict) and (summary.get("title") or summary.get("body")):
+                continue
+            # DevEco 把子代理完成通知(<task id=… state="completed">)以 user 角色注入,
+            # part 带 synthetic=True;wugang 0905 的会话 50 条 user 里 46 条是它,不是人输入。
+            texts = [p for p in parts if p.get("type") == "text"]
+            if texts and all(p.get("synthetic") for p in texts):
                 continue
             txt = _user_prompt(parts)
             if txt.strip():
@@ -1487,11 +1538,15 @@ def _parse(data, storage_root=None, source_file=None):
             if entry["name"] == "Workflow":
                 workflow_calls.append((entry, output))
             elif name.lower() not in NO_ACTIVITY_TOOLS:
-                # 工具执行区间:见 NO_ACTIVITY_TOOLS,其余工具算活动。
+                # 工具执行区间:见 NO_ACTIVITY_TOOLS,其余工具算活动。task 的跨度是等子代理
+                # (0905 的会话里 796 分钟,比主线自己的 reasoning 多 30 倍),单独收。
                 st = (state or {}).get("time") or {}
                 if isinstance(st.get("start"), (int, float)) \
                         and isinstance(st.get("end"), (int, float)) and st["end"] > st["start"]:
-                    main_act.append((m["_idx"], float(st["start"]), float(st["end"])))
+                    iv = (m["_idx"], float(st["start"]), float(st["end"]))
+                    (task_act if name.lower() == "task" else main_act).append(iv)
+            if entry.get("child_session"):
+                task_index[entry["child_session"]] = entry
             tools.append(entry)
 
     # ---- stages ----
@@ -1541,12 +1596,15 @@ def _parse(data, storage_root=None, source_file=None):
         db = _open_db(db_path)
         if db is not None:
             try:
-                agents, sub_act = _build_db_agents(db, session_id, stages, cwd, model, billing, wf_index)
+                agents, sub_act = _build_db_agents(db, session_id, stages, cwd, model, billing, wf_index,
+                                                   task_index)
             except Exception:
                 agents, sub_act = [], []
             finally:
                 db.close()
     if not agents:
+        # 没有子会话数据(JSON 导出 / 无库):子代理干活的时间只有 task 跨度能代表,退回计入
+        main_act.extend(task_act)
         agents = _build_workflow_agents(workflow_calls, model)
         # 无 DB 兜底:子代理只有 workflow 结果里的 ts/dur,用它粗估活动区间。
         for a in agents:
@@ -1708,6 +1766,7 @@ def _parse(data, storage_root=None, source_file=None):
     # strip lineage-only temp fields
     for t in tools:
         t.pop("_inp", None)
+        t.pop("_interrupted", None)
         t.pop("_visible_source_lines", None)
         t.pop("_probed_paths", None)
     for a in agents:
