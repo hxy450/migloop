@@ -251,12 +251,7 @@ def gates(source_path, candidate_path, candidate_sha, registry_path, contracts_p
     candidate, code = candidate_check(candidate_path, candidate_sha)
     registry, contracts = read(registry_path), read(contracts_path)
     source_sha = sha(source_path)
-    if (registry.get("schema") != "migloop-transfer-registry-validation/1"
-            or registry.get("source_manifest_sha256") != source_sha or registry.get("code_digest") != code["content_digest"]
-            or registry.get("passed") is not True or registry.get("runtime_stable") is not True
-            or registry.get("runtime_before") != registry.get("runtime_after")
-            or (registry.get("runtime_before") or {}).get("entries") != code["entries"]):
-        raise ValueError("Complete registry validation must pass for this candidate")
+    _validate_registry(source, cases, code, registry, source_sha, [c["id"] for c in source["cohorts"]])
     if (contracts.get("schema") != "migloop-transfer-contract-freeze/1" or contracts.get("status") != "frozen"
             or contracts.get("source_manifest_sha256") != source_sha or contracts.get("candidate_manifest_sha256") != candidate_sha
             or stamp(contracts["frozen_at"]) < stamp(candidate["frozen_at"])):
@@ -265,16 +260,7 @@ def gates(source_path, candidate_path, candidate_sha, registry_path, contracts_p
     if [c["id"] for c in registry["cohorts"]] != wanted or [c["id"] for c in contracts["cohorts"]] != wanted:
         raise ValueError("Registry/contract cohorts differ from full declared queue")
     private = []
-    for src, reg, core in zip(source["cohorts"], registry["cohorts"], contracts["cohorts"]):
-        if reg.get("passed") is not True or reg.get("missing") != [] or reg.get("unexpected") != [] or type(reg.get("registered_count")) is not int or reg["registered_count"] != src["file_count"]:
-            raise ValueError("Incomplete source registry")
-        # prepare_transfer_sources records canonical pool-relative POSIX paths.
-        expected = {row["path"] for row in src["files"]}
-        registered = reg.get("registered", [])
-        if len(registered) != len(expected) or {relative(p) for p in registered} != expected:
-            raise ValueError("Registered source paths differ despite counts")
-        if sum(p.endswith(".jsonl") for p in registered) != src["jsonl_count"]:
-            raise ValueError("Registered JSONL subset changed")
+    for src, core in zip(source["cohorts"], contracts["cohorts"]):
         if core.get("task_ids") != [t["id"] for t in src["tasks"]] or core.get("boundary_gap_reviewed") is not True:
             raise ValueError("Full ordered task contract and inter-anchor review required")
         if {a["role"] for a in core["artifacts"]} != {"reference", "core"}:
@@ -287,6 +273,27 @@ def gates(source_path, candidate_path, candidate_sha, registry_path, contracts_p
             check_entry(item)  # bytes only: deliberately never read private JSON
             private.append(item)
     return source, cases, candidate, code, private
+
+
+def _validate_registry(source, cases, code, registry, source_sha, cohort_ids):
+    if (registry.get("schema") != "migloop-transfer-registry-validation/1"
+            or registry.get("source_manifest_sha256") != source_sha or registry.get("code_digest") != code["content_digest"]
+            or registry.get("passed") is not True or registry.get("runtime_stable") is not True
+            or registry.get("runtime_before") != registry.get("runtime_after")
+            or (registry.get("runtime_before") or {}).get("entries") != code["entries"]
+            or [c.get("id") for c in registry.get("cohorts", [])] != cohort_ids):
+        raise ValueError("Complete registry validation must pass for this candidate")
+    if len(registry["cohorts"]) != len(source["cohorts"]):
+        raise ValueError("Complete registry cohort count differs")
+    for src, reg in zip(source["cohorts"], registry["cohorts"]):
+        expected = {row["path"] for row in src["files"]}
+        registered = reg.get("registered", [])
+        if (reg.get("passed") is not True or reg.get("missing") != [] or reg.get("unexpected") != []
+                or type(reg.get("registered_count")) is not int or reg["registered_count"] != src["file_count"]
+                or len(registered) != len(set(registered)) or len(registered) != len(expected)
+                or {relative(p) for p in registered} != expected
+                or sum(p.endswith(".jsonl") for p in registered) != src["jsonl_count"]):
+            raise ValueError("Incomplete source registry; counts or paths differ")
 
 
 def common_prompt(case):
@@ -388,6 +395,114 @@ def prepare(out, source_manifest, candidate_path, candidate_sha, registry, contr
     return {"out": str(out), "cases": len(cases), "manifest_sha256": sha(out / "manifest.json"), "model_calls": 0}
 
 
+def _unlinked(path):
+    value = Path(path).absolute()
+    if any(p.is_symlink() or getattr(p, "is_junction", lambda: False)() for p in (value, *value.parents)):
+        raise ValueError("Linked development path is not an immutable input/output")
+    return value.resolve()
+
+
+def _development_parent(parent, expected_sha=None):
+    parent = _unlinked(parent)
+    manifest_path, runner_path = parent / "manifest.json", parent / "run_transfer.py"
+    for path in (manifest_path, runner_path, parent / "READY.json"):
+        _unlinked(path)
+    digest = sha(manifest_path)
+    manifest, ready = read(manifest_path), read(parent / "READY.json")
+    if (expected_sha is not None and expected_sha != digest
+            or manifest.get("schema") != SCHEMA or manifest.get("status") != "frozen_ready"
+            or ready.get("manifest_sha256") != digest or ready.get("model_calls") != 0
+            or "development_parent" in manifest):
+        raise ValueError("Invalid frozen development parent/READY; chains are not supported")
+    runner_sha = sha(runner_path)
+    if (runner_sha != manifest.get("runner_origin", {}).get("sha256")
+            or len([row for row in manifest["artifacts"]
+                    if row["path"] == "run_transfer.py" and row["sha256"] == runner_sha]) != 1):
+        raise ValueError("Parent runner hash/artifact mismatch")
+    if load(runner_path, "development_parent_runner").verify(parent) != manifest or sha(manifest_path) != digest:
+        raise ValueError("Parent verification mismatch/drift")
+    return manifest
+
+
+def prepare_development(out, parent, candidate_path, candidate_sha, registry):
+    """Prepare a tools-only development package reusing a frozen pair's evidence.
+
+    The parent is verified by its own frozen runner.  Its source, private artifact
+    and approval bytes remain external and unchanged; only the candidate/registry
+    and newly-created public package are allowed to differ.
+    """
+    out, parent, candidate_path, registry = map(_unlinked, (out, parent, candidate_path, registry))
+    if out.exists() or any(inside(out, p) or inside(p, out)
+                           for p in (parent, candidate_path, registry)):
+        raise ValueError("Development output must be new and separate")
+    parent_manifest = _development_parent(parent)
+    source_ref = parent_manifest["inputs"]["source_manifest"]
+    contracts_ref = parent_manifest["inputs"]["contracts"]
+    source_path, contracts_path = Path(source_ref["path"]), Path(contracts_ref["path"])
+    if entry(source_path) != source_ref or entry(contracts_path) != contracts_ref:
+        raise ValueError("Parent source/private reference drift")
+    candidate, code = candidate_check(candidate_path, candidate_sha)
+    old_candidate = parent_manifest["inputs"]["candidate_manifest"]
+    if candidate.get("transfer_runner", {}).get("sha256", LOADED_SHA) != LOADED_SHA:
+        raise ValueError("Use the transfer runner frozen with this candidate")
+    if (candidate_path / "manifest.json").resolve() == Path(old_candidate["path"]).resolve() or entry(candidate_path / "manifest.json") == old_candidate:
+        raise ValueError("Development candidate must be new")
+    source, cases = source_cases(source_path)
+    parent_cases = [{k: v for k, v in c.items() if k not in ("prompts", "configs")} for c in parent_manifest["cases"]]
+    if cases != parent_cases:
+        raise ValueError("Development source/task mismatch")
+    registry_data = read(registry)
+    source_sha = sha(source_path)
+    _validate_registry(source, cases, code, registry_data, source_sha, parent_manifest["cohorts"])
+    if any(inside(out, Path(c["pool"])) or inside(Path(c["pool"]), out) for c in cases):
+        raise ValueError("Development output overlaps source pool")
+    paths = helper_sources(candidate)
+    for path, _, digest in paths:
+        if sha(path) != digest:
+            raise ValueError("Frozen helper mismatch: " + str(path))
+    out.mkdir(parents=True)
+    shutil.copytree(candidate_path / "code", out / "code")
+    shutil.copyfile(SELF, out / "run_transfer.py")
+    for path, name, _ in paths:
+        target = out / "helpers" / name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(path, target)
+    _, base, raw = helpers(out)
+    config = read(parent / "settings/raw.json")
+    save(out / "settings/raw.json", config)
+    parent_cases_by_id = {c["id"]: c for c in parent_manifest["cases"]}
+    for case in cases:
+        case["prompts"], case["configs"] = {}, {}
+        parent_prompt = relative(parent_cases_by_id[case["id"]]["prompts"]["tools"])
+        p = parent_prompt
+        (out / p).parent.mkdir(parents=True, exist_ok=True)
+        (out / p).write_bytes((parent / p).read_bytes())
+        case["prompts"]["tools"] = p
+        setting = f"settings/{case['id']}.json"
+        save(out / setting, base.settings(config, out / "code", candidate["python"],
+            {"pool": case["pool"], "anchor": case["sid"], "roots": case["roots"]}))
+        case["configs"] = {"tools": setting}
+    executable = Path(raw.command(cases[0]["pool"], config)[0])
+    metadata = {"source_manifest": entry(source_path), "candidate_manifest": entry(candidate_path / "manifest.json"),
+                "registry": entry(registry), "contracts": contracts_ref}
+    manifest = {"schema": SCHEMA, "status": "frozen_ready", "frozen_at": now(), **FIXED,
+        "automatic_retry": False, "format_repair": False, "candidate": str(candidate_path),
+        "inputs": metadata, "private_artifacts": parent_manifest["private_artifacts"],
+        "code_digest": code["content_digest"], "code_entries": code["entries"],
+        "cases": cases, "cohorts": parent_manifest["cohorts"], "python": candidate["python"],
+        "executables": [entry(candidate["python"]), entry(executable)],
+        "helper_origins": [entry(p) for p, _, _ in paths], "runner_origin": entry(SELF),
+        "verifier_template_sha256": hashlib.sha256(base.POSTPROCESS.encode()).hexdigest(),
+        "artifacts": inventory(out), "cost_scope": "input+output; development tools-only",
+        "development_parent": {"path": str(parent), "manifest_sha256": sha(parent / "manifest.json"),
+            "source_manifest_sha256": source_sha, "contracts_manifest_sha256": contracts_ref["sha256"],
+            "raw_reused": True, "exposure": "development_exposed"}}
+    save(out / "manifest.json", manifest)
+    save(out / "READY.json", {"manifest_sha256": sha(out / "manifest.json"), "model_calls": 0})
+    verify(out)
+    return {"out": str(out), "cases": len(cases), "manifest_sha256": sha(out / "manifest.json"), "model_calls": 0}
+
+
 def verify(out):
     out = Path(out).resolve()
     manifest = read(out / "manifest.json")
@@ -402,8 +517,43 @@ def verify(out):
     for folder in ("code", "helpers", "settings", "tasks"):
         rows = [{**item, "path": item["path"][len(folder) + 1:]} for item in manifest["artifacts"] if item["path"].startswith(folder + "/")]
         check_tree(out / folder, rows)
-    source, cases, candidate, code, private = gates(manifest["inputs"]["source_manifest"]["path"], manifest["candidate"],
-        manifest["inputs"]["candidate_manifest"]["sha256"], manifest["inputs"]["registry"]["path"], manifest["inputs"]["contracts"]["path"])
+    if "development_parent" in manifest:
+        parent = Path(manifest["development_parent"]["path"])
+        parent_manifest = _development_parent(parent, manifest["development_parent"]["manifest_sha256"])
+        source_ref = manifest["inputs"]["source_manifest"]
+        contracts_ref = manifest["inputs"]["contracts"]
+        if source_ref != parent_manifest["inputs"]["source_manifest"] or contracts_ref != parent_manifest["inputs"]["contracts"]:
+            raise ValueError("Development source/private references changed")
+        source, cases = source_cases(source_ref["path"])
+        candidate, code = candidate_check(manifest["candidate"], manifest["inputs"]["candidate_manifest"]["sha256"])
+        registry = read(manifest["inputs"]["registry"]["path"])
+        _validate_registry(source, cases, code, registry, sha(Path(source_ref["path"])), parent_manifest["cohorts"])
+        if (sha(Path(source_ref["path"])) != manifest["development_parent"]["source_manifest_sha256"]
+                or sha(Path(contracts_ref["path"])) != manifest["development_parent"]["contracts_manifest_sha256"]
+                or registry.get("code_digest") != code["content_digest"]
+                or registry.get("passed") is not True):
+            raise ValueError("Development external binding drift")
+        private = parent_manifest["private_artifacts"]
+        if manifest["private_artifacts"] != private:
+            raise ValueError("Development private references changed")
+        if (manifest["development_parent"].get("raw_reused") is not True
+                or manifest["development_parent"].get("exposure") != "development_exposed"
+                or manifest.get("cost_scope") != "input+output; development tools-only"):
+            raise ValueError("Invalid development exposure marker")
+        if cases != [{k: v for k, v in c.items() if k not in ("prompts", "configs")} for c in manifest["cases"]]:
+            raise ValueError("Development source/task mismatch")
+        if manifest["cohorts"] != parent_manifest["cohorts"]:
+            raise ValueError("Development cohort order changed")
+        parent_cases = {row["id"]: row for row in parent_manifest["cases"]}
+        for case in manifest["cases"]:
+            if set(case["configs"]) != {"tools"} or set(case["prompts"]) != {"tools"}:
+                raise ValueError("Development packages are tools-only")
+            original_prompt = parent / relative(parent_cases[case["id"]]["prompts"]["tools"])
+            if sha(out / relative(case["prompts"]["tools"])) != sha(original_prompt):
+                raise ValueError("Development public question differs from parent")
+    else:
+        source, cases, candidate, code, private = gates(manifest["inputs"]["source_manifest"]["path"], manifest["candidate"],
+            manifest["inputs"]["candidate_manifest"]["sha256"], manifest["inputs"]["registry"]["path"], manifest["inputs"]["contracts"]["path"])
     if cases != [{k: v for k, v in c.items() if k not in ("prompts", "configs")} for c in manifest["cases"]] or code["content_digest"] != manifest["code_digest"] or private != manifest["private_artifacts"]:
         raise ValueError("Frozen source/task/contract mismatch")
     return manifest
@@ -519,6 +669,8 @@ def run_queue(out, arm):
     if arm not in ("raw", "tools"):
         raise ValueError("Unknown arm")
     manifest = verify(out)
+    if manifest.get("development_parent") and arm != "tools":
+        raise ValueError("Development package reuses the original raw baseline; only tools may run")
     require_smoke(out, manifest)
     # One whole arm lock also prevents raw/tools overlap and denominator changes.
     if (out / arm).exists() or (out / "ACTIVE.json").exists():
@@ -595,10 +747,10 @@ def smoke_model(out):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("mode", choices=("freeze-candidate", "prepare", "verify", "smoke-offline", "smoke-model", "run"))
+    parser.add_argument("mode", choices=("freeze-candidate", "prepare", "prepare-development", "verify", "smoke-offline", "smoke-model", "run"))
     parser.add_argument("--out", required=True, type=Path)
     parser.add_argument("--arm", choices=("raw", "tools"))
-    for name in ("source-manifest", "candidate", "registry", "contracts", "runtime-source"):
+    for name in ("source-manifest", "candidate", "registry", "contracts", "runtime-source", "parent"):
         parser.add_argument("--" + name, type=Path)
     parser.add_argument("--candidate-sha256")
     args = parser.parse_args()
@@ -610,6 +762,10 @@ def main():
         if not all((args.source_manifest, args.candidate, args.candidate_sha256, args.registry, args.contracts)):
             parser.error("prepare requires all explicit freeze inputs")
         result = prepare(args.out, args.source_manifest, args.candidate, args.candidate_sha256, args.registry, args.contracts)
+    elif args.mode == "prepare-development":
+        if not all((args.parent, args.candidate, args.candidate_sha256, args.registry)):
+            parser.error("prepare-development requires parent, candidate, candidate-sha256 and registry")
+        result = prepare_development(args.out, args.parent, args.candidate, args.candidate_sha256, args.registry)
     elif args.mode == "run":
         if not args.arm:
             parser.error("run requires --arm")

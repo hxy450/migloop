@@ -618,7 +618,7 @@
       }
       function openRecord(row, target, scope, undated) {
         if (!scope || !scope.at) { target.textContent = "未返回明确时间范围，不能自动改用 latest 展开。"; return; }
-        independentlyQuery([argumentRequest("record", {ref: row.ref, offset: 0, max_chars: 12000,
+        independentlyQuery([argumentRequest("record", {ref: row.ref, offset: 0, max_chars: null,
           include_undated: !!undated}, scope)], target);
       }
       function load(offset, includeUndated) {
@@ -1575,6 +1575,8 @@
       }
       renderTimeAtomNavigation(box, "原始记录全集（另查，不受总览分区省略影响）", data.raw_index, scope);
       renderTimeAtomNavigation(box, "历史正文入口（不代表当前状态）", data.body_sources, scope);
+      renderTimeAtomNavigation(box, "窗口起点及之前的原文入口（独立范围；不是当前快照）",
+        data.body_sources && data.body_sources.before_window, null);
       timeAtomQueryButton(box, "独立查看原生事件索引", data.events_query, scope);
       host.appendChild(box); return true;
     }
@@ -1643,7 +1645,7 @@
           if (undated) row.appendChild(el("div", "pnote argument-undated-note", "原文可定位，但时间和节点输入归属未获认证；以下全池查阅不补成模型访问或历史关系。"));
           button.onclick = function () {
             button.disabled = true;
-            var args = {ref: openRef, offset: 0, max_chars: 12000};
+            var args = {ref: openRef, offset: 0, max_chars: null};
             if (undated) args.include_undated = true;
             independentlyQuery([argumentRequest("record", args, inspectScope)], target);
           };

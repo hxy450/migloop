@@ -110,6 +110,10 @@ def _record_prefix(record: dict, count: int) -> dict:
     end = record["offset"] + count
     out.update(next_offset=end if end < record["chars"] else None,
                delivered_chars=count, budget_truncated=count < len(record["text"]))
+    if "complete" in out:
+        out["complete"] = record["offset"] == 0 and end == record["chars"]
+    if "returned_chars" in out:
+        out["returned_chars"] = count
     return out
 
 
@@ -139,6 +143,21 @@ def _max_prefix(text: str, make, budget: int) -> dict | None:
     return best
 
 
+def _body_navigations(data: dict) -> list[dict]:
+    """Known locator pages only; an earlier page retains its independent scope.
+
+    Never recursively treat arbitrary historical JSON as a navigation protocol.
+    Both pages contain locators, not delivered original bodies.
+    """
+    main = data.get("body_sources")
+    if not isinstance(main, dict):
+        return []
+    return [page for page in (main, main.get("before_window"))
+            if isinstance(page, dict) and isinstance(page.get("entries"), list)
+            and isinstance(page.get("query"), dict) and _integer(page.get("total"))
+            and page["total"] >= len(page["entries"])]
+
+
 def _page_fit(data: dict, budget: int) -> dict | None:
     original_pages = _pages(data)
     output = deepcopy(data)
@@ -148,8 +167,9 @@ def _page_fit(data: dict, budget: int) -> dict | None:
     # Raw-record views prioritize their selected evidence prefix. Atom views
     # instead prioritize historical body navigation over unrelated raw mentions.
     # Neither kind of locator certifies that its target body was delivered.
-    navigation = output.get("body_sources")
-    if isinstance(navigation, dict) and isinstance(navigation.get("entries"), list) and isinstance(navigation.get("query"), dict):
+    # Fold the optional earlier-window locators before current-window locators.
+    # Counts and the earlier page's own executable scope remain visible.
+    for navigation in reversed(_body_navigations(output)):
         if data.get("schema") != "migloop-time-atom/1":
             navigation.update(entries=[], remaining=navigation["total"], budget_folded=True)
         else:
@@ -285,10 +305,10 @@ def _continuations(original: dict, delivered: dict | None) -> list[dict]:
                 if row.get("preview_budget_truncated"):
                     result.append({"kind": "raw_requery", "ref": row.get("ref"), "offset": 0,
                                    "scope": deepcopy(scope), "note": "preview position is not a raw text offset"})
-        navigation = delivered.get("body_sources") if delivered else None
-        if isinstance(navigation, dict) and navigation.get("budget_folded"):
-            result.append({"kind": "body_navigation", "next_query": deepcopy(navigation["query"]),
-                           "remaining": navigation["remaining"], "note": "仅导航未交付；没有认证正文已读"})
+        for navigation in _body_navigations(delivered or {}):
+            if navigation.get("budget_folded"):
+                result.append({"kind": "body_navigation", "next_query": deepcopy(navigation["query"]),
+                               "remaining": navigation["remaining"], "note": "仅导航未交付；没有认证正文已读"})
         return result
     if schema in RECORD_SCHEMAS and _record_safe(original):
         row = delivered or original

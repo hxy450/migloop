@@ -30,12 +30,12 @@ _DEFAULTS: dict[str, dict[str, Any]] = {
     "action": {"id": None, "seq": None, "ref": None, "max_chars": 20000, "offset": 0, "find": "", "part": None,
                "m_n": 0, "m_from": 1},
     "check": {"draft": None, "file": None},
-    "record": {"ref": None, "at": "latest", "offset": 0, "max_chars": 20000, "include_undated": False},
+    "record": {"ref": None, "at": "latest", "offset": 0, "max_chars": None, "include_undated": False},
 }
 for _tool in ("file", "agent", "search", "diff", "blame"):
     _DEFAULTS[_tool].update(at=None, offset=0, limit=40, include_undated=False)
     _DEFAULTS[_tool].setdefault("since_ts", None)
-_DEFAULTS["diff"]["max_chars"] = 6000
+_DEFAULTS["diff"]["max_chars"] = None
 for _tool in ("diff", "blame"):
     _DEFAULTS[_tool].update(window_offset=0, window_limit=4)
 for _tool in ("file", "agent", "search", "diff", "blame"):
@@ -422,7 +422,7 @@ def temporal_data_core(ledger: atoms.Ledger, tool: str, args: dict[str, Any]) ->
         from . import temporal_state
         return temporal_state.query(ledger, tool, args["path"], args["at"], since_ts=args["since_ts"],
             start=args.get("start"), n=args.get("n"), offset=args["offset"], limit=args["limit"],
-            max_chars=args.get("max_chars", 6000), window_offset=args.get("window_offset", 0),
+            max_chars=args.get("max_chars"), window_offset=args.get("window_offset", 0),
             window_limit=args.get("window_limit", 4))
     if tool == "record":
         return temporal.record_data(ledger, **args)

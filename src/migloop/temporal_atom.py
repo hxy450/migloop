@@ -19,9 +19,8 @@ _OVERVIEW_LIMITS = {"writes": 3, "reads": 3, "candidates": 2, "messages": 2}
 # Task constraints are original input, not a generated summary. Let short
 # fields fit whole; batch delivery still applies its independent total budget.
 _MESSAGE_PREVIEW_CHARS = 4096
-# Explicit messages uses the same bounded original-field page as its expand
-# locator. Overview remains a preview; batch may further shorten either view.
-_MESSAGE_PAGE_CHARS = 12000
+# Explicit messages selects the complete original field. Overview alone is a
+# preview; an explicitly requested transport budget may shorten either view.
 
 
 def _request(kind, key, window, view, offset, limit, include_undated, details):
@@ -39,7 +38,7 @@ def _pointer(part, window):
 def _expand(parts, scope, *, include_undated=False):
     refs = [{"ref": p["ref"], "pointer": p["pointer"]} for p in parts
             if p is not None and (p["in_window"] or (include_undated and p["ts"] is None))]
-    return {"tool": "expand", "args": {"refs": refs, "max_chars": 12000,
+    return {"tool": "expand", "args": {"refs": refs,
             "include_undated": include_undated}, "scope": deepcopy(scope)} if refs else None
 
 
@@ -209,7 +208,7 @@ def _messages(ledger, key, window, scope, *, explicit=False):
                     continue  # Undated text is raw material, never cutoff input.
                 for pointer, text, label in _text_fields(record):
                     addressable = counts[store.source_key(path, store.source_spec(ledger, path))] == 1
-                    excerpt = text[:_MESSAGE_PAGE_CHARS if explicit else _MESSAGE_PREVIEW_CHARS]
+                    excerpt = text if explicit else text[:_MESSAGE_PREVIEW_CHARS]
                     rows.append({**record.address(), "pointer": pointer, "message_kind": label,
                                  "preview": excerpt, "preview_start": 0, "chars": len(text),
                                  "preview_kind": "original_decoded_field_excerpt",
@@ -217,7 +216,7 @@ def _messages(ledger, key, window, scope, *, explicit=False):
                                  "source_agent": key, "sender_certified": False,
                                  "reference_status": "addressable" if addressable else "ambiguous_source",
                                  "expand_query": {"tool": "expand", "args": {"refs": [{"ref": record.ref,
-                                     "pointer": pointer}], "max_chars": _MESSAGE_PAGE_CHARS}, "scope": deepcopy(scope)} if addressable else None})
+                                     "pointer": pointer}]}, "scope": deepcopy(scope)} if addressable else None})
         except (OSError, UnicodeError, ValueError) as exc:
             gaps.append({"source": path, "error": str(exc)})
     rows.sort(key=lambda r: (r["ts"], r["source"], r["line"], r["pointer"]))

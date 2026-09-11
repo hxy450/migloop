@@ -9,14 +9,18 @@ CORE = """\
 返回可能是无损compact JSON（schema=migloop-batch-wire/1）：子项在batch.items，ledger仍在顶层；omitted只省重复封装，不是省掉证据，也没有需你解析的别名。
 - file args={path,at,since_ts?,view?,offset?,limit?}；agent用id代path。at为含时区ISO或latest；latest返回时固定成实际已知截止。
   默认overview先给已索引读写、候选与原生正文入口；agent同时给有时间的任务/消息。每组独立计数和续读，不是原始记录前缀。
-  原始任务字段最多展示4096字符，短字段可完整交付；仍受批量预算约束，chars是原长，preview_span才是实际片段，不把定位当全文。
-  view=writes/reads/candidates（agent另有messages）分页该组；view=records分页完整原始记录层。视图是导航，不改变search的完整范围。
+  overview的任务预览最多4096字符；显式view=messages返回选中消息的完整原始字段。chars是原长，preview_span是实际片段。
+  view=writes/reads/candidates分页操作索引；它们仍是导航，原文用expand。view=records分页全部原始记录的索引。视图不改变search范围。
 - search args={q,at,file?或agent?,since_ts?,offset?,limit?}；全池省略file/agent。q_any=[词1,词2]是字面量OR，与q互斥，不是正则。
   全池还保留已登记的workflow/journal、工具输出与脚本等附件原文，不将附件伪装成agent转录。include_undated=true可检索未知时间资料；附件内的timestamp不是它进入上下文的证据。
 - changes args={path,at,since_ts}列已确认操作/未决效应；diff同样时间范围看内容变化。写入可能无净变化，修改不必然是缺陷。
 - events同样范围，索引所有已注册源的原生调用，不依赖读写解析；普通消息/未知记录也留入口。路径提及不是作者证据。
-- 展开证据：{tool:expand,scope:照抄返回scope,args:{refs:[引用1,引用2],max_chars:12000}}。
-  接受raw:原文引用或diff给的旧#动作引用，请求/结果各自截时。offset是字符分页，不能把半页当全文。
+- 展开证据：{tool:expand,scope:照抄返回scope,args:{refs:[引用1,引用2]}}，默认完整原文，不默认12k截断。
+  record、expand与每条时间diff的max_chars省略/null为完整所选正文；正整数才要求字符页。batch的max_chars省略/null不二次裁切。
+  接受raw:原文引用或diff给的旧#动作引用，请求/结果各自截时。完整指选定记录/字段，不是自动读取整个session。
+  原文complete/returned_chars/next_offset和预算continuations表示实际交付，status=ok并不意味着全文；宿主截断也不算完整。
+  next_offset属于每条原文：用该条ref/pointer/scope及其整数offset续取，不要一直重开offset=0。
+  多条原文的续读位置可能不同，应拆成独立batch项，不能把一条的offset套给所有refs。消息列表offset与正文字符offset不同。
   大记录可用refs:[{ref:"raw:…",pointer:"/payload/output"}]仅展开字段；pointer照events给的JSON Pointer，不猜字段。
   未知时间附件需显式include_undated=true，在pool范围独立展开；不据此画读写边或认定是某agent截止前的输入。纯文本/脚本按原文展开，不猜JSON字段。
 - blame args={path,at,start?,n?}查保守文本来源；未知/候选/并发不猜作者。它不是原因判定。
@@ -28,13 +32,30 @@ agent展示已保存转录，不证明所有文字当时仍在上下文或被采
 分页/折叠仅控制交付，search查完整范围；留意next_offset、error/deferred、未分类和未知时间。零命中不证明不存在。
 原始记录层和search的关系注释默认摘要；省略计数和next_query可展开，details=true也受交付预算限制；原文无需先开完整注释。
 概览中的请求正文入口不等于当前文件内容；已索引写入不等于已证缺陷。unknown状态不表示原文没有历史Write，优先核原生正文入口。
-摘要、历史报告、实际操作回执、构建成功、特定产物行为验证分开看；别把worker报告扩大成全阶段事实。
+文件body_sources.before_window是另一个更早范围的原文入口，不是窗口起点的精确快照；query里已带它自己的scope。
+
+## 返回对象如何调用
+query/expand_query/next_query是返回字段，不是工具名；值为{tool,args,scope?}，直接放进下一次batch.requests即可，sid在batch外层。
+例如返回expand_query={tool:"expand",args:{refs:[{ref:"raw:…",pointer:"/message/content"}]},scope:{...}}，
+则调用batch(sid,requests=[这个expand_query对象])；不要调用名为expand_query的工具，不猜pointer或重写scope。
+也可单独调用expand(sid,refs=返回args.refs,scope=返回scope)。依赖上一批结果的调用等返回后再发。
+优先批量展开已选中的少量证据，避免大量无关全文挤满宿主输出；若看到宿主truncated警告，分小批/字符页续取。
+省token靠少取无关材料和减少重复，不把显式选择的证据偷偷换成摘要。
+
+## 声明不等于事实
+生成者、修复者、reviewer的解释/PASS/finding先当作待核主张，不能因其身份或语气相信它；双方可能误判或事后合理化。
+先明确它声称的可检验事实，再对照实际源码/规格及实际修改、原始读取或构建输出。修复者说“源端从不做X”，要查源端是否真的如此。
+原始派工内容能证明当时收到了什么要求，不证明实际实现或正确性；写入正文证明请求写什么，成功回执也不证明所有行为正确。
+报告说“修好了”或“没有测试”不替代相应范围的实现/测试记录；只定位声明原文，不算声明获得独立支持。
+核生成原因时，分别找相关代码何时引入、该次作者实际收到的输入、修复实际改变了什么；不要拿最后作者或后修old_string代替引入链。
+发现冲突时保留两边依据，以能直接检验的证据判断；无法判定就记录具体未知，不在两个代理声明中选更自信的那个。
 
 先自由调查，再组织论证。系统记录实际调用及交付，不需要你回忆路线；搜索跳转不构成历史读写边。
 按changes核对操作及unclassified_related余项；后者不是写入认证，但不能看完已识别操作就把余项当不存在。
 候选/未分类是工具的识别边界，不是历史上没发生。可展开原始请求和回执自行论证，不能用“工具未确认”代替调查。
 code_host_intent仅是外层脚本文字中的调用意图，outer成功不证明内部调用执行；独立原生补丁仍可由changes/diff展开，但作者和完整文件状态可能未知。
 一个原因可以关联多笔修改，同一操作也可关联多个原因；findings[].changes记录这些关系，不必再重复一张coverage表。
+收尾时核已经发现的实质修改是否各有解释、非修复理由或明确未解释项。同一操作中的独立改动不能只写一个代表项就称覆盖全部。
 修改关联用changes.id或diff.event_id；已索引原子的id与同次操作一致，但须确属目标修复范围。events.id是原生调用索引，不替代目标修改id。
 归责某个agent需核当时相关输入、实际输出和反证。池内存在正确spec不等于该agent读到；读写链存在不等于错误沿链传播。
 分清已证局部原因、待验证机制、优化建议。可以停在证据边界，不强迫归因到skill或唯一最初作者。

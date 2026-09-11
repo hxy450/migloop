@@ -143,7 +143,7 @@ def _field(value, pointer):
     return value
 
 
-def _record(ledger, ref, current, *, offset=0, max_chars=12000, include_undated=False, pointer=None):
+def _record(ledger, ref, current, *, offset=0, max_chars=None, include_undated=False, pointer=None):
     record = store.resolve(ledger, ref)
     window = temporal.Window.parse(current["at"], current["since_ts"])
     if record.ts is not None and not window.contains(record.ts):
@@ -162,12 +162,12 @@ def _record(ledger, ref, current, *, offset=0, max_chars=12000, include_undated=
     data = temporal.record_data(ledger, ref, at=current["at"], offset=offset,
                                 max_chars=max_chars, include_undated=include_undated)
     if pointer is not None:
+        from . import text_window
         if record.malformed or record.textual:
             raise ValueError("原始记录不是有效JSON；只能展开原文")
         value = _field(record.value, pointer)
         text = value if isinstance(value, str) else json.dumps(value, ensure_ascii=False, separators=(",", ":"))
-        data.update(schema="migloop-raw-field/1", pointer=pointer, text=text[offset:offset + max_chars],
-                    chars=len(text), next_offset=offset + max_chars if offset + max_chars < len(text) else None,
+        data.update(schema="migloop-raw-field/1", pointer=pointer, **text_window.page(text, offset, max_chars),
                     representation="decoded_string" if isinstance(value, str) else "json_value",
                     field_sha256=digest(text))
     return data
@@ -184,7 +184,7 @@ def _action_refs(ledger, ref):
     return [store.read_record(path, line, source=store.source_spec(ledger, path)).ref for line in sorted(wanted)]
 
 
-def expand(ledger, refs, current, *, offset=0, max_chars=12000, include_undated=False):
+def expand(ledger, refs, current, *, offset=0, max_chars=None, include_undated=False):
     if not isinstance(refs, list) or not 1 <= len(refs) <= 24:
         raise ValueError("refs必须是1–24个引用或{ref,pointer}；可以混合raw和已给出的旧动作引用")
     items = []
@@ -288,12 +288,12 @@ def _delivery(data):
 
 
 @raw_events.reuse_scans
-def batch(ledger, requests, max_chars=100000):
+def batch(ledger, requests, max_chars=None):
     from . import delivery_budget
     if not isinstance(requests, list) or not 1 <= len(requests) <= 24:
         raise ValueError("requests需要1–24项；批量不使用隐式当前节点")
-    if type(max_chars) is not int or not 1000 <= max_chars <= 400000:
-        raise ValueError("max_chars数据正文预算为1000–400000；查询/凭据封装另计")
+    if max_chars is not None and (type(max_chars) is not int or not 1000 <= max_chars <= 400000):
+        raise ValueError("max_chars省略/null不二次裁切；显式数据预算为1000–400000，封装另计")
     items, selected = [], {}
     for i, request in enumerate(requests):
         item = {"item_index": i, "tool": request.get("tool") if isinstance(request, dict) else None,
@@ -317,16 +317,18 @@ def batch(ledger, requests, max_chars=100000):
     # every later source. All receipts describe this projected body only.
     fitted, used = {}, 0
     positions = list(selected)
+    budget = sum(delivery_budget.size(data) for data in selected.values()) if max_chars is None else max_chars
     for ordinal, i in enumerate(positions):
-        result = delivery_budget.fit(selected[i], (max_chars - used) // (len(positions) - ordinal))
+        allocation = delivery_budget.size(selected[i]) if max_chars is None else (budget - used) // (len(positions) - ordinal)
+        result = delivery_budget.fit(selected[i], allocation)
         fitted[i] = result
         used += result["data_chars"]
     for i in positions:
-        if used >= max_chars:
+        if used >= budget:
             break
         old = fitted[i]
         if old["budget_adjusted"]:
-            result = delivery_budget.fit(selected[i], old["data_chars"] + max_chars - used)
+            result = delivery_budget.fit(selected[i], old["data_chars"] + budget - used)
             if result["data_chars"] >= old["data_chars"]:
                 fitted[i] = result
                 used += result["data_chars"] - old["data_chars"]
@@ -353,10 +355,11 @@ def batch(ledger, requests, max_chars=100000):
     return {"schema": SCHEMA, "ledger": atoms.ledger_identity(ledger), "delivery_summary": summary,
             "attention": attention, "items": items,
             "data_chars": used, "max_chars": max_chars, "budget_scope": "serialized_data_only",
-            "note": "逐项独立取证，不生成历史边。ok也可能部分交付：按next_offset/continuations续读；deferred/error无正文。max_chars计data，封装另计。"}
+            "note": "逐项独立取证，不生成历史边。默认不二次裁切所选正文；显式max_chars计data，封装另计。"
+                    "ok仍可能是调用者选定的字符页或显式预算下的部分交付：按next_offset/continuations续读；deferred/error无正文。"}
 
 
-def render_batch(ledger, requests, max_chars=100000):
+def render_batch(ledger, requests, max_chars=None):
     data = batch(ledger, requests, max_chars)
     return render_batch_data(data, requests, max_chars)
 
@@ -371,6 +374,10 @@ def render_batch_data(data, requests, max_chars):
     body = json.dumps(data, ensure_ascii=False, separators=(",", ":"))
     receipt = {"schema": "migloop-investigation-receipt/1", "ledger": data["ledger"],
                "request_sha256": digest({"requests": requests, "max_chars": max_chars}), "body_sha256": digest(body)}
+    # An explicit numeric budget has exactly the old request normalization.
+    # Only the new unlimited default needs the versioned omission semantics.
+    if max_chars is None:
+        receipt["argument_normalization"] = "time-query/3"
     original = body + MARKER + json.dumps(receipt, separators=(",", ":"))
     from . import batch_wire
     try:
@@ -379,6 +386,8 @@ def render_batch_data(data, requests, max_chars):
         wire_receipt = {"schema": WIRE_RECEIPT, "codec": batch_wire.SCHEMA, "ledger": data["ledger"],
                         "request_sha256": receipt["request_sha256"], "body_sha256": digest(wire_body),
                         "canonical_sha256": digest(data)}
+        if "argument_normalization" in receipt:
+            wire_receipt["argument_normalization"] = receipt["argument_normalization"]
         wire = wire_body + WIRE_MARKER + json.dumps(wire_receipt, separators=(",", ":"))
     except ValueError:
         return original  # Compression may decline; never truncate/coerce to fit it.
@@ -389,7 +398,7 @@ def render_query(ledger, tool, args):
     data = {**query(ledger, tool, args), "ledger": atoms.ledger_identity(ledger)}
     body = json.dumps(data, ensure_ascii=False, separators=(",", ":"))
     receipt = {"schema": "migloop-investigation-receipt/1", "ledger": atoms.ledger_identity(ledger),
-               "argument_normalization": "time-query/2",
+               "argument_normalization": "time-query/3",
                "tool": tool, "request_sha256": digest(_receipt_args(tool, args)), "body_sha256": digest(body)}
     return body + MARKER + json.dumps(receipt, separators=(",", ":"))
 
@@ -403,19 +412,22 @@ def batch_parameters(args):
             requests = json.loads(requests)
         except ValueError as exc:
             raise ValueError("requests必须是JSON数组") from exc
-    value = args.get("max_chars", 100000)
+    value = args.get("max_chars")
     if isinstance(value, str) and value.isdigit():
         value = int(value)
     return {"requests": requests, "max_chars": value}
 
 
-def _receipt_args(tool, supplied):
+def _receipt_args(tool, supplied, normalization="time-query/3"):
     args = {k: v for k, v in supplied.items() if k != "sid"}
     if tool == "batch":
-        return batch_parameters(args)
+        normalized = batch_parameters(args)
+        if normalization != "time-query/3" and "max_chars" not in args:
+            normalized["max_chars"] = 100000
+        return normalized
     defaults = {
         "changes": {"at": "latest", "since_ts": None, "offset": 0, "limit": 40, "related_offset": 0, "related_limit": 8},
-        "expand": {"offset": 0, "max_chars": 12000, "include_undated": False},
+        "expand": {"offset": 0, "max_chars": None if normalization == "time-query/3" else 12000, "include_undated": False},
     }
     return {**defaults.get(tool, {}), **args}
 
@@ -429,8 +441,8 @@ def parse_receipt(tool, args, text):
         return None
     try:
         receipt, data = json.loads(tail), json.loads(body)
-        normalized = _receipt_args(tool, args)
         normalization = receipt.get("argument_normalization")
+        normalized = _receipt_args(tool, args, normalization)
         if tool == "changes" and normalization is None:
             # Original receipts predate the optional remainder-page defaults.
             # Do not rewrite recorded requests or invalidate their old hashes.
@@ -438,7 +450,7 @@ def parse_receipt(tool, args, text):
                 if key not in args:
                     normalized.pop(key, None)
         valid = (receipt["schema"] == "migloop-investigation-receipt/1"
-                 and normalization in (None, "time-query/2")
+                 and normalization in (None, "time-query/2", "time-query/3")
                  and receipt["ledger"] == data["ledger"]
                  and receipt["body_sha256"] == digest(body)
                  and receipt["request_sha256"] == digest(normalized)
@@ -459,11 +471,12 @@ def _parse_wire_receipt(tool, args, text):
     try:
         receipt = json.loads(tail, object_pairs_hook=batch_wire._unique_object,
                              parse_constant=batch_wire._reject_constant)
-        if (type(receipt) is not dict or set(receipt) != {
-                "schema", "codec", "ledger", "request_sha256", "body_sha256", "canonical_sha256"}
+        required = {"schema", "codec", "ledger", "request_sha256", "body_sha256", "canonical_sha256"}
+        if (type(receipt) is not dict or set(receipt) not in (required, required | {"argument_normalization"})
                 or receipt["schema"] != WIRE_RECEIPT or receipt["codec"] != batch_wire.SCHEMA
+                or receipt.get("argument_normalization") not in (None, "time-query/3")
                 or receipt["body_sha256"] != digest(body)
-                or receipt["request_sha256"] != digest(_receipt_args(tool, args))):
+                or receipt["request_sha256"] != digest(_receipt_args(tool, args, receipt.get("argument_normalization")))):
             return None
         data = batch_wire.unpack(body, batch_parameters({k: v for k, v in args.items() if k != "sid"})["requests"])
         if receipt["ledger"] != data["ledger"] or receipt["canonical_sha256"] != digest(data):

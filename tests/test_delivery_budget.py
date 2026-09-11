@@ -64,6 +64,37 @@ def test_already_fitting_body_is_unchanged_and_independent_copy():
     assert data["rows"][0]["ref"].endswith("hash0")
 
 
+@pytest.mark.parametrize("atom", [False, True])
+def test_prior_body_navigation_folds_without_widening_the_evidence_window(atom):
+    data = view(1)
+    if atom:
+        data = {"schema": "migloop-time-atom/1", "scope": deepcopy(SCOPE),
+                "sections": {"writes": page([])}}
+    prior_scope = {"kind": "file", "key": SCOPE["key"], "at": SCOPE["since_ts"], "since_ts": None}
+    query = {"tool": "events", "scope": prior_scope, "args": {"view": "bodies", "limit": 40}}
+    prior = {"total": 9, "remaining": 7, "scope": prior_scope, "query": query,
+             "unknown_time_count": 2, "gaps": [{"source": "unreadable", "error": "missing"}],
+             "entries": [{"ref": "raw:earlier:L1:abc", "locator_padding": "x" * 7000},
+                         {"ref": "raw:earlier:L2:def", "locator_padding": "y" * 7000}]}
+    data["body_sources"] = {"total": 0, "remaining": 0, "entries": [],
+        "query": {"tool": "events", "scope": deepcopy(SCOPE), "args": {"view": "bodies"}},
+        "before_window": prior}
+    original = deepcopy(data)
+    fitted = budget.fit(data, 3500)
+    assert fitted["status"] == "ok"
+    assert fitted["data"]["scope"] == SCOPE
+    shown = fitted["data"]["body_sources"]["before_window"]
+    assert shown["entries"] == [] and shown["remaining"] == shown["total"] == 9
+    assert shown["unknown_time_count"] == 2 and shown["gaps"] == prior["gaps"]
+    assert shown["query"] == query and shown["scope"] == prior_scope
+    continuation = next(c for c in fitted["continuations"] if c.get("next_query") == query)
+    assert continuation["remaining"] == 9
+    from migloop import investigation
+    assert "raw:earlier:" not in str(investigation._delivery(fitted["data"]))
+    assert data == original
+    assert_bounded(fitted, 3500)
+
+
 @pytest.mark.parametrize("amount", [0, 20, 750, 1300, 2500, 5000])
 def test_serialized_total_budget_and_original_object_unchanged(amount):
     data = view()

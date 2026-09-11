@@ -122,8 +122,7 @@ def _part_preview(part, current: dict[str, Any], window: temporal.Window) -> dic
             "scope_relation": "inherited" if in_range else "independent_antecedent",
             "scope_note": "继承原查询范围" if in_range else "独立查看起点前的请求/回执；不是原since窗口内的证据",
             "expand_query": {"tool": "expand", "scope": query_scope,
-                             "args": {"refs": [{"ref": part.record.ref, "pointer": pointer}],
-                                      "max_chars": 4000}}}
+                             "args": {"refs": [{"ref": part.record.ref, "pointer": pointer}]}}}
 
 
 def _call_presentation(event, window: temporal.Window, current: dict[str, Any],
@@ -429,14 +428,14 @@ def native_effects(ledger: atoms.Ledger, current_scope: dict[str, Any]) -> tuple
     return rows, gaps
 
 
-def native_diff(ledger: atoms.Ledger, row: dict[str, Any], max_chars: int = 6000) -> dict[str, Any] | None:
+def native_diff(ledger: atoms.Ledger, row: dict[str, Any], max_chars: int | None = None) -> dict[str, Any] | None:
     """An independently located native delta, never an inferred full snapshot.
 
     Keep large patch bodies out of the modification inventory. Consumers ask
     for this projection explicitly; the raw reference opens the whole event.
     """
-    if type(max_chars) is not int or not 1 <= max_chars <= 120000:
-        raise ValueError("max_chars 必须在 1–120000 之间")
+    from . import text_window
+    text_window.validate(max_chars=max_chars)
     ref = next(iter(row.get("evidence") or []), None)
     if not isinstance(ref, str):
         return None
@@ -457,7 +456,7 @@ def native_diff(ledger: atoms.Ledger, row: dict[str, Any], max_chars: int = 6000
     return {"ts": row["observation_ts"], "effect_ts": None, "ref": ref, "agent": None,
             "event_id": row["id"], "author_status": "unknown", "changed_time_unknown": True,
             "basis": "native_effect_observation", "effect_status": row["status"],
-            "diff": delta[:max_chars], "diff_chars": len(delta), "truncated": len(delta) > max_chars,
+            "diff": delta[:max_chars], "diff_chars": len(delta), "truncated": max_chars is not None and len(delta) > max_chars,
             "native": deepcopy(native), "semantic_checked": False,
             "note": "原生事件的目标补丁；时间为观察可用时刻，不认证外层作者、完整前后状态或缺陷原因。"
                     + ("回执未确认执行：此处仅为所报补丁，不能当实际已生效差异。" if row["status"] != "confirmed_change" else "")}

@@ -138,8 +138,9 @@ def build_server(backend: Any | None = None) -> Any:
                     annotation_offset: int = 0, annotation_limit: int | None = None,
                     relation_offset: int = 0, relation_limit: int | None = None, view: str | None = None) -> str:
         """默认打开 agent 截至 at 的输入、产出、任务及候选概览；at 省略=latest，不需 via。
-        view=reads/writes/messages/candidates 分页所选组；messages每条给最多12000字符原始字段页，总览预览4096字符。
-        字段更长或batch预算再截断时，用expand_query的ref/pointer及offset续取；消息行offset不等于字段字符offset。
+        view=reads/writes/messages/candidates 分页所选组；messages逐条给完整原始字段，总览仅预览4096字符。
+        expand_query是返回的{tool,args,scope}参数对象，不是工具名；调用它的tool=expand以展开该项原文。
+        显式batch预算或宿主截断时仍须续取；消息行offset不等于原文字段字符offset。
         view=records 分页全部原始记录，未知工具也保留。
         limit/offset 只控制所选视图，不限制 search(agent=...,at=...) 搜索范围；record/expand 展开原文。
         请求早于 at、返回晚于 at，只给请求不泄漏返回。未知时间单列（include_undated），不算已知输入。
@@ -194,9 +195,10 @@ def build_server(backend: Any | None = None) -> Any:
 
     @srv.tool(**text_options)
     async def diff(sid: str, path: str, v: int | None = None, at: str | None = None,
-                   since_ts: str | None = None, offset: int = 0, limit: int = 40, max_chars: int = 6000,
+                   since_ts: str | None = None, offset: int = 0, limit: int = 40, max_chars: int | None = None,
                    window_offset: int = 0, window_limit: int = 4, details: bool = False) -> str:
-        """at=ISO/latest 查询截止前已返回修改，可用 since_ts 缩小时间段；一次多条，offset/limit分页，max_chars每条预算。
+        """at=ISO/latest 查询截止前已返回修改，可用 since_ts 缩小时间段；offset/limit按修改分页，每条差分默认完整。
+        max_chars省略/null不截差分，正整数才显式限制每条字符数。
         区间/未知单独标记，原文 action 展开；显式 v 兼容旧单版差分。不打开新节点。"""
         ledger, cwd = await _ctx(sid)
         from . import atom_queries
@@ -238,9 +240,10 @@ def build_server(backend: Any | None = None) -> Any:
 
     @srv.tool(**text_options)
     async def record(sid: str, ref: str, at: str = "latest", offset: int = 0,
-                     max_chars: int = 20000, include_undated: bool = False) -> str:
+                     max_chars: int | None = None, include_undated: bool = False) -> str:
         """展开时间查询返回的 raw: 引用；原始JSONL，不要求解析成 action。at 保持调查截止，晚到结果拒绝返回。
-        offset/max_chars 分页；未知时间须显式 include_undated，不作为截止前事实。不是读写跳转。"""
+        默认完整原始记录；正整数max_chars才显式字符分页。complete/returned_chars/next_offset说明实际原文范围。
+        未知时间须显式 include_undated，不作为截止前事实。不是读写跳转。"""
         ledger, cwd = await _ctx(sid)
         from . import atom_queries
         return atom_queries.render_text(ledger, cwd, "record", dict(ref=ref, at=at, offset=offset,
@@ -268,13 +271,14 @@ def build_server(backend: Any | None = None) -> Any:
         return atom_queries.render_text(ledger, _cwd, "check", dict(draft=draft, file=file), chains=payload)
 
     @srv.tool(**text_options)
-    async def batch(sid: str, requests: list[dict[str, Any]], max_chars: int = 100000) -> str:
+    async def batch(sid: str, requests: list[dict[str, Any]], max_chars: int | None = None) -> str:
         """自由批量调查：1–24项{tool,args,scope?}，tool=file/agent/search/record/expand/diff/blame/changes/events。
         新调查建议用此统一接口。每项独立时间范围，不填via。file/agent等args用path/id、at、since_ts；
-        返回scope可整段复用，expand的args={refs:[raw或旧动作引用],max_chars:12000}继承scope。
+        返回scope可整段复用，expand的args={refs:[raw或旧动作引用]}继承scope，默认完整展开。
         changes给确认操作与未决效应清单，events给未依赖读写解析的原生调用；纯提及不认证写者。
         scope={kind:file|agent|pool,key:路径或id,at:ISO,since_ts:ISO或null}，默认latest会固定为当前已知时间。
-        max_chars限制data正文字符（封装另计）；默认关系摘要，details=true与较小limit可展开完整注释。
+        默认不二次裁切选定正文；正整数max_chars才限制data总字符（封装另计）。原文很多时分批展开以避免宿主截断。
+        默认关系摘要，details=true与较小limit可展开完整注释。
         返回JSON；若schema为migloop-batch-wire/1，子项在batch.items。只省重复封装，data/续读不变，ledger仍在顶层。
         details是统一的关系注释开关；没有额外注释层的查询也接受它，正文/时间范围不变。
         每项显示ok/error/deferred。未交付不能当查过；有依赖的下一批应等返回，查询顺序不生成历史边。"""
@@ -294,9 +298,10 @@ def build_server(backend: Any | None = None) -> Any:
 
     @srv.tool(**text_options)
     async def expand(sid: str, refs: list[str | dict[str, str]], scope: dict[str, Any], offset: int = 0,
-                     max_chars: int = 12000, include_undated: bool = False) -> str:
+                     max_chars: int | None = None, include_undated: bool = False) -> str:
         """一次展开1–24条证据，接受raw或旧#动作引用；scope照抄批量查询返回，继承文件/agent及时间上下界。
-        可用{ref,pointer}只展开events指向的JSON字段。max_chars按每条原文/字段计，需限制总返回时放进batch。
+        默认完整展开选中的原文或{ref,pointer}字段，不是全文session；正整数max_chars才按每条显式分页。
+        complete/returned_chars/next_offset说明范围；有next_offset须续读或明确未完整。可用batch显式总预算。
         同一动作的请求与返回分别按时间核验，晚到结果不泄漏。逐项标拒绝/缺失/下一页，不制造新读写边。"""
         ledger, cwd = await _ctx(sid)
         from . import atom_queries

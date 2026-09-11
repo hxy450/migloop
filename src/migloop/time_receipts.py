@@ -34,8 +34,14 @@ def canonical(tool: str, request: dict[str, Any]) -> dict[str, Any]:
     return normalized
 
 
-def _request_matches(tool, request, expected):
+def _request_matches(tool, request, expected, normalization=None):
+    if normalization not in (None, "time-query/3"):
+        return False
     normalized = canonical(tool, request)
+    # Historical omitted limits meant a page, not today's full-text request.
+    # Keep that exact request identity tied to the original returned bytes.
+    if normalization is None and tool in ("record", "diff") and request.get("max_chars") in (None, ""):
+        normalized["max_chars"] = 20000 if tool == "record" else 6000
     if digest(normalized) == expected:
         return True
     # Earlier time receipts predate annotation pagination as well as atom
@@ -63,6 +69,7 @@ def append(ledger: atoms.Ledger, tool: str, request: dict[str, Any], text: str, 
     # State diff/blame already has legacy action references, no raw row receipt.
     raw_refs = [ref for ref in refs if isinstance(ref, str) and ref.startswith("raw:")]
     receipt = {"schema": "migloop-time-receipt/1", "tool": tool, "ledger": atoms.ledger_identity(ledger),
+               "argument_normalization": "time-query/3",
                "request_sha256": digest(canonical(tool, request)), "body_sha256": digest(text),
                "node": node, "raw_refs_sha256": digest(raw_refs), "raw_count": len(raw_refs),
                "relation": None}
@@ -77,7 +84,7 @@ def parse(ledger: atoms.Ledger, tool: str, request: dict[str, Any], text: str) -
         receipt = json.loads(tail)
         if (receipt.get("schema") != "migloop-time-receipt/1" or receipt["tool"] != tool
                 or receipt["ledger"] != atoms.ledger_identity(ledger)
-                or not _request_matches(tool, request, receipt["request_sha256"])
+                or not _request_matches(tool, request, receipt["request_sha256"], receipt.get("argument_normalization"))
                 or receipt["body_sha256"] != digest(body)):
             return None
         if tool == "record":

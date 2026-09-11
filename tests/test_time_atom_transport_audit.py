@@ -308,3 +308,21 @@ global.fetch=async(url,options)=>{requests.push({url,payload:options.body&&JSON.
 })().catch(e=>{console.error(e);process.exitCode=1});
 """
     assert _node(script)["passed"]
+
+
+def test_template_prior_navigation_opens_only_its_declared_earlier_scope():
+    script = _DOM + _helpers() + r"""
+const scope={kind:'file',key:'/p/A',at:'2026-09-10T10:10:00Z',since_ts:'2026-09-10T10:04:00Z'};
+const earlier={...scope,at:scope.since_ts,since_ts:null};
+const data={schema:'migloop-time-atom/1',scope,sections:{},body_sources:{total:0,entries:[],
+ before_window:{total:1,entries:[{ref:'raw:abc:L1:abc',query:{tool:'expand',args:{refs:['raw:abc:L1:abc']},scope:earlier}}],
+ query:{tool:'events',args:{view:'bodies'},scope:earlier}}}};
+global.fetch=async(url,options)=>{requests.push(JSON.parse(options.body));return {json:async()=>({items:[]})}};
+(async()=>{const host=el('div');renderTimeAtom(host,data,scope);
+ const prior=walk(host).find(n=>n.className==='time-atom-navigation' && n.children[0].textContent.includes('窗口起点'));
+ assert(prior);walk(prior).find(n=>n.tagName==='button').onclick();await tick();
+ assert.deepEqual(requests[0].requests[0].scope,earlier);
+ assert.equal(JSON.stringify({PROBE,XT}),before);console.log(JSON.stringify({passed:true}));
+})().catch(e=>{console.error(e);process.exitCode=1});
+"""
+    assert _node(script)["passed"]

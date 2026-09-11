@@ -144,7 +144,7 @@ def _entry(event, projected, part, pointer, value, kind, extent, scope):
             "source_agents": sorted(event.agents), "author_certified": False, "current_state_certified": False,
             "reference_status": "addressable" if event.addressable else "ambiguous_source",
             "query": {"tool": "expand", "scope": deepcopy(scope),
-                      "args": {"refs": [{"ref": part.record.ref, "pointer": pointer}], "max_chars": 12000}}
+                      "args": {"refs": [{"ref": part.record.ref, "pointer": pointer}]}}
                      if event.addressable else None}
 
 
@@ -155,6 +155,30 @@ def navigation(ledger, path, at, since_ts=None, *, show=True):
     page["remaining"] = data["total"] - len(page["entries"])
     page["query"] = {"tool": "events", "scope": deepcopy(data["scope"]), "args": {"view": "bodies", "limit": 40}}
     page["current_state_certified"] = False
+    if data["scope"]["since_ts"] is not None:
+        # Project again at the earlier cutoff. A request's later receipt must
+        # not change its status in this independent pre-window navigation.
+        rows, undated, native, prior_scope = _collect(ledger, path, data["scope"]["since_ts"])
+        entries = []
+        for kind in ("write_request", "read_response"):
+            candidates = [row for row in rows if row["kind"] == kind]
+            if candidates and show:
+                latest = candidates[-1]
+                ties = sum(row["record_ts"] == latest["record_ts"] for row in candidates)
+                entries.append({**deepcopy(latest), "timestamp_tie_count": ties,
+                                "selection_is_unique": ties == 1})
+        page["before_window"] = {
+            "scope": prior_scope, "total": len(rows), "remaining": len(rows) - len(entries),
+            "entries": entries, "kind_counts": dict(Counter(row["kind"] for row in rows)),
+            "unknown_time_count": undated, "source_count": native["source_count"],
+            "gaps": deepcopy(native["gaps"]),
+            "query": {"tool": "events", "args": {"view": "bodies", "limit": 40}, "scope": deepcopy(prior_scope)},
+            "selection": "latest_per_kind_at_or_before_window_start",
+            "navigation_is_relation": False, "current_state_certified": False,
+            "note": "独立的起点及之前正文导航，正文尚未交付；最多各取一个最新Write请求/Read返回。"
+                    "同刻多条只取稳定排序代表，selection_is_unique不是作者或磁盘状态认证。"
+                    "失败请求仍是请求，Read仍是观察；全部并列/更早入口沿query展开。"
+                    "本导航不涵盖shell/脚本/所有原生格式，零项不代表此前没有写入或正文。"}
     return page
 
 

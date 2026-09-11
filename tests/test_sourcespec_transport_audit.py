@@ -202,7 +202,7 @@ global.fetch=async(url,options)=>{requests.push({url,...JSON.parse(options.body)
 (async()=>{const host=el('div');argumentEvidence(host,[evidence],null,'原文');
  const button=walk(host).find(n=>n.className==='argument-open-original');assert(button);button.onclick();await tick();
  assert.equal(requests.length,1);assert.equal(requests[0].url,API+'/batch');
- assert.deepEqual(requests[0].requests[0],{tool:'record',args:{ref,offset:0,max_chars:12000},scope});
+ assert.deepEqual(requests[0].requests[0],{tool:'record',args:{ref,offset:0,max_chars:null},scope});
  assert.equal(JSON.stringify(evidence),original);assert.equal(JSON.stringify({PROBE,XT}),before);
  assert(walk(host).some(n=>n.tagName==='pre'&&n.textContent.includes('<img src=x> literal')));
  console.log(JSON.stringify({passed:true}));

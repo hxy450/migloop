@@ -78,20 +78,17 @@ def test_explicit_messages_has_the_same_field_page_as_expand(tmp_path, length):
     expanded = investigation.query(ledger, "expand", {
         **row["expand_query"]["args"], "scope": data["scope"]})
     field, = expanded["items"][0]["records"]
-    # An explicit message page must not silently retain the overview's 4096
-    # character selection limit. It still has the bounded native-field page.
-    assert row["preview"] == field["text"] == original[:12000]
+    # Explicit messages and expand select the full original. Only the overview
+    # has a preview limit; a caller may separately request a transport budget.
+    assert row["preview"] == field["text"] == original
     assert row["chars"] == field["chars"] == length
-    assert row["preview_span"] == {"offset": 0, "chars": min(length, 12000)}
+    assert row["preview_span"] == {"offset": 0, "chars": length}
     shown = investigation.batch(ledger, [{"tool": "agent", "args": args}], 100000)
     assert shown["items"][0]["data"]["sections"] == data["sections"]
     assert atom_queries.json_data(ledger, "agent", args)["sections"] == data["sections"]
     overview = investigation.query(ledger, "agent", {"id": agent, "at": ts(3)})
     assert overview["sections"]["messages"]["rows"][0]["preview"] == original[:4096]
-    if field["next_offset"] is not None:
-        more = investigation.query(ledger, "expand", {**row["expand_query"]["args"],
-            "offset": field["next_offset"], "scope": data["scope"]})
-        assert more["items"][0]["records"][0]["text"] == original[12000:24000]
+    assert field["next_offset"] is None
 
 
 def test_explicit_message_page_keeps_time_scope_and_actual_budget_receipt(tmp_path):

@@ -293,10 +293,10 @@ def query(ledger: atoms.Ledger, *, kind: str, key: str | None = None, at: str = 
 
 
 def record_data(ledger: atoms.Ledger, ref: str, *, at: str = "latest", offset: int = 0,
-                max_chars: int = 20000, include_undated: bool = False) -> dict[str, Any]:
+                max_chars: int | None = None, include_undated: bool = False) -> dict[str, Any]:
+    from . import text_window
     window = Window.parse(at)
-    if type(offset) is not int or offset < 0 or type(max_chars) is not int or not 1 <= max_chars <= 120000:
-        raise ValueError("offset ≥ 0；max_chars 必须在 1–120000 之间")
+    text_window.validate(offset, max_chars)
     record = store.resolve(ledger, ref)
     if record.ts is None and not include_undated:
         raise ValueError("记录时间未知；显式 include_undated=true 才能展开，不计入截止前输入")
@@ -305,8 +305,7 @@ def record_data(ledger: atoms.Ledger, ref: str, *, at: str = "latest", offset: i
     # Original JSONL bytes decoded as UTF-8, not a reconstructed Action summary.
     text = record.raw
     return {"schema": "migloop-raw-record/1", **record.address(), "at": window.at,
-            "text": text[offset:offset + max_chars], "offset": offset, "chars": len(text),
-            "next_offset": offset + max_chars if offset + max_chars < len(text) else None,
+            **text_window.page(text, offset, max_chars),
             "receipt": {"schema": "migloop-query-receipt/1", "node": None,
                         "scope": {"at": window.at}, "records": [record.ref], "navigation_is_relation": False}}
 

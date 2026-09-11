@@ -168,14 +168,14 @@ def replay(ledger: atoms.Ledger, at: str, path: str | None = None) -> tuple[dict
 
 def query(ledger: atoms.Ledger, tool: str, path: str, at: str, *, since_ts: str | None = None,
           start: int | None = None, n: int | None = None, offset: int = 0, limit: int = 40,
-          max_chars: int = 6000, window_offset: int = 0, window_limit: int = 4) -> dict[str, Any]:
+          max_chars: int | None = None, window_offset: int = 0, window_limit: int = 4) -> dict[str, Any]:
     import os
 
     from .temporal import _page
     window = Window.parse(at, since_ts)
     _page([], window_offset, window_limit)
-    if type(max_chars) is not int or not 1 <= max_chars <= 120000:
-        raise ValueError("max_chars 必须在 1–120000 之间")
+    from . import text_window
+    text_window.validate(max_chars=max_chars)
     if any(type(value) is not int or value < 1 for value in (start, n) if value is not None):
         raise ValueError("start/n 必须是正整数")
     canonical = resolve_file(ledger, path)
@@ -256,7 +256,7 @@ def query(ledger: atoms.Ledger, tool: str, path: str, at: str, *, since_ts: str 
                          "basis": "observed_interval_not_single_writer" if observed else version.diff_kind,
                          "diff": (version.diff or "")[:max_chars],
                          "diff_chars": len(version.diff or ""),
-                         "truncated": len(version.diff or "") > max_chars,
+                         "truncated": max_chars is not None and len(version.diff or "") > max_chars,
                          "note": "全文/原生补丁用 action(ref=...)；此处不把观测封口当单笔写入"})
         # Independent patch observations have no outer Action author and may
         # leave the full state unknown, but their exact raw delta is inspectable.
