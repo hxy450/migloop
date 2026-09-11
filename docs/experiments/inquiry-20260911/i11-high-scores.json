@@ -1,0 +1,19 @@
+{
+  "schema":"inquiry-developer-score/1",
+  "round":"i11-high","model":"gpt-5.6-luna","effort":"high",
+  "reference":"../file-first-10/scoring-core.json",
+  "grading":"Developer semantic adjudication of the two original reports. Not blind, not a full-cohort result. No best-of selection; an improved core and a regressed core do not establish net superiority.",
+  "cases":[
+    {"id":"F10-02","report_id":"75813bc66f5c411e","units":{"mask":"correct","icon":"correct","back-gate":"partial","progress":"correct","system-bars":"correct"},"basis":"All five change families found, mask receipt now paired correctly and Progress retained. Still stops at Slice11's isModal claim/D020 conflict rather than recovering initial onBackPressed followed by assembly removal. It does not provide the complete frozen back-gate core."},
+    {"id":"F10-03","report_id":"f0a6331bc825439e","units":{"label":"correct","button-style":"correct","test-integration":"correct","logging":"wrong","comment-policy":"correct"},"basis":"Finally contrasts the delivered Roll specification/synthesized snapshot with later runtime ROLL and qualifies theme delivery. Test/ECAT contract boundaries correct. Regresses logging: falsely claims the original generation Write already contains console.error, rather than visual repair adding it."}
+  ],
+  "summary":{"correct":8,"partial":1,"omitted":0,"wrong":1,"total":10,"unit_weighted_percent":80.0},
+  "additional_errors":[
+    {"case":"F10-03","major":true,"quote":"生成期文件包含 console.error，以及指向 Android/Kotlin/Material/ConstraintLayout 等来源的注释（e-69cb044637d1，JSONL 行75）。","counterevidence":"The cited original Write in agent-a349784d2663f1f0a L75 at 2026-09-03T15:52:02.314Z contains no console.error. Visual repair agent-a4874344c8fb6228d L68/e-4bb71218bb29 at 18:29:11.587Z introduces it. The model did request the initial Write both as a window and a complete open; this is not absence from the source index."},
+    {"case":"F10-03","major":false,"quote":"e-4e8699c255a6 以 hilog 替换 console.error","counterevidence":"Actual runtime replacement is e-229789c2e667. Both references appear in the change list, but the sentence assigns the replacement to the wrong specific call."}
+  ],
+  "audit_limits":"Core review and concrete counterexamples, not an exhaustive blind claim-precision study. No claim of zero additional unsupported mechanisms.",
+  "delivery":{"Splash":{"frames_sent":150,"frames_visible_complete":150,"mechanical_status":"valid"},"DiceIndex":{"frames_sent":97,"frames_visible_complete":97,"mechanical_status":"valid"},"semantic_verified":false},
+  "cost":{"model_seconds_sum":1057.4370110001182,"input_plus_output":10035380,"by_case":{"F10-02":{"seconds":684.2910760000814,"tokens":6892866},"F10-03":{"seconds":373.14593500003684,"tokens":3142514}},"note":"Dice used batched page: 12 calls, including one rejected six-entry request and a later compliant batch. Its time/tokens fell versus i09-high Dice, but a new attribution error prevents acceptance; no isolated causal speed claim."},
+  "accepted":false
+}
