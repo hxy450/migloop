@@ -806,8 +806,12 @@ def probe_payload(path: str, run_dir: str) -> dict[str, Any]:
 
 def fixchain_html(path: str) -> str:
     payload = fixchain_light(path)
-    return load_asset("fixchain.html").replace("__FIXCHAIN_JSON__",
-                                               json.dumps(payload, ensure_ascii=False))
+    # The default explorer has one entity/time contract, independent of the
+    # loaded report schema. Keep the legacy template only for legacy consumers.
+    encoded = json.dumps(payload, ensure_ascii=False).replace("<", "\\u003c")
+    return (load_asset("time_tree.html")
+            .replace("__TIME_TREE_CORE__", load_asset("time_tree_core.html"))
+            .replace("__FIXCHAIN_JSON__", encoded))
 
 
 # ═══════════════ 两原子端点(JSON / 文本) ═══════════════

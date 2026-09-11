@@ -1,0 +1,1904 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Migloop · 时间探索树</title>
+    <link rel="icon" href="data:," />
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #24334c;
+        --muted: #718098;
+        --line: #dce3ee;
+        --blue: #3976cf;
+        --red: #bc3c42;
+        --gold: #be842b;
+        --green: #438a75;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #f3f5fa;
+        color: var(--ink);
+        font:
+          14px/1.5 system-ui,
+          "Microsoft YaHei",
+          sans-serif;
+      }
+      button,
+      input,
+      select {
+        font: inherit;
+      }
+      button {
+        cursor: pointer;
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        background: white;
+        color: var(--ink);
+        padding: 5px 9px;
+      }
+      button:hover {
+        border-color: var(--blue);
+        background: #f3f7ff;
+      }
+      button:disabled {
+        opacity: 0.5;
+        cursor: wait;
+      }
+      input,
+      select {
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 6px;
+        background: white;
+        min-width: 0;
+      }
+      input {
+        width: 100%;
+      }
+      header {
+        padding: 16px 22px 10px;
+      }
+      h1 {
+        font-size: 21px;
+        margin: 0 0 4px;
+      }
+      h2 {
+        font-size: 16px;
+        margin: 5px 0 10px;
+      }
+      h3 {
+        font-size: 14px;
+        margin: 12px 0 6px;
+      }
+      .subtle {
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .warn {
+        background: #fff7e9;
+        border-left: 3px solid var(--gold);
+        padding: 9px;
+        margin: 8px 0;
+      }
+      .error {
+        color: #a82932;
+        white-space: pre-wrap;
+      }
+      .mono,
+      pre {
+        font-family: ui-monospace, Consolas, monospace;
+        font-size: 12px;
+      }
+      pre {
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        background: #f7f9fc;
+        border-radius: 6px;
+        padding: 9px;
+        max-height: 65vh;
+        overflow: auto;
+      }
+      .reason {
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+      }
+      details {
+        margin: 8px 0;
+      }
+      summary {
+        cursor: pointer;
+      }
+      details > div {
+        margin-top: 7px;
+      }
+      .row {
+        display: flex;
+        gap: 6px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      .stack {
+        display: grid;
+        gap: 7px;
+      }
+      .pill {
+        display: inline-block;
+        padding: 2px 6px;
+        border-radius: 5px;
+        font-size: 11px;
+        background: #edf1f8;
+        color: #65738a;
+      }
+      .claim-pill {
+        background: #fff0f0;
+        color: var(--red);
+      }
+      .time {
+        color: #63718a;
+        font-size: 11px;
+      }
+      .panel {
+        background: white;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        min-width: 0;
+        overflow: auto;
+      }
+      #workspace {
+        display: grid;
+        grid-template-columns: 270px minmax(420px, 1fr) 340px;
+        gap: 12px;
+        padding: 0 14px 14px;
+        height: calc(100vh - 100px);
+        min-height: 480px;
+      }
+      #rail,
+      #side {
+        padding: 14px;
+      }
+      #rail .directory-item {
+        display: block;
+        width: 100%;
+        text-align: left;
+        margin: 5px 0;
+        overflow-wrap: anywhere;
+      }
+      .directory-label {
+        display: block;
+      }
+      .directory-meta {
+        font-size: 11px;
+        color: var(--muted);
+      }
+      #directory {
+        max-height: 38vh;
+        overflow: auto;
+      }
+      #treepanel {
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+      #toolbar {
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--line);
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .legend {
+        font-size: 11px;
+        color: var(--muted);
+      }
+      .legend .red {
+        color: var(--red);
+      }
+      #graph {
+        flex: 1;
+        overflow: auto;
+        position: relative;
+        min-height: 360px;
+      }
+      #canvas {
+        position: relative;
+        transform-origin: 0 0;
+        min-height: 400px;
+      }
+      #canvas svg {
+        position: absolute;
+        inset: 0;
+        overflow: visible;
+        pointer-events: none;
+      }
+      .node {
+        position: absolute;
+        width: 238px;
+        min-height: 84px;
+        border: 1.5px solid var(--gold);
+        border-radius: 9px;
+        padding: 8px 10px;
+        background: #fffefa;
+        box-shadow: 0 2px 6px #152c4910;
+        cursor: pointer;
+      }
+      .node.agent {
+        border-color: var(--green);
+        background: #fcfffd;
+      }
+      .node.root {
+        outline: 3px solid #eadcbc;
+        outline-offset: 3px;
+      }
+      .node.selected {
+        box-shadow: 0 0 0 3px #89b7f655;
+      }
+      .node.claimed {
+        border-color: var(--red);
+        background: #fff7f7;
+      }
+      .node.entry {
+        outline: 2px solid var(--red);
+        outline-offset: 2px;
+      }
+      .node.recorded {
+        box-shadow: inset 0 0 0 2px #79a7e1;
+      }
+      .node.candidate {
+        border-style: dashed;
+      }
+      .node-title {
+        display: block;
+        font-size: 13px;
+        font-weight: 600;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .node .node-time {
+        display: block;
+        font:
+          11px/1.5 ui-monospace,
+          Consolas,
+          monospace;
+        margin: 3px 0;
+      }
+      .node .node-note {
+        display: block;
+        font-size: 11px;
+        color: var(--muted);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .node.stub {
+        border: 1px dashed #aeb9cc;
+        background: #f8faff;
+        min-height: 42px;
+        color: var(--blue);
+        font-size: 12px;
+      }
+      .wire {
+        stroke: #9baec8;
+        stroke-width: 1.6;
+        fill: none;
+      }
+      .wire.candidate {
+        stroke: #a68b60;
+        stroke-dasharray: 5 4;
+      }
+      .wire.model {
+        stroke: var(--red);
+        stroke-width: 2;
+      }
+      .edge-label {
+        font: 10px system-ui;
+        fill: #72819a;
+        paint-order: stroke;
+        stroke: white;
+        stroke-width: 4;
+        stroke-linejoin: round;
+      }
+      .column {
+        position: absolute;
+        top: 13px;
+        width: 238px;
+        font-size: 11px;
+        text-align: center;
+        color: var(--muted);
+      }
+      #empty {
+        padding: 70px 28px;
+        text-align: center;
+        color: var(--muted);
+      }
+      .section-row {
+        padding: 9px 0;
+        border-bottom: 1px solid #eef1f6;
+        overflow-wrap: anywhere;
+      }
+      .section-row .row {
+        margin-top: 6px;
+      }
+      #model-list button.active {
+        border-color: var(--red);
+        color: var(--red);
+      }
+      .trace-item {
+        margin: 7px 0;
+        padding: 8px;
+        border: 1px solid #e3e9f2;
+        border-radius: 7px;
+      }
+      .trace-item button {
+        font-size: 12px;
+      }
+      .query-output {
+        border-left: 2px solid #dbe5f3;
+        padding-left: 9px;
+        margin: 8px 0;
+      }
+      .loading {
+        padding: 25px;
+        color: var(--muted);
+      }
+      #status {
+        min-height: 19px;
+      }
+      .chips {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+        margin-top: 7px;
+      }
+      #rootname {
+        font-weight: 600;
+        max-width: 450px;
+        overflow-wrap: anywhere;
+      }
+      #manual-log {
+        max-height: 25vh;
+        overflow: auto;
+      }
+      .scope-controls label {
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .scope-controls input {
+        font:
+          12px ui-monospace,
+          Consolas,
+          monospace;
+      }
+      #pool-time {
+        font:
+          12px ui-monospace,
+          Consolas,
+          monospace;
+      }
+      #errorbox {
+        margin: 0 15px 8px;
+      }
+      .hidden,
+      [hidden] {
+        display: none !important;
+      }
+      @media (max-width: 1150px) {
+        #workspace {
+          grid-template-columns: 225px minmax(400px, 1fr) 290px;
+          padding: 0 7px 7px;
+          gap: 7px;
+        }
+        #rail,
+        #side {
+          padding: 10px;
+        }
+      }
+      @media (max-width: 800px) {
+        #workspace {
+          grid-template-columns: 210px minmax(400px, 1fr);
+          height: auto;
+        }
+        #treepanel {
+          height: 75vh;
+        }
+        #side {
+          grid-column: 1/-1;
+          max-height: 70vh;
+        }
+      }
+      .mono {
+        overflow-wrap: anywhere;
+      }
+      #directory {
+        max-height: 30vh;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>返修链路 · 时间探索树</h1>
+      <div class="subtle" id="subtitle"></div>
+      <div id="status" class="subtle">正在加载目录…</div>
+    </header>
+    <div id="errorbox" class="error" role="alert"></div>
+    <main id="workspace">
+      <aside id="rail" class="panel">
+        <h2>选择调查入口</h2>
+        <div class="stack scope-controls">
+          <label for="at">截止时间（含该时刻，明确时区）</label
+          ><input id="at" placeholder="2026-07-26T21:48:57.218000Z" /><label
+            for="since"
+            >起始时间（可选；留空包含全部更早材料）</label
+          ><input id="since" placeholder="从最早记录开始" /><button
+            id="apply-time"
+          >
+            用这个时间重新查询当前根
+          </button>
+        </div>
+        <div class="subtle" style="margin: 9px 0">
+          时间限定证据范围，不保证那一刻的完整文件内容已知。版本只是关键时间的快捷入口。
+        </div>
+        <input id="q" placeholder="搜索文件名或 agent" aria-label="搜索目录" />
+        <div id="directory"></div>
+        <details id="direct-entry">
+          <summary>直接打开路径 / agent ID</summary>
+          <div class="stack">
+            <select id="direct-kind">
+              <option value="file">文件</option>
+              <option value="agent">agent</option></select
+            ><input id="direct-key" placeholder="完整路径或 agent ID" /><button
+              id="direct-open"
+            >
+              独立打开，不创建读写边
+            </button>
+          </div>
+        </details>
+        <hr
+          style="border: 0; border-top: 1px solid var(--line); margin: 16px 0"
+        />
+        <h2>模型调查与结论</h2>
+        <div class="row">
+          <input id="run" placeholder="F10-01/rep1" style="flex: 1" /><button
+            id="load-probe"
+          >
+            载入
+          </button>
+        </div>
+        <div id="model-summary" class="subtle"></div>
+        <div id="model-list"></div>
+        <details>
+          <summary>原始模型查询记录 <span id="trace-count"></span></summary>
+          <div class="subtle">
+            查询顺序不是读写边。蓝框只表示有对应范围的已记录返回，不证明读懂了内容。
+          </div>
+          <div id="trace"></div>
+        </details>
+        <details>
+          <summary>本次手动查阅记录</summary>
+          <div class="subtle">仅当前浏览器，不会写入原来的模型轨迹。</div>
+          <div id="manual-log"></div>
+        </details>
+      </aside>
+      <section id="treepanel" class="panel">
+        <div id="toolbar">
+          <div>
+            <div id="rootname">从左栏选择文件或 agent</div>
+            <div class="legend">
+              实线：已核操作　虚线：候选操作　<span class="red"
+                >红色：模型问题主张</span
+              >　蓝框：对应范围的查询记录
+            </div>
+          </div>
+          <div class="row">
+            <button id="zoom-out" aria-label="缩小">−</button
+            ><button id="zoom-in" aria-label="放大">+</button
+            ><button id="focus-root">定位根</button
+            ><button id="fit">适应</button><button id="reset">清空树</button>
+          </div>
+        </div>
+        <div id="graph">
+          <div id="canvas">
+            <div id="empty">
+              文件 → 历史写入调用的 agent → 读取过的文件<br />点击节点继续探索；候选和相关提及按需展开。
+            </div>
+          </div>
+        </div>
+      </section>
+      <aside id="side" class="panel">
+        <h2>节点详情</h2>
+        <p class="subtle">
+          点树上的节点，查看时间范围、模型原因、已核操作和原文。每个展开动作都沿用当前节点的时间范围。
+        </p>
+      </aside>
+    </main>
+    __TIME_TREE_CORE__
+    <script>
+      (() => {
+        "use strict";
+        const DATA = __FIXCHAIN_JSON__,
+          C = window.MigloopTimeTree;
+        const $ = (id) => document.getElementById(id),
+          el = (tag, cls, text) => {
+            const e = document.createElement(tag);
+            if (cls) e.className = cls;
+            if (text != null) e.textContent = String(text);
+            return e;
+          };
+        const SID = encodeURIComponent(DATA.sid || DATA.sid8),
+          U = DATA.urls || {},
+          API = U.atom || "/api/insight1/atom/" + SID,
+          PROBE_API = U.probe || "/api/insight1/probe/" + SID;
+        let index = null,
+          probe = null,
+          finding = null,
+          roots = [],
+          selected = null,
+          serial = 0,
+          epoch = 0,
+          detailEpoch = 0,
+          intent = 0,
+          probeRequest = 0,
+          zoom = 1,
+          directoryLimit = 60,
+          manual = [];
+        const cache = new Map(),
+          nodes = new Map();
+        const baseName = (p) =>
+          String(p || "")
+            .replace(/\\/g, "/")
+            .split("/")
+            .pop();
+        const label = (s) =>
+          s.kind === "file"
+            ? baseName(s.key)
+            : (index?.agents || []).find((a) => a.id === s.key)?.label || s.key;
+        const requestFor = (s, view = "overview") => ({
+          tool: s.kind,
+          args: {
+            [s.kind === "file" ? "path" : "id"]: s.key,
+            at: s.at,
+            since_ts: s.since_ts,
+            view,
+            limit: 20,
+          },
+        });
+        function issue(error) {
+          $("errorbox").textContent = String(error?.message || error);
+        }
+        function clearError() {
+          $("errorbox").textContent = "";
+        }
+        function button(host, text, fn, cls) {
+          const b = el("button", cls, text);
+          b.type = "button";
+          b.onclick = async () => {
+            b.disabled = true;
+            try {
+              await fn();
+            } catch (e) {
+              issue(e);
+            } finally {
+              b.disabled = false;
+            }
+          };
+          host.append(b);
+          return b;
+        }
+        function details(host, title, value) {
+          const d = el("details");
+          d.append(
+            el("summary", null, title),
+            el(
+              "pre",
+              null,
+              typeof value === "string"
+                ? value
+                : JSON.stringify(value, null, 2),
+            ),
+          );
+          host.append(d);
+          return d;
+        }
+        function scopeControls() {
+          return {
+            at: $("at").value.trim(),
+            since_ts: $("since").value.trim() || null,
+          };
+        }
+        function noteManual(request, status) {
+          manual.push({
+            i: manual.length + 1,
+            at: new Date().toISOString(),
+            request,
+            status,
+          });
+          const row = el(
+            "div",
+            "trace-item",
+            "#" + manual.length + " " + request.tool + " · " + status,
+          );
+          details(row, "参数", request);
+          $("manual-log").prepend(row);
+        }
+        async function getJSON(url) {
+          const r = await fetch(url, { credentials: "include" });
+          const d = await r.json();
+          if (!r.ok || d?.error) throw Error(d.error || "HTTP " + r.status);
+          return d;
+        }
+        async function run(request) {
+          const r = await fetch(API + "/batch", {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ requests: [request] }),
+          });
+          const p = await r.json();
+          const item = p.items?.[0];
+          noteManual(request, item?.status || "error");
+          if (!r.ok || p.error || !item || item.status !== "ok")
+            throw Error(p.error || item?.error || JSON.stringify(item || p));
+          return item;
+        }
+        async function atom(s) {
+          s = C.scope(s);
+          const k = C.scopeKey(s);
+          if (cache.has(k)) return cache.get(k);
+          const request = requestFor(s),
+            args = { ...request.args };
+          if (args.since_ts == null) delete args.since_ts;
+          const data = await getJSON(
+            API + "/" + s.kind + "?" + new URLSearchParams(args),
+          );
+          noteManual(request, "ok");
+          if (data?.schema !== "migloop-time-atom/1")
+            throw Error("未收到时间原子，保留原树，不回退版本查询。");
+          cache.set(C.scopeKey(C.scope(data.scope)), data);
+          return data;
+        }
+        function create(s, parent = null, relation = null) {
+          const n = {
+            id: "n" + ++serial,
+            scope: C.scope(s),
+            parent,
+            relation,
+            children: [],
+            pages: {},
+            expanded: false,
+            data: null,
+          };
+          nodes.set(n.id, n);
+          return n;
+        }
+        function ancestors(n) {
+          const a = [];
+          for (let p = n; p; p = p.parent) a.push(C.scopeKey(p.scope));
+          return a;
+        }
+        function claimList(n) {
+          return (probe?.argument_graph?.nodes || []).filter(
+            (c) =>
+              (!finding || c.finding === finding) &&
+              C.claimMatches(probe.argument_graph, c, n.scope),
+          );
+        }
+        function traceRows() {
+          const out = [];
+          for (const s of probe?.query_trace?.steps || []) {
+            out.push({
+              step: s.step,
+              tool: s.tool,
+              args: s.args,
+              scope: s.scope,
+              status: s.status,
+              delivery: s.delivery,
+              boundary: s.delivery_boundary,
+              source: s,
+            });
+            for (const i of s.items || [])
+              out.push({
+                step: s.step + "." + i.item_index,
+                tool: i.tool,
+                args: i.args,
+                scope: i.scope,
+                status: s.status === "recorded_response" ? i.status : s.status,
+                delivery: i.delivery,
+                boundary: i.delivery_boundary,
+                source: i,
+              });
+          }
+          return out;
+        }
+        function visits(n) {
+          if (probe?.trace_identity?.bound !== true) return [];
+          return traceRows().filter(
+            (r) =>
+              ["ok", "recorded_response"].includes(r.status) &&
+              r.scope &&
+              (() => {
+                try {
+                  return C.scopeKey(C.scope(r.scope)) === C.scopeKey(n.scope);
+                } catch {
+                  return false;
+                }
+              })(),
+          );
+        }
+        function contains(n) {
+          return (
+            nodes.get(n.id) === n &&
+            roots.some((r) => {
+              let p = n;
+              while (p.parent) p = p.parent;
+              return p === r;
+            })
+          );
+        }
+        function pageRows(n, name, page) {
+          n.pages[name] = page;
+          for (const row of page.rows || []) {
+            const rel = C.relation(n.scope, row, name);
+            if (!rel) continue;
+            const opKey = C.operationKey(row);
+            if (n.children.some((c) => c.section === name && c.opKey === opKey))
+              continue;
+            const child = create(rel.target, n, rel);
+            child.opKey = opKey;
+            child.section = name;
+            child.loop = ancestors(n).includes(C.scopeKey(child.scope));
+            n.children.push(child);
+          }
+        }
+        async function expand(n) {
+          if (n.loop) return select(n);
+          if (n.expanded) return select(n);
+          const ticket = epoch,
+            focusTicket = ++intent;
+          selected = n;
+          n.busy = true;
+          render();
+          try {
+            const data = n.data || (await atom(n.scope));
+            if (ticket !== epoch || !contains(n)) return;
+            n.scope = C.scope(data.scope);
+            n.data = data;
+            n.expanded = true;
+            const primary = n.scope.kind === "file" ? "writes" : "reads";
+            pageRows(n, primary, data.sections[primary]);
+            render(focusTicket === intent ? n : null);
+            if (focusTicket === intent) await select(n);
+          } finally {
+            n.busy = false;
+            if (ticket === epoch && contains(n)) render();
+          }
+        }
+        async function more(n, name) {
+          const ticket = epoch;
+          const page = n.pages[name],
+            query = page?.next_query || n.data?.sections[name]?.query;
+          if (!query) return;
+          const item = await run(query);
+          if (ticket !== epoch || !contains(n)) return;
+          const data = item.data;
+          if (
+            data.schema !== "migloop-time-atom/1" ||
+            C.scopeKey(data.scope) !== C.scopeKey(n.scope)
+          )
+            throw Error("续页范围不一致，未连接节点。");
+          pageRows(n, name, data.sections[name]);
+          render(n);
+          await select(n);
+        }
+        async function openRoot(s) {
+          clearError();
+          const ticket = ++epoch;
+          const requested = C.scope(s);
+          $("status").textContent = "查询时间范围…";
+          const data = await atom(requested);
+          if (ticket !== epoch) return;
+          roots = [];
+          nodes.clear();
+          const n = create(data.scope);
+          roots = [n];
+          n.data = data;
+          selected = n;
+          zoom = 1;
+          $("at").value = n.scope.at;
+          $("since").value = n.scope.since_ts || "";
+          await expand(n);
+          $("status").textContent =
+            "当前树是证据关系；手动探索不会改写模型的调查记录。";
+          updateURL(n.scope);
+        }
+        function updateURL(s) {
+          const u = new URL(location.href);
+          u.searchParams.delete("v");
+          u.searchParams.delete("agent");
+          u.searchParams.delete("file");
+          u.searchParams.set(s.kind === "file" ? "file" : "agent", s.key);
+          u.searchParams.set("at", s.at);
+          if (s.since_ts) u.searchParams.set("since_ts", s.since_ts);
+          else u.searchParams.delete("since_ts");
+          history.replaceState(null, "", u);
+        }
+        function visibleKids(n) {
+          return n.collapsed ? [] : n.children;
+        }
+        function render(focus) {
+          const canvas = $("canvas");
+          canvas.replaceChildren();
+          if (!roots.length) {
+            canvas.append(el("div", null, "从左栏选择文件或 agent。"));
+            return;
+          }
+          const positions = [],
+            links = [];
+          let maxDepth = 0,
+            minDepth = 0,
+            cursor = 65;
+          function measure(n, depth) {
+            maxDepth = Math.max(maxDepth, depth);
+            minDepth = Math.min(minDepth, depth);
+            const kids = visibleKids(n);
+            let height = kids.reduce(
+              (sum, c) =>
+                sum +
+                measure(
+                  c,
+                  depth + (c.relation?.direction === "downstream" ? -1 : 1),
+                ),
+              0,
+            );
+            const stubs = Object.values(n.pages).filter(
+              (p) => p.next_query,
+            ).length;
+            n.stubNames = Object.keys(n.pages).filter(
+              (k) => n.pages[k].next_query,
+            );
+            if (!n.collapsed) {
+              height += stubs * 58;
+              if (stubs) maxDepth = Math.max(maxDepth, depth + 1);
+            }
+            n.height = Math.max(114, height);
+            n.depth = depth;
+            return n.height;
+          }
+          roots.forEach((n) => measure(n, 0));
+          function place(n, y) {
+            n.x = 28 + (maxDepth - n.depth) * 326;
+            n.y = y + n.height / 2 - 43;
+            positions.push(n);
+            let ky = y;
+            for (const c of visibleKids(n)) {
+              place(c, ky);
+              links.push({ from: c, to: n, rel: c.relation });
+              ky += c.height;
+            }
+            n.stubY = ky;
+          }
+          for (const root of roots) {
+            place(root, cursor);
+            cursor += root.height + 65;
+          }
+          // Returning downstream can revisit an earlier column. Resolve same-column
+          // collisions without merging distinct time scopes or inventing topology.
+          for (let d = minDepth; d <= maxDepth; d++) {
+            let bottom = 40;
+            for (const n of positions
+              .filter((n) => n.depth === d)
+              .sort((a, b) => a.y - b.y)) {
+              n.y = Math.max(n.y, bottom);
+              bottom = n.y + 114;
+            }
+          }
+          const width = (maxDepth - minDepth + 1) * 326 + 30,
+            height = Math.max(cursor + 30, ...positions.map((n) => n.y + 150));
+          canvas.style.width = width + "px";
+          canvas.style.height = height + "px";
+          canvas.style.transform = "scale(" + zoom + ")";
+          const svg = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "svg",
+          );
+          svg.setAttribute("width", width);
+          svg.setAttribute("height", height);
+          canvas.append(svg);
+          function line(a, b, rel) {
+            if (a.x > b.x) [a, b] = [b, a];
+            const p = document.createElementNS(svg.namespaceURI, "path");
+            const x1 = a.x + 238,
+              y1 = a.y + 43,
+              x2 = b.x,
+              y2 = b.y + 43;
+            p.setAttribute(
+              "d",
+              `M${x1},${y1} C${(x1 + x2) / 2},${y1} ${(x1 + x2) / 2},${y2} ${x2},${y2}`,
+            );
+            p.setAttribute(
+              "class",
+              "wire " +
+                (rel.status === "candidate" ? "candidate" : "") +
+                (rel.model ? " model" : ""),
+            );
+            p.dataset.status = rel.status;
+            p.dataset.from = a.id;
+            p.dataset.to = b.id;
+            svg.append(p);
+            const t = document.createElementNS(svg.namespaceURI, "text");
+            t.setAttribute("x", (x1 + x2) / 2);
+            t.setAttribute("y", (y1 + y2) / 2 - 5);
+            t.setAttribute("text-anchor", "middle");
+            t.setAttribute("class", "edge-label");
+            t.textContent =
+              rel.status === "candidate"
+                ? "候选 " + rel.kind
+                : rel.kind === "read"
+                  ? "已返回读"
+                  : rel.kind === "delete"
+                    ? "历史删除"
+                    : "历史写";
+            svg.append(t);
+          }
+          for (const l of links) line(l.from, l.to, l.rel);
+          for (let d = minDepth; d <= maxDepth; d++) {
+            const c = el(
+              "div",
+              "column",
+              d === 0
+                ? "根 · 选定时间范围"
+                : d > 0
+                  ? "上游查阅 " + d
+                  : "下游查阅 " + -d,
+            );
+            c.style.left = 28 + (maxDepth - d) * 326 + "px";
+            canvas.append(c);
+          }
+          for (const n of positions) {
+            const claims = claimList(n),
+              problem = claims.some((c) =>
+                ["origin", "propagated"].includes(c.role),
+              );
+            const div = el(
+              "div",
+              "node " +
+                n.scope.kind +
+                (roots.includes(n) ? " root" : "") +
+                (n === selected ? " selected" : "") +
+                (problem ? " claimed" : "") +
+                (claims.some((c) => c.role === "origin") ? " entry" : "") +
+                (visits(n).length ? " recorded" : "") +
+                (n.relation?.status === "candidate" ? " candidate" : ""),
+            );
+            div.dataset.nodeId = n.id;
+            div.dataset.scope = C.scopeKey(n.scope);
+            div.style.left = n.x + "px";
+            div.style.top = n.y + "px";
+            div.title = n.scope.key + "\n截至 " + n.scope.at;
+            div.append(
+              el("span", "node-title", label(n.scope)),
+              el(
+                "span",
+                "node-time",
+                n.scope.at.replace("T", " ").replace(/000Z$/, "Z"),
+              ),
+            );
+            let note = n.busy
+              ? "载入中…"
+              : n.loop
+                ? "同一范围已在祖先中 · 可查看，不重复展开"
+                : n.expanded
+                  ? "点选详情 · " + n.children.length + " 个关系入口"
+                  : "点击展开" +
+                    (n.scope.kind === "file" ? "历史写者" : "读取输入");
+            if (claims.length)
+              note =
+                claims.map((c) => c.finding + " · " + c.role).join(" / ") +
+                " · 模型主张";
+            div.append(el("span", "node-note", note));
+            div.onclick = () => {
+              (n.expanded || n.loop ? select(n) : expand(n)).catch(issue);
+            };
+            canvas.append(div);
+            if (!n.collapsed)
+              n.stubNames.forEach((name, i) => {
+                const p = n.pages[name],
+                  stub = el(
+                    "button",
+                    "node stub",
+                    "+" +
+                      p.remaining +
+                      " 条" +
+                      (name === "writes"
+                        ? "写入"
+                        : name === "reads"
+                          ? "读取"
+                          : "候选") +
+                      "未展开",
+                  );
+                stub.style.left = n.x - 326 + "px";
+                stub.style.top = n.stubY + i * 58 + "px";
+                stub.dataset.section = name;
+                stub.onclick = () => more(n, name).catch(issue);
+                canvas.append(stub);
+              });
+          }
+          $("rootname").textContent =
+            roots.length === 1
+              ? label(roots[0].scope) + " · 截至 " + roots[0].scope.at
+              : roots.length + " 个时间根 · 无依据的部分不连线";
+          if (focus) requestAnimationFrame(() => focusNode(focus));
+        }
+        function focusNode(n) {
+          if (!n || n.x == null) return;
+          const g = $("graph");
+          g.scrollLeft = Math.max(0, (n.x + 119) * zoom - g.clientWidth / 2);
+          g.scrollTop = Math.max(0, (n.y + 43) * zoom - g.clientHeight / 2);
+        }
+        async function select(n) {
+          if (!contains(n)) return;
+          intent++;
+          selected = n;
+          render();
+          const ticket = ++detailEpoch;
+          const side = $("side");
+          side.replaceChildren();
+          side.append(
+            el("h2", null, label(n.scope)),
+            el("div", "mono", n.scope.key),
+            el("div", "time", "截至 " + n.scope.at),
+          );
+          if (n.scope.since_ts)
+            side.append(el("div", "time", "从 " + n.scope.since_ts + " 开始"));
+          side.append(
+            el(
+              "p",
+              "subtle",
+              "此节点代表截止时间内的证据，不是完整磁盘或上下文快照。",
+            ),
+          );
+          const controls = el("div", "row");
+          button(controls, "以此为根", () => openRoot(n.scope));
+          if (n.expanded)
+            button(controls, n.collapsed ? "展开分支" : "折叠分支", () => {
+              n.collapsed = !n.collapsed;
+              render(n);
+              select(n);
+            });
+          side.append(controls);
+          for (const claim of claimList(n)) renderClaim(side, claim, n.scope);
+          const otherClaims = (probe?.argument_graph?.nodes || []).filter(
+            (c) =>
+              c.kind === n.scope.kind &&
+              (c.binding?.canonical_key || c.key) === n.scope.key &&
+              !C.claimMatches(probe.argument_graph, c, n.scope),
+          );
+          if (otherClaims.length) {
+            const box = el("details");
+            box.append(
+              el(
+                "summary",
+                null,
+                "同一实体其他时间的主张 · " + otherClaims.length,
+              ),
+            );
+            for (const c of otherClaims)
+              button(box, c.finding + " · " + c.at, () => openClaim(c));
+            side.append(box);
+          }
+          if (n.relation) {
+            const rel = el("details");
+            rel.open = true;
+            rel.append(el("summary", null, n.relation.label || "本跳操作依据"));
+            if (n.relation.model) {
+              const edge = n.relation.evidence;
+              rel.append(el("p", "reason", edge.claim || "未填写传播理由"));
+              details(rel, "关系核验（与传播主张分开）", edge.binding);
+              details(rel, "模型声明及引用", edge);
+            } else renderOperation(rel, n.relation.evidence, n.parent.scope);
+            side.append(rel);
+          }
+          const knownVisits = visits(n);
+          if (knownVisits.length)
+            details(
+              side,
+              "对应范围的原始查询（不证明正文全部交付）",
+              knownVisits,
+            );
+          const data = n.data || (await atom(n.scope));
+          if (ticket !== detailEpoch || selected !== n) return;
+          n.data = data;
+          const coverage = data.coverage || {};
+          if (data.stale_annotation_sources?.length || data.warnings?.length)
+            side.append(
+              el(
+                "div",
+                "warn",
+                (data.warnings || []).join("\n") ||
+                  "来源已变化，操作注释已隐藏。",
+              ),
+            );
+          side.append(
+            el(
+              "div",
+              "subtle",
+              "索引操作不是全部效应。原始记录 " +
+                data.raw_index.total +
+                " 条；时间未知 " +
+                data.raw_index.unknown_time_count +
+                " 条。",
+            ),
+          );
+          for (const name of Object.keys(data.sections)) {
+            const page = data.sections[name],
+              d = el("details");
+            d.dataset.section = name;
+            d.append(
+              el(
+                "summary",
+                null,
+                {
+                  writes: "历史写入",
+                  reads: "已返回读取",
+                  candidates: "候选操作（未确认）",
+                  messages: "原始消息 / 输入",
+                }[name] +
+                  " · " +
+                  page.total,
+              ),
+            );
+            let loaded = false;
+            d.ontoggle = () => {
+              if (!d.open || loaded) return;
+              loaded = true;
+              const host = el("div");
+              d.append(host);
+              loadSection(n, name, page.query, host).catch((e) => {
+                host.textContent = e.message;
+                loaded = false;
+              });
+            };
+            side.append(d);
+          }
+          const tools = el("div", "row");
+          button(tools, "相关原始记录", () =>
+            independent(data.raw_index.query, side, n.scope),
+          );
+          button(tools, "所有原生调用", () =>
+            independent(data.events_query, side, n.scope),
+          );
+          if (n.scope.kind === "file") {
+            for (const tool of ["diff", "blame"])
+              button(tools, tool, () =>
+                independent(
+                  {
+                    tool,
+                    args: {
+                      path: n.scope.key,
+                      at: n.scope.at,
+                      since_ts: n.scope.since_ts,
+                    },
+                  },
+                  side,
+                  n.scope,
+                ),
+              );
+          }
+          side.append(tools);
+          const search = el("details");
+          search.append(el("summary", null, "在此时间范围搜索"));
+          const text = el("textarea");
+          text.rows = 3;
+          text.style.width = "100%";
+          text.placeholder = "关键词一\n关键词二";
+          search.append(text);
+          button(search, "搜索当前节点", () =>
+            independent(
+              {
+                tool: "search",
+                args: {
+                  q_any: text.value.split(/\r?\n/).filter(Boolean),
+                  [n.scope.kind === "file" ? "file" : "agent"]: n.scope.key,
+                  at: n.scope.at,
+                  since_ts: n.scope.since_ts,
+                  limit: 40,
+                },
+              },
+              search,
+              n.scope,
+            ),
+          );
+          button(search, "同一截止时间 · 全池搜索", () =>
+            independent(
+              {
+                tool: "search",
+                args: {
+                  q_any: text.value.split(/\r?\n/).filter(Boolean),
+                  at: n.scope.at,
+                  since_ts: n.scope.since_ts,
+                  limit: 40,
+                },
+              },
+              search,
+              {
+                kind: "pool",
+                key: null,
+                at: n.scope.at,
+                since_ts: n.scope.since_ts,
+              },
+            ),
+          );
+          side.append(search);
+          if (data.body_sources) {
+            const body = el("details");
+            body.append(el("summary", null, "文件正文的其他原始入口"));
+            renderNavigation(body, data.body_sources, n.scope);
+            side.append(body);
+          }
+          const versions = el("details");
+          versions.append(
+            el("summary", null, "旧版本坐标 → 关键时间（仅快捷入口）"),
+          );
+          let vLoaded = false;
+          versions.ontoggle = () => {
+            if (versions.open && !vLoaded) {
+              vLoaded = true;
+              versionShortcuts(n, versions).catch((e) =>
+                versions.append(el("div", "error", e.message)),
+              );
+            }
+          };
+          side.append(versions);
+          details(side, "覆盖边界与未知", coverage);
+          details(side, "完整原始返回", data);
+        }
+        async function loadSection(n, name, query, host) {
+          const item = await run(query);
+          const data = item.data,
+            page = data.sections?.[name];
+          if (!page) throw Error("缺少对应分区");
+          host.replaceChildren();
+          host.append(
+            el(
+              "div",
+              "subtle",
+              "共 " +
+                page.total +
+                " 条，本页 " +
+                page.rows.length +
+                " 条，剩余 " +
+                page.remaining +
+                " 条",
+            ),
+          );
+          const r = el("div", "row");
+          if (name !== "messages")
+            button(r, "将本页操作加入树（仅有依据的边）", () => {
+              if (!contains(n))
+                throw Error("原树已切换，请在当前节点重新展开。");
+              pageRows(n, name, page);
+              render(n);
+            });
+          if (page.next_query)
+            button(r, "下一页", () =>
+              loadSection(n, name, page.next_query, host),
+            );
+          host.append(r);
+          for (const row of page.rows) {
+            const d = el("details", "section-row");
+            d.append(
+              el(
+                "summary",
+                null,
+                (row.tool || row.message_kind || "记录") +
+                  " · " +
+                  (row.operation?.path || row.agent || row.ts || ""),
+              ),
+            );
+            if (name === "messages") {
+              d.append(el("div", "reason", row.preview || ""));
+              queryButton(d, "展开原始字段", row.expand_query, n.scope);
+            } else renderOperation(d, row, n.scope);
+            host.append(d);
+          }
+        }
+        function renderOperation(host, row, s) {
+          if (!row) return;
+          host.append(
+            el(
+              "div",
+              "subtle",
+              "发起 " +
+                (row.use_ts || "未知") +
+                "；返回 " +
+                (row.done_ts || "未确认"),
+            ),
+          );
+          host.append(
+            el(
+              "div",
+              "subtle",
+              "操作 " +
+                (row.operation?.status || "未知") +
+                "；正文交付 " +
+                (row.operation?.delivery || "未认证") +
+                "。操作不等于问题传播。",
+            ),
+          );
+          queryButton(host, "展开该调用原文", row.expand_query, s);
+          for (const q of [row.agent_query, row.file_query])
+            if (q)
+              button(host, "独立打开 " + q.tool, () =>
+                openRoot({
+                  kind: q.tool,
+                  key: q.args[q.tool === "file" ? "path" : "id"],
+                  at: q.args.at,
+                  since_ts: q.args.since_ts || null,
+                }),
+              );
+          details(host, "完整操作证据", row);
+        }
+        function queryButton(host, title, q, s) {
+          if (q) button(host, title, () => independent(q, host, s));
+        }
+        function renderNavigation(host, value, s) {
+          details(host, "导航元数据", value);
+          queryButton(host, "展开入口", value.query, s);
+          queryButton(host, "下一页", value.next_query, s);
+          for (const row of value.entries || []) {
+            const d = el("details");
+            d.append(el("summary", null, row.ref || row.source || "原文"));
+            queryButton(d, "展开此入口", row.query, s);
+            host.append(d);
+          }
+        }
+        async function independent(query, host, s) {
+          const out = el("div", "query-output");
+          out.append(
+            el("div", "subtle", "当前查看器独立重查 · 不增加模型访问记录"),
+          );
+          host.append(out);
+          try {
+            const request = {
+              tool: query.tool,
+              args: { ...query.args },
+              ...(query.scope ? { scope: query.scope } : { scope: s }),
+            };
+            const item = await run(request);
+            renderResult(out, item, request);
+          } catch (e) {
+            out.append(el("div", "error", e.message));
+            throw e;
+          }
+        }
+        function renderResult(host, item, request) {
+          const d = item.data || {};
+          if (d.text != null) host.append(el("pre", null, d.text));
+          else if (d.rows)
+            for (const row of d.rows) {
+              const box = el("details");
+              box.append(
+                el(
+                  "summary",
+                  null,
+                  (row.tool || row.kind || row.type || row.status || "记录") +
+                    " · " +
+                    (row.ts || row.observed_at || row.ref || ""),
+                ),
+              );
+              if (row.text != null) box.append(el("pre", null, row.text));
+              if (row.diff != null) box.append(el("pre", null, row.diff));
+              for (const q of [row.expand_query, row.query])
+                queryButton(box, "展开原文", q, item.scope || request.scope);
+              details(box, "返回数据", row);
+              host.append(box);
+            }
+          details(host, "完整查询结果", item);
+          for (const next of item.continuations || [])
+            queryButton(
+              host,
+              "继续展开未交付部分",
+              next.next_query,
+              next.scope || item.scope || request.scope,
+            );
+          if (d.next_query)
+            queryButton(
+              host,
+              "下一页",
+              d.next_query,
+              item.scope || request.scope,
+            );
+          else if (d.next_offset != null)
+            queryButton(
+              host,
+              "下一页（同一范围）",
+              { ...request, args: { ...request.args, offset: d.next_offset } },
+              item.scope || request.scope,
+            );
+        }
+        async function versionShortcuts(n, host) {
+          const field = n.scope.kind === "file" ? "path" : "id";
+          const old = await getJSON(
+            API +
+              "/" +
+              n.scope.kind +
+              "?" +
+              new URLSearchParams({ [field]: n.scope.key }),
+          );
+          host.append(
+            el(
+              "div",
+              "subtle",
+              "旧 v 是关键事件标签；点击后只使用其时间，不混用 v 参数。相同时间的版本共享同一时间范围，未必存在唯一先后。",
+            ),
+          );
+          const versions =
+            n.scope.kind === "file"
+              ? (old.versions || []).map((v) => ({ v: v.v, ts: v.ts }))
+              : (old.actions || [])
+                  .filter((a) => a.ver != null)
+                  .map((a) => ({ v: a.ver, ts: a.ts }));
+          for (const v of versions) {
+            if (!v.ts) continue;
+            let at;
+            try {
+              at = C.normalizeTime(v.ts);
+            } catch {
+              continue;
+            }
+            if (at > n.scope.at) continue;
+            button(host, "v" + v.v + " · " + at, () =>
+              openRoot({ ...n.scope, at, since_ts: null }),
+            );
+          }
+          if (!versions.length)
+            host.append(
+              el(
+                "div",
+                "subtle",
+                "无可用版本时间；仍可直接输入任意有效截止时间。",
+              ),
+            );
+        }
+        function renderClaim(host, c, s) {
+          const d = el("details", "claim-detail");
+          d.open = true;
+          d.dataset.claimId = c.id;
+          d.append(
+            el("summary", null, c.finding + " · " + c.role + " · 模型主张"),
+            el("p", "reason", c.reason || "未填写原因"),
+          );
+          d.append(
+            el("div", "subtle", "节点坐标可核 ≠ 原文支持断言 ≠ 归因正确。"),
+          );
+          details(d, "节点定位状态", c.binding);
+          for (const [name, refs] of [
+            ["支持证据", c.evidence],
+            ["反证 / 边界", c.counterevidence],
+          ]) {
+            const box = el("details");
+            box.append(el("summary", null, name + " · " + (refs || []).length));
+            for (const e of refs || []) {
+              const row = el("div", "section-row");
+              row.append(
+                el("div", "mono", e.original_ref || e.ref || String(e)),
+                el(
+                  "div",
+                  "subtle",
+                  (e.status || "未核") + " · " + (e.diag || ""),
+                ),
+              );
+              if (
+                e.status === "ok" &&
+                (e.raw_ref || e.ref || "").startsWith("raw:")
+              )
+                queryButton(
+                  row,
+                  "展开原文",
+                  {
+                    tool: "record",
+                    args: { ref: e.raw_ref || e.ref, max_chars: null },
+                    scope: e.scope || s,
+                  },
+                  e.scope || s,
+                );
+              details(row, "引用校验", e);
+              box.append(row);
+            }
+            d.append(box);
+          }
+          host.append(d);
+        }
+        async function openClaim(c) {
+          if (
+            !C.claimMatches(probe.argument_graph, c, {
+              kind: c.kind,
+              key: c.binding?.canonical_key || c.key,
+              at: c.binding?.at || c.at,
+              since_ts: null,
+            })
+          )
+            throw Error("此主张的身份或时间尚未核回，不能绑定到当前树。");
+          await openRoot({
+            kind: c.kind,
+            key: c.binding.canonical_key,
+            at: c.binding.at,
+            since_ts: null,
+          });
+        }
+        async function showFinding(fid) {
+          const g = probe?.argument_graph;
+          if (!g) return;
+          finding = fid;
+          renderModel();
+          const cs = (g.nodes || []).filter(
+            (c) =>
+              c.finding === fid &&
+              C.claimMatches(g, c, {
+                kind: c.kind,
+                key: c.binding?.canonical_key,
+                at: c.binding?.at,
+                since_ts: null,
+              }),
+          );
+          if (!cs.length)
+            throw Error(
+              "此结论没有已核回的时间节点；主张仍保留，不绑定到其他时刻。",
+            );
+          const primary =
+            cs.find((c) => c.kind === "file" && c.role === "repaired") ||
+            cs.find((c) => c.kind === "file") ||
+            cs.find((c) => c.role === "repaired") ||
+            cs[0];
+          epoch++;
+          nodes.clear();
+          roots = [];
+          const byClaim = new Map();
+          for (const c of cs) {
+            const n = create({
+              kind: c.kind,
+              key: c.binding.canonical_key,
+              at: c.binding.at,
+              since_ts: null,
+            });
+            byClaim.set(c.id, n);
+            roots.push(n);
+          }
+          for (const e of g.edges || []) {
+            if (e.finding !== fid || !C.modelEdgeAllowed(g, e)) continue;
+            const child = byClaim.get(e.from),
+              parent = byClaim.get(e.to);
+            if (
+              !child ||
+              !parent ||
+              child.parent ||
+              ancestors(parent).includes(C.scopeKey(child.scope))
+            )
+              continue;
+            const candidate =
+              e.binding.status === "candidate" ||
+              e.relation.startsWith("possible_");
+            child.parent = parent;
+            child.relation = {
+              kind: e.relation.replace("possible_", ""),
+              status: candidate ? "candidate" : "confirmed",
+              model: true,
+              direction: "upstream",
+              label: candidate
+                ? "模型声明的候选关系 · 未证明读写发生"
+                : "模型声明的关系 · 读写定位已核，传播原因未验证",
+              evidence: e,
+            };
+            parent.children.push(child);
+            roots = roots.filter((r) => r !== child);
+          }
+          const main = byClaim.get(primary.id);
+          roots.sort((a, b) => (b === main ? 1 : 0) - (a === main ? 1 : 0));
+          selected = main;
+          $("at").value = main.scope.at;
+          $("since").value = "";
+          render(main);
+          const u = new URL(location.href);
+          for (const key of ["file", "agent", "at", "since_ts", "v"])
+            u.searchParams.delete(key);
+          u.searchParams.set("finding", fid);
+          history.replaceState(null, "", u);
+          await expand(main);
+          $("status").textContent =
+            "已载入结论 " +
+            fid +
+            "；未核出关系的主张保留为独立时间根，不补边。";
+        }
+        async function loadProbe(options = {}) {
+          clearError();
+          const runName = $("run").value.trim();
+          if (!runName) return;
+          const ticket = ++probeRequest,
+            nav = epoch;
+          const p = await getJSON(
+            PROBE_API + "?run=" + encodeURIComponent(runName),
+          );
+          if (ticket !== probeRequest) return;
+          probe = p;
+          finding = options.finding || null;
+          renderModel();
+          renderTrace();
+          if (!p.argument_graph) {
+            render();
+            if (selected) await select(selected);
+            $("model-summary").textContent =
+              "旧报告已保留，但没有时间节点；不将 v 猜成时间。手动探索仍可用。";
+            details($("model-summary"), "原报告", p.report);
+            return;
+          }
+          if (options.navigate !== false && nav === epoch) {
+            const first =
+              p.argument_graph.findings?.find((f) => f.id === finding) ||
+              p.argument_graph.findings?.[0];
+            if (first && p.argument_graph.identity?.bound === true)
+              await showFinding(first.id);
+            else {
+              const target = p.target || p.argument_graph.target;
+              if (target?.file && target?.at)
+                await openRoot({
+                  kind: "file",
+                  key: target.file,
+                  at: target.at,
+                  since_ts: null,
+                });
+            }
+          } else {
+            render();
+            if (selected) await select(selected);
+          }
+          const u = new URL(location.href);
+          u.searchParams.set("probe", runName);
+          history.replaceState(null, "", u);
+        }
+        function renderModel() {
+          const host = $("model-list");
+          host.replaceChildren();
+          const g = probe?.argument_graph;
+          if (!g) return;
+          $("model-summary").textContent =
+            (g.identity?.bound === true
+              ? "账本身份匹配"
+              : "身份未绑定，不给当前树上色") +
+            (g.partial_document ? " · 原稿格式不合规，仅局部预览" : "") +
+            "。红色只是模型主张。";
+          for (const f of g.findings || []) {
+            const box = el("details");
+            box.open = f.id === finding;
+            box.append(el("summary", null, f.id + " · " + f.title));
+            box.append(el("p", "reason", f.reason || ""));
+            button(box, "在树上查看该结论", () => showFinding(f.id));
+            for (const c of (g.nodes || []).filter((c) => c.finding === f.id)) {
+              button(
+                box,
+                label({ kind: c.kind, key: c.key }) + " · " + c.role,
+                async () => {
+                  finding = f.id;
+                  await openClaim(c);
+                  renderModel();
+                },
+              );
+            }
+            details(box, "未知 / 建议 / 验证", {
+              unknown: f.unknown,
+              recommendation: f.recommendation,
+              validation: f.validation,
+            });
+            const edges = (g.edges || []).filter((e) => e.finding === f.id);
+            details(box, "声明的关系与核验（不自动补边）", edges);
+            host.append(box);
+          }
+          details(host, "原始模型报告 / YAML", probe.report);
+          details(host, "格式与绑定诊断", g.diagnostics);
+          details(host, "完整结构化结论", g);
+        }
+        function renderTrace() {
+          const host = $("trace");
+          host.replaceChildren();
+          const rows = traceRows();
+          $("trace-count").textContent =
+            "· " +
+            (probe?.query_trace?.steps || []).length +
+            " 步 / " +
+            rows.length +
+            " 行（含批量项）";
+          for (const r of rows) {
+            const d = el("details", "trace-item");
+            d.append(
+              el(
+                "summary",
+                null,
+                "#" + r.step + " " + r.tool + " · " + r.status,
+              ),
+              el("div", "subtle", r.boundary?.reason || "交付边界未记录"),
+            );
+            details(d, "原始请求与回执", r.source);
+            if (r.scope && ["file", "agent"].includes(r.scope.kind))
+              button(d, "在树上独立查看这个时间范围", () =>
+                openRoot(C.scope(r.scope)),
+              );
+            host.append(d);
+          }
+        }
+        function directory() {
+          const host = $("directory");
+          host.replaceChildren();
+          if (!index) return;
+          const q = $("q").value.toLowerCase();
+          let rows = [
+            ...(index.files || []).map((f) => ({
+              kind: "file",
+              key: f.path,
+              count: f.n_versions,
+            })),
+            ...(index.agents || []).map((a) => ({
+              kind: "agent",
+              key: a.id,
+              title: a.label,
+              count: a.n_versions,
+            })),
+          ];
+          rows = rows.filter((r) =>
+            (r.key + " " + (r.title || "")).toLowerCase().includes(q),
+          );
+          if (!q) {
+            const fixed = new Set([probe?.target?.file, ...(DATA.fixes || []).map((f) => f.id)]);
+            rows.sort(
+              (a, b) => (fixed.has(b.key) ? 1 : 0) - (fixed.has(a.key) ? 1 : 0),
+            );
+          }
+          host.append(
+            el(
+              "div",
+              "subtle",
+              rows.length + " 个入口；名称命中不代表读写关系",
+            ),
+          );
+          for (const r of rows.slice(0, directoryLimit)) {
+            const b = button(
+              host,
+              "",
+              () => openRoot({ kind: r.kind, key: r.key, ...scopeControls() }),
+              "directory-item",
+            );
+            b.append(
+              el(
+                "span",
+                "directory-label",
+                (r.kind === "file" ? "▱ " : "○ ") +
+                  (r.title || baseName(r.key)),
+              ),
+              el(
+                "span",
+                "directory-meta",
+                r.kind + " · " + r.count + " 个旧版本标签",
+              ),
+            );
+            b.title = r.key;
+          }
+          if (rows.length > directoryLimit)
+            button(host, "更多目录项", () => {
+              directoryLimit += 60;
+              directory();
+            });
+        }
+        $("q").oninput = () => {
+          directoryLimit = 60;
+          directory();
+        };
+        $("load-probe").onclick = () => loadProbe().catch(issue);
+        $("apply-time").onclick = () => {
+          if (!roots[0]) return issue("请先选一个根");
+          openRoot({ ...roots[0].scope, ...scopeControls() }).catch(issue);
+        };
+        $("direct-open").onclick = () =>
+          openRoot({
+            kind: $("direct-kind").value,
+            key: $("direct-key").value.trim(),
+            ...scopeControls(),
+          }).catch(issue);
+        $("zoom-in").onclick = () => {
+          zoom = Math.min(1.4, zoom + 0.1);
+          render(selected || roots[0]);
+        };
+        $("zoom-out").onclick = () => {
+          zoom = Math.max(0.6, zoom - 0.1);
+          render(selected || roots[0]);
+        };
+        $("focus-root").onclick = () => focusNode(roots[0]);
+        $("fit").onclick = () => {
+          if (!roots.length) return;
+          zoom = Math.max(
+            0.6,
+            Math.min(
+              1,
+              $("graph").clientWidth / parseFloat($("canvas").style.width),
+              $("graph").clientHeight / parseFloat($("canvas").style.height),
+            ),
+          );
+          render(roots[0]);
+        };
+        $("reset").onclick = () => {
+          epoch++;
+          detailEpoch++;
+          roots = [];
+          nodes.clear();
+          selected = null;
+          $("side").replaceChildren(
+            el("p", "subtle", "选择新的时间根；已载入的模型报告仍保留。"),
+          );
+          render();
+        };
+        window.__timeTree = {
+          state: () => ({
+            roots: roots.map((n) => ({ id: n.id, scope: n.scope })),
+            nodes: [...nodes.values()].map((n) => ({
+              id: n.id,
+              scope: n.scope,
+              parent: n.parent?.id,
+              relation: n.relation,
+              expanded: n.expanded,
+              claims: claimList(n).map((c) => c.id),
+            })),
+            selected: selected?.id,
+            manual,
+            trace: probe?.query_trace,
+            argument: probe?.argument_graph,
+          }),
+          open: openRoot,
+        };
+        async function boot() {
+          try {
+            $("subtitle").textContent =
+              (DATA.project || "") +
+              " · session " +
+              (DATA.sid8 || "") +
+              " · 与 MCP 共用时间查询内核";
+            index = await getJSON(API + "/index");
+            const end = index.time_scope?.latest_known_pool_time;
+            if (!end)
+              throw Error("没有已知全池截止时间；请输入明确时间后直接打开。");
+            $("at").value = end;
+            directory();
+            $("status").textContent =
+              "目录已就绪 · 版本标签不限定你能查询的时间。";
+            const url = new URL(location.href),
+              kind = url.searchParams.has("file")
+                ? "file"
+                : url.searchParams.has("agent")
+                  ? "agent"
+                  : null;
+            if (url.searchParams.get("probe")) {
+              $("run").value = url.searchParams.get("probe");
+              await loadProbe({
+                navigate: !kind,
+                finding: url.searchParams.get("finding"),
+              });
+            }
+            if (kind)
+              await openRoot({
+                kind,
+                key: url.searchParams.get(kind),
+                at: url.searchParams.get("at") || end,
+                since_ts: url.searchParams.get("since_ts") || null,
+              });
+          } catch (e) {
+            issue(e);
+            $("status").textContent =
+              "加载失败；保留错误，不静默回退到旧版本树。";
+          }
+        }
+        boot();
+      })();
+    </script>
+  </body>
+</html>
