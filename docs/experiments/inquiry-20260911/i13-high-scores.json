@@ -1,0 +1,18 @@
+{
+  "schema":"inquiry-developer-score/1",
+  "round":"i13-high","model":"gpt-5.6-luna","effort":"high",
+  "reference":"../file-first-10/scoring-core.json",
+  "grading":"Developer semantic review of both original reports; not blind, not a full-cohort result. The unfiltered outline is available and used, but availability is not attribution correctness.",
+  "cases":[
+    {"id":"F10-02","report_id":"9881658909ba46ae","units":{"mask":"correct","icon":"correct","back-gate":"partial","progress":"correct","system-bars":"correct"},"basis":"All local modification families found. Still omits initial handler then assembly removal; protocol-return fallback is not fully explained. Actual generation outline contains the removed handler and emitted frames include it, so this miss cannot be attributed to undisclosed truncation."},
+    {"id":"F10-03","report_id":"bc0717d0a33d40a0","units":{"label":"correct","button-style":"correct","test-integration":"correct","logging":"partial","comment-policy":"correct"},"basis":"Strongly recovers actual generation deliberation choosing Roll under AC14 and later runtime conflict. Logging stays at ECAT cleanup, omitting the earlier visual-repair addition even though both plus-console and minus-console lines were delivered in the outline."}
+  ],
+  "summary":{"correct":8,"partial":2,"omitted":0,"wrong":0,"total":10,"unit_weighted_percent":80.0},
+  "additional_errors":[
+    {"case":"F10-03","major":true,"quote":"生成者未读 themes.xml 的事实来自其 input_scope 的原生读路径清单","counterevidence":"The same generator's Bash return L40/e-b36ea4332843 at 15:38:45.901Z includes values/themes.xml and values-night/themes.xml contents, before its Write L75 at 15:52:02.314Z. Native Read-path absence is not absence of delivered tool content."}
+  ],
+  "adjudication_corrections":{"date":"2026-09-11","record":"i14-adjudication-corrections.md","retracted":["Wrong visual actor: s-agent-eb3f1b28c6e5 and s-agent-b7cac272cfd0 resolve to the SAME fixer at different cutoffs.","Wrong log citation: e-4e8699c255a6 IS the console.error to hilog.error Edit; e-229789c2e667 edits a comment."],"core_score_changed":false},
+  "delivery":{"Splash":{"frames_sent":85,"frames_visible_complete":85,"mechanical_status":"valid"},"DiceIndex":{"frames_sent":79,"frames_visible_complete":79,"mechanical_status":"valid"},"semantic_verified":false},
+  "cost":{"model_seconds_sum":754.0492203000467,"input_plus_output":5019447,"by_case":{"F10-02":{"seconds":399.52473669999745,"tokens":2248370},"F10-03":{"seconds":354.5244836000493,"tokens":2771077}}},
+  "accepted":false
+}

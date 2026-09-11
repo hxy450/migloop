@@ -11,9 +11,9 @@
   "additional_errors":[
     {"case":"F10-01","major":true,"quote":"后续 Slice 8 接线引入 helper 可见性编译错误","counterevidence":"Slice8 native Write is July 24. Visual fixer agent-a68daf720e780b4c2 L592 first adds private priceDigits/priceSuffix on July 26, then builder reports and removes private. This is repair-created, not Slice8-generated."},
     {"case":"F10-01","major":true,"quote":"未见修复后 BUILD SUCCESSFUL","counterevidence":"agent-af0e3d2ae54dbf769.jsonl L37, e-67b279e75764, 2026-07-26T21:46:28.608Z, is BUILD SUCCESSFUL before observation cutoff."},
-    {"case":"F10-01","major":false,"quote":"脚本报告本页 4 sites/import 并成功返回","counterevidence":"Actual repair return L104/e-827ccccf4976 says MemberCenterPage 3 sites. There are four controllers but H5 already has a transparent mask."},
-    {"case":"F10-03","major":true,"quote":"finding A node f: 后续视觉任务完成修复。","counterevidence":"Node s-agent-eb3f1b28c6e5 is the visual finding author, not the actual code repair writer s-agent-b7cac272cfd0. Its owned references can validate the source identity without establishing the claimed repair responsibility."}
+    {"case":"F10-01","major":false,"quote":"脚本报告本页 4 sites/import 并成功返回","counterevidence":"Actual repair return L104/e-827ccccf4976 says MemberCenterPage 3 sites. There are four controllers but H5 already has a transparent mask."}
   ],
+  "adjudication_corrections":{"date":"2026-09-11","record":"i14-adjudication-corrections.md","retracted":["Wrong actor: both cited agent scope IDs resolve to the same actual fixer, at different cutoffs."],"core_score_changed":false},
   "cost":{"model_seconds_sum":680.3560739000095,"input_plus_output":3176104,"accounting":"Cached input included once; reasoning is not double counted. Import/offline audit separate."},
   "accepted":false
 }
