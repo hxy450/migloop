@@ -6,9 +6,60 @@ Literal predecessors are deliberately weaker than line authorship.
 
 from collections import defaultdict
 
-from .citations import cited_refs
+from .citations import cited_refs, inline_refs
 from .native_text import change_outline, change_payloads
 from .store import iso, timestamp
+
+CHECK_TERMS = [
+    "BUILD SUCCESSFUL",
+    "BUILD FAILED",
+    "BUILD_EXIT_CODE",
+    "install bundle successfully",
+    "INSTALL_FAILED",
+    "tests passed",
+    "tests failed",
+    "test result",
+]
+CHECK_ANCHOR_TERMS = CHECK_TERMS + ["Compiler Error", "Error Message:"]
+
+
+def return_window(engine, agent, at, cutoff, limitations):
+    """A bounded navigation window, shared by write and cited-check anchors."""
+    all_returns = {
+        "op": "agent",
+        "key": agent,
+        "since": iso(at),
+        "at": cutoff,
+        "view": "returns",
+        "offset": 0,
+        "limit": 20,
+    }
+    # The public query contract permits at most eight terms per request.
+    query = {**all_returns, "limit": 5, "terms": CHECK_TERMS}
+    data = engine.query(query)
+    matches = []
+    for row in data["rows"]:
+        try:
+            engine.store.source_record(row["ref"])
+        except (ValueError, OSError) as exc:
+            limitations.append({"ref": row["cite"], "error": str(exc)})
+            continue
+        matches.append(
+            {k: row[k] for k in ("cite", "at", "name", "line", "tools", "excerpt")}
+        )
+    return {
+        "agent": agent,
+        "since": iso(at),
+        "at": cutoff,
+        "total": data["total"],
+        "matches": matches,
+        "next": data["next"],
+        "query": query,
+        "all_returns_query": all_returns,
+        "not_validation_proof": True,
+        "not_absence_proof": True,
+        "note": "Server lookup, not a model-opened source. Markers in recorded tool returns may be quoted docs, old logs or another target. Received at/after this anchor does not prove a later-started command, target-state validation, supersession or behavior success. Open originals and paired commands; zero hits does not prove no validation.",
+    }
 
 
 def post_write_returns(engine, operations, target, limitations):
@@ -18,57 +69,62 @@ def post_write_returns(engine, operations, target, limitations):
     for op in operations:
         if op["op"] == "write" and op["agent"] and (start is None or op["at"] >= start):
             latest[op["agent"]] = max(op["at"], latest.get(op["agent"], op["at"]))
-    rows = []
-    for agent, at in sorted(latest.items()):
-        all_returns = {
-            "op": "agent",
-            "key": agent,
-            "since": iso(at),
-            "at": target["at"],
-            "view": "returns",
-            "offset": 0,
-            "limit": 20,
-        }
-        query = {
-            **all_returns,
-            "limit": 5,
-            "terms": [
-                "BUILD SUCCESSFUL",
-                "BUILD FAILED",
-                "BUILD_EXIT_CODE",
-                "install bundle successfully",
-                "INSTALL_FAILED",
-                "tests passed",
-                "tests failed",
-                "test result",
-            ],
-        }
-        data = engine.query(query)
-        matches = []
-        for row in data["rows"]:
-            try:
-                engine.store.source_record(row["ref"])
-            except (ValueError, OSError) as exc:
-                limitations.append({"ref": row["cite"], "error": str(exc)})
-                continue
-            matches.append(
-                {k: row[k] for k in ("cite", "at", "name", "line", "tools", "excerpt")}
+    return [
+        return_window(engine, agent, at, target["at"], limitations)
+        for agent, at in sorted(latest.items())
+    ]
+
+
+def cited_check_followups(engine, document, target, limitations):
+    """Cited check-like returns may be superseded, even for non-writing actors.
+
+    Literal markers select navigation anchors, not a classifier of real tests.
+    No candidate is added to the submitted evidence or to historical edges.
+    """
+    latest = {}
+    cutoff = timestamp(target["at"], required=True)
+    references = set(inline_refs(document.get("unexplained", [])))
+    for finding in document["findings"]:
+        references.update(cited_refs(finding, engine.store))
+    for ref in sorted(references):
+        try:
+            record, _ = engine.store.source_record(ref)
+        except (ValueError, OSError, TypeError) as exc:
+            limitations.append({"ref": ref, "error": str(exc)})
+            continue
+        if (
+            not record["agent"]
+            or record["at"] is None
+            or record["at"] > cutoff
+            or not engine.store.rows(
+                "SELECT 1 FROM tool_returns WHERE record=? LIMIT 1", (record["ref"],)
             )
-        rows.append(
-            {
-                "agent": agent,
-                "since": iso(at),
-                "at": target["at"],
-                "total": data["total"],
-                "matches": matches,
-                "next": data["next"],
-                "query": query,
-                "all_returns_query": all_returns,
-                "not_validation_proof": True,
-                "not_absence_proof": True,
-                "note": "Server lookup, not a model-opened source. Markers in recorded tool returns may be quoted docs, old logs or another target. Received after the last indexed target write does not prove the command started after it, built that state, or passed behavior tests. Open originals and paired commands; zero hits does not prove no validation.",
-            }
-        )
+            or not any(
+                term.casefold() in record["body"].casefold() for term in CHECK_ANCHOR_TERMS
+            )
+        ):
+            continue
+        anchor = latest.get(record["agent"])
+        cite = engine.store.handle("e", {"ref": record["ref"]})
+        if anchor is None or record["at"] > anchor["at"]:
+            latest[record["agent"]] = {"at": record["at"], "refs": {cite}}
+        elif record["at"] == anchor["at"]:
+            anchor["refs"].add(cite)
+    rows = []
+    for agent, anchor in sorted(latest.items()):
+        item = return_window(engine, agent, anchor["at"], target["at"], limitations)
+        # Do not repeat an anchor alone. Pagination remains explicit if more
+        # candidates exist beyond this preview; omission is never an absence proof.
+        if item["next"] is not None or any(
+            r["cite"] not in anchor["refs"] for r in item["matches"]
+        ):
+            rows.append(
+                {
+                    **item,
+                    "evidence": sorted(anchor["refs"]),
+                    "anchor_basis": "Latest model-cited tool return per actor containing check-like words, not necessarily a real check or target write.",
+                }
+            )
     return rows
 
 
@@ -247,6 +303,9 @@ def review(engine, document, target, nodes):
         "literal_predecessors": predecessors,
         "post_write_returns": post_write_returns(
             engine, operations, target, limitations
+        ),
+        "cited_check_followups": cited_check_followups(
+            engine, document, target, limitations
         ),
         "limitations": limitations,
         "semantic_verified": False,

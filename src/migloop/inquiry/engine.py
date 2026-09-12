@@ -356,7 +356,7 @@ class Engine:
                 elif op not in (scope["kind"], "blame"):
                     raise ValueError("scope kind does not match operation")
         allowed = {
-            "review": {"op", "report_id", "offset", "limit"},
+            "review": {"op", "report_id", "view", "offset", "limit"},
             "catalog": {"op", "kind", "q", "offset", "limit"},
             "file": {
                 "op",
@@ -461,6 +461,24 @@ class Engine:
             report = json.loads(reports[0]["data"])
             if self.origin == "mcp" and report["trace_session"] != self.session:
                 raise ValueError("report belongs to a different investigator")
+            view = request.get("view", "evidence")
+            if view not in ("evidence", "coverage"):
+                raise ValueError("review view must be evidence or coverage")
+            if view == "coverage":
+                coverage = report["coverage"]
+                rows = [
+                    {"category": kind, **item}
+                    for kind in ("unassessed", "unknown", "unattributed_native_writes")
+                    for item in coverage[kind]
+                ]
+                return {
+                    "kind": "evidence_review",
+                    "view": view,
+                    "report_id": report_id,
+                    "complete": coverage["complete"],
+                    **self._page(rows, offset, limit),
+                    "note": coverage["note"],
+                }
             review = report.get("evidence_review")
             if review is None:
                 raise ValueError("this frozen report predates evidence review")
@@ -470,6 +488,7 @@ class Engine:
                     "actor_notes",
                     "literal_predecessors",
                     "post_write_returns",
+                    "cited_check_followups",
                     "timeline",
                     "limitations",
                 )

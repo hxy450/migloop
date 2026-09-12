@@ -578,7 +578,7 @@
       group.id='evidence-review';
       element('summary',`事实对账（不是归因认证）：执行者提示 ${review.actor_notes.length}，片段前序 ${review.literal_predecessors.length}，时间范围 ${review.timeline.length}`,group);
       element('p','以下是独立于模型原因的原始记录对账；不修改节点判定，不新增因果边。',group,'small muted');
-      for(const [title,rows] of [['执行者提示',review.actor_notes],['片段前序线索',review.literal_predecessors],['写入后工具返回的字面线索（非验证结论）',review.post_write_returns||[]],['引用实际时间',review.timeline],['核验限制',review.limitations]]) {
+      for(const [title,rows] of [['执行者提示',review.actor_notes],['片段前序线索',review.literal_predecessors],['写入后工具返回的字面线索（非验证结论）',review.post_write_returns||[]],['所引检查之后的回执线索（非验证结论）',review.cited_check_followups||[]],['引用实际时间',review.timeline],['核验限制',review.limitations]]) {
         for(const row of rows) {
           const box=element('details','',group);
           element('summary',`${title} · ${row.node || row.finding || row.operation || row.agent || row.ref}`,box);
@@ -588,9 +588,9 @@
     }
     function appendReviewEvidence(row,box,at) {
       element('pre',JSON.stringify(row,null,2),box);
-      const refs=new Set([...(row.evidence||[]),...(row.earlier_evidence||[]),...(row.current_evidence||[]),...(row.operations||[]).flatMap(op=>op.evidence),...(row.matches||[]).map(r=>r.cite)]);
+      const refs=new Set([...(row.ref?[row.ref]:[]),...(row.refs||[]),...(row.evidence||[]),...(row.earlier_evidence||[]),...(row.current_evidence||[]),...(row.operations||[]).flatMap(op=>op.evidence),...(row.matches||[]).map(r=>r.cite)]);
       for(const ref of refs) button(ref,box,()=>open(ref,at));
-      if(row.all_returns_query) button('独立查该写者后续全部返回（不计入模型轨迹）',box,()=>query(row.all_returns_query));
+      if(row.all_returns_query) button(row.anchor_basis?'独立查该检查者后续全部返回（不计入模型轨迹）':'独立查该写者后续全部返回（不计入模型轨迹）',box,()=>query(row.all_returns_query));
     }
     function showNode(n) {
       $("reasonTitle").textContent = n.key;

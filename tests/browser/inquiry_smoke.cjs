@@ -223,15 +223,24 @@ async function main() {
           const post=graph.evidence_review.post_write_returns?.[0];
           let postSince=null;
           if(post) {const later=await query(post.all_returns_query);postSince=later.scope.since;}
+          const follow=graph.evidence_review.cited_check_followups?.[0];
+          let followSince=null;
+          if(follow) {const later=await query(follow.all_returns_query);followSince=later.scope.since;}
+          const coverage=await query({op:'review',report_id:graph.report_id,view:'coverage',offset:0,limit:2});
+          const coverageVisible=document.querySelectorAll('#records .row').length;
           return {timelineShown,returnTotal:returns.total,expected:input.tool_return_total,
             visibleRows:visibleReturns,expectedRows:returns.rows.length,
-            reviewVisible,reviewExpected:review.rows.length,postSince,expectedSince:post?.since||null};
+            reviewVisible,reviewExpected:review.rows.length,postSince,expectedSince:post?.since||null,
+            followSince,expectedFollowSince:follow?.since||null,
+            coverageVisible,coverageExpected:coverage.rows.length};
         })()`);
         assert(checked.timelineShown);
         assert.equal(checked.returnTotal,checked.expected);
         assert.equal(checked.visibleRows,checked.expectedRows);
         assert.equal(checked.reviewVisible,checked.reviewExpected);
         assert.equal(checked.postSince,checked.expectedSince);
+        assert.equal(checked.followSince,checked.expectedFollowSince);
+        assert.equal(checked.coverageVisible,checked.coverageExpected);
         assert.equal(await evaluate('JSON.stringify({graph,trace})'),initial);
         fs.writeFileSync(path.join(out,'evidence-review.json'),JSON.stringify(checked,null,2));
       }

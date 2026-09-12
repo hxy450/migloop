@@ -1,0 +1,22 @@
+{
+  "schema":"inquiry-developer-score/1", "round":"i16-high", "model":"gpt-5.6-luna", "effort":"high",
+  "reference":"../file-first-10/scoring-core.json",
+  "grading":"Both predeclared Member/Splash pilots. Developer original-source review; independent Luna checked Splash. Its initial no-major-extra judgment missed the final build assertion; after main supplied the exact disputed span and source pointer it independently verified the later success and corrected its audit. No investigator rewriting, gold changes, raw reruns or best-of selection.",
+  "cases":[
+    {"id":"F10-01","report_id":"de7d7893b760484f","units":{"mask":"omitted","images":"correct","cta":"correct","price":"correct","indicator":"correct","repair-compile":"correct"},"basis":"Other five local causes recovered; private helpers correctly assigned to repair, successful build cited. But entire mask modification omitted, with a misleading no-other-changes closure. Treat the omission/closure together, not two independent errors. Earlier fabricated old-PASS pipeline finding removed. Minor simplification of intermediate Span history is not an initial/repair responsibility reversal."},
+    {"id":"F10-02","report_id":"29880fce6c6e4294","units":{"mask":"correct","icon":"correct","back-gate":"partial","progress":"correct","system-bars":"correct"},"basis":"All repair families found, initial image-contract conflict and runtime uncertainty preserved. Back-gate still lacks explicit initial handler -> assembly removal history. Additional last-build assertion is false, below."}
+  ],
+  "summary":{"correct":9,"partial":1,"omitted":1,"wrong":0,"total":11,"unit_weighted_percent":81.8181818182,"files_run":2,"files_not_run":8},
+  "additional_errors":[
+    {"case":"F10-02","major":true,"quote":"最后一次全工程编译记录为 FAIL，报错在 MemberCenterPage 私有属性…见 e-b205030d5921","counterevidence":"Same builder agent-af0e3d2ae54dbf769: L24/e-b205030d5921 is 2026-07-26T21:45:43.530Z; L37, raw 078813f4378ab687:37:75eb915863b54814 (e-67b279e75764), is 21:46:28.608Z with EXIT=0 and BUILD SUCCESSFUL in 6 s 859 ms, before END21:48:57.793Z. This only refutes the build-order assertion, not proving visual/behavioral success."}
+  ],
+  "investigation_failures":[
+    {"case":"F10-01","detail":"No open of mask script e-b8ad2c92a1c0 or its receipt e-827ccccf4976. Script remains in final coverage.unassessed with description Patch all controllers with maskColor. Returning only unassessed_count did not prevent premature closure. The one incompletely host-visible frame was query4866a5ba0d3c4cd1, a different CTA/price/indicator finding window, not the missing mask script."},
+    {"case":"F10-02","detail":"Referenced builder did not write Splash, so target-writer-only post_write_returns did not expose that builder's later success. Original tool return remains indexed and searchable; no source bytes were lost."}
+  ],
+  "mechanical":{"valid":2,"frames_sent":295,"frames_visible_complete":294,"final_binding_errors":0,"missing_evidence_links":0,"semantic_verified":false,"qualification":"A valid graph is not full host delivery or correct attribution. Member has one incomplete frame; no blanket full-read claim."},
+  "cost":{"input_plus_output":11372295,"input_total":11315629,"cached_input":10785792,"uncached_input":529837,"output":56666,"model_seconds_sum":1524.7054981,"by_case":{"F10-01":{"tokens":7561222,"seconds":1016.5349492},"F10-02":{"tokens":3811073,"seconds":508.1705489}},"accounting":"All original runs and own revisions. Import and grading separate. No raw-equivalent efficiency claim; high effort and Member task caveat remain."},
+  "accepted":false,
+  "why_not":"Two incomplete core units, one major false build-order claim and one incomplete delivered frame. No other eight cases or stability repeats run.",
+  "next":"Expose existing coverage difference and later same-checker receipts. Do not infer script effects, rewrite reasons, or certify success from lexical markers. Freeze before testing."
+}

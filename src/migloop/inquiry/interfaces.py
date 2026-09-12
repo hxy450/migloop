@@ -49,8 +49,9 @@ mechanical_status只核坐标/引用/原生关系及原生写对账，不是正�
 机械通过也不证明因果正确；“没查到检查”不能写成“确认遗漏检查”，这也适用于最后的简短摘要。
 submit还有evidence_review和review_query：收尾打开{op:review,report_id:自己刚提交的ID,offset:0,limit:100}，按列表next和END FRAME续完。timeline列自己引用的实际发生时间，别把节点查询截止当证据发生时间。actor_notes指出节点引用的原生目标写实际由其它actor执行：先核身份，协调责任不能冒充执行作者。literal_predecessors给尚未引用的较早Edit/patch中相同新增行：核原文，区分返修中新添与生成遗留。它只是字面前序线索，不证明首作者/连续状态/因果；不会替你改报告或加边。核对后需要改的由你自行重提，不为了清空提示凭空补链。
 post_write_returns给已确认目标写者最后写入之后、截至观察结束的工具返回入口，并列构建/安装/测试字面词候选。项目级回执不一定含目标文件名，不能只看file列表就断言没有。候选可能只是读到的文档或其它构建，时间相邻也不认证目标版本/真实行为；打开原文及对应命令再裁定。零命中不是没有验证的证明，仍可用all_returns_query或全池截时搜索。
+cited_check_followups从你引用的检查类工具返回继续查同一agent后续回执，不要求他写过目标文件。报告末尾unexplained中的引用也参与；引用失败不能据此称“最后结果失败”。展开后续回执并核实际命令/目标/时刻，再决定是否更新结论。它只是字面词线索，读到的文档也会命中，不证明覆盖目标或成功；未列出不证明没有后续检查。
 coverage.unattributed_native_writes是未归因的已记录原生写，需用view:changes核原文并并入finding.changes；原因未明可在对应finding里限定未知，不能用reviewed:unknown把已经可展开的修改藏掉。
-coverage.unassessed是未判明效应的相关调用，不代表全是修改；它们留在UI和文件calls，不要求逐条写没有改文件的套话。
+coverage.unassessed是未判明效应的相关调用，不代表全是修改。提交后打开coverage_query（review的view:coverage），按两层next看完差集，再批量展开相关原文。实际改动并入findings；确定只读/别的文件可列reviewed:no_target_change；仍不确定就标unknown。不要漏掉整类脚本修复后宣称“没有其它改动”；complete=false时未决项必须留在交付中，不能用“不是原生写”排除它们。
 reviewed:no_target_change表示该事件实际只查询或改了别的对象；不能用“Bash不是native write”作为排除理由。已有脚本正文和写后观察支持目标修改时，应解释该修改，关系不能机检则留未知边。
 必须自行检查可能修改的脚本并解释真实改动；确实拿不准的列unknown/unexplained。不要用机械通过声称看全或归因无错。
 
@@ -233,6 +234,7 @@ def build_mcp(path):
                         "actor_notes",
                         "literal_predecessors",
                         "post_write_returns",
+                        "cited_check_followups",
                         "limitations",
                     )
                 },
@@ -263,10 +265,32 @@ def build_mcp(path):
                     }
                     for r in review["post_write_returns"][:4]
                 ],
+                "cited_check_followups": [
+                    {
+                        k: r[k]
+                        for k in (
+                            "agent",
+                            "since",
+                            "evidence",
+                            "total",
+                            "matches",
+                            "not_validation_proof",
+                            "not_absence_proof",
+                        )
+                    }
+                    for r in review["cited_check_followups"][:4]
+                ],
                 "preview_limit_per_kind": 4,
                 "note": "Open review_query for all notes and actual cited times. Hints are not authorship or causal proof; only this investigator may revise the original.",
             }
             summary["review_query"] = {"op": "review", "report_id": graph["report_id"]}
+            summary["coverage_query"] = {
+                "op": "review",
+                "report_id": graph["report_id"],
+                "view": "coverage",
+                "offset": 0,
+                "limit": 100,
+            }
             summary["coverage"] = {
                 "explained": len(c["explained"]),
                 "model_excluded": len(c["model_excluded"]),
