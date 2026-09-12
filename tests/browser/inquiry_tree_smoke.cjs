@@ -49,6 +49,7 @@ const report = {
 const traces = [{ id: "model-session", origin: "mcp", queries: [{ query: { op: "agent", ...writer.node } }],
   frames: [{ offset: 0 }], visibility: [] }];
 const requests = [];
+let retryFailures=0;
 const liveUrl = process.env.INQUIRY_LIVE_URL;
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 async function main() {
@@ -90,7 +91,7 @@ async function main() {
         const reads=q.key===report.target.file ? [{id:"read",number:1,at:times.read,op:"read",label:"读取原文",agent:"session:reader",file:q.key,originals:[original]}] : [];
         if(q.view==="catalog") data={at:times.root,files:[{path:report.target.file,n_events:2},{path:input.node.key,n_events:1}],agents:[{id:writer.node.key,label:"generator-worker",session:"session",parent:origin.node.key,n_events:1},{id:origin.node.key,label:"spec-author",session:"session",parent:null,n_events:1}]};
         else if(q.view==="overview") data={at:times.root,files:2,agents:3,report_limit:100,reports:[{id:report.report_id,file:report.target.file,at:times.root,count:3,title:"测试调查"}]};
-        else if(q.view==="history") {const rows=q.category==="reads"?reads:writes;data={scope,rows,total:rows.length,next:null,changes:writes.length,reads:reads.length};}
+        else if(q.view==="history") {const rows=q.category==="all"?[...writes,...reads]:q.category==="reads"?reads:writes;data={scope,rows,total:rows.length,next:null,changes:writes.length,reads:reads.length};}
         else if(q.view==="operation") data={scope,id:q.id,at:q.id==="w1"?times.writer:times.root,content:q.id==="w1"?"WHOLE WRITE":q.id==="read"?"2\tPARTIAL READ":null,
           content_kind:q.id==="w1"?"write_body":q.id==="read"?"read_observation":null,
           changes:q.id==="w2"?[{text:"-OLD_VALUE\n+NEW_VALUE",kind:"edit"}]:[],originals:[original],note:"实际记录；可能只有片段，不推演完整文件"};
@@ -103,7 +104,13 @@ async function main() {
         if (q.view === "neighbors") {
           let rows = [];
           if (q.key === report.target.file) rows = [writer, { ...writer, id: "native:w2" }, repair];
-          if (q.key === writer.node.key) rows = [input, {...candidate,id:"native:guess",source:"indexed"}, later];
+          if (q.key === writer.node.key) rows = [input, {...candidate,id:"native:guess",source:"indexed"}, later,
+            row("native:r-empty","read",coordinate("file","/migration/specs/External.md",times.read)),
+            row("native:r-retry","read",coordinate("file","/migration/specs/Retry.md",times.read))];
+          if(q.key==="/migration/specs/Retry.md") {
+            if(retryFailures++===0){res.writeHead(503,{"Content-Type":"application/json"});return res.end(JSON.stringify({error:"fixture temporary failure"}));}
+            rows=[origin];
+          }
           if (q.key === input.node.key) rows = q.offset ? [origin] : [{...candidate,id:"native:guess",source:"indexed"}];
           if (q.key === origin.node.key) rows = [row("native:dispatch", "dispatch", coordinate("agent", "session:parent", "2026-09-12T05:00:00.000001Z"),
             { strength: "candidate", occurrence_at: "2026-09-12T05:00:00.000001Z", confirmed_at: times.root,
@@ -177,6 +184,23 @@ async function main() {
       await wait("migloopViewer.tree?.byId[migloopViewer.tree.root]?.scope.key.endsWith('/MemberCenterPage.ets') && !migloopViewer.tree.byId[migloopViewer.tree.root].busy && document.querySelector('#side .vrow')");
       liveDiagnostic.manualEntryWorks=await evaluate("migloopViewer.report===null && migloopViewer.tree.byId[migloopViewer.tree.root].children.length>1");
       assert(liveDiagnostic.manualEntryWorks,"old file hash opens a real manual tree");
+      await evaluate("document.querySelector('#q').value='GuidePage.ets';document.querySelector('#q').dispatchEvent(new Event('input'));document.querySelector('#railbody .ritem .rrow').click()");
+      await wait("document.querySelector('#railbody .vers .vline')");
+      await evaluate("document.querySelector('#railbody .vers .vline').click()");
+      await wait("migloopViewer.tree?.byId[migloopViewer.tree.root]?.scope.key.endsWith('/GuidePage.ets') && !migloopViewer.tree.byId[migloopViewer.tree.root].busy");
+      const guideWriter=await evaluate("Object.values(migloopViewer.tree.byId).find(n=>n.aid?.includes(':aconv-guide-')).tid");
+      await evaluate("document.querySelector('[data-tid=\""+guideWriter+"\"]').click()");
+      await wait("Object.values(migloopViewer.tree.byId).some(n=>n.path?.endsWith('/resource-mapping.md'))");
+      const guideInput=await evaluate("Object.values(migloopViewer.tree.byId).find(n=>n.path?.endsWith('/resource-mapping.md')).tid");
+      await evaluate("document.querySelector('[data-tid=\""+guideInput+"\"]').click()");
+      await wait("document.querySelector('.expansion-note')?.textContent.includes('未找到已确认的写者') && document.querySelector('#side .srcblock .ln')");
+      liveDiagnostic.guideInput={
+        terminal:await evaluate("document.querySelector('[data-tid=\""+guideInput+"\"] .chev').textContent"),
+        originalVisible:await evaluate("document.querySelector('#side .srcblock').textContent.length>0"),
+        fakeWriters:await evaluate("(migloopViewer.tree.byId['"+guideInput+"'].children||[]).length")};
+      assert.equal(liveDiagnostic.guideInput.terminal,"·");assert(liveDiagnostic.guideInput.originalVisible);assert.equal(liveDiagnostic.guideInput.fakeWriters,0);
+      await wait("document.querySelector('#railbody .vers .vline')");
+      assert.equal(await evaluate("document.querySelector('#railbody .vers').textContent.includes('读取原文')"),false);
       await evaluate("document.querySelector('#zf').click()");
     } else {
       assert.equal(await evaluate(rootNode+".scope.key"),report.target.file);
@@ -243,10 +267,26 @@ async function main() {
       assert.equal(await evaluate("document.querySelectorAll('#railbody .rkind').length"),2,"grouped file catalog");
       await evaluate("document.querySelector('#q').value='AudioPlayer';document.querySelector('#q').dispatchEvent(new Event('input'));document.querySelector('#railbody .ritem .rrow').click()");
       await wait("document.querySelector('#railbody .vline')");
+      assert.equal(await evaluate("document.querySelector('#railbody .vers').textContent.includes('读取原文')"),false,"left entry lists writes only; read observations remain in the drawer");
       assert.equal(JSON.stringify(traces),initial,"manual UI leaves trace alone");
       assert(!requests.some(q=>q.op==="record_trace"));
       const race=await evaluate("(async()=>{const slow=migloopViewer.loadReport('slow');await migloopViewer.loadReport('tree-fixture');await slow;return new URLSearchParams(location.search).get('report')})()");
       assert.equal(race,"tree-fixture");
+      await evaluate("migloopViewer.expand(migloopViewer.tree.byId[migloopViewer.tree.root].children[0])");
+      const emptyId=await evaluate("Object.values(migloopViewer.tree.byId).find(n=>n.scope?.key==='/migration/specs/External.md').tid");
+      await evaluate("document.querySelector('[data-tid=\""+emptyId+"\"]').click()");
+      await wait("document.querySelector('.expansion-note')?.textContent.includes('未找到已确认的写者')");
+      assert.equal(await evaluate("document.querySelector('[data-tid=\""+emptyId+"\"] .chev').textContent"),"·","empty upstream is visibly terminal, not a fake expand arrow");
+      const emptyQueries=requests.filter(q=>q.key==='/migration/specs/External.md'&&q.view==='neighbors').length;
+      await evaluate("document.querySelector('[data-tid=\""+emptyId+"\"]').click()");
+      assert.equal(requests.filter(q=>q.key==='/migration/specs/External.md'&&q.view==='neighbors').length,emptyQueries,"known empty node stays inspectable without refetch");
+      const retryId=await evaluate("Object.values(migloopViewer.tree.byId).find(n=>n.scope?.key==='/migration/specs/Retry.md').tid");
+      await evaluate("document.querySelector('[data-tid=\""+retryId+"\"]').click()");
+      await wait("document.querySelector('.expansion-note')?.textContent.includes('上游查询失败')");
+      assert.equal(await evaluate("document.querySelector('[data-tid=\""+retryId+"\"] .chev').textContent"),"!");
+      await evaluate("document.querySelector('.expansion-note .lnk').click()");
+      await wait("migloopViewer.tree.byId['"+retryId+"'].loaded && !migloopViewer.tree.byId['"+retryId+"'].error && migloopViewer.tree.byId['"+retryId+"'].children.length===1");
+      assert.equal(await evaluate("document.querySelector('.expansion-note').hidden"),true,"successful retry clears failure instead of claiming no writer");
       await evaluate("document.querySelector('#q').value='';document.querySelector('#q').dispatchEvent(new Event('input'));document.querySelector('#zf').click()");
     }
     assert.equal(errors.length, 0, errors.join("\n"));
@@ -255,7 +295,7 @@ async function main() {
     const audit = { passed: true, url, errors, liveDiagnostic, queryCount: requests.length,
       checks: ["original compact shell", "single tree for saved and manual exploration", "ordinary candidates hidden",
         "model-review-only dashed edges", "write text and edit delta", "read observation expansion",
-        "trace isolation", "precise cutoff", "load dialog", "only load control", "original hover highlight", "colored inline diffs", "original grouped catalog", "Ctrl-wheel zoom", "no JavaScript errors"],
+        "trace isolation", "precise cutoff", "load dialog", "only load control", "original hover highlight", "colored inline diffs", "original grouped catalog", "Ctrl-wheel zoom", "write-only entry timeline", "empty upstream remains inspectable", "no JavaScript errors"],
     };
     fs.writeFileSync(path.join(out, "audit.json"), JSON.stringify(audit, null, 2));
     console.log(JSON.stringify({ ...audit, artifacts: out }));

@@ -94,7 +94,7 @@
     async function atomTimes(vers, kind, key, offset) {
       var scope = {kind: kind, key: key, at: IDX.at};
       try {
-        var page = await view(scope, "history", {category: "all", limit: 100, offset: offset || 0});
+        var page = await view(scope, "history", {category: "changes", limit: 100, offset: offset || 0});
         if (!offset) {
           vers.textContent = "";
           vers.appendChild(vline("最新", "截至 " + dateTime(IDX.at) + " · 全部历史", "", function () { guard(() => openRoot(scope)); }));
@@ -261,6 +261,7 @@
     async function expandRelations(node, direction, done) {
       var tree = XT, state = direction === "downstream" ? (node.downstream || (node.downstream = {})) : node;
       if (state.loaded && state.next == null) { node.busy = false; if(done)done(); return; }
+      state.error = ""; node.busy = true;
       try {
         const q = atom(node.scope, {view: "neighbors", direction: direction, limit: 100});
         if (state.next != null) q.offset = state.next;
@@ -284,12 +285,12 @@
         });
         groups.forEach(function(group){var latest=group.reduce((a,b)=>a.node.at<b.node.at?b:a);rows.push({...latest,groupRows:group});});
         rows.forEach(row => relationNode(node, row, direction === "downstream"));
-        state.loaded = true; state.next = page.next; node.expanded = true;
+        state.loaded = true; state.next = page.next; state.total = page.total; node.expanded = true;
         if (page.next != null && direction === "upstream") {
           addKid(node, xtNode("leaf", {label: "+ 继续展开", moreFor: node.tid, noEdge: true}));
         }
       } catch (error) { state.error = error.message; }
-      finally { if(XT === tree) { node.busy = false; if(done)done(state.error); } }
+      finally { if(XT === tree) { node.busy = false; if(direction === "upstream")expansionFeedback(node); if(done)done(state.error); } }
     }
     function expandFile(node, done) { return expandRelations(node, "upstream", done); }
     function expandAgent(node, done) { return expandRelations(node, "upstream", done); }
@@ -300,9 +301,11 @@
       if(node.kind === "file") drawerFile(node);
       else if(node.kind === "agent") drawerAgent(node);
       if(node.busy || node.kind === "leaf" || node.isRight || node.reference) { renderTree(tid); return; }
-      if(node.expanded) { collapse(node); node.loaded=false; node.next=null; renderTree(tid); return; }
+      if(node.loaded && node.next == null && !(node.children || []).length && !node.error) { renderTree(tid); return; }
+      if(node.expanded && !node.error) { collapse(node); node.loaded=false; node.next=null; renderTree(tid); return; }
       node.busy = true;
-      var done = function(err) { if(err)fail(err); renderTree(tid); };
+      renderTree(tid);
+      var done = function() { renderTree(tid); };
       if(node.kind === "file") expandFile(node, done); else expandAgent(node, done);
     }
     function rootLabel(node) {
@@ -447,11 +450,14 @@
         d.appendChild(caption);
       } else d.appendChild(document.createTextNode(node.label));
       (node.badges || []).forEach(function (b) { d.appendChild(el("span", "badge " + (b.cls || ""), b.t)); });
-      if (node.kind !== "leaf" && !node.isRight) d.appendChild(el("span", "chev", node.expanded ? "▾" : (node.busy ? "…" : "▸")));
+      var ended = node.loaded && node.next == null && !(node.children || []).length;
+      if (node.kind !== "leaf" && !node.isRight) d.appendChild(el("span", "chev", node.busy ? "…" : node.error ? "!" : node.reference ? "↗" : ended ? "·" : node.expanded ? "▾" : "▸"));
       d.title = (node.kind === "file" ? node.path : node.kind === "agent" ? node.aid : node.label)
               + ((node.badges || []).length ? "  [" + node.badges.map(function (b) { return b.t; }).join(" · ") + "]" : "")
               + (node.isRight ? "  (下游节点:抽屉里可「以此为根」)" : "");
       if(node.scope)d.title += "\n截至 " + node.scope.at;
+      if(node.error)d.title += "\n查询失败，可点击重试";
+      else if(ended)d.title += "\n此时间范围内未找到可展开的已确认上游；仍可查看原文。";
       d.addEventListener("click", function (ev) { ev.stopPropagation(); onNode(node.tid); });
       d.addEventListener("mouseenter", function () { hiliteEdges(node.tid, true); });
       d.addEventListener("mouseleave", function () { hiliteEdges(node.tid, false); });
@@ -628,6 +634,24 @@
         (node.row.evidence||[]).forEach(ref=>rawLink(q,ref,XT.byId[node.parent]?.scope||node.scope));
       }
     }
+    function expansionFeedback(node) {
+      if (side.dataset.node !== node.tid || selTid !== node.tid) return;
+      var body=side.querySelector(".body");if(!body)return;
+      var note=body.querySelector(".expansion-note");
+      if(!note){note=el("div","kv expansion-note");body.prepend(note);}
+      note.textContent="";note.hidden=true;
+      if(node.error){
+        note.hidden=false;note.appendChild(el("span","error","上游查询失败："+node.error+" "));
+        note.appendChild(lnk("重试","more",function(){onNode(node.tid);}));
+      } else if(node.reference){
+        note.hidden=false;note.textContent="该关系已在当前路径中出现。可用「以此为根」单独查看，树上不重复递归。";
+      } else if(node.loaded && node.next == null && !(node.children || []).length){
+        note.hidden=false;
+        note.textContent=(node.kind==="file"?"截至这个时刻，当前索引未找到已确认的写者。":"截至这个时刻，未找到可展开的已确认上游。")
+          +(node.total?" 未确认关系按展示设置不画边。":"")
+          +(node.kind==="file"?"这不代表从未写入；仍可查看读到的原文与相关调用。":"仍可在下方查看任务和原始调用。");
+      }
+    }
     function timedHead(node, cls, tag, title, sub) {
       var h=head(cls,tag+" · 截至 "+dateTime(node.scope.at),title,sub,node.isRoot?null:node.scope);
       h.querySelector(".tag").title=node.scope.at+" · 点击换一个时刻";h.querySelector(".tag").style.cursor="pointer";
@@ -675,17 +699,17 @@
       });
     }
     function drawerFile(node) {
-      ++detailEpoch;side.innerHTML="";
+      ++detailEpoch;side.innerHTML="";side.dataset.node=node.tid;
       side.appendChild(timedHead(node,"file","文件原子",baseName(node.scope.key),node.scope.key));
-      var body=el("div","body");side.appendChild(body);claimsSection(node,body);
+      var body=el("div","body");side.appendChild(body);expansionFeedback(node);claimsSection(node,body);
       var holder=el("div");body.appendChild(holder);contentSection(holder,node.scope,node.operation);
       fileVersionSection(body,node.scope,holder);
       foldSection("相关调用与记录",body,box=>rawRows(box,node.scope,"calls"));searchSection(body,node.scope);
     }
     async function drawerAgent(node) {
-      var epoch=++detailEpoch,scope=node.scope;side.innerHTML="";
+      var epoch=++detailEpoch,scope=node.scope;side.innerHTML="";side.dataset.node=node.tid;
       side.appendChild(timedHead(node,"gen","Agent 原子",agentLabelOf(scope.key),scope.key));
-      var body=el("div","body");side.appendChild(body);claimsSection(node,body);
+      var body=el("div","body");side.appendChild(body);expansionFeedback(node);claimsSection(node,body);
       var identity=sec("身份");identity.appendChild(pills([{t:"会话 "+scope.key.split(":")[0].slice(0,8)}]));body.appendChild(identity);
       try {
         var relation=await query(atom(scope,{view:"relations",limit:1}));if(epoch!==detailEpoch)return;
