@@ -1,4 +1,5 @@
 """The report seeds the same lossless, lazy temporal tree as manual expansion."""
+
 import subprocess
 from pathlib import Path
 
@@ -8,7 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 def test_exact_scope_grouping_preserves_claims_edges_and_microseconds():
     assertions = r"""
 const assert = require('node:assert/strict');
-const {EvidenceTreeModel, scopeIdentity, measureTree, GEOMETRY} = require('./src/migloop/inquiry/tree.js');
+const {EvidenceTreeModel, scopeIdentity, measureTree, GEOMETRY, visibleRelation} = require('./src/migloop/inquiry/tree.js');
 const at='2026-01-01T00:00:01.000001Z';
 const root={kind:'file',key:'/out',at,since:null};
 const row=(id,kind,key,extra={})=>({id,relation:kind==='agent'?'write':'read',
@@ -17,6 +18,11 @@ const row=(id,kind,key,extra={})=>({id,relation:kind==='agent'?'write':'read',
 const writer=row('native:w','agent','worker');
 const input=row('native:r','file','/full/path/spec');
 const candidate=row('model:c','file','/candidate',{strength:'candidate',source:'model_review'});
+const lexical={...candidate,id:'native:guess',source:'indexed'};
+assert(!visibleRelation(lexical),'ordinary candidates stay out of the human tree');
+assert(visibleRelation(candidate),'reviewed relations with evidence remain visible');
+assert(!visibleRelation({...candidate,evidence:[]}), 'unsubstantiated model edge is hidden');
+assert(!visibleRelation({...writer,time_unknown:true}), 'undated effects are not confirmed temporal edges');
 const original={id:'A:origin',finding:'A',kind:'file',key:'/full/path/spec',
   at:'2026-01-01T00:00:09Z',since:'2026-01-01T00:00:00Z',exists:true,
   scope:'s-original',role:'origin',reason:'Original reason',evidence:['e-abcdef12']};
@@ -29,6 +35,11 @@ const report={nodes:[original,{...original,id:'B:origin',finding:'B',reason:'Sec
  ]}};
 const before=JSON.stringify(report);
 const tree=new EvidenceTreeModel(root); tree.seed(report);
+assert.equal(tree.insert(tree.root,lexical),null,'manual expansion cannot add lexical candidates');
+const hidden=new EvidenceTreeModel(root);
+hidden.seed({nodes:[original],tree:{paths:[{node:original.id,status:'candidate',steps:[writer,lexical,input]}]}});
+assert.equal(hidden.nodes.size,1,'hidden middle edge cannot reconnect surrounding confirmed edges');
+assert.equal(hidden.unclosed.length,1);
 assert.equal(tree.root.children.length,1,'shared report prefixes merge');
 const worker=tree.root.children[0];
 assert.deepEqual(worker.children[0].claims.map(n=>n.id),['A:origin','B:origin']);
@@ -99,17 +110,28 @@ assert.equal(tree.visible().length,1,'collapse hides both sides without inventin
 console.log('temporal tree invariants passed');
 """
     result = subprocess.run(
-        ["node", "-e", assertions], cwd=ROOT, capture_output=True,
-        text=True, encoding="utf-8", timeout=10, check=True,
+        ["node", "-e", assertions],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        timeout=10,
+        check=True,
     )
     assert "temporal tree invariants passed" in result.stdout
 
 
 def test_inquiry_page_has_only_the_shared_tree_renderer():
     page = (ROOT / "src/migloop/inquiry/page.html").read_text(encoding="utf-8")
+    viewer = (ROOT / "src/migloop/inquiry/viewer.js").read_text(encoding="utf-8")
     assert "function draw(" not in page
     assert "function presentationGraph(" not in page
-    assert "new InquiryEvidenceTree.InquiryTree(" in page
-    assert '__INQUIRY_ASSET_BASE__/tree.js' in page
-    assert '__INQUIRY_CONFIG__' in page
-    assert '(config.api_base || "") + path' in page
+    assert "new InquiryEvidenceTree.InquiryTree(" in viewer
+    assert "__INQUIRY_ASSET_BASE__/tree.js" in page
+    assert "__INQUIRY_ASSET_BASE__/viewer.js" in page
+    assert "__INQUIRY_CONFIG__" in page
+    assert '(config.api_base || "") + route' in viewer
+    for identifier in ("rail", "viewport", "side", "reportsDialog", "load"):
+        assert f'id="{identifier}"' in page
+    for removed in ("structuredReport", "queryPanel", "restorePaths", "rawRecord"):
+        assert f'id="{removed}"' not in page

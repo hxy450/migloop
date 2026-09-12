@@ -27,10 +27,10 @@ def dispatch_http(path, route, data=None):
     parsed = urlparse(route)
     args = parse_qs(parsed.query)
     mime = "application/json; charset=utf-8"
-    if parsed.path == "/tree.js" and data is None:
+    if parsed.path in ("/tree.js", "/viewer.js") and data is None:
         return (
             200,
-            Path(__file__).with_name("tree.js").read_text(encoding="utf-8"),
+            Path(__file__).with_name(parsed.path[1:]).read_text(encoding="utf-8"),
             "text/javascript; charset=utf-8",
         )
     store = None
@@ -39,6 +39,10 @@ def dispatch_http(path, route, data=None):
         engine = Engine(store)
         if parsed.path == "/api/query" and data is not None:
             output = engine.query(data)  # Human exploration never calls investigate().
+        elif parsed.path == "/api/view" and data is not None:
+            from .viewer import viewer_query
+
+            output = viewer_query(engine, data)
         elif parsed.path == "/api/report" and data is not None:
             output = check(engine, data["document"], save=True)
         elif parsed.path == "/api/report" and data is None:

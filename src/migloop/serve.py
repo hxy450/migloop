@@ -27,7 +27,7 @@ from . import service
 
 _RE_REPORT = re.compile(r"^/(?:api/)?insight1/report/([^/]+)/?$")
 _RE_FIXCHAIN = re.compile(r"^/api/insight1/fixchain/([^/]+)/?$")
-_RE_INQUIRY = re.compile(r"^/api/insight1/inquiry/([^/]+)(/(?:api/[a-z]+|tree\.js))$")
+_RE_INQUIRY = re.compile(r"^/api/insight1/inquiry/([^/]+)(/(?:api/[a-z]+|(?:tree|viewer)\.js))$")
 _RE_FIXDATA = re.compile(r"^/api/insight1/fixchain-data/([^/]+)/?$")
 _RE_ATOM_TEXT = re.compile(r"^/api/insight1/atom/([^/]+)/text/([a-z]+)/?$")
 _RE_ATOM = re.compile(r"^/api/insight1/atom/([^/]+)/([a-z]+)/?$")
@@ -69,7 +69,7 @@ class _Handler(BaseHTTPRequestHandler):
 
         suffix = match.group(2)
         # Static assets do not build an index or open source files.
-        database = None if suffix == "/tree.js" else service.inquiry_database(self._path_of(match.group(1)))
+        database = None if suffix in ("/tree.js", "/viewer.js") else service.inquiry_database(self._path_of(match.group(1)))
         status, body, mime = dispatch_http(database, suffix + ("?" + query if query else ""), data)
         self._send(status, body.encode("utf-8"), mime)
 

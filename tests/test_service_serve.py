@@ -106,7 +106,7 @@ def test_pages_and_atoms(session: tuple[str, dict[str, str]]) -> None:
     assert "findings" in service.report_trace(path, static=True, with_chains=False)["audit"]
     page = service.fixchain_html(path)
     assert "__INQUIRY_CONFIG__" not in page and '"project":"proj"' in page
-    assert "时间证据树" in page and "/tree.js" in page
+    assert "两原子探索树" in page and "/tree.js" in page and "/viewer.js" in page
 
     idx = service.atom_json(path, "index", {})
     assert [f["path"] for f in idx["files"]] == ["/proj/entry/A.ets"]

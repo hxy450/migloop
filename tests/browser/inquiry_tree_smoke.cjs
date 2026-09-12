@@ -64,33 +64,52 @@ async function main() {
       if (url.pathname === base + "/") {
         const page = fs.readFileSync(path.join(root, "src/migloop/inquiry/page.html"), "utf8")
           .replace("__INQUIRY_CONFIG__", JSON.stringify({ api_base: base, project: "Fixture project" }))
-          .replace("__INQUIRY_ASSET_BASE__", base);
+          .replaceAll("__INQUIRY_ASSET_BASE__", base);
         res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" }); return res.end(page);
       }
-      if (url.pathname === base + "/tree.js") {
+      if (["/tree.js", "/viewer.js"].some(asset => url.pathname === base + asset)) {
         res.writeHead(200, { "Content-Type": "text/javascript; charset=utf-8" });
-        return res.end(fs.readFileSync(path.join(root, "src/migloop/inquiry/tree.js")));
+        return res.end(fs.readFileSync(path.join(root, "src/migloop/inquiry", path.basename(url.pathname))));
       }
       if (url.pathname === "/favicon.ico") { res.writeHead(204); return res.end(); }
       let data;
       if (url.pathname === base + "/api/info") data = { sources: 3, records: 128, latest_at: times.root, reports: [{ id: report.report_id }] };
-      else if (url.pathname === base + "/api/report") data = report;
+      else if (url.pathname === base + "/api/report") {
+        if(url.searchParams.get("id")==="slow")await sleep(150);
+        data = report;
+      }
       else if (url.pathname === base + "/api/trace") data = traces;
       else if (url.pathname === base + "/api/frame") data = { text: "真实调查帧" };
+      else if (url.pathname === base + "/api/view") {
+        let body = ""; for await (const chunk of req) body += chunk;
+        const q=JSON.parse(body), scope={kind:q.kind,key:q.key,at:q.at,since:q.since||null};
+        const original={ref:"e-12345678",source:"fixture.jsonl",line:8,at:times.writer};
+        const writes=q.key===report.target.file ? [
+          {id:"w1",number:1,at:times.writer,op:"write",label:"写入",agent:writer.node.key,file:q.key,originals:[original]},
+          {id:"w2",number:2,at:times.root,op:"write",label:"写入",agent:"session:fixer",file:q.key,originals:[original]}] : [];
+        const reads=q.key===report.target.file ? [{id:"read",number:1,at:times.read,op:"read",label:"读取原文",agent:"session:reader",file:q.key,originals:[original]}] : [];
+        if(q.view==="overview") data={at:times.root,files:2,agents:3,report_limit:100,reports:[{id:report.report_id,file:report.target.file,at:times.root,count:3,title:"测试调查"}]};
+        else if(q.view==="history") {const rows=q.category==="reads"?reads:writes;data={scope,rows,total:rows.length,next:null,changes:writes.length,reads:reads.length};}
+        else if(q.view==="operation") data={scope,id:q.id,content:q.id==="w1"?"WHOLE WRITE":q.id==="read"?"2\\tPARTIAL READ":null,
+          content_kind:q.id==="w1"?"write_body":q.id==="read"?"read_observation":null,
+          changes:q.id==="w2"?[{text:"-OLD_VALUE\\n+NEW_VALUE",kind:"edit"}]:[],originals:[original],note:"实际记录；可能只有片段，不推演完整文件"};
+        else throw Error("Unexpected view "+q.view);
+      }
       else if (url.pathname === base + "/api/query") {
         let body = ""; for await (const chunk of req) body += chunk;
         const q = JSON.parse(body); requests.push(q);
+        if(q.include_reads && q.view!=="calls")throw Error("include_reads only belongs to calls");
         if (q.view === "neighbors") {
           let rows = [];
           if (q.key === report.target.file) rows = [writer, { ...writer, id: "native:w2" }, repair];
-          if (q.key === writer.node.key) rows = [input, candidate, later];
-          if (q.key === input.node.key) rows = [origin];
+          if (q.key === writer.node.key) rows = [input, {...candidate,id:"native:guess",source:"indexed"}, later];
+          if (q.key === input.node.key) rows = q.offset ? [origin] : [{...candidate,id:"native:guess",source:"indexed"}];
           if (q.key === origin.node.key) rows = [row("native:dispatch", "dispatch", coordinate("agent", "session:parent", "2026-09-12T05:00:00.000001Z"),
             { strength: "candidate", occurrence_at: "2026-09-12T05:00:00.000001Z", confirmed_at: times.root,
               identity_known_at_cutoff: false, identity_basis: "子 Agent 身份来自稍后回执，本次查询截止时未知。", status: "identity_pending" })];
           if(q.direction==='downstream') rows=q.key===report.target.file ? [row('native:reader','read',coordinate('agent','session:reader',times.writer))] : [];
-          data = { kind: "neighbors", scope: { kind: q.op, key: q.key, at: q.at }, rows, total: rows.length, next: null };
-        } else if (q.op === 'catalog') data = {kind:'catalog',catalog_kind:q.kind,rows:[{key:report.target.file}],total:1,next:null};
+          data = { kind: "neighbors", scope: { kind: q.op, key: q.key, at: q.at }, rows, total: rows.length, next: q.key===input.node.key && !q.offset && q.direction!=="downstream" ? 1 : null };
+        } else if (q.op === 'catalog') data = {kind:'catalog',catalog_kind:q.kind,rows:[{key:q.kind==='file'?report.target.file:writer.node.key}],total:1,next:null};
         else if (q.op === "open") data = { source: "fixture.jsonl", line: 8, at: times.origin, text: q.pointer === "" ? "FULL RAW RECORD" : "ORIGINAL EVIDENCE", request_context: null };
         else if (q.view === "changes") data = { kind: "changes", rows: [{ at: times.origin, agent: "spec-author", strength: "confirmed",
           payloads: [{ tool: "Edit", block: 0, body: { old_string: "OLD_VALUE", new_string: "NEW_VALUE" } }],
@@ -136,147 +155,139 @@ async function main() {
     };
     const wait = async expression => {
       for (let i = 0; i < 120; i++) { if (await evaluate(expression)) return; await sleep(100); }
-      throw Error("Page condition timeout: " + expression);
+      throw Error("Page condition timeout: " + expression + "\n" + await evaluate("document.body.innerText.slice(-1600)") + "\n" + errors.join("\n"));
     };
     await send("Runtime.enable");
     await send("Page.enable");
     await send("Emulation.setDeviceMetricsOverride", { width: 1720, height: 1020, deviceScaleFactor: 1, mobile: false });
     await send("Page.navigate", { url });
-    await wait("window.inquiryTree?.model && document.querySelector('#structuredReport')");
+    await wait("window.inquiryTree?.model && document.querySelector('#side .vrow')");
     let liveDiagnostic = null;
     if (liveUrl) {
       liveDiagnostic = await evaluate(`(async () => {
-        const before = await api('/api/trace?session=' + encodeURIComponent(inquiryTree.report.trace_session));
-        const seedEdges = [...inquiryTree.model.nodes.values()].filter(n=>n.row).map(n=>n.row.id);
-        const rootKey = inquiryTree.model.root.coordinate.key;
+        const getTrace=()=>fetch((INQUIRY_CONFIG.api_base||'')+'/api/trace?session='+encodeURIComponent(inquiryTree.report.trace_session)).then(r=>r.json());
+        const before=await getTrace();
+        const seedEdges=[...inquiryTree.model.nodes.values()].filter(n=>n.row).length;
         await inquiryTree.expand(inquiryTree.model.root);
-        const first = inquiryTree.model.root.children.find(n=>!n.reference);
-        if (first) await inquiryTree.expand(first);
-        const after = await api('/api/trace?session=' + encodeURIComponent(inquiryTree.report.trace_session));
-        const origin = [...inquiryTree.model.nodes.values()].find(n=>n.claims.some(c=>c.role==='origin'));
-        if (origin) inquiryTree.select(origin);
-        const claim = origin?.claims.find(c=>c.evidence?.length);
-        if (claim) await open(claim.evidence[0], claim.at);
-        const originalOpened = !claim || document.querySelector('#original').textContent.length > 0;
+        const first=inquiryTree.model.root.children.find(n=>!n.reference);
+        if(first)await inquiryTree.expand(first);
+        const after=await getTrace();
+        const origin=[...inquiryTree.model.nodes.values()].find(n=>n.claims.some(c=>c.role==='origin'));
+        if(origin)inquiryTree.select(origin);
         inquiryTree.fit();
-        const rootRect = document.querySelector('.tree-node.root').getBoundingClientRect();
-        const graphRect = document.querySelector('#graph').getBoundingClientRect();
-        return { root: rootKey, seededEdges: seedEdges.length, displayedNodes: inquiryTree.model.visible().length,
-          rootVisible: rootRect.top >= graphRect.top && rootRect.bottom <= graphRect.bottom,
-          zoom: inquiryTree.zoom,
-          originalOpened,
-          manualFailures: [...inquiryTree.model.nodes.values()].filter(n=>n.error).map(n=>n.error),
-          traceUnchanged: JSON.stringify(before)===JSON.stringify(after),
-          gaps: inquiryTree.model.unclosed.length, report: inquiryTree.report.report_id,
-          candidateEdges: [...document.querySelectorAll('.tree-edge.candidate')].length,
-          reason: document.querySelector('#reason').textContent.slice(0,200) };
+        return {root:inquiryTree.model.root.coordinate.key,seedEdges,nodes:inquiryTree.model.visible().length,
+          traceUnchanged:JSON.stringify(before)===JSON.stringify(after),gaps:inquiryTree.model.unclosed.length,
+          manualFailures:[...inquiryTree.model.nodes.values()].filter(n=>n.error).map(n=>n.error),
+          ordinaryCandidates:[...inquiryTree.model.nodes.values()].filter(n=>n.row?.strength==='candidate' && n.row.source!=='model_review').length};
       })()`);
-      assert(liveDiagnostic.root, 'real report has root');
-      assert(liveDiagnostic.traceUnchanged, 'live manual expansion does not alter trace');
-      assert(liveDiagnostic.originalOpened, 'real claim evidence opens at its original cutoff');
-      assert(liveDiagnostic.rootVisible, 'root stays visible with the report path after expansion');
-      assert(liveDiagnostic.zoom >= 0.62, 'original auto-fit has a 0.62 floor and a 1:1 control');
-      assert.deepEqual(liveDiagnostic.manualFailures, [], 'live neighbors returned errors');
-      assert.equal(await evaluate("document.querySelector('.tree-node.root').classList.contains('historical-problem')"), false);
-      await evaluate("document.querySelector('#oneToOne').click()");
-      liveDiagnostic.screenshotZoom = await evaluate("inquiryTree.zoom");
+      assert(liveDiagnostic.traceUnchanged, "manual expansion leaves real model trace unchanged");
+      assert.equal(liveDiagnostic.ordinaryCandidates,0);
+      assert.deepEqual(liveDiagnostic.manualFailures,[]);
+      await evaluate("inquiryTree.select(inquiryTree.model.root)");
+      await wait("document.querySelector('#side .vrow')");
+      await evaluate("[...document.querySelectorAll('#side .vrow button')].find(b=>b.textContent==='原文 / diff').click()");
+      await wait("document.querySelector('#side .original pre')");
+      liveDiagnostic.originalOpened=await evaluate("document.querySelector('#side .original pre').textContent.length>0");
+      assert(liveDiagnostic.originalOpened);
+      await evaluate("[...document.querySelectorAll('#side details')].find(d=>d.firstChild.textContent==='相关调用与记录').open=true");
+      await wait("document.querySelector('#side .quote button')");
+      await evaluate("[...document.querySelectorAll('#side details')].find(d=>d.firstChild.textContent==='片段来源 / 搜索历史').open=true;document.querySelector('#side input').value='30';[...document.querySelectorAll('#side button')].find(b=>b.textContent==='查找').click()");
+      await wait("[...document.querySelectorAll('#side details')].find(d=>d.firstChild.textContent==='片段来源 / 搜索历史').querySelector('.quote')");
+      await evaluate("inquiryTree.select(inquiryTree.model.root.children[0])");
+      await wait("document.querySelector('#side .tag')?.textContent==='AGENT 原子' && [...document.querySelectorAll('#side details')].some(d=>d.firstChild.textContent==='其它工具返回')");
+      await evaluate("[...document.querySelectorAll('#side details')].find(d=>d.firstChild.textContent==='其它工具返回').open=true;[...document.querySelectorAll('#side details')].find(d=>d.firstChild.textContent==='派发与任务').open=true");
+      await wait("[...document.querySelectorAll('#side details')].find(d=>d.firstChild.textContent==='其它工具返回').querySelector('.quote')");
+      await wait("[...document.querySelectorAll('#side details')].find(d=>d.firstChild.textContent==='派发与任务').querySelector('.quote')");
+      assert.equal(await evaluate("document.querySelectorAll('#side .error').length"),0);
+      await evaluate("inquiryTree.select(inquiryTree.model.root)");
+      await wait("document.querySelector('#side .vrow')");
+      await evaluate("document.querySelector('#z1').click()");
     } else {
-    assert.equal(await evaluate("inquiryTree.model.root.coordinate.key"), report.target.file);
-    assert.equal(await evaluate("document.querySelector('.tree-node.root').classList.contains('historical-problem')"), false);
-    assert.equal(await evaluate("inquiryTree.model.root.children.length"), 1, "shared report prefix");
-    assert.equal(await evaluate("getComputedStyle(document.querySelector('.tree-node')).height"), '30px', 'original compact height');
-    assert.equal(await evaluate("getComputedStyle(document.querySelector('.tree-node')).width"), '196px', 'original compact width');
-    assert.equal(await evaluate("getComputedStyle(document.querySelector('#graph')).backgroundImage"), 'none', 'original plain canvas');
-    assert.equal(await evaluate("document.querySelector('.colhead').textContent.startsWith('ROOT')"), true);
-    assert.equal(await evaluate("[...document.querySelectorAll('.tree-node')].every(n => n === document.querySelector('.tree-node.root') || +n.style.left.replace('px','') < +document.querySelector('.tree-node.root').style.left.replace('px',''))"), true, "root sits at right");
-    assert.equal(await evaluate("getComputedStyle(document.querySelector('[data-edge=\"model:review\"]')).strokeDasharray !== 'none'"), true);
-    assert.equal(await evaluate("document.querySelector('[data-edge=\"model:review\"]').dataset.strength"), "candidate");
-    assert.equal(await evaluate("[...inquiryTree.model.nodes.values()].some(n=>n.coordinate.key==='unknown-author')"), false);
-    assert.equal(await evaluate("document.querySelector('#gaps').textContent.includes('缺少历史连接')"), true);
-    assert.equal(await evaluate("document.querySelector('.tree-node.agent').textContent.includes('模型查过')"), true);
-    await evaluate("inquiryTree.select(inquiryTree.model.root)");
-    assert.equal(await evaluate("document.querySelectorAll('[data-repair-anchor]').length"), 1, "repair evidence deduplicates across findings");
-    assert.equal(await evaluate("document.querySelector('#reason').textContent.includes('目标修改依据 · 候选')"), true);
-    assert.equal(await evaluate("[...inquiryTree.model.nodes.values()].some(n=>n.coordinate.key==='session:fixer')"), false, "repair anchor creates no automatic problem node");
-    const initialTrace = JSON.stringify(traces);
-    await evaluate("inquiryTree.expand(inquiryTree.model.root)");
-    assert.equal(await evaluate("inquiryTree.model.root.children.length"), 3, "same-second different operation and repair candidate");
-    assert.equal(await evaluate("inquiryTree.model.root.children[0].origins.has('report') && inquiryTree.model.root.children[0].origins.has('manual')"), true);
-    await evaluate("inquiryTree.expand(inquiryTree.model.root.children[0])");
-    assert.equal(await evaluate("inquiryTree.model.root.children[0].children.filter(n=>n.coordinate.key.includes('AudioSpec')).length"), 2, "microseconds preserved");
-    assert.equal(JSON.stringify(traces), initialTrace, "manual calls leave model trace untouched");
-    assert(!requests.some(q => q.op === "record_trace"), "no trace mutation request");
-    await evaluate("inquiryTree.expand(inquiryTree.model.root,'downstream')");
-    assert.equal(await evaluate("inquiryTree.model.rights.length"),1,'native reader goes to the right');
-    assert.equal(await evaluate("inquiryTree.positions.get(inquiryTree.model.rights[0].id).x > inquiryTree.positions.get(inquiryTree.model.root.id).x"),true);
-    assert.equal(await evaluate("document.querySelector('.colhead.down').textContent"),'下游 · 读者');
-    await evaluate("document.querySelector('.tree-node.root').click()");
-    assert.equal(await evaluate("inquiryTree.model.root.collapsed"),true,'clicking the node collapses its subtree');
-    await evaluate("document.querySelector('.tree-node.root').click()");
-    assert.equal(await evaluate("inquiryTree.model.root.collapsed"),false,'clicking again expands existing children');
-    assert.equal(JSON.stringify(traces),initialTrace);
-    await evaluate("document.querySelector('#findings').value='B'; document.querySelector('#findings').dispatchEvent(new Event('change'))");
-    assert.equal(await evaluate("document.querySelector('#reason').textContent.includes('候选输入仍未认证因果')"), true, "switching findings refreshes node reasons");
-    await evaluate("document.querySelector('#findings').value='A'; document.querySelector('#findings').dispatchEvent(new Event('change'))");
-    assert.equal(await evaluate("document.querySelector('[data-edge=\"model:review\"]')===null"), true);
-    assert.equal(await evaluate("document.querySelector('#findingText').textContent.includes('完整原因 A')"), true);
-    await evaluate("inquiryTree.select([...inquiryTree.model.nodes.values()].find(n=>n.claims.some(c=>c.id==='A:origin')))");
-    assert.equal(await evaluate("document.querySelector('#reason').textContent.includes('原稿原因与范围都必须保留')"), true);
-    await evaluate("inquiryTree.expand([...inquiryTree.model.nodes.values()].find(n=>n.claims.some(c=>c.id==='A:origin')))");
-    await evaluate("inquiryTree.select([...inquiryTree.model.nodes.values()].find(n=>n.row?.relation==='dispatch'))");
-    assert.equal(await evaluate("document.querySelector('#reason').textContent.includes('身份来自稍后回执')"), true);
-    assert.equal(await evaluate("document.querySelector('#reason').textContent.includes('身份尚未知')"), true);
-    await evaluate("[...document.querySelectorAll('#reason button')].find(b=>b.textContent==='e-12345678').click()");
-    await wait("document.querySelector('#original').textContent.includes('ORIGINAL EVIDENCE')");
-    assert.equal(requests.at(-1).at, times.origin, "edge evidence keeps its source query cutoff");
-    await evaluate("inquiryTree.select([...inquiryTree.model.nodes.values()].find(n=>n.claims.some(c=>c.id==='A:origin')))");
-    await evaluate("[...document.querySelectorAll('#reason button')].find(b=>b.textContent==='e-abcdef12').click()");
-    await wait("document.querySelector('#original').textContent.includes('ORIGINAL EVIDENCE')");
-    assert.equal(requests.at(-1).at, times.root, "claim evidence uses original claim scope");
-    await evaluate("document.querySelector('#rawRecord').closest('details').open=true");
-    await wait("document.querySelector('#rawRecord').textContent==='FULL RAW RECORD'");
-    await evaluate("inquiryTree.select(inquiryTree.model.root); [...document.querySelectorAll('#reason button')].find(b=>b.textContent==='查看原生差异').click()");
-    await wait("document.querySelector('#records').textContent.includes('OLD_VALUE')");
-    assert.equal(await evaluate("document.querySelector('#records').textContent.includes('NEW_VALUE')"), true);
-    await evaluate("document.querySelector('#collapse').click()");
-    assert.equal(await evaluate("inquiryTree.model.visible().length"), 1);
-    await evaluate("document.querySelector('#restorePaths').click()");
-    assert.equal(await evaluate("inquiryTree.model.visible().length>1"), true);
-    const zoom = await evaluate("inquiryTree.zoom");
-    await evaluate("document.querySelector('#zoomIn').click()");
-    assert.equal(await evaluate("inquiryTree.zoom") > zoom, true);
-    await evaluate("document.querySelector('#fit').click()");
-    await evaluate("document.querySelector('#oneToOne').click()");
-    assert.equal(await evaluate("inquiryTree.zoom"),1,'original 1:1 button');
-    await evaluate("document.querySelector('#railtog').click()");
-    assert.equal(await evaluate("document.querySelector('#rail').classList.contains('closed')"),true);
-    await evaluate("document.querySelector('#railtog').click(); document.querySelector('#catalogFiles').click()");
-    await wait("document.querySelector('[data-catalog-key]')!==null");
-    await evaluate("document.querySelector('#kind').value='file'; document.querySelector('#key').value='/migration/harmony/AudioPlayer.ets'; document.querySelector('#at').value='2026-09-12T10:00:00.000003Z'; document.querySelector('#startTree').click()");
-    await wait("inquiryTree.model.root.coordinate.at==='2026-09-12T10:00:00.000003Z' && inquiryTree.model.root.loaded");
-    assert.equal(await evaluate("inquiryTree.report"), null);
-    assert.equal(requests.at(-1).at, "2026-09-12T10:00:00.000003Z");
-    assert.equal(requests.at(-1).report_id, undefined);
-    await evaluate("reload()");
-    assert.equal(await evaluate("document.querySelector('#at').value"), "2026-09-12T10:00:00.000003Z", "reload preserves chosen cutoff");
-    await send("Page.navigate", { url: url.replace("?report=tree-fixture", "?probe=legacy-fixture") });
-    await wait("document.querySelector('#status')?.textContent.includes('旧版报告未载入')");
-    assert.equal(await evaluate("document.querySelector('#at').value"), times.root, "empty explorer defaults to latest indexed time");
-    assert.equal(await evaluate("document.querySelector('#info').textContent.includes('Fixture project')"), true);
-    assert.equal(await evaluate("inquiryTree.report"), null, "legacy probe is not silently loaded as inquiry report");
-    await evaluate("document.querySelector('#load').click()");
-    await wait("inquiryTree.report?.report_id==='tree-fixture'");
-    await evaluate("document.querySelector('#findings').value='A'; document.querySelector('#findings').dispatchEvent(new Event('change')); inquiryTree.select([...inquiryTree.model.nodes.values()].find(n=>n.claims.some(c=>c.id==='A:origin')))");
+      assert.equal(await evaluate("inquiryTree.model.root.coordinate.key"),report.target.file);
+      assert.equal(await evaluate("inquiryTree.model.root.children.length"),1);
+      assert.equal(await evaluate("(async()=>{const slow=migloopViewer.loadReport('slow');await migloopViewer.loadReport('tree-fixture');await slow;return new URLSearchParams(location.search).get('report')})()"),"tree-fixture","a late report response cannot replace a newer navigation");
+      assert.equal(await evaluate("getComputedStyle(document.querySelector('.tree-node')).height"),"30px");
+      assert.equal(await evaluate("getComputedStyle(document.querySelector('.tree-node')).width"),"196px");
+      assert.equal(await evaluate("document.querySelector('#askai').disabled"),true,"unconnected AI is not a fake working button");
+      assert.equal(await evaluate("document.querySelector('#structuredReport')"),null,"no investigator console");
+      assert.equal(await evaluate("getComputedStyle(document.querySelector('[data-edge=\"model:review\"]')).strokeDasharray !== 'none'"),true);
+      assert.equal(await evaluate("[...inquiryTree.model.nodes.values()].some(n=>n.coordinate.key==='unknown-author')"),false);
+      assert.equal(await evaluate("document.querySelector('.tree-node.root').classList.contains('historical-problem')"),false);
+      await evaluate("[...document.querySelectorAll('#side .vrow button')].find(b=>b.textContent==='原文 / diff').click()");
+      await wait("document.querySelector('#side').textContent.includes('WHOLE WRITE')");
+      await evaluate("[...document.querySelectorAll('#side .vrow')][1].querySelectorAll('button')[1].click()");
+      await wait("document.querySelector('#side').textContent.includes('NEW_VALUE')");
+      await evaluate("[...document.querySelectorAll('#side details')].find(d=>d.firstChild.textContent==='已知时刻的读取原文').open=true");
+      await wait("document.querySelector('[data-operation=\"read\"]')");
+      await evaluate("[...document.querySelectorAll('[data-operation=\"read\"] button')].find(b=>b.textContent==='原文').click()");
+      await wait("document.querySelector('#side').textContent.includes('PARTIAL READ')");
+      assert.equal(await evaluate("document.querySelector('#side').textContent.includes('可能只有片段')"),true);
+      const initialTrace=JSON.stringify(traces);
+      await evaluate("inquiryTree.expand(inquiryTree.model.root)");
+      assert.equal(await evaluate("inquiryTree.model.root.children.length"),2,"raw repair candidate stays hidden");
+      assert.equal(await evaluate("inquiryTree.model.root.children[0].origins.has('report') && inquiryTree.model.root.children[0].origins.has('manual')"),true);
+      await evaluate("inquiryTree.expand(inquiryTree.model.root.children[0])");
+      assert.equal(await evaluate("inquiryTree.model.root.children[0].children.filter(n=>n.coordinate.key.includes('AudioSpec')).length"),2,"microseconds preserved");
+      assert.equal(await evaluate("[...inquiryTree.model.nodes.values()].some(n=>n.row?.id==='native:guess')"),false);
+      await evaluate("inquiryTree.expand(inquiryTree.model.root.children[0].children[0])");
+      assert(requests.some(q=>q.key===input.node.key && q.offset===1),"candidate-only page does not hide next confirmed page");
+      await evaluate("inquiryTree.expand(inquiryTree.model.root,'downstream')");
+      assert.equal(await evaluate("inquiryTree.model.rights.length"),1);
+      assert.equal(JSON.stringify(traces),initialTrace);
+      assert(!requests.some(q=>q.op==="record_trace"));
+      await evaluate("document.querySelector('.tree-node.root').click()");
+      assert.equal(await evaluate("inquiryTree.model.root.collapsed"),true);
+      await evaluate("document.querySelector('.tree-node.root').click()");
+      assert.equal(await evaluate("inquiryTree.model.root.collapsed"),false);
+      await evaluate("document.querySelector('#finding').value='B';document.querySelector('#finding').dispatchEvent(new Event('change'))");
+      await wait("document.querySelector('#side').textContent.includes('候选输入仍未认证因果')");
+      await evaluate("document.querySelector('#finding').value='A';document.querySelector('#finding').dispatchEvent(new Event('change'))");
+      await wait("document.querySelector('[data-claim=\"A:origin\"]')");
+      assert.equal(await evaluate("document.querySelector('[data-edge=\"model:review\"]')"),null);
+      await evaluate("document.querySelector('[data-claim=\"A:origin\"] details').open=true;document.querySelector('[data-claim=\"A:origin\"] button').click()");
+      await wait("document.querySelector('[data-claim=\"A:origin\"]').textContent.includes('ORIGINAL EVIDENCE')");
+      assert.equal(requests.at(-1).at,times.root,"claim evidence keeps original cutoff");
+      assert.equal(requests.at(-1).since,times.origin,"claim evidence keeps original lower bound");
+      await evaluate("document.querySelector('#load').click()");
+      await wait("document.querySelector('#reportsDialog').open");
+      assert.equal(await evaluate("document.querySelector('#reportNotes').textContent.includes('尚未连到树上')"),false,"finding A has no hidden path");
+      await evaluate("document.querySelector('#reportsList button').click()");
+      await wait("!document.querySelector('#reportsDialog').open");
+      await evaluate("document.querySelector('#load').click()");
+      await wait("document.querySelector('#reportNotes').textContent.includes('缺少历史连接')");
+      await evaluate("document.querySelector('#closeReports').click();inquiryTree.select(inquiryTree.model.root)");
+      await wait("document.querySelector('#side .head button')");
+      await evaluate("document.querySelector('#side .head button').click()");
+      await wait("document.querySelector('#timeDialog').open");
+      assert.equal(await evaluate("document.querySelector('#at').value"),times.root);
+      await evaluate("document.querySelector('#at').value='2026-09-12T10:00:00.000003Z';document.querySelector('#applyTime').click()");
+      await wait("inquiryTree.model.root.coordinate.at==='2026-09-12T10:00:00.000003Z' && !document.querySelector('#timeDialog').open");
+      assert.equal(await evaluate("inquiryTree.report"),null);
+      assert.equal(await evaluate("document.querySelector('#finding').hidden"),true);
+      assert.equal(await evaluate("[...inquiryTree.model.nodes.values()].some(n=>n.modelSeen)"),false,"exiting a report clears model-visit marks");
+      assert.equal(await evaluate("inquiryTree.model.root.children.length"),2,"manual mode has confirmed writers only");
+      assert.equal(await evaluate("new URLSearchParams(location.search).has('report')"),false,"manual time does not retain a report URL that overrides it on refresh");
+      await send("Page.reload");
+      await wait("inquiryTree.model?.root.coordinate.at==='2026-09-12T10:00:00.000003Z' && inquiryTree.model.root.loaded");
+      assert.equal(await evaluate("inquiryTree.report"),null,"refresh preserves manual scope");
+      await evaluate("document.querySelector('#z1').click();document.querySelector('#railtog').click()");
+      assert.equal(await evaluate("inquiryTree.zoom"),1);
+      assert.equal(await evaluate("document.querySelector('#rail').classList.contains('closed')"),true);
+      await evaluate("document.querySelector('#railtog').click();document.querySelectorAll('#railbody .rsec')[1].querySelector('.rrow').click()");
+      await wait("document.querySelector('#railbody .vline')");
+      // The host job is deliberately a fixture. Production stays disabled until configured.
+      await evaluate("migloopViewer.configure({investigate:async target=>{window.aiTarget=target;return 'tree-fixture'}});document.querySelector('#askai').click()");
+      await wait("inquiryTree.report?.report_id==='tree-fixture' && document.querySelector('#askai').textContent==='AI 帮我查'");
+      assert.equal(await evaluate("aiTarget.file"),report.target.file);
+      await evaluate("migloopViewer.configure({});document.querySelector('#finding').value='A';document.querySelector('#finding').dispatchEvent(new Event('change'));document.querySelector('#z1').click()");
     }
     assert.equal(errors.length, 0, errors.join("\n"));
     const screenshot = await send("Page.captureScreenshot", { format: "png" });
     fs.writeFileSync(path.join(out, "inquiry-tree.png"), Buffer.from(screenshot.data, "base64"));
     const audit = { passed: true, url, errors, liveDiagnostic, queryCount: requests.length,
-      checks: liveUrl ? ["real report root", "live upstream neighbors", "trace isolation", "node evidence", "no JavaScript errors"] :
-        ["single renderer", "automatic/manual identity", "right root", "shared prefix", "candidate dash", "unclosed isolation",
-        "microsecond and operation identity", "finding switch", "original scope", "native diff", "trace isolation", "new root cutoff", "zoom/collapse",
-        "legacy link warning", "default cutoff preservation", "project label", "repair anchor evidence", "dispatch identity timing",
-        "original compact geometry", "native right readers", "node click toggle", "catalog and rail", "1:1 zoom"],
+      checks: ["original compact shell", "single tree for saved and manual exploration", "ordinary candidates hidden",
+        "model-review-only dashed edges", "write text and edit delta", "read observation expansion",
+        "trace isolation", "precise cutoff", "load dialog", "no fabricated AI runner", "no JavaScript errors"],
     };
     fs.writeFileSync(path.join(out, "audit.json"), JSON.stringify(audit, null, 2));
     console.log(JSON.stringify({ ...audit, artifacts: out }));

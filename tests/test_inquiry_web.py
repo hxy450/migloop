@@ -51,6 +51,8 @@ def test_session_tree_uses_same_http_and_kernel(session, tmp_path, monkeypatch):
         assert page[0] == 200 and prefix + "/tree.js" in page[1]
         assert "__INQUIRY_CONFIG__" not in page[1]
         assert call(prefix + "/tree.js")[2].startswith("text/javascript")
+        assert prefix + "/viewer.js" in page[1]
+        assert call(prefix + "/viewer.js")[2].startswith("text/javascript")
         query = {
             "op": "file",
             "key": "/proj/entry/A.ets",
@@ -61,6 +63,21 @@ def test_session_tree_uses_same_http_and_kernel(session, tmp_path, monkeypatch):
         assert status == 200
         assert json.loads(body) == json.loads(
             dispatch_http(database, "/api/query", query)[1]
+        )
+        assert json.loads(call(prefix + "/api/trace")[1]) == []
+        display = {
+            "view": "history",
+            "kind": "file",
+            "key": query["key"],
+            "at": query["at"],
+        }
+        status, body, _ = call(prefix + "/api/view", display)
+        assert status == 200
+        assert json.loads(body) == json.loads(
+            dispatch_http(database, "/api/view", display)[1]
+        )
+        assert "reports" in json.loads(
+            call(prefix + "/api/view", {"view": "overview"})[1]
         )
         assert json.loads(call(prefix + "/api/trace")[1]) == []
         assert (

@@ -129,7 +129,7 @@ def http_server(tmp_path):
             body = response.read().decode()
             return response.status, body if path.split("?", 1)[
                 0
-            ] in ("/", "/tree.js") else json.loads(body)
+            ] in ("/", "/tree.js", "/viewer.js") else json.loads(body)
         finally:
             connection.close()
 
@@ -150,9 +150,10 @@ def test_http_uses_same_kernel_and_manual_queries_do_not_forge_model_visits(
     assert status == 200 and data == engine.query(q)
     assert call("/api/trace")[1] == []
     status, page = call("/")
-    assert status == 200 and "原因仍是模型主张" in page
+    assert status == 200 and "AI 判断的问题" in page
     assert "__INQUIRY_CONFIG__" not in page and 'src="/tree.js"' in page
     assert call("/tree.js")[0] == 200
+    assert call("/viewer.js")[0] == 200
     assert call("/?report=example")[0] == 200
     assert call("/api/query", q, "https://not-the-local-page.example")[0] == 403
     assert call("/api/query", [q])[0] == 400

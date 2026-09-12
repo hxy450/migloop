@@ -1,763 +1,243 @@
 <!doctype html>
-<html lang="zh-CN">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>返修链路 · 两原子探索树</title>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>返修链路</title>
 <style>
-/* Original migloop fixchain.html / migbot-server prototype presentation.
-   Time scopes replace version labels; inquiry remains the only query engine. */
-:root {
-  --page:#f3f4f7;--surface:#fff;--ink:#191c23;--ink-2:#4b5160;--ink-3:#8a90a0;
-  --ring:#e4e6ec;--wash:#f7f8fa;--wash-2:#eef0f4;
-  --c-src:#7c5cd6;--c-spec:#2a78d6;--c-gen:#1a9e6c;--c-file:#d68a2a;--c-fix:#cf222e;--c-dis:#0f8a7a;
-  --file:var(--c-file);--agent:var(--c-gen);--problem:var(--c-fix);--blue:var(--c-spec);--muted:var(--ink-3);
-  --mono:Consolas,"Cascadia Mono","SF Mono",Menlo,monospace;
-  --sans:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;
-}
-*{box-sizing:border-box;margin:0}
-body{background:var(--page);color:var(--ink);font:14px/1.6 var(--sans);padding:22px clamp(14px,2vw,32px) 30px}
-header{max-width:1720px;margin:0 auto 12px}.eyebrow{font-size:11px;color:var(--ink-3);letter-spacing:.12em;text-transform:uppercase}
-h1{font-size:22px;margin-top:2px;display:flex;gap:12px;align-items:baseline;flex-wrap:wrap}
-h1 em{font-style:normal;font-size:12.5px;color:var(--ink-3);font-weight:400}
-h2{font-size:12px;margin-bottom:8px}p{margin:8px 0}.small{font-size:11px}.muted{color:var(--ink-3)}
-.chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;align-items:center}.chip{font-size:12px;padding:2px 11px;border:1px solid var(--ring);border-radius:99px;background:var(--surface);color:var(--ink-2)}
-main{max-width:1720px;margin:0 auto;display:flex;gap:12px;align-items:stretch;height:calc(100vh - 160px);min-height:460px;position:relative}
-.panel{min-width:0;background:var(--surface);border:1px solid var(--ring);border-radius:14px;box-shadow:0 1px 2px rgba(16,24,40,.04),0 6px 18px rgba(16,24,40,.04);overflow:hidden}
-.rail{flex:0 0 292px;display:flex;flex-direction:column}.railhead{display:flex;gap:6px;align-items:center;padding:10px;border-bottom:1px solid var(--ring)}
-.railhead b{flex:1;font-size:11px;letter-spacing:.1em;color:var(--ink-3);white-space:nowrap;overflow:hidden}
-.railhead button{width:22px;height:22px;padding:0}.rail.closed{flex-basis:30px}.rail.closed .railbody{display:none}.rail.closed .railhead{flex-direction:column;padding:8px 4px}.rail.closed b{writing-mode:vertical-rl}
-.railbody{overflow:auto;flex:1}.rail section{padding:10px;border-bottom:1px solid var(--ring)}
-.section-label{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}.section-label h2{margin:0;font-size:11px;letter-spacing:.08em;color:var(--ink-3)}
-button,input,select,textarea{font:inherit;color:var(--ink-2)}button{cursor:pointer;border:1px solid var(--ring);background:var(--surface);border-radius:6px;padding:3px 8px;font-size:12px}
-button:hover{background:var(--wash)}button:disabled{opacity:.55;cursor:default}
-input,textarea,select{border:1px solid var(--ring);border-radius:8px;padding:5px 8px;font-size:12px;max-width:100%;background:var(--wash)}
-input,textarea{width:100%}input:focus,textarea:focus{outline:1px solid var(--c-spec)}textarea{min-height:150px;font:11px/1.6 var(--mono)}
-label{display:block;color:var(--ink-3);font-size:11px;margin:6px 0 3px}.control-row{display:flex;gap:5px;align-items:center}.control-row>*{min-width:0}.control-row select{flex:1}
-.primary{border-color:var(--c-spec);color:var(--c-spec);border-radius:99px}.wide{width:100%;margin-top:8px}
-.tools{display:flex;gap:5px;flex-wrap:wrap;margin:8px 0}.tools button{font-size:11px}.row{border-top:1px solid var(--ring);padding:8px 0;overflow-wrap:anywhere}.row:first-child{border-top:0}
-.row button,details button,#reason button{margin:3px 3px 0 0;font-size:11px}.row section{padding:8px 0}
-details{margin:8px 0}summary{cursor:pointer;color:var(--ink-2);font-size:11.5px;overflow-wrap:anywhere}
-pre{white-space:pre-wrap;overflow-wrap:anywhere;font:11px/1.55 var(--mono);max-height:60vh;overflow:auto;background:var(--wash);border:1px solid var(--ring);border-radius:7px;padding:8px 10px;margin:6px 0}
-.catalog-row{display:block;border:0;width:100%;text-align:left;border-radius:8px;padding:4px 6px;font:11.5px var(--mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-#catalog{max-height:24vh;overflow:auto;margin-top:6px}.catalog-kind{display:flex;gap:5px;margin:6px 0}.catalog-kind button.active{color:var(--c-spec);background:var(--wash-2)}
-.workspace{flex:1;display:flex;flex-direction:column;position:relative}.toolbar{display:flex;gap:10px;align-items:center;padding:10px 14px;background:var(--surface);border-bottom:1px solid var(--ring);font-size:11.5px}
-.toolbar .legend{display:flex;gap:12px;flex-wrap:wrap;flex:1;color:var(--ink-3)}.legend i{font-style:normal;display:inline-flex;align-items:center;gap:4px}
-.sw{width:10px;height:10px;border-radius:3px;border:1.5px solid;display:inline-block}.sw.file{border-color:var(--c-file)}.sw.agent{border-color:var(--c-gen)}.sw.dispatch{border-color:var(--c-dis);border-style:dashed}.sw.candidate{border-color:var(--c-src);border-style:dashed}.sw.problem{border-color:var(--c-fix)}
-.zoomctl{display:flex;gap:4px;align-items:center}.zoomctl button{font-size:12px;min-width:26px;height:24px;padding:0 8px}.zoomctl span{font:10px var(--mono)}
-#graph{flex:1;min-height:0;position:relative;overflow:auto;background:var(--surface)}
-.tree-spacer{position:relative;min-width:100%}.canvas{position:absolute;left:0;top:0;transform-origin:0 0}.wires{position:absolute;left:0;top:0;pointer-events:none;z-index:1;overflow:visible}
-.wire{fill:none;stroke:#cfd3dc;stroke-width:1.4}.wire.candidate,.wire.reviewed{stroke:#9b89ba;stroke-dasharray:4 4}
-.colhead{position:absolute;top:0;font-size:10.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);padding-bottom:5px;border-bottom:2px solid var(--ring);text-align:center;white-space:nowrap}
-.colhead.root{color:var(--c-file);border-color:var(--c-file)}.colhead.rootA{color:var(--c-gen);border-color:var(--c-gen)}.colhead.down{color:var(--c-spec);border-color:var(--c-spec)}
-.node{position:absolute;z-index:2;width:196px;height:30px;font-size:12px;padding:0 20px 0 10px;line-height:28px;border:1.4px solid var(--ring);border-radius:8px;background:var(--wash);cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink-2);display:flex;gap:3px;align-items:center;outline:none}
-.node:hover{box-shadow:0 2px 10px rgba(16,24,40,.14);z-index:3}.node.sel{box-shadow:0 0 0 2.5px color-mix(in srgb,var(--c-spec) 45%,transparent)}
-.node .chev{position:absolute;right:8px;top:0;color:var(--ink-3);font-size:10px}.tree-node-name{overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1}.tree-time{font:10px var(--mono);color:var(--ink-3);flex-shrink:0}
-.node.file{border-color:color-mix(in srgb,var(--c-file) 55%,transparent);font-family:var(--mono);font-size:11.5px;color:var(--ink)}
-.node.gen{border-color:color-mix(in srgb,var(--c-gen) 55%,transparent);color:var(--ink);background:color-mix(in srgb,var(--c-gen) 5%,var(--surface))}
-.node.root{border-width:2px;font-weight:600;background:color-mix(in srgb,var(--c-file) 10%,var(--surface))}
-.node.gen.root{background:color-mix(in srgb,var(--c-gen) 12%,var(--surface))}
-.node.dispatch{border-style:dashed;border-color:var(--c-dis);color:var(--c-dis);background:var(--surface)}.node.down{border-style:dotted}
-.node.candidate{border-style:dashed}.node.historical-problem{border-color:var(--c-fix);color:var(--c-fix);background:color-mix(in srgb,var(--c-fix) 5%,var(--surface))}
-.node.seen{outline:1px dotted var(--c-spec);outline-offset:-4px}.node.leaf{border-color:color-mix(in srgb,var(--c-src) 45%,transparent);color:var(--c-src);font-size:11px;font-family:var(--sans)}
-.tree-badges{position:absolute;width:1px;height:1px;clip-path:inset(50%);overflow:hidden}.cvempty{padding:40px 24px;font-size:12.5px;color:var(--ink-3);max-width:520px}
-.canvas-note{padding:6px 12px;border-top:1px solid var(--ring);font-size:10px;color:var(--ink-3);display:flex;justify-content:space-between;gap:8px}
-.inspector{flex:0 0 380px;display:flex;flex-direction:column}.tabs{display:flex;gap:2px;padding:8px;border-bottom:1px solid var(--ring)}.tabs button{flex:1;border:0;font-size:11px;color:var(--ink-3)}.tabs button.active{color:var(--c-spec);background:var(--wash)}
-.inspector-scroll{overflow:auto;min-height:0;flex:1;padding:16px 20px}.tab-content[hidden]{display:none}.detail-title{overflow-wrap:anywhere;font:600 15px/1.35 var(--sans);margin:2px 0 12px}
-.inspector section{padding:6px 0}.meta-line{font-size:11px;color:var(--ink-3);overflow-wrap:anywhere}.reason-claim{border-left:3px solid var(--ring);border-radius:8px;background:var(--wash);padding:10px 12px!important;margin:12px 0}
-.reason-claim p{white-space:pre-wrap;font-size:12px}.reason-claim[data-problem=true]{border-left-color:var(--c-fix)}.badge{display:inline-block;font-size:11px;padding:1px 8px;border-radius:99px;background:var(--wash-2);color:var(--ink-2)}
-.empty-detail{color:var(--ink-3);font-size:12.5px;line-height:1.8}.error{color:var(--c-fix);white-space:pre-wrap;overflow-wrap:anywhere}.audit-count{background:var(--wash-2);padding:0 4px;border-radius:3px}
-main.hide-inspector .inspector{display:none}#records{max-height:50vh;overflow:auto}#status{margin-top:6px}
-@media(max-width:1150px){.inspector{position:absolute;right:0;top:0;bottom:0;width:380px;z-index:12;box-shadow:-8px 0 28px #26345622}.rail{flex-basis:250px}}
-@media(max-width:720px){body{padding:12px 8px}main{height:calc(100vh - 160px);min-height:360px}.rail{position:absolute;left:0;top:0;bottom:0;width:260px;z-index:11;display:none}.rail.mobile-open{display:flex}.inspector{width:min(380px,calc(100vw - 16px))}.toolbar{flex-wrap:wrap}.legend{gap:8px}#mobileRail{display:block!important}}
+  :root {
+    --page: #f3f4f7; --surface: #ffffff; --ink: #191c23; --ink-2: #4b5160; --ink-3: #8a90a0;
+    --ring: #e4e6ec; --wash: #f7f8fa; --wash-2: #eef0f4;
+    --c-src: #7c5cd6; --c-spec: #2a78d6; --c-gen: #1a9e6c; --c-file: #d68a2a; --c-fix: #cf222e; --c-dis: #0f8a7a;
+    --mono: Consolas, "Cascadia Mono", "SF Mono", Menlo, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--page); color: var(--ink); font: 14px/1.6 var(--sans);
+         padding: 22px clamp(14px, 2vw, 32px) 30px; }
+  .mono { font-family: var(--mono); }
+  header { max-width: 1720px; margin: 0 auto 12px; }
+  .crumb { font-size: 11px; color: var(--ink-3); letter-spacing: .12em; text-transform: uppercase; }
+  h1 { font-size: 22px; margin-top: 2px; display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  h1 em { font-style: normal; font-size: 12.5px; color: var(--ink-3); font-weight: 400; }
+  h1 em b { color: var(--ink-2); font-family: var(--mono); font-weight: 600; }
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; align-items: center; }
+  .chip { font-size: 12px; padding: 2px 11px; border: 1px solid var(--ring); border-radius: 99px; background: var(--surface); color: var(--ink-2); }
+  .chip b { color: var(--ink); }
+  .clear { display: none; font-size: 12px; color: var(--c-spec); cursor: pointer; padding: 2px 10px; border: 1px solid color-mix(in srgb, var(--c-spec) 40%, transparent); border-radius: 99px; }
+  .clear.show { display: inline-block; }
+
+  .stage-wrap { max-width: 1720px; margin: 0 auto; display: flex; gap: 12px; align-items: flex-start; }
+  .panel { background: var(--surface); border: 1px solid var(--ring); border-radius: 14px;
+           box-shadow: 0 1px 2px rgba(16,24,40,.04), 0 6px 18px rgba(16,24,40,.04); }
+  /* 左栏:入口 —— 任何 文件@v / agent@ver 都能当根 */
+  .rail { flex: 0 0 292px; height: calc(100vh - 176px); min-height: 460px; display: flex; flex-direction: column; overflow: hidden; }
+  .rail.closed { flex-basis: 30px; }
+  .rail.closed .railbody, .rail.closed .search { display: none; }
+  .rail .railhead { display: flex; align-items: center; gap: 6px; padding: 10px 10px 8px; border-bottom: 1px solid var(--ring); }
+  .rail .railhead b { flex: 1 1 auto; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); white-space: nowrap; overflow: hidden; }
+  .rail.closed .railhead { flex-direction: column; padding: 8px 4px; }
+  .rail.closed .railhead b { writing-mode: vertical-rl; letter-spacing: .15em; }
+  .rail .tog { font-size: 12px; width: 22px; height: 22px; border: 1px solid var(--ring); background: var(--surface); border-radius: 6px; cursor: pointer; color: var(--ink-2); }
+  .rail .search { margin: 8px 10px 4px; }
+  .rail .search input { width: 100%; font: 12.5px var(--sans); padding: 6px 10px; border: 1px solid var(--ring); border-radius: 8px; background: var(--wash); color: var(--ink); outline: none; }
+  .rail .search input:focus { border-color: color-mix(in srgb, var(--c-spec) 60%, transparent); background: var(--surface); }
+  .railbody { flex: 1 1 auto; overflow-y: auto; padding: 4px 6px 12px; }
+  .rsec > .rsh { display: flex; align-items: center; gap: 6px; font-size: 10.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+                 color: var(--ink-3); padding: 10px 6px 4px; cursor: pointer; user-select: none; }
+  .rsec > .rsh .n { font-weight: 500; letter-spacing: 0; }
+  .rsec > .rsh .chev { margin-left: auto; font-size: 10px; }
+  .rsec.closed > .rlist { display: none; }
+  .rkind { font-size: 10.5px; color: var(--ink-3); padding: 6px 6px 2px; cursor: pointer; user-select: none; display: flex; gap: 6px; }
+  .rkind .chev { margin-left: auto; font-size: 10px; }
+  .rkind.closed + .rklist { display: none; }
+  .ritem { border-radius: 8px; }
+  .ritem > .rrow { display: flex; align-items: center; gap: 6px; padding: 4px 6px 4px; font-size: 12px; color: var(--ink); cursor: pointer; border-radius: 8px; }
+  .ritem > .rrow:hover { background: var(--wash); }
+  .ritem.on > .rrow { background: color-mix(in srgb, var(--c-spec) 8%, var(--surface)); }
+  .ritem .lab { flex: 1 1 auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ritem .lab.mono { font-size: 11.5px; }
+  .ritem .lab .ind { color: var(--ink-3); }
+  .ritem .pill { font-size: 10px; padding: 0 6px; }
+  .ritem .vers { padding: 2px 0 6px 14px; display: none; }
+  .ritem.open .vers { display: block; }
+  .vline { display: flex; gap: 6px; align-items: baseline; padding: 3px 6px; font-size: 11.5px; color: var(--ink-2); border-radius: 6px; cursor: pointer; border-left: 2px solid var(--ring); margin-left: 2px; }
+  .vline:hover { background: var(--wash); color: var(--ink); border-left-color: var(--c-spec); }
+  .vline .vn { font-family: var(--mono); font-size: 10.5px; color: var(--ink-3); min-width: 26px; }
+  .vline .t { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .vline.fix .t { color: var(--c-fix); }
+  .rempty { font-size: 11.5px; color: var(--ink-3); padding: 6px 8px; }
+
+  .graph { flex: 1 1 auto; min-width: 0; position: relative; overflow: auto; height: calc(100vh - 176px); min-height: 460px; }
+  .toolbar { position: sticky; top: 0; left: 0; z-index: 6; display: flex; gap: 10px; align-items: center;
+             padding: 10px 14px; background: color-mix(in srgb, var(--surface) 88%, transparent);
+             backdrop-filter: blur(6px); border-bottom: 1px solid var(--ring); font-size: 11.5px; color: var(--ink-3); }
+  .toolbar .legend { display: flex; gap: 12px; flex-wrap: wrap; flex: 1 1 auto; }
+  .legend i { font-style: normal; display: inline-flex; align-items: center; gap: 4px; }
+  .legend .sw { width: 10px; height: 10px; border-radius: 3px; border: 1.5px solid; display: inline-block; }
+  .zoomctl { display: flex; gap: 4px; }
+  .zoomctl button { font-size: 12px; min-width: 26px; height: 24px; border: 1px solid var(--ring); padding: 0 8px;
+                    background: var(--surface); border-radius: 6px; cursor: pointer; color: var(--ink-2); }
+  .zoomctl button:hover { background: var(--wash); }
+  .canvas { position: relative; transform-origin: 0 0; }
+  .colhead { position: absolute; top: 0; font-size: 10.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+             color: var(--ink-3); padding-bottom: 5px; border-bottom: 2px solid var(--ring); text-align: center; white-space: nowrap; overflow: hidden; }
+  .colhead.root { color: var(--c-file); border-color: var(--c-file); }
+  .colhead.rootA { color: var(--c-gen); border-color: var(--c-gen); }
+  .colhead.fix { color: var(--c-fix); border-color: var(--c-fix); }
+  .colhead.down { color: var(--c-spec); border-color: var(--c-spec); }
+  svg.wires { position: absolute; left: 0; top: 0; pointer-events: none; z-index: 1; overflow: visible; }
+  .wire { fill: none; stroke: #cfd3dc; stroke-width: 1.4; transition: stroke .12s, stroke-width .12s; }
+  .wire.on { stroke: var(--c-file); stroke-width: 2.2; }
+  .node { position: absolute; z-index: 2; height: 30px; font-size: 12px; padding: 0 26px 0 10px; line-height: 28px;
+          border: 1.4px solid var(--ring); border-radius: 8px; background: var(--wash); cursor: pointer;
+          white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--ink-2);
+          transition: box-shadow .12s, transform .12s; }
+  .node:hover { box-shadow: 0 2px 10px rgba(16,24,40,.14); transform: translateY(-1px); z-index: 3; }
+  .node.sel { box-shadow: 0 0 0 2.5px color-mix(in srgb, var(--c-spec) 45%, transparent); }
+  .node .chev { position: absolute; right: 8px; top: 0; color: var(--ink-3); font-size: 10px; }
+  .node .badge { display: inline-block; font-size: 9.5px; line-height: 14px; padding: 0 5px; margin-left: 5px; border-radius: 4px;
+                 background: var(--wash-2); color: var(--ink-3); vertical-align: 1px; font-family: var(--sans); }
+  .node .badge.stale { background: color-mix(in srgb, var(--c-fix) 12%, transparent); color: var(--c-fix); font-weight: 700; }
+  .node .badge.via { background: color-mix(in srgb, var(--c-src) 12%, transparent); color: var(--c-src); }
+  .node .badge.self { background: color-mix(in srgb, var(--c-gen) 12%, transparent); color: var(--c-gen); }
+  .node.file { border-color: color-mix(in srgb, var(--c-file) 55%, transparent); font-family: var(--mono); font-size: 11.5px; color: var(--ink); }
+  .node.file.root { background: color-mix(in srgb, var(--c-file) 10%, var(--surface)); border-width: 2px; font-weight: 600; }
+  .node.file.stale { border-left: 4px solid var(--c-fix); }
+  .node.gen  { border-color: color-mix(in srgb, var(--c-gen) 55%, transparent); color: var(--ink); background: color-mix(in srgb, var(--c-gen) 5%, var(--surface)); }
+  .node.gen.root { border-width: 2px; font-weight: 600; background: color-mix(in srgb, var(--c-gen) 12%, var(--surface)); }
+  .node.gen.sharp { border-color: var(--c-fix); box-shadow: inset 3px 0 0 var(--c-fix); }
+  .node.fix  { border-color: var(--c-fix); color: var(--c-fix); font-weight: 600; background: color-mix(in srgb, var(--c-fix) 5%, var(--surface)); }
+  .node.dispatch { border-style: solid; border-color: var(--c-dis); color: var(--c-dis); background: var(--surface); }
+  .node.leaf { border-color: color-mix(in srgb, var(--c-src) 45%, transparent); color: var(--c-src); cursor: default; }
+  .node.leaf:hover { transform: none; box-shadow: none; }
+  .node.down { border-style: solid; }
+  .cvempty { position: absolute; left: 24px; top: 40px; font-size: 12.5px; color: var(--ink-3); line-height: 1.8; max-width: 520px; }
+
+  .side { flex: 0 0 380px; position: relative; padding: 0; max-height: calc(100vh - 176px); min-height: 460px; overflow-y: auto; }
+  .side .placeholder { color: var(--ink-3); font-size: 12.5px; line-height: 1.8; padding: 22px 20px; }
+  .side .head { padding: 16px 20px 12px; border-bottom: 1px solid var(--ring); position: sticky; top: 0; background: var(--surface); z-index: 2; border-radius: 14px 14px 0 0; }
+  .side .head.file { border-top: 4px solid var(--c-file); }
+  .side .head.gen { border-top: 4px solid var(--c-gen); }
+  .side .head.fix { border-top: 4px solid var(--c-fix); }
+  .side .tag { font-size: 10.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); }
+  .side .head.file .tag { color: var(--c-file); } .side .head.gen .tag { color: var(--c-gen); } .side .head.fix .tag { color: var(--c-fix); }
+  .side h3 { font-size: 15px; word-break: break-all; margin-top: 2px; line-height: 1.35; }
+  .side .sub { font-size: 11.5px; color: var(--ink-3); margin-top: 3px; word-break: break-all; }
+  .side .rootbtn { margin-top: 8px; font: 12px var(--sans); padding: 4px 12px; border-radius: 99px; cursor: pointer;
+                   border: 1px solid color-mix(in srgb, var(--c-spec) 50%, transparent); color: var(--c-spec); background: var(--surface); }
+  .side .rootbtn:hover { background: color-mix(in srgb, var(--c-spec) 8%, var(--surface)); }
+  .side .body { padding: 6px 20px 20px; }
+  .side .sec { margin-top: 16px; }
+  .side .sec > b { display: block; font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); font-weight: 700; margin-bottom: 6px; }
+  .side .kv { font-size: 12.5px; color: var(--ink-2); line-height: 1.7; }
+  .side .kv .k { color: var(--ink-3); font-size: 11px; margin-right: 6px; }
+  .side .pills { display: flex; gap: 6px; flex-wrap: wrap; }
+  .pill { font-size: 11px; padding: 1px 8px; border-radius: 99px; background: var(--wash-2); color: var(--ink-2); }
+  .pill.warn { background: color-mix(in srgb, var(--c-fix) 10%, transparent); color: var(--c-fix); font-weight: 600; }
+  .pill.ok { background: color-mix(in srgb, var(--c-gen) 10%, transparent); color: var(--c-gen); }
+  .pill.via { background: color-mix(in srgb, var(--c-src) 10%, transparent); color: var(--c-src); }
+  .vrow { display: grid; grid-template-columns: 34px 1fr auto; gap: 8px; align-items: baseline; padding: 6px 8px; border-radius: 8px;
+          font-size: 12px; color: var(--ink-2); border-left: 3px solid transparent; }
+  .vrow:hover { background: var(--wash); }
+  .vrow.anchor { background: color-mix(in srgb, var(--c-file) 10%, transparent); border-left-color: var(--c-file); }
+  .vrow.dim { opacity: .5; }
+  .vrow .vn { font-family: var(--mono); font-size: 11px; color: var(--ink-3); }
+  .vrow .who { font-weight: 600; color: var(--ink); }
+  .vrow .who.fix { color: var(--c-fix); } .vrow .who.ext { color: var(--c-src); font-weight: 500; }
+  .vrow .meta { font-size: 11px; color: var(--ink-3); display: block; }
+  .vrow .act { font-size: 11px; color: var(--c-spec); cursor: pointer; white-space: nowrap; }
+  .vrow .act:hover { text-decoration: underline; }
+  .diffblock, .srcblock { grid-column: 1 / -1; font: 11px/1.55 var(--mono); background: var(--wash);
+               border: 1px solid var(--ring); border-radius: 7px; padding: 8px 10px; margin: 4px 0 6px;
+               white-space: pre-wrap; word-break: break-all; overflow-x: auto; }
+  .srcblock { white-space: pre; overflow: auto; max-height: 60vh; counter-reset: ln; }
+  .srcblock .ln { display: block; }
+  .srcblock .ln::before { counter-increment: ln; content: counter(ln); display: inline-block; width: 3.2em; color: var(--ink-3); text-align: right; margin-right: 12px; user-select: none; }
+  .dl-add { color: #1a7f37; background: rgba(26,158,108,.10); display: inline; }
+  .dl-del { color: #cf222e; background: rgba(207,34,46,.08); display: inline; }
+  .dl-ctx { color: var(--ink-3); }
+  .quote { font-size: 12px; color: var(--ink-2); background: var(--wash); border-radius: 10px; padding: 10px 12px;
+           border-left: 3px solid var(--ring); line-height: 1.65; word-break: break-word; margin-top: 8px; white-space: pre-wrap; }
+  .quote b { display: block; font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; margin-bottom: 4px; white-space: normal; color: var(--ink-3); }
+  .quote.dispatch { border-left-color: var(--c-gen); } .quote.dispatch b { color: var(--c-gen); }
+  .quote.cause { border-left-color: var(--c-fix); } .quote.cause b { color: var(--c-fix); }
+  .quote.inbox { border-left-color: var(--c-spec); } .quote.inbox b { color: var(--c-spec); }
+  .quote.dim { opacity: .6; }
+  .more { font-size: 11px; color: var(--c-spec); cursor: pointer; white-space: nowrap; }
+  .tl { position: relative; margin-top: 4px; }
+  .tl .trow { display: grid; grid-template-columns: 40px 1fr; gap: 8px; padding: 5px 8px; border-radius: 8px; font-size: 12px; color: var(--ink-2); border-left: 3px solid transparent; }
+  .tl .trow:hover { background: var(--wash); }
+  .tl .trow.anchor { background: color-mix(in srgb, var(--c-gen) 10%, transparent); border-left-color: var(--c-gen); }
+  .tl .trow.dim { opacity: .5; }
+  .tl .vn { font-family: var(--mono); font-size: 11px; color: var(--ink-3); padding-top: 1px; }
+  .tl .eff { color: var(--ink); }
+  .tl .inp { font-size: 11px; color: var(--ink-3); }
+  .arow { font-size: 11px; color: var(--ink-3); padding: 2px 0 2px 8px; border-left: 2px solid var(--ring); margin: 2px 0 0 4px; word-break: break-all; }
+  .arow .vn { font-family: var(--mono); color: var(--ink-3); }
+  .arow .diffblock { margin-top: 4px; }
+  .lnk { color: var(--c-spec); cursor: pointer; }
+  .lnk:hover { text-decoration: underline; }
+  .lnk.mono { font-family: var(--mono); font-size: 11.5px; }
+
+  .empty { max-width: 620px; margin: 12vh auto 0; text-align: center; color: var(--ink-3); }
+  .empty h2 { color: var(--ink-2); font-size: 17px; margin-bottom: 8px; }
+
+  /* Original shell; these rules support time labels and a single load dialog. */
+  .graph{display:flex;flex-direction:column;overflow:hidden}#viewport{flex:1;position:relative;overflow:auto;min-height:0}
+  .tree-spacer{position:relative;min-width:100%}.tree-canvas{position:absolute;top:0;left:0}.tree-node{display:flex;align-items:center;gap:3px}
+  .tree-node-name{min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis}.tree-time{font:10px var(--mono);color:var(--ink-3)}
+  .tree-badges{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+  .node.historical-problem{border-color:var(--c-fix);color:var(--c-fix);background:color-mix(in srgb,var(--c-fix) 5%,var(--surface))}
+  .node.candidate{border-style:dashed}.wire.reviewed{stroke:#9b89ba;stroke-dasharray:4 4}.node.seen{outline:1px dotted var(--c-spec);outline-offset:-4px}
+  .tree-more{width:196px;text-align:left;font:11px var(--sans)}
+  button,input,select{font:inherit;color:inherit}button{cursor:pointer;border:1px solid var(--ring);border-radius:6px;background:var(--surface);padding:3px 8px}
+  button:hover{background:var(--wash)}button:disabled{opacity:.5;cursor:default}.loadbtn{font-size:12px;border-radius:99px}
+  .side details{margin-top:12px}.side summary{cursor:pointer;color:var(--ink-3);font-size:11.5px}.side .act{border:0;padding:0 3px;background:none;font-size:11px;color:var(--c-spec)}
+  .side .head button{font-size:12px}.side .original{grid-column:1/-1;width:100%}.side .vrow .meta{font-family:var(--sans)}.vrow .t{font-family:var(--mono)}
+  .empty-note{font-size:12px;color:var(--ink-3);padding:8px 0}.error{color:var(--c-fix);white-space:pre-wrap;overflow-wrap:anywhere}
+  dialog{width:min(620px,90vw);max-height:80vh;overflow:auto;margin:auto;border:1px solid var(--ring);border-radius:14px;padding:20px;color:var(--ink)}
+  dialog::backdrop{background:#16202d55}dialog h2{font-size:17px;margin-bottom:12px}dialog .close{float:right}dialog select,dialog input{max-width:100%;padding:6px;border:1px solid var(--ring);border-radius:6px}
+  dialog p,dialog details{margin:12px 0}dialog summary{cursor:pointer;font-size:12px}.report-row{padding:10px 0;border-top:1px solid var(--ring);display:flex;align-items:center;gap:10px}
+  .report-row span{flex:1;font-size:12px}.report-row small{display:block;color:var(--ink-3)}
+  #finding{font-size:12px;padding:3px 8px;border:1px solid var(--ring);border-radius:99px;max-width:280px}
+  @media(max-width:1150px){.rail{flex-basis:240px}.side{flex-basis:320px}}
+  @media(max-width:850px){.stage-wrap{flex-wrap:wrap}.rail{flex-basis:220px}.graph{flex:1}.side{flex-basis:100%;max-height:60vh;min-height:200px}}
 </style>
-</head>
-<body>
-<header><div class="eyebrow">MigLoop · Fix Traceback</div><h1>返修链路<em>两原子探索树 —— 文件 × agent，按时间选择起点</em></h1><div class="chips"><span id="info" class="chip">读取索引…</span><span class="chip">时间证据树 · 原始关系与模型主张分开</span></div></header>
-<main id="layout">
-<aside class="panel rail" id="rail">
-<div class="railhead"><b>入口 · 选一个时间当根</b><button id="railtog" title="收起/展开入口">◂</button></div><div class="railbody">
-<section><input id="catalogSearch" type="search" placeholder="搜文件名 / 路径 / agent…"><div class="catalog-kind"><button id="catalogFiles" class="active">文件</button><button id="catalogAgents">agent</button></div><div id="catalog" class="small muted">输入关键词查询，或点击文件 / agent 浏览入口。</div></section>
-<section><div class="section-label"><h2>调查结论</h2><span class="small muted">自动展开路径</span></div>
-<div class="control-row"><select id="reports" aria-label="报告"></select><button id="load">载入</button></div>
-<details><summary>通过 report_id 载入</summary><input id="reportId" placeholder="完整 report_id"><button id="loadId">载入此报告</button></details>
-<details><summary>粘贴 inquiry/1 YAML / JSON</summary><textarea id="draft" aria-label="报告原稿" placeholder="完整结构化结论…"></textarea><button id="submit">核验并载入</button></details>
-<div class="control-row"><select id="findings" aria-label="问题筛选"><option value="">全部问题</option></select><button id="restorePaths">展开路径</button></div>
-</section>
-<section><div class="section-label"><h2>探索起点</h2><select id="kind" aria-label="对象类型"><option value="file">文件</option><option value="agent">Agent</option><option value="pool">全池搜索</option></select></div>
-<input id="key" placeholder="完整文件路径或 Agent 身份" aria-label="对象身份">
-<label for="at">截至时间 · ISO，保留精度</label><input id="at" placeholder="2026-09-12T10:00:00.000001Z">
-<label for="since">起始时间 · 可空</label><input id="since" placeholder="未限定起点">
-<button id="startTree" class="primary wide">以此为根展开</button>
-<div id="status" class="small muted" role="status"></div>
-<details id="manualTools"><summary>原文、差异与索引查询</summary>
-<input id="terms" placeholder="搜索词，逗号分隔（OR）" style="margin-top:8px">
-<label>原文排序 <select id="order"><option value="">默认</option><option value="oldest">较早优先</option><option value="newest">较新优先</option></select></label>
-<div class="tools"><button id="query">查原文索引</button><button id="relations">查读写关系</button><button id="calls">查相关调用</button><button id="changes">展开原生修改</button><button id="outline">原生增删清单</button><button id="history">片段修改历史</button><button id="inputs">Agent 已收输入</button><button id="messages">Agent 任务消息</button><button id="returns">工具返回</button><button id="agents">Agent 目录</button><button id="files">文件目录</button></div>
-</details><div id="records"></div>
-</section>
-<section class="small muted">展开遵循节点自己的截止时间。单条记录不代表完整文件快照；页面查询不会写入模型调查轨迹。</section>
-</div></aside>
-<section class="panel workspace">
-<div class="toolbar"><button id="mobileRail" style="display:none">入口</button><div class="legend"><i><span class="sw file"></span>文件@时间</i><i><span class="sw agent"></span>agent@时间</i><i><span class="sw dispatch"></span>派发它的上游</i><i><span class="sw candidate"></span>候选 / 模型复核</i><i><span class="sw problem"></span>问题 · 模型主张</i><i>左侧上游 · 右侧下游</i></div><div class="zoomctl"><button id="zoomOut">−</button><button id="zoomIn">+</button><button id="fit">适应</button><button id="oneToOne">1:1</button><span id="zoomValue">100%</span></div></div>
-<div id="graph" aria-label="时间证据树画布"></div>
-<div class="canvas-note"><span id="treeSummary">点节点展开 / 收起 · 截至所选时间</span><button id="downstream">展开根的下游</button><button id="collapse">折叠</button><button id="toggleInspector">详情</button><button id="showAudit" style="border:0;padding:0;font-size:10px">未闭合与核验 <span id="gapCount" class="audit-count">0</span></button></div>
-</section>
-<aside class="panel inspector">
-<div class="tabs"><button data-tab="detail" class="active">节点证据</button><button data-tab="report">结论原稿</button><button data-tab="audit">核验</button><button data-tab="trace">调查轨迹</button></div>
-<div class="inspector-scroll">
-<div class="tab-content" id="tab-detail"><h2 id="reasonTitle" class="detail-title">节点原因 / 原始证据</h2><div id="reason"><p class="empty-detail">点击树中节点查看原因、时间范围和原文依据。</p></div><div id="requestContext"></div><pre id="original"></pre><details><summary>完整原始记录（未改写）</summary><pre id="rawRecord"></pre></details></div>
-<div class="tab-content" id="tab-report" hidden><h2>结论原稿</h2><div id="findingText"></div></div>
-<div class="tab-content" id="tab-audit" hidden><h2>未闭合与事实核验</h2><p class="small muted">未知关系不画连线。核验结果与模型原因分别保留。</p><div id="gaps"></div></div>
-<div class="tab-content" id="tab-trace" hidden><h2>实际调查工具调用</h2><p class="small muted">只展示实际调用。已发送 ≠ 宿主完整呈现 ≠ 模型理解。人新展开不加入此轨迹。</p><div id="trace"></div></div>
-</div></aside>
-</main>
+</head><body>
+<header>
+  <div class="crumb">MigLoop · Fix Traceback</div>
+  <h1>返修链路<em id="rootlbl">两原子探索树 —— 文件 × agent，按时间回看</em></h1>
+  <div class="chips" id="chips"><span class="chip" id="counts">读取目录…</span>
+    <button class="loadbtn" id="load">载入调查</button>
+    <button class="loadbtn" id="askai" disabled title="尚未接入 server 的 AI 调查任务服务；本版可载入已有结果">AI 帮我查</button>
+    <select id="finding" aria-label="选择问题" hidden></select><button id="unload" class="loadbtn" hidden>退出调查</button>
+  </div>
+</header>
+<div class="stage-wrap" id="wrap">
+  <aside class="rail panel" id="rail">
+    <div class="railhead"><b>入口 · 选一个时间当根</b><button class="tog" id="railtog">◂</button></div>
+    <div class="search"><input id="q" type="search" placeholder="搜文件名 / 路径 / agent / 会话…" autocomplete="off"></div>
+    <div class="railbody" id="railbody"><div class="rempty">读取目录…</div></div>
+  </aside>
+  <div class="graph panel" id="graph">
+    <div class="toolbar"><div class="legend">
+      <i><span class="sw" style="border-color:var(--c-file)"></span>文件@时间</i>
+      <i><span class="sw" style="border-color:var(--c-gen)"></span>agent@时间</i>
+      <i><span class="sw" style="border-color:var(--c-dis)"></span>派发上游</i>
+      <i><span class="sw" style="border-color:var(--c-fix)"></span>AI 判断的问题</i>
+      <i>实线：已确认关系</i><i>虚线：模型复核补充</i>
+    </div><div class="zoomctl"><button id="zo">−</button><button id="zi">+</button><button id="zf">适应</button><button id="z1">1:1</button></div></div>
+    <div id="viewport"></div>
+  </div>
+  <aside class="side panel" id="side"><div class="placeholder">左栏选文件或 agent，点开一个时刻。<br><br>文件 → 左边写者，右边读者；<br>agent → 左边读取与派发者，右边产出。<br><br>载入调查后，仍在这棵树上查看 AI 判断及依据。</div></aside>
+</div>
+<dialog id="reportsDialog"><button class="close" id="closeReports">关闭</button><h2>载入调查</h2>
+  <div id="reportsList"></div><div id="reportNotes"></div>
+  <details><summary>导入 YAML / JSON 结果文件</summary><input type="file" id="importReport" accept=".yaml,.yml,.json"><p class="empty-note">导入后先核对节点和原始依据，再显示在树上。</p></details>
+  <p id="reportError" class="error"></p>
+</dialog>
+<dialog id="timeDialog"><button class="close" id="closeTime">关闭</button><h2>查看这个时刻</h2>
+  <p id="timeName"></p><input id="at" aria-label="截止时间" placeholder="含时区的完整时间" style="width:100%">
+  <p class="empty-note">时间使用 UTC；输入会保留小数精度。</p><button id="applyTime">以此时间为根</button>
+</dialog>
 <script>window.INQUIRY_CONFIG = __INQUIRY_CONFIG__;</script>
 <script src="__INQUIRY_ASSET_BASE__/tree.js"></script>
-  <script>
-    "use strict";
-    const $ = (id) => document.getElementById(id);
-    const config = window.INQUIRY_CONFIG || {};
-    let graph = null,
-      trace = [];
-    async function api(path, body) {
-      const response = await fetch(
-        (config.api_base || "") + path,
-        body === undefined
-          ? {}
-          : {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(body),
-            },
-      );
-      const data = await response.json();
-      if (!response.ok) throw Error(data.error || response.status);
-      return data;
-    }
-    function element(tag, text, parent, cls) {
-      const e = document.createElement(tag);
-      if (text !== undefined) e.textContent = text;
-      if (cls) e.className = cls;
-      if (parent) parent.append(e);
-      return e;
-    }
-    function button(text, parent, fn) {
-      const e = element("button", text, parent);
-      e.onclick = () => guard(fn);
-      return e;
-    }
-    async function guard(fn) {
-      try {
-        await fn();
-      } catch (error) {
-        $("status").textContent = error.message;
-        $("status").className = "error";
-      }
-    }
-    function request(view = "records") {
-      const kind = $("kind").value,
-        q = {
-          op: kind === "pool" ? "search" : kind,
-          at: $("at").value,
-          limit: 20,
-        };
-      if (kind !== "pool") {
-        q.key = $("key").value;
-        q.view = view;
-      } else {
-        if(!['records','returns'].includes(view)) throw Error('全池支持原文搜索或工具返回；读写关系和修改请选文件/Agent。');
-        q.kind='pool';
-        if(view==='returns') q.view=view;
-      }
-      if ($("since").value) q.since = $("since").value;
-      if(['records','returns','messages'].includes(view) && $('order').value) q.order=$('order').value;
-      if ($("terms").value)
-        q.terms = $("terms")
-          .value.split(",")
-          .map((x) => x.trim())
-          .filter(Boolean);
-      return q;
-    }
-    async function query(q) {
-      $("manualTools").open = true;
-      $("status").textContent = "查询中…";
-      const data = await api("/api/query", q);
-      $('requestContext').replaceChildren();
-      $('original').textContent='';
-      $('rawRecord').textContent='';
-      delete $('rawRecord').dataset.ref;
-      $('rawRecord').closest('details').ontoggle=null;
-      const at = data.scope?.at || q.at;
-      if (data.scope) {
-        $('kind').value=data.scope.kind;
-        $('key').value=data.scope.key || '';
-        $('at').value=data.scope.at;
-        $('since').value=data.scope.since || '';
-        $('terms').value=(q.terms || []).join(',');
-        $('order').value=q.order || '';
-      }
-      $("records").replaceChildren();
-      $("status").className = "small muted";
-      $("status").textContent =
-        `共 ${data.total ?? 0} ${data.kind==='matching_agents'?'个actor':'条'}；当前 ${data.rows?.length ?? 0} 条（索引，不是全文）${data.order?' · '+data.order:''}` +
-        (data.undated_records
-          ? `；未知时间 ${data.undated_records} 条${q.undated ? "（已纳入）" : "（未默认纳入）"}`
-          : "");
-      if(data.matching_agents) {
-        const nav=data.matching_agents;
-        const box=element('details','',$('records'));box.open=true;
-        element('summary',`匹配分布：${nav.matched_records} 条来自 ${nav.total} 个 actor（不是读写关系）`,box);
-        for(const row of nav.rows) renderMatchingActor(row,box,at,q.undated);
-        button('查看全部匹配 actor',box,()=>query(nav.query));
-      }
-      for (const row of data.rows || []) {
-        const box = element("div", "", $("records"), "row");
-        if(data.kind==='matching_agents') {renderMatchingActor(row,box,at,q.undated);continue;}
-        if (data.kind === "catalog") {
-          button(row.key, box, () => {
-            $("kind").value = data.catalog_kind;
-            $("key").value = row.key;
-            return query(request());
-          });
-          continue;
-        }
-        if (data.kind === 'evidence_review') {
-          element('div',row.category,box,'small muted');
-          appendReviewEvidence(row,box,at);
-        } else if (row.ref) {
-          element(
-            "div",
-            `${row.at || "时间未知"} · ${row.name}:${row.line}`,
-            box,
-            "small muted",
-          );
-          element("div", row.excerpt, box);
-          button("展开原文", box, () => open(row.ref, at, q.undated));
-          if (row.agent_scope)
-            button('打开所属agent',box,()=>query({op:'agent',scope:row.agent_scope}));
-        } else if (data.kind === 'inputs') {
-          element('div', `${row.path} · 返回 ${row.deliveries} 次`, box);
-          for (const ref of row.results)
-            button(ref,box,()=>open(ref,at));
-        } else if (data.kind === 'changes' || data.kind === 'blame' || data.kind === 'outline') {
-          element('div',`${row.at} · ${row.agent||'未知归属'} · ${row.strength}`,box,'small');
-          for(const item of row.outline || []) {
-            element('div',`${item.tool} · ${item.kind} · 块 ${item.block} / 步 ${item.step}${item.snapshot_lines!=null?' · 快照 '+item.snapshot_lines+' 行（正文可展开）':''}`,box,'small');
-            element('pre',item.text || '本次字面参数无行差异；不代表完整文件状态',box);
-          }
-          if(row.actor_scope) button('打开该actor完整截止范围',box,()=>query({op:'agent',scope:row.actor_scope}));
-          for(const payload of row.payloads || []) {
-            element('div',`${payload.tool} · 原记录块 ${payload.block}（请求正文不等于效果认证）`,box,'small');
-            element('pre',typeof payload.body==='string'?payload.body:JSON.stringify(payload.body,null,2),box);
-          }
-          for(const hit of row.term_deltas || []) {
-            element('div',`${hit.term} · ${hit.delta} · 块 ${hit.block} / 步 ${hit.step}`,box,'small');
-            element('pre',`OLD\n${hit.old_lines.join('\n')}\nNEW\n${hit.new_lines.join('\n')}`,box);
-          }
-          for(const ref of [row.request,row.result].filter(Boolean)) button('原始依据',box,()=>open(ref,at));
-        } else {
-          element("div", `${row.op} · ${row.strength} · ${row.status}`, box);
-          element("div", row.agent || "作者未知", box, "small");
-          element("div", row.path, box, "small");
-          for (const ref of [row.request, row.result].filter(Boolean))
-            button("原始依据", box, () => open(ref, at, q.undated));
-          if (row.from_scope && row.to_scope) {
-            button('打开该次agent',box,()=>query({op:'agent',scope:row.op==='read'?row.to_scope:row.from_scope}));
-            button('打开该次文件',box,()=>query({op:'file',scope:row.op==='read'?row.from_scope:row.to_scope}));
-          }
-        }
-      }
-      if (data.input_messages) {
-        const group=element('details','',$('records'));
-        group.open=true;
-        element('summary',`收到的历史消息 ${data.input_message_total} 条，首条及最近共 ${data.input_messages.length} 条入口`,group);
-        for(const row of data.input_messages) {
-          const box=element('div',row.excerpt,group,'row small');
-          button('展开历史任务原文',box,()=>open(row.cite,at));
-        }
-        button('查看全部消息',group,()=>query(data.message_query));
-      }
-      if (data.tool_return_query) {
-        const group=element('details','',$('records'));
-        element('summary',`工具返回 ${data.tool_return_total} 条（与Read表有重叠；未知时间 ${data.tool_return_undated} 条）`,group);
-        for(const row of data.tool_return_preview) {
-          const box=element('div',`${row.at} · ${row.excerpt}`,group,'row small');
-          button('展开返回原文',box,()=>open(row.cite,at,q.undated));
-        }
-        button('查看全部工具返回',group,()=>query(data.tool_return_query));
-      }
-      if (data.next !== null && data.next !== undefined)
-        button("下一页", $("records"), () =>
-          query({ ...q, offset: data.next }),
-        );
-      if (data.participants?.length) {
-        const group=element('details','',$('records'));
-        element('summary',`原生参与者 ${data.participants.length}（不代表唯一责任人）`,group);
-        for (const actor of data.participants) {
-          button(`${actor.agent} · 写 ${actor.writes} / 读 ${actor.reads}`,group,()=>query({op:'agent',scope:actor.scope}));
-          if (actor.input_scope)
-            button('写调用发起前的输入',group,()=>query({op:'agent',scope:actor.input_scope,view:'inputs'}));
-        }
-      }
-      if (data.unfold)
-        button(`展开 ${data.folded_read_calls} 条只读形状调用（不认证运行效应）`,$('records'),()=>query(data.unfold));
-      if (data.note) element('p',data.note,$('records'),'small muted');
-      for (const dispatch of data.dispatches || []) {
-        const box = element("div", "", $("records"), "row");
-        element(
-          "div",
-          `原生派发：${dispatch.parent} → ${dispatch.child}`,
-          box,
-          "small",
-        );
-        button("独立打开子代理", box, () => {
-          $("kind").value = "agent";
-          $("key").value = dispatch.child;
-          return query(request());
-        });
-        for (const ref of [dispatch.request, dispatch.result].filter(Boolean))
-          button("派发原文", box, () => open(ref, at));
-      }
-      return data;
-    }
-    let catalogKind = "file", catalogEpoch = 0, catalogTimer;
-    async function renderCatalog(kind = catalogKind, offset = 0) {
-      catalogKind = kind;
-      const epoch = ++catalogEpoch;
-      $("catalogFiles").classList.toggle("active", kind === "file");
-      $("catalogAgents").classList.toggle("active", kind === "agent");
-      const data = await api("/api/query", { op: "catalog", kind, q: $("catalogSearch").value.trim(), offset, limit: 30 });
-      if (epoch !== catalogEpoch) return;
-      $("catalog").replaceChildren();
-      element("div", `全池目录 ${data.total} 项 · 打开时按下方时间截取`, $("catalog"), "small muted");
-      for (const row of data.rows || []) {
-        const b = button(kind === "file" ? row.key.split(/[\\/]/).pop() : row.key.split(":").pop(), $("catalog"), () => {
-          $("kind").value = kind; $("key").value = row.key;
-          $("startTree").click();
-        });
-        b.className = "catalog-row"; b.title = row.key; b.dataset.catalogKey = row.key;
-      }
-      if (offset) button("上一页", $("catalog"), () => renderCatalog(kind, Math.max(0, offset - 30)));
-      if (data.next != null) button("下一页", $("catalog"), () => renderCatalog(kind, data.next));
-    }
-    async function open(ref, at, undated = false) {
-      selectTab("detail");
-      const data = await api("/api/query", { op: "open", ref, at, undated });
-      renderRequestContext(data.request_context, at, undated);
-      $("rawRecord").textContent = '展开此处读取完整原始记录。';
-      $('rawRecord').dataset.ref=ref;
-      $("original").textContent =
-        `${data.source}:${data.line}\n${data.at || "时间未知"} · 与MCP共用的原生正文\n\n${data.text}`;
-      const detail=$('rawRecord').closest('details');
-      const loadRaw=async()=>{
-        if(!detail.open) return;
-        const raw=await api('/api/query',{op:'open',ref,at,undated,pointer:''});
-        if($('rawRecord').dataset.ref===ref) $('rawRecord').textContent=raw.text;
-      };
-      detail.ontoggle=()=>guard(loadRaw);
-      if(detail.open) await loadRaw();
-    }
-    function renderRequestContext(context, at, undated) {
-      const host=$('requestContext');host.replaceChildren();
-      if(!context) return;
-      element('strong','此返回对应的原始调用（不认证读写效应）',host);
-      for(const request of context.requests) {
-        const row=element('div','',host,'row');
-        element('div',`${request.source}:${request.line} · ${request.at} · ${request.tool} · 请求块 ${request.request_block} → 返回块 ${request.result_block}`,row,'small');
-        element('pre',JSON.stringify(request.parameters,null,2)+'\n'+request.argument_preview,row);
-        if(request.argument_truncated) element('div',`命令预览已截断；原文 ${request.argument_chars} 字符`,row,'small');
-        button('展开完整原始调用',row,()=>open(request.cite,at,undated));
-      }
-      for(const missing of context.unavailable) element('div',missing.reason,host,'small error');
-      element('div',context.note,host,'small muted');
-    }
-    function selectTab(name) {
-      document.querySelectorAll(".tab-content").forEach(e => e.hidden = e.id !== "tab-" + name);
-      document.querySelectorAll("[data-tab]").forEach(e => e.classList.toggle("active", e.dataset.tab === name));
-      $("layout").classList.remove("hide-inspector");
-    }
-    function renderReportPanels() {
-      $("findingText").replaceChildren();
-      $("gaps").replaceChildren();
-      if (!graph) return;
-      const fid = $("findings").value;
-      renderFindingText(graph.document.findings.find(f => f.id === fid));
-      for (const path of tree.model.unclosed) {
-        const box = element("div", "", $("gaps"), "row small");
-        element("strong", (path.finding || "路径") + " · 未闭合", box);
-        element("p", path.diagnostic || "未找到可核的上游路径。", box);
-        const claim = graph.nodes.find(n => n.id === path.node);
-        if (claim) button("查看原稿原因与证据", box, () => showNode({ coordinate: claim, claims: [claim], origins: new Set(["report"]) }));
-      }
-      for (const edge of (graph.unverified_edges || []).filter(
-        (e) => !fid || e.finding === fid,
-      ))
-        element(
-          "div",
-          `未核连接（不画边）：${edge.from} → ${edge.to}；${edge.diagnostic}`,
-          $("gaps"),
-          "row small",
-        );
-      for (const issue of graph.issues || [])
-        element("div", JSON.stringify(issue), $("gaps"), "error small");
-      if (graph.coverage) {
-        const c=graph.coverage;
-        element('p', `调用对账：已解释 ${c.explained.length}，模型排除 ${c.model_excluded.length}，未定 ${c.unknown.length}，未处理 ${c.unassessed.length}，只读形状 ${c.read_only_shapes?.length||0}。排除/原因仍是模型主张。`, $('gaps'), 'small');
-        if(c.read_only_shapes?.length) {
-          const detail=element('details','',$('gaps'));
-          element('summary','展开只读形状依据（不认证运行效应）',detail);
-          for (const row of c.read_only_shapes) button(row.ref,detail,()=>open(row.ref,(graph.target||graph.document.target).at));
-        }
-        for (const [label,rows] of [['未判明调用',c.unassessed],['模型明确保留未知',c.unknown]]) {
-          if(!rows.length) continue;
-          const group=element('details','',$('gaps'));
-          element('summary',`${label} ${rows.length} 条（展开全部）`,group);
-          for(const row of rows) {
-            const box=element('div',row.reason||row.summary,group,'row small');
-            button(row.ref,box,()=>open(row.ref,(graph.target||graph.document.target).at));
-          }
-        }
-        for (const row of c.unattributed_native_writes||[]) {
-          const box=element('div','尚未归因的原生写入',$('gaps'),'error small');
-          for(const ref of row.refs) button(ref,box,()=>open(ref,(graph.target||graph.document.target).at));
-        }
-      }
-      for (const row of graph.missing_evidence_links || [])
-        element('div', `已引用但未接入图：${row.op} · ${row.path} · ${row.link}`, $('gaps'),'error small');
-      renderReview(graph.evidence_review, $('gaps'));
-      $("gapCount").textContent = tree.model.unclosed.length + (graph.unverified_edges || []).filter(e => !fid || e.finding === fid).length + (graph.issues || []).length;
-    }
-    function renderFindingText(finding) {
-      const host=$('findingText');
-      const selected = finding ? [finding] : graph.document.findings;
-      const fields = selected.flatMap(f => [
-        ['reason', f.id + ' · ' + f.title + ' · 本条解释（模型主张）', f.reason],
-        ['unknown', f.id + ' · 本条未证实事项', f.unknown],
-        ['hypothesis', f.id + ' · 机制假设（尚未证实）', f.hypothesis],
-        ['recommendation', f.id + ' · 优化建议（效果需另验）', f.recommendation],
-      ]);
-      fields.push(['unexplained','整份报告的未解释事项 / 限制',graph.document.unexplained]);
-      for(const [field,label,value] of fields) {
-        if(!value || !value.length) continue;
-        const detail=element('details','',host);
-        element('summary',label,detail);
-        const text=typeof value==='string'?value:JSON.stringify(value,null,2);
-        const body=element('pre',text,detail);body.dataset.field=field;
-        for(const ref of new Set(text.match(/\be-[0-9a-f]{8,64}\b/g)||[]))
-          button(ref,detail,()=>open(ref,graph.target.at));
-      }
-      const full=element('details','',host);
-      element('summary','完整结构化结论（只读）',full);
-      element('p',`以下是提交内容的 JSON 展示，不是原始 YAML/JSON 字节。原始提交 SHA-256：${graph.source_sha256}。原因、假设和建议均不是工具认证。`,full,'small muted');
-      element('pre',JSON.stringify(graph.document,null,2),full).id='structuredReport';
-    }
-    function renderReview(review, container) {
-      if(!review) return;
-      const group=element('details','',container);
-      group.id='evidence-review';
-      element('summary',`事实对账（不是归因认证）：执行者提示 ${review.actor_notes.length}，片段前序 ${review.literal_predecessors.length}，时间范围 ${review.timeline.length}`,group);
-      element('p','以下是独立于模型原因的原始记录对账；不修改节点判定，不新增因果边。',group,'small muted');
-      for(const [title,rows] of [['执行者提示',review.actor_notes],['片段前序线索',review.literal_predecessors],['写入后工具返回的字面线索（非验证结论）',review.post_write_returns||[]],['所引检查之后的回执线索（非验证结论）',review.cited_check_followups||[]],['引用实际时间',review.timeline],['核验限制',review.limitations]]) {
-        for(const row of rows) {
-          const box=element('details','',group);
-          element('summary',`${title} · ${row.node || row.finding || row.operation || row.agent || row.ref}`,box);
-          appendReviewEvidence(row,box,graph.target.at);
-        }
-      }
-    }
-    function renderMatchingActor(row,box,at,undated=false) {
-      const item=element('div',`${row.agent || '未知身份'} · ${row.matches} 条 · ${row.first_at || '未知时间'} — ${row.last_at || '未知时间'}`,box,'small');
-      element('div','最新匹配样例（不认证验证）：'+row.excerpt,item);
-      button('展开样例原文',item,()=>open(row.latest_match,at,undated));
-      if(row.query) button('只看此 actor 的同范围匹配',item,()=>query(row.query));
-    }
-    function appendReviewEvidence(row,box,at) {
-      element('pre',JSON.stringify(row,null,2),box);
-      const refs=new Set([...(row.ref?[row.ref]:[]),...(row.refs||[]),...(row.evidence||[]),...(row.earlier_evidence||[]),...(row.current_evidence||[]),...(row.operations||[]).flatMap(op=>op.evidence),...(row.matches||[]).map(r=>r.cite)]);
-      for(const ref of refs) button(ref,box,()=>open(ref,at));
-      if(row.all_returns_query) button(row.anchor_basis?'独立查该检查者后续全部返回（不计入模型轨迹）':'独立查该写者后续全部返回（不计入模型轨迹）',box,()=>query(row.all_returns_query));
-      if(row.pool_returns_query) button('独立查同一时间窗内所有 agent 的返回（可加行为关键词；不认证验证）',box,()=>query(row.pool_returns_query));
-    }
-    function showNode(n) {
-      selectTab("detail");
-      const coordinate = n.coordinate;
-      const members = n.claims || [];
-      $("reasonTitle").textContent = coordinate.key;
-      $("reason").replaceChildren();
-      $("requestContext").replaceChildren();
-      $("original").textContent = "";
-      $("rawRecord").textContent = "";
-      delete $("rawRecord").dataset.ref;
-      $("rawRecord").closest("details").ontoggle = null;
-      const root = tree.model && n === tree.model.root;
-      element("span", root ? "截至观察结束的历史范围" : coordinate.kind === "file" ? "历史文件范围" : "历史 Agent 范围", $("reason"), "badge");
-      element("p", (coordinate.since || "未限定起点") + " → " + coordinate.at, $("reason"), "meta-line");
-      if (root) element("p", "起点用于追溯历史，不认证最新文件内容有问题。", $("reason"), "small muted");
-      const queryCoordinate = (view) => {
-        const q = { op: coordinate.kind, key: coordinate.key, at: coordinate.at, view, limit: 20 };
-        if (coordinate.since) q.since = coordinate.since;
-        return query(q);
-      };
-      button("查该范围原文", $("reason"), () => queryCoordinate("records"));
-      if (coordinate.kind === "file") button("查看原生差异", $("reason"), () => queryCoordinate("changes"));
-      else button("查看已收输入", $("reason"), () => queryCoordinate("inputs"));
-      if (n.id && !n.reference && !n.isRight) button("展开其他上游", $("reason"), () => tree.expand(n));
-      button("以此时间为根", $("reason"), () => {
-        $("kind").value = coordinate.kind; $("key").value = coordinate.key;
-        $("at").value = coordinate.at; $("since").value = coordinate.since || "";
-        $("startTree").click();
-      });
-      if (n.row) {
-        const box = element("section", "", $("reason"), "row");
-        const evidenceAt = n.parent?.coordinate.at || coordinate.at;
-        element("strong", ({ read: "读取输入", write: "写入关系", dispatch: "父 Agent 派发" })[n.row.relation] +
-          " · " + (n.row.strength === "confirmed" ? "已核" : "候选") +
-          " · " + (n.row.source === "model_review" ? "模型复核" : "原生索引"), box);
-        element("p", n.row.claim || "此边表示索引中的历史关系，不认证问题因果。", box);
-        element("div", n.row.at + " · " + n.row.id, box, "meta-line");
-        if (n.row.relation === "dispatch") {
-          if (n.row.identity_known_at_cutoff === false)
-            element("p", "本次关系查询截止时，子 Agent 身份尚未知。", box, "badge");
-          if (n.row.identity_basis) element("p", n.row.identity_basis, box);
-          element("div", "派发发生：" + (n.row.occurrence_at || n.row.at || "时间未知") +
-            "；身份确认：" + (n.row.confirmed_at || "未记录"), box, "meta-line");
-          if (n.parent) element("div", "关系查询截至：" + n.parent.coordinate.at, box, "meta-line");
-          if (n.row.status) element("div", "关系状态：" + n.row.status, box, "meta-line");
-        }
-        for (const ref of n.row.evidence || []) button(ref, box, () => open(ref, evidenceAt));
-      }
-      for (const anchor of n.repairAnchors || []) {
-        const box = element("section", "", $("reason"), "row");
-        box.dataset.repairAnchor = anchor.row.id;
-        const row = anchor.row;
-        element("strong", "目标修改依据 · " + (row.strength === "candidate" ? "候选" : "已核") +
-          " · " + (row.source === "model_review" ? "模型复核" : "原生索引"), box);
-        element("div", "问题 " + [...anchor.findings].join(" / ") + " · " + row.at, box, "meta-line");
-        element("p", row.claim, box);
-        for (const ref of row.evidence || []) button(ref, box, () => open(ref, coordinate.at));
-      }
-      for (const anchor of n.anchors || []) {
-        const box = element("section", "", $("reason"), "row");
-        const row = anchor.row;
-        element("strong", anchor.finding + " · 本文件历史写入依据 · " +
-          (row.strength === "candidate" ? "候选" : "已核") + " · " +
-          (row.source === "model_review" ? "模型复核" : "原生索引"), box);
-        element("p", row.claim, box);
-        element("div", row.at + " · " + row.id, box, "meta-line");
-        element("p", "这条入边支持历史文件范围的主张；可正常展开写者继续查证。", box, "small muted");
-        for (const ref of row.evidence || []) button(ref, box, () => open(ref, coordinate.at));
-      }
-      if (!members.length) element("p", "此节点没有模型归因。可继续展开上游或查看原始依据。", $("reason"), "small muted");
-      for (const member of members) {
-        const box = element("section", "", $("reason"), "reason-claim");
-        box.dataset.claim = member.id;
-        box.dataset.problem = ["origin", "propagated"].includes(member.role);
-        element("strong", member.id + " · " + (member.generated_context ? "未归因的原生端点" :
-          ({origin:"问题进入",propagated:"问题保留",context:"输入/背景",repaired:"修复",unknown:"未定"})[member.role]) + " · 模型主张", box);
-        element("p", member.reason, box);
-        element("p", "原稿范围：" + (member.since || "未限定起点") + " → " + member.at, box, "meta-line");
-        button("打开原稿节点范围", box, () => query(member.scope ?
-          { op: member.kind, scope: member.scope } :
-          { op: member.kind, key: member.key, at: member.at, since: member.since || undefined }));
-        const time = graph?.evidence_review?.timeline.find(t => t.node === member.id);
-        if (time) element("p", "引用实际发生于 " + time.first + " → " + time.last, box, "small muted");
-        for (const note of graph?.evidence_review?.actor_notes || []) {
-          if (note.node === member.id) element("p", "执行者待核：" + note.actual_actors.join(", ") + "；协调责任须另证。", box, "badge");
-        }
-        for (const ref of member.evidence || []) button(ref, box, () => open(ref, member.at));
-      }
-    }
-    async function loadGraph(data) {
-      graph = data;
-      if (data.report_id) {
-        if (![...$('reports').options].some(o=>o.value===data.report_id)) {
-          const option=element('option',data.report_id,$('reports')); option.value=data.report_id;
-        }
-        $('reports').value=data.report_id;
-      }
-      $("kind").value = "file";
-      $("reasonTitle").textContent = "节点原因 / 原始证据";
-      $("reason").replaceChildren();
-      $('requestContext').replaceChildren();
-      $("original").textContent = "";
-      $("rawRecord").textContent = "";
-      delete $("rawRecord").dataset.ref;
-      $("rawRecord").closest("details").ontoggle = null;
-      $("records").replaceChildren();
-      $("status").textContent = "";
-      $("manualTools").open = false;
-      $("findings").replaceChildren();
-      $("findings").disabled = false;
-      element("option", "全部问题", $("findings")).value = "";
-      for (const f of data.document.findings) {
-        const option = element("option", `${f.id} · ${f.title}`, $("findings"));
-        option.value = f.id;
-      }
-      const target = data.target || data.document.target;
-      $("at").value = target.at;
-      $("since").value = target.since || "";
-      $("key").value = target.file;
-      tree.loadReport(data);
-      tree.select([...tree.model.nodes.values()].find(n => n !== tree.model.root &&
-        n.claims.some(c => c.role === "origin")) || tree.model.root);
-      renderReportPanels();
-      updateTreeSummary();
-      await reloadTrace();
-    }
-    async function reload() {
-      const info = await api("/api/info");
-      $("info").textContent =
-        `${config.project ? config.project + " · " : ""}${info.sources} 个登记源 · ${info.records} 条原始记录`;
-      if (!graph && !$("at").value && info.latest_at) $("at").value = info.latest_at;
-      $("reports").replaceChildren();
-      for (const r of info.reports) {
-        const option = element("option", r.id, $("reports"));
-        option.value = r.id;
-      }
-      if(graph?.report_id) $('reports').value=graph.report_id;
-      await reloadTrace();
-    }
-    async function reloadTrace() {
-      trace = await api(
-        "/api/trace" +
-          (graph ? "?session=" + encodeURIComponent(graph.trace_session) : ""),
-      );
-      tree.markSeen(trace);
-      tree.render();
-      $("trace").replaceChildren();
-      for (const run of trace) {
-        const box = element("details", "", $("trace"));
-        element(
-          "summary",
-          `${run.id} · 来源 ${run.origin} · ${run.queries.length} 个查询 · 已发送 ${run.frames.length} 帧`,
-          box,
-        );
-        element("pre", JSON.stringify(run.queries, null, 2), box);
-        element(
-          "div",
-          run.visibility.length
-            ? "宿主观察：" + JSON.stringify(run.visibility)
-            : "宿主可见性：未记录，不能算完整已读",
-          box,
-          "muted",
-        );
-        for (const f of run.frames)
-          button(`帧 ${f.offset}`, box, async () => {
-            selectTab("detail");
-            $('requestContext').replaceChildren();
-            $('rawRecord').textContent='';
-            delete $('rawRecord').dataset.ref;
-            $('rawRecord').closest('details').ontoggle=null;
-            $("original").textContent = (
-              await api(`/api/frame?id=${run.id}&offset=${f.offset}`)
-            ).text;
-          });
-      }
-    }
-    $("query").onclick = () => guard(() => query(request()));
-    $("relations").onclick = () => guard(() => query(request("relations")));
-    $("calls").onclick = () => guard(() => query(request("calls")));
-    $("changes").onclick = () => guard(() => query(request("changes")));
-    $("outline").onclick = () => guard(() => query(request("outline")));
-    $("history").onclick = () => guard(() => {
-      if ($('kind').value !== 'file') throw new Error('片段历史需要选择文件');
-      const q=request(); delete q.view; q.op='blame'; return query(q);
-    });
-    $("inputs").onclick = () => guard(() => query(request("inputs")));
-    $("messages").onclick = () => guard(() => query(request("messages")));
-    $("returns").onclick = () => guard(() => query(request("returns")));
-    $("agents").onclick = () =>
-      guard(() => query({ op: "catalog", kind: "agent", limit: 20 }));
-    $("files").onclick = () =>
-      guard(() =>
-        query({ op: "catalog", kind: "file", q: $("key").value, limit: 20 }),
-      );
-    $("load").onclick = () =>
-      guard(async () =>
-        loadGraph(
-          await api("/api/report?id=" + encodeURIComponent($("reports").value)),
-        ),
-      );
-    $("submit").onclick = () =>
-      guard(async () => {
-        await loadGraph(
-          await api("/api/report", { document: $("draft").value }),
-        );
-        await reload();
-      });
-    const tree = new InquiryEvidenceTree.InquiryTree({
-      host: $("graph"), api, onSelect: showNode, onChange: updateTreeSummary,
-    });
-    // One renderer for report-seeded and manually queried neighbors.
-    window.inquiryTree = tree;
-    function updateTreeSummary() {
-      const count = tree.model?.visible().length || 0;
-      $("treeSummary").textContent = count ? count + " 个历史节点 · 点节点展开 / 收起" : "从文件或 agent 时间点出发";
-    }
-    $("findings").onchange = () => {
-      tree.setFinding($("findings").value);
-      tree.select([...tree.model.nodes.values()].find(n => n !== tree.model.root &&
-        n.claims.some(c => c.role === "origin")) || tree.model.root);
-      renderReportPanels();
-      updateTreeSummary();
-    };
-    $("startTree").onclick = () => guard(async () => {
-      if ($("kind").value === "pool") throw Error("全池搜索没有单一根，请选择文件或 Agent。");
-      graph = null;
-      $("findings").replaceChildren();
-      element("option", "手动探索", $("findings")).value = "";
-      $("findings").disabled = true;
-      $("findingText").replaceChildren();
-      $("gaps").replaceChildren();
-      $("gapCount").textContent = "0";
-      await tree.start({ kind: $("kind").value, key: $("key").value, at: $("at").value, since: $("since").value || null });
-      updateTreeSummary();
-    });
-    $("zoomIn").onclick = () => tree.setZoom(tree.zoom * 1.2);
-    $("zoomOut").onclick = () => tree.setZoom(tree.zoom / 1.2);
-    $("fit").onclick = () => tree.fit(false);
-    $("oneToOne").onclick = () => { tree.setZoom(1); if (tree.model) tree.focus(tree.model.root); };
-    $("downstream").onclick = () => guard(async () => {
-      if (!tree.model) throw Error("请先选一个文件或 agent 当根。");
-      await tree.expand(tree.model.root, "downstream");
-      const state = tree.model.downstream;
-      $("status").textContent = state.error || `根的下游：${state.total ?? 0} 条截至所选时间的历史关系（不认证同一内容状态）`;
-      tree.fit();
-    });
-    $("railtog").onclick = () => $("rail").classList.toggle("closed");
-    $("catalogFiles").onclick = () => guard(() => renderCatalog("file"));
-    $("catalogAgents").onclick = () => guard(() => renderCatalog("agent"));
-    $("catalogSearch").oninput = () => {
-      clearTimeout(catalogTimer); ++catalogEpoch;
-      catalogTimer = setTimeout(() => guard(() => renderCatalog(catalogKind)), 250);
-    };
-    $("collapse").onclick = () => tree.collapse();
-    $("restorePaths").onclick = () => tree.paths();
-    $("toggleInspector").onclick = () => $("layout").classList.toggle("hide-inspector");
-    $("mobileRail").onclick = () => $("rail").classList.toggle("mobile-open");
-    $("showAudit").onclick = () => selectTab("audit");
-    document.querySelectorAll("[data-tab]").forEach(e => e.onclick = () => selectTab(e.dataset.tab));
-    $("loadId").onclick = () => guard(async () => {
-      if (!$("reportId").value.trim()) throw Error("请输入 report_id。");
-      await loadGraph(await api("/api/report?id=" + encodeURIComponent($("reportId").value.trim())));
-    });
-    if (innerWidth < 1150) $("layout").classList.add("hide-inspector");
-    new ResizeObserver(() => { if (tree.model) tree.render(); }).observe($("graph"));
-    guard(async () => {
-      await reload();
-      const params = new URLSearchParams(location.search);
-      const id = params.get("report") || params.get("report_id") || config.report_id;
-      if (id)
-        await loadGraph(await api("/api/report?id=" + encodeURIComponent(id)));
-      else {
-        tree.render();
-        if (params.has("probe")) {
-          $("status").className = "error small";
-          $("status").textContent = "旧版报告未载入，需 inquiry report_id。请在调查结论中选择报告，或输入 report_id。";
-        }
-      }
-    });
-  </script>
-</body>
-</html>
+<script src="__INQUIRY_ASSET_BASE__/viewer.js"></script>
+</body></html>

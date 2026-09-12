@@ -7,6 +7,9 @@
   const scopeIdentity = n => JSON.stringify([n.kind, n.key, n.at, n.since ?? null]);
   const validCoordinate = n => n && ["file", "agent"].includes(n.kind) &&
     typeof n.key === "string" && n.key.length && typeof n.at === "string" && n.at.length;
+  // A human-view policy only: the MCP/index retain every candidate.
+  const visibleRelation = row => Boolean(row && !row.time_unknown &&
+    (row.strength === "confirmed" || (row.source === "model_review" && row.evidence?.length)));
   class EvidenceTreeModel {
     constructor(root) {
       if (!validCoordinate(root)) throw Error("开树需要文件或 Agent 的完整身份及截止时间。");
@@ -40,6 +43,7 @@
       if (!row || !row.id || !validCoordinate(row.node) ||
           !["read", "write", "dispatch"].includes(row.relation) ||
           !["confirmed", "candidate"].includes(row.strength)) return null;
+      if (!visibleRelation(row)) return null;
       // Neither a report nor a click can promote a candidate to confirmed.
       const key = JSON.stringify([row.id, scopeIdentity(row.node), row.strength, row.source]);
       if (direction === "downstream" && parent !== this.root) return null;
@@ -69,6 +73,10 @@
         }
         if (path.status === "unclosed") { this.unclosed.push(path); continue; }
         const steps = path.steps || [];
+        if (steps.some(row => !visibleRelation(row))) {
+          this.unclosed.push({ ...path, diagnostic: "路径含尚未由模型复核的候选关系，本页暂不画出。" });
+          continue;
+        }
         const coordinates = new Set([scopeIdentity(this.root.coordinate)]);
         const operations = new Set();
         const invalid = steps.some((row, index) => {
@@ -212,6 +220,7 @@
     }
     async start(coordinate) {
       this.report = null;
+      this.trace = [];
       this.finding = "";
       this.cache.clear();
       this.model = new EvidenceTreeModel(coordinate);
@@ -240,7 +249,7 @@
       try {
         const q = {
           op: node.coordinate.kind, key: node.coordinate.key, at: node.coordinate.at,
-          view: "neighbors", direction, limit: 24,
+          view: "neighbors", direction, limit: 100,
         };
         if (node.coordinate.since) q.since = node.coordinate.since;
         if (state.loaded && state.next != null) q.offset = state.next;
@@ -248,7 +257,13 @@
           q.report_id = this.report.report_id;
           if (this.finding) q.finding = this.finding;
         }
-        const data = await this.api("/api/query", q);
+        let data;
+        do {
+          data = await this.api("/api/query", q);
+          if (model !== this.model) return;
+          if ((data.rows || []).some(visibleRelation) || data.next == null) break;
+          q.offset = data.next; // Do not stop on a page containing only hidden candidates.
+        } while (true);
         if (model !== this.model) return; // A changed root cannot receive stale rows.
         for (const row of data.rows || []) model.insert(node, row, "manual", direction);
         state.loaded = true;
@@ -388,6 +403,7 @@
         Object.assign(card.dataset, { node: node.id, key: node.coordinate.key, at: node.coordinate.at,
           depth, origins: [...node.origins].join(" "), members: JSON.stringify(node.claims.map(n => n.id)) });
         card.style.left = p.x + "px"; card.style.top = p.y + "px";
+        card.style.width = W + "px";
         card.tabIndex = 0; card.setAttribute("role", "button");
         const key = node.coordinate.key;
         const name = node.coordinate.kind === "file" ? key.split(/[\\/]/).pop() : key.split(":").pop();
@@ -405,7 +421,7 @@
         el("span", "tree-badges", notes.join(" · "), card);
         el("span", "chev", node.error ? "!" : node.isRight ? "" : node.loading ? "…" :
           node.reference ? "↗" : node.children.length && !node.collapsed ? "▾" :
-          node.loaded && !node.children.length ? "·" : "▸", card);
+          node.loaded && !node.children.length && node.next == null ? "·" : "▸", card);
         card.onclick = () => this.activate(node);
         card.onkeydown = event => {
           if (event.key === "Enter" || event.key === " ") { event.preventDefault(); this.activate(node); }
@@ -416,7 +432,7 @@
         const node = downstream ? this.model.root : this.model.nodes.get(id);
         const state = downstream ? this.model.downstream : node;
         const button = el("button", "tree-more node leaf", state.loading ? "读取中…" : state.error ?
-          "重试 · " + state.error : state.loaded ? "+ 继续展开（" + Math.max(0, state.total - state.next) + " 条未取）" : "+ 展开其他上游", canvas);
+          "重试 · " + state.error : state.loaded ? "+ 继续展开" : "+ 展开其他上游", canvas);
         button.dataset.expand = node.id;
         button.style.left = p.x + "px"; button.style.top = p.y + "px"; button.style.width = W + "px";
         button.disabled = state.loading;
@@ -426,7 +442,7 @@
       if (label) label.textContent = Math.round(this.zoom * 100) + "%";
     }
   }
-  const exported = { EvidenceTreeModel, InquiryTree, scopeIdentity, measureTree, GEOMETRY };
+  const exported = { EvidenceTreeModel, InquiryTree, scopeIdentity, measureTree, GEOMETRY, visibleRelation };
   if (typeof module !== "undefined" && module.exports) module.exports = exported;
   else global.InquiryEvidenceTree = exported;
 })(typeof globalThis !== "undefined" ? globalThis : this);
