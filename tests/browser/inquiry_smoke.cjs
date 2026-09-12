@@ -172,6 +172,33 @@ async function main() {
       '[...document.querySelectorAll("#records button")].find(b=>b.textContent==="展开原文").click()',
     );
     await wait('document.getElementById("original").textContent.length > 100');
+    const receiptArg=process.argv.indexOf('--receipt-ref');
+    if(receiptArg>=0) {
+      const provenance=await evaluate(`(async()=>{
+        const ref=${JSON.stringify(process.argv[receiptArg+1])},at=graph.target.at;
+        const data=await api('/api/query',{op:'open',ref,at});
+        await open(ref,at);
+        const context=data.request_context;
+        if(!context?.requests.length) throw Error('fixture has no native paired request');
+        const visible=document.getElementById('requestContext').textContent;
+        const shown=context.requests.every(r=>visible.includes(r.argument_preview)&&visible.includes(r.source+':'+r.line));
+        const expected=context.requests[0].cite;
+        const command=await api('/api/query',{op:'open',ref:expected,at});
+        document.querySelector('#requestContext button').click();
+        return {shown,expectedText:command.text,requests:context.requests};
+      })()`);
+      assert(provenance.shown,'native receipt request context missing in UI');
+      await wait(`document.getElementById('original').textContent.includes(${JSON.stringify(provenance.expectedText)})`);
+      assert.equal(await evaluate('document.getElementById("requestContext").textContent'),'','stale request provenance after switching source');
+      const cleared=await evaluate(`(async()=>{
+        await open(${JSON.stringify(process.argv[receiptArg+1])},graph.target.at);
+        await query({op:'file',key:graph.target.file,at:graph.target.at,view:'calls',limit:1});
+        return ['requestContext','original','rawRecord'].every(id=>document.getElementById(id).textContent==='');
+      })()`);
+      assert(cleared,'stale evidence panel after a new manual query');
+      assert.equal(await evaluate('JSON.stringify({graph,trace})'),initial);
+      fs.writeFileSync(path.join(out,'request-context.json'),JSON.stringify(provenance,null,2));
+    }
     const validImage = await send("Page.captureScreenshot", { format: "png" });
     fs.writeFileSync(
       path.join(out, "inquiry-valid.png"),

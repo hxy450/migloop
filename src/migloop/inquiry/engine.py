@@ -10,6 +10,7 @@ from bisect import bisect_right
 from functools import wraps
 
 from .native_text import change_outline, change_payloads, render_payloads, term_deltas
+from .request_context import request_context
 from .store import Store, digest, encode, iso, timestamp
 
 
@@ -532,6 +533,7 @@ class Engine:
             record, text = self.store.source_record(ref)
             if not in_scope(record["at"], at, since, request.get("undated", False)):
                 raise ValueError("record outside requested time scope")
+            provenance = request_context(self.store, record, text, at)
             if "pointer" in request:
                 value = selected(json.loads(text), request["pointer"])
                 text = value if isinstance(value, str) else encode(value)
@@ -607,6 +609,7 @@ class Engine:
                 "at": iso(record["at"]),
                 "record_owner": record["agent"],
                 "record_owner_scope": owner_scope,
+                **({"request_context": provenance} if provenance is not None else {}),
                 "native_context": [
                     {
                         "op": r["op"],
@@ -1180,6 +1183,31 @@ class Engine:
                 )
                 if k in data
             }
+            if data.get("request_context"):
+                paired = data["request_context"]["requests"]
+                context["request_context"] = {
+                    "total": len(paired),
+                    "preview_only": True,
+                    "requests": [
+                        {
+                            k: r[k]
+                            for k in (
+                                "cite",
+                                "at",
+                                "tool",
+                                "request_block",
+                                "result_block",
+                                "parameters",
+                                "argument_preview",
+                                "argument_chars",
+                                "argument_truncated",
+                                "not_effect_proof",
+                            )
+                        }
+                        for r in paired[:2]
+                    ],
+                    "unavailable": len(data["request_context"]["unavailable"]),
+                }
             identity = uuid.uuid4().hex[:16]
             with self.store.db:
                 self.store.db.execute(

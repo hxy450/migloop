@@ -65,7 +65,7 @@ def check(engine, text, *, save=False):
     referenced = set()
     explained_changes = set()
 
-    def verify_refs(refs, at, where, since=None):
+    def verify_refs(refs, at, where, since=None, scope_kind="report_cutoff"):
         if not isinstance(refs, list) or any(not isinstance(ref, str) for ref in refs):
             issues.append(
                 {"where": where, "error": "evidence must be a list of original refs"}
@@ -76,7 +76,20 @@ def check(engine, text, *, save=False):
             try:
                 record, _ = engine.store.source_record(ref)
                 if not in_scope(record["at"], at, since):
-                    raise ValueError("evidence outside node time range or undated")
+                    issues.append(
+                        {
+                            "where": where,
+                            "ref": ref,
+                            "error": f"evidence outside {scope_kind} time range or undated",
+                            "scope_kind": scope_kind,
+                            "record_at": iso(record["at"]),
+                            "required_scope": {"since": iso(since), "at": iso(at)},
+                            "note": "changes must be inside the target's original repair interval. Earlier generation context belongs in reason or a correctly bounded node.evidence, not changes; later/undated evidence cannot be made early. Do not change the required target interval just to silence this error."
+                            if scope_kind == "target_change_window"
+                            else "Use evidence actually within this declared scope, or a separately opened scope appropriate to the claim. No timestamp or report text has been rewritten.",
+                        }
+                    )
+                    continue
                 valid.add(record["ref"])
                 referenced.add(record["ref"])
             except (ValueError, OSError) as exc:
@@ -87,8 +100,8 @@ def check(engine, text, *, save=False):
                 issues.append(issue)
         return valid
 
-    def verify_text(value, at, where, since=None):
-        verify_refs(inline_refs(value), at, where, since)
+    def verify_text(value, at, where, since=None, scope_kind="report_cutoff"):
+        verify_refs(inline_refs(value), at, where, since, scope_kind)
 
     seen_findings = set()
     for index, finding in enumerate(document["findings"]):
@@ -134,6 +147,7 @@ def check(engine, text, *, save=False):
                 timestamp(target["at"], required=True),
                 f"{fid}.changes",
                 timestamp(target.get("since")),
+                "target_change_window",
             )
         )
         local = {}
@@ -192,8 +206,10 @@ def check(engine, text, *, save=False):
                 exists = engine.store.has_records(node["kind"], key, at, since=since)
             except ValueError:
                 exists = False
-            refs = verify_refs(node.get("evidence", []), at, f"{fid}.{nid}", since)
-            verify_text(node["reason"], at, f"{fid}.{nid}.reason", since)
+            refs = verify_refs(
+                node.get("evidence", []), at, f"{fid}.{nid}", since, "node"
+            )
+            verify_text(node["reason"], at, f"{fid}.{nid}.reason", since, "node")
             if not exists:
                 issues.append(
                     {
@@ -245,6 +261,7 @@ def check(engine, text, *, save=False):
             origin, destination = local.get(edge.get("from")), local.get(edge.get("to"))
             reason = "node missing"
             bound = None
+            supporting_request = None
             if origin and destination:
                 relation = edge.get("relation")
                 op = {
@@ -266,7 +283,19 @@ def check(engine, text, *, save=False):
                     if n.get("since") is not None
                 ]
                 start = max(starts) if starts else None
-                refs = verify_refs(edge.get("evidence", []), cutoff, f"{fid}.edge")
+                issue_count = len(issues)
+                refs = verify_refs(
+                    edge.get("evidence", []), cutoff, f"{fid}.edge", scope_kind="edge"
+                )
+                if len(issues) != issue_count:
+                    unverified.append(
+                        {
+                            **edge,
+                            "finding": fid,
+                            "diagnostic": "Edge evidence failed source/time validation; no bound edge.",
+                        }
+                    )
+                    continue
                 reason = "no matching indexed operation; independent lookup is not a read/write edge"
                 if (
                     relation == "dispatch"
@@ -279,6 +308,7 @@ def check(engine, text, *, save=False):
                         if not in_scope(dispatch["at"], cutoff, start):
                             continue
                         if {dispatch["request"], dispatch["result"]} <= refs:
+                            supporting_request = dispatch["request"]
                             bound = {
                                 **edge,
                                 "from": origin["id"],
@@ -297,7 +327,8 @@ def check(engine, text, *, save=False):
                     and destination["exists"]
                 ):
                     matches = []
-                    for operation in engine.relations("file", file["key"], cutoff):
+                    operations = engine.relations("file", file["key"], cutoff)
+                    for operation in operations:
                         expected = {operation["request"], operation["result"]} - {None}
                         if (
                             operation["agent"] == agent["key"]
@@ -322,8 +353,27 @@ def check(engine, text, *, save=False):
                             )
                     if len(matches) == 1:
                         bound = matches[0]
+                        supporting_request = next(
+                            r["request"]
+                            for r in operations
+                            if r["id"] == bound["operation"]
+                        )
                     elif len(matches) > 1:
                         reason = "multiple operations share these record references; use the returned link to select its exact block"
+                if bound and start is not None:
+                    # A receipt inside the interval may answer an earlier request.
+                    # Only this bound operation's exact request gets that exception.
+                    issue_count = len(issues)
+                    verify_refs(
+                        sorted(refs - {supporting_request}),
+                        cutoff,
+                        f"{fid}.edge",
+                        start,
+                        "edge",
+                    )
+                    if len(issues) != issue_count:
+                        bound = None
+                        reason = "Additional edge evidence predates the interval; only the bound operation's native request may be earlier context."
             if bound:
                 bound["source"] = "native_evidence" if automatic_edges else "model_edge"
                 edges.append(bound)

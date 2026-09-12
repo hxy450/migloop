@@ -195,6 +195,7 @@
       <section>
         <h2 id="reasonTitle">节点原因 / 原始证据</h2>
         <div id="reason"></div>
+        <div id="requestContext"></div>
         <pre id="original"></pre>
         <details>
           <summary>完整原始记录（未改写）</summary>
@@ -274,6 +275,11 @@
     async function query(q) {
       $("status").textContent = "查询中…";
       const data = await api("/api/query", q);
+      $('requestContext').replaceChildren();
+      $('original').textContent='';
+      $('rawRecord').textContent='';
+      delete $('rawRecord').dataset.ref;
+      $('rawRecord').closest('details').ontoggle=null;
       const at = data.scope?.at || q.at;
       if (data.scope) {
         $('kind').value=data.scope.kind;
@@ -400,6 +406,7 @@
     }
     async function open(ref, at, undated = false) {
       const data = await api("/api/query", { op: "open", ref, at, undated });
+      renderRequestContext(data.request_context, at, undated);
       $("rawRecord").textContent = '展开此处读取完整原始记录。';
       $('rawRecord').dataset.ref=ref;
       $("original").textContent =
@@ -412,6 +419,20 @@
       };
       detail.ontoggle=()=>guard(loadRaw);
       if(detail.open) await loadRaw();
+    }
+    function renderRequestContext(context, at, undated) {
+      const host=$('requestContext');host.replaceChildren();
+      if(!context) return;
+      element('strong','此返回对应的原始调用（不认证读写效应）',host);
+      for(const request of context.requests) {
+        const row=element('div','',host,'row');
+        element('div',`${request.source}:${request.line} · ${request.at} · ${request.tool} · 请求块 ${request.request_block} → 返回块 ${request.result_block}`,row,'small');
+        element('pre',JSON.stringify(request.parameters,null,2)+'\n'+request.argument_preview,row);
+        if(request.argument_truncated) element('div',`命令预览已截断；原文 ${request.argument_chars} 字符`,row,'small');
+        button('展开完整原始调用',row,()=>open(request.cite,at,undated));
+      }
+      for(const missing of context.unavailable) element('div',missing.reason,host,'small error');
+      element('div',context.note,host,'small muted');
     }
     function svg(tag, attrs, parent) {
       const e = document.createElementNS(NS, tag);
@@ -649,6 +670,7 @@
       $("kind").value = "file";
       $("reasonTitle").textContent = "节点原因 / 原始证据";
       $("reason").replaceChildren();
+      $('requestContext').replaceChildren();
       $("original").textContent = "";
       $("rawRecord").textContent = "";
       $("findings").replaceChildren();
@@ -699,6 +721,10 @@
         );
         for (const f of run.frames)
           button(`帧 ${f.offset}`, box, async () => {
+            $('requestContext').replaceChildren();
+            $('rawRecord').textContent='';
+            delete $('rawRecord').dataset.ref;
+            $('rawRecord').closest('details').ontoggle=null;
             $("original").textContent = (
               await api(`/api/frame?id=${run.id}&offset=${f.offset}`)
             ).text;

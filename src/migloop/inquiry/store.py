@@ -115,6 +115,8 @@ CREATE TEMP TABLE parts(record TEXT,source TEXT,slot INT,family TEXT,role TEXT,c
  payload TEXT,success INT,at INT,PRIMARY KEY(record,slot));
 CREATE INDEX pair_calls ON parts(source,family,call_id);
 CREATE TABLE pairs(a TEXT,b TEXT,PRIMARY KEY(a,b));
+CREATE TABLE call_pairs(request TEXT,request_slot INT,result TEXT,result_slot INT,
+ PRIMARY KEY(result,result_slot));
 CREATE TABLE effects(id TEXT PRIMARY KEY,path TEXT,agent TEXT,op TEXT,strength TEXT,at INT,
  request TEXT,result TEXT,status TEXT,basis TEXT,request_slot INT,result_slot INT);
 CREATE INDEX effect_path ON effects(path,at);
@@ -272,7 +274,7 @@ class Store:
         )
         self.db.create_function("literal_any", 2, literal_any, deterministic=True)
         schema = self.db.execute("SELECT value FROM meta WHERE key='schema'").fetchone()
-        if schema is None or schema[0] != "inquiry/index/4":
+        if schema is None or schema[0] != "inquiry/index/5":
             self.db.close()
             raise ValueError(
                 "incomplete or incompatible index; import into a new path or use its frozen code"
@@ -302,7 +304,7 @@ class Store:
             for source in sources:
                 cls._import(db, source)
             cls._effects(db)
-            db.execute("INSERT INTO meta VALUES(?,?)", ("schema", "inquiry/index/4"))
+            db.execute("INSERT INTO meta VALUES(?,?)", ("schema", "inquiry/index/5"))
             db.commit()
         finally:
             db.close()
@@ -492,6 +494,15 @@ class Store:
                 else "returned"
             )
             if ordered:
+                db.execute(
+                    "INSERT INTO call_pairs VALUES(?,?,?,?)",
+                    (
+                        request["record"],
+                        request["slot"],
+                        result["record"],
+                        result["slot"],
+                    ),
+                )
                 db.execute(
                     "INSERT OR IGNORE INTO pairs VALUES(?,?)",
                     (request["record"], result["record"]),
