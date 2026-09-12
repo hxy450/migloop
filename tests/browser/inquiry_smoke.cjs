@@ -71,11 +71,20 @@ async function main() {
         ws.send(JSON.stringify({ id, method, params }));
       });
     const evaluate = async (expression) => {
-      const data = await send("Runtime.evaluate", {
-        expression,
-        awaitPromise: true,
-        returnByValue: true,
-      });
+      const started = Date.now();
+      const label = expression.slice(0, 160);
+      if (process.env.INQUIRY_SMOKE_TRACE) console.log("evaluate", label);
+      let data;
+      try {
+        data = await send("Runtime.evaluate", {
+          expression,
+          awaitPromise: true,
+          returnByValue: true,
+        });
+      } catch (error) {
+        throw new Error(`${error.message}; expression: ${label}`, { cause: error });
+      }
+      if (process.env.INQUIRY_SMOKE_TRACE) console.log("evaluated_ms", Date.now()-started);
       if (data.exceptionDetails)
         throw Error(JSON.stringify(data.exceptionDetails));
       return data.result.value;
