@@ -10,9 +10,7 @@ from copy import deepcopy
 import hashlib
 import http.client
 import json
-import os
 from pathlib import Path
-import subprocess
 import threading
 
 import pytest
@@ -48,9 +46,6 @@ def real_http(tmp_path, monkeypatch):
     monkeypatch.setattr(service, "session_ledger", lambda path: by_path[path])
     monkeypatch.setattr(service, "session_cwd", lambda _path: "/proj")
     monkeypatch.setattr(service, "fixchain_payload", lambda _path: {"chains": []})
-    monkeypatch.setattr(service, "fixchain_light", lambda _path: {
-        "sid": "graph", "sid8": "graph", "project": "Synthetic HTTP integration", "fixes": [], "fixers": [],
-    })
     for ledger in ledgers.values():
         atoms.ledger_identity(ledger)
     original_ledgers, original_files = deepcopy(ledgers), _files(tmp_path)
@@ -266,87 +261,3 @@ def test_post_budget_deferral_is_not_delivered_data(real_http):
         {"tool": "agent", "args": {"id": real_http["aid"], "at": ts(17)}}], "max_chars": 1000})
     assert status == 200 and data["items"][0]["status"] == "deferred"
     assert data["items"][0]["delivery"]["records"] == [] and "data" not in data["items"][0]
-
-
-@pytest.mark.skipif(not os.environ.get("MIGLOOP_TEST_CDP"), reason="optional real-page test requires an existing loopback Chrome CDP endpoint")
-@pytest.mark.parametrize("partial", [False, True])
-def test_real_page_pastes_yaml_and_expands_evidence_through_real_http(real_http, partial):
-    """Opt in with MIGLOOP_TEST_CDP=http://127.0.0.1:19653; no mock routes.
-
-    Chrome is supplied by the caller. This test closes only its own tab, and
-    the fixture closes its real HTTP server. There is no model invocation.
-    """
-    yaml = pytest.importorskip("yaml")
-    doc = (_partial_document if partial else document)(real_http["ledgers"]["graph"])
-    draft = yaml.safe_dump(doc, allow_unicode=True, sort_keys=False)
-    script = r"""
-const assert=require('node:assert/strict');
-const [base,endpoint,draft,partialFlag]=process.argv.slice(1);
-const partial=partialFlag==='true',nodeCount=partial?4:3;
-async function main(){
-  assert.equal(new URL(endpoint).hostname,'127.0.0.1');
-  const target=await(await fetch(endpoint+'/json/new?about:blank',{method:'PUT'})).json();
-  const socket=new WebSocket(target.webSocketDebuggerUrl);
-  await new Promise((resolve,reject)=>{socket.onopen=resolve;socket.onerror=reject;});
-  const pending=new Map(),requests=[],errors=[];let serial=0;
-  socket.onmessage=event=>{const m=JSON.parse(event.data);
-    if(m.method==='Runtime.exceptionThrown')errors.push(m.params.exceptionDetails.text);
-    if(m.method==='Network.requestWillBeSent'&&m.params.request.method==='POST')requests.push(m.params.request);
-    const p=pending.get(m.id);if(p){pending.delete(m.id);clearTimeout(p.timer);m.error?p.reject(Error(JSON.stringify(m.error))):p.resolve(m.result);}};
-  const send=(method,params={})=>new Promise((resolve,reject)=>{const id=++serial;
-    const timer=setTimeout(()=>{pending.delete(id);reject(Error('CDP timeout '+method));},10000);
-    pending.set(id,{resolve,reject,timer});socket.send(JSON.stringify({id,method,params}));});
-  const evaluate=async expression=>{const r=await send('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true});
-    if(r.exceptionDetails)throw Error(r.exceptionDetails.exception?.description||r.exceptionDetails.text);return r.result.value;};
-  const until=async(expression,label)=>{for(let i=0;i<100;i++){if(await evaluate(expression))return;await new Promise(r=>setTimeout(r,100));}throw Error('Timeout '+label);};
-  try{
-    await send('Page.enable');await send('Runtime.enable');await send('Network.enable');
-    await send('Emulation.setDeviceMetricsOverride',{width:1800,height:1200,deviceScaleFactor:1,mobile:false});
-    await send('Page.navigate',{url:base+'/api/insight1/fixchain/graph'});
-    await until("window.__mig && document.querySelector('.draft-loader')",'real page');
-    await evaluate(`(()=>{const loader=document.querySelector('.draft-loader');loader.open=true;
-      loader.querySelector('textarea').value=${JSON.stringify(draft)};loader.querySelector('.draft-submit').click();})()`);
-    try{await until(`__mig.probe()?.manual_input===true && document.querySelectorAll('.argument-card').length===${nodeCount}`,'real v3 check');}
-    catch(error){throw Error(error.message+' '+JSON.stringify(await evaluate("({cards:document.querySelectorAll('.argument-card').length,probe:__mig.probe(),message:document.querySelector('.draft-loader')?.textContent})")));}
-    const before=await evaluate("JSON.stringify(__mig.probe().argument_graph)");
-    assert.equal(await evaluate("__mig.probe().argument_graph.identity.bound"),true);
-    assert.equal(await evaluate("document.querySelectorAll('.argument-wire').length"),2);
-    assert.equal(await evaluate("__mig.probe().query_trace == null && __mig.probe().steps.length===0"),true);
-    if(partial){
-      assert.equal(await evaluate("__mig.probe().argument_graph.partial_document"),true);
-      assert.equal(await evaluate("__mig.probe().argument_graph.original_schema_valid"),false);
-      assert(await evaluate("document.querySelector('#argument-view').textContent.includes('局部预览：原稿仍未通过严格格式校验')"));
-      assert(await evaluate("document.querySelector('#argument-view').textContent.includes('unknown_top_level')"),'original schema error visible');
-      assert(await evaluate("document.querySelector('#argument-view').textContent.includes('INVALID_AGENT_AGENT_WRITE')"),'invalid declaration retained');
-      assert.equal(await evaluate("[...document.querySelectorAll('.argument-wire')].some(e=>e.dataset.from==='F/actor'&&e.dataset.to==='F/peer')"),false);
-      await evaluate("[...document.querySelectorAll('.argument-card')].find(n=>n.dataset.nodeId==='F/peer').click()");
-      assert(await evaluate("document.querySelector('#side .argument-node-reason').textContent.includes('VALID_PEER_REASON <img')"),'valid node reason retained');
-      assert.equal(await evaluate("document.querySelectorAll('#side img').length"),0,'reason text escaped');
-      await evaluate("[...document.querySelectorAll('.argument-card')].find(n=>n.dataset.nodeId==='F/spec').click()");
-    }
-    const expected=await evaluate("(()=>{const e=__mig.probe().argument_graph.nodes[0].evidence[0];return {ref:e.raw_ref||e.ref,scope:e.scope};})()");
-    await evaluate("document.querySelector('#side .argument-open-original').click()");
-    await until("document.querySelector('#side .query-recheck-result pre')",'real record expansion');
-    const record=await evaluate("JSON.parse(document.querySelector('#side .query-recheck-result pre').textContent)");
-    assert.equal(record.schema,'migloop-raw-record/1');assert.equal(record.ref,expected.ref);
-    assert.equal(record.scope.at,expected.scope.at);assert.equal(record.scope.since_ts,null);
-    assert.equal(typeof record.text,'string');assert(record.text.length>0);
-    assert.equal(await evaluate("JSON.stringify(__mig.probe().argument_graph)"),before);
-    assert.equal(await evaluate("__mig.probe().query_trace == null"),true);
-    assert.deepEqual(errors,[]);
-    assert.equal(requests.length,2);assert(requests[0].url.endsWith('/atom/graph/check'));assert(requests[1].url.endsWith('/atom/graph/batch'));
-    const check=JSON.parse(requests[0].postData),batch=JSON.parse(requests[1].postData);
-    assert.equal(check.draft,draft);assert.equal(batch.requests[0].tool,'record');assert.equal(batch.requests[0].args.ref,expected.ref);
-    assert.equal(batch.requests[0].scope.since_ts,null);
-    console.log(JSON.stringify({passed:true,realHttp:true,nodes:nodeCount,edges:2,posts:2,manualTraceAbsent:true,partial}));
-  }finally{socket.close();await fetch(endpoint+'/json/close/'+target.id).catch(()=>{});}
-}
-main().catch(error=>{console.error(error);process.exitCode=1;});
-"""
-    completed = subprocess.run(["node", "-e", script, real_http["base"], os.environ["MIGLOOP_TEST_CDP"], draft, str(partial).lower()],
-                               cwd=Path(__file__).resolve().parents[1], text=True, encoding="utf-8",
-                               capture_output=True, timeout=35)
-    assert completed.returncode == 0, completed.stdout + completed.stderr
-    result = json.loads(completed.stdout.strip())
-    assert result == {"passed": True, "realHttp": True, "nodes": 4 if partial else 3, "edges": 2,
-                      "posts": 2, "manualTraceAbsent": True, "partial": partial}

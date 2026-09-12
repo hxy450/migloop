@@ -1,5 +1,7 @@
 # 时间通路恢复已有派发关系
 
+> 历史兼容层记录。2026-09-12 起默认 UI 改用 inquiry 查询内核，旧树模板及其浏览器测试已删除；当前时态契约见 [单一时间证据树](specs/time-evidence-tree.md)。本文的旧后端兼容测试仍保留。
+
 2026-09-11。旧版 atoms._link_dispatches / agent_atom(parent, children) / verdict._rel_dispatch / fixchain.html 的派发能力未被删除，但时间原子、v3 结论、新默认树未迁移它，属于功能回归，不是新产品需求。
 
 本次保留旧接口，新增共享 dispatch_scope：时间 agent 的 dispatches 分区、v3 dispatch/possible_dispatch 校验使用相同证据策略。新树沿该分区展开父子 agent；agent→agent 不能冒充文件写边。文件/agent 的两种节点不变，不新增 skill 节点类型。历史 skill 仍是文件。

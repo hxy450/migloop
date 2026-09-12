@@ -1,4 +1,4 @@
-"""Independent SourceSpec transport/probe/UI audit. Synthetic evidence only."""
+"""Independent SourceSpec transport/probe audit. Synthetic evidence only."""
 from __future__ import annotations
 
 import asyncio
@@ -14,7 +14,6 @@ import pytest
 from migloop import atoms, investigation, mcp_server, probe, serve, service, time_probe, transcript_store as store, verdict_v3
 from tests.test_atoms import _call, _rec
 from tests.test_cc_source_discovery import SID, dump
-from tests.test_time_atom_transport_audit import _DOM, _helpers, _node, TEMPLATE
 
 AT = "2026-01-01T00:03:00Z"
 SINCE = "2026-01-01T00:00:00Z"
@@ -182,66 +181,3 @@ def test_aux_evidence_retained_in_probe_but_cannot_prove_author_or_input(source_
     before = deepcopy(graph)
     investigation.query(ledger, "record", {"ref": ref, "at": AT, "include_undated": True})
     assert verdict_v3.build(ledger, document)["argument_graph"] == before
-
-
-def evidence_helpers():
-    text = TEMPLATE.read_text(encoding="utf-8")
-    return "function argumentEvidence(" + text.split("    function argumentEvidence(", 1)[1].split("    function argumentFindings(", 1)[0]
-
-
-@pytest.mark.parametrize("width", [20, 40])
-def test_ui_ok_evidence_opens_exact_ref_and_original_scope_without_mutation(width):
-    script = _DOM + _helpers() + evidence_helpers() + r"""
-function argumentBound(){return true;}
-const scope={kind:'agent',key:'a',at:'2026-01-01T00:03:00Z',since_ts:'2026-01-01T00:00:00Z'};
-const ref='raw:'+('a'.repeat(WIDTH))+':L1:'+('b'.repeat(20));
-const evidence={ref,raw_ref:ref,status:'ok',scope,semantic_checked:false};
-const original=JSON.stringify(evidence);
-global.fetch=async(url,options)=>{requests.push({url,...JSON.parse(options.body)});
- return {json:async()=>({items:[{tool:'record',status:'ok',scope,data:{ref,text:'<img src=x> literal',next_offset:null}}]})};};
-(async()=>{const host=el('div');argumentEvidence(host,[evidence],null,'原文');
- const button=walk(host).find(n=>n.className==='argument-open-original');assert(button);button.onclick();await tick();
- assert.equal(requests.length,1);assert.equal(requests[0].url,API+'/batch');
- assert.deepEqual(requests[0].requests[0],{tool:'record',args:{ref,offset:0,max_chars:null},scope});
- assert.equal(JSON.stringify(evidence),original);assert.equal(JSON.stringify({PROBE,XT}),before);
- assert(walk(host).some(n=>n.tagName==='pre'&&n.textContent.includes('<img src=x> literal')));
- console.log(JSON.stringify({passed:true}));
-})().catch(e=>{console.error(e);process.exitCode=1});
-""".replace("WIDTH", str(width))
-    assert _node(script)["passed"]
-
-
-def test_ui_undated_aux_opens_explicit_pool_view_not_agent_input():
-    # Regression for the observed missing button; parent owns the template fix.
-    script = _DOM + _helpers() + evidence_helpers() + r"""
-function argumentBound(){return true;}
-const scope={kind:'agent',key:'a',at:'2026-01-01T00:03:00Z',since_ts:'2026-01-01T00:00:00Z'};
-const ref='raw:'+('a'.repeat(40))+':L1:'+('b'.repeat(20));
-const evidence={ref,raw_ref:ref,status:'undated',scope,ts:null,semantic_checked:false};
-const original=JSON.stringify(evidence);
-global.fetch=async(url,options)=>{requests.push({url,...JSON.parse(options.body)});
- return {json:async()=>({items:[{tool:'record',status:'ok',data:{ref,ts:null,text:'UNKNOWN_TIME_RAW',next_offset:null}}]})};};
-(async()=>{const host=el('div');argumentEvidence(host,[evidence],null,'附件');
- const button=walk(host).find(n=>n.tagName==='button'&&n.textContent.includes('时间未知'));
- assert(button,'uniquely located undated evidence needs explicit independent raw navigation');
- assert(button.textContent.includes('全池独立查阅'));button.onclick();await tick();
- assert.equal(requests.length,1);assert.equal(requests[0].url,API+'/batch');
- const q=requests[0].requests[0];assert.equal(q.tool,'record');assert.equal(q.args.ref,ref);
- assert.equal(q.args.include_undated,true);assert.deepEqual(q.scope,{kind:'pool',key:null,at:scope.at,since_ts:scope.since_ts});
- assert.equal(JSON.stringify(evidence),original);assert.equal(JSON.stringify({PROBE,XT}),before);
- console.log(JSON.stringify({passed:true}));
-})().catch(e=>{console.error(e);process.exitCode=1});
-"""
-    assert _node(script)["passed"]
-
-
-@pytest.mark.parametrize("status,bound", [("outside_scope", True), ("invalid", True), ("undated", False)])
-def test_ui_invalid_outside_or_unbound_evidence_has_no_backdoor_expansion(status, bound):
-    script = _DOM + _helpers() + evidence_helpers() + "\nfunction argumentBound(){return " + json.dumps(bound) + ";}\n" + r"""
-const evidence={ref:'raw:'+('a'.repeat(40))+':L1:'+('b'.repeat(20)),status:STATUS,
- scope:{kind:'agent',key:'a',at:'2026-01-01T00:03:00Z',since_ts:null}};
-const host=el('div');argumentEvidence(host,[evidence],null,'原文');
-assert.equal(walk(host).filter(n=>n.tagName==='button').length,0);
-assert.equal(JSON.stringify({PROBE,XT}),before);console.log(JSON.stringify({passed:true}));
-""".replace("STATUS", json.dumps(status))
-    assert _node(script)["passed"]

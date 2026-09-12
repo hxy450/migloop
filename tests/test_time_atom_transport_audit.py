@@ -1,7 +1,6 @@
-"""Independent time-atom transport/UI audit over small synthetic sources only.
+"""Independent time-atom transport audit over small synthetic sources only.
 
 Real HTTP handlers, MCP callbacks, selection and receipt parsers are exercised.
-The JavaScript tests execute template helpers, not copied projection logic.
 """
 from __future__ import annotations
 
@@ -9,9 +8,6 @@ import asyncio
 from copy import deepcopy
 import http.client
 import json
-from pathlib import Path
-import shutil
-import subprocess
 from urllib.parse import urlencode
 
 import pytest
@@ -20,9 +16,6 @@ from migloop import atom_queries, atoms, delivery_budget, investigation, mcp_ser
 from tests.test_investigation_http import real_http  # noqa: F401 -- shared real loopback fixture
 from tests.test_temporal import corpus, ts
 from tests.test_verdict_v3 import document
-
-TEMPLATE = Path(__file__).parents[1] / "src/migloop/render/templates/fixchain.html"
-
 
 def _get(server, tool, args):
     connection = http.client.HTTPConnection(server["base"].split("://")[1], timeout=5)
@@ -203,126 +196,3 @@ def test_original_message_cannot_spoof_additional_receipt_prefix(tmp_path):
     receipt = time_receipts.parse(ledger, "agent", args, text)
     assert receipt and receipt["raw_count"] == 1
     assert "raw:abc:L999:abc" not in receipt["records"]
-
-
-def _node(script):
-    executable = shutil.which("node")
-    if not executable:
-        pytest.skip("optional Node runtime unavailable")
-    result = subprocess.run([executable, "-"], input=script, encoding="utf-8", capture_output=True, timeout=15)
-    assert result.returncode == 0, result.stderr
-    return json.loads(result.stdout)
-
-
-def _helpers():
-    text = TEMPLATE.read_text(encoding="utf-8")
-    return "function argumentText(value) {" + text.split("    function argumentText(value) {", 1)[1].split(
-        "    function argumentEvidence(", 1)[0]
-
-
-_DOM = r"""
-const assert=require('node:assert/strict');
-class Element {
- constructor(tag, cls, text){this.tagName=tag;this.className=cls||'';this.children=[];this.dataset={};this.value='';this.listeners={};this._text=text||'';}
- appendChild(node){this.children.push(node);return node;}
- set textContent(value){this._text=String(value);this.children=[];}
- get textContent(){return this._text+this.children.map(n=>n.textContent).join('');}
- get childNodes(){return this.children;}
- setAttribute(){}
- addEventListener(name,fn){this.listeners[name]=fn;}
-}
-function el(tag,cls,text){return new Element(tag,cls,text);}
-const walk=node=>[node,...node.children.flatMap(walk)];
-const API='/api/insight1/atom/test', requests=[];
-const PROBE={argument_graph:{nodes:[{id:'original',reason:'MODEL_REASON'}],edges:[]},query_trace:{steps:[{tool:'agent'}],edges:[]}};
-const XT={byId:{original:{tid:'original'}}};
-const before=JSON.stringify({PROBE,XT});
-const tick=()=>new Promise(resolve=>setImmediate(resolve));
-"""
-
-
-def test_template_replay_view_requires_authenticated_schema_and_never_mutates_original():
-    script = _DOM + _helpers() + r"""
-const args={id:'a',at:'2026-09-10T10:10:00Z'}, scope={kind:'agent',key:'a',at:args.at,since_ts:null};
-const saved=JSON.stringify(args), delivery={data_schema:'migloop-time-view/1'};
-assert.equal(recordedTimeRequest('agent',args,scope,delivery,true).args.view,'records');
-assert.equal(recordedTimeRequest('agent',args,scope,delivery,false).args.view,undefined);
-assert.equal(recordedTimeRequest('agent',args,scope,{},true).args.view,undefined);
-assert.equal(recordedTimeRequest('agent',['invalid'],scope,delivery,true),null);
-assert.equal(recordedTimeRequest('agent',{...args,view:'overview'},scope,delivery,true).args.view,'overview');
-assert.equal(JSON.stringify(args),saved);
-assert.equal(timeAtomRequest({tool:'file',args:{path:'/p/B',at:args.at,since_ts:null}},scope).scope.kind,'file');
-assert.equal(timeAtomRequest({tool:'file',args:{path:'/p/B',at:args.at,since_ts:null}},scope).scope.key,'/p/B');
-assert.equal(timeAtomRequest({tool:'file',args:{path:'/p/B'}},null),null);
-assert.equal(timeAtomRequest({tool:'file',args:{path:'/p/B'},scope:{...scope,at:'latest'}},null),null);
-assert.equal(JSON.stringify({PROBE,XT}),before);
-console.log(JSON.stringify({passed:true}));
-"""
-    assert _node(script)["passed"]
-
-
-def test_template_section_navigation_uses_returned_view_cursor_and_no_implicit_edges():
-    script = _DOM + _helpers() + r"""
-const scope={kind:'agent',key:'a',at:'2026-09-10T10:10:00Z',since_ts:'2026-09-10T10:04:00Z'};
-const query=(view,offset)=>({tool:'agent',args:{id:'a',at:scope.at,since_ts:scope.since_ts,view,offset,limit:1}});
-const data={schema:'migloop-time-atom/1',scope,view:'overview',next_offset:999,
- sections:{writes:{total:2,offset:0,limit:1,rows:[{operation:{path:'/p/A',status:'confirmed'},
-  expand_query:{tool:'expand',args:{refs:[{ref:'raw:abc:L1:abc',pointer:'/input'}]},scope}}],query:query('writes',0),next_query:query('writes',1)},
-  candidates:{total:8,offset:0,limit:0,rows:[],query:query('candidates',0),next_query:query('candidates',0)}},
- raw_index:{total:20,query:query('records',0)},
- body_sources:{total:1,entries:[{ref:'raw:abc:L1:abc',query:{tool:'expand',args:{refs:['raw:abc:L1:abc']},scope}}]}};
-global.fetch=async(url,options)=>{requests.push({url,...JSON.parse(options.body)});return {json:async()=>({items:[{item_index:0,tool:'agent',status:'ok',scope,data}]})}};
-(async()=>{const host=el('div');await independentlyQuery([{tool:'agent',args:{id:'a',at:scope.at}}],host);
- assert(walk(host).some(n=>n.className==='time-atom-overview'));
- assert.equal(walk(host).filter(n=>n.className==='query-next').length,0);
- const next=walk(host).find(n=>n.className==='time-atom-next');next.onclick();await tick();
- assert.equal(requests[1].requests[0].args.view,'writes');assert.equal(requests[1].requests[0].args.offset,1);
- assert.equal(requests[1].requests[0].args.limit,1);assert.deepEqual(requests[1].requests[0].scope,scope);
- const raw=walk(host).find(n=>n.className==='time-atom-navigation');
- walk(raw).find(n=>n.tagName==='button').onclick();await tick();
- assert.equal(requests[2].requests[0].args.view,'records');
- assert.equal(JSON.stringify({PROBE,XT}),before);console.log(JSON.stringify({passed:true,requests:requests.length}));
-})().catch(e=>{console.error(e);process.exitCode=1});
-"""
-    assert _node(script) == {"passed": True, "requests": 3}
-
-
-def test_template_fullraw_panel_and_record_open_keep_both_time_bounds():
-    text = TEMPLATE.read_text(encoding="utf-8")
-    section = "function temporalSection(" + text.split("    function temporalSection(", 1)[1].split(
-        "    function timeScopeSection(", 1)[0]
-    script = _DOM + _helpers() + section + r"""
-const scope={kind:'agent',key:'a',at:'2026-09-10T10:10:00Z',since_ts:'2026-09-10T10:04:00Z'};
-const page={schema:'migloop-time-view/1',scope,node:scope,total:1,counts:{undated:0},gaps:[],
- stale_annotation_sources:[],offset:0,limit:30,next_offset:null,undated:{rows:[]},
- rows:[{ref:'raw:abc:L1:abc',ts:'2026-09-10T10:05:00Z',kind:'user',source:'a.jsonl',line:1,preview:'ORIGINAL',annotations:[],agents:[]}]};
-global.fetch=async(url,options)=>{requests.push({url,payload:options.body&&JSON.parse(options.body)});
- return {json:async()=>options.body?{items:[{tool:'record',status:'ok',scope,data:{text:'<b>literal</b>',next_offset:null}}]}:page};};
-(async()=>{const host=el('div');temporalSection(host,'agent','a',scope.at,{since_ts:scope.since_ts});
- const panel=host.children[0];panel.open=true;panel.listeners.toggle();await tick();
- assert.equal(new URL(requests[0].url,'http://localhost').searchParams.get('view'),'records');
- const record=walk(host).find(n=>n.className==='time-record');walk(record).find(n=>n.tagName==='button').onclick();await tick();
- assert.equal(requests[1].url,API+'/batch');assert.deepEqual(requests[1].payload.requests[0].scope,scope);
- assert.equal(requests[1].payload.requests[0].tool,'record');assert.equal(requests[1].payload.requests[0].args.offset,0);
- assert.equal(JSON.stringify({PROBE,XT}),before);console.log(JSON.stringify({passed:true}));
-})().catch(e=>{console.error(e);process.exitCode=1});
-"""
-    assert _node(script)["passed"]
-
-
-def test_template_prior_navigation_opens_only_its_declared_earlier_scope():
-    script = _DOM + _helpers() + r"""
-const scope={kind:'file',key:'/p/A',at:'2026-09-10T10:10:00Z',since_ts:'2026-09-10T10:04:00Z'};
-const earlier={...scope,at:scope.since_ts,since_ts:null};
-const data={schema:'migloop-time-atom/1',scope,sections:{},body_sources:{total:0,entries:[],
- before_window:{total:1,entries:[{ref:'raw:abc:L1:abc',query:{tool:'expand',args:{refs:['raw:abc:L1:abc']},scope:earlier}}],
- query:{tool:'events',args:{view:'bodies'},scope:earlier}}}};
-global.fetch=async(url,options)=>{requests.push(JSON.parse(options.body));return {json:async()=>({items:[]})}};
-(async()=>{const host=el('div');renderTimeAtom(host,data,scope);
- const prior=walk(host).find(n=>n.className==='time-atom-navigation' && n.children[0].textContent.includes('窗口起点'));
- assert(prior);walk(prior).find(n=>n.tagName==='button').onclick();await tick();
- assert.deepEqual(requests[0].requests[0].scope,earlier);
- assert.equal(JSON.stringify({PROBE,XT}),before);console.log(JSON.stringify({passed:true}));
-})().catch(e=>{console.error(e);process.exitCode=1});
-"""
-    assert _node(script)["passed"]

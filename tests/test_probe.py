@@ -64,19 +64,6 @@ def test_probe_maps_calls_and_links_to_nodes(tmp_path: Any) -> None:
     assert [n["kind"] for n in p["links"][1]["nodes"]] == ["agent", "file", "file", "agent"]   # 主语在前,其余是提到
 
 
-def test_fixchain_template_has_probe_hooks() -> None:
-    from migloop.service import load_asset
-    html = load_asset("fixchain.html")
-    assert 'id="probe"' in html and "U.probe" in html and "probeDecorate(d, node)" in html and "bootProbe()" in html
-    # 调查树由服务端给(probeBuildTrajectory),页面不再自己按键铺树;词法候选是图例里的显式开关
-    assert "probeBuildTrajectory(" in html and "probeExpand" not in html and "unstub" not in html
-    assert 'id="cand"' in html and "showCand" in html and "markHidden(" in html and "kidsOf(" in html
-    # 树上虚线:改动类可能写者挂上游、只读提及折灰桩;调查树按缺陷分组
-    assert ".node.possible" in html and "possibleWriters(" in html and "只读提及" in html
-    assert "probeDefect(" in html and "PROBE.defect" in html
-    assert ".node.p-chain" in html and ".wire.chain" in html and "未查" in html
-    # 红只落在 键 + 版本 对上的节点;同 id 别的版本挂灰标说明环判的是哪一版
-    assert "probeVerdictFor(" in html and "判的是 v" in html
 
 
 def test_probe_rejects_forged_line_numbers(tmp_path: Any) -> None:

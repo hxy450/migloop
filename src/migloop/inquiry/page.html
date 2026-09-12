@@ -1,227 +1,78 @@
 <!doctype html>
 <html lang="zh-CN">
-  <meta charset="utf-8" /><meta
-    name="viewport"
-    content="width=device-width,initial-scale=1"
-  />
-  <title>Migloop · 返修调查内核</title>
-  <style>
-    * {
-      box-sizing: border-box;
-    }
-    body {
-      margin: 0;
-      background: #f4f6fa;
-      color: #243042;
-      font:
-        14px system-ui,
-        sans-serif;
-    }
-    header {
-      padding: 20px 28px;
-      background: #fff;
-      border-bottom: 1px solid #dde3ee;
-    }
-    h1 {
-      margin: 0 0 8px;
-      font-size: 22px;
-    }
-    main {
-      display: grid;
-      grid-template-columns: minmax(300px, 360px) minmax(500px, 1fr);
-      gap: 16px;
-      padding: 16px;
-    }
-    section {
-      background: white;
-      border: 1px solid #dde3ee;
-      border-radius: 9px;
-      padding: 16px;
-      margin-bottom: 16px;
-    }
-    h2 {
-      font-size: 16px;
-      margin: 0 0 12px;
-    }
-    button,
-    input,
-    select,
-    textarea {
-      font: inherit;
-    }
-    button {
-      cursor: pointer;
-      border: 1px solid #cad4e3;
-      background: #fff;
-      border-radius: 5px;
-      padding: 6px 10px;
-      margin: 3px;
-    }
-    button:hover {
-      background: #eef3fb;
-    }
-    input,
-    textarea,
-    select {
-      border: 1px solid #cad4e3;
-      border-radius: 5px;
-      padding: 8px;
-      max-width: 100%;
-    }
-    textarea {
-      width: 100%;
-      min-height: 120px;
-      font-family: monospace;
-    }
-    .muted {
-      color: #69778a;
-    }
-    .error {
-      color: #b42318;
-      white-space: pre-wrap;
-    }
-    .row {
-      border-top: 1px solid #e9edf4;
-      padding: 8px 0;
-      overflow-wrap: anywhere;
-    }
-    pre {
-      white-space: pre-wrap;
-      overflow-wrap: anywhere;
-      font:
-        12px/1.55 ui-monospace,
-        monospace;
-      max-height: 65vh;
-      overflow: auto;
-    }
-    #graph {
-      width: 100%;
-      min-height: 240px;
-      overflow: auto;
-    }
-    svg {
-      display: block;
-    }
-    details {
-      margin: 8px 0;
-    }
-    .node {
-      cursor: pointer;
-    }
-    .small {
-      font-size: 12px;
-    }
-    .badge {
-      display: inline-block;
-      background: #fff2df;
-      color: #925100;
-      border-radius: 4px;
-      padding: 3px 6px;
-    }
-  </style>
-  <header>
-    <h1>返修调查 · 事件内核</h1>
-    <div id="info" class="muted">读取索引…</div>
-    <div class="small muted">
-      原因是模型主张；原始引用、历史关系和因果正确性分开。当前页面不会修改旧调查记录。
-    </div>
-  </header>
-  <main>
-    <aside>
-      <section>
-        <h2>手动取证</h2>
-        <select id="kind">
-          <option value="file">文件</option>
-          <option value="agent">Agent</option>
-          <option value="pool">全池搜索</option>
-        </select>
-        <input
-          id="key"
-          placeholder="文件路径或 agent 身份"
-          style="width: 100%; margin-top: 8px"
-        /><input
-          id="at"
-          placeholder="截至时间（带时区 ISO）"
-          style="width: 100%; margin-top: 8px"
-        />
-        <input
-          id="since"
-          placeholder="起始时间（可空）"
-          style="width: 100%; margin-top: 8px"
-        /><input
-          id="terms"
-          placeholder="搜索词，逗号分隔（OR）"
-          style="width: 100%; margin-top: 8px"
-        />
-        <label class="small">原文/消息/返回排序 <select id="order"><option value="">默认</option><option value="oldest">较早优先</option><option value="newest">较新优先（非有效性认证）</option></select></label>
-        <button id="query">查原文索引</button
-        ><button id="relations">查读写关系</button
-        ><button id="calls">查相关调用</button
-        ><button id="changes">展开原生修改</button
-        ><button id="outline">原生增删清单</button
-        ><button id="history">片段修改历史</button
-        ><button id="inputs">查 Agent 已收输入</button
-        ><button id="messages">查 Agent 任务消息</button
-        ><button id="returns">查工具返回（Agent / 全池）</button
-        ><button id="agents">Agent目录</button
-        ><button id="files">文件目录</button>
-        <div id="status" class="small muted"></div>
-        <div id="records"></div>
-      </section>
-      <section>
-        <h2>载入模型结论</h2>
-        <select id="reports"></select
-        ><button id="load">载入</button>
-        <details>
-          <summary>粘贴 inquiry/1 YAML / JSON</summary>
-          <textarea id="draft"></textarea
-          ><button id="submit">核验并载入</button>
-        </details>
-      </section>
-    </aside>
-    <article>
-      <section>
-        <h2>
-          结论证据图
-          <select id="findings"></select>
-        </h2>
-        <div class="small muted">
-          红色：模型主张有问题 · 实线：原生关系可核 · 虚线：有依据的候选 ·
-          未核关系不画连线
-        </div>
-        <div id="graph"></div>
-        <div id="findingText"></div>
-        <div id="gaps"></div>
-      </section>
-      <section>
-        <h2 id="reasonTitle">节点原因 / 原始证据</h2>
-        <div id="reason"></div>
-        <div id="requestContext"></div>
-        <pre id="original"></pre>
-        <details>
-          <summary>完整原始记录（未改写）</summary>
-          <pre id="rawRecord"></pre>
-        </details>
-      </section>
-      <section>
-        <h2>实际调查工具调用</h2>
-        <div class="small muted">
-          仅记录真实工具调用。服务端已发送 ≠ 宿主完整呈现 ≠
-          模型理解。手动取证不加入此列表。
-        </div>
-        <div id="trace"></div>
-      </section>
-    </article>
-  </main>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Migloop · 时间证据树</title>
+<style>
+:root{--page:#f3f4f7;--surface:#fff;--ink:#232735;--muted:#858c9b;--ring:#e3e6ed;--wash:#f7f8fa;--file:#bf872c;--agent:#26967a;--problem:#c6464a;--blue:#466eb5;--mono:Consolas,"Cascadia Mono",monospace}
+*{box-sizing:border-box}body{margin:0;background:var(--page);color:var(--ink);font:13px/1.5 system-ui,"Microsoft YaHei",sans-serif;height:100vh;overflow:hidden}
+header{height:82px;padding:13px 22px;display:flex;align-items:center;justify-content:space-between;gap:20px}h1{font-size:20px;line-height:1.3;margin:0 0 4px;letter-spacing:-.5px}h2{font-size:13px;margin:0 0 10px}p{margin:8px 0}.eyebrow{font:10px var(--mono);letter-spacing:1.8px;color:var(--muted);margin-bottom:3px}.header-meta{text-align:right}.small{font-size:11px}.muted{color:var(--muted)}.error{color:#b42318;white-space:pre-wrap;overflow-wrap:anywhere}.badge{display:inline-block;padding:3px 7px;border-radius:5px;background:#fff1da;color:#936323;font-size:11px}
+main{display:grid;grid-template-columns:250px minmax(360px,1fr) 340px;gap:12px;height:calc(100vh - 94px);padding:0 14px;position:relative}
+.panel{min-width:0;background:white;border:1px solid var(--ring);border-radius:12px;box-shadow:0 2px 9px #202b4506;overflow:hidden}
+.rail{overflow-y:auto}.rail section{padding:15px 13px;border-bottom:1px solid var(--ring)}.rail .section-label{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}.rail .section-label h2{margin:0}
+button,input,select,textarea{font:inherit}button{cursor:pointer;color:var(--ink);border:1px solid var(--ring);background:#fff;border-radius:6px;padding:5px 8px;line-height:1.4}button:hover{background:#eef2f9;border-color:#c3cede}button:disabled{cursor:default;opacity:.5}input,textarea,select{border:1px solid var(--ring);border-radius:6px;padding:7px 8px;max-width:100%;background:var(--wash);color:var(--ink)}input:focus,textarea:focus,select:focus{outline:2px solid #cad7ed;outline-offset:1px}
+input,textarea{width:100%}textarea{min-height:150px;font:11px/1.5 var(--mono)}label{display:block;color:#6d7688;font-size:11px;margin:9px 0 4px}.control-row{display:flex;gap:5px;align-items:center}.control-row>*{min-width:0}.control-row select{flex:1}.primary{background:#293a50;color:white;border-color:#293a50}.primary:hover{background:#344d6a}.wide{width:100%;margin-top:12px}.tools{display:flex;gap:5px;flex-wrap:wrap;margin:9px 0}.tools button{font-size:11px}.row{border-top:1px solid #eceff4;padding:9px 0;overflow-wrap:anywhere}.row button,details button{margin:3px 3px 0 0;font-size:11px}.row section{padding:8px 0}.row:first-child{border-top:0}
+details{margin:8px 0}summary{cursor:pointer;color:#5e697e;font-size:11px;overflow-wrap:anywhere}pre{white-space:pre-wrap;overflow-wrap:anywhere;font:11px/1.6 var(--mono);max-height:55vh;overflow:auto;background:var(--wash);border:1px solid var(--ring);border-radius:6px;padding:10px;margin:8px 0}
+.workspace{display:flex;flex-direction:column;position:relative}.toolbar{padding:10px 12px;display:flex;align-items:center;justify-content:space-between;gap:10px;border-bottom:1px solid var(--ring);min-height:51px}.toolbar h2{margin:0;font-size:13px}.toolbar-left{display:flex;gap:8px;align-items:center}.toolbar select{max-width:215px;font-size:11px;padding:4px 7px}.zoomctl{display:flex;gap:3px;align-items:center;white-space:nowrap}.zoomctl button{font-size:11px;padding:4px 7px}.zoomctl span{font:10px var(--mono);min-width:32px;text-align:center}
+.legend{display:flex;gap:14px;flex-wrap:wrap;padding:8px 13px;color:#7a8292;font-size:10px;border-bottom:1px solid #edf0f5}.legend i{font-style:normal;display:flex;align-items:center;gap:5px}.line{width:20px;border-top:1.5px solid #9299aa}.line.dashed{border-top-style:dashed}.red-dot{width:7px;height:7px;background:var(--problem);border-radius:2px}
+#graph{flex:1;min-height:0;position:relative;overflow:auto;background:radial-gradient(#dbe0e9 .75px,transparent .75px);background-size:16px 16px}.tree-spacer{position:relative;min-width:100%}.tree-canvas{position:absolute;top:0;left:0;transform-origin:0 0}.tree-wires{position:absolute;inset:0;pointer-events:none}.tree-edge{fill:none;stroke:#aeb6c5;stroke-width:1.5}.tree-edge.candidate,.tree-edge.reviewed{stroke:#ab96be;stroke-dasharray:5 4}.tree-node{position:absolute;width:232px;height:72px;background:white;border:1px solid #d6dce5;border-radius:9px;padding:9px 11px;cursor:pointer;box-shadow:0 2px 6px #22335108;outline:none}.tree-node:hover{box-shadow:0 3px 12px #26345619;z-index:2}.tree-node.file{border-left:3px solid var(--file)}.tree-node.agent{border-left:3px solid var(--agent)}.tree-node.root{background:#fffcf5;border:1.5px solid #c5a164;border-left-width:3px}.tree-node.historical-problem{background:#fff5f4;border-color:#cb6c70;border-left-color:var(--problem)}.tree-node.selected{box-shadow:0 0 0 2px #9db4dc,0 3px 12px #26345615}
+.tree-node-heading{display:flex;gap:7px;align-items:center;font-size:12px;line-height:17px}.atom-icon{color:var(--file);font-size:15px}.agent .atom-icon{color:var(--agent)}.tree-node-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;min-width:0}.tree-badges{display:flex;gap:5px;white-space:nowrap;overflow:hidden;margin-top:3px;font-size:9px;color:#8a91a0;line-height:15px}.tree-badges .historical-tag{color:var(--problem)}.tree-badges .candidate-tag{color:#8b689f}.tree-badges .manual-tag{color:var(--blue)}.tree-badges .seen-tag{color:#487d79}.tree-time{font:9px/14px var(--mono);color:#8d96a6;margin-top:1px}.tree-fold{position:absolute;left:-13px;top:23px;border-radius:50%;width:22px;height:22px;padding:0;background:#fff;font-size:14px}.tree-more{position:absolute;font-size:10px;color:#75859e;border:0;background:transparent;padding:0 4px;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.tree-more:disabled{opacity:.65}.tree-more:hover{background:transparent;color:#3b67a8}.tree-column-title{position:absolute;font-size:10px;color:#a38960;width:232px}.tree-empty{max-width:390px;margin:18vh auto;text-align:center;color:#7d8799;padding:20px}.tree-empty h2{font-size:16px;color:#5d687b}.tree-empty-icon{font-size:42px;color:#b9c6d6;margin-bottom:10px}
+.canvas-note{padding:9px 12px;border-top:1px solid var(--ring);font-size:10px;color:var(--muted);display:flex;justify-content:space-between;gap:10px}.inspector{display:flex;flex-direction:column}.tabs{display:flex;gap:2px;padding:8px;border-bottom:1px solid var(--ring)}.tabs button{flex:1;border:0;font-size:11px;color:#8690a1}.tabs button.active{color:#315782;background:#edf2f9}.inspector-scroll{overflow:auto;min-height:0;flex:1;padding:14px}.tab-content[hidden]{display:none}.detail-title{overflow-wrap:anywhere;font:600 13px/1.6 var(--mono);margin-bottom:12px}.inspector section{padding:8px 0}.inspector .meta-line{color:#8a93a3;font-size:10px;overflow-wrap:anywhere}.reason-claim{border-left:2px solid #d1dae8;padding-left:10px!important;margin:12px 0}.reason-claim p{white-space:pre-wrap;font-size:12px}.empty-detail{padding:30px 8px;color:#929aaa;text-align:center}.audit-count{padding:0 4px;background:#fff0dc;color:#9f6b28;border-radius:3px}
+main.hide-inspector{grid-template-columns:250px minmax(360px,1fr)}main.hide-inspector .inspector{display:none}#records{max-height:50vh;overflow:auto}#status{margin-top:10px}#reason button{margin:3px 3px 0 0;font-size:11px}
+@media(max-width:1250px){main{grid-template-columns:230px minmax(360px,1fr)}.inspector{position:absolute;right:14px;top:0;bottom:0;width:340px;z-index:12;box-shadow:-8px 0 28px #26345622}.header-meta{max-width:340px}main.hide-inspector{grid-template-columns:230px minmax(360px,1fr)}}
+@media(max-width:720px){header{height:72px;padding:10px 12px}.header-meta{display:none}main,main.hide-inspector{grid-template-columns:minmax(0,1fr);height:calc(100vh - 84px);padding:0 8px}.rail{position:absolute;left:8px;top:52px;bottom:0;width:250px;z-index:11;display:none}.rail.mobile-open{display:block}.toolbar{flex-wrap:wrap}.toolbar-left{flex-wrap:wrap}.inspector{right:8px;width:min(340px,calc(100vw - 16px))}.legend{gap:8px}#mobileRail{display:block!important}}
+</style>
+</head>
+<body>
+<header><div><div class="eyebrow">MIGLOOP / INQUIRY</div><h1>时间证据树</h1><div id="info" class="small muted">读取索引…</div></div><div class="header-meta small muted">沿历史读写与派发，逐层追溯问题来源<br>模型原因、历史关系与原始证据分别可查</div></header>
+<main id="layout">
+<aside class="panel rail" id="rail">
+<section><div class="section-label"><h2>调查结论</h2><span class="small muted">自动展开路径</span></div>
+<div class="control-row"><select id="reports" aria-label="报告"></select><button id="load">载入</button></div>
+<details><summary>通过 report_id 载入</summary><input id="reportId" placeholder="完整 report_id"><button id="loadId">载入此报告</button></details>
+<details><summary>粘贴 inquiry/1 YAML / JSON</summary><textarea id="draft" aria-label="报告原稿" placeholder="完整结构化结论…"></textarea><button id="submit">核验并载入</button></details>
+</section>
+<section><div class="section-label"><h2>探索起点</h2><select id="kind" aria-label="对象类型"><option value="file">文件</option><option value="agent">Agent</option><option value="pool">全池搜索</option></select></div>
+<input id="key" placeholder="完整文件路径或 Agent 身份" aria-label="对象身份">
+<label for="at">截至时间 · ISO，保留精度</label><input id="at" placeholder="2026-09-12T10:00:00.000001Z">
+<label for="since">起始时间 · 可空</label><input id="since" placeholder="未限定起点">
+<button id="startTree" class="primary wide">以此为根展开</button>
+<div id="status" class="small muted" role="status"></div>
+<details id="manualTools"><summary>原文、差异与索引查询</summary>
+<input id="terms" placeholder="搜索词，逗号分隔（OR）" style="margin-top:8px">
+<label>原文排序 <select id="order"><option value="">默认</option><option value="oldest">较早优先</option><option value="newest">较新优先</option></select></label>
+<div class="tools"><button id="query">查原文索引</button><button id="relations">查读写关系</button><button id="calls">查相关调用</button><button id="changes">展开原生修改</button><button id="outline">原生增删清单</button><button id="history">片段修改历史</button><button id="inputs">Agent 已收输入</button><button id="messages">Agent 任务消息</button><button id="returns">工具返回</button><button id="agents">Agent 目录</button><button id="files">文件目录</button></div>
+</details><div id="records"></div>
+</section>
+<section class="small muted">展开遵循节点自己的截止时间。单条记录不代表完整文件快照；页面查询不会写入模型调查轨迹。</section>
+</aside>
+<section class="panel workspace">
+<div class="toolbar"><div class="toolbar-left"><button id="mobileRail" style="display:none">入口</button><h2>结论证据树</h2><select id="findings" aria-label="问题筛选"><option value="">全部问题</option></select></div><div class="zoomctl"><button id="zoomOut" title="缩小">−</button><span id="zoomValue">100%</span><button id="zoomIn" title="放大">+</button><button id="fit">适配</button><button id="collapse">折叠</button><button id="restorePaths">展开路径</button><button id="toggleInspector" title="显示或收起详情">详情</button></div></div>
+<div class="legend"><i><b class="red-dot"></b>历史问题 · 模型主张</i><i><b class="line"></b>已核关系</i><i><b class="line dashed"></b>候选 / 模型复核</i><i>上游 → 下游</i></div>
+<div id="graph" aria-label="时间证据树画布"></div>
+<div class="canvas-note"><span id="treeSummary">从右侧根节点向左展开 · Ctrl + 滚轮缩放</span><button id="showAudit" style="border:0;padding:0;font-size:10px">未闭合与核验 <span id="gapCount" class="audit-count">0</span></button></div>
+</section>
+<aside class="panel inspector">
+<div class="tabs"><button data-tab="detail" class="active">节点证据</button><button data-tab="report">结论原稿</button><button data-tab="audit">核验</button><button data-tab="trace">调查轨迹</button></div>
+<div class="inspector-scroll">
+<div class="tab-content" id="tab-detail"><h2 id="reasonTitle" class="detail-title">节点原因 / 原始证据</h2><div id="reason"><p class="empty-detail">点击树中节点查看原因、时间范围和原文依据。</p></div><div id="requestContext"></div><pre id="original"></pre><details><summary>完整原始记录（未改写）</summary><pre id="rawRecord"></pre></details></div>
+<div class="tab-content" id="tab-report" hidden><h2>结论原稿</h2><div id="findingText"></div></div>
+<div class="tab-content" id="tab-audit" hidden><h2>未闭合与事实核验</h2><p class="small muted">未知关系不画连线。核验结果与模型原因分别保留。</p><div id="gaps"></div></div>
+<div class="tab-content" id="tab-trace" hidden><h2>实际调查工具调用</h2><p class="small muted">只展示实际调用。已发送 ≠ 宿主完整呈现 ≠ 模型理解。人新展开不加入此轨迹。</p><div id="trace"></div></div>
+</div></aside>
+</main>
+<script>window.INQUIRY_CONFIG = __INQUIRY_CONFIG__;</script>
+<script src="__INQUIRY_ASSET_BASE__/tree.js"></script>
   <script>
     "use strict";
-    const $ = (id) => document.getElementById(id),
-      NS = "http://www.w3.org/2000/svg";
+    const $ = (id) => document.getElementById(id);
+    const config = window.INQUIRY_CONFIG || {};
     let graph = null,
       trace = [];
     async function api(path, body) {
       const response = await fetch(
-        path,
+        (config.api_base || "") + path,
         body === undefined
           ? {}
           : {
@@ -279,6 +130,7 @@
       return q;
     }
     async function query(q) {
+      $("manualTools").open = true;
       $("status").textContent = "查询中…";
       const data = await api("/api/query", q);
       $('requestContext').replaceChildren();
@@ -420,6 +272,7 @@
       return data;
     }
     async function open(ref, at, undated = false) {
+      selectTab("detail");
       const data = await api("/api/query", { op: "open", ref, at, undated });
       renderRequestContext(data.request_context, at, undated);
       $("rawRecord").textContent = '展开此处读取完整原始记录。';
@@ -449,164 +302,26 @@
       for(const missing of context.unavailable) element('div',missing.reason,host,'small error');
       element('div',context.note,host,'small muted');
     }
-    function svg(tag, attrs, parent) {
-      const e = document.createElementNS(NS, tag);
-      for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
-      parent.append(e);
-      return e;
+    function selectTab(name) {
+      document.querySelectorAll(".tab-content").forEach(e => e.hidden = e.id !== "tab-" + name);
+      document.querySelectorAll("[data-tab]").forEach(e => e.classList.toggle("active", e.dataset.tab === name));
+      $("layout").classList.remove("hide-inspector");
     }
-    function presentationGraph(data, fid) {
-      // Quotient only exact, verified query identities. Every displayed wire
-      // still corresponds to an existing edge; no path/causality is inferred.
-      const groups=new Map(), aliases=new Map();
-      for(const node of data.nodes.filter(n=>n.finding===fid)) {
-        const identity=node.exists===true
-          ? JSON.stringify([node.finding,node.kind,node.key,node.at,node.since??null])
-          : JSON.stringify(['unverified',node.id]);
-        if(!groups.has(identity)) groups.set(identity,{...node,members:[]});
-        const group=groups.get(identity);
-        group.members.push(node);
-        aliases.set(node.id,group.id);
-      }
-      return {nodes:[...groups.values()],edges:data.edges.filter(e=>e.finding===fid)
-        .map(e=>({...e,source_claim:e.from,target_claim:e.to,
-          from:aliases.get(e.from),to:aliases.get(e.to)}))};
-    }
-    function draw() {
-      const host = $("graph");
-      host.replaceChildren();
+    function renderReportPanels() {
       $("findingText").replaceChildren();
       $("gaps").replaceChildren();
-      if (!graph) {
-        element("p", "尚未载入结论。可先手动取证。", host, "muted");
-        return;
+      if (!graph) return;
+      const fid = $("findings").value;
+      renderFindingText(graph.document.findings.find(f => f.id === fid));
+      for (const path of tree.model.unclosed) {
+        const box = element("div", "", $("gaps"), "row small");
+        element("strong", (path.finding || "路径") + " · 未闭合", box);
+        element("p", path.diagnostic || "未找到可核的上游路径。", box);
+        const claim = graph.nodes.find(n => n.id === path.node);
+        if (claim) button("查看原稿原因与证据", box, () => showNode({ coordinate: claim, claims: [claim], origins: new Set(["report"]) }));
       }
-      const fid = $("findings").value,
-        {nodes,edges} = presentationGraph(graph,fid),
-        depth = new Map(nodes.map((n) => [n.id, 0]));
-      renderFindingText(graph.document.findings.find(f=>f.id===fid));
-      const merged=nodes.reduce((count,n)=>count+n.members.length-1,0);
-      if(merged) element('p',`合并显示 ${merged} 个重复坐标：同一对象、同一时间范围。每条原稿判定和理由均保留；框内主张之间不新增关系，连线仍仅来自原有历史关系。`,host,'small muted');
-      // Finite layout even for cyclic/shared model arguments; drawing never invents relations.
-      for (let i = 0; i < nodes.length; i++) {
-        let changed = false;
-        for (const e of edges) {
-          if (e.from === e.to) continue;
-          const d = Math.min(nodes.length - 1, (depth.get(e.from) || 0) + 1);
-          if (d > (depth.get(e.to) || 0)) {
-            depth.set(e.to, d);
-            changed = true;
-          }
-        }
-        if (!changed) break;
-      }
-      const counts = new Map(),
-        positions = new Map();
-      const nodeHeight=n=>n.members.length>1?45+19*n.members.length:68;
-      const rowHeight=Math.max(105,...nodes.map(n=>nodeHeight(n)+22));
-      for (const n of nodes) {
-        const d = depth.get(n.id),
-          r = counts.get(d) || 0;
-        counts.set(d, r + 1);
-        positions.set(n.id, { x: 20 + d * 285, y: 25 + r * rowHeight });
-      }
-      const width = Math.max(
-          600,
-          ...[...positions.values()].map((p) => p.x + 300),
-        ),
-        height = Math.max(230,...nodes.map(n=>positions.get(n.id).y+nodeHeight(n)+22));
-      const root = svg(
-        "svg",
-        { width, height, viewBox: `0 0 ${width} ${height}` },
-        host,
-      );
-      const defs = svg("defs", {}, root),
-        marker = svg(
-          "marker",
-          {
-            id: "arrow",
-            viewBox: "0 0 10 10",
-            refX: 9,
-            refY: 5,
-            markerWidth: 6,
-            markerHeight: 6,
-            orient: "auto-start-reverse",
-          },
-          defs,
-        );
-      svg("path", { d: "M 0 0 L 10 5 L 0 10 z", fill: "#77869a" }, marker);
-      const byId=new Map(nodes.map(n=>[n.id,n]));
-      const anchor=(id,member)=>{
-        const n=byId.get(id);
-        return positions.get(id).y+(n.members.length>1?36+19*n.members.findIndex(m=>m.id===member):34);
-      };
-      for (const e of edges) {
-        const a = positions.get(e.from),
-          b = positions.get(e.to);
-        if (!a || !b) continue;
-        const ay=anchor(e.from,e.source_claim),by=anchor(e.to,e.target_claim);
-        const wire=svg(
-          "path",
-          {
-            d: e.from===e.to
-              ? `M${a.x+245},${ay} C${a.x+285},${ay-25} ${a.x+285},${by+25} ${a.x+245},${by}`
-              : `M${a.x + 245},${ay} C${a.x + 265},${ay} ${b.x - 20},${by} ${b.x},${by}`,
-            fill: "none",
-            stroke: "#77869a",
-            "stroke-width": 1.5,
-            "stroke-dasharray": e.strength === "candidate" ? "5 4" : "",
-            "marker-end": "url(#arrow)",
-          },
-          root,
-        );
-        svg('title',{},wire).textContent=e.claim;
-      }
-      for (const n of nodes) {
-        const p = positions.get(n.id),
-          g = svg(
-            "g",
-            { class: "node", transform: `translate(${p.x},${p.y})`,
-              'data-members':JSON.stringify(n.members.map(m=>m.id)) },
-            root,
-          );
-        const bad = n.members.some(m=>["origin", "propagated"].includes(m.role));
-        svg(
-          "rect",
-          {
-            width: 245,
-            height: nodeHeight(n),
-            rx: 8,
-            fill: bad && n.members.length===1 ? "#fff0ef" : "#f4f7fb",
-            stroke: bad ? "#d94d45" : "#9aa9ba",
-            "stroke-width": n.members.some(m=>m.role === "origin") ? 2.5 : 1,
-          },
-          g,
-        );
-        svg(
-          "text",
-          { x: 10, y: 22, "font-size": 12, fill: "#283444" },
-          g,
-        ).textContent = (
-          n.kind === "file" ? n.key.split("/").pop() : n.key.split(":").pop()
-        ).slice(0, 34);
-        for(const [index,member] of n.members.entries()) {
-          const claim=svg('text',{x:10,y:43+19*index,'font-size':11,
-            fill:['origin','propagated'].includes(member.role)?'#c33':'#65748b',
-            class:'claim','data-claim':member.id},g);
-          claim.textContent=member.generated_context?'原生证据端点 · 未归因':
-            `${{origin:'问题进入',propagated:'问题保留',context:'输入/背景',repaired:'修复',unknown:'未定'}[member.role]} · 模型主张${member.exists?'':' · 节点未核'}`;
-          claim.onclick=event=>{event.stopPropagation();showNode(member);};
-        }
-        svg(
-          "text",
-          { x: 10, y: nodeHeight(n)-10, "font-size": 10, fill: "#65748b" },
-          g,
-        ).textContent = n.at;
-        svg("title", {}, g).textContent = n.key;
-        g.onclick = () => showNode(n);
-      }
-      for (const edge of graph.unverified_edges.filter(
-        (e) => e.finding === fid,
+      for (const edge of (graph.unverified_edges || []).filter(
+        (e) => !fid || e.finding === fid,
       ))
         element(
           "div",
@@ -614,7 +329,7 @@
           $("gaps"),
           "row small",
         );
-      for (const issue of graph.issues)
+      for (const issue of graph.issues || [])
         element("div", JSON.stringify(issue), $("gaps"), "error small");
       if (graph.coverage) {
         const c=graph.coverage;
@@ -641,15 +356,18 @@
       for (const row of graph.missing_evidence_links || [])
         element('div', `已引用但未接入图：${row.op} · ${row.path} · ${row.link}`, $('gaps'),'error small');
       renderReview(graph.evidence_review, $('gaps'));
+      $("gapCount").textContent = tree.model.unclosed.length + (graph.unverified_edges || []).filter(e => !fid || e.finding === fid).length + (graph.issues || []).length;
     }
     function renderFindingText(finding) {
       const host=$('findingText');
-      finding ||= {}; // An empty finding set can still have global unknowns.
-      const fields=[['reason','本条解释（模型主张）',finding.reason],
-        ['unknown','本条未证实事项',finding.unknown],
-        ['hypothesis','机制假设（尚未证实）',finding.hypothesis],
-        ['recommendation','优化建议（效果需另验）',finding.recommendation],
-        ['unexplained','整份报告的未解释事项 / 限制',graph.document.unexplained]];
+      const selected = finding ? [finding] : graph.document.findings;
+      const fields = selected.flatMap(f => [
+        ['reason', f.id + ' · ' + f.title + ' · 本条解释（模型主张）', f.reason],
+        ['unknown', f.id + ' · 本条未证实事项', f.unknown],
+        ['hypothesis', f.id + ' · 机制假设（尚未证实）', f.hypothesis],
+        ['recommendation', f.id + ' · 优化建议（效果需另验）', f.recommendation],
+      ]);
+      fields.push(['unexplained','整份报告的未解释事项 / 限制',graph.document.unexplained]);
       for(const [field,label,value] of fields) {
         if(!value || !value.length) continue;
         const detail=element('details','',host);
@@ -692,29 +410,86 @@
       if(row.pool_returns_query) button('独立查同一时间窗内所有 agent 的返回（可加行为关键词；不认证验证）',box,()=>query(row.pool_returns_query));
     }
     function showNode(n) {
-      $("reasonTitle").textContent = n.key;
+      selectTab("detail");
+      const coordinate = n.coordinate;
+      const members = n.claims || [];
+      $("reasonTitle").textContent = coordinate.key;
       $("reason").replaceChildren();
-      const members=n.members||[n];
-      element("span", members.every(m=>m.generated_context) ? "自动证据节点，模型未归因" : "模型主张，不是因果认证", $("reason"), "badge");
-      element("p", `历史范围：${n.since || "未限定起点"} → ${n.at}；不是完整文件快照`, $("reason"), "small");
-      button("独立打开节点", $("reason"), () => {
-        $("kind").value = n.kind;
-        $("key").value = n.key;
-        $("at").value = n.at;
-        $("since").value = n.since || "";
-        return query(request());
-      });
-      for(const member of members) {
-        const box=element('section','',$('reason'),'row');
-        box.dataset.claim=member.id;
-        element('strong',`${member.id} · ${member.generated_context?'未归因的原生端点':{origin:'问题进入',propagated:'问题保留',context:'输入/背景',repaired:'修复',unknown:'未定'}[member.role]}`,box);
-        element('p',member.reason,box);
-        const time=graph.evidence_review?.timeline.find(t=>t.node===member.id);
-        if(time) element('p',`所引记录实际发生于 ${time.first} → ${time.last}（不是查询截止；不认证原因）`,box,'small muted');
-        for(const note of graph.evidence_review?.actor_notes||[]) {
-          if(note.node===member.id) element('p',`执行者待核：所引原生目标写的实际actor是 ${note.actual_actors.join(', ')}，不是这个节点。协调责任须另证。`,box,'badge');
+      $("requestContext").replaceChildren();
+      $("original").textContent = "";
+      $("rawRecord").textContent = "";
+      delete $("rawRecord").dataset.ref;
+      $("rawRecord").closest("details").ontoggle = null;
+      const root = tree.model && n === tree.model.root;
+      element("span", root ? "截至观察结束的历史范围" : coordinate.kind === "file" ? "历史文件范围" : "历史 Agent 范围", $("reason"), "badge");
+      element("p", (coordinate.since || "未限定起点") + " → " + coordinate.at, $("reason"), "meta-line");
+      if (root) element("p", "起点用于追溯历史，不认证最新文件内容有问题。", $("reason"), "small muted");
+      const queryCoordinate = (view) => {
+        const q = { op: coordinate.kind, key: coordinate.key, at: coordinate.at, view, limit: 20 };
+        if (coordinate.since) q.since = coordinate.since;
+        return query(q);
+      };
+      button("查该范围原文", $("reason"), () => queryCoordinate("records"));
+      if (coordinate.kind === "file") button("查看原生差异", $("reason"), () => queryCoordinate("changes"));
+      else button("查看已收输入", $("reason"), () => queryCoordinate("inputs"));
+      if (n.id && !n.reference) button("展开其他上游", $("reason"), () => tree.expand(n));
+      if (n.row) {
+        const box = element("section", "", $("reason"), "row");
+        const evidenceAt = n.parent?.coordinate.at || coordinate.at;
+        element("strong", ({ read: "读取输入", write: "写入关系", dispatch: "父 Agent 派发" })[n.row.relation] +
+          " · " + (n.row.strength === "confirmed" ? "已核" : "候选") +
+          " · " + (n.row.source === "model_review" ? "模型复核" : "原生索引"), box);
+        element("p", n.row.claim || "此边表示索引中的历史关系，不认证问题因果。", box);
+        element("div", n.row.at + " · " + n.row.id, box, "meta-line");
+        if (n.row.relation === "dispatch") {
+          if (n.row.identity_known_at_cutoff === false)
+            element("p", "本次关系查询截止时，子 Agent 身份尚未知。", box, "badge");
+          if (n.row.identity_basis) element("p", n.row.identity_basis, box);
+          element("div", "派发发生：" + (n.row.occurrence_at || n.row.at || "时间未知") +
+            "；身份确认：" + (n.row.confirmed_at || "未记录"), box, "meta-line");
+          if (n.parent) element("div", "关系查询截至：" + n.parent.coordinate.at, box, "meta-line");
+          if (n.row.status) element("div", "关系状态：" + n.row.status, box, "meta-line");
         }
-        for(const ref of member.evidence||[]) button(ref,box,()=>open(ref,member.at));
+        for (const ref of n.row.evidence || []) button(ref, box, () => open(ref, evidenceAt));
+      }
+      for (const anchor of n.repairAnchors || []) {
+        const box = element("section", "", $("reason"), "row");
+        box.dataset.repairAnchor = anchor.row.id;
+        const row = anchor.row;
+        element("strong", "目标修改依据 · " + (row.strength === "candidate" ? "候选" : "已核") +
+          " · " + (row.source === "model_review" ? "模型复核" : "原生索引"), box);
+        element("div", "问题 " + [...anchor.findings].join(" / ") + " · " + row.at, box, "meta-line");
+        element("p", row.claim, box);
+        for (const ref of row.evidence || []) button(ref, box, () => open(ref, coordinate.at));
+      }
+      for (const anchor of n.anchors || []) {
+        const box = element("section", "", $("reason"), "row");
+        const row = anchor.row;
+        element("strong", anchor.finding + " · 本文件历史写入依据 · " +
+          (row.strength === "candidate" ? "候选" : "已核") + " · " +
+          (row.source === "model_review" ? "模型复核" : "原生索引"), box);
+        element("p", row.claim, box);
+        element("div", row.at + " · " + row.id, box, "meta-line");
+        element("p", "这条入边支持历史文件范围的主张；可正常展开写者继续查证。", box, "small muted");
+        for (const ref of row.evidence || []) button(ref, box, () => open(ref, coordinate.at));
+      }
+      if (!members.length) element("p", "此节点没有模型归因。可继续展开上游或查看原始依据。", $("reason"), "small muted");
+      for (const member of members) {
+        const box = element("section", "", $("reason"), "reason-claim");
+        box.dataset.claim = member.id;
+        element("strong", member.id + " · " + (member.generated_context ? "未归因的原生端点" :
+          ({origin:"问题进入",propagated:"问题保留",context:"输入/背景",repaired:"修复",unknown:"未定"})[member.role]) + " · 模型主张", box);
+        element("p", member.reason, box);
+        element("p", "原稿范围：" + (member.since || "未限定起点") + " → " + member.at, box, "meta-line");
+        button("打开原稿节点范围", box, () => query(member.scope ?
+          { op: member.kind, scope: member.scope } :
+          { op: member.kind, key: member.key, at: member.at, since: member.since || undefined }));
+        const time = graph?.evidence_review?.timeline.find(t => t.node === member.id);
+        if (time) element("p", "引用实际发生于 " + time.first + " → " + time.last, box, "small muted");
+        for (const note of graph?.evidence_review?.actor_notes || []) {
+          if (note.node === member.id) element("p", "执行者待核：" + note.actual_actors.join(", ") + "；协调责任须另证。", box, "badge");
+        }
+        for (const ref of member.evidence || []) button(ref, box, () => open(ref, member.at));
       }
     }
     async function loadGraph(data) {
@@ -731,7 +506,14 @@
       $('requestContext').replaceChildren();
       $("original").textContent = "";
       $("rawRecord").textContent = "";
+      delete $("rawRecord").dataset.ref;
+      $("rawRecord").closest("details").ontoggle = null;
+      $("records").replaceChildren();
+      $("status").textContent = "";
+      $("manualTools").open = false;
       $("findings").replaceChildren();
+      $("findings").disabled = false;
+      element("option", "全部问题", $("findings")).value = "";
       for (const f of data.document.findings) {
         const option = element("option", `${f.id} · ${f.title}`, $("findings"));
         option.value = f.id;
@@ -740,13 +522,18 @@
       $("at").value = target.at;
       $("since").value = target.since || "";
       $("key").value = target.file;
-      draw();
+      tree.loadReport(data);
+      tree.select([...tree.model.nodes.values()].find(n => n !== tree.model.root &&
+        n.claims.some(c => c.role === "origin")) || tree.model.root);
+      renderReportPanels();
+      updateTreeSummary();
       await reloadTrace();
     }
     async function reload() {
       const info = await api("/api/info");
       $("info").textContent =
-        `${info.sources} 个登记源 · ${info.records} 条原始记录 · 新内核（独立入口）`;
+        `${config.project ? config.project + " · " : ""}${info.sources} 个登记源 · ${info.records} 条原始记录`;
+      if (!graph && !$("at").value && info.latest_at) $("at").value = info.latest_at;
       $("reports").replaceChildren();
       for (const r of info.reports) {
         const option = element("option", r.id, $("reports"));
@@ -760,6 +547,8 @@
         "/api/trace" +
           (graph ? "?session=" + encodeURIComponent(graph.trace_session) : ""),
       );
+      tree.markSeen(trace);
+      tree.render();
       $("trace").replaceChildren();
       for (const run of trace) {
         const box = element("details", "", $("trace"));
@@ -779,6 +568,7 @@
         );
         for (const f of run.frames)
           button(`帧 ${f.offset}`, box, async () => {
+            selectTab("detail");
             $('requestContext').replaceChildren();
             $('rawRecord').textContent='';
             delete $('rawRecord').dataset.ref;
@@ -820,13 +610,63 @@
         );
         await reload();
       });
-    $("findings").onchange = draw;
+    const tree = new InquiryEvidenceTree.InquiryTree({
+      host: $("graph"), api, onSelect: showNode, onChange: updateTreeSummary,
+    });
+    // One renderer for report-seeded and manually queried neighbors.
+    window.inquiryTree = tree;
+    function updateTreeSummary() {
+      const count = tree.model?.visible().length || 0;
+      $("treeSummary").textContent = count ? count + " 个历史节点 · 向左追溯上游 · Ctrl + 滚轮缩放" : "从右侧根节点向左展开";
+    }
+    $("findings").onchange = () => {
+      tree.setFinding($("findings").value);
+      tree.select([...tree.model.nodes.values()].find(n => n !== tree.model.root &&
+        n.claims.some(c => c.role === "origin")) || tree.model.root);
+      renderReportPanels();
+      updateTreeSummary();
+    };
+    $("startTree").onclick = () => guard(async () => {
+      if ($("kind").value === "pool") throw Error("全池搜索没有单一根，请选择文件或 Agent。");
+      graph = null;
+      $("findings").replaceChildren();
+      element("option", "手动探索", $("findings")).value = "";
+      $("findings").disabled = true;
+      $("findingText").replaceChildren();
+      $("gaps").replaceChildren();
+      $("gapCount").textContent = "0";
+      await tree.start({ kind: $("kind").value, key: $("key").value, at: $("at").value, since: $("since").value || null });
+      updateTreeSummary();
+    });
+    $("zoomIn").onclick = () => tree.setZoom(tree.zoom * 1.2);
+    $("zoomOut").onclick = () => tree.setZoom(tree.zoom / 1.2);
+    $("fit").onclick = () => tree.fit();
+    $("collapse").onclick = () => tree.collapse();
+    $("restorePaths").onclick = () => tree.paths();
+    $("toggleInspector").onclick = () => $("layout").classList.toggle("hide-inspector");
+    $("mobileRail").onclick = () => $("rail").classList.toggle("mobile-open");
+    $("showAudit").onclick = () => selectTab("audit");
+    document.querySelectorAll("[data-tab]").forEach(e => e.onclick = () => selectTab(e.dataset.tab));
+    $("loadId").onclick = () => guard(async () => {
+      if (!$("reportId").value.trim()) throw Error("请输入 report_id。");
+      await loadGraph(await api("/api/report?id=" + encodeURIComponent($("reportId").value.trim())));
+    });
+    if (innerWidth < 1250) $("layout").classList.add("hide-inspector");
+    new ResizeObserver(() => { if (tree.model) tree.render(); }).observe($("graph"));
     guard(async () => {
       await reload();
-      const id = new URLSearchParams(location.search).get("report");
+      const params = new URLSearchParams(location.search);
+      const id = params.get("report") || params.get("report_id") || config.report_id;
       if (id)
         await loadGraph(await api("/api/report?id=" + encodeURIComponent(id)));
-      else draw();
+      else {
+        tree.render();
+        if (params.has("probe")) {
+          $("status").className = "error small";
+          $("status").textContent = "旧版报告未载入，需 inquiry report_id。请在调查结论中选择报告，或输入 report_id。";
+        }
+      }
     });
   </script>
+</body>
 </html>

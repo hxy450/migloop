@@ -16,10 +16,11 @@ import os
 import re
 import threading
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
 from . import adapters, atoms, atoms_collect, atoms_text, audit, crosschain, filestory
-from .render import build_html, load_asset, load_template
+from .render import build_html, load_template
 
 
 class SessionLookupError(Exception):
@@ -756,41 +757,51 @@ def report_html(path: str) -> str:
     return build_html(report_trace(path), load_template())
 
 
-def fixchain_light(path: str) -> dict[str, Any]:
-    """链页首屏:入口列表只从链缓存拿(没缓存先空着,页面拿到 fixchain-data 自己填)。"""
-    pool = _frozen_pool()
-    scope: dict[str, Any] | None = None
-    if pool is not None:
-        scope = observation_scope(path)
-        path = str(scope["anchor"])
-    data = extract_trace(path)
-    meta = data.get("meta") or {}
-    fmt = _fmt_of(data)
+def inquiry_database(path: str) -> str:
+    """Snapshot index for the selected source pool; no legacy ledger construction.
+
+    Reuse is keyed by source registration and stats, never SQLite mtime (queries
+    save handles). A changed source set gets another index, not a rewritten report.
+    """
+    from .cc_sources import all_source_paths
+    from .inquiry.store import Store, describe_source, digest, encode
+
+    scope = observation_scope(path)
+    anchor = str(scope["anchor"])
+    fmt, cwd = _root_signature(anchor)
     if fmt not in _ATOM_FORMATS:
-        raise SessionLookupError(f"返修链路暂不支持 {fmt} 会话")
-    cwd = str(meta.get("cwd") or "")
-    cwd_norm = cwd.replace("\\", "/").rstrip("/")
-    fixes: list[dict[str, Any]] = []
-    fixers: list[dict[str, Any]] = []
+        raise SessionLookupError(f"时间证据树暂不支持 {fmt} 会话")
+    pool = _frozen_pool()
+    if pool:
+        _validate_frozen_tree(pool)
+    roots = scope["roots"] if scope["mode"] == "frozen_anchor" else [
+        *prior_roots(fmt, anchor, cwd or ""), anchor]
+    paths = set()
+    for root in roots:
+        if fmt == "claude":
+            paths.update(all_source_paths(root))
+        else:
+            paths.update(item["path"] for item in adapters.get("codex").discover_rollout_tree(
+                root, sessions_root=pool))
+    registrations = []
+    signature = []
+    for source_path in sorted({os.path.abspath(p) for p in paths}):
+        if pool:
+            source_path = _frozen_path(source_path, pool)
+        item = Path(source_path)
+        name = item.relative_to(pool).as_posix() if pool else item.as_posix()
+        stat = item.stat()
+        registrations.append((item, name))
+        signature.append((name, str(item), stat.st_size, stat.st_mtime_ns))
+    fingerprint = digest(encode(["inquiry/index/5", signature]).encode())
+    cache = Path(os.environ.get("MIGLOOP_CACHE_DIR") or
+                 os.path.join(os.environ.get("LOCALAPPDATA") or os.path.expanduser("~"), "Migloop"))
+    database = cache / "inquiry" / (fingerprint + ".sqlite")
     with _LOCK:
-        hit = _FIXCHAIN_CACHE.get(path)
-    if (scope is None or scope["mode"] != "frozen_anchor") and hit is not None and ("frozen_pool", pool) in hit[0]:
-        fixes, fixers = filestory.chain_entry_lists(list(hit[1].get("chains") or []))
-    later_paths = later_roots(fmt, path, cwd)
-    later = None
-    if later_paths:
-        lsid = root_sid8(fmt, later_paths[0])
-        if lsid:
-            later = {"sid8": lsid, "url": f"/api/insight1/fixchain/{lsid}"}
-    sid = str(meta.get("session_id") or root_sid8(fmt, path))
-    payload = {
-        "sid8": sid[:8], "sid": sid,
-        "project": next((x for x in reversed(cwd_norm.split("/")) if x), ""),
-        "fixes": fixes, "fixers": fixers, "later": later,
-    }
-    if scope is not None and scope["mode"] == "frozen_anchor":
-        payload["observation_scope"] = scope
-    return payload
+        store = Store(database) if database.exists() else Store.build(
+            database, [describe_source(item, name) for item, name in registrations])
+        store.close()
+    return str(database)
 
 
 def probe_payload(path: str, run_dir: str) -> dict[str, Any]:
@@ -805,13 +816,19 @@ def probe_payload(path: str, run_dir: str) -> dict[str, Any]:
 
 
 def fixchain_html(path: str) -> str:
-    payload = fixchain_light(path)
-    # The default explorer has one entity/time contract, independent of the
-    # loaded report schema. Keep the legacy template only for legacy consumers.
-    encoded = json.dumps(payload, ensure_ascii=False).replace("<", "\\u003c")
-    return (load_asset("time_tree.html")
-            .replace("__TIME_TREE_CORE__", load_asset("time_tree_core.html"))
-            .replace("__FIXCHAIN_JSON__", encoded))
+    from .inquiry.store import describe_source
+    from .inquiry.web import render_page
+
+    scope = observation_scope(path)
+    anchor = str(scope["anchor"])
+    fmt, cwd = _root_signature(anchor)
+    if fmt not in _ATOM_FORMATS:
+        raise SessionLookupError(f"时间证据树暂不支持 {fmt} 会话")
+    owner = describe_source(anchor, anchor).agent
+    sid = owner.split(":", 1)[0] if owner else root_sid8(fmt, anchor)
+    return render_page(f"/api/insight1/inquiry/{sid}",
+                       {"sid": sid, "project": (cwd or "").rsplit("/", 1)[-1],
+                        "observation_scope": scope})
 
 
 # ═══════════════ 两原子端点(JSON / 文本) ═══════════════

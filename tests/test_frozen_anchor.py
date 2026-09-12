@@ -185,10 +185,14 @@ def test_stage_report_and_fixchain_high_level_views_use_anchor(tmp_path, monkeyp
            {k: v for k, v in anchor_report.items() if k != "observation_scope"}
     assert early_report["observation_scope"]["requested_root"] == str(early)
     assert "cross_hint" not in early_report["audit"]
-    light = service.fixchain_light(str(early))
-    assert light["sid8"] == service.fixchain_light(str(anchor))["sid8"]
-    assert light["fixes"] == [] and light["fixers"] == []
-    assert light["observation_scope"]["requested_root"] == str(early)
+    def config(path):
+        page = service.fixchain_html(str(path))
+        return json.loads(page.split("window.INQUIRY_CONFIG = ", 1)[1].split(";</script>", 1)[0])
+
+    early_config, anchor_config = config(early), config(anchor)
+    assert early_config["sid"] == anchor_config["sid"]
+    assert early_config["api_base"] == anchor_config["api_base"]
+    assert early_config["observation_scope"]["requested_root"] == str(early)
 
 
 def test_fixchain_cache_tracks_rebuilt_ledger_not_only_root_files(tmp_path, monkeypatch):

@@ -129,7 +129,7 @@ def http_server(tmp_path):
             body = response.read().decode()
             return response.status, body if path.split("?", 1)[
                 0
-            ] == "/" else json.loads(body)
+            ] in ("/", "/tree.js") else json.loads(body)
         finally:
             connection.close()
 
@@ -150,7 +150,9 @@ def test_http_uses_same_kernel_and_manual_queries_do_not_forge_model_visits(
     assert status == 200 and data == engine.query(q)
     assert call("/api/trace")[1] == []
     status, page = call("/")
-    assert status == 200 and "原因是模型主张" in page
+    assert status == 200 and "原因仍是模型主张" in page
+    assert "__INQUIRY_CONFIG__" not in page and 'src="/tree.js"' in page
+    assert call("/tree.js")[0] == 200
     assert call("/?report=example")[0] == 200
     assert call("/api/query", q, "https://not-the-local-page.example")[0] == 403
     assert call("/api/query", [q])[0] == 400
@@ -206,7 +208,10 @@ def test_explicit_native_dispatch_not_directory_or_message_proximity(tmp_path):
     )
     rows = engine.query({"op": "agent", "key": "a", "at": ts(5)})["dispatches"]
     assert len(rows) == 1 and rows[0]["child"] == "b"
-    assert not engine.query({"op": "agent", "key": "a", "at": ts(1)})["dispatches"]
+    pending = engine.query({"op": "agent", "key": "a", "at": ts(1)})["dispatches"]
+    assert len(pending) == 1 and pending[0]["strength"] == "candidate"
+    assert pending[0]["result"] is None and pending[0]["identity_known_at_cutoff"] is False
+    assert not engine.query({"op": "agent", "key": "a", "at": ts(0)})["dispatches"]
     engine.store.close()
 
 

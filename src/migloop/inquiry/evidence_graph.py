@@ -11,7 +11,10 @@ from .store import iso, timestamp
 
 def attach(engine, finding, target):
     if "edges" in finding:
-        return finding
+        return {
+            **finding,
+            "edges": finding["edges"] + finding.get("reviewed_edges", []),
+        }
     cutoff = timestamp(target["at"], required=True)
     nodes = [dict(node) for node in finding.get("nodes", [])]
     refs, citations = set(), {}
@@ -29,7 +32,7 @@ def attach(engine, finding, target):
             return engine.store.handle_value(node["scope"], "s")
         return node
 
-    def endpoint(kind, key, at, evidence):
+    def endpoint(kind, key, at, evidence, observed_at=None):
         matches = []
         for node in nodes:
             value = coordinates(node)
@@ -56,7 +59,13 @@ def attach(engine, finding, target):
             # the edge from a later claim citing this actual write (or read).
             return min(matches, key=lambda item: item[:2])[2]["id"]
         scope = engine.store.handle(
-            "s", {"kind": kind, "key": key, "at": iso(at), "since": None}
+            "s",
+            {
+                "kind": kind,
+                "key": key,
+                "at": iso(observed_at if observed_at is not None else at),
+                "since": None,
+            },
         )
         identity = "recorded-" + scope
         while any(n.get("id") == identity for n in nodes):
@@ -96,4 +105,26 @@ def attach(engine, finding, target):
                 "claim": f"原生记录：{operation['op']} @ {iso(operation['at'])}；仅认证历史关系，不证明问题传播。",
             }
         )
-    return {**finding, "nodes": nodes, "edges": edges}
+    for dispatch in engine.dispatches(cutoff):
+        evidence = [dispatch[k] for k in ("request", "result") if dispatch[k]]
+        if not refs.intersection(evidence):
+            continue
+        observed_at = min(dispatch["confirmed_at"], cutoff)
+        edges.append(
+            {
+                "from": endpoint(
+                    "agent", dispatch["parent"], dispatch["at"], evidence, observed_at
+                ),
+                "to": endpoint(
+                    "agent", dispatch["child"], dispatch["at"], evidence, observed_at
+                ),
+                "relation": "dispatch",
+                "evidence": evidence,
+                "claim": "原生派发；不认证问题内容传播。",
+            }
+        )
+    return {
+        **finding,
+        "nodes": nodes,
+        "edges": edges + finding.get("reviewed_edges", []),
+    }

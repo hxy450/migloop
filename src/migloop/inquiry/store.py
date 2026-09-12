@@ -738,49 +738,42 @@ class Store:
         return candidates[0] if candidates else normalized
 
 
+def describe_source(path, name):
+    """Read native ownership once; directories never establish agent identity."""
+    path = Path(path)
+    agent, cwd = None, ""
+    if path.suffix == ".jsonl":
+        with path.open("r", encoding="utf-8-sig", errors="replace") as stream:
+            for _ in range(20):
+                line = stream.readline()
+                if not line:
+                    break
+                try:
+                    obj = json.loads(line)
+                except ValueError:
+                    continue
+                if not isinstance(obj, dict):
+                    continue
+                if obj.get("type") == "session_meta" and isinstance(
+                    obj.get("payload"), dict
+                ):
+                    agent = obj["payload"].get("id")
+                    cwd = obj["payload"].get("cwd") or ""
+                    break
+                if obj.get("sessionId"):
+                    agent = (
+                        str(obj["sessionId"]) + ":" + str(obj.get("agentId") or "main")
+                    )
+                    cwd = obj.get("cwd") or ""
+                    break
+    return Source(
+        str(path), name, agent, cwd, "auto" if path.suffix == ".jsonl" else "text"
+    )
+
+
 def discover(pool):
     """Register native owners only. A directory hierarchy is never a dispatch edge."""
     root = Path(pool).resolve()
     for path in sorted(root.rglob("*")):
-        if not path.is_file() or path.suffix not in (
-            ".jsonl",
-            ".md",
-            ".json",
-            ".py",
-            ".txt",
-        ):
-            continue
-        agent, cwd = None, ""
-        if path.suffix == ".jsonl":
-            with path.open("r", encoding="utf-8", errors="replace") as stream:
-                for _ in range(20):
-                    line = stream.readline()
-                    if not line:
-                        break
-                    try:
-                        obj = json.loads(line)
-                    except ValueError:
-                        continue
-                    if not isinstance(obj, dict):
-                        continue
-                    if obj.get("type") == "session_meta" and isinstance(
-                        obj.get("payload"), dict
-                    ):
-                        agent = obj["payload"].get("id")
-                        cwd = obj["payload"].get("cwd") or ""
-                        break
-                    if obj.get("sessionId"):
-                        agent = (
-                            str(obj["sessionId"])
-                            + ":"
-                            + str(obj.get("agentId") or "main")
-                        )
-                        cwd = obj.get("cwd") or ""
-                        break
-        yield Source(
-            str(path),
-            path.relative_to(root).as_posix(),
-            agent,
-            cwd,
-            "auto" if path.suffix == ".jsonl" else "text",
-        )
+        if path.is_file() and path.suffix in (".jsonl", ".md", ".json", ".py", ".txt"):
+            yield describe_source(path, path.relative_to(root).as_posix())

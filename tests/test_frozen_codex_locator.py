@@ -52,7 +52,9 @@ def test_meta_fallback_never_searches_external_or_subagent_files(pool, tmp_path)
 
 def test_page_canonical_sid_roundtrips_all_frozen_api_routes(pool, monkeypatch):
     path = str(pool / NAMES[1])
-    sid = service.fixchain_light(path)["sid"]
+    page = service.fixchain_html(path)
+    sid = IDS[1]
+    assert f'"sid":"{sid}"' in page
     assert sid == IDS[1] and service.locate_session(sid) == path
     monkeypatch.setattr(service, "probe_payload", lambda resolved, run: {"resolved": resolved, "run": run})
     server = serve.make_server(sid, "127.0.0.1", 0, {})
@@ -60,7 +62,7 @@ def test_page_canonical_sid_roundtrips_all_frozen_api_routes(pool, monkeypatch):
     base = f"http://127.0.0.1:{server.server_address[1]}"
     try:
         status, body, _ = _get(base, "/api/insight1/fixchain/" + sid)
-        assert status == 200 and f'"sid": "{sid}"' in body.decode("utf-8")
+        assert status == 200 and f'"sid":"{sid}"' in body.decode("utf-8")
         for prefix in ("/api/insight1/fixchain-data/", "/api/insight1/atom/"):
             status, body, _ = _get(base, prefix + sid + ("/index" if "atom" in prefix else ""))
             assert status == 200 and isinstance(json.loads(body), dict)

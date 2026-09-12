@@ -1,4 +1,4 @@
-"""Explicit opt-in entry point. The normal migloop CLI and page stay unchanged."""
+"""Standalone CLI/MCP for the inquiry engine shared with the session tree page."""
 
 import argparse
 import json

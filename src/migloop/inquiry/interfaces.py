@@ -6,8 +6,7 @@ import inspect
 import json
 import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from pathlib import Path
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import urlparse
 
 from .engine import Engine
 from .report import check
@@ -45,7 +44,7 @@ inputs的tool_return_total/tool_return_query单列全部已记录工具返回入
 5. 把事实、竞争解释和机制假设分开。全池出现不证明交付；局部搜索无结果不证明全阶段没有检查。
 “检查报告只提结构”只能证明报告这么写，不能据此认证“仅做结构检查/确认漏验”。
 声称某阶段没有成功回执/输入/检查前，在该阶段完整范围搜索并展开正反例；写前范围不能用于否定写后检查。停止时对照原文核结论中的确定性句子，不把hypothesis搬成最终摘要中的事实。
-6. 最后提交节点原因和证据即可，不要手工拼edges。服务端从这些引用核回原生读写、自动连线；补出的中性端点不是你认定有问题的节点。
+6. 最后提交节点原因和证据，通常不必手工拼edges。服务端从这些引用核回原生读写与派发、自动连线；补出的中性端点不是你认定有问题的节点。
 你只需给真正要归因的节点填scope、role、reason、evidence。原文引用e-...、agent范围s-agent-...、文件范围s-file-...各有不同类型，不能换前缀猜ID。
 mechanical_status只核坐标/引用/原生关系及原生写对账，不是正确率、全文覆盖或因果认证。needs_revision须处理错误，不靠删证据回避。
 机械通过也不证明因果正确；“没查到检查”不能写成“确认遗漏检查”，这也适用于最后的简短摘要。
@@ -117,16 +116,32 @@ unexplained: [尚未解释的修改或未决效应]
 reviewed:
   - {ref: "e-调用", effect: no_target_change, reason: 原文为什么仅查询或改了别的文件}
   - {ref: "e-调用", effect: unknown, reason: 缺哪份执行/内容证据，当前无法确认}
-省略edges时系统只按已引用原生操作生成历史连接；未知脚本仍不变成写边，独立搜到spec也不变成曾被生成者读取。
+省略edges时系统只按已引用原生操作生成历史连接；未知脚本不会自动变成写边，独立搜到spec也不变成曾被生成者读取。
 relations返回的link及两端scope可以核关系，但不要求你为这些边手工创建中间节点。
 节点role只用origin/propagated/context/repaired/unknown。未知关系可省略边并写unknown，不编造link。
 origin是写出坏结果的环节，不是发现问题/提出修复的环节；propagated是仍保留问题的节点，不是已经修好的文件。发现并修复问题的检查者用repaired；只提供任务/契约/证据用context。判断不了则unknown。
 初版按当时契约正确、后续只是新增测试/平台要求时，初版节点用context；不要一边说不是生成错，一边把初版标为问题节点。
 仍可显式给target:{file,at,since}、节点{kind,key,at}，或边{relation,evidence:[请求,返回]}；
 但不能同一对象混合scope与显式坐标，或link与显式relation/evidence。时间必须涵盖实际引用。
-节点截止必须涵盖引用。read从file到agent、write从agent到file；没有原生依据就保留未核关系，不编边。
+节点截止必须涵盖引用。read从file到agent、write从agent到file；没有实际依据就保留未核关系，不编边。
 节点scope若带since则下界也保留；不要拿修复区间scope引用生成期事件。需要更早证据时打开相应历史范围。连边按实际操作时刻核两端区间，而不是按报告排列顺序接线。
 多个修改可合并原因，但未解释的必须说明；引用可定位与原因正确不同。submit保存同一调查员的原稿，返回页面report_id。
+
+时间树与模型自主调查：
+file/agent可用view:neighbors按当前scope分页展开上游（direction:downstream看下游），与页面点击共用一份关系投影。模型不用维护via；独立查阅不制造读写边。
+submit另给path_status及每个问题节点的路径状态。complete只表示已引用的历史操作能按时间连到目标，不认证问题内容连续传播或因果正确；needs_path不能说已完成调用链。
+未闭合时可自由补查并引用缺的中间读写/派发，或明确保留unknown；不要为了画树发明证据。原始查询顺序与最后的证据路径分别保存，不能把整理后的树叫作模型实际查阅顺序。
+少数未识别脚本效应，经你核原文后可在finding.reviewed_edges补报告专属虚线：
+  - from: author
+    to: output
+    relation: write
+    claim: 模型复核这次脚本对该文件写入；说明依据及不确定性
+    evidence: ["e-原始记录"]
+    review:
+      at: "原始事件实际时刻（含时区），不是节点查询截止"
+      quotes: [{ref: "e-原始记录", text: "该记录中逐字可核的命令或回执摘录"}]
+两端必须是真实file/agent节点且时间范围覆盖事件。摘录与时刻核回原文不等于语义成立：补边始终是candidate/model_review，不写入事实索引；无摘录或时间错的边不会画。
+带report_id（可另带finding）的neighbors包含所载报告的虚线补边，不带则只看索引。文件历史根不沿用修复区间since；原稿节点的since仍保留，不能借画图越界引用。
 """
 
 
@@ -210,8 +225,14 @@ def build_mcp(path):
                     "unverified_edges",
                     "semantic_verified",
                     "mechanical_status",
+                    "path_status",
                 )
             } | {"nodes": len(graph["nodes"]), "bound_edges": len(graph["edges"])}
+            summary["paths"] = [
+                {k: p[k] for k in ("finding", "node", "status", "diagnostic")}
+                for p in graph["tree"]["paths"]
+            ]
+            summary["path_note"] = graph["tree"]["note"]
             summary["resolution_hints"] = {
                 issue["ref"]: {
                     k: v for k, v in issue["resolution_hint"].items() if k != "note"
@@ -334,6 +355,8 @@ def build_mcp(path):
 
 
 def make_http(path, port=0):
+    from .web import dispatch_http, render_page
+
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *_):
             pass
@@ -352,7 +375,7 @@ def make_http(path, port=0):
             if urlparse(self.path).path == "/":
                 self.send(
                     200,
-                    Path(__file__).with_name("page.html").read_text(encoding="utf-8"),
+                    render_page(),
                     "text/html; charset=utf-8",
                 )
                 return
@@ -378,62 +401,6 @@ def make_http(path, port=0):
                 self.send(400, encode({"error": str(exc)}))
 
         def dispatch(self, data):
-            store = Store(path)
-            engine = Engine(store)
-            parsed = urlparse(self.path)
-            try:
-                if parsed.path == "/api/query" and data is not None:
-                    # Manual UI exploration must not rewrite the model's recorded route.
-                    output = engine.query(data)
-                elif parsed.path == "/api/report" and data is not None:
-                    output = check(engine, data["document"], save=True)
-                elif parsed.path == "/api/report" and data is None:
-                    identity = parse_qs(parsed.query).get("id", [""])[0]
-                    rows = store.rows(
-                        "SELECT request,data FROM runs WHERE id=? AND kind='report'",
-                        (identity,),
-                    )
-                    if not rows:
-                        raise ValueError("report not found")
-                    saved = json.loads(rows[0]["data"])
-                    output = check(
-                        Engine(store, session=saved["trace_session"]),
-                        rows[0]["request"],
-                    )
-                    output["report_id"] = identity
-                elif parsed.path == "/api/trace" and data is None:
-                    output = engine.trace(
-                        parse_qs(parsed.query).get("session", [None])[0]
-                    )
-                elif parsed.path == "/api/frame" and data is None:
-                    args = parse_qs(parsed.query)
-                    rows = store.rows(
-                        "SELECT text FROM frames WHERE run=? AND offset=?",
-                        (args.get("id", [""])[0], int(args.get("offset", ["0"])[0])),
-                    )
-                    if not rows:
-                        raise ValueError("emitted frame not found")
-                    output = {"text": rows[0]["text"]}
-                elif parsed.path == "/api/info" and data is None:
-                    output = {
-                        "sources": store.db.execute(
-                            "SELECT COUNT(*) FROM sources"
-                        ).fetchone()[0],
-                        "records": store.db.execute(
-                            "SELECT COUNT(*) FROM records"
-                        ).fetchone()[0],
-                        "reports": store.rows(
-                            "SELECT id FROM runs WHERE kind='report' ORDER BY rowid DESC"
-                        ),
-                        "guide": GUIDE,
-                    }
-                else:
-                    self.send(404, encode({"error": "route not found"}))
-                    return
-                self.send(200, encode(output))
-            except (ValueError, TypeError, KeyError, IndexError, OSError) as exc:
-                self.send(400, encode({"error": str(exc)}))
-            finally:
-                store.close()
+            self.send(*dispatch_http(path, self.path, data))
 
     return ThreadingHTTPServer(("127.0.0.1", port), Handler)

@@ -11,6 +11,7 @@ from .engine import bounds, in_scope
 from .evidence_graph import attach
 from .evidence_review import review
 from .store import digest, encode, iso, timestamp
+from .tree import evidence_paths, reviewed_edge
 
 
 def parse(text):
@@ -112,6 +113,7 @@ def check(engine, text, *, save=False):
             "changes",
             "nodes",
             "edges",
+            "reviewed_edges",
             "unknown",
             "hypothesis",
             "recommendation",
@@ -128,6 +130,11 @@ def check(engine, text, *, save=False):
         original_node_ids = {
             n.get("id") for n in finding.get("nodes", []) if isinstance(n, dict)
         }
+        if not isinstance(finding.get("reviewed_edges", []), list) or any(
+            not isinstance(e, dict) or "review" not in e
+            for e in finding.get("reviewed_edges", [])
+        ):
+            raise ValueError("reviewed_edges must contain explicit relation reviews")
         automatic_edges = "edges" not in finding
         finding = attach(engine, finding, target)
         for field in ("title", "reason", "unknown", "hypothesis", "recommendation"):
@@ -238,6 +245,7 @@ def check(engine, text, *, save=False):
                 "evidence",
                 "claim",
                 "link",
+                "review",
             }:
                 raise ValueError("invalid edge fields")
             if "link" in edge:
@@ -262,6 +270,7 @@ def check(engine, text, *, save=False):
             reason = "node missing"
             bound = None
             supporting_request = None
+            supporting_result = None
             if origin and destination:
                 relation = edge.get("relation")
                 op = {
@@ -283,9 +292,20 @@ def check(engine, text, *, save=False):
                     if n.get("since") is not None
                 ]
                 start = max(starts) if starts else None
+                dispatch_edge = (
+                    "review" not in edge
+                    and relation == "dispatch"
+                    and origin["kind"] == destination["kind"] == "agent"
+                )
+                observed_at = (
+                    timestamp(target["at"], required=True) if dispatch_edge else cutoff
+                )
                 issue_count = len(issues)
                 refs = verify_refs(
-                    edge.get("evidence", []), cutoff, f"{fid}.edge", scope_kind="edge"
+                    edge.get("evidence", []),
+                    observed_at,
+                    f"{fid}.edge",
+                    scope_kind="edge",
                 )
                 if len(issues) != issue_count:
                     unverified.append(
@@ -297,30 +317,49 @@ def check(engine, text, *, save=False):
                     )
                     continue
                 reason = "no matching indexed operation; independent lookup is not a read/write edge"
-                if (
-                    relation == "dispatch"
-                    and origin["kind"] == destination["kind"] == "agent"
-                ):
-                    for dispatch in engine.store.rows(
-                        "SELECT * FROM dispatches WHERE parent=? AND child=? AND at<=?",
-                        (origin["key"], destination["key"], cutoff),
-                    ):
+                if "review" in edge:
+                    try:
+                        bound = reviewed_edge(engine, edge, origin, destination, fid)
+                    except (ValueError, TypeError, KeyError, OSError) as exc:
+                        reason = str(exc)
+                if dispatch_edge:
+                    # The native receipt can confirm this historical mapping
+                    # later than either endpoint. It must still be available
+                    # by the report's observation cutoff, and is not exposed
+                    # by an earlier tree step.
+                    for dispatch in engine.dispatches(observed_at, agent=origin["key"]):
+                        if (dispatch["parent"], dispatch["child"]) != (
+                            origin["key"],
+                            destination["key"],
+                        ):
+                            continue
                         if not in_scope(dispatch["at"], cutoff, start):
                             continue
-                        if {dispatch["request"], dispatch["result"]} <= refs:
+                        if ({dispatch["request"], dispatch["result"]} - {None}) <= refs:
                             supporting_request = dispatch["request"]
+                            supporting_result = dispatch["result"]
                             bound = {
                                 **edge,
                                 "from": origin["id"],
                                 "to": destination["id"],
                                 "finding": fid,
-                                "strength": "confirmed",
+                                "strength": dispatch["strength"],
                                 "operation": dispatch["id"],
+                                "at": iso(dispatch["at"]),
+                                "occurrence_at": iso(dispatch["at"]),
+                                "confirmed_at": iso(dispatch["confirmed_at"]),
+                                "request": dispatch["request"],
+                                "result": dispatch["result"],
+                                "identity_known_at_cutoff": dispatch[
+                                    "identity_known_at_cutoff"
+                                ],
+                                "identity_basis": dispatch["identity_basis"],
                                 "semantic_verified": False,
                             }
                             break
                 if (
-                    op
+                    "review" not in edge
+                    and op
                     and file["kind"] == "file"
                     and agent["kind"] == "agent"
                     and origin["exists"]
@@ -348,6 +387,7 @@ def check(engine, text, *, save=False):
                                     "finding": fid,
                                     "strength": operation["strength"],
                                     "operation": operation["id"],
+                                    "at": iso(operation["at"]),
                                     "semantic_verified": False,
                                 }
                             )
@@ -360,12 +400,16 @@ def check(engine, text, *, save=False):
                         )
                     elif len(matches) > 1:
                         reason = "multiple operations share these record references; use the returned link to select its exact block"
-                if bound and start is not None:
+                if (
+                    bound
+                    and "review" not in edge
+                    and (start is not None or dispatch_edge)
+                ):
                     # A receipt inside the interval may answer an earlier request.
                     # Only this bound operation's exact request gets that exception.
                     issue_count = len(issues)
                     verify_refs(
-                        sorted(refs - {supporting_request}),
+                        sorted(refs - {supporting_request, supporting_result}),
                         cutoff,
                         f"{fid}.edge",
                         start,
@@ -373,9 +417,12 @@ def check(engine, text, *, save=False):
                     )
                     if len(issues) != issue_count:
                         bound = None
-                        reason = "Additional edge evidence predates the interval; only the bound operation's native request may be earlier context."
+                        reason = "Additional edge evidence falls outside the endpoint interval; only the bound native request and dispatch confirmation have timing exceptions."
             if bound:
-                bound["source"] = "native_evidence" if automatic_edges else "model_edge"
+                if bound.get("source") != "model_review":
+                    bound["source"] = (
+                        "native_evidence" if automatic_edges else "model_edge"
+                    )
                 edges.append(bound)
             else:
                 unverified.append({**edge, "finding": fid, "diagnostic": reason})
@@ -427,6 +474,8 @@ def check(engine, text, *, save=False):
         "trace_session": engine.session,
         "note": "Reasons are model claims. Bound references/operations are not causal proof.",
     }
+    result["tree"] = evidence_paths(engine, result)
+    result["path_status"] = "complete" if result["tree"]["complete"] else "needs_path"
     if save:
         identity = uuid.uuid4().hex[:16]
         with engine.store.db:
@@ -435,4 +484,25 @@ def check(engine, text, *, save=False):
                 (identity, "report", text, encode(result), ""),
             )
         result["report_id"] = identity
+    return result
+
+
+def load_report(engine, identity, *, recheck=True):
+    """Recheck the original document, without saving another report or route."""
+    rows = engine.store.rows(
+        "SELECT request,data FROM runs WHERE id=? AND kind='report'", (identity,)
+    )
+    if len(rows) != 1:
+        raise ValueError("report not found")
+    saved = json.loads(rows[0]["data"])
+    if saved["source_sha256"] != digest(rows[0]["request"].encode()):
+        raise ValueError("stored report no longer matches its original document")
+    if not recheck:
+        return {**saved, "report_id": identity}
+    from .engine import Engine
+
+    result = check(
+        Engine(engine.store, session=saved["trace_session"]), rows[0]["request"]
+    )
+    result["report_id"] = identity
     return result

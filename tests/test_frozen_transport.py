@@ -53,7 +53,9 @@ def test_http_and_mcp_alias_queries_share_scope_and_navigation_state(tmp_path, m
                 assert scope["anchor"] == str(anchor) and scope["roots"] == [str(early), str(anchor)]
             with urlopen(base + f"/api/insight1/fixchain/{sid}") as response:
                 html = response.read().decode("utf-8")
-                assert '"mode": "frozen_anchor"' in html
+                config = json.loads(html.split("window.INQUIRY_CONFIG = ", 1)[1].split(";</script>", 1)[0])
+                assert config["observation_scope"]["mode"] == "frozen_anchor"
+                assert config["observation_scope"]["anchor"] == str(anchor)
     finally:
         server.shutdown()
         worker.join(timeout=5)

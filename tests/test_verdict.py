@@ -451,11 +451,3 @@ def test_guide_and_sessions_carry_the_contract(tmp_path: Any) -> None:
     led = _pool(tmp_path)
     text = atoms_text.render_chains({"chains": [], "touched": []}, identity=atoms.ledger_identity(led))
     assert text.splitlines()[0] == f"账本身份: {atoms.ledger_identity(led)}"
-
-
-def test_fixchain_template_has_verdict_hooks() -> None:
-    from migloop.service import load_asset
-    html = load_asset("fixchain.html")
-    for needle in ("probeRolesFor(", "probeReason(", ".node.p-fixed", ".node.p-carry", ".node.p-ok", "修复落点",
-                   "账本身份", "PROBE.roles", "legacy", "evidence", ".wire.cand"):
-        assert needle in html, needle

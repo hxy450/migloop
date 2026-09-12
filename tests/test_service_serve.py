@@ -104,10 +104,9 @@ def test_pages_and_atoms(session: tuple[str, dict[str, str]]) -> None:
     static = service.report_trace(path, static=True)
     assert static["urls"] == {"fixchain": None}                    # 导出 HTML:入口藏起来
     assert "findings" in service.report_trace(path, static=True, with_chains=False)["audit"]
-    light = service.fixchain_light(path)
-    assert light["sid8"] == "abcdef12" and light["project"] == "proj"
-    assert [f["id"] for f in light["fixes"]] == ["/proj/entry/A.ets"]   # 首屏列表从链缓存来
-    assert "__FIXCHAIN_JSON__" not in service.fixchain_html(path)
+    page = service.fixchain_html(path)
+    assert "__INQUIRY_CONFIG__" not in page and '"project":"proj"' in page
+    assert "时间证据树" in page and "/tree.js" in page
 
     idx = service.atom_json(path, "index", {})
     assert [f["path"] for f in idx["files"]] == ["/proj/entry/A.ets"]
@@ -156,7 +155,7 @@ def test_serve_routes(session: tuple[str, dict[str, str]]) -> None:
         assert st == 200 and final.endswith("/api/insight1/report/abcdef12")   # 302 → 报告页
         assert "返修" in body.decode("utf-8")
         st, body, _ = _get(base, "/api/insight1/fixchain/abcdef12")
-        assert st == 200 and '"sid8": "abcdef12"' in body.decode("utf-8")
+        assert st == 200 and f'"sid":"{SID}"' in body.decode("utf-8")
         st, body, _ = _get(base, "/api/insight1/fixchain-data/abcdef12")
         assert st == 200 and len(json.loads(body)["chains"]) == 1
         st, body, _ = _get(base, "/api/insight1/atom/abcdef12/text/guide")

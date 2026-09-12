@@ -203,6 +203,24 @@ def in_scope(value, at, since, undated=False):
     )
 
 
+def project_dispatch(row, at):
+    """Occurrence and identity confirmation are separate native timestamps.
+
+    A historical query may name a child using the later native mapping, but
+    cannot present that later receipt as evidence already available then.
+    """
+    confirmed_at = row.get("confirmed_at")
+    known = confirmed_at is not None and confirmed_at <= at and bool(row.get("result"))
+    return {
+        **row,
+        "strength": "confirmed" if known else "candidate",
+        "result": row.get("result") if known else None,
+        "identity_known_at_cutoff": known,
+        "identity_basis": "native_return" if known else "retrospective_native_mapping",
+        "status": "returned" if known else "identity_not_known_at_cutoff",
+    }
+
+
 def selected(value, pointer):
     if pointer == "":
         return value
@@ -337,6 +355,25 @@ class Engine:
                 )
         return sorted(result, key=lambda r: (r["at"] is None, r["at"] or 0, r["id"]))
 
+    def dispatches(self, at, since=None, *, agent=None):
+        """Project native dispatches without changing the stored index schema."""
+        rows = self.store.rows(
+            "SELECT d.*,q.at AS occurrence_at,r.at AS confirmed_at FROM dispatches d "
+            "JOIN records q ON q.ref=d.request JOIN records r ON r.ref=d.result "
+            "WHERE (? IS NULL OR d.parent=? OR d.child=?)",
+            (agent, agent, agent),
+        )
+        projected = []
+        for row in rows:
+            if not in_scope(row["occurrence_at"], at, since):
+                continue
+            # Validate the identity mapping even when its confirming receipt is
+            # later than the view. Projection still withholds that future body.
+            for ref in (row["request"], row["result"]):
+                self.store.source_record(ref)
+            projected.append(project_dispatch({**row, "at": row["occurrence_at"]}, at))
+        return sorted(projected, key=lambda row: (row["at"], row["id"]))
+
     @coordinate_transaction
     def query(self, request):
         if not isinstance(request, dict):
@@ -434,6 +471,8 @@ class Engine:
                 "limit",
             },
         }
+        for entity in ("file", "agent"):
+            allowed[entity].update({"report_id", "finding", "direction"})
         if op not in allowed:
             raise ValueError(
                 f"unknown operation {op!r}; use one of {', '.join(allowed)}; no legacy version/via parameters"
@@ -443,6 +482,12 @@ class Engine:
             raise ValueError(
                 f"unknown parameters {sorted(extra)}; {op} accepts {sorted(allowed[op])}; no legacy version/via parameters"
             )
+        if (
+            op in ("file", "agent")
+            and request.get("view") != "neighbors"
+            and any(k in request for k in ("report_id", "finding", "direction"))
+        ):
+            raise ValueError("report_id/finding/direction require view=neighbors")
         offset, limit = (
             request.get("offset", 0),
             request.get(
@@ -725,6 +770,7 @@ class Engine:
         if view not in (
             "records",
             "relations",
+            "neighbors",
             "calls",
             "inputs",
             "changes",
@@ -733,8 +779,18 @@ class Engine:
             "returns",
         ):
             raise ValueError(
-                "view must be records, calls, relations, inputs, changes, outline, messages or returns"
+                "view must be records, calls, relations, neighbors, inputs, changes, outline, messages or returns"
             )
+        if view == "neighbors":
+            from .tree import tree_neighbors
+
+            if op not in ("file", "agent") or any(
+                k in request for k in ("terms", "order", "include_reads")
+            ):
+                raise ValueError(
+                    "neighbors requires a file/agent scope without text filters"
+                )
+            return tree_neighbors(self, scope, request)
         if view == "inputs" and op != "agent":
             raise ValueError("inputs is an agent view")
         if view == "messages" and op != "agent":
@@ -756,18 +812,14 @@ class Engine:
             if op != "search"
             else []
         )
-        dispatches = (
-            self.store.rows(
-                "SELECT * FROM dispatches WHERE (parent=? OR child=?) AND at<=?",
-                (scope["key"], scope["key"], at),
-            )
-            if op == "agent"
-            else []
-        )
         dispatches = [
-            {**d, "at": iso(d["at"])}
-            for d in dispatches
-            if since is None or d["at"] >= since
+            {
+                **d,
+                **{key: iso(d[key]) for key in ("at", "occurrence_at", "confirmed_at")},
+            }
+            for d in (
+                self.dispatches(at, since, agent=scope["key"]) if op == "agent" else []
+            )
         ]
         if view in ("relations", "inputs", "changes", "outline") and request.get(
             "terms"

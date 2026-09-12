@@ -3,7 +3,8 @@ hmigbot 同名路径上(fixchain.html / viewer.html 的默认相对地址就是�
 
     /                                        → 302 到目标会话的报告页
     /api/insight1/report/<sid>  /insight1/report/<sid>
-    /api/insight1/fixchain/<sid>             返修链路页(首屏轻,链由页面异步拉)
+    /api/insight1/fixchain/<sid>             单一时间证据树页面
+    /api/insight1/inquiry/<sid>/*            与 inquiry CLI 共用的查询应用
     /api/insight1/fixchain-data/<sid>        {chains, cross, t0}
     /api/insight1/atom/<sid>/<tool>          index | file | agent | blame | action(JSON)
     /api/insight1/atom/<sid>/text/<tool>     guide | sessions | index | file | agent | blame | diff | action(文本)
@@ -26,6 +27,7 @@ from . import service
 
 _RE_REPORT = re.compile(r"^/(?:api/)?insight1/report/([^/]+)/?$")
 _RE_FIXCHAIN = re.compile(r"^/api/insight1/fixchain/([^/]+)/?$")
+_RE_INQUIRY = re.compile(r"^/api/insight1/inquiry/([^/]+)(/(?:api/[a-z]+|tree\.js))$")
 _RE_FIXDATA = re.compile(r"^/api/insight1/fixchain-data/([^/]+)/?$")
 _RE_ATOM_TEXT = re.compile(r"^/api/insight1/atom/([^/]+)/text/([a-z]+)/?$")
 _RE_ATOM = re.compile(r"^/api/insight1/atom/([^/]+)/([a-z]+)/?$")
@@ -45,6 +47,7 @@ class _Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", ctype)
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-store")
+        self.send_header("X-Content-Type-Options", "nosniff")
         self.end_headers()
         self.wfile.write(body)
 
@@ -61,10 +64,20 @@ class _Handler(BaseHTTPRequestHandler):
     def _path_of(self, sid: str) -> str:
         return service.locate_session(urllib.parse.unquote(sid), self.roots)
 
+    def _inquiry(self, match, query="", data=None):
+        from .inquiry.web import dispatch_http
+
+        suffix = match.group(2)
+        # Static assets do not build an index or open source files.
+        database = None if suffix == "/tree.js" else service.inquiry_database(self._path_of(match.group(1)))
+        status, body, mime = dispatch_http(database, suffix + ("?" + query if query else ""), data)
+        self._send(status, body.encode("utf-8"), mime)
+
     def do_POST(self) -> None:
         """Read-only JSON queries; POST avoids long YAML/batch data in URLs."""
         route = urllib.parse.urlsplit(self.path).path
         match = _RE_ATOM.match(route)
+        inquiry = _RE_INQUIRY.match(route)
         try:
             size = int(self.headers.get("Content-Length", "0"))
             if not 0 < size <= 1_000_000:
@@ -74,6 +87,18 @@ class _Handler(BaseHTTPRequestHandler):
             # Closing a Windows socket with unread request bytes can reset it
             # before the client receives the otherwise valid 404 response.
             body = self.rfile.read(size)
+            if inquiry:
+                if size > 160000:
+                    raise ValueError("inquiry request body must be 1–160000 bytes")
+                origin = self.headers.get("Origin")
+                if origin and urllib.parse.urlsplit(origin).netloc != self.headers.get("Host"):
+                    self._json(403, {"error": "cross-origin writes refused"})
+                    return
+                args = json.loads(body.decode("utf-8"))
+                if not isinstance(args, dict):
+                    raise ValueError("JSON query must be an object")
+                self._inquiry(inquiry, data=args)
+                return
             if not match or match.group(2) not in {"batch", "check", "expand", "changes", "events"}:
                 self._json(404, {"error": "no such read-only query route"})
                 return
@@ -106,6 +131,10 @@ class _Handler(BaseHTTPRequestHandler):
             m = _RE_FIXCHAIN.match(route)
             if m:
                 self._html(service.fixchain_html(self._path_of(m.group(1))))
+                return
+            m = _RE_INQUIRY.match(route)
+            if m:
+                self._inquiry(m, url.query)
                 return
             m = _RE_FIXDATA.match(route)
             if m:
