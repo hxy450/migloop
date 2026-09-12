@@ -1,12 +1,193 @@
 {
-  "schema":"inquiry-developer-score/1", "round":"i20-high", "investigator_commit":"221f6b5",
-  "model":"gpt-5.6-luna", "effort":"high", "reference":"../file-first-10/scoring-core.json",
-  "provisional":true, "grading":"Frozen six/five/etc core units per file; source-backed developer review with independent review. Preserve minor/audit limitations separately. Do not fill source facts into investigator reports or rerun raw.",
-  "cases":[
-    {"id":"F10-01","report_id":"739132fdf2f14e5d","units":{"mask":"correct","images":"correct","cta":"correct","price":"correct","indicator":"correct","repair-compile":"correct"},"detail":"See i20-high-pilot-scores.json for exact input/output proof, minor property-name error, grouped-actor warning, and costs."},
-    {"id":"F10-03","report_id":"1aa6588893e74cb7","units":{"label":"correct","button-style":"correct","test-integration":"correct","logging":"correct","comment-policy":"correct"},"basis":"Actual delivered page spec e-15bff7bf6f00 and feature spec e-a6ace9bceac6 specify resource Roll; later runtime ROLL/shape requirements and edits are separated. Export/UI ids are later testing contracts. Console is located in visual repair e-4bb71218bb29 then changed by ECAT e-4e8699c255a6, not initial Write. Comment cleanup retains D002 TODO resource semantics. No major extra identified in actual final doc; unresolved effects explicitly retained.","audit_caveats":"118 unassessed related calls remain; report explicitly disclaims exhaustive effect verification. D.visual_output role propagated is less precise than its prose saying console was introduced there, but the actual responsible visual-repair actor is correctly identified, not initial generation. This is not a claim of perfect node classifications.","cost":{"input_plus_output":4834919,"input_total":4811466,"cached_input":4584704,"uncached_input":226762,"output":23453,"seconds":564.228347599972},"mechanical":{"valid":true,"queries":70,"query_failed":9,"opens":51,"open_failed":8,"frames":107,"frames_visible_complete":107,"bodies_visible_complete":35,"host_truncated_wrappers":1,"nodes":45,"edges":31,"unassessed":118,"missing_evidence_links":0,"actor_notes":0}}
+  "schema": "inquiry-developer-score/1",
+  "round": "i20-high",
+  "investigator_commit": "221f6b5",
+  "model": "gpt-5.6-luna",
+  "effort": "high",
+  "reference": "../file-first-10/scoring-core.json",
+  "provisional": true,
+  "grading": "Frozen six/five/etc core units per file; source-backed developer review with independent review. Preserve minor/audit limitations separately. Do not fill source facts into investigator reports or rerun raw.",
+  "cases": [
+    {
+      "id": "F10-01",
+      "report_id": "739132fdf2f14e5d",
+      "units": {
+        "mask": "correct",
+        "images": "correct",
+        "cta": "correct",
+        "price": "correct",
+        "indicator": "correct",
+        "repair-compile": "correct"
+      },
+      "detail": "See i20-high-pilot-scores.json for exact input/output proof, minor property-name error, grouped-actor warning, and costs."
+    },
+    {
+      "id": "F10-02",
+      "report_id": "4051144a06304bce",
+      "units": {
+        "mask": "correct",
+        "icon": "correct",
+        "back-gate": "partial",
+        "progress": "correct",
+        "system-bars": "correct"
+      },
+      "basis": "Independent fresh-context Luna and developer review agree. Final A/B explain isModal, onWillDismiss and separate navigation return fallback, but omit initial onBackPressed and assembly deletion. Other four causes supported; no major extra identified. The deletion was actually delivered in the generation outline, not lost by the collector (i20-splash-delivery.md).",
+      "cost": {
+        "input_plus_output": 7694315,
+        "input_total": 7655540,
+        "cached_input": 7361792,
+        "uncached_input": 293748,
+        "output": 38775,
+        "seconds": 992.9252178000752
+      },
+      "mechanical": {
+        "valid": true,
+        "queries": 160,
+        "query_failed": 5,
+        "opens": 139,
+        "open_failed": 4,
+        "frames": 199,
+        "frames_visible_complete": 143,
+        "bodies_visible_complete": 47,
+        "host_truncated_wrappers": 2,
+        "nodes": 23,
+        "edges": 18,
+        "unassessed": 0,
+        "unknown_calls": 2,
+        "missing_evidence_links": 0,
+        "actor_notes": 0
+      }
+    },
+    {
+      "id": "F10-03",
+      "report_id": "1aa6588893e74cb7",
+      "units": {
+        "label": "correct",
+        "button-style": "correct",
+        "test-integration": "correct",
+        "logging": "correct",
+        "comment-policy": "correct"
+      },
+      "basis": "Actual delivered page spec e-15bff7bf6f00 and feature spec e-a6ace9bceac6 specify resource Roll; later runtime ROLL/shape requirements and edits are separated. Export/UI ids are later testing contracts. Console is located in visual repair e-4bb71218bb29 then changed by ECAT e-4e8699c255a6, not initial Write. Comment cleanup retains D002 TODO resource semantics. No major extra identified in actual final doc; unresolved effects explicitly retained.",
+      "audit_caveats": "118 unassessed related calls remain; report explicitly disclaims exhaustive effect verification. D.visual_output role propagated is less precise than its prose saying console was introduced there, but the actual responsible visual-repair actor is correctly identified, not initial generation. This is not a claim of perfect node classifications.",
+      "cost": {
+        "input_plus_output": 4834919,
+        "input_total": 4811466,
+        "cached_input": 4584704,
+        "uncached_input": 226762,
+        "output": 23453,
+        "seconds": 564.228347599972
+      },
+      "mechanical": {
+        "valid": true,
+        "queries": 70,
+        "query_failed": 9,
+        "opens": 51,
+        "open_failed": 8,
+        "frames": 107,
+        "frames_visible_complete": 107,
+        "bodies_visible_complete": 35,
+        "host_truncated_wrappers": 1,
+        "nodes": 45,
+        "edges": 31,
+        "unassessed": 118,
+        "missing_evidence_links": 0,
+        "actor_notes": 0
+      }
+    },
+    {
+      "id": "F10-04",
+      "report_id": "7c8e1f8f1faf46d6",
+      "units": {
+        "debug-wiring": "correct",
+        "wrong-class-repair": "correct"
+      },
+      "basis": "Correctly explains missing startup debug injection/default false and subsequent wrong F013Service setter repaired to AppTrackConfig, including later successful build. Core2/2. A separate behavioral-verification denial is contradicted, so no-major acceptance fails.",
+      "additional_errors": [
+        {
+          "major": true,
+          "kind": "false_absence_of_runtime_validation",
+          "quote": "池内没有修复后登录或日志行为回执",
+          "counterevidence": [
+            "c657f0879a83d117:184:1825225bc722d151",
+            "c657f0879a83d117:187:98dbb54a56469a63",
+            "c657f0879a83d117:190:5a5c1246f8ad7345"
+          ],
+          "detail": "Fresh-context independent review found later real HMOS login_hmos UI runs through EntryAbility, input test phone/code and login, successful ID signal. This is not early standalone curl. No HTTP trace receipt identified; only the login/phone-validation absence is contradicted. Repeated absence wording counts as one major claim; do not zero the two correct core units."
+        }
+      ],
+      "cost": {
+        "input_plus_output": 4337350,
+        "input_total": 4319004,
+        "cached_input": 4103680,
+        "uncached_input": 215324,
+        "output": 18346,
+        "seconds": 469.2615471999161
+      },
+      "mechanical": {
+        "valid": true,
+        "queries": 81,
+        "query_failed": 2,
+        "opens": 43,
+        "open_failed": 0,
+        "frames": 101,
+        "frames_visible_complete": 101,
+        "bodies_visible_complete": 43,
+        "host_truncated_wrappers": 1,
+        "nodes": 21,
+        "edges": 15,
+        "unassessed": 0,
+        "missing_evidence_links": 0,
+        "actor_notes": 0
+      }
+    },
+    {
+      "id": "F10-05",
+      "report_id": "9c21cb54aa434c51",
+      "units": {
+        "android-id-unblock": "correct"
+      },
+      "basis": "Explicit D010 hold/no-invention task e-bcd828123cd9 is contrasted with empty-id backend failure and prior test-hex success. Later DevicePrefs hookup is correctly framed as test unblock, not certified final device-identity equivalence. Main reviewed exact final doc and existing original-source adjudication; no major extra identified. Origin role on the compliant generator denotes the failed-state output location according to the report's own qualification, not a proved instruction violation.",
+      "cost": {
+        "input_plus_output": 1855644,
+        "input_total": 1841067,
+        "cached_input": 1699584,
+        "uncached_input": 141483,
+        "output": 14577,
+        "seconds": 354.1473529000068
+      },
+      "mechanical": {
+        "valid": true,
+        "queries": 56,
+        "query_failed": 5,
+        "opens": 32,
+        "open_failed": 1,
+        "frames": 76,
+        "frames_visible_complete": 74,
+        "bodies_visible_complete": 25,
+        "host_truncated_wrappers": 2,
+        "nodes": 9,
+        "edges": 6,
+        "unassessed": 0,
+        "missing_evidence_links": 0,
+        "actor_notes": 0
+      }
+    }
   ],
-  "summary":{"files_graded":2,"files_remaining":8,"correct":11,"partial":0,"wrong":0,"omitted":0,"units_graded":11,"frozen_units_total":28},
-  "adjudication_corrections":["Independent review accidentally repeated Member's Indicator-property criticism while grading Dice; that sentence is absent from the actual Dice document, so it is rejected, not counted. Main source check also corrected an earlier handoff note: e-15bff7bf6f00 is an actual page-spec tool_result at physical line52, not a Read request. Original records overrule cached notes. Neither correction changes gold or model text."],
-  "accepted":false,"why_not":"Cohort not finished; no stability repeats. Two graded files cannot establish all-three-session success or generalization."
+  "summary": {
+    "files_graded": 5,
+    "files_remaining": 5,
+    "correct": 18,
+    "partial": 1,
+    "wrong": 0,
+    "omitted": 0,
+    "units_graded": 19,
+    "frozen_units_total": 28,
+    "major_extra_claims": 1
+  },
+  "adjudication_corrections": [
+    "Independent review accidentally repeated Member's Indicator-property criticism while grading Dice; that sentence is absent from the actual Dice document, so it is rejected, not counted. Main source check also corrected an earlier handoff note: e-15bff7bf6f00 is an actual page-spec tool_result at physical line52, not a Read request. Original records overrule cached notes. Neither correction changes gold or model text."
+  ],
+  "accepted": false,
+  "why_not": "Cohort incomplete and one major false behavioral-verification absence already found. Even if remaining cores pass, this candidate fails the no-major gate. Finish same-frozen cohort to diagnose all cases, retain every result; no raw reruns or stability repeats yet."
 }
