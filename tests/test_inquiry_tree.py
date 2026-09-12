@@ -120,6 +120,79 @@ def test_searching_good_spec_does_not_make_it_an_input(chain):
     assert origin["status"] == "unclosed" and not origin["steps"]
 
 
+def test_normal_input_paths_are_displayed_without_changing_problem_closure(chain):
+    doc = document(chain)
+    doc["findings"][0]["nodes"].append(
+        {
+            "id": "input",
+            "kind": "file",
+            "key": "A.ets",
+            "at": ts(5),
+            "role": "context",
+            "reason": "The inspected input, not a claim of fault",
+            "evidence": [chain.store.locate("b.jsonl", 2)],
+        }
+    )
+    graph = report.check(chain, json.dumps(doc))
+    assert graph["document"] == doc
+    assert graph["tree"]["complete"] and graph["tree"]["problem_nodes"] == 2
+    path, = graph["tree"]["context_paths"]
+    assert path["node"] == "A:input" and path["purpose"] == "context"
+    assert path["status"] == "native"
+    assert [r["relation"] for r in path["steps"]] == ["write", "read"]
+    scope = graph["tree"]["root"]
+    for step in path["steps"]:
+        result = chain.query({"op": scope["kind"], **{k: scope[k] for k in ("key", "at", "since")}, "view": "neighbors"})
+        assert step in result["rows"]
+        scope = step["node"]
+
+
+def test_cited_input_endpoint_is_visible_but_not_a_new_model_judgment(chain):
+    graph = report.check(chain, json.dumps(document(chain)))
+    path, = graph["tree"]["context_paths"]
+    assert path["status"] == "native"
+    assert [r["relation"] for r in path["steps"]] == ["write", "read"]
+    node = next(n for n in graph["nodes"] if n["id"] == path["node"])
+    assert node["generated_context"] and node["role"] == "context"
+    assert node["key"] == "/proj/A.ets"
+    assert graph["tree"]["problem_nodes"] == 2
+
+
+def test_agent_input_judgment_cites_read_not_output_write(chain):
+    doc = document(chain)
+    doc["findings"][0]["nodes"].append({
+        "id": "received", "kind": "agent", "key": "b", "at": ts(8),
+        "role": "context", "reason": "received this input", "evidence": [chain.store.locate("b.jsonl", 2)],
+    })
+    graph = report.check(chain, json.dumps(doc))
+    path = next(p for p in graph["tree"]["context_paths"] if p["node"] == "A:received")
+    assert path["status"] == "native" and len(path["steps"]) == 1
+    assert path["steps"][0]["relation"] == "write"
+    assert graph["tree"]["complete"] and graph["tree"]["problem_nodes"] == 2
+
+
+@pytest.mark.parametrize("cutoff", [ts(4), ts(15)])
+def test_unrelated_or_not_yet_read_context_is_not_connected(chain, cutoff):
+    doc = document(chain)
+    # The source ref is real, but it is either before this input was returned
+    # or describes B rather than a relationship involving the claimed A input.
+    doc["findings"][0]["nodes"].append(
+        {
+            "id": "independent",
+            "kind": "file",
+            "key": "A.ets",
+            "at": cutoff,
+            "role": "context",
+            "reason": "Independent lookup, not a proved delivered input",
+            "evidence": [chain.store.locate("b.jsonl", 2 if cutoff == ts(4) else 3)],
+        }
+    )
+    graph = report.check(chain, json.dumps(doc))
+    assert graph["tree"]["complete"] and graph["tree"]["problem_nodes"] == 2
+    path = next(p for p in graph["tree"]["context_paths"] if p["node"] == "A:independent")
+    assert path["status"] == "unclosed" and not path["steps"]
+
+
 def test_inverted_temporal_path_is_not_completed(tmp_path):
     engine = build(
         tmp_path,

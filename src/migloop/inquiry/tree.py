@@ -271,7 +271,7 @@ def evidence_paths(engine, graph):
         engine.store.resolve_file(target["file"]),
         timestamp(target["at"], required=True),
     )
-    paths = []
+    paths, context_paths = [], []
     for finding in graph["document"]["findings"]:
         fid = finding["id"]
         events = graph_events(graph, fid)
@@ -286,12 +286,26 @@ def evidence_paths(engine, graph):
                 incoming.setdefault(tuple(event["to"]), []).append(event)
         for values in incoming.values():
             values.sort(key=lambda e: (e["strength"] != "confirmed", -e["at"], e["id"]))
+        # A model may cite a returned input on its agent judgment instead of
+        # naming a separate file node. attach() already supplies that neutral
+        # endpoint; allow its cited read/dispatch arm, not every generated node.
+        input_refs = {}
+        for event in events:
+            if event["relation"] in ("read", "dispatch"):
+                input_refs.setdefault(tuple(event["from"]), set()).update(event["refs"])
         goals = [
             n
             for n in graph["nodes"]
             if n["finding"] == fid
-            and n["role"] in ("origin", "propagated")
-            and not n["generated_context"]
+            and n["role"] in ("origin", "propagated", "context")
+            and (
+                not n["generated_context"]
+                or bool(
+                    input_refs.get((n["kind"], n["key"]), set()).intersection(
+                        n["valid_refs"]
+                    )
+                )
+            )
         ]
         change_refs = set()
         target_at = timestamp(target["at"], required=True)
@@ -343,11 +357,25 @@ def evidence_paths(engine, graph):
                 current = (scope["kind"], scope["key"])
                 at = timestamp(scope["at"], required=True)
                 goal_since = timestamp(goal.get("since"))
+                # A context judgment on an agent can cite its received input,
+                # not its output write. Certify that actual incoming operation
+                # within the reached window, without reclassifying the input.
+                received_context = (
+                    goal["role"] == "context"
+                    and goal["kind"] == "agent"
+                    and any(
+                        event["relation"] in ("read", "dispatch")
+                        and event["strength"] == "confirmed"
+                        and in_scope(event["at"], at, goal_since)
+                        and event["refs"].intersection(goal["valid_refs"])
+                        for event in incoming.get(current, [])
+                    )
+                )
                 hit = (
                     current == (goal["kind"], goal["key"])
                     and at <= timestamp(goal["at"], required=True)
                     and (goal_since is None or at >= goal_since)
-                    and bool(incident.intersection(goal["valid_refs"]))
+                    and (bool(incident.intersection(goal["valid_refs"])) or received_context)
                 )
                 # A target-file claim is already at the root, but still needs an
                 # actual cited incoming write corresponding to its history.
@@ -393,16 +421,20 @@ def evidence_paths(engine, graph):
                 if any(s["strength"] != "confirmed" for s in support)
                 else "native"
             )
-            paths.append(
+            # Normal inputs need the same temporal/source checks as problem
+            # nodes, but their display coverage is not causal-path completion.
+            destination = context_paths if goal["role"] == "context" else paths
+            destination.append(
                 {
                     "finding": fid,
                     "node": goal["id"],
+                    "purpose": "context" if goal["role"] == "context" else "problem",
                     "status": status,
                     "steps": found or [],
                     "anchor": anchor,
                     "repair_anchor": repair_row,
                     "diagnostic": (
-                        "缺少目标修改引用或到此问题节点的同问题、非倒序证据路径。"
+                        "缺少目标修改引用或到此节点的同问题、非倒序证据路径。"
                         + (
                             " 路径搜索达到预算，未证明不存在。"
                             if inspected >= 10000
@@ -416,6 +448,7 @@ def evidence_paths(engine, graph):
     return {
         "root": root,
         "paths": paths,
+        "context_paths": context_paths,
         "complete": all(p["status"] != "unclosed" for p in paths),
         "problem_nodes": len(paths),
         "note": "自动展开与手动展开共用邻居投影；不是模型实际查询顺序，也不认证文件状态连续。",

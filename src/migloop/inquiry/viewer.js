@@ -753,8 +753,8 @@
     }
     function reportNotes() {
       var host=document.getElementById("reportNotes");host.textContent="";if(!report)return;
-      if(hiddenPaths.length){var details=el("details");details.appendChild(el("summary",null,hiddenPaths.length+" 条结论尚无可显示的完整路径"));
-        hiddenPaths.forEach(p=>details.appendChild(kv(p.node,p.diagnostic)));host.appendChild(details);}
+      if(hiddenPaths.length){var details=el("details");details.appendChild(el("summary",null,hiddenPaths.length+" 个报告节点尚未接入树"));
+        hiddenPaths.forEach(p=>details.appendChild(kv((p.purpose==="context"?"参考材料 · ":"问题节点 · ")+p.node,p.diagnostic)));host.appendChild(details);}
       var details=el("details");details.appendChild(el("summary",null,"本次调查结论"));
       report.document.findings.filter(f=>!activeFinding||f.id===activeFinding).forEach(f=>details.appendChild(quoteLong("cause",f.title,f.reason)));
       host.appendChild(details);host.appendChild(lnk("退出调查，手动查看此文件","more",function(){var scope=XT.byId[XT.root].scope;document.getElementById("reportsDialog").close();guard(()=>openRoot(scope));}));

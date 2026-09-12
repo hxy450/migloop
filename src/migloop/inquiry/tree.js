@@ -59,7 +59,9 @@
     }
     seed(graph, finding = "") {
       const byId = new Map((graph.nodes || []).map(n => [n.id, n]));
-      for (const path of graph.tree?.paths || []) {
+      // Context arms use the very same checked edges, without being counted
+      // as problem-node closure or upgrading a normal input to an origin.
+      for (const path of [...(graph.tree?.paths || []), ...(graph.tree?.context_paths || [])]) {
         if (finding && path.finding !== finding) continue;
         if (path.repair_anchor) {
           const row = path.repair_anchor;

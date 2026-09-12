@@ -6,6 +6,36 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def test_context_paths_keep_input_reason_and_merge_with_manual_tree():
+    assertions = r"""
+const assert = require('node:assert/strict');
+const {EvidenceTreeModel} = require('./src/migloop/inquiry/tree.js');
+const root = {kind:'file',key:'/output',at:'2026-01-01T00:00:10Z',since:null};
+const writer = {id:'native:w',relation:'write',strength:'confirmed',source:'indexed',
+ evidence:['write'],node:{...root,kind:'agent',key:'writer'}};
+const input = {id:'native:r',relation:'read',strength:'confirmed',source:'indexed',
+ evidence:['read'],node:{...root,key:'/spec'}};
+const claim = {id:'A:input',finding:'A',...input.node,role:'context',exists:true,
+ reason:'The requirement was supplied correctly',evidence:['read']};
+const graph = {nodes:[claim],tree:{root,paths:[],context_paths:[
+ {finding:'A',node:claim.id,purpose:'context',status:'native',steps:[writer,input]},
+ {finding:'B',node:'B:independent',purpose:'context',status:'unclosed',steps:[]},
+]}};
+const before = JSON.stringify(graph);
+const tree = new EvidenceTreeModel(root); tree.seed(graph);
+const w = tree.root.children[0], spec = w.children[0];
+assert.equal(tree.nodes.size,3);
+assert.equal(spec.claims[0].role,'context');
+assert.equal(spec.claims[0].reason,claim.reason);
+assert.equal(tree.insert(w,input),spec,'manual expansion reuses the same input edge');
+assert.equal(tree.unclosed[0].purpose,'context');
+const filtered = new EvidenceTreeModel(root); filtered.seed(graph,'B');
+assert.equal(filtered.nodes.size,1,'independent context does not create a fake path');
+assert.equal(JSON.stringify(graph),before,'presentation never rewrites the report');
+"""
+    subprocess.run(["node", "-e", assertions], cwd=ROOT, check=True, timeout=10)
+
+
 def test_exact_scope_grouping_preserves_claims_edges_and_microseconds():
     assertions = r"""
 const assert = require('node:assert/strict');

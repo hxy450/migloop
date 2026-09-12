@@ -173,6 +173,15 @@ async function main() {
     let liveDiagnostic = null;
     const rootNode="migloopViewer.tree.byId[migloopViewer.tree.root]";
     if(liveUrl) {
+      const initialShot = await send("Page.captureScreenshot", { format: "png" });
+      fs.writeFileSync(path.join(out, "loaded-report.png"), Buffer.from(initialShot.data, "base64"));
+      const problem = await evaluate("Object.values(migloopViewer.tree.byId).find(n=>n.claims.some(c=>c.role==='origin'))?.tid");
+      if(problem) {
+        await evaluate("migloopViewer.select("+JSON.stringify(problem)+")");
+        await wait("document.querySelector('#side .quote')?.textContent.includes('模型判断')");
+        const reasonShot = await send("Page.captureScreenshot", { format: "png" });
+        fs.writeFileSync(path.join(out, "loaded-node-reason.png"), Buffer.from(reasonShot.data, "base64"));
+      }
       liveDiagnostic=await evaluate("(async()=>{const t=migloopViewer.tree,getTrace=()=>fetch((INQUIRY_CONFIG.api_base||'')+'/api/trace?session='+encodeURIComponent(migloopViewer.report.trace_session)).then(r=>r.json());const before=await getTrace(),seedEdges=Object.values(t.byId).filter(n=>n.row).length;await migloopViewer.expand(t.root);const first=t.byId[t.root].children.map(id=>t.byId[id]).find(n=>n.kind==='agent');if(first)await migloopViewer.expand(first.tid);const after=await getTrace();return {seedEdges,nodes:Object.values(t.byId).length,gaps:migloopViewer.hiddenPaths.length,traceUnchanged:JSON.stringify(before)===JSON.stringify(after),ordinaryCandidates:Object.values(t.byId).filter(n=>n.row?.strength==='candidate'&&n.row.source!=='model_review').length,errors:Object.values(t.byId).filter(n=>n.error).map(n=>n.error)};})()");
       assert(liveDiagnostic.traceUnchanged);assert.equal(liveDiagnostic.ordinaryCandidates,0);assert.deepEqual(liveDiagnostic.errors,[]);
       await evaluate("migloopViewer.select(migloopViewer.tree.root)");
@@ -237,7 +246,7 @@ async function main() {
       const initial=JSON.stringify(traces);
       await evaluate("document.querySelector('#load').click()");
       await wait("document.querySelector('#reportsDialog').open");
-      assert.equal(await evaluate("document.querySelector('#reportNotes').textContent.includes('尚无可显示')"),true);
+      assert.equal(await evaluate("document.querySelector('#reportNotes').textContent.includes('尚未接入树')"),true);
       await evaluate("document.querySelector('#finding').value='A';document.querySelector('#finding').dispatchEvent(new Event('change'))");
       await wait("!document.querySelector('#reportsDialog').open");
       assert.equal(await evaluate("document.querySelector('[data-edge=\"model:review\"]')"),null);
