@@ -56,9 +56,14 @@ def return_window(engine, agent, at, cutoff, limitations):
         "next": data["next"],
         "query": query,
         "all_returns_query": all_returns,
+        "pool_returns_query": {
+            **{k: v for k, v in all_returns.items() if k not in ("op", "key")},
+            "op": "search",
+            "kind": "pool",
+        },
         "not_validation_proof": True,
         "not_absence_proof": True,
-        "note": "Server lookup, not a model-opened source. Markers in recorded tool returns may be quoted docs, old logs or another target. Received at/after this anchor does not prove a later-started command, target-state validation, supersession or behavior success. Open originals and paired commands; zero hits does not prove no validation.",
+        "note": "Server lookup, not a model-opened source. Counts and previews above cover this actor only. pool_returns_query opens other actors in the SAME time window; add your own behavioral terms, not just the filename or build words. Neither scope certifies validation: returns may be quoted docs, old logs or another target. Received at/after this anchor does not prove a later-started command, target-state validation, supersession or behavior success. Open originals and paired commands; zero hits does not prove no validation.",
     }
 
 

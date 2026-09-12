@@ -347,6 +347,45 @@ async function main() {
         assert.equal(await evaluate('JSON.stringify({graph,trace})'),initial);
         fs.writeFileSync(path.join(out,'evidence-review.json'),JSON.stringify(checked,null,2));
       }
+      if (process.argv.includes('--pool-returns')) {
+        const pooled=await evaluate(`(async()=>{
+          const anchor=graph.evidence_review.post_write_returns[0];
+          // Old frozen reports have no i21 navigation field. A display-only row
+          // exercises the same button without resubmitting/changing that report.
+          const q=anchor.pool_returns_query||{...anchor.all_returns_query,op:'search',kind:'pool'};
+          delete q.key;
+          const fixture=document.createElement('div');document.body.append(fixture);
+          appendReviewEvidence({...anchor,pool_returns_query:q},fixture,graph.target.at);
+          const control=[...fixture.querySelectorAll('button')].find(b=>b.textContent.includes('同一时间窗'));
+          if(!control) throw Error('missing cross-actor query button');
+          const originalQuery=query;let sent=null,pending=null;
+          query=(request)=>{sent=request;pending=originalQuery(request);return pending;};
+          try {control.click();await pending;} finally {query=originalQuery;fixture.remove();}
+          if(!sent) throw Error('button did not execute query');
+          document.getElementById('terms').value='BUILD';
+          const manual=request('returns');
+          const expected=await api('/api/query',manual);
+          let buttonRequest=null,buttonPending=null;
+          query=(request)=>{buttonRequest=request;buttonPending=originalQuery(request);return buttonPending;};
+          try {document.getElementById('returns').click();await buttonPending;} finally {query=originalQuery;}
+          let unsupportedRejected=false;try {request('relations');}catch {unsupportedRejected=true;}
+          return {sent,expectedQuery:q,manual,buttonRequest,
+            rowCount:document.querySelectorAll('#records .row').length,expectedRows:expected.rows.length,
+            expectedAt:anchor.at,expectedSince:anchor.since,unsupportedRejected};
+        })()`);
+        assert.deepEqual(pooled.sent,pooled.expectedQuery);
+        assert.deepEqual(pooled.manual,pooled.buttonRequest);
+        assert.equal(pooled.manual.op,'search');
+        assert.equal(pooled.manual.kind,'pool');
+        assert.equal(pooled.manual.view,'returns');
+        assert(!('key' in pooled.manual));
+        assert.equal(pooled.manual.at,pooled.expectedAt);
+        assert.equal(pooled.manual.since,pooled.expectedSince);
+        assert.equal(pooled.rowCount,pooled.expectedRows);
+        assert(pooled.unsupportedRejected);
+        assert.equal(await evaluate('JSON.stringify({graph,trace})'),initial);
+        fs.writeFileSync(path.join(out,'pool-returns.json'),JSON.stringify(pooled,null,2));
+      }
       assert.equal(errors.length, 0);
       const result = {passed:true, url, errors, model_report:true, report_mutated:false,
         checks:["all findings match submitted graph", "node reason", "manual query isolation", "raw expansion"]};

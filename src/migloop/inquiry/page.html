@@ -161,7 +161,7 @@
         ><button id="history">片段修改历史</button
         ><button id="inputs">查 Agent 已收输入</button
         ><button id="messages">查 Agent 任务消息</button
-        ><button id="returns">查 Agent 工具返回</button
+        ><button id="returns">查工具返回（Agent / 全池）</button
         ><button id="agents">Agent目录</button
         ><button id="files">文件目录</button>
         <div id="status" class="small muted"></div>
@@ -263,6 +263,10 @@
       if (kind !== "pool") {
         q.key = $("key").value;
         q.view = view;
+      } else {
+        if(!['records','returns'].includes(view)) throw Error('全池支持原文搜索或工具返回；读写关系和修改请选文件/Agent。');
+        q.kind='pool';
+        if(view==='returns') q.view=view;
       }
       if ($("since").value) q.since = $("since").value;
       if ($("terms").value)
@@ -668,6 +672,7 @@
       const refs=new Set([...(row.ref?[row.ref]:[]),...(row.refs||[]),...(row.evidence||[]),...(row.earlier_evidence||[]),...(row.current_evidence||[]),...(row.operations||[]).flatMap(op=>op.evidence),...(row.matches||[]).map(r=>r.cite)]);
       for(const ref of refs) button(ref,box,()=>open(ref,at));
       if(row.all_returns_query) button(row.anchor_basis?'独立查该检查者后续全部返回（不计入模型轨迹）':'独立查该写者后续全部返回（不计入模型轨迹）',box,()=>query(row.all_returns_query));
+      if(row.pool_returns_query) button('独立查同一时间窗内所有 agent 的返回（可加行为关键词；不认证验证）',box,()=>query(row.pool_returns_query));
     }
     function showNode(n) {
       $("reasonTitle").textContent = n.key;

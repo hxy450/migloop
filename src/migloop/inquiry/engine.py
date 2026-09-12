@@ -394,6 +394,7 @@ class Engine:
                 "offset",
                 "limit",
                 "terms",
+                "view",
             },
             "open": {
                 "op",
@@ -705,6 +706,8 @@ class Engine:
             }
         where, values, scope = self._where(request)
         view = request.get("view", "records")
+        if op == "search" and view not in ("records", "returns"):
+            raise ValueError("search view must be records or returns")
         if view not in (
             "records",
             "relations",
@@ -720,8 +723,10 @@ class Engine:
             )
         if view == "inputs" and op != "agent":
             raise ValueError("inputs is an agent view")
-        if view in ("messages", "returns") and op != "agent":
-            raise ValueError("messages/returns are agent views")
+        if view == "messages" and op != "agent":
+            raise ValueError("messages is an agent view")
+        if view == "returns" and op not in ("agent", "search"):
+            raise ValueError("returns requires an agent view or search scope")
         if view in ("changes", "outline") and op != "file":
             raise ValueError("changes/outline are file views")
         if "include_reads" in request and (

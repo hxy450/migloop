@@ -5,7 +5,7 @@
   "model": "gpt-5.6-luna",
   "effort": "high",
   "reference": "../file-first-10/scoring-core.json",
-  "provisional": true,
+  "provisional": false,
   "grading": "Frozen six/five/etc core units per file; source-backed developer review with independent review. Preserve minor/audit limitations separately. Do not fill source facts into investigator reports or rerun raw.",
   "cases": [
     {
@@ -172,22 +172,213 @@
         "missing_evidence_links": 0,
         "actor_notes": 0
       }
+    },
+    {
+      "id": "F10-06",
+      "report_id": "db72c65e560f48ab",
+      "units": {
+        "back-image-box": "correct",
+        "track-vs-control": "correct",
+        "bottom-inset": "correct"
+      },
+      "basis": "Fresh-context independent and developer source review agree on 3/3: initial image-box/padding mismatch, control20dp versus drawable4dp track, actual hostSwiper bottom inset rather than childbutton resize. Unknown whether pageactor received drawable is preserved. No postrepair visual-counterevidence or major extra identified.",
+      "cost": {
+        "input_plus_output": 8311915,
+        "input_total": 8281679,
+        "cached_input": 7883776,
+        "uncached_input": 397903,
+        "output": 30236,
+        "seconds": 982.1104136999929
+      },
+      "mechanical": {
+        "valid": true,
+        "queries": 183,
+        "query_failed": 12,
+        "opens": 114,
+        "open_failed": 11,
+        "frames": 219,
+        "frames_visible_complete": 219,
+        "bodies_visible_complete": 55,
+        "host_truncated_wrappers": 2,
+        "nodes": 28,
+        "edges": 14,
+        "unassessed": 0,
+        "missing_evidence_links": 0,
+        "actor_notes": 0
+      }
+    },
+    {
+      "id": "F10-07",
+      "report_id": "2236a94787a84841",
+      "units": {
+        "test-bridge": "correct",
+        "error-observer": "correct"
+      },
+      "basis": "Fresh-context independent and developer source review agree on 2/2. Actual late testbridge and ECAT observer are separated from original window capability and initialcontract. Real Want launch/UI runs exist, but UI summaries explicitly say AppStorage bridge keys were not observable; these do not falsify bounded lackofproof of key consumption.",
+      "additional_errors": [
+        {
+          "major": false,
+          "kind": "overbroad_unknown_wording",
+          "quote": "没有设备级崩溃注入/日志回收记录",
+          "counterevidence": [
+            "6c461a15eda162c9:204:f2f932a6d7db948e",
+            "6c461a15eda162c9:268:e618259bad1114cc"
+          ],
+          "detail": "There are earlier natural page-load crashes and jscrash collection, not controlled injection or postobserver callback verification. The unresolved observer-specific question is valid, but blanket wording should not erase existing earlier logs."
+        }
+      ],
+      "audit_caveats": "Want launch refs6c461a15eda162c9:199:8c1dc34db7933ca8 /200:1692461e04647409; key-unobservability summaries1595bf17223c1f0d:312:263a56aafb1c9a09 ande15beb5e3a62885b:471:c7a1bace7227d6f6. Later11f1d3dd11b1b970:48:caa206d145c0ea59 is build only.",
+      "cost": {
+        "input_plus_output": 3164830,
+        "input_total": 3142985,
+        "cached_input": 2951168,
+        "uncached_input": 191817,
+        "output": 21845,
+        "seconds": 501.63179579994176
+      },
+      "mechanical": {
+        "valid": true,
+        "queries": 57,
+        "query_failed": 1,
+        "opens": 35,
+        "open_failed": 1,
+        "frames": 86,
+        "frames_visible_complete": 82,
+        "bodies_visible_complete": 29,
+        "host_truncated_wrappers": 2,
+        "nodes": 15,
+        "edges": 10,
+        "unassessed": 0,
+        "missing_evidence_links": 0,
+        "actor_notes": 0
+      }
+    },
+    {
+      "id": "F10-08",
+      "report_id": "14180e1c261445a8",
+      "units": {
+        "identity-phase-and-conflict": "correct",
+        "icon-scope": "correct"
+      },
+      "basis": "Developer reviewed exact final doc against source-backed reference. Explicit dev-identity no-bundle/vendor boundary is separated from later scope expansion. Vendor rule conflict is bounded, not claimed resolved. Icon changes are entry→AppScope layered resource copying and reference switch; no unsupported claim of completed Android launcher migration. No major extra identified.",
+      "cost": {
+        "input_plus_output": 2758176,
+        "input_total": 2738124,
+        "cached_input": 2573056,
+        "uncached_input": 165068,
+        "output": 20052,
+        "seconds": 463.37152210006025
+      },
+      "mechanical": {
+        "valid": true,
+        "queries": 63,
+        "query_failed": 2,
+        "opens": 36,
+        "open_failed": 1,
+        "frames": 78,
+        "frames_visible_complete": 78,
+        "bodies_visible_complete": 38,
+        "host_truncated_wrappers": 1,
+        "nodes": 16,
+        "edges": 7,
+        "unassessed": 0,
+        "missing_evidence_links": 0,
+        "actor_notes": 0
+      }
+    },
+    {
+      "id": "F10-09",
+      "report_id": "174c2d6ccb1b43f9",
+      "units": {
+        "hit-test": "correct"
+      },
+      "basis": "Fresh-context independent source review: prepatch Block at 2098fb5a430cd82b:8027:998edb590633a4f8, SDK semantics, native patch8066/8067 to Default and actual readback8110. Unknown first writer and exact initial generation birth preserved. No major extra identified.",
+      "audit_caveats": "Complete SDK Block evidence e-cfe45fc0be03 and direct readback e-19da54b9e9a0 are not listed in final references; quoted SDK e-9db92afa5e95 is truncated. This is citation hygiene, not a false central modification. e-224b50c107f5 really is PREPATCH Block, contrary to stale review notes.",
+      "cost": {
+        "input_plus_output": 3046899,
+        "input_total": 3033021,
+        "cached_input": 2864128,
+        "uncached_input": 168893,
+        "output": 13878,
+        "seconds": 405.030072
+      },
+      "mechanical": {
+        "valid": true,
+        "queries": 75,
+        "query_failed": 1,
+        "opens": 41,
+        "open_failed": 0,
+        "frames": 82,
+        "frames_visible_complete": 82,
+        "bodies_visible_complete": 36,
+        "host_truncated_wrappers": 4,
+        "nodes": 3,
+        "edges": 1,
+        "unassessed": 0,
+        "missing_evidence_links": 0,
+        "actor_notes": 0
+      }
+    },
+    {
+      "id": "F10-10",
+      "report_id": "88cfa25d132c4425",
+      "units": {
+        "signing-reference": "correct"
+      },
+      "basis": "Fresh-context independent source review: one-line product→existing default signingConfig, initial unsigned contract/build success versus later signed build/install. Does not claim unsigned cannot build/install or confuse production/API authentication. No major extra identified.",
+      "audit_caveats": "The sentence asserting signed-hap/SignHap success groups e-f33c4d0aff68 and e-adca9218a936 (unsigned/fallback) with e-f007e3793b47 (actual supporting signed result); later e-387c36b7edd2 supports signed installation. Keep this mixed-citation caveat.",
+      "cost": {
+        "input_plus_output": 3584594,
+        "input_total": 3569203,
+        "cached_input": 3378432,
+        "uncached_input": 190771,
+        "output": 15391,
+        "seconds": 396.6039778
+      },
+      "mechanical": {
+        "valid": true,
+        "queries": 85,
+        "query_failed": 1,
+        "opens": 41,
+        "open_failed": 1,
+        "frames": 92,
+        "frames_visible_complete": 92,
+        "bodies_visible_complete": 46,
+        "host_truncated_wrappers": 1,
+        "nodes": 4,
+        "edges": 1,
+        "unassessed": 0,
+        "missing_evidence_links": 0,
+        "actor_notes": 0
+      }
     }
   ],
   "summary": {
-    "files_graded": 5,
-    "files_remaining": 5,
-    "correct": 18,
+    "files_graded": 10,
+    "files_remaining": 0,
+    "correct": 27,
     "partial": 1,
     "wrong": 0,
     "omitted": 0,
-    "units_graded": 19,
+    "units_graded": 28,
     "frozen_units_total": 28,
-    "major_extra_claims": 1
+    "major_extra_claims": 1,
+    "all_core_files": 9,
+    "all_core_and_no_major_files": 8,
+    "semantic_accuracy_is_not_every_sentence_precision": true
   },
   "adjudication_corrections": [
-    "Independent review accidentally repeated Member's Indicator-property criticism while grading Dice; that sentence is absent from the actual Dice document, so it is rejected, not counted. Main source check also corrected an earlier handoff note: e-15bff7bf6f00 is an actual page-spec tool_result at physical line52, not a Read request. Original records overrule cached notes. Neither correction changes gold or model text."
+    "Independent review accidentally repeated Member's Indicator-property criticism while grading Dice; that sentence is absent from the actual Dice document, so it is rejected, not counted. Main source check also corrected an earlier handoff note: e-15bff7bf6f00 is an actual page-spec tool_result at physical line52, not a Read request. Original records overrule cached notes. Neither correction changes gold or model text.",
+    "Direct original lookup also corrected old notes on Codex dialog: e-224b50c107f5 is prepatch8027 containing Block (2098fb5a430cd82b:8027:998edb590633a4f8), not postpatch8110. No model error is inferred from the wrong handoff note."
   ],
   "accepted": false,
-  "why_not": "Cohort incomplete and one major false behavioral-verification absence already found. Even if remaining cores pass, this candidate fails the no-major gate. Finish same-frozen cohort to diagnose all cases, retain every result; no raw reruns or stability repeats yet."
+  "why_not": "Full frozen cohort complete: core27/28, but one major false behavioral-verification absence (F10-04). No stability repeats. Token/time cost is not improved over i14; fixed raw comparisons remain confounded by effort and Member task. This tuned development set does not establish generalization.",
+  "cost": {
+    "input_plus_output": 46281905,
+    "input_total": 46050352,
+    "cached_input": 43748608,
+    "uncached_input": 2301744,
+    "output": 231553,
+    "model_seconds_sum": 6035.677273100126
+  }
 }

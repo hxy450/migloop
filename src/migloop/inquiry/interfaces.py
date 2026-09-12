@@ -49,6 +49,7 @@ mechanical_status只核坐标/引用/原生关系及原生写对账，不是正�
 机械通过也不证明因果正确；“没查到检查”不能写成“确认遗漏检查”，这也适用于最后的简短摘要。
 submit还有evidence_review和review_query：收尾打开{op:review,report_id:自己刚提交的ID,offset:0,limit:100}，按列表next和END FRAME续完。timeline列自己引用的实际发生时间，别把节点查询截止当证据发生时间。actor_notes指出节点引用的原生目标写实际由其它actor执行：先核身份，协调责任不能冒充执行作者。literal_predecessors给尚未引用的较早Edit/patch中相同新增行：核原文，区分返修中新添与生成遗留。它只是字面前序线索，不证明首作者/连续状态/因果；不会替你改报告或加边。核对后需要改的由你自行重提，不为了清空提示凭空补链。
 post_write_returns给已确认目标写者最后写入之后、截至观察结束的工具返回入口，并列构建/安装/测试字面词候选。项目级回执不一定含目标文件名，不能只看file列表就断言没有。候选可能只是读到的文档或其它构建，时间相邻也不认证目标版本/真实行为；打开原文及对应命令再裁定。零命中不是没有验证的证明，仍可用all_returns_query或全池截时搜索。
+每个返回窗口另给pool_returns_query：同一时间范围内所有agent的工具返回，不限写者。判断后修行为验证时，从这里加本条行为的关键词查其它检查者，不要沿用生成截止或只搜构建词。返回里可能只是被读到的旧日志/说明，仍核原始命令、实际时刻、目标及观察结果；“我没查到/尚未核实”不能写成“池内没有”。
 cited_check_followups从你引用的检查类工具返回继续查同一agent后续回执，不要求他写过目标文件。报告末尾unexplained中的引用也参与；引用失败不能据此称“最后结果失败”。展开后续回执并核实际命令/目标/时刻，再决定是否更新结论。它只是字面词线索，读到的文档也会命中，不证明覆盖目标或成功；未列出不证明没有后续检查。
 coverage.unattributed_native_writes是未归因的已记录原生写，需用view:changes核原文并并入finding.changes；原因未明可在对应finding里限定未知，不能用reviewed:unknown把已经可展开的修改藏掉。
 coverage.unassessed是未判明效应的相关调用，不代表全是修改。提交后打开coverage_query（review的view:coverage），按两层next看完差集，再批量展开相关原文。实际改动并入findings；确定只读/别的文件可列reviewed:no_target_change；仍不确定就标unknown。不要漏掉整类脚本修复后宣称“没有其它改动”；complete=false时未决项必须留在交付中，不能用“不是原生写”排除它们。
@@ -65,6 +66,7 @@ calls仅筛原生工具调用入口，包含无法判断效应的脚本，result
 默认折叠原生只读工具和有限的完整标准只读命令形状，folded_read_calls给数量，unfold给完整查询；include_reads:true可展开全部。折叠不推断运行时效应，不假设复杂脚本无写，不影响records/search。
 agent：把op改成agent、key改成目录中的agent身份。默认records是全文索引，不是全部原文。view:inputs给原生读文件、任务消息和工具返回三个有重叠的渠道；view:messages查非工具消息，view:returns查工具返回，都可分页和多词terms过滤。records/search仍搜整个范围，inputs不是完整有效上下文。
 检索：{op:search,kind:pool|agent|file,key:可选范围,at:ISO,terms:[字面词1,词2],offset:0,limit:20}，多词OR。
+search默认搜全部已记录内容；可加view:returns只搜索原生工具返回（仍包含失败/未配对返回）。与agent的returns共用索引和时间过滤；命中不是验证成功证明，不新建文件读写边。
 展开：{op:open,ref:照抄记录ID,at:ISO,pointer:可选JSONPointer}；也可用source:逻辑源名称,line:物理行号代替ref。
 展开列表里的原文时，可直接用{op:open,ref:e-...,scope:该列表的scope_id}继承时间范围，避免手抄错截止；scope在open中只限制时间，不改变原文归属或创建关系。不要把某条记录的发生时刻当成整批不同原文的共同截止。遇outside time scope，核record_at与requested_scope；这是未成功读取，不是资料不存在，更不能算已经看过。
 每个file/agent视图返回scope_id=s-file-...或s-agent-...，锁定kind/key/at/since。后续可用{op:search,scope:已返回的scope_id,terms:[...]}
@@ -262,6 +264,7 @@ def build_mcp(path):
                         "since": r["since"],
                         "total": r["total"],
                         "matches": r["matches"],
+                        "pool_returns_query": r["pool_returns_query"],
                         "not_validation_proof": True,
                         "not_absence_proof": True,
                     }
@@ -276,6 +279,7 @@ def build_mcp(path):
                             "evidence",
                             "total",
                             "matches",
+                            "pool_returns_query",
                             "not_validation_proof",
                             "not_absence_proof",
                         )
