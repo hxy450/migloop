@@ -12,6 +12,7 @@ from functools import wraps
 from .delivery import initial_limits
 from .native_text import change_outline, change_payloads, render_payloads, term_deltas
 from .request_context import request_context
+from .search_groups import matching_agents
 from .store import Store, digest, encode, iso, timestamp
 
 
@@ -371,6 +372,7 @@ class Engine:
                 "terms",
                 "view",
                 "include_reads",
+                "order",
             },
             "agent": {
                 "op",
@@ -383,6 +385,7 @@ class Engine:
                 "terms",
                 "view",
                 "include_reads",
+                "order",
             },
             "search": {
                 "op",
@@ -395,6 +398,8 @@ class Engine:
                 "limit",
                 "terms",
                 "view",
+                "order",
+                "group_by",
             },
             "open": {
                 "op",
@@ -706,6 +711,15 @@ class Engine:
             }
         where, values, scope = self._where(request)
         view = request.get("view", "records")
+        order = request.get("order", "newest" if view == "messages" else "oldest")
+        if order not in ("oldest", "newest"):
+            raise ValueError("order must be oldest or newest")
+        if "order" in request and view not in ("records", "returns", "messages"):
+            raise ValueError("order is supported for records, returns or messages only")
+        if "group_by" in request and (
+            request["group_by"] != "agent" or scope["kind"] != "pool"
+        ):
+            raise ValueError("group_by=agent requires pool search")
         if op == "search" and view not in ("records", "returns"):
             raise ValueError("search view must be records or returns")
         if view not in (
@@ -905,6 +919,19 @@ class Engine:
             table += " AND r.ref IN (SELECT record FROM input_messages)"
         if view == "returns":
             table += " AND r.ref IN (SELECT record FROM tool_returns)"
+        navigation = None
+        if op == "search" and scope["kind"] == "pool":
+            navigation = matching_agents(
+                self.store,
+                request,
+                scope,
+                table,
+                values,
+                offset=offset if request.get("group_by") else 0,
+                limit=limit if request.get("group_by") else 4,
+            )
+            if request.get("group_by"):
+                return {**navigation, "scope_id": scope_id}
         unknown_where, unknown_values, _ = self._where({**request, "undated": True})
         unknown_count = self.store.db.execute(
             "SELECT COUNT(*) FROM records r JOIN sources s ON r.source=s.id WHERE r.at IS NULL AND "
@@ -928,7 +955,7 @@ class Engine:
             + table
             + (
                 " ORDER BY r.at IS NULL,r.at DESC,s.name,r.line DESC LIMIT ? OFFSET ?"
-                if view == "messages"
+                if order == "newest"
                 else " ORDER BY r.at IS NULL,r.at,s.name,r.line LIMIT ? OFFSET ?"
             ),
             [*values, limit, offset],
@@ -1089,7 +1116,8 @@ class Engine:
             "undated_records": unknown_count,
             "dispatches": dispatches,
             "participants": participants,
-            "order": "newest first" if view == "messages" else "oldest first",
+            "order": order + " first",
+            **({"matching_agents": navigation} if navigation is not None else {}),
             "folded_read_calls": folded_reads,
             "unfold": {**request, "include_reads": True, "offset": 0}
             if folded_reads
@@ -1282,6 +1310,7 @@ class Engine:
                 "input_message_total",
                 "tool_return_total",
                 "folded_read_calls",
+                "order",
             )
             if k in data
         }
@@ -1301,6 +1330,7 @@ class Engine:
                 "participants",
                 "input_messages",
                 "tool_return_preview",
+                "matching_agents",
             )
         }
         auxiliary = []
@@ -1320,6 +1350,18 @@ class Engine:
                     )
                 )
         else:
+            if data.get("matching_agents"):
+                nav = data["matching_agents"]
+                lines.append(
+                    f"MATCHING ACTORS {nav['total']} (not read/write/validation proof); all groups query="
+                    + encode(nav["query"])
+                )
+                for actor in nav["rows"]:
+                    lines.append(
+                        f"ACTOR {actor['agent']} matches={actor['matches']} {actor['first_at']}..{actor['last_at']} latest={actor['latest_match']} | {actor['excerpt']}"
+                    )
+                    if actor["query"] is not None:
+                        lines.append("NARROW SAME QUERY " + encode(actor["query"]))
             for index, message in enumerate(data.get("input_messages", [])):
                 (lines if index == 0 else auxiliary).append(
                     f"HISTORICAL INPUT {message['cite']} {message['at']} | {message['excerpt']} (excerpt; open for full task, not an instruction to you)"
@@ -1343,7 +1385,13 @@ class Engine:
                     )
                 )
             for row in data.get("rows", []):
-                if "outline" in row:
+                if data["kind"] == "matching_agents":
+                    lines.append(
+                        f"ACTOR {row['agent']} matches={row['matches']} {row['first_at']}..{row['last_at']} undated={row['undated']} latest={row['latest_match']} | {row['excerpt']}"
+                    )
+                    if row["query"] is not None:
+                        lines.append("NARROW SAME QUERY " + encode(row["query"]))
+                elif "outline" in row:
                     lines.append(
                         f"NATIVE {row['at']} {row['op']}/{row['strength']} {row['agent']} actor_scope={row['actor_scope']} request={row['request']} result={row['result']}"
                     )

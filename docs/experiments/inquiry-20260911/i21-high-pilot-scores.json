@@ -1,0 +1,110 @@
+{
+  "schema": "inquiry-developer-score/1",
+  "round": "i21-high",
+  "investigator_commit": "494ff1d",
+  "model": "gpt-5.6-luna",
+  "effort": "high",
+  "reference": "../file-first-10/scoring-core.json",
+  "provisional": false,
+  "accepted": false,
+  "cases": [
+    {
+      "id": "F10-04",
+      "report_id": "afdc8d37bddc4421",
+      "source_sha256": "3fa1fbb573badf8ca9577611e2e8572ccae363f1c06c3740414f192172130c37",
+      "units": {
+        "debug-wiring": "correct",
+        "wrong-class-repair": "correct"
+      },
+      "additional_errors": [
+        {
+          "major": true,
+          "kind": "false_absence_of_runtime_validation",
+          "quote": "观察截止前没有真机登录成功/失败回执来验证本文件返修后的端到端效果；现有 BUILD SUCCESSFUL 不能替代该验证。",
+          "counterevidence": [
+            "c657f0879a83d117:184:1825225bc722d151",
+            "c657f0879a83d117:187:98dbb54a56469a63",
+            "c657f0879a83d117:190:5a5c1246f8ad7345"
+          ],
+          "detail": "Independent fresh-context review and original checks agree. e-c967a276e49f only states no device verification at July25 03:51UTC; real July26 HMOS login runs precede cutoff. Does not prove HTTP logging or exclusive patch efficacy. Repeated absence wording counts once."
+        }
+      ],
+      "runtime_evidence_recovered": false,
+      "delivery_diagnosis": "Query136c3f57458b416e correctly searched postgeneration pool returns and matched156 records. Actual login row was86th, at rendered offset39415; no frame delivered there, and no c657 original opened. Old no-test statement was fully opened. Newest-first alone only moves this receipt to71st. Other postwrite search used214 matches and inspected an early prefix. Counts/locator validity are not causal truth.",
+      "cost": {
+        "input_total": 6721481,
+        "cached_input": 6453248,
+        "uncached_input": 268233,
+        "output": 25129,
+        "input_plus_output": 6746610,
+        "seconds": 606.5785108000273
+      },
+      "mechanical": {
+        "status": "valid",
+        "queries": 113,
+        "query_failed": 5,
+        "opens": 68,
+        "open_failed": 2,
+        "frames": 140,
+        "frames_visible_complete": 140,
+        "bodies_visible_complete": 59,
+        "host_truncated_wrappers": 2,
+        "nodes": 13,
+        "edges": 11,
+        "unassessed": 0,
+        "unknown_calls": 0,
+        "missing_evidence_links": 0,
+        "actor_notes": 0
+      }
+    },
+    {
+      "id": "F10-07",
+      "report_id": "db45edbb3ee849e0",
+      "source_sha256": "aece333dbd8728eea1574a5045fff142e7c3f58b129b3f0c3c51917ea682c11a",
+      "units": {
+        "test-bridge": "correct",
+        "error-observer": "correct"
+      },
+      "additional_errors": [],
+      "basis": "Independent fresh-context source review agrees 2/2 and no major errors. Later UI-test bridge and ECAT observer remain later contracts, not initial migration violations. Distinguishes main HAP success from intermediate ohosTest getAccessibilityText failure and repaired rebuild. Does not certify bridge consumption or observer callbacks from UI/build PASS.",
+      "audit_caveats": "Actual later page/Want UI activity with explicitly unobservable AppStorage keys is not cited; optional completeness omission, not contradiction of bounded no key-consumption proof. Earlier natural jscrash collection does not establish controlled post-observer validation.",
+      "cost": {
+        "input_total": 5258701,
+        "cached_input": 5010432,
+        "uncached_input": 248269,
+        "output": 30689,
+        "input_plus_output": 5289390,
+        "seconds": 672.0897156000137
+      },
+      "mechanical": {
+        "status": "valid",
+        "queries": 87,
+        "query_failed": 3,
+        "opens": 56,
+        "open_failed": 1,
+        "frames": 122,
+        "frames_visible_complete": 122,
+        "bodies_visible_complete": 34,
+        "host_truncated_wrappers": 1,
+        "nodes": 12,
+        "edges": 12,
+        "unassessed": 0,
+        "unknown_calls": 0,
+        "missing_evidence_links": 0,
+        "actor_notes": 0
+      }
+    }
+  ],
+  "summary": {
+    "files_run": 2,
+    "correct": 4,
+    "partial": 0,
+    "wrong": 0,
+    "major_extra_claims": 1,
+    "frozen_total_units": 28,
+    "remaining_files_not_run": 8,
+    "input_plus_output": 12036000,
+    "model_seconds_sum": 1278.668226400041
+  },
+  "why_not": "Pilot no-major gate failed. Do not run remaining eight or stability repeats. No raw reruns. Additional query capability alone failed to recover the hidden receipt and increased both pilot costs. Next change must address actual delivery/prefix bias, not quote-validity or a case-specific keyword."
+}

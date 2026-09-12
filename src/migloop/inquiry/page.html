@@ -153,6 +153,7 @@
           placeholder="搜索词，逗号分隔（OR）"
           style="width: 100%; margin-top: 8px"
         />
+        <label class="small">原文/消息/返回排序 <select id="order"><option value="">默认</option><option value="oldest">较早优先</option><option value="newest">较新优先（非有效性认证）</option></select></label>
         <button id="query">查原文索引</button
         ><button id="relations">查读写关系</button
         ><button id="calls">查相关调用</button
@@ -269,6 +270,7 @@
         if(view==='returns') q.view=view;
       }
       if ($("since").value) q.since = $("since").value;
+      if(['records','returns','messages'].includes(view) && $('order').value) q.order=$('order').value;
       if ($("terms").value)
         q.terms = $("terms")
           .value.split(",")
@@ -291,16 +293,25 @@
         $('at').value=data.scope.at;
         $('since').value=data.scope.since || '';
         $('terms').value=(q.terms || []).join(',');
+        $('order').value=q.order || '';
       }
       $("records").replaceChildren();
       $("status").className = "small muted";
       $("status").textContent =
-        `共 ${data.total ?? 0} 条；当前 ${data.rows?.length ?? 0} 条（索引，不是全文）` +
+        `共 ${data.total ?? 0} ${data.kind==='matching_agents'?'个actor':'条'}；当前 ${data.rows?.length ?? 0} 条（索引，不是全文）${data.order?' · '+data.order:''}` +
         (data.undated_records
           ? `；未知时间 ${data.undated_records} 条${q.undated ? "（已纳入）" : "（未默认纳入）"}`
           : "");
+      if(data.matching_agents) {
+        const nav=data.matching_agents;
+        const box=element('details','',$('records'));box.open=true;
+        element('summary',`匹配分布：${nav.matched_records} 条来自 ${nav.total} 个 actor（不是读写关系）`,box);
+        for(const row of nav.rows) renderMatchingActor(row,box,at,q.undated);
+        button('查看全部匹配 actor',box,()=>query(nav.query));
+      }
       for (const row of data.rows || []) {
         const box = element("div", "", $("records"), "row");
+        if(data.kind==='matching_agents') {renderMatchingActor(row,box,at,q.undated);continue;}
         if (data.kind === "catalog") {
           button(row.key, box, () => {
             $("kind").value = data.catalog_kind;
@@ -666,6 +677,12 @@
           appendReviewEvidence(row,box,graph.target.at);
         }
       }
+    }
+    function renderMatchingActor(row,box,at,undated=false) {
+      const item=element('div',`${row.agent || '未知身份'} · ${row.matches} 条 · ${row.first_at || '未知时间'} — ${row.last_at || '未知时间'}`,box,'small');
+      element('div','最新匹配样例（不认证验证）：'+row.excerpt,item);
+      button('展开样例原文',item,()=>open(row.latest_match,at,undated));
+      if(row.query) button('只看此 actor 的同范围匹配',item,()=>query(row.query));
     }
     function appendReviewEvidence(row,box,at) {
       element('pre',JSON.stringify(row,null,2),box);

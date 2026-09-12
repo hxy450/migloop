@@ -31,6 +31,7 @@ def return_window(engine, agent, at, cutoff, limitations):
         "since": iso(at),
         "at": cutoff,
         "view": "returns",
+        "order": "newest",
         "offset": 0,
         "limit": 20,
     }

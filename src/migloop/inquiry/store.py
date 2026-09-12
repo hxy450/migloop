@@ -115,6 +115,7 @@ CREATE TEMP TABLE parts(record TEXT,source TEXT,slot INT,family TEXT,role TEXT,c
  payload TEXT,success INT,at INT,PRIMARY KEY(record,slot));
 CREATE INDEX pair_calls ON parts(source,family,call_id);
 CREATE TABLE pairs(a TEXT,b TEXT,PRIMARY KEY(a,b));
+CREATE INDEX pairs_by_result ON pairs(b,a);
 CREATE TABLE call_pairs(request TEXT,request_slot INT,result TEXT,result_slot INT,
  PRIMARY KEY(result,result_slot));
 CREATE TABLE effects(id TEXT PRIMARY KEY,path TEXT,agent TEXT,op TEXT,strength TEXT,at INT,

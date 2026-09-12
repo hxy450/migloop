@@ -386,6 +386,35 @@ async function main() {
         assert.equal(await evaluate('JSON.stringify({graph,trace})'),initial);
         fs.writeFileSync(path.join(out,'pool-returns.json'),JSON.stringify(pooled,null,2));
       }
+      if (process.argv.includes('--search-groups')) {
+        const grouped=await evaluate(`(async()=>{
+          const q={op:'search',kind:'pool',view:'returns',at:graph.target.at,terms:['BUILD'],limit:2};
+          if(graph.target.since) q.since=graph.target.since;
+          const data=await query(q),nav=data.matching_agents;
+          if(!nav?.rows.length) throw Error('missing matching-actor navigation');
+          const control=[...document.querySelectorAll('#records button')].find(b=>b.textContent==='只看此 actor 的同范围匹配');
+          if(!control) throw Error('no actor narrowing button');
+          const saved=query;let sent=null,pending=null;
+          query=(request)=>{sent=request;pending=saved(request);return pending;};
+          let narrowed;try {control.click();narrowed=await pending;} finally {query=saved;}
+          const selectedOrder=document.getElementById('order').value;
+          document.getElementById('order').value='oldest';
+          const manual=request('returns');
+          const all=await query(nav.query);
+          return {sent,expected:nav.rows[0].query,selectedOrder,manualOrder:manual.order,
+            narrowed:narrowed.scope,expectedBounds:data.scope,
+            groupedKind:all.kind,displayed:document.querySelectorAll('#records .row').length,expectedDisplayed:all.rows.length};
+        })()`);
+        assert.deepEqual(grouped.sent,grouped.expected);
+        assert.equal(grouped.selectedOrder,'newest');
+        assert.equal(grouped.manualOrder,'oldest');
+        assert.equal(grouped.narrowed.at,grouped.expectedBounds.at);
+        assert.equal(grouped.narrowed.since,grouped.expectedBounds.since);
+        assert.equal(grouped.groupedKind,'matching_agents');
+        assert.equal(grouped.displayed,grouped.expectedDisplayed);
+        assert.equal(await evaluate('JSON.stringify({graph,trace})'),initial);
+        fs.writeFileSync(path.join(out,'search-groups.json'),JSON.stringify(grouped,null,2));
+      }
       assert.equal(errors.length, 0);
       const result = {passed:true, url, errors, model_report:true, report_mutated:false,
         checks:["all findings match submitted graph", "node reason", "manual query isolation", "raw expansion"]};
