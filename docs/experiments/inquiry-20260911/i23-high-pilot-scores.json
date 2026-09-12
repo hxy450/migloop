@@ -1,0 +1,111 @@
+{
+  "schema": "inquiry-developer-score/1",
+  "round": "i23-high",
+  "investigator_commit": "5aa296b",
+  "model": "gpt-5.6-luna",
+  "effort": "high",
+  "reference": "../file-first-10/scoring-core.json",
+  "provisional": false,
+  "accepted": false,
+  "cases": [
+    {
+      "id": "F10-04",
+      "report_id": "1075adabb5cc4b2e",
+      "source_sha256": "ecf936b1813ccb4d0173faaf2434de3a59dd5010e463a500100b08724df229c9",
+      "units": {
+        "debug-wiring": "correct",
+        "wrong-class-repair": "correct"
+      },
+      "additional_errors": [],
+      "runtime_evidence_recovered": true,
+      "basis": "Independent fresh-context review and original source checks support both core causes and actual postrepair HMOS observations. e-7492cd979ecb native harmonyos code request success, e-8db50819fcd9 UI dump45s, e-ddff821fa963 login success/ID28299590 atJuly26 17:28UTC; not Android. Bounds are afterJuly25repair and beforecutoff. Does not claim HTTP logging, release=false, AppTrackConfig runtime or exclusive patch causality.",
+      "audit_caveats": "AppTrackConfig 'later-added interface' is ambiguous relative to Base3 vs generation cutoff. Source e-c6e0939e9957 shows interface existed beforeGEN but after earlier Base3 material; do not invent a postGEN birth claim. Effective delivery/true profile remains qualified.",
+      "cost": {
+        "input_total": 5066255,
+        "cached_input": 4836864,
+        "uncached_input": 229391,
+        "output": 16938,
+        "input_plus_output": 5083193,
+        "seconds": 422.4839464999968
+      },
+      "mechanical": {
+        "status": "valid",
+        "queries": 82,
+        "query_failed": 7,
+        "opens": 50,
+        "open_failed": 3,
+        "frames": 105,
+        "frames_visible_complete": 105,
+        "bodies_visible_complete": 56,
+        "host_truncated_wrappers": 1,
+        "nodes": 11,
+        "edges": 9,
+        "unassessed": 0,
+        "missing_evidence_links": 0
+      }
+    },
+    {
+      "id": "F10-07",
+      "report_id": "c8f4d8a1af65420f",
+      "source_sha256": "2f6d0101de0760568188ae0441d932329e61c7bf35d8cd80edbd58569f30196c",
+      "units": {
+        "test-bridge": "correct",
+        "error-observer": "correct"
+      },
+      "basis": "Later UI/ECAT contracts and code changes correctly distinguished from initial migration requirements. Report now acknowledges later10/10, but still denies observed reentry together with unobservable bridge semantics.",
+      "additional_errors": [
+        {
+          "major": true,
+          "kind": "overbroad_denial_of_runtime_observation",
+          "quote": "也没有证据证明桥键写入、mock 注入和 onNewWant 重入在真实运行中被直接观测。",
+          "counterevidence": [
+            "1595bf17223c1f0d:256:4b9a8792cb29dca7",
+            "1595bf17223c1f0d:260:e45b584caf18eb2e",
+            "1595bf17223c1f0d:265:68539b638a10c2bd",
+            "1595bf17223c1f0d:267:b1f42abbe4ec9edb"
+          ],
+          "detail": "Native replay result and captured hilog establish onNewWant×3. AppStorage/mock consumption remains unobservable. A combined unqualified negative hides this distinction. Core2/2 retained; absence phrasing counted once, not per repetition."
+        }
+      ],
+      "audit_caveats": "B's postobserver build fact is true in source but is not given an explicit inline original citation in the actual reason/unknown. Do not accuse the final of citing e-ffb770aff011/e-3d920429c219 there: neither occurs in this document. e-77a81b0258b2 only appears in reviewed:no_target_change, not sufficient postobserver proof. Actualpostbuild11f1d3dd11b1b970:44/:48 is later than21:19.",
+      "cost": {
+        "input_total": 1877232,
+        "cached_input": 1739520,
+        "uncached_input": 137712,
+        "output": 17511,
+        "input_plus_output": 1894743,
+        "seconds": 379.11075620003976
+      },
+      "mechanical": {
+        "status": "valid",
+        "queries": 46,
+        "query_failed": 2,
+        "opens": 32,
+        "open_failed": 2,
+        "frames": 61,
+        "frames_visible_complete": 61,
+        "bodies_visible_complete": 17,
+        "host_truncated_wrappers": 1,
+        "nodes": 10,
+        "edges": 9,
+        "unassessed": 0,
+        "missing_evidence_links": 0
+      }
+    }
+  ],
+  "summary": {
+    "files_run": 2,
+    "correct": 4,
+    "partial": 0,
+    "wrong": 0,
+    "major_extra_claims": 1,
+    "remaining_files_not_run": 8,
+    "input_plus_output": 6977936,
+    "model_seconds_sum": 801.5947027000366
+  },
+  "adjudication_corrections": [
+    "Independent Dice reviewer initially called the grouped absence minor, then applied the frozen behavioral-validation criterion and agreed it can be major. Parent keeps the unqualified denial of observed onNewWant as a major extra, not a core zero. Severity classification is an adjudicated rubric decision; raw contrary observation itself is directly supported.",
+    "Reviewer carried over build-ref criticism from prior context. Exact JSON search found e-ffb770aff011/e-3d920429c219 occur0 times in this final; criticism rejected, missing inline support retained separately. Reviewer also mistyped267 hash ending9ed4; SQLite source is9edb. Source records and actual document override reviewer memory."
+  ],
+  "why_not": "F04 positive recovery gate met; F07 observation distinction/no-major gate failed. No remaining8 or stability repeats. Preserve all results. Next controlled comparison changes Luna effort only, not tools/prompts or raw baseline."
+}
