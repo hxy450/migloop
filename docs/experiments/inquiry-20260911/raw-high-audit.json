@@ -1,0 +1,779 @@
+{
+  "schema": "inquiry-matched-raw-high-audit/1",
+  "verified_at_utc": "2026-09-12T08:13:50Z",
+  "provisional": false,
+  "model_calls_in_this_audit": 0,
+  "raw_root": "C:/Users/hongy/projects/_migloop-eval-20260909/file-first-10/raw-high-i20-match-20260912",
+  "tool_root": "C:/Users/hongy/projects/_migloop-eval-20260909/file-first-10/inquiry-iterations-20260911/i20-high",
+  "raw_manifest_sha256": "7bc5b0b536421f242dbe633ab9996924a0a24a1f2a24fc8dd142359ad9e7bda5",
+  "tool_manifest_sha256": "e5a84fcc6d00e2c0b433586a23ba958eaf622cc50b159e6c34e306f21dda0f66",
+  "core_sha256": "0d48f30f9e501eedd55b87e086590c72e8b7fb8096a939f56842b71703426497",
+  "raw_driver_sha256": "caa94822399ffabb934c58033314a939f13b08d30f1d5b0c975e27896c2703e1",
+  "raw_driver_commit": "3af7096",
+  "raw_driver_git_blob_sha256": "caa94822399ffabb934c58033314a939f13b08d30f1d5b0c975e27896c2703e1",
+  "raw_driver_commit_blob_matches_manifest": true,
+  "raw": [
+    {
+      "id": "F10-01",
+      "report_sha256": "2efbeadaba8ee08559a0a415fabed8e30510eb668a2fb50ce9d57fd00f72b757",
+      "native_sha256": "ea4b77fa0bff71d4859910e41096722708d860abb13e67afbad2050341f63a83",
+      "native_sha_matches": true,
+      "native_final_equals_report": true,
+      "native_final_count": 1,
+      "actual_model_effort": [
+        [
+          "gpt-5.6-luna",
+          "high"
+        ]
+      ],
+      "status": "completed",
+      "recording_complete": true,
+      "host_skill_catalog_absent": true,
+      "started_at": "2026-09-12T07:08:39.579513+00:00",
+      "ended_at": "2026-09-12T07:19:51.743348+00:00",
+      "usage": {
+        "input_total": 5175227,
+        "cache_read": 4828672,
+        "cache_creation": 0,
+        "input_uncached": 346555,
+        "output": 23300,
+        "thinking_reported": 8220,
+        "output_includes_thinking": "Codex output_tokens is used once; reasoning is not added",
+        "input_semantics": "Codex input_tokens is the total; reported cache read/write are not added to it. input_uncached means input_tokens minus cached_input_tokens."
+      },
+      "seconds": 672.1680370999966
+    },
+    {
+      "id": "F10-02",
+      "report_sha256": "402c178a068cd0ff23c04ab2fa3d0d598eb8a68be740b3ec95beb294e85db88b",
+      "native_sha256": "2e1be1830d7707092955df0158a77fcbd307d77ed33cb2f69d4a5462a952dda4",
+      "native_sha_matches": true,
+      "native_final_equals_report": true,
+      "native_final_count": 1,
+      "actual_model_effort": [
+        [
+          "gpt-5.6-luna",
+          "high"
+        ]
+      ],
+      "status": "completed",
+      "recording_complete": true,
+      "host_skill_catalog_absent": true,
+      "started_at": "2026-09-12T07:08:49.756269+00:00",
+      "ended_at": "2026-09-12T07:20:57.515523+00:00",
+      "usage": {
+        "input_total": 7149274,
+        "cache_read": 6698496,
+        "cache_creation": 0,
+        "input_uncached": 450778,
+        "output": 24964,
+        "thinking_reported": 7926,
+        "output_includes_thinking": "Codex output_tokens is used once; reasoning is not added",
+        "input_semantics": "Codex input_tokens is the total; reported cache read/write are not added to it. input_uncached means input_tokens minus cached_input_tokens."
+      },
+      "seconds": 727.7733785000164
+    },
+    {
+      "id": "F10-03",
+      "report_sha256": "46562fa22d608ad262423bc51af05483104c151f3655f9f91911784445d92a93",
+      "native_sha256": "d4e51592c241556a2b388e6a14f5309b62512764c8f4b9e0c5bcc19ac2717658",
+      "native_sha_matches": true,
+      "native_final_equals_report": true,
+      "native_final_count": 1,
+      "actual_model_effort": [
+        [
+          "gpt-5.6-luna",
+          "high"
+        ]
+      ],
+      "status": "completed",
+      "recording_complete": true,
+      "host_skill_catalog_absent": true,
+      "started_at": "2026-09-12T07:20:56.505399+00:00",
+      "ended_at": "2026-09-12T07:36:32.300711+00:00",
+      "usage": {
+        "input_total": 6309812,
+        "cache_read": 5859584,
+        "cache_creation": 0,
+        "input_uncached": 450228,
+        "output": 32006,
+        "thinking_reported": 11678,
+        "output_includes_thinking": "Codex output_tokens is used once; reasoning is not added",
+        "input_semantics": "Codex input_tokens is the total; reported cache read/write are not added to it. input_uncached means input_tokens minus cached_input_tokens."
+      },
+      "seconds": 935.8142218000721
+    },
+    {
+      "id": "F10-04",
+      "report_sha256": "517fd851ab7d8d9d330cd530b2f06847c9b26f4bea701cbf86c8c75903f4f755",
+      "native_sha256": "bfffa450b22dbaf6f0625ee338a07626288a6c852ae2fa7e2e94fac8c5a98c4d",
+      "native_sha_matches": true,
+      "native_final_equals_report": true,
+      "native_final_count": 1,
+      "actual_model_effort": [
+        [
+          "gpt-5.6-luna",
+          "high"
+        ]
+      ],
+      "status": "completed",
+      "recording_complete": true,
+      "host_skill_catalog_absent": true,
+      "started_at": "2026-09-12T07:22:56.545418+00:00",
+      "ended_at": "2026-09-12T07:29:04.615223+00:00",
+      "usage": {
+        "input_total": 1880647,
+        "cache_read": 1687808,
+        "cache_creation": 0,
+        "input_uncached": 192839,
+        "output": 15229,
+        "thinking_reported": 8014,
+        "output_includes_thinking": "Codex output_tokens is used once; reasoning is not added",
+        "input_semantics": "Codex input_tokens is the total; reported cache read/write are not added to it. input_uncached means input_tokens minus cached_input_tokens."
+      },
+      "seconds": 368.07571999996435
+    },
+    {
+      "id": "F10-05",
+      "report_sha256": "587a1e4a27be2324f13c433bd1197657ebb238a5d78784b46a87c917b8071fa2",
+      "native_sha256": "c41e9f648d78b72ebb205b4b88aa4b8424ce260dec641ef068e796adf5d84425",
+      "native_sha_matches": true,
+      "native_final_equals_report": true,
+      "native_final_count": 1,
+      "actual_model_effort": [
+        [
+          "gpt-5.6-luna",
+          "high"
+        ]
+      ],
+      "status": "completed",
+      "recording_complete": true,
+      "host_skill_catalog_absent": true,
+      "started_at": "2026-09-12T07:29:27.917094+00:00",
+      "ended_at": "2026-09-12T07:37:28.704494+00:00",
+      "usage": {
+        "input_total": 3908345,
+        "cache_read": 3672832,
+        "cache_creation": 0,
+        "input_uncached": 235513,
+        "output": 19905,
+        "thinking_reported": 9728,
+        "output_includes_thinking": "Codex output_tokens is used once; reasoning is not added",
+        "input_semantics": "Codex input_tokens is the total; reported cache read/write are not added to it. input_uncached means input_tokens minus cached_input_tokens."
+      },
+      "seconds": 480.79389689990785
+    },
+    {
+      "id": "F10-06",
+      "report_sha256": "26d7168c01699093fa3a4b1c498d34ac180ac35ad8b2b3fc4b0e2aa273e55917",
+      "native_sha256": "1ddcd4fe24e7397fa494fbedddf34bc38b783ceeac0318382c8dcb7bc59c1786",
+      "native_sha_matches": true,
+      "native_final_equals_report": true,
+      "native_final_count": 1,
+      "actual_model_effort": [
+        [
+          "gpt-5.6-luna",
+          "high"
+        ]
+      ],
+      "status": "completed",
+      "recording_complete": true,
+      "host_skill_catalog_absent": true,
+      "started_at": "2026-09-12T07:37:07.496261+00:00",
+      "ended_at": "2026-09-12T07:52:24.859897+00:00",
+      "usage": {
+        "input_total": 4113808,
+        "cache_read": 3752704,
+        "cache_creation": 0,
+        "input_uncached": 361104,
+        "output": 18278,
+        "thinking_reported": 5487,
+        "output_includes_thinking": "Codex output_tokens is used once; reasoning is not added",
+        "input_semantics": "Codex input_tokens is the total; reported cache read/write are not added to it. input_uncached means input_tokens minus cached_input_tokens."
+      },
+      "seconds": 917.3755933999782
+    },
+    {
+      "id": "F10-07",
+      "report_sha256": "0e4c97f3775e0f22bd372dc1113e78b4f67287834154711a1bb977e4acc4e500",
+      "native_sha256": "f4402ebea01e0683a91b4dedfb8f25bbd20c3ca8206324358428e8207d693b71",
+      "native_sha_matches": true,
+      "native_final_equals_report": true,
+      "native_final_count": 1,
+      "actual_model_effort": [
+        [
+          "gpt-5.6-luna",
+          "high"
+        ]
+      ],
+      "status": "completed",
+      "recording_complete": true,
+      "host_skill_catalog_absent": true,
+      "started_at": "2026-09-12T07:44:19.619740+00:00",
+      "ended_at": "2026-09-12T07:52:34.206957+00:00",
+      "usage": {
+        "input_total": 4015782,
+        "cache_read": 3743488,
+        "cache_creation": 0,
+        "input_uncached": 272294,
+        "output": 18975,
+        "thinking_reported": 7730,
+        "output_includes_thinking": "Codex output_tokens is used once; reasoning is not added",
+        "input_semantics": "Codex input_tokens is the total; reported cache read/write are not added to it. input_uncached means input_tokens minus cached_input_tokens."
+      },
+      "seconds": 494.5986907000188
+    },
+    {
+      "id": "F10-08",
+      "report_sha256": "7688eb3ac61c5358800d8d93ce66a756e6ad3023d81188e7c9e55c371633a849",
+      "native_sha256": "8406373adf0841e418949edd916b47c38e13b4eeb2ad6636675ab299bd08cade",
+      "native_sha_matches": true,
+      "native_final_equals_report": true,
+      "native_final_count": 1,
+      "actual_model_effort": [
+        [
+          "gpt-5.6-luna",
+          "high"
+        ]
+      ],
+      "status": "completed",
+      "recording_complete": true,
+      "host_skill_catalog_absent": true,
+      "started_at": "2026-09-12T07:57:23.267891+00:00",
+      "ended_at": "2026-09-12T08:05:18.796919+00:00",
+      "usage": {
+        "input_total": 5250206,
+        "cache_read": 4991232,
+        "cache_creation": 0,
+        "input_uncached": 258974,
+        "output": 20295,
+        "thinking_reported": 9926,
+        "output_includes_thinking": "Codex output_tokens is used once; reasoning is not added",
+        "input_semantics": "Codex input_tokens is the total; reported cache read/write are not added to it. input_uncached means input_tokens minus cached_input_tokens."
+      },
+      "seconds": 475.53736930002924
+    },
+    {
+      "id": "F10-09",
+      "report_sha256": "b15278716b4a817ae843ec10ed558a3e2c7294902075e687f9b42403970d0f93",
+      "native_sha256": "909f836da6c403ac13bae85b3ca48077cecefa544262d0fe0dedf65e8cb41c97",
+      "native_sha_matches": true,
+      "native_final_equals_report": true,
+      "native_final_count": 1,
+      "actual_model_effort": [
+        [
+          "gpt-5.6-luna",
+          "high"
+        ]
+      ],
+      "status": "completed",
+      "recording_complete": true,
+      "host_skill_catalog_absent": true,
+      "started_at": "2026-09-12T07:57:33.170384+00:00",
+      "ended_at": "2026-09-12T08:04:27.869674+00:00",
+      "usage": {
+        "input_total": 4043610,
+        "cache_read": 3816448,
+        "cache_creation": 0,
+        "input_uncached": 227162,
+        "output": 16868,
+        "thinking_reported": 6481,
+        "output_includes_thinking": "Codex output_tokens is used once; reasoning is not added",
+        "input_semantics": "Codex input_tokens is the total; reported cache read/write are not added to it. input_uncached means input_tokens minus cached_input_tokens."
+      },
+      "seconds": 414.7051846999675
+    },
+    {
+      "id": "F10-10",
+      "report_sha256": "c91e19ea98666f9fa58848ea0374f000855c4bee0a49bb03af1749511acc624a",
+      "native_sha256": "70fada4e5e88034fe917679d2c2ef454cd3c376abb6235ca725bbf7ea4fb58a1",
+      "native_sha_matches": true,
+      "native_final_equals_report": true,
+      "native_final_count": 1,
+      "actual_model_effort": [
+        [
+          "gpt-5.6-luna",
+          "high"
+        ]
+      ],
+      "status": "completed",
+      "recording_complete": true,
+      "host_skill_catalog_absent": true,
+      "started_at": "2026-09-12T08:06:08.629032+00:00",
+      "ended_at": "2026-09-12T08:11:24.608826+00:00",
+      "usage": {
+        "input_total": 2097189,
+        "cache_read": 1891328,
+        "cache_creation": 0,
+        "input_uncached": 205861,
+        "output": 14836,
+        "thinking_reported": 7789,
+        "output_includes_thinking": "Codex output_tokens is used once; reasoning is not added",
+        "input_semantics": "Codex input_tokens is the total; reported cache read/write are not added to it. input_uncached means input_tokens minus cached_input_tokens."
+      },
+      "seconds": 315.98447040002793
+    }
+  ],
+  "tool": [
+    {
+      "id": "F10-01",
+      "native_sha_matches": true,
+      "contexts": [
+        [
+          "gpt-5.6-luna",
+          "high"
+        ]
+      ],
+      "report_id": "739132fdf2f14e5d",
+      "native_final_report_id_matches": true,
+      "native_final_source_sha_matches": true,
+      "verdict_file_sha256": "adca53e5444f75ca7681687c2f6e223a8f7deb9e70772416488143cc1b3d4339",
+      "verdict_source_sha256": "adca53e5444f75ca7681687c2f6e223a8f7deb9e70772416488143cc1b3d4339",
+      "source_sha_matches": true,
+      "native_submit_bound": true,
+      "audit_errors": [],
+      "native_sha256": "5b93fb6a28a6995b6d7e04718e1169cfbaf04e42aa52fe0d7bb8f2ad96f473db",
+      "status": "completed",
+      "recording_complete": true,
+      "host_skill_catalog_absent": true,
+      "started_at": "2026-09-12T02:37:23.860873+00:00",
+      "ended_at": "2026-09-12T02:52:30.202585+00:00",
+      "usage": {
+        "input_total": 6658263,
+        "cache_read": 6348288,
+        "cache_creation": 0,
+        "input_uncached": 309975,
+        "output": 35000,
+        "thinking_reported": 12173,
+        "output_includes_thinking": "Codex output_tokens is used once; reasoning is not added",
+        "input_semantics": "Codex input_tokens is the total; reported cache read/write are not added to it. input_uncached means input_tokens minus cached_input_tokens."
+      },
+      "seconds": 906.3670262000524,
+      "system_cost": {
+        "offline_audit_seconds": 0.1618105999659747,
+        "model_calls": 0,
+        "import_seconds": 20.12678859999869,
+        "warm_end_to_end_seconds": 906.5288368000183,
+        "cold_end_to_end_seconds": 926.655625400017
+      }
+    },
+    {
+      "id": "F10-02",
+      "native_sha_matches": true,
+      "contexts": [
+        [
+          "gpt-5.6-luna",
+          "high"
+        ]
+      ],
+      "report_id": "4051144a06304bce",
+      "native_final_report_id_matches": true,
+      "native_final_source_sha_matches": true,
+      "verdict_file_sha256": "b016faadccb57ffbe612d8fbf4d79c91bc9824bcd6d865afab06fda7611344a0",
+      "verdict_source_sha256": "b016faadccb57ffbe612d8fbf4d79c91bc9824bcd6d865afab06fda7611344a0",
+      "source_sha_matches": true,
+      "native_submit_bound": true,
+      "audit_errors": [],
+      "native_sha256": "279dfb5bf86a3d3edc3a6a8d89975b3ae0bc8ebc6b2a52a69cf3fb4a0e6a7713",
+      "status": "completed",
+      "recording_complete": true,
+      "host_skill_catalog_absent": true,
+      "started_at": "2026-09-12T02:55:19.344846+00:00",
+      "ended_at": "2026-09-12T03:11:52.245142+00:00",
+      "usage": {
+        "input_total": 7655540,
+        "cache_read": 7361792,
+        "cache_creation": 0,
+        "input_uncached": 293748,
+        "output": 38775,
+        "thinking_reported": 14212,
+        "output_includes_thinking": "Codex output_tokens is used once; reasoning is not added",
+        "input_semantics": "Codex input_tokens is the total; reported cache read/write are not added to it. input_uncached means input_tokens minus cached_input_tokens."
+      },
+      "seconds": 992.9252178000752,
+      "system_cost": {
+        "offline_audit_seconds": 0.1857387999771163,
+        "model_calls": 0,
+        "import_seconds": 20.12678859999869,
+        "warm_end_to_end_seconds": 993.1109566000523,
+        "cold_end_to_end_seconds": 1013.237745200051
+      }
+    },
+    {
+      "id": "F10-03",
+      "native_sha_matches": true,
+      "contexts": [
+        [
+          "gpt-5.6-luna",
+          "high"
+        ]
+      ],
+      "report_id": "1aa6588893e74cb7",
+      "native_final_report_id_matches": true,
+      "native_final_source_sha_matches": true,
+      "verdict_file_sha256": "220c4b7759675d58cbedc0ba88d6118d2f4dafbce223db618a5e58eb855b634b",
+      "verdict_source_sha256": "220c4b7759675d58cbedc0ba88d6118d2f4dafbce223db618a5e58eb855b634b",
+      "source_sha_matches": true,
+      "native_submit_bound": true,
+      "audit_errors": [],
+      "native_sha256": "1fe67dc4eede9ea2fb09377a7339d8071d4454d8481c312a46b00c94a1449cdb",
+      "status": "completed",
+      "recording_complete": true,
+      "host_skill_catalog_absent": true,
+      "started_at": "2026-09-12T02:55:43.073089+00:00",
+      "ended_at": "2026-09-12T03:05:07.288285+00:00",
+      "usage": {
+        "input_total": 4811466,
+        "cache_read": 4584704,
+        "cache_creation": 0,
+        "input_uncached": 226762,
+        "output": 23453,
+        "thinking_reported": 9345,
+        "output_includes_thinking": "Codex output_tokens is used once; reasoning is not added",
+        "input_semantics": "Codex input_tokens is the total; reported cache read/write are not added to it. input_uncached means input_tokens minus cached_input_tokens."
+      },
+      "seconds": 564.228347599972,
+      "system_cost": {
+        "offline_audit_seconds": 0.1128618000075221,
+        "model_calls": 0,
+        "import_seconds": 1.6998588000424206,
+        "warm_end_to_end_seconds": 564.3412093999796,
+        "cold_end_to_end_seconds": 566.041068200022
+      }
+    },
+    {
+      "id": "F10-04",
+      "native_sha_matches": true,
+      "contexts": [
+        [
+          "gpt-5.6-luna",
+          "high"
+        ]
+      ],
+      "report_id": "7c8e1f8f1faf46d6",
+      "native_final_report_id_matches": true,
+      "native_final_source_sha_matches": true,
+      "verdict_file_sha256": "455c8f952970b85adf3895ac7130adb66419a1f5f808222486ac2999eace5e06",
+      "verdict_source_sha256": "455c8f952970b85adf3895ac7130adb66419a1f5f808222486ac2999eace5e06",
+      "source_sha_matches": true,
+      "native_submit_bound": true,
+      "audit_errors": [],
+      "native_sha256": "0ae57e8d7573dc20ae8580e908a929917443a62fe8677fccb9eadc400242f9c8",
+      "status": "completed",
+      "recording_complete": true,
+      "host_skill_catalog_absent": true,
+      "started_at": "2026-09-12T03:06:05.495893+00:00",
+      "ended_at": "2026-09-12T03:13:54.749992+00:00",
+      "usage": {
+        "input_total": 4319004,
+        "cache_read": 4103680,
+        "cache_creation": 0,
+        "input_uncached": 215324,
+        "output": 18346,
+        "thinking_reported": 7274,
+        "output_includes_thinking": "Codex output_tokens is used once; reasoning is not added",
+        "input_semantics": "Codex input_tokens is the total; reported cache read/write are not added to it. input_uncached means input_tokens minus cached_input_tokens."
+      },
+      "seconds": 469.2615471999161,
+      "system_cost": {
+        "offline_audit_seconds": 0.14946530002634972,
+        "model_calls": 0,
+        "import_seconds": 20.12678859999869,
+        "warm_end_to_end_seconds": 469.41101249994244,
+        "cold_end_to_end_seconds": 489.53780109994113
+      }
+    },
+    {
+      "id": "F10-05",
+      "native_sha_matches": true,
+      "contexts": [
+        [
+          "gpt-5.6-luna",
+          "high"
+        ]
+      ],
+      "report_id": "9c21cb54aa434c51",
+      "native_final_report_id_matches": true,
+      "native_final_source_sha_matches": true,
+      "verdict_file_sha256": "4906f98e96c1e37f21e21ba2d2b98a4def967ad3ef07fadacf3a64fd10267366",
+      "verdict_source_sha256": "4906f98e96c1e37f21e21ba2d2b98a4def967ad3ef07fadacf3a64fd10267366",
+      "source_sha_matches": true,
+      "native_submit_bound": true,
+      "audit_errors": [],
+      "native_sha256": "c10e188de2feb2f8457062a42ef170380b364ddcd4d2252c2191dd5c0310b3c5",
+      "status": "completed",
+      "recording_complete": true,
+      "host_skill_catalog_absent": true,
+      "started_at": "2026-09-12T03:14:37.038674+00:00",
+      "ended_at": "2026-09-12T03:20:31.177117+00:00",
+      "usage": {
+        "input_total": 1841067,
+        "cache_read": 1699584,
+        "cache_creation": 0,
+        "input_uncached": 141483,
+        "output": 14577,
+        "thinking_reported": 6370,
+        "output_includes_thinking": "Codex output_tokens is used once; reasoning is not added",
+        "input_semantics": "Codex input_tokens is the total; reported cache read/write are not added to it. input_uncached means input_tokens minus cached_input_tokens."
+      },
+      "seconds": 354.1473529000068,
+      "system_cost": {
+        "offline_audit_seconds": 0.269263599999249,
+        "model_calls": 0,
+        "import_seconds": 20.12678859999869,
+        "warm_end_to_end_seconds": 354.41661650000606,
+        "cold_end_to_end_seconds": 374.54340510000475
+      }
+    },
+    {
+      "id": "F10-06",
+      "native_sha_matches": true,
+      "contexts": [
+        [
+          "gpt-5.6-luna",
+          "high"
+        ]
+      ],
+      "report_id": "db72c65e560f48ab",
+      "native_final_report_id_matches": true,
+      "native_final_source_sha_matches": true,
+      "verdict_file_sha256": "0f3ee0a6754e0cde335a443aa7828058385da457615bcc21c7a7d19b7474124f",
+      "verdict_source_sha256": "0f3ee0a6754e0cde335a443aa7828058385da457615bcc21c7a7d19b7474124f",
+      "source_sha_matches": true,
+      "native_submit_bound": true,
+      "audit_errors": [],
+      "native_sha256": "85fdf058905b5e92a659308129403620731763aa600ace0748e2b60a30029b8d",
+      "status": "completed",
+      "recording_complete": true,
+      "host_skill_catalog_absent": true,
+      "started_at": "2026-09-12T03:16:54.882832+00:00",
+      "ended_at": "2026-09-12T03:33:16.971850+00:00",
+      "usage": {
+        "input_total": 8281679,
+        "cache_read": 7883776,
+        "cache_creation": 0,
+        "input_uncached": 397903,
+        "output": 30236,
+        "thinking_reported": 10877,
+        "output_includes_thinking": "Codex output_tokens is used once; reasoning is not added",
+        "input_semantics": "Codex input_tokens is the total; reported cache read/write are not added to it. input_uncached means input_tokens minus cached_input_tokens."
+      },
+      "seconds": 982.1104136999929,
+      "system_cost": {
+        "offline_audit_seconds": 0.7888534999219701,
+        "model_calls": 0,
+        "import_seconds": 20.12678859999869,
+        "warm_end_to_end_seconds": 982.8992671999149,
+        "cold_end_to_end_seconds": 1003.0260557999136
+      }
+    },
+    {
+      "id": "F10-07",
+      "native_sha_matches": true,
+      "contexts": [
+        [
+          "gpt-5.6-luna",
+          "high"
+        ]
+      ],
+      "report_id": "2236a94787a84841",
+      "native_final_report_id_matches": true,
+      "native_final_source_sha_matches": true,
+      "verdict_file_sha256": "e5b840f833ce55d575928f0d94540d9cfd08eedca918f2bd2ce27b8767648074",
+      "verdict_source_sha256": "e5b840f833ce55d575928f0d94540d9cfd08eedca918f2bd2ce27b8767648074",
+      "source_sha_matches": true,
+      "native_submit_bound": true,
+      "audit_errors": [],
+      "native_sha256": "0d3fb563de9f8472276109e3640b80ccdf8f810829aba4b86f176a23ab39ecbe",
+      "status": "completed",
+      "recording_complete": true,
+      "host_skill_catalog_absent": true,
+      "started_at": "2026-09-12T03:21:11.526864+00:00",
+      "ended_at": "2026-09-12T03:29:33.147521+00:00",
+      "usage": {
+        "input_total": 3142985,
+        "cache_read": 2951168,
+        "cache_creation": 0,
+        "input_uncached": 191817,
+        "output": 21845,
+        "thinking_reported": 8706,
+        "output_includes_thinking": "Codex output_tokens is used once; reasoning is not added",
+        "input_semantics": "Codex input_tokens is the total; reported cache read/write are not added to it. input_uncached means input_tokens minus cached_input_tokens."
+      },
+      "seconds": 501.63179579994176,
+      "system_cost": {
+        "offline_audit_seconds": 0.45939779991749674,
+        "model_calls": 0,
+        "import_seconds": 1.6998588000424206,
+        "warm_end_to_end_seconds": 502.09119359985925,
+        "cold_end_to_end_seconds": 503.7910523999017
+      }
+    },
+    {
+      "id": "F10-08",
+      "native_sha_matches": true,
+      "contexts": [
+        [
+          "gpt-5.6-luna",
+          "high"
+        ]
+      ],
+      "report_id": "14180e1c261445a8",
+      "native_final_report_id_matches": true,
+      "native_final_source_sha_matches": true,
+      "verdict_file_sha256": "d31a1e72721850dc8defc43adc48d25d02bde99a41a2b5e894fb8537b411ffcf",
+      "verdict_source_sha256": "d31a1e72721850dc8defc43adc48d25d02bde99a41a2b5e894fb8537b411ffcf",
+      "source_sha_matches": true,
+      "native_submit_bound": true,
+      "audit_errors": [],
+      "native_sha256": "583e796dcad41273fa60d67be7f7fd15d117681f858b00547e6fb80d00c174dc",
+      "status": "completed",
+      "recording_complete": true,
+      "host_skill_catalog_absent": true,
+      "started_at": "2026-09-12T03:30:39.849297+00:00",
+      "ended_at": "2026-09-12T03:38:23.200444+00:00",
+      "usage": {
+        "input_total": 2738124,
+        "cache_read": 2573056,
+        "cache_creation": 0,
+        "input_uncached": 165068,
+        "output": 20052,
+        "thinking_reported": 8506,
+        "output_includes_thinking": "Codex output_tokens is used once; reasoning is not added",
+        "input_semantics": "Codex input_tokens is the total; reported cache read/write are not added to it. input_uncached means input_tokens minus cached_input_tokens."
+      },
+      "seconds": 463.37152210006025,
+      "system_cost": {
+        "offline_audit_seconds": 0.1146528999088332,
+        "model_calls": 0,
+        "import_seconds": 1.6998588000424206,
+        "warm_end_to_end_seconds": 463.4861749999691,
+        "cold_end_to_end_seconds": 465.1860338000115
+      }
+    },
+    {
+      "id": "F10-09",
+      "native_sha_matches": true,
+      "contexts": [
+        [
+          "gpt-5.6-luna",
+          "high"
+        ]
+      ],
+      "report_id": "174c2d6ccb1b43f9",
+      "native_final_report_id_matches": true,
+      "native_final_source_sha_matches": true,
+      "verdict_file_sha256": "0b1475ea1579fc05afcac5813151457ca681e1d6680e253f96d01cc243800aab",
+      "verdict_source_sha256": "0b1475ea1579fc05afcac5813151457ca681e1d6680e253f96d01cc243800aab",
+      "source_sha_matches": true,
+      "native_submit_bound": true,
+      "audit_errors": [],
+      "native_sha256": "5047aab7ababaec145f0fba18619242e23d91b3590a38f157b686b0133bb211b",
+      "status": "completed",
+      "recording_complete": true,
+      "host_skill_catalog_absent": true,
+      "started_at": "2026-09-12T03:35:22.290562+00:00",
+      "ended_at": "2026-09-12T03:42:07.311775+00:00",
+      "usage": {
+        "input_total": 3033021,
+        "cache_read": 2864128,
+        "cache_creation": 0,
+        "input_uncached": 168893,
+        "output": 13878,
+        "thinking_reported": 5237,
+        "output_includes_thinking": "Codex output_tokens is used once; reasoning is not added",
+        "input_semantics": "Codex input_tokens is the total; reported cache read/write are not added to it. input_uncached means input_tokens minus cached_input_tokens."
+      },
+      "seconds": 405.0300720001105,
+      "system_cost": {
+        "offline_audit_seconds": 0.11774160002823919,
+        "model_calls": 0,
+        "import_seconds": 2.321961299981922,
+        "warm_end_to_end_seconds": 405.14781360013876,
+        "cold_end_to_end_seconds": 407.4697749001207
+      }
+    },
+    {
+      "id": "F10-10",
+      "native_sha_matches": true,
+      "contexts": [
+        [
+          "gpt-5.6-luna",
+          "high"
+        ]
+      ],
+      "report_id": "88cfa25d132c4425",
+      "native_final_report_id_matches": true,
+      "native_final_source_sha_matches": true,
+      "verdict_file_sha256": "bd45392642154c61e0f493e46d3a25eab5637c1081f7c430a0bbdaf090c1d049",
+      "verdict_source_sha256": "bd45392642154c61e0f493e46d3a25eab5637c1081f7c430a0bbdaf090c1d049",
+      "source_sha_matches": true,
+      "native_submit_bound": true,
+      "audit_errors": [],
+      "native_sha256": "7883b43bf4259632e2bd9386252e1378b4760e0c96c538baaf8bbbdd8c8add4f",
+      "status": "completed",
+      "recording_complete": true,
+      "host_skill_catalog_absent": true,
+      "started_at": "2026-09-12T03:40:51.035948+00:00",
+      "ended_at": "2026-09-12T03:47:27.639086+00:00",
+      "usage": {
+        "input_total": 3569203,
+        "cache_read": 3378432,
+        "cache_creation": 0,
+        "input_uncached": 190771,
+        "output": 15391,
+        "thinking_reported": 5948,
+        "output_includes_thinking": "Codex output_tokens is used once; reasoning is not added",
+        "input_semantics": "Codex input_tokens is the total; reported cache read/write are not added to it. input_uncached means input_tokens minus cached_input_tokens."
+      },
+      "seconds": 396.60397779999766,
+      "system_cost": {
+        "offline_audit_seconds": 0.2213679999113083,
+        "model_calls": 0,
+        "import_seconds": 2.321961299981922,
+        "warm_end_to_end_seconds": 396.825345799909,
+        "cold_end_to_end_seconds": 399.1473070998909
+      }
+    }
+  ],
+  "cost": {
+    "raw": {
+      "runs": 10,
+      "input_total": 43943900,
+      "cached_input": 40942592,
+      "uncached_input": 3001308,
+      "output": 204656,
+      "total": 44148556,
+      "seconds": 5802.826562799979
+    },
+    "tool": {
+      "runs": 10,
+      "input_total": 46050352,
+      "cached_input": 43748608,
+      "uncached_input": 2301744,
+      "output": 231553,
+      "total": 46281905,
+      "seconds": 6035.677273100126
+    }
+  },
+  "schedule": {
+    "raw": {
+      "first_started_at": "2026-09-12T07:08:39.579513+00:00",
+      "last_ended_at": "2026-09-12T08:11:24.608826+00:00",
+      "start_to_end_seconds": 3765.029
+    },
+    "tool": {
+      "first_started_at": "2026-09-12T02:37:23.860873+00:00",
+      "last_ended_at": "2026-09-12T03:47:27.639086+00:00",
+      "start_to_end_seconds": 4203.779
+    },
+    "note": "Start-to-end spans include dispatch/review gaps, not a pure speed comparison. Investigator elapsed seconds include command/tool waiting; sum and perfile mean reported separately. Maximum2 investigators, no adaptive reruns."
+  },
+  "limitations": [
+    "Mechanical identity/final hash binding is not semantic correctness.",
+    "Tool native_submit_bound is rechecked against frozen delivery-audit and native final/sourceSHA, not a new end-to-end causal path certification.",
+    "Processing tokens include cached input; cache not added twice and reasoning not added to output twice. No dollar claim.",
+    "Model comparison excludes separate developer/reviewer adjudication cost. Tool warm/cold import/audit timings retained separately.",
+    "Historical same-effort comparison, not contemporaneous randomization; GUIDE and structured self-review differ and development set has repeated exposure."
+  ]
+}

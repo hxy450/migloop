@@ -15,3 +15,5 @@
 预检：一个离线组合回归覆盖同题/配置、原稿防覆盖和题干漂移拒绝，通过；Ruff通过；prepare/verify的10题与完整池核验通过、模型调用0。初次冻结后发现import排序格式问题，在任何runs目录出现前修正并把旧driver哈希保存在manifest.prelaunch_driver_revision；没有模型中途换代码。最终driver SHA256为`caa94822399ffabb934c58033314a939f13b08d30f1d5b0c975e27896c2703e1`。
 
 新manifest外部锚点：SHA256 `7bc5b0b536421f242dbe633ab9996924a0a24a1f2a24fc8dd142359ad9e7bda5`。独立只读Luna审查确认十题、完整池、高深度配置和无MCP相符，前两份实际native turn_context为Luna/high。初始skip_host_skill_discovery消息是各轮已有的实验功能告警，不能当语义错误，也不隐藏。冻结校验不等于每份报告未被改过；裁决时另核metrics中的native转录SHA、最终原文及报告SHA。没有改变运行中的代码或设置。
+
+完成记录（2026-09-12）：预定10/10一次跑完，无重试/超时/身份失败；代码、题目、配置、核心和池校验仍通过。最终原稿/型号核验、逐条裁决与同深度成本见[raw-high-results.md](raw-high-results.md)。本段是结果链接，不回写预登记或模型原稿。

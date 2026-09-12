@@ -1,0 +1,352 @@
+{
+  "schema": "inquiry-developer-score/1",
+  "round": "raw-high-i20-match-20260912",
+  "investigator_driver_commit": "3af7096",
+  "model": "gpt-5.6-luna",
+  "effort": "high",
+  "reference": "../file-first-10/scoring-core.json",
+  "provisional": false,
+  "grading": "Frozen core meaning; original-source developer adjudication with independent Luna review. Reports not edited; no gold-fed investigators, no MCP/YAML citation penalty for raw. Core coverage and extra major errors separately reported. Claim precision not exhaustively measured.",
+  "cases": [
+    {
+      "id": "F10-01",
+      "report_sha256": "2efbeadaba8ee08559a0a415fabed8e30510eb668a2fb50ce9d57fd00f72b757",
+      "units": {
+        "mask": "correct",
+        "images": "correct",
+        "cta": "correct",
+        "price": "partial",
+        "indicator": "correct",
+        "repair-compile": "correct"
+      },
+      "basis": "All six modification families recovered, including repair-created private-helper compile failure. Price explains uniform vs segmented styles but does not establish generator's received rich-text input -> output: final cites later visual finding, C XML and S8 output, explicitly leaves C replaceSpan reading unknown. Reviewer initially filled S8 input from source, then corrected partial. Equivalent actual report-supported chain would be accepted; no exact gold ID requirement.",
+      "additional_errors": [
+        {
+          "major": true,
+          "kind": "unproven_and_partly_contradicted_instruction_causality",
+          "quote": "medium confidence 规则造成了过度保守。",
+          "quote2": "没有把“源 XML 明确宽度”和“资源固有宽高比”视为允许使用的尺寸。",
+          "counterevidence": [
+            "eae088fd0f77ec14:61:3f16eadfab2d50a5",
+            "eae088fd0f77ec14:85:37076ce7f71b8de7",
+            "e20177b797c186b1:264:059f5b72db0ea50e"
+          ],
+          "detail": "Initial C and S8 full Writes use image widths280/254; C handoff explicitly sources dimensions from XML. Missing aspect/height does not establish the D008 rule caused omission; final states mechanism as fact. Count once."
+        },
+        {
+          "major": false,
+          "kind": "false_source_availability",
+          "quote": "缺少两个版本的完整文件快照。",
+          "counterevidence": [
+            "eae088fd0f77ec14:61:3f16eadfab2d50a5",
+            "e20177b797c186b1:264:059f5b72db0ea50e"
+          ],
+          "detail": "Full original Write payloads do exist, so blanket source-absence is inaccurate. Do not infer unique earliest causal responsibility or erroneous full price suffix from C's placeholder Text30. Keep bounded earliest-cause unknown separately, not add a second major solely for that uncertainty."
+        }
+      ],
+      "audit_caveats": "C/S8/F/B/O role abbreviations omit unique source filenames; request cites may not identify exact returned body. Reviewer wrongly used fixer113 (HomePage grep) for Membermask; parent verified actual103script/104Member3sites and retracted reviewer error. No full claim-precision measurement.",
+      "cost": {
+        "input_total": 5175227,
+        "cached_input": 4828672,
+        "uncached_input": 346555,
+        "output": 23300,
+        "input_plus_output": 5198527,
+        "seconds": 672.1680370999966
+      }
+    },
+    {
+      "id": "F10-02",
+      "report_sha256": "402c178a068cd0ff23c04ab2fa3d0d598eb8a68be740b3ec95beb294e85db88b",
+      "units": {
+        "mask": "missing",
+        "icon": "missing",
+        "back-gate": "correct",
+        "progress": "correct",
+        "system-bars": "correct"
+      },
+      "basis": "Restores initial onBackPressed, disappearance during Navigation integration beforeSlice11, D020/isModal assumption, and distinct dismissal vs return-to-page protections; concrete deletingwrite remains unknown in report but core historical meaning is satisfied without exact-ID requirement. Progress and window lifecycle supported. Mask103/104 and image233/234 repair families omitted.",
+      "additional_errors": [],
+      "audit_caveats": "Exact assembly Edit exists at aentry-setup123/124; report failed to locate it. Opening says 能定位到的…有三组, not 仅有/只有. Reviewer initially counted missingfamilies as majorfalseexhaustiveness then correctedmajor0. Its written grades/F10-02/rep1.json remains preliminary, not final. No full claim-precision measurement.",
+      "cost": {
+        "input_total": 7149274,
+        "cached_input": 6698496,
+        "uncached_input": 450778,
+        "output": 24964,
+        "input_plus_output": 7174238,
+        "seconds": 727.7733785000164
+      }
+    },
+    {
+      "id": "F10-03",
+      "report_sha256": "46562fa22d608ad262423bc51af05483104c151f3655f9f91911784445d92a93",
+      "units": {
+        "label": "correct",
+        "button-style": "correct",
+        "test-integration": "correct",
+        "logging": "correct",
+        "comment-policy": "correct"
+      },
+      "basis": "Explicit spec/resource Roll vs Android runtime ROLL and later uppercase/shape repair; late UI ids and UT export; visual-fixer console birth -> ECAT hilog; source-faithful TODO retained. Equivalent cause explanation meets all5 core units, no need exact gold IDs.",
+      "additional_errors": [
+        {
+          "major": false,
+          "kind": "false_native_source_availability",
+          "quote": "visual-fixer 和 UI ID 注入子代理的内部写入调用未在池内以独立工具记录出现",
+          "counterevidence": [
+            "d633aae10da220bd:68:10571d3a4fcf9637",
+            "7389901a2a4bcb6d:22:4b3fa7935fcd649b",
+            "7389901a2a4bcb6d:25:d83a48c03a266b6c",
+            "7389901a2a4bcb6d:28:6ca4937c74039a36"
+          ],
+          "detail": "Native independent child Edits actually exist; parent read exactpayloads. This doesnot change correctly identified modifications/actor-stage boundaries, so evidence audit limitation not an extra major. Would prevent claiming complete source audit."
+        }
+      ],
+      "audit_caveats": "Native command audit shows repeated Get-ChildItem -Filter '*.jsonl' without -Recurse, missing nested children despite broad root scans; earlyrg exited1. Countcommandsnotsemanticproof. Later no freshvisualretest remainsbounded/supported, not falseabsenceofallUIbehavior. No exhaustive claimprecision.",
+      "cost": {
+        "input_total": 6309812,
+        "cached_input": 5859584,
+        "uncached_input": 450228,
+        "output": 32006,
+        "input_plus_output": 6341818,
+        "seconds": 935.8142218000721
+      }
+    },
+    {
+      "id": "F10-04",
+      "report_sha256": "517fd851ab7d8d9d330cd530b2f06847c9b26f4bea701cbf86c8c75903f4f755",
+      "units": {
+        "debug-wiring": "correct",
+        "wrong-class-repair": "correct"
+      },
+      "basis": "Existingdebug/defaultfalse startup dependency and missingwiring correctly distinguished fromrepairwrongF013Service setter -> AppTrackConfig, withbuildsuccess. Core2/2.",
+      "additional_errors": [
+        {
+          "major": true,
+          "kind": "false_absence_of_postrepair_behavioral_validation",
+          "quote": "修复后的设备端手机号输入流程是否重新完整跑通。",
+          "quote2": "记录只证明了修复后的编译成功和正则静态测试结果",
+          "counterevidence": [
+            "c657f0879a83d117:184:1825225bc722d151",
+            "c657f0879a83d117:187:98dbb54a56469a63",
+            "c657f0879a83d117:190:5a5c1246f8ad7345"
+          ],
+          "detail": "Broad records-cannot-prove/only-static claim contradicted by later realHMOS phone/code/login success beforecutoff. Not merely saying current investigator didnot rerun. Doesnot proveexclusivepatchcause/buildprofile/HTTPlogging. Same frozen behavioralvalidation criterion as i20; corecorrect doesnot exemptmajor."
+        }
+      ],
+      "audit_caveats": "2025 v2backup date shouldbe2026, minor typo. Reviewer initially made validatedfalseabsence nonmajor becausecorecorrect, then corrected underexplicitrubric. Its75%precision based4selectedclaims rejected asnonexhaustive.",
+      "cost": {
+        "input_total": 1880647,
+        "cached_input": 1687808,
+        "uncached_input": 192839,
+        "output": 15229,
+        "input_plus_output": 1895876,
+        "seconds": 368.07571999996435
+      }
+    },
+    {
+      "id": "F10-05",
+      "report_sha256": "587a1e4a27be2324f13c433bd1197657ebb238a5d78784b46a87c917b8071fa2",
+      "units": {
+        "android-id-unblock": "correct"
+      },
+      "basis": "Correctly explains explicit D010pending/no inventedvalue, trueemptyidbackendblock, laterpersisted16hex testingunblock and production/platformequivalencelimits.",
+      "additional_errors": [
+        {
+          "major": true,
+          "kind": "predicted_runtime_failure_promoted_to_observed_trigger",
+          "quote": "且手机号校验修复后该阻塞才被实际暴露。",
+          "counterevidence": [
+            "cf6a999d195dbc27:5138:93f5dc4d239f20a4",
+            "cf6a999d195dbc27:5164:287d09a3e8807b78",
+            "cf6a999d195dbc27:5166:8aff660c0244e954",
+            "cf6a999d195dbc27:5329:36b480b074c55cd5"
+          ],
+          "detail": "5138 says recompile/retry and '仍可能' hitD010;5164/5166 staticdiagnosis/read;5329 explicitly bothfixesnotdeviceverified. Repairorderingisreal, a new actualrequest/backendfailurebetweenrepairs isnotestablished. Late3/3 cannotbackdateearliertrigger. Count repeatedmeaningonce, core remainscorrect."
+        }
+      ],
+      "audit_caveats": "LateHMOSsummary treatedasreportedboundedtesteffect, notproductionidentityproof. No fullclaimprecision measurement.",
+      "cost": {
+        "input_total": 3908345,
+        "cached_input": 3672832,
+        "uncached_input": 235513,
+        "output": 19905,
+        "input_plus_output": 3928250,
+        "seconds": 480.79389689990785
+      }
+    },
+    {
+      "id": "F10-06",
+      "report_sha256": "26d7168c01699093fa3a4b1c498d34ac180ac35ad8b2b3fc4b0e2aa273e55917",
+      "units": {
+        "back-image-box": "correct",
+        "track-vs-control": "correct",
+        "bottom-inset": "correct"
+      },
+      "basis": "Native initial Guide Write64 and later inherited geometry agree with image/padding mismatch, 20dp control versus4dp track; actual hostSwiper bottominset distinguished from childbutton finding. Original mapping lacks4dp, resourceactor knowledge not imputed to pageactor. Main and independent reviewer agree3/3.",
+      "additional_errors": [],
+      "audit_caveats": "Observer main1416 cited repeatedly is queue launch rather than observation result; local facts supported by original initialWrite, Android inputs and native repair168/469/473/580 withpairedreturns. No later visualretest identified; bounded effectiveness caveats kept. No exhaustive claimprecision.",
+      "cost": {
+        "input_total": 4113808,
+        "cached_input": 3752704,
+        "uncached_input": 361104,
+        "output": 18278,
+        "input_plus_output": 4132086,
+        "seconds": 917.3755933999782
+      }
+    },
+    {
+      "id": "F10-07",
+      "report_sha256": "0e4c97f3775e0f22bd372dc1113e78b4f67287834154711a1bb977e4acc4e500",
+      "units": {
+        "test-bridge": "correct",
+        "error-observer": "correct"
+      },
+      "basis": "Late Want/AppStorage/TestDataSetup cold/hot testbridge and ECAT observer explained, not certified as violated original mandatory business inputs. Initial lifecycle/window capability recognized. Independent reviewer and main agree core2/2.",
+      "additional_errors": [
+        {
+          "major": true,
+          "kind": "false_absence_of_postrepair_build_validation",
+          "quote": "修改报告明确未重新编译；因此不能声称该修改已通过构建或运行验证。",
+          "quote2": "池内没有生成后重新编译/运行该版本的证据。",
+          "counterevidence": [
+            "91c6917609a8ee64:41:d2708721e7b02b04",
+            "11f1d3dd11b1b970:48:caa206d145c0ea59"
+          ],
+          "detail": "Observer patched21:19; independent builder21:24 has CompileArkTS/BUILD_SUCCESSFUL and BUILD_EXIT_CODE0 with EntryAbility observer warnings. Modifier personally didnot compile is true, whole-pool no subsequent build is false. Count repeated meaning once. Buildsuccess doesnot prove callback semantics; earlier21:01 onNewWant/UI run predates observer and is not counterevidence to bounded no observer runtime validation."
+        }
+      ],
+      "audit_caveats": "Keeps lateECAT standard and unknown initialresponsibility boundaries. No all-sentence claimprecision measured.",
+      "cost": {
+        "input_total": 4015782,
+        "cached_input": 3743488,
+        "uncached_input": 272294,
+        "output": 18975,
+        "input_plus_output": 4034757,
+        "seconds": 494.5986907000188
+      }
+    },
+    {
+      "id": "F10-08",
+      "report_sha256": "7688eb3ac61c5358800d8d93ce66a756e6ad3023d81188e7c9e55c371633a849",
+      "units": {
+        "identity-phase-and-conflict": "correct",
+        "icon-scope": "correct"
+      },
+      "basis": "Explicit dev-identity no-bundle/vendor instruction, later scopeexpansion and vendorconflict recovered. Original defaulticon policy separated from entry->AppScope existing scaffold copies, not certified Androidlauncher migration. Core2/2.",
+      "additional_errors": [
+        {
+          "major": true,
+          "kind": "false_absence_of_postrepair_build_validation",
+          "quote": "因此本次不能声称这些改动已被重新编译或运行验证。",
+          "counterevidence": [
+            "11f1d3dd11b1b970:23:6634a536daf8df5a",
+            "11f1d3dd11b1b970:26:6356e82596a7e67c",
+            "11f1d3dd11b1b970:29:8c7f2a25f193af98",
+            "11f1d3dd11b1b970:48:caa206d145c0ea59"
+          ],
+          "detail": "Same mistaken scopeexpansion as F07: modifier didnot compile, but builder21:23 read newbundle/vendor/layeredicon, then built sameworkspace successfully21:24. Compiler evidence doesnot independently prove runtime/visual benefit, that narrower unknown remainsvalid. Countonceperreport."
+        }
+      ],
+      "audit_caveats": "Original app_icon resolved; report's missing layered assets wording is not denialofoldapp_icon. Corecorrect despite buildvalidation falseassertion. No exhaustive claimprecision.",
+      "cost": {
+        "input_total": 5250206,
+        "cached_input": 4991232,
+        "uncached_input": 258974,
+        "output": 20295,
+        "input_plus_output": 5270501,
+        "seconds": 475.53736930002924
+      }
+    },
+    {
+      "id": "F10-09",
+      "report_sha256": "b15278716b4a817ae843ec10ed558a3e2c7294902075e687f9b42403970d0f93",
+      "units": {
+        "hit-test": "correct"
+      },
+      "basis": "Actual postexecute Block->Default and parentblockingchildclicks correctly identified. Latervisualfix descriptions attributedtoactualchildreport6090, precise patches/runtimeeffect keptbounded; no false no-callback claim. Core1/1.",
+      "additional_errors": [
+        {
+          "major": true,
+          "kind": "unsupported_generation_stage_from_postgeneration_snapshot",
+          "quote": "这能定位到“生成实现阶段的 ArkUI 事件语义错误”，不是需求遗漏。",
+          "counterevidence": [
+            "2098fb5a430cd82b:5717:eca71c4ed17a52d3",
+            "2098fb5a430cd82b:7687:cd35d61c949c7094",
+            "2098fb5a430cd82b:8027:998edb590633a4f8",
+            "2098fb5a430cd82b:8067:0a9aae7ad53fd0f3"
+          ],
+          "detail": "Original creation is only a childsummary, no creationpatch/full childrollout. Block snapshot8027 is after generation-end7687; root absenceofintermediatewrites cannot certify stateatcutoff/introducingstage. Broad generatorimplementation blame stated as locatedfact, not stagehypothesis. This is unsupported-as-fact, NOT proof Block was actually introduced aftergeneration. Core localcause remainscorrect. Not penalized for missing exactoriginalauthor name."
+        }
+      ],
+      "audit_caveats": "Reviewer initially accepted no recordedintermediatewrite as affirmative generationtimeproof, then retracted under original missingchild boundary. Later visualmodifications truthfully report child6090 and unobservedexactpatch; immediateconfigmissing oldHAP distinguished from later reportedregression7253. No exhaustive claimprecision.",
+      "cost": {
+        "input_total": 4043610,
+        "cached_input": 3816448,
+        "uncached_input": 227162,
+        "output": 16868,
+        "input_plus_output": 4060478,
+        "seconds": 414.7051846999675
+      }
+    },
+    {
+      "id": "F10-10",
+      "report_sha256": "c91e19ea98666f9fa58848ea0374f000855c4bee0a49bb03af1749511acc624a",
+      "units": {
+        "signing-reference": "correct"
+      },
+      "basis": "Product reference to existingdefault signconfig correctlyexplained; unsigned generation contract not mistaken for knownvalidcredentials ignored. True extra observations: A7970 no signingConfigs and compatible6.0.2 versus B4930 configureddefault/compatible6.0.1; introductionunknown. Stage1childreport4444/4489 of removingemptyreference appropriately attributed. Lateractual4944patch and build/install distinguished.",
+      "additional_errors": [],
+      "audit_caveats": "New supported snapshotfacts accepted without adding coreunits or requiring toolreport to mention auxiliarydetails. No claim unsignednecessarilyuninstallable; signed/install recommendation not counted as such. Exactinitialfileauthor/materialcreation/DevEco effects remainunknown. No exhaustive claimprecision.",
+      "cost": {
+        "input_total": 2097189,
+        "cached_input": 1891328,
+        "uncached_input": 205861,
+        "output": 14836,
+        "input_plus_output": 2112025,
+        "seconds": 315.98447040002793
+      }
+    }
+  ],
+  "pending": [],
+  "summary": {
+    "files_graded": 10,
+    "files_remaining": 0,
+    "correct": 25,
+    "partial": 1,
+    "wrong": 0,
+    "omitted": 2,
+    "units_graded": 28,
+    "frozen_units_total": 28,
+    "file_weighted_core_coverage": 0.9433333333333334,
+    "unit_weighted_core_coverage": 0.8928571428571429,
+    "major_extra_claims": 6,
+    "files_with_major": 6,
+    "all_core_files": 8,
+    "all_core_and_no_major_files": 3,
+    "all_claim_precision": null,
+    "all_claim_precision_note": "Not exhaustively measured; core coverage is not precision of every sentence."
+  },
+  "cost": {
+    "runs": 10,
+    "input_total": 43943900,
+    "cached_input": 40942592,
+    "uncached_input": 3001308,
+    "output": 204656,
+    "total": 44148556,
+    "seconds": 5802.826562799979
+  },
+  "adjudication_corrections": [
+    "Member price initially6/6 because reviewer supplied missing S8 input proof from gold; corrected to partial after checking actual report. Member fixer113 was HomePage grep, actual mask103/104; reviewer mistake not model error.",
+    "Splash opening is bounded 能定位到的, not false exhaustive denial. Preliminary external grades/F10-02/rep1.json retains oldmajor1 and is not authoritative; parent correction major0 here.",
+    "CCEntry reviewer initially exempted falsebehaviorvalidation becausecorecorrect; correctedmajor1. A4selectedclaim75%precision rejected asnotexhaustive.",
+    "DiceIndex and Member missingnativewrite/fullsnapshot claims are audit/minor where centralcause/actor notchanged; do not inflate extra majors for every source-availability mistake.",
+    "CodexDialog reviewer initially treated no intermediate recordedwrite as proof of generationtimeBlock; corrected to unsupportedstage major1 after rechecking missing childcreationpatch. This doesnot assert the Block definitely arose aftergeneration.",
+    "New signing snapshot differences accepted as true additionalfindings. Frozen core meanings/counts unchanged."
+  ],
+  "comparison_limitations": [
+    "Matched Luna high, same file-taskprefix including Member and complete pools; GUIDE/structuredreview and MCP remain arm differences.",
+    "Historical10x1 versus frozeni20 10x1; no randomization or stabilityreplication; developmentset repeatedlyused, no generalization claim.",
+    "No new toolinvestigatorruns or best-of-i21..24 substitution; old mediumbaseline unchanged.",
+    "Structuredend-to-end causalpath correctness is not established by thissemantic comparison."
+  ]
+}
