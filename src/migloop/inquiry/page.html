@@ -577,7 +577,7 @@
     }
     function renderFindingText(finding) {
       const host=$('findingText');
-      if(!finding) return;
+      finding ||= {}; // An empty finding set can still have global unknowns.
       const fields=[['reason','本条解释（模型主张）',finding.reason],
         ['unknown','本条未证实事项',finding.unknown],
         ['hypothesis','机制假设（尚未证实）',finding.hypothesis],

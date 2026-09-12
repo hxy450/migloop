@@ -132,6 +132,19 @@ async function main() {
         fs.writeFileSync(path.join(out, `finding-${id.replace(/[^a-zA-Z0-9_-]/g, "_")}.png`), Buffer.from(shot.data, "base64"));
       }
       await evaluate(`document.getElementById('findings').value=${JSON.stringify(ids[0])};draw()`);
+      if(process.argv.includes('--report-text')) {
+        const empty=await evaluate(`(async()=>{
+          const original=graph;
+          const fixture=structuredClone(graph);fixture.document.findings=[];
+          fixture.document.unexplained=['Synthetic unresolved case, not a model report'];
+          fixture.nodes=[];fixture.edges=[];
+          await loadGraph(fixture);
+          const shown=document.querySelector('#findingText [data-field="unexplained"]')?.textContent===JSON.stringify(fixture.document.unexplained,null,2);
+          await loadGraph(original);
+          return shown;
+        })()`);
+        assert(empty,'empty finding set hid global uncertainty');
+      }
     }
     assert.equal(
       await evaluate(
