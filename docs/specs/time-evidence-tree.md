@@ -68,3 +68,13 @@
 - 最终全仓回归：3,132 passed、10 skipped，241.04 秒；1 条重复 ZIP 名警告来自既有故意构造的反例。新增核心/HTTP Python 文件通过 Ruff F 类检查，`git diff --check` 通过。
 
 按 GitNexus refactoring/exploring 做调用方核查；总变更涉及公共 query、report、HTTP，静态影响检测为 critical，所以以全仓回归加真实浏览器验收收口，而不是只检查 HTML 字符串。索引未覆盖的新符号另由源码和行为测试核查。
+
+## 外观纠偏：取回最早的返修链路原型
+
+同日用户澄清，要的是 `fuxi-ailabs/migbot-server` 里的早期返修链路页面，不是 8dc5abf 新画的大卡片。代码核对确认：migloop 删除前的 `src/migloop/render/templates/fixchain.html` 与 server 的 `src/vendor/migloop/render/templates/fixchain.html` 同源，保留相同的 `NODE_W=196, NODE_H=30, GAP_Y=8, GAP_X=74`、measure/place 子树排布、左侧入口、右侧详情和根右侧下游。
+
+本次将上述呈现与交互移回唯一 `inquiry/page.html` / `tree.js`：紧凑节点、无点阵背景、上游列头、文件/agent 边框配色、点节点展开或收起、入口搜索、收起左栏、适应和 1:1、根右侧原生下游。manual 开根并行取两侧，报告载入只自动展开它的证据路径；额外展开仍是人查，不写入模型轨迹。
+
+没有恢复旧版本状态机、旧查询 API 或旧模板加载器；没有修改归因/引用/路径核验后端。所有关联仍来自现有时间 neighbors，节点完整截止时间和原稿范围保留在详情与 tooltip，短时间标签不参与身份计算。目录是全池导航，打开节点才按选择的时间截取。
+
+GitNexus 前端影响分析：render 为 MEDIUM，2 个树类及其余入口为 LOW，HTML 内嵌函数未索引时直接核查调用方。本轮 205 项 inquiry 回归通过；浏览器新增紧凑几何、不重叠、点节点切换、真实右侧读者、目录和缩放检查通过，JS errors=0。真实会员页展开 36 个历史节点、原文可开、trace 未变；原有 8 条未闭合主张仍留在核验处，没有为展示改写报告。真实截图 `C:/Users/hongy/AppData/Local/Temp/inquiry-tree-check-93gi9B/inquiry-tree.png` 是主动点击 1:1 后的视图。

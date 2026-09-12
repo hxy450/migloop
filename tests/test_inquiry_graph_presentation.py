@@ -8,7 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 def test_exact_scope_grouping_preserves_claims_edges_and_microseconds():
     assertions = r"""
 const assert = require('node:assert/strict');
-const {EvidenceTreeModel, scopeIdentity} = require('./src/migloop/inquiry/tree.js');
+const {EvidenceTreeModel, scopeIdentity, measureTree, GEOMETRY} = require('./src/migloop/inquiry/tree.js');
 const at='2026-01-01T00:00:01.000001Z';
 const root={kind:'file',key:'/out',at,since:null};
 const row=(id,kind,key,extra={})=>({id,relation:kind==='agent'?'write':'read',
@@ -77,6 +77,25 @@ assert.equal(disconnected.root.claims.length,0,'unclosed attribution stays in au
 assert.equal(JSON.stringify(report),before,'original report is immutable');
 worker.collapsed=true;
 assert(!tree.visible().some(r=>r.node===later));
+worker.collapsed=false;
+const rights=tree.insert(tree.root,row('native:reader','agent','reader',{relation:'read'}),'manual','downstream');
+assert.equal(tree.rights.length,1);
+assert(rights.isRight && !tree.root.children.includes(rights));
+assert.equal(tree.insert(worker,writer,'manual','downstream'),null,'only root has right-side projections');
+const layout=measureTree(tree);
+assert.deepEqual(GEOMETRY,{width:196,height:30,gapY:8,gapX:74,top:34,left:24});
+assert(layout.positions.get(rights.id).x>layout.positions.get(tree.root.id).x);
+assert(layout.positions.get(worker.id).x<layout.positions.get(tree.root.id).x);
+const columns=new Map();
+for(const {node,depth} of layout.visible){
+  const p=layout.positions.get(node.id);assert(p.y>=34);
+  if(!columns.has(depth))columns.set(depth,[]);columns.get(depth).push(p.y);
+}
+for(const ys of columns.values()){
+  ys.sort((a,b)=>a-b);for(let i=1;i<ys.length;i++)assert(ys[i]-ys[i-1]>=38,'original compact rows do not overlap');
+}
+tree.root.collapsed=true;
+assert.equal(tree.visible().length,1,'collapse hides both sides without inventing new state');
 console.log('temporal tree invariants passed');
 """
     result = subprocess.run(

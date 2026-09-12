@@ -3,35 +3,86 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Migloop · 时间证据树</title>
+<title>返修链路 · 两原子探索树</title>
 <style>
-:root{--page:#f3f4f7;--surface:#fff;--ink:#232735;--muted:#858c9b;--ring:#e3e6ed;--wash:#f7f8fa;--file:#bf872c;--agent:#26967a;--problem:#c6464a;--blue:#466eb5;--mono:Consolas,"Cascadia Mono",monospace}
-*{box-sizing:border-box}body{margin:0;background:var(--page);color:var(--ink);font:13px/1.5 system-ui,"Microsoft YaHei",sans-serif;height:100vh;overflow:hidden}
-header{height:82px;padding:13px 22px;display:flex;align-items:center;justify-content:space-between;gap:20px}h1{font-size:20px;line-height:1.3;margin:0 0 4px;letter-spacing:-.5px}h2{font-size:13px;margin:0 0 10px}p{margin:8px 0}.eyebrow{font:10px var(--mono);letter-spacing:1.8px;color:var(--muted);margin-bottom:3px}.header-meta{text-align:right}.small{font-size:11px}.muted{color:var(--muted)}.error{color:#b42318;white-space:pre-wrap;overflow-wrap:anywhere}.badge{display:inline-block;padding:3px 7px;border-radius:5px;background:#fff1da;color:#936323;font-size:11px}
-main{display:grid;grid-template-columns:250px minmax(360px,1fr) 340px;gap:12px;height:calc(100vh - 94px);padding:0 14px;position:relative}
-.panel{min-width:0;background:white;border:1px solid var(--ring);border-radius:12px;box-shadow:0 2px 9px #202b4506;overflow:hidden}
-.rail{overflow-y:auto}.rail section{padding:15px 13px;border-bottom:1px solid var(--ring)}.rail .section-label{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}.rail .section-label h2{margin:0}
-button,input,select,textarea{font:inherit}button{cursor:pointer;color:var(--ink);border:1px solid var(--ring);background:#fff;border-radius:6px;padding:5px 8px;line-height:1.4}button:hover{background:#eef2f9;border-color:#c3cede}button:disabled{cursor:default;opacity:.5}input,textarea,select{border:1px solid var(--ring);border-radius:6px;padding:7px 8px;max-width:100%;background:var(--wash);color:var(--ink)}input:focus,textarea:focus,select:focus{outline:2px solid #cad7ed;outline-offset:1px}
-input,textarea{width:100%}textarea{min-height:150px;font:11px/1.5 var(--mono)}label{display:block;color:#6d7688;font-size:11px;margin:9px 0 4px}.control-row{display:flex;gap:5px;align-items:center}.control-row>*{min-width:0}.control-row select{flex:1}.primary{background:#293a50;color:white;border-color:#293a50}.primary:hover{background:#344d6a}.wide{width:100%;margin-top:12px}.tools{display:flex;gap:5px;flex-wrap:wrap;margin:9px 0}.tools button{font-size:11px}.row{border-top:1px solid #eceff4;padding:9px 0;overflow-wrap:anywhere}.row button,details button{margin:3px 3px 0 0;font-size:11px}.row section{padding:8px 0}.row:first-child{border-top:0}
-details{margin:8px 0}summary{cursor:pointer;color:#5e697e;font-size:11px;overflow-wrap:anywhere}pre{white-space:pre-wrap;overflow-wrap:anywhere;font:11px/1.6 var(--mono);max-height:55vh;overflow:auto;background:var(--wash);border:1px solid var(--ring);border-radius:6px;padding:10px;margin:8px 0}
-.workspace{display:flex;flex-direction:column;position:relative}.toolbar{padding:10px 12px;display:flex;align-items:center;justify-content:space-between;gap:10px;border-bottom:1px solid var(--ring);min-height:51px}.toolbar h2{margin:0;font-size:13px}.toolbar-left{display:flex;gap:8px;align-items:center}.toolbar select{max-width:215px;font-size:11px;padding:4px 7px}.zoomctl{display:flex;gap:3px;align-items:center;white-space:nowrap}.zoomctl button{font-size:11px;padding:4px 7px}.zoomctl span{font:10px var(--mono);min-width:32px;text-align:center}
-.legend{display:flex;gap:14px;flex-wrap:wrap;padding:8px 13px;color:#7a8292;font-size:10px;border-bottom:1px solid #edf0f5}.legend i{font-style:normal;display:flex;align-items:center;gap:5px}.line{width:20px;border-top:1.5px solid #9299aa}.line.dashed{border-top-style:dashed}.red-dot{width:7px;height:7px;background:var(--problem);border-radius:2px}
-#graph{flex:1;min-height:0;position:relative;overflow:auto;background:radial-gradient(#dbe0e9 .75px,transparent .75px);background-size:16px 16px}.tree-spacer{position:relative;min-width:100%}.tree-canvas{position:absolute;top:0;left:0;transform-origin:0 0}.tree-wires{position:absolute;inset:0;pointer-events:none}.tree-edge{fill:none;stroke:#aeb6c5;stroke-width:1.5}.tree-edge.candidate,.tree-edge.reviewed{stroke:#ab96be;stroke-dasharray:5 4}.tree-node{position:absolute;width:232px;height:72px;background:white;border:1px solid #d6dce5;border-radius:9px;padding:9px 11px;cursor:pointer;box-shadow:0 2px 6px #22335108;outline:none}.tree-node:hover{box-shadow:0 3px 12px #26345619;z-index:2}.tree-node.file{border-left:3px solid var(--file)}.tree-node.agent{border-left:3px solid var(--agent)}.tree-node.root{background:#fffcf5;border:1.5px solid #c5a164;border-left-width:3px}.tree-node.historical-problem{background:#fff5f4;border-color:#cb6c70;border-left-color:var(--problem)}.tree-node.selected{box-shadow:0 0 0 2px #9db4dc,0 3px 12px #26345615}
-.tree-node-heading{display:flex;gap:7px;align-items:center;font-size:12px;line-height:17px}.atom-icon{color:var(--file);font-size:15px}.agent .atom-icon{color:var(--agent)}.tree-node-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;min-width:0}.tree-badges{display:flex;gap:5px;white-space:nowrap;overflow:hidden;margin-top:3px;font-size:9px;color:#8a91a0;line-height:15px}.tree-badges .historical-tag{color:var(--problem)}.tree-badges .candidate-tag{color:#8b689f}.tree-badges .manual-tag{color:var(--blue)}.tree-badges .seen-tag{color:#487d79}.tree-time{font:9px/14px var(--mono);color:#8d96a6;margin-top:1px}.tree-fold{position:absolute;left:-13px;top:23px;border-radius:50%;width:22px;height:22px;padding:0;background:#fff;font-size:14px}.tree-more{position:absolute;font-size:10px;color:#75859e;border:0;background:transparent;padding:0 4px;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.tree-more:disabled{opacity:.65}.tree-more:hover{background:transparent;color:#3b67a8}.tree-column-title{position:absolute;font-size:10px;color:#a38960;width:232px}.tree-empty{max-width:390px;margin:18vh auto;text-align:center;color:#7d8799;padding:20px}.tree-empty h2{font-size:16px;color:#5d687b}.tree-empty-icon{font-size:42px;color:#b9c6d6;margin-bottom:10px}
-.canvas-note{padding:9px 12px;border-top:1px solid var(--ring);font-size:10px;color:var(--muted);display:flex;justify-content:space-between;gap:10px}.inspector{display:flex;flex-direction:column}.tabs{display:flex;gap:2px;padding:8px;border-bottom:1px solid var(--ring)}.tabs button{flex:1;border:0;font-size:11px;color:#8690a1}.tabs button.active{color:#315782;background:#edf2f9}.inspector-scroll{overflow:auto;min-height:0;flex:1;padding:14px}.tab-content[hidden]{display:none}.detail-title{overflow-wrap:anywhere;font:600 13px/1.6 var(--mono);margin-bottom:12px}.inspector section{padding:8px 0}.inspector .meta-line{color:#8a93a3;font-size:10px;overflow-wrap:anywhere}.reason-claim{border-left:2px solid #d1dae8;padding-left:10px!important;margin:12px 0}.reason-claim p{white-space:pre-wrap;font-size:12px}.empty-detail{padding:30px 8px;color:#929aaa;text-align:center}.audit-count{padding:0 4px;background:#fff0dc;color:#9f6b28;border-radius:3px}
-main.hide-inspector{grid-template-columns:250px minmax(360px,1fr)}main.hide-inspector .inspector{display:none}#records{max-height:50vh;overflow:auto}#status{margin-top:10px}#reason button{margin:3px 3px 0 0;font-size:11px}
-@media(max-width:1250px){main{grid-template-columns:230px minmax(360px,1fr)}.inspector{position:absolute;right:14px;top:0;bottom:0;width:340px;z-index:12;box-shadow:-8px 0 28px #26345622}.header-meta{max-width:340px}main.hide-inspector{grid-template-columns:230px minmax(360px,1fr)}}
-@media(max-width:720px){header{height:72px;padding:10px 12px}.header-meta{display:none}main,main.hide-inspector{grid-template-columns:minmax(0,1fr);height:calc(100vh - 84px);padding:0 8px}.rail{position:absolute;left:8px;top:52px;bottom:0;width:250px;z-index:11;display:none}.rail.mobile-open{display:block}.toolbar{flex-wrap:wrap}.toolbar-left{flex-wrap:wrap}.inspector{right:8px;width:min(340px,calc(100vw - 16px))}.legend{gap:8px}#mobileRail{display:block!important}}
+/* Original migloop fixchain.html / migbot-server prototype presentation.
+   Time scopes replace version labels; inquiry remains the only query engine. */
+:root {
+  --page:#f3f4f7;--surface:#fff;--ink:#191c23;--ink-2:#4b5160;--ink-3:#8a90a0;
+  --ring:#e4e6ec;--wash:#f7f8fa;--wash-2:#eef0f4;
+  --c-src:#7c5cd6;--c-spec:#2a78d6;--c-gen:#1a9e6c;--c-file:#d68a2a;--c-fix:#cf222e;--c-dis:#0f8a7a;
+  --file:var(--c-file);--agent:var(--c-gen);--problem:var(--c-fix);--blue:var(--c-spec);--muted:var(--ink-3);
+  --mono:Consolas,"Cascadia Mono","SF Mono",Menlo,monospace;
+  --sans:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;
+}
+*{box-sizing:border-box;margin:0}
+body{background:var(--page);color:var(--ink);font:14px/1.6 var(--sans);padding:22px clamp(14px,2vw,32px) 30px}
+header{max-width:1720px;margin:0 auto 12px}.eyebrow{font-size:11px;color:var(--ink-3);letter-spacing:.12em;text-transform:uppercase}
+h1{font-size:22px;margin-top:2px;display:flex;gap:12px;align-items:baseline;flex-wrap:wrap}
+h1 em{font-style:normal;font-size:12.5px;color:var(--ink-3);font-weight:400}
+h2{font-size:12px;margin-bottom:8px}p{margin:8px 0}.small{font-size:11px}.muted{color:var(--ink-3)}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;align-items:center}.chip{font-size:12px;padding:2px 11px;border:1px solid var(--ring);border-radius:99px;background:var(--surface);color:var(--ink-2)}
+main{max-width:1720px;margin:0 auto;display:flex;gap:12px;align-items:stretch;height:calc(100vh - 160px);min-height:460px;position:relative}
+.panel{min-width:0;background:var(--surface);border:1px solid var(--ring);border-radius:14px;box-shadow:0 1px 2px rgba(16,24,40,.04),0 6px 18px rgba(16,24,40,.04);overflow:hidden}
+.rail{flex:0 0 292px;display:flex;flex-direction:column}.railhead{display:flex;gap:6px;align-items:center;padding:10px;border-bottom:1px solid var(--ring)}
+.railhead b{flex:1;font-size:11px;letter-spacing:.1em;color:var(--ink-3);white-space:nowrap;overflow:hidden}
+.railhead button{width:22px;height:22px;padding:0}.rail.closed{flex-basis:30px}.rail.closed .railbody{display:none}.rail.closed .railhead{flex-direction:column;padding:8px 4px}.rail.closed b{writing-mode:vertical-rl}
+.railbody{overflow:auto;flex:1}.rail section{padding:10px;border-bottom:1px solid var(--ring)}
+.section-label{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}.section-label h2{margin:0;font-size:11px;letter-spacing:.08em;color:var(--ink-3)}
+button,input,select,textarea{font:inherit;color:var(--ink-2)}button{cursor:pointer;border:1px solid var(--ring);background:var(--surface);border-radius:6px;padding:3px 8px;font-size:12px}
+button:hover{background:var(--wash)}button:disabled{opacity:.55;cursor:default}
+input,textarea,select{border:1px solid var(--ring);border-radius:8px;padding:5px 8px;font-size:12px;max-width:100%;background:var(--wash)}
+input,textarea{width:100%}input:focus,textarea:focus{outline:1px solid var(--c-spec)}textarea{min-height:150px;font:11px/1.6 var(--mono)}
+label{display:block;color:var(--ink-3);font-size:11px;margin:6px 0 3px}.control-row{display:flex;gap:5px;align-items:center}.control-row>*{min-width:0}.control-row select{flex:1}
+.primary{border-color:var(--c-spec);color:var(--c-spec);border-radius:99px}.wide{width:100%;margin-top:8px}
+.tools{display:flex;gap:5px;flex-wrap:wrap;margin:8px 0}.tools button{font-size:11px}.row{border-top:1px solid var(--ring);padding:8px 0;overflow-wrap:anywhere}.row:first-child{border-top:0}
+.row button,details button,#reason button{margin:3px 3px 0 0;font-size:11px}.row section{padding:8px 0}
+details{margin:8px 0}summary{cursor:pointer;color:var(--ink-2);font-size:11.5px;overflow-wrap:anywhere}
+pre{white-space:pre-wrap;overflow-wrap:anywhere;font:11px/1.55 var(--mono);max-height:60vh;overflow:auto;background:var(--wash);border:1px solid var(--ring);border-radius:7px;padding:8px 10px;margin:6px 0}
+.catalog-row{display:block;border:0;width:100%;text-align:left;border-radius:8px;padding:4px 6px;font:11.5px var(--mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#catalog{max-height:24vh;overflow:auto;margin-top:6px}.catalog-kind{display:flex;gap:5px;margin:6px 0}.catalog-kind button.active{color:var(--c-spec);background:var(--wash-2)}
+.workspace{flex:1;display:flex;flex-direction:column;position:relative}.toolbar{display:flex;gap:10px;align-items:center;padding:10px 14px;background:var(--surface);border-bottom:1px solid var(--ring);font-size:11.5px}
+.toolbar .legend{display:flex;gap:12px;flex-wrap:wrap;flex:1;color:var(--ink-3)}.legend i{font-style:normal;display:inline-flex;align-items:center;gap:4px}
+.sw{width:10px;height:10px;border-radius:3px;border:1.5px solid;display:inline-block}.sw.file{border-color:var(--c-file)}.sw.agent{border-color:var(--c-gen)}.sw.dispatch{border-color:var(--c-dis);border-style:dashed}.sw.candidate{border-color:var(--c-src);border-style:dashed}.sw.problem{border-color:var(--c-fix)}
+.zoomctl{display:flex;gap:4px;align-items:center}.zoomctl button{font-size:12px;min-width:26px;height:24px;padding:0 8px}.zoomctl span{font:10px var(--mono)}
+#graph{flex:1;min-height:0;position:relative;overflow:auto;background:var(--surface)}
+.tree-spacer{position:relative;min-width:100%}.canvas{position:absolute;left:0;top:0;transform-origin:0 0}.wires{position:absolute;left:0;top:0;pointer-events:none;z-index:1;overflow:visible}
+.wire{fill:none;stroke:#cfd3dc;stroke-width:1.4}.wire.candidate,.wire.reviewed{stroke:#9b89ba;stroke-dasharray:4 4}
+.colhead{position:absolute;top:0;font-size:10.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);padding-bottom:5px;border-bottom:2px solid var(--ring);text-align:center;white-space:nowrap}
+.colhead.root{color:var(--c-file);border-color:var(--c-file)}.colhead.rootA{color:var(--c-gen);border-color:var(--c-gen)}.colhead.down{color:var(--c-spec);border-color:var(--c-spec)}
+.node{position:absolute;z-index:2;width:196px;height:30px;font-size:12px;padding:0 20px 0 10px;line-height:28px;border:1.4px solid var(--ring);border-radius:8px;background:var(--wash);cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink-2);display:flex;gap:3px;align-items:center;outline:none}
+.node:hover{box-shadow:0 2px 10px rgba(16,24,40,.14);z-index:3}.node.sel{box-shadow:0 0 0 2.5px color-mix(in srgb,var(--c-spec) 45%,transparent)}
+.node .chev{position:absolute;right:8px;top:0;color:var(--ink-3);font-size:10px}.tree-node-name{overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1}.tree-time{font:10px var(--mono);color:var(--ink-3);flex-shrink:0}
+.node.file{border-color:color-mix(in srgb,var(--c-file) 55%,transparent);font-family:var(--mono);font-size:11.5px;color:var(--ink)}
+.node.gen{border-color:color-mix(in srgb,var(--c-gen) 55%,transparent);color:var(--ink);background:color-mix(in srgb,var(--c-gen) 5%,var(--surface))}
+.node.root{border-width:2px;font-weight:600;background:color-mix(in srgb,var(--c-file) 10%,var(--surface))}
+.node.gen.root{background:color-mix(in srgb,var(--c-gen) 12%,var(--surface))}
+.node.dispatch{border-style:dashed;border-color:var(--c-dis);color:var(--c-dis);background:var(--surface)}.node.down{border-style:dotted}
+.node.candidate{border-style:dashed}.node.historical-problem{border-color:var(--c-fix);color:var(--c-fix);background:color-mix(in srgb,var(--c-fix) 5%,var(--surface))}
+.node.seen{outline:1px dotted var(--c-spec);outline-offset:-4px}.node.leaf{border-color:color-mix(in srgb,var(--c-src) 45%,transparent);color:var(--c-src);font-size:11px;font-family:var(--sans)}
+.tree-badges{position:absolute;width:1px;height:1px;clip-path:inset(50%);overflow:hidden}.cvempty{padding:40px 24px;font-size:12.5px;color:var(--ink-3);max-width:520px}
+.canvas-note{padding:6px 12px;border-top:1px solid var(--ring);font-size:10px;color:var(--ink-3);display:flex;justify-content:space-between;gap:8px}
+.inspector{flex:0 0 380px;display:flex;flex-direction:column}.tabs{display:flex;gap:2px;padding:8px;border-bottom:1px solid var(--ring)}.tabs button{flex:1;border:0;font-size:11px;color:var(--ink-3)}.tabs button.active{color:var(--c-spec);background:var(--wash)}
+.inspector-scroll{overflow:auto;min-height:0;flex:1;padding:16px 20px}.tab-content[hidden]{display:none}.detail-title{overflow-wrap:anywhere;font:600 15px/1.35 var(--sans);margin:2px 0 12px}
+.inspector section{padding:6px 0}.meta-line{font-size:11px;color:var(--ink-3);overflow-wrap:anywhere}.reason-claim{border-left:3px solid var(--ring);border-radius:8px;background:var(--wash);padding:10px 12px!important;margin:12px 0}
+.reason-claim p{white-space:pre-wrap;font-size:12px}.reason-claim[data-problem=true]{border-left-color:var(--c-fix)}.badge{display:inline-block;font-size:11px;padding:1px 8px;border-radius:99px;background:var(--wash-2);color:var(--ink-2)}
+.empty-detail{color:var(--ink-3);font-size:12.5px;line-height:1.8}.error{color:var(--c-fix);white-space:pre-wrap;overflow-wrap:anywhere}.audit-count{background:var(--wash-2);padding:0 4px;border-radius:3px}
+main.hide-inspector .inspector{display:none}#records{max-height:50vh;overflow:auto}#status{margin-top:6px}
+@media(max-width:1150px){.inspector{position:absolute;right:0;top:0;bottom:0;width:380px;z-index:12;box-shadow:-8px 0 28px #26345622}.rail{flex-basis:250px}}
+@media(max-width:720px){body{padding:12px 8px}main{height:calc(100vh - 160px);min-height:360px}.rail{position:absolute;left:0;top:0;bottom:0;width:260px;z-index:11;display:none}.rail.mobile-open{display:flex}.inspector{width:min(380px,calc(100vw - 16px))}.toolbar{flex-wrap:wrap}.legend{gap:8px}#mobileRail{display:block!important}}
 </style>
 </head>
 <body>
-<header><div><div class="eyebrow">MIGLOOP / INQUIRY</div><h1>时间证据树</h1><div id="info" class="small muted">读取索引…</div></div><div class="header-meta small muted">沿历史读写与派发，逐层追溯问题来源<br>模型原因、历史关系与原始证据分别可查</div></header>
+<header><div class="eyebrow">MigLoop · Fix Traceback</div><h1>返修链路<em>两原子探索树 —— 文件 × agent，按时间选择起点</em></h1><div class="chips"><span id="info" class="chip">读取索引…</span><span class="chip">时间证据树 · 原始关系与模型主张分开</span></div></header>
 <main id="layout">
 <aside class="panel rail" id="rail">
+<div class="railhead"><b>入口 · 选一个时间当根</b><button id="railtog" title="收起/展开入口">◂</button></div><div class="railbody">
+<section><input id="catalogSearch" type="search" placeholder="搜文件名 / 路径 / agent…"><div class="catalog-kind"><button id="catalogFiles" class="active">文件</button><button id="catalogAgents">agent</button></div><div id="catalog" class="small muted">输入关键词查询，或点击文件 / agent 浏览入口。</div></section>
 <section><div class="section-label"><h2>调查结论</h2><span class="small muted">自动展开路径</span></div>
 <div class="control-row"><select id="reports" aria-label="报告"></select><button id="load">载入</button></div>
 <details><summary>通过 report_id 载入</summary><input id="reportId" placeholder="完整 report_id"><button id="loadId">载入此报告</button></details>
 <details><summary>粘贴 inquiry/1 YAML / JSON</summary><textarea id="draft" aria-label="报告原稿" placeholder="完整结构化结论…"></textarea><button id="submit">核验并载入</button></details>
+<div class="control-row"><select id="findings" aria-label="问题筛选"><option value="">全部问题</option></select><button id="restorePaths">展开路径</button></div>
 </section>
 <section><div class="section-label"><h2>探索起点</h2><select id="kind" aria-label="对象类型"><option value="file">文件</option><option value="agent">Agent</option><option value="pool">全池搜索</option></select></div>
 <input id="key" placeholder="完整文件路径或 Agent 身份" aria-label="对象身份">
@@ -46,12 +97,11 @@ main.hide-inspector{grid-template-columns:250px minmax(360px,1fr)}main.hide-insp
 </details><div id="records"></div>
 </section>
 <section class="small muted">展开遵循节点自己的截止时间。单条记录不代表完整文件快照；页面查询不会写入模型调查轨迹。</section>
-</aside>
+</div></aside>
 <section class="panel workspace">
-<div class="toolbar"><div class="toolbar-left"><button id="mobileRail" style="display:none">入口</button><h2>结论证据树</h2><select id="findings" aria-label="问题筛选"><option value="">全部问题</option></select></div><div class="zoomctl"><button id="zoomOut" title="缩小">−</button><span id="zoomValue">100%</span><button id="zoomIn" title="放大">+</button><button id="fit">适配</button><button id="collapse">折叠</button><button id="restorePaths">展开路径</button><button id="toggleInspector" title="显示或收起详情">详情</button></div></div>
-<div class="legend"><i><b class="red-dot"></b>历史问题 · 模型主张</i><i><b class="line"></b>已核关系</i><i><b class="line dashed"></b>候选 / 模型复核</i><i>上游 → 下游</i></div>
+<div class="toolbar"><button id="mobileRail" style="display:none">入口</button><div class="legend"><i><span class="sw file"></span>文件@时间</i><i><span class="sw agent"></span>agent@时间</i><i><span class="sw dispatch"></span>派发它的上游</i><i><span class="sw candidate"></span>候选 / 模型复核</i><i><span class="sw problem"></span>问题 · 模型主张</i><i>左侧上游 · 右侧下游</i></div><div class="zoomctl"><button id="zoomOut">−</button><button id="zoomIn">+</button><button id="fit">适应</button><button id="oneToOne">1:1</button><span id="zoomValue">100%</span></div></div>
 <div id="graph" aria-label="时间证据树画布"></div>
-<div class="canvas-note"><span id="treeSummary">从右侧根节点向左展开 · Ctrl + 滚轮缩放</span><button id="showAudit" style="border:0;padding:0;font-size:10px">未闭合与核验 <span id="gapCount" class="audit-count">0</span></button></div>
+<div class="canvas-note"><span id="treeSummary">点节点展开 / 收起 · 截至所选时间</span><button id="downstream">展开根的下游</button><button id="collapse">折叠</button><button id="toggleInspector">详情</button><button id="showAudit" style="border:0;padding:0;font-size:10px">未闭合与核验 <span id="gapCount" class="audit-count">0</span></button></div>
 </section>
 <aside class="panel inspector">
 <div class="tabs"><button data-tab="detail" class="active">节点证据</button><button data-tab="report">结论原稿</button><button data-tab="audit">核验</button><button data-tab="trace">调查轨迹</button></div>
@@ -266,10 +316,30 @@ main.hide-inspector{grid-template-columns:250px minmax(360px,1fr)}main.hide-insp
           $("key").value = dispatch.child;
           return query(request());
         });
-        for (const ref of [dispatch.request, dispatch.result])
+        for (const ref of [dispatch.request, dispatch.result].filter(Boolean))
           button("派发原文", box, () => open(ref, at));
       }
       return data;
+    }
+    let catalogKind = "file", catalogEpoch = 0, catalogTimer;
+    async function renderCatalog(kind = catalogKind, offset = 0) {
+      catalogKind = kind;
+      const epoch = ++catalogEpoch;
+      $("catalogFiles").classList.toggle("active", kind === "file");
+      $("catalogAgents").classList.toggle("active", kind === "agent");
+      const data = await api("/api/query", { op: "catalog", kind, q: $("catalogSearch").value.trim(), offset, limit: 30 });
+      if (epoch !== catalogEpoch) return;
+      $("catalog").replaceChildren();
+      element("div", `全池目录 ${data.total} 项 · 打开时按下方时间截取`, $("catalog"), "small muted");
+      for (const row of data.rows || []) {
+        const b = button(kind === "file" ? row.key.split(/[\\/]/).pop() : row.key.split(":").pop(), $("catalog"), () => {
+          $("kind").value = kind; $("key").value = row.key;
+          $("startTree").click();
+        });
+        b.className = "catalog-row"; b.title = row.key; b.dataset.catalogKey = row.key;
+      }
+      if (offset) button("上一页", $("catalog"), () => renderCatalog(kind, Math.max(0, offset - 30)));
+      if (data.next != null) button("下一页", $("catalog"), () => renderCatalog(kind, data.next));
     }
     async function open(ref, at, undated = false) {
       selectTab("detail");
@@ -432,7 +502,12 @@ main.hide-inspector{grid-template-columns:250px minmax(360px,1fr)}main.hide-insp
       button("查该范围原文", $("reason"), () => queryCoordinate("records"));
       if (coordinate.kind === "file") button("查看原生差异", $("reason"), () => queryCoordinate("changes"));
       else button("查看已收输入", $("reason"), () => queryCoordinate("inputs"));
-      if (n.id && !n.reference) button("展开其他上游", $("reason"), () => tree.expand(n));
+      if (n.id && !n.reference && !n.isRight) button("展开其他上游", $("reason"), () => tree.expand(n));
+      button("以此时间为根", $("reason"), () => {
+        $("kind").value = coordinate.kind; $("key").value = coordinate.key;
+        $("at").value = coordinate.at; $("since").value = coordinate.since || "";
+        $("startTree").click();
+      });
       if (n.row) {
         const box = element("section", "", $("reason"), "row");
         const evidenceAt = n.parent?.coordinate.at || coordinate.at;
@@ -477,6 +552,7 @@ main.hide-inspector{grid-template-columns:250px minmax(360px,1fr)}main.hide-insp
       for (const member of members) {
         const box = element("section", "", $("reason"), "reason-claim");
         box.dataset.claim = member.id;
+        box.dataset.problem = ["origin", "propagated"].includes(member.role);
         element("strong", member.id + " · " + (member.generated_context ? "未归因的原生端点" :
           ({origin:"问题进入",propagated:"问题保留",context:"输入/背景",repaired:"修复",unknown:"未定"})[member.role]) + " · 模型主张", box);
         element("p", member.reason, box);
@@ -617,7 +693,7 @@ main.hide-inspector{grid-template-columns:250px minmax(360px,1fr)}main.hide-insp
     window.inquiryTree = tree;
     function updateTreeSummary() {
       const count = tree.model?.visible().length || 0;
-      $("treeSummary").textContent = count ? count + " 个历史节点 · 向左追溯上游 · Ctrl + 滚轮缩放" : "从右侧根节点向左展开";
+      $("treeSummary").textContent = count ? count + " 个历史节点 · 点节点展开 / 收起" : "从文件或 agent 时间点出发";
     }
     $("findings").onchange = () => {
       tree.setFinding($("findings").value);
@@ -640,7 +716,22 @@ main.hide-inspector{grid-template-columns:250px minmax(360px,1fr)}main.hide-insp
     });
     $("zoomIn").onclick = () => tree.setZoom(tree.zoom * 1.2);
     $("zoomOut").onclick = () => tree.setZoom(tree.zoom / 1.2);
-    $("fit").onclick = () => tree.fit();
+    $("fit").onclick = () => tree.fit(false);
+    $("oneToOne").onclick = () => { tree.setZoom(1); if (tree.model) tree.focus(tree.model.root); };
+    $("downstream").onclick = () => guard(async () => {
+      if (!tree.model) throw Error("请先选一个文件或 agent 当根。");
+      await tree.expand(tree.model.root, "downstream");
+      const state = tree.model.downstream;
+      $("status").textContent = state.error || `根的下游：${state.total ?? 0} 条截至所选时间的历史关系（不认证同一内容状态）`;
+      tree.fit();
+    });
+    $("railtog").onclick = () => $("rail").classList.toggle("closed");
+    $("catalogFiles").onclick = () => guard(() => renderCatalog("file"));
+    $("catalogAgents").onclick = () => guard(() => renderCatalog("agent"));
+    $("catalogSearch").oninput = () => {
+      clearTimeout(catalogTimer); ++catalogEpoch;
+      catalogTimer = setTimeout(() => guard(() => renderCatalog(catalogKind)), 250);
+    };
     $("collapse").onclick = () => tree.collapse();
     $("restorePaths").onclick = () => tree.paths();
     $("toggleInspector").onclick = () => $("layout").classList.toggle("hide-inspector");
@@ -651,7 +742,7 @@ main.hide-inspector{grid-template-columns:250px minmax(360px,1fr)}main.hide-insp
       if (!$("reportId").value.trim()) throw Error("请输入 report_id。");
       await loadGraph(await api("/api/report?id=" + encodeURIComponent($("reportId").value.trim())));
     });
-    if (innerWidth < 1250) $("layout").classList.add("hide-inspector");
+    if (innerWidth < 1150) $("layout").classList.add("hide-inspector");
     new ResizeObserver(() => { if (tree.model) tree.render(); }).observe($("graph"));
     guard(async () => {
       await reload();

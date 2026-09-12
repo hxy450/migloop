@@ -88,8 +88,10 @@ async function main() {
           if (q.key === origin.node.key) rows = [row("native:dispatch", "dispatch", coordinate("agent", "session:parent", "2026-09-12T05:00:00.000001Z"),
             { strength: "candidate", occurrence_at: "2026-09-12T05:00:00.000001Z", confirmed_at: times.root,
               identity_known_at_cutoff: false, identity_basis: "子 Agent 身份来自稍后回执，本次查询截止时未知。", status: "identity_pending" })];
+          if(q.direction==='downstream') rows=q.key===report.target.file ? [row('native:reader','read',coordinate('agent','session:reader',times.writer))] : [];
           data = { kind: "neighbors", scope: { kind: q.op, key: q.key, at: q.at }, rows, total: rows.length, next: null };
-        } else if (q.op === "open") data = { source: "fixture.jsonl", line: 8, at: times.origin, text: q.pointer === "" ? "FULL RAW RECORD" : "ORIGINAL EVIDENCE", request_context: null };
+        } else if (q.op === 'catalog') data = {kind:'catalog',catalog_kind:q.kind,rows:[{key:report.target.file}],total:1,next:null};
+        else if (q.op === "open") data = { source: "fixture.jsonl", line: 8, at: times.origin, text: q.pointer === "" ? "FULL RAW RECORD" : "ORIGINAL EVIDENCE", request_context: null };
         else if (q.view === "changes") data = { kind: "changes", rows: [{ at: times.origin, agent: "spec-author", strength: "confirmed",
           payloads: [{ tool: "Edit", block: 0, body: { old_string: "OLD_VALUE", new_string: "NEW_VALUE" } }],
           request: "e-12345678" }], total: 1, next: null };
@@ -173,13 +175,19 @@ async function main() {
       assert(liveDiagnostic.traceUnchanged, 'live manual expansion does not alter trace');
       assert(liveDiagnostic.originalOpened, 'real claim evidence opens at its original cutoff');
       assert(liveDiagnostic.rootVisible, 'root stays visible with the report path after expansion');
-      assert(liveDiagnostic.zoom >= 0.75, 'fit keeps node labels readable');
+      assert(liveDiagnostic.zoom >= 0.62, 'original auto-fit has a 0.62 floor and a 1:1 control');
       assert.deepEqual(liveDiagnostic.manualFailures, [], 'live neighbors returned errors');
       assert.equal(await evaluate("document.querySelector('.tree-node.root').classList.contains('historical-problem')"), false);
+      await evaluate("document.querySelector('#oneToOne').click()");
+      liveDiagnostic.screenshotZoom = await evaluate("inquiryTree.zoom");
     } else {
     assert.equal(await evaluate("inquiryTree.model.root.coordinate.key"), report.target.file);
     assert.equal(await evaluate("document.querySelector('.tree-node.root').classList.contains('historical-problem')"), false);
     assert.equal(await evaluate("inquiryTree.model.root.children.length"), 1, "shared report prefix");
+    assert.equal(await evaluate("getComputedStyle(document.querySelector('.tree-node')).height"), '30px', 'original compact height');
+    assert.equal(await evaluate("getComputedStyle(document.querySelector('.tree-node')).width"), '196px', 'original compact width');
+    assert.equal(await evaluate("getComputedStyle(document.querySelector('#graph')).backgroundImage"), 'none', 'original plain canvas');
+    assert.equal(await evaluate("document.querySelector('.colhead').textContent.startsWith('ROOT')"), true);
     assert.equal(await evaluate("[...document.querySelectorAll('.tree-node')].every(n => n === document.querySelector('.tree-node.root') || +n.style.left.replace('px','') < +document.querySelector('.tree-node.root').style.left.replace('px',''))"), true, "root sits at right");
     assert.equal(await evaluate("getComputedStyle(document.querySelector('[data-edge=\"model:review\"]')).strokeDasharray !== 'none'"), true);
     assert.equal(await evaluate("document.querySelector('[data-edge=\"model:review\"]').dataset.strength"), "candidate");
@@ -198,6 +206,15 @@ async function main() {
     assert.equal(await evaluate("inquiryTree.model.root.children[0].children.filter(n=>n.coordinate.key.includes('AudioSpec')).length"), 2, "microseconds preserved");
     assert.equal(JSON.stringify(traces), initialTrace, "manual calls leave model trace untouched");
     assert(!requests.some(q => q.op === "record_trace"), "no trace mutation request");
+    await evaluate("inquiryTree.expand(inquiryTree.model.root,'downstream')");
+    assert.equal(await evaluate("inquiryTree.model.rights.length"),1,'native reader goes to the right');
+    assert.equal(await evaluate("inquiryTree.positions.get(inquiryTree.model.rights[0].id).x > inquiryTree.positions.get(inquiryTree.model.root.id).x"),true);
+    assert.equal(await evaluate("document.querySelector('.colhead.down').textContent"),'下游 · 读者');
+    await evaluate("document.querySelector('.tree-node.root').click()");
+    assert.equal(await evaluate("inquiryTree.model.root.collapsed"),true,'clicking the node collapses its subtree');
+    await evaluate("document.querySelector('.tree-node.root').click()");
+    assert.equal(await evaluate("inquiryTree.model.root.collapsed"),false,'clicking again expands existing children');
+    assert.equal(JSON.stringify(traces),initialTrace);
     await evaluate("document.querySelector('#findings').value='B'; document.querySelector('#findings').dispatchEvent(new Event('change'))");
     assert.equal(await evaluate("document.querySelector('#reason').textContent.includes('候选输入仍未认证因果')"), true, "switching findings refreshes node reasons");
     await evaluate("document.querySelector('#findings').value='A'; document.querySelector('#findings').dispatchEvent(new Event('change'))");
@@ -229,6 +246,12 @@ async function main() {
     await evaluate("document.querySelector('#zoomIn').click()");
     assert.equal(await evaluate("inquiryTree.zoom") > zoom, true);
     await evaluate("document.querySelector('#fit').click()");
+    await evaluate("document.querySelector('#oneToOne').click()");
+    assert.equal(await evaluate("inquiryTree.zoom"),1,'original 1:1 button');
+    await evaluate("document.querySelector('#railtog').click()");
+    assert.equal(await evaluate("document.querySelector('#rail').classList.contains('closed')"),true);
+    await evaluate("document.querySelector('#railtog').click(); document.querySelector('#catalogFiles').click()");
+    await wait("document.querySelector('[data-catalog-key]')!==null");
     await evaluate("document.querySelector('#kind').value='file'; document.querySelector('#key').value='/migration/harmony/AudioPlayer.ets'; document.querySelector('#at').value='2026-09-12T10:00:00.000003Z'; document.querySelector('#startTree').click()");
     await wait("inquiryTree.model.root.coordinate.at==='2026-09-12T10:00:00.000003Z' && inquiryTree.model.root.loaded");
     assert.equal(await evaluate("inquiryTree.report"), null);
@@ -252,7 +275,8 @@ async function main() {
       checks: liveUrl ? ["real report root", "live upstream neighbors", "trace isolation", "node evidence", "no JavaScript errors"] :
         ["single renderer", "automatic/manual identity", "right root", "shared prefix", "candidate dash", "unclosed isolation",
         "microsecond and operation identity", "finding switch", "original scope", "native diff", "trace isolation", "new root cutoff", "zoom/collapse",
-        "legacy link warning", "default cutoff preservation", "project label", "repair anchor evidence", "dispatch identity timing"],
+        "legacy link warning", "default cutoff preservation", "project label", "repair anchor evidence", "dispatch identity timing",
+        "original compact geometry", "native right readers", "node click toggle", "catalog and rail", "1:1 zoom"],
     };
     fs.writeFileSync(path.join(out, "audit.json"), JSON.stringify(audit, null, 2));
     console.log(JSON.stringify({ ...audit, artifacts: out }));
