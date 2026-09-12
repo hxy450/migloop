@@ -153,3 +153,15 @@ def test_pagination_keeps_individual_operation_ids(observed):
     )
     assert first["rows"][0]["id"] != second["rows"][0]["id"] and second["next"] is None
     assert "guide" not in viewer_query(observed, {"view": "overview"})
+
+
+def test_catalog_counts_native_changes_without_promoting_candidates(observed):
+    before = observed.store.rows("SELECT * FROM effects")
+    data = viewer_query(observed, {"view": "catalog"})
+    assert data["files"] == [{"path": "/proj/A.ets", "n_events": 2}]
+    assert data["agents"][0]["id"] == "a"
+    assert data["agents"][0]["n_events"] == 2
+    assert data["agents"][0]["parent"] is None
+    assert data["agents"][0]["label"] == "a"
+    assert before == observed.store.rows("SELECT * FROM effects")
+    assert observed.trace() == []

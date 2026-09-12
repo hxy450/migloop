@@ -1,5 +1,8 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>返修链路</title>
+<html lang="zh-CN"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>返修链路</title>
 <style>
   :root {
     --page: #f3f4f7; --surface: #ffffff; --ink: #191c23; --ink-2: #4b5160; --ink-3: #8a90a0;
@@ -104,10 +107,10 @@
   .node.gen.root { border-width: 2px; font-weight: 600; background: color-mix(in srgb, var(--c-gen) 12%, var(--surface)); }
   .node.gen.sharp { border-color: var(--c-fix); box-shadow: inset 3px 0 0 var(--c-fix); }
   .node.fix  { border-color: var(--c-fix); color: var(--c-fix); font-weight: 600; background: color-mix(in srgb, var(--c-fix) 5%, var(--surface)); }
-  .node.dispatch { border-style: solid; border-color: var(--c-dis); color: var(--c-dis); background: var(--surface); }
+  .node.dispatch { border-style: dashed; border-color: var(--c-dis); color: var(--c-dis); background: var(--surface); }
   .node.leaf { border-color: color-mix(in srgb, var(--c-src) 45%, transparent); color: var(--c-src); cursor: default; }
   .node.leaf:hover { transform: none; box-shadow: none; }
-  .node.down { border-style: solid; }
+  .node.down { border-style: dotted; }
   .cvempty { position: absolute; left: 24px; top: 40px; font-size: 12.5px; color: var(--ink-3); line-height: 1.8; max-width: 520px; }
 
   .side { flex: 0 0 380px; position: relative; padding: 0; max-height: calc(100vh - 176px); min-height: 460px; overflow-y: auto; }
@@ -178,65 +181,64 @@
 
   .empty { max-width: 620px; margin: 12vh auto 0; text-align: center; color: var(--ink-3); }
   .empty h2 { color: var(--ink-2); font-size: 17px; margin-bottom: 8px; }
-
-  /* Original shell; these rules support time labels and a single load dialog. */
-  .graph{display:flex;flex-direction:column;overflow:hidden}#viewport{flex:1;position:relative;overflow:auto;min-height:0}
-  .tree-spacer{position:relative;min-width:100%}.tree-canvas{position:absolute;top:0;left:0}.tree-node{display:flex;align-items:center;gap:3px}
-  .tree-node-name{min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis}.tree-time{font:10px var(--mono);color:var(--ink-3)}
-  .tree-badges{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
-  .node.historical-problem{border-color:var(--c-fix);color:var(--c-fix);background:color-mix(in srgb,var(--c-fix) 5%,var(--surface))}
-  .node.candidate{border-style:dashed}.wire.reviewed{stroke:#9b89ba;stroke-dasharray:4 4}.node.seen{outline:1px dotted var(--c-spec);outline-offset:-4px}
-  .tree-more{width:196px;text-align:left;font:11px var(--sans)}
-  button,input,select{font:inherit;color:inherit}button{cursor:pointer;border:1px solid var(--ring);border-radius:6px;background:var(--surface);padding:3px 8px}
-  button:hover{background:var(--wash)}button:disabled{opacity:.5;cursor:default}.loadbtn{font-size:12px;border-radius:99px}
-  .side details{margin-top:12px}.side summary{cursor:pointer;color:var(--ink-3);font-size:11.5px}.side .act{border:0;padding:0 3px;background:none;font-size:11px;color:var(--c-spec)}
-  .side .head button{font-size:12px}.side .original{grid-column:1/-1;width:100%}.side .vrow .meta{font-family:var(--sans)}.vrow .t{font-family:var(--mono)}
-  .empty-note{font-size:12px;color:var(--ink-3);padding:8px 0}.error{color:var(--c-fix);white-space:pre-wrap;overflow-wrap:anywhere}
-  dialog{width:min(620px,90vw);max-height:80vh;overflow:auto;margin:auto;border:1px solid var(--ring);border-radius:14px;padding:20px;color:var(--ink)}
-  dialog::backdrop{background:#16202d55}dialog h2{font-size:17px;margin-bottom:12px}dialog .close{float:right}dialog select,dialog input{max-width:100%;padding:6px;border:1px solid var(--ring);border-radius:6px}
-  dialog p,dialog details{margin:12px 0}dialog summary{cursor:pointer;font-size:12px}.report-row{padding:10px 0;border-top:1px solid var(--ring);display:flex;align-items:center;gap:10px}
-  .report-row span{flex:1;font-size:12px}.report-row small{display:block;color:var(--ink-3)}
-  #finding{font-size:12px;padding:3px 8px;border:1px solid var(--ring);border-radius:99px;max-width:280px}
-  @media(max-width:1150px){.rail{flex-basis:240px}.side{flex-basis:320px}}
-  @media(max-width:850px){.stage-wrap{flex-wrap:wrap}.rail{flex-basis:220px}.graph{flex:1}.side{flex-basis:100%;max-height:60vh;min-height:200px}}
 </style>
 </head><body>
+
 <header>
   <div class="crumb">MigLoop · Fix Traceback</div>
-  <h1>返修链路<em id="rootlbl">两原子探索树 —— 文件 × agent，按时间回看</em></h1>
-  <div class="chips" id="chips"><span class="chip" id="counts">读取目录…</span>
-    <button class="loadbtn" id="load">载入调查</button>
-    <button class="loadbtn" id="askai" disabled title="尚未接入 server 的 AI 调查任务服务；本版可载入已有结果">AI 帮我查</button>
-    <select id="finding" aria-label="选择问题" hidden></select><button id="unload" class="loadbtn" hidden>退出调查</button>
-  </div>
+  <h1>返修链路<em id="rootlbl">两原子探索树 —— 文件 × agent，任何一个时刻都能当根</em>
+    <span class="clear" id="clear">✕ 回到入口</span></h1>
+  <div class="chips" id="chips"></div>
 </header>
-<div class="stage-wrap" id="wrap">
+<div class="stage-wrap" id="wrap" hidden>
   <aside class="rail panel" id="rail">
-    <div class="railhead"><b>入口 · 选一个时间当根</b><button class="tog" id="railtog">◂</button></div>
+    <div class="railhead"><b>入口 · 选一个时刻当根</b><button class="tog" id="railtog" title="收起/展开">◂</button></div>
     <div class="search"><input id="q" type="search" placeholder="搜文件名 / 路径 / agent / 会话…" autocomplete="off"></div>
-    <div class="railbody" id="railbody"><div class="rempty">读取目录…</div></div>
+    <div class="railbody" id="railbody"><div class="rempty">账本装配中…</div></div>
   </aside>
   <div class="graph panel" id="graph">
-    <div class="toolbar"><div class="legend">
-      <i><span class="sw" style="border-color:var(--c-file)"></span>文件@时间</i>
-      <i><span class="sw" style="border-color:var(--c-gen)"></span>agent@时间</i>
-      <i><span class="sw" style="border-color:var(--c-dis)"></span>派发上游</i>
-      <i><span class="sw" style="border-color:var(--c-fix)"></span>AI 判断的问题</i>
-      <i>实线：已确认关系</i><i>虚线：模型复核补充</i>
-    </div><div class="zoomctl"><button id="zo">−</button><button id="zi">+</button><button id="zf">适应</button><button id="z1">1:1</button></div></div>
-    <div id="viewport"></div>
+    <div class="toolbar">
+      <div class="legend">
+        <i><span class="sw" style="border-color:var(--c-file)"></span>文件@时间</i>
+        <i><span class="sw" style="border-color:var(--c-gen)"></span>agent@时间</i>
+        <i><span class="sw" style="border-color:var(--c-dis);"></span>派发它的上游</i>
+        <i><span class="sw" style="border-color:var(--c-spec);"></span>下游(读者 / 产出)</i>
+        <i><span class="sw" style="border-color:var(--c-fix)"></span>修复方</i>
+        <i>红色：模型判断</i><i>虚线：模型复核补充</i>
+      </div>
+      <div class="zoomctl"><button id="zo">−</button><button id="zi">+</button><button id="zf">适应</button><button id="z1">1:1</button></div>
+    </div>
+    <div class="canvas" id="canvas"><svg class="wires" id="wires"></svg></div>
   </div>
-  <aside class="side panel" id="side"><div class="placeholder">左栏选文件或 agent，点开一个时刻。<br><br>文件 → 左边写者，右边读者；<br>agent → 左边读取与派发者，右边产出。<br><br>载入调查后，仍在这棵树上查看 AI 判断及依据。</div></aside>
+  <aside class="side panel" id="side">
+    <div class="placeholder">左栏搜一个文件或 agent,点开它的时间,选一个当根。<br><br>文件@时间 → 左边写者(上游),右边读者(下游);<br>agent@时间 → 左边读取与派发者(上游),右边产出(下游)。<br><br>右侧抽屉:写入脊柱 / 原文观察 / 派发指令 / 收件箱 / 时间线。</div>
+  </aside>
 </div>
-<dialog id="reportsDialog"><button class="close" id="closeReports">关闭</button><h2>载入调查</h2>
-  <div id="reportsList"></div><div id="reportNotes"></div>
-  <details><summary>导入 YAML / JSON 结果文件</summary><input type="file" id="importReport" accept=".yaml,.yml,.json"><p class="empty-note">导入后先核对节点和原始依据，再显示在树上。</p></details>
-  <p id="reportError" class="error"></p>
-</dialog>
-<dialog id="timeDialog"><button class="close" id="closeTime">关闭</button><h2>查看这个时刻</h2>
-  <p id="timeName"></p><input id="at" aria-label="截止时间" placeholder="含时区的完整时间" style="width:100%">
-  <p class="empty-note">时间使用 UTC；输入会保留小数精度。</p><button id="applyTime">以此时间为根</button>
-</dialog>
+<div class="empty" id="empty" hidden>
+  <h2>本次会话没有返修记录</h2>
+  <div>修复轮(verify/fixer)发生后,这里会为每一次修复画出完整链路。</div>
+</div>
+
+<style>
+/* Only the time/review overlay and its load dialog supplement the prototype. */
+.node.dispatch,.node.down{border-style:solid}.node.reviewed{border-style:dashed}
+.wire.reviewed{stroke-dasharray:4 4}.node.problem{border-color:var(--c-fix);color:var(--c-fix)}
+/* The name/coordinate split is retained from dev/fixchain, with time as suffix. */
+.node-caption { display: inline-flex; max-width: 100%; vertical-align: top; }
+.node-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.node-version { flex: 0 0 auto; }
+dialog{margin:auto;width:min(620px,90vw);max-height:80vh;overflow:auto;padding:20px;color:var(--ink);border:1px solid var(--ring);border-radius:14px}
+dialog::backdrop{background:#16202d55}dialog h3{font-size:16px;margin-bottom:12px}dialog .close{float:right}
+dialog .report-row{padding:10px 0;border-bottom:1px solid var(--ring);font-size:12px}dialog .report-row .more{float:right}
+dialog input,dialog select{font:12px var(--sans);padding:6px;max-width:100%;border:1px solid var(--ring);border-radius:6px}
+dialog p,dialog details{margin-top:12px}dialog summary{cursor:pointer;font-size:12px}
+.error{color:var(--c-fix);white-space:pre-wrap}.sec.folded> :not(b){display:none}.sec.folded>b,.sec.foldable>b{cursor:pointer}
+</style>
+<dialog id="reportsDialog"><span class="more close" id="closeReports">关闭</span><h3>载入调查</h3><div id="reportsList"></div>
+<div id="reportNotes"></div><p><select id="finding" aria-label="选择问题"><option value="">全部问题</option></select></p>
+<details><summary>导入 YAML / JSON 结果文件</summary><input type="file" id="importReport" accept=".yaml,.yml,.json"></details><p class="error" id="reportError"></p></dialog>
+<dialog id="timeDialog"><span class="more close" id="closeTime">关闭</span><h3>查看这个时刻</h3><p id="timeName"></p>
+<input id="at" aria-label="截止时间" style="width:100%"><p><span class="lnk" id="applyTime">以此时间为根 →</span></p></dialog>
 <script>window.INQUIRY_CONFIG = __INQUIRY_CONFIG__;</script>
 <script src="__INQUIRY_ASSET_BASE__/tree.js"></script>
 <script src="__INQUIRY_ASSET_BASE__/viewer.js"></script>

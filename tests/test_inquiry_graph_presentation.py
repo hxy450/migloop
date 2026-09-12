@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 def test_exact_scope_grouping_preserves_claims_edges_and_microseconds():
     assertions = r"""
 const assert = require('node:assert/strict');
-const {EvidenceTreeModel, scopeIdentity, measureTree, GEOMETRY, visibleRelation} = require('./src/migloop/inquiry/tree.js');
+const {EvidenceTreeModel, scopeIdentity, visibleRelation} = require('./src/migloop/inquiry/tree.js');
 const at='2026-01-01T00:00:01.000001Z';
 const root={kind:'file',key:'/out',at,since:null};
 const row=(id,kind,key,extra={})=>({id,relation:kind==='agent'?'write':'read',
@@ -93,18 +93,6 @@ const rights=tree.insert(tree.root,row('native:reader','agent','reader',{relatio
 assert.equal(tree.rights.length,1);
 assert(rights.isRight && !tree.root.children.includes(rights));
 assert.equal(tree.insert(worker,writer,'manual','downstream'),null,'only root has right-side projections');
-const layout=measureTree(tree);
-assert.deepEqual(GEOMETRY,{width:196,height:30,gapY:8,gapX:74,top:34,left:24});
-assert(layout.positions.get(rights.id).x>layout.positions.get(tree.root.id).x);
-assert(layout.positions.get(worker.id).x<layout.positions.get(tree.root.id).x);
-const columns=new Map();
-for(const {node,depth} of layout.visible){
-  const p=layout.positions.get(node.id);assert(p.y>=34);
-  if(!columns.has(depth))columns.set(depth,[]);columns.get(depth).push(p.y);
-}
-for(const ys of columns.values()){
-  ys.sort((a,b)=>a-b);for(let i=1;i<ys.length;i++)assert(ys[i]-ys[i-1]>=38,'original compact rows do not overlap');
-}
 tree.root.collapsed=true;
 assert.equal(tree.visible().length,1,'collapse hides both sides without inventing new state');
 console.log('temporal tree invariants passed');
@@ -121,17 +109,81 @@ console.log('temporal tree invariants passed');
     assert "temporal tree invariants passed" in result.stdout
 
 
-def test_inquiry_page_has_only_the_shared_tree_renderer():
+def test_inquiry_page_uses_prototype_renderer_not_new_tree_renderer():
     page = (ROOT / "src/migloop/inquiry/page.html").read_text(encoding="utf-8")
     viewer = (ROOT / "src/migloop/inquiry/viewer.js").read_text(encoding="utf-8")
-    assert "function draw(" not in page
-    assert "function presentationGraph(" not in page
-    assert "new InquiryEvidenceTree.InquiryTree(" in viewer
+    projection = (ROOT / "src/migloop/inquiry/tree.js").read_text(encoding="utf-8")
+    assert "class InquiryTree" not in projection
+    assert "document.createElement" not in projection
+    for function in (
+        "renderTree",
+        "addTreeNode",
+        "drawEdges",
+        "hiliteEdges",
+        "head",
+        "fileVersionSection",
+    ):
+        assert f"function {function}(" in viewer
     assert "__INQUIRY_ASSET_BASE__/tree.js" in page
     assert "__INQUIRY_ASSET_BASE__/viewer.js" in page
     assert "__INQUIRY_CONFIG__" in page
     assert '(config.api_base || "") + route' in viewer
-    for identifier in ("rail", "viewport", "side", "reportsDialog", "load"):
+    for identifier in ("rail", "canvas", "wires", "side", "reportsDialog"):
         assert f'id="{identifier}"' in page
-    for removed in ("structuredReport", "queryPanel", "restorePaths", "rawRecord"):
+    for removed in (
+        "viewport",
+        "structuredReport",
+        "queryPanel",
+        "restorePaths",
+        "rawRecord",
+        "askai",
+    ):
         assert f'id="{removed}"' not in page
+
+
+def test_prototype_css_and_presentation_functions_are_retained_verbatim():
+    import hashlib
+    import re
+
+    page = (ROOT / "src/migloop/inquiry/page.html").read_text(encoding="utf-8")
+    viewer = (ROOT / "src/migloop/inquiry/viewer.js").read_text(encoding="utf-8")
+    # SHA256 of the original migbot-server template, before the time adapter.
+    expected = {
+        "css": "90d849c7b8ce7e3103718069f92073766dfcfa1101af779994500e9e3fb26504",
+        "el": "e0d6d210f2f38c82b48ac8634c54bab12fad2ed22efb0d02b35d6b67337fa3b0",
+        "pill": "b15b833409ceb410b2030b0e00e0fec1581d277755e718dd03a10b4535f52f18",
+        "rsec": "90cfbd126fb6196307696488b60e4648acfb705e1aeb9a55d027645958afa7e0",
+        "ritem": "ce568082de5c1ef774554aec9ecbe06645cd707a50fb4805d9d05d210bd188ec",
+        "vline": "b8b29a5ed4b8eb9d19edac33e76930c71c592b4a1d3a6c7468f440bf3f66d7a9",
+        "xtNode": "d280d17fb12391118972e18e082c03dce1f6dff1a7c4ec2adac3e00075e7d176",
+        "addKid": "6d4be60ffa2405be90e723e98bc7679a358cb138d252e1ca30fe5b5622b6612e",
+        "addRight": "c3ec29355d2001fe6de35684b9f3cdaaa3c8950fc405eb092cf37444fd558e04",
+        "collapse": "894fc26f78115d235a7dd1543e5e0c6c656776481b2aec296cf45e35199b8bc7",
+        "measure": "07b4f3d7ffcf64535d865247a29351852b0c0c04a0d089c6bfbff40f70196ed8",
+        "place": "d74f608509cd5d0937f4b82f357f96d82d993733df9dba2a89307682028554e9",
+        "canvasTop": "840f9c340e0f2e4a164fdb2f83742ca683aa52ec03bc3805699b6e9706e8bc1e",
+        "applyZoom": "5f9c129903a82f8c0420116a805b9f9ec30f4b2ae223ff565308dc5445ff825c",
+        "fitView": "6cdd90d839e0e74c21a2b25f09a45d7af2d71d09022aba50f7c03fd3c2536558",
+        "renderTree": "208ef15576b779eadda3597a51ceec64ad0a0dd98aee6d83baa118746689602d",
+        "hiliteEdges": "1a8247f06df1a83d5fb2c8e296df15b50af07bb21fc84d8a3c121fefc9139612",
+        "head": "d3623bc2a5d08047d04f392264cce06946c1e5058654805360b424459b35db8c",
+        "sec": "83641870bb92a272ee54cc8c086c24d430196b829cfd59c7512e12384404dbb8",
+        "kv": "f0a13bb6617cac50f471b30b79ec64df4382c9a76651bb1d56feb2b2f3724c85",
+        "pills": "7ddc126e2c11beb6d7335514632be68217060da37e9af650991710aa33dfd7df",
+        "lnk": "e0ddce049df61653e9b4b54fe319496cadb4503528289fcffc5bd9401ec31975",
+        "quote": "0d126e9e2d8bdb0813cfdecdc3a60052e1ec5983c23398b1d1d3d6eb2732b343",
+        "quoteLong": "c0b530c3acec5ed32e96bc4f57a350aadb33c328c17a436c9247af5cf4c7fa95",
+    }
+    for name, sha in expected.items():
+        if name == "css":
+            content = re.search(r"<style>[\s\S]*?</style>", page).group()
+        else:
+            start = viewer.index("    function " + name + "(")
+            line_end = viewer.index("\n", start)
+            end = (
+                line_end
+                if viewer[start:line_end].endswith("}")
+                else viewer.index("\n    }", start) + 6
+            )
+            content = viewer[start:end].strip()
+        assert hashlib.sha256(content.encode()).hexdigest() == sha, name

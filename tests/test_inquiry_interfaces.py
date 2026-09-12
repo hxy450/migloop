@@ -150,7 +150,7 @@ def test_http_uses_same_kernel_and_manual_queries_do_not_forge_model_visits(
     assert status == 200 and data == engine.query(q)
     assert call("/api/trace")[1] == []
     status, page = call("/")
-    assert status == 200 and "AI 判断的问题" in page
+    assert status == 200 and "红色：模型判断" in page
     assert "__INQUIRY_CONFIG__" not in page and 'src="/tree.js"' in page
     assert call("/tree.js")[0] == 200
     assert call("/viewer.js")[0] == 200

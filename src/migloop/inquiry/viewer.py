@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 
 from .engine import packet_text
 from .native_text import change_outline, change_payloads
@@ -174,6 +175,34 @@ def viewer_query(engine, request):
     if not isinstance(request, dict):
         raise ValueError("display request must be an object")
     view = request.get("view")
+    if view == "catalog":
+        at = engine.store.db.execute("SELECT MAX(at) FROM records").fetchone()[0]
+        files = engine.store.rows(
+            "SELECT f.path, COUNT(e.id) AS n_events FROM files f LEFT JOIN effects e "
+            "ON e.path=f.path AND e.strength='confirmed' AND e.op!='read' "
+            "GROUP BY f.path ORDER BY f.path"
+        )
+        agents = engine.store.rows(
+            "SELECT s.agent AS id, MIN(s.name) AS source, COUNT(DISTINCT e.id) AS n_events "
+            "FROM sources s LEFT JOIN effects e ON e.agent=s.agent "
+            "AND e.strength='confirmed' AND e.op!='read' "
+            "WHERE s.agent IS NOT NULL GROUP BY s.agent ORDER BY s.agent"
+        )
+        parents = {}
+        for dispatch in engine.dispatches(at):
+            if dispatch["strength"] == "confirmed":
+                parents.setdefault(dispatch["child"], set()).add(dispatch["parent"])
+        for agent in agents:
+            session, _, name = agent["id"].partition(":")
+            agent["session"] = session[:8]
+            agent["label"] = (
+                "主会话:" + session[:8]
+                if name == "main"
+                else re.sub(r"-[0-9a-f]{16,}$", "", name or agent["id"])
+            )
+            candidates = parents.get(agent["id"], set())
+            agent["parent"] = next(iter(candidates)) if len(candidates) == 1 else None
+        return {"at": iso(at), "files": files, "agents": agents}
     if view == "overview":
         return {
             "at": iso(

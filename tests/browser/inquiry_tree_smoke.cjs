@@ -88,11 +88,12 @@ async function main() {
           {id:"w1",number:1,at:times.writer,op:"write",label:"写入",agent:writer.node.key,file:q.key,originals:[original]},
           {id:"w2",number:2,at:times.root,op:"write",label:"写入",agent:"session:fixer",file:q.key,originals:[original]}] : [];
         const reads=q.key===report.target.file ? [{id:"read",number:1,at:times.read,op:"read",label:"读取原文",agent:"session:reader",file:q.key,originals:[original]}] : [];
-        if(q.view==="overview") data={at:times.root,files:2,agents:3,report_limit:100,reports:[{id:report.report_id,file:report.target.file,at:times.root,count:3,title:"测试调查"}]};
+        if(q.view==="catalog") data={at:times.root,files:[{path:report.target.file,n_events:2},{path:input.node.key,n_events:1}],agents:[{id:writer.node.key,label:"generator-worker",session:"session",parent:origin.node.key,n_events:1},{id:origin.node.key,label:"spec-author",session:"session",parent:null,n_events:1}]};
+        else if(q.view==="overview") data={at:times.root,files:2,agents:3,report_limit:100,reports:[{id:report.report_id,file:report.target.file,at:times.root,count:3,title:"测试调查"}]};
         else if(q.view==="history") {const rows=q.category==="reads"?reads:writes;data={scope,rows,total:rows.length,next:null,changes:writes.length,reads:reads.length};}
-        else if(q.view==="operation") data={scope,id:q.id,content:q.id==="w1"?"WHOLE WRITE":q.id==="read"?"2\\tPARTIAL READ":null,
+        else if(q.view==="operation") data={scope,id:q.id,at:q.id==="w1"?times.writer:times.root,content:q.id==="w1"?"WHOLE WRITE":q.id==="read"?"2\tPARTIAL READ":null,
           content_kind:q.id==="w1"?"write_body":q.id==="read"?"read_observation":null,
-          changes:q.id==="w2"?[{text:"-OLD_VALUE\\n+NEW_VALUE",kind:"edit"}]:[],originals:[original],note:"实际记录；可能只有片段，不推演完整文件"};
+          changes:q.id==="w2"?[{text:"-OLD_VALUE\n+NEW_VALUE",kind:"edit"}]:[],originals:[original],note:"实际记录；可能只有片段，不推演完整文件"};
         else throw Error("Unexpected view "+q.view);
       }
       else if (url.pathname === base + "/api/query") {
@@ -161,125 +162,92 @@ async function main() {
     await send("Page.enable");
     await send("Emulation.setDeviceMetricsOverride", { width: 1720, height: 1020, deviceScaleFactor: 1, mobile: false });
     await send("Page.navigate", { url });
-    await wait("window.inquiryTree?.model && document.querySelector('#side .vrow')");
+    await wait("window.migloopViewer?.tree && document.querySelector('#side .vrow')");
     let liveDiagnostic = null;
-    if (liveUrl) {
-      liveDiagnostic = await evaluate(`(async () => {
-        const getTrace=()=>fetch((INQUIRY_CONFIG.api_base||'')+'/api/trace?session='+encodeURIComponent(inquiryTree.report.trace_session)).then(r=>r.json());
-        const before=await getTrace();
-        const seedEdges=[...inquiryTree.model.nodes.values()].filter(n=>n.row).length;
-        await inquiryTree.expand(inquiryTree.model.root);
-        const first=inquiryTree.model.root.children.find(n=>!n.reference);
-        if(first)await inquiryTree.expand(first);
-        const after=await getTrace();
-        const origin=[...inquiryTree.model.nodes.values()].find(n=>n.claims.some(c=>c.role==='origin'));
-        if(origin)inquiryTree.select(origin);
-        inquiryTree.fit();
-        return {root:inquiryTree.model.root.coordinate.key,seedEdges,nodes:inquiryTree.model.visible().length,
-          traceUnchanged:JSON.stringify(before)===JSON.stringify(after),gaps:inquiryTree.model.unclosed.length,
-          manualFailures:[...inquiryTree.model.nodes.values()].filter(n=>n.error).map(n=>n.error),
-          ordinaryCandidates:[...inquiryTree.model.nodes.values()].filter(n=>n.row?.strength==='candidate' && n.row.source!=='model_review').length};
-      })()`);
-      assert(liveDiagnostic.traceUnchanged, "manual expansion leaves real model trace unchanged");
-      assert.equal(liveDiagnostic.ordinaryCandidates,0);
-      assert.deepEqual(liveDiagnostic.manualFailures,[]);
-      await evaluate("inquiryTree.select(inquiryTree.model.root)");
+    const rootNode="migloopViewer.tree.byId[migloopViewer.tree.root]";
+    if(liveUrl) {
+      liveDiagnostic=await evaluate("(async()=>{const t=migloopViewer.tree,getTrace=()=>fetch((INQUIRY_CONFIG.api_base||'')+'/api/trace?session='+encodeURIComponent(migloopViewer.report.trace_session)).then(r=>r.json());const before=await getTrace(),seedEdges=Object.values(t.byId).filter(n=>n.row).length;await migloopViewer.expand(t.root);const first=t.byId[t.root].children.map(id=>t.byId[id]).find(n=>n.kind==='agent');if(first)await migloopViewer.expand(first.tid);const after=await getTrace();return {seedEdges,nodes:Object.values(t.byId).length,gaps:migloopViewer.hiddenPaths.length,traceUnchanged:JSON.stringify(before)===JSON.stringify(after),ordinaryCandidates:Object.values(t.byId).filter(n=>n.row?.strength==='candidate'&&n.row.source!=='model_review').length,errors:Object.values(t.byId).filter(n=>n.error).map(n=>n.error)};})()");
+      assert(liveDiagnostic.traceUnchanged);assert.equal(liveDiagnostic.ordinaryCandidates,0);assert.deepEqual(liveDiagnostic.errors,[]);
+      await evaluate("migloopViewer.select(migloopViewer.tree.root)");
       await wait("document.querySelector('#side .vrow')");
-      await evaluate("[...document.querySelectorAll('#side .vrow button')].find(b=>b.textContent==='原文 / diff').click()");
-      await wait("document.querySelector('#side .original pre')");
-      liveDiagnostic.originalOpened=await evaluate("document.querySelector('#side .original pre').textContent.length>0");
-      assert(liveDiagnostic.originalOpened);
-      await evaluate("[...document.querySelectorAll('#side details')].find(d=>d.firstChild.textContent==='相关调用与记录').open=true");
-      await wait("document.querySelector('#side .quote button')");
-      await evaluate("[...document.querySelectorAll('#side details')].find(d=>d.firstChild.textContent==='片段来源 / 搜索历史').open=true;document.querySelector('#side input').value='30';[...document.querySelectorAll('#side button')].find(b=>b.textContent==='查找').click()");
-      await wait("[...document.querySelectorAll('#side details')].find(d=>d.firstChild.textContent==='片段来源 / 搜索历史').querySelector('.quote')");
-      await evaluate("inquiryTree.select(inquiryTree.model.root.children[0])");
-      await wait("document.querySelector('#side .tag')?.textContent==='AGENT 原子' && [...document.querySelectorAll('#side details')].some(d=>d.firstChild.textContent==='其它工具返回')");
-      await evaluate("[...document.querySelectorAll('#side details')].find(d=>d.firstChild.textContent==='其它工具返回').open=true;[...document.querySelectorAll('#side details')].find(d=>d.firstChild.textContent==='派发与任务').open=true");
-      await wait("[...document.querySelectorAll('#side details')].find(d=>d.firstChild.textContent==='其它工具返回').querySelector('.quote')");
-      await wait("[...document.querySelectorAll('#side details')].find(d=>d.firstChild.textContent==='派发与任务').querySelector('.quote')");
+      await evaluate("[...document.querySelectorAll('#side .vrow .act .lnk')].find(n=>n.textContent==='原文').click()");
+      await wait("document.querySelector('#side .srcblock .ln')");
       assert.equal(await evaluate("document.querySelectorAll('#side .error').length"),0);
-      await evaluate("inquiryTree.select(inquiryTree.model.root)");
-      await wait("document.querySelector('#side .vrow')");
-      await evaluate("document.querySelector('#z1').click()");
+      await send("Page.navigate",{url:liveUrl.split('?')[0]+"#file=MemberCenterPage.ets"});
+      await wait("migloopViewer.tree?.byId[migloopViewer.tree.root]?.scope.key.endsWith('/MemberCenterPage.ets') && !migloopViewer.tree.byId[migloopViewer.tree.root].busy && document.querySelector('#side .vrow')");
+      liveDiagnostic.manualEntryWorks=await evaluate("migloopViewer.report===null && migloopViewer.tree.byId[migloopViewer.tree.root].children.length>1");
+      assert(liveDiagnostic.manualEntryWorks,"old file hash opens a real manual tree");
+      await evaluate("document.querySelector('#zf').click()");
     } else {
-      assert.equal(await evaluate("inquiryTree.model.root.coordinate.key"),report.target.file);
-      assert.equal(await evaluate("inquiryTree.model.root.children.length"),1);
-      assert.equal(await evaluate("(async()=>{const slow=migloopViewer.loadReport('slow');await migloopViewer.loadReport('tree-fixture');await slow;return new URLSearchParams(location.search).get('report')})()"),"tree-fixture","a late report response cannot replace a newer navigation");
-      assert.equal(await evaluate("getComputedStyle(document.querySelector('.tree-node')).height"),"30px");
-      assert.equal(await evaluate("getComputedStyle(document.querySelector('.tree-node')).width"),"196px");
-      assert.equal(await evaluate("document.querySelector('#askai').disabled"),true,"unconnected AI is not a fake working button");
-      assert.equal(await evaluate("document.querySelector('#structuredReport')"),null,"no investigator console");
-      assert.equal(await evaluate("getComputedStyle(document.querySelector('[data-edge=\"model:review\"]')).strokeDasharray !== 'none'"),true);
-      assert.equal(await evaluate("[...inquiryTree.model.nodes.values()].some(n=>n.coordinate.key==='unknown-author')"),false);
-      assert.equal(await evaluate("document.querySelector('.tree-node.root').classList.contains('historical-problem')"),false);
-      await evaluate("[...document.querySelectorAll('#side .vrow button')].find(b=>b.textContent==='原文 / diff').click()");
-      await wait("document.querySelector('#side').textContent.includes('WHOLE WRITE')");
-      await evaluate("[...document.querySelectorAll('#side .vrow')][1].querySelectorAll('button')[1].click()");
-      await wait("document.querySelector('#side').textContent.includes('NEW_VALUE')");
-      await evaluate("[...document.querySelectorAll('#side details')].find(d=>d.firstChild.textContent==='已知时刻的读取原文').open=true");
+      assert.equal(await evaluate(rootNode+".scope.key"),report.target.file);
+      assert.equal(await evaluate("getComputedStyle(document.querySelector('#canvas .node')).height"),"30px");
+      assert.equal(await evaluate("getComputedStyle(document.querySelector('#canvas .node')).width"),"196px");
+      assert.equal(await evaluate("document.querySelector('#viewport')"),null,"original canvas");
+      assert.equal(await evaluate("document.querySelector('#askai')"),null,"only load added");
+      assert.equal(await evaluate("getComputedStyle(document.querySelector('[data-edge=\"model:review\"]')).strokeDasharray!=='none'"),true);
+      const writerId=await evaluate(rootNode+".children[0]");
+      await evaluate("document.querySelector('[data-tid=\""+writerId+"\"]').dispatchEvent(new MouseEvent('mouseenter'))");
+      assert.equal(await evaluate("document.querySelectorAll('.wire.on').length>0"),true,"hover highlights incident edges");
+      await evaluate("document.querySelector('[data-tid=\""+writerId+"\"]').dispatchEvent(new MouseEvent('mouseleave'))");
+      assert.equal(await evaluate("document.querySelectorAll('.wire.on').length"),0);
+      await evaluate("[...document.querySelectorAll('#side .vrow .act .lnk')].find(n=>n.textContent==='原文').click()");
+      await wait("document.querySelector('#side .srcblock')?.textContent.includes('WHOLE WRITE')");
+      await evaluate("[...document.querySelectorAll('[data-operation=\"w2\"] .act .lnk')].find(n=>n.textContent==='diff').click()");
+      await wait("document.querySelector('.diffblock .dl-add')?.textContent.includes('NEW_VALUE')");
+      assert.equal(await evaluate("document.querySelector('.diffblock .dl-del').textContent"),"-OLD_VALUE");
+      await evaluate("[...document.querySelectorAll('#side .foldable>b')].find(n=>n.textContent.includes('读取观察')).click()");
       await wait("document.querySelector('[data-operation=\"read\"]')");
-      await evaluate("[...document.querySelectorAll('[data-operation=\"read\"] button')].find(b=>b.textContent==='原文').click()");
-      await wait("document.querySelector('#side').textContent.includes('PARTIAL READ')");
-      assert.equal(await evaluate("document.querySelector('#side').textContent.includes('可能只有片段')"),true);
-      const initialTrace=JSON.stringify(traces);
-      await evaluate("inquiryTree.expand(inquiryTree.model.root)");
-      assert.equal(await evaluate("inquiryTree.model.root.children.length"),2,"raw repair candidate stays hidden");
-      assert.equal(await evaluate("inquiryTree.model.root.children[0].origins.has('report') && inquiryTree.model.root.children[0].origins.has('manual')"),true);
-      await evaluate("inquiryTree.expand(inquiryTree.model.root.children[0])");
-      assert.equal(await evaluate("inquiryTree.model.root.children[0].children.filter(n=>n.coordinate.key.includes('AudioSpec')).length"),2,"microseconds preserved");
-      assert.equal(await evaluate("[...inquiryTree.model.nodes.values()].some(n=>n.row?.id==='native:guess')"),false);
-      await evaluate("inquiryTree.expand(inquiryTree.model.root.children[0].children[0])");
-      assert(requests.some(q=>q.key===input.node.key && q.offset===1),"candidate-only page does not hide next confirmed page");
-      await evaluate("inquiryTree.expand(inquiryTree.model.root,'downstream')");
-      assert.equal(await evaluate("inquiryTree.model.rights.length"),1);
-      assert.equal(JSON.stringify(traces),initialTrace);
-      assert(!requests.some(q=>q.op==="record_trace"));
-      await evaluate("document.querySelector('.tree-node.root').click()");
-      assert.equal(await evaluate("inquiryTree.model.root.collapsed"),true);
-      await evaluate("document.querySelector('.tree-node.root').click()");
-      assert.equal(await evaluate("inquiryTree.model.root.collapsed"),false);
-      await evaluate("document.querySelector('#finding').value='B';document.querySelector('#finding').dispatchEvent(new Event('change'))");
-      await wait("document.querySelector('#side').textContent.includes('候选输入仍未认证因果')");
-      await evaluate("document.querySelector('#finding').value='A';document.querySelector('#finding').dispatchEvent(new Event('change'))");
-      await wait("document.querySelector('[data-claim=\"A:origin\"]')");
-      assert.equal(await evaluate("document.querySelector('[data-edge=\"model:review\"]')"),null);
-      await evaluate("document.querySelector('[data-claim=\"A:origin\"] details').open=true;document.querySelector('[data-claim=\"A:origin\"] button').click()");
-      await wait("document.querySelector('[data-claim=\"A:origin\"]').textContent.includes('ORIGINAL EVIDENCE')");
-      assert.equal(requests.at(-1).at,times.root,"claim evidence keeps original cutoff");
-      assert.equal(requests.at(-1).since,times.origin,"claim evidence keeps original lower bound");
+      await evaluate("document.querySelector('[data-operation=\"read\"] .act .lnk').click()");
+      await wait("document.querySelector('#side .srcblock')?.textContent.includes('PARTIAL READ')");
+      assert.equal(await evaluate("document.querySelector('#side').textContent.includes('可能是片段')"),true);
+      await evaluate("migloopViewer.expand(migloopViewer.tree.root)");
+      assert.equal(await evaluate(rootNode+".children.filter(id=>migloopViewer.tree.byId[id].row).length"),1,"prototype groups repeated writes by one writer");
+      assert.equal(await evaluate(rootNode+".children.map(id=>migloopViewer.tree.byId[id]).find(n=>n.groupRows?.length===2).groupRows.length"),2,"grouping retains both original event IDs");
+      await evaluate("migloopViewer.expand('"+writerId+"')");
+      assert.equal(await evaluate("migloopViewer.tree.byId['"+writerId+"'].children.map(id=>migloopViewer.tree.byId[id]).filter(n=>n.scope?.key.includes('AudioSpec')).length"),2);
+      await evaluate("migloopViewer.expand(migloopViewer.tree.byId['"+writerId+"'].children[0])");
+      assert(requests.some(q=>q.key===input.node.key&&q.offset===1),"hidden-only page continues");
+      await evaluate("migloopViewer.expand(migloopViewer.tree.root,'downstream')");
+      assert.equal(await evaluate("migloopViewer.tree.rights.length"),1);
+      assert.equal(await evaluate("Object.values(migloopViewer.tree.byId).some(n=>n.row?.id==='native:guess')"),false);
+      const initial=JSON.stringify(traces);
       await evaluate("document.querySelector('#load').click()");
       await wait("document.querySelector('#reportsDialog').open");
-      assert.equal(await evaluate("document.querySelector('#reportNotes').textContent.includes('尚未连到树上')"),false,"finding A has no hidden path");
-      await evaluate("document.querySelector('#reportsList button').click()");
+      assert.equal(await evaluate("document.querySelector('#reportNotes').textContent.includes('尚无可显示')"),true);
+      await evaluate("document.querySelector('#finding').value='A';document.querySelector('#finding').dispatchEvent(new Event('change'))");
       await wait("!document.querySelector('#reportsDialog').open");
-      await evaluate("document.querySelector('#load').click()");
-      await wait("document.querySelector('#reportNotes').textContent.includes('缺少历史连接')");
-      await evaluate("document.querySelector('#closeReports').click();inquiryTree.select(inquiryTree.model.root)");
-      await wait("document.querySelector('#side .head button')");
-      await evaluate("document.querySelector('#side .head button').click()");
+      assert.equal(await evaluate("document.querySelector('[data-edge=\"model:review\"]')"),null);
+      await evaluate("migloopViewer.select(Object.values(migloopViewer.tree.byId).find(n=>n.claims.some(c=>c.id==='A:origin')).tid)");
+      await wait("document.querySelector('#side').textContent.includes('原稿原因与范围都必须保留')");
+      await evaluate("[...document.querySelectorAll('#side .quote .foldable>b')].find(n=>n.textContent.includes('原始依据')).click()");
+      await wait("document.querySelector('#side .quote .foldable .lnk')");
+      await evaluate("document.querySelector('#side .quote .foldable .lnk').click()");
+      await wait("document.querySelector('#side .quote pre')?.textContent.includes('ORIGINAL EVIDENCE')");
+      assert.equal(requests.at(-1).at,times.root);assert.equal(requests.at(-1).since,times.origin);
+      await evaluate("migloopViewer.select(migloopViewer.tree.root);document.querySelector('#side .tag').click()");
       await wait("document.querySelector('#timeDialog').open");
       assert.equal(await evaluate("document.querySelector('#at').value"),times.root);
       await evaluate("document.querySelector('#at').value='2026-09-12T10:00:00.000003Z';document.querySelector('#applyTime').click()");
-      await wait("inquiryTree.model.root.coordinate.at==='2026-09-12T10:00:00.000003Z' && !document.querySelector('#timeDialog').open");
-      assert.equal(await evaluate("inquiryTree.report"),null);
-      assert.equal(await evaluate("document.querySelector('#finding').hidden"),true);
-      assert.equal(await evaluate("[...inquiryTree.model.nodes.values()].some(n=>n.modelSeen)"),false,"exiting a report clears model-visit marks");
-      assert.equal(await evaluate("inquiryTree.model.root.children.length"),2,"manual mode has confirmed writers only");
-      assert.equal(await evaluate("new URLSearchParams(location.search).has('report')"),false,"manual time does not retain a report URL that overrides it on refresh");
+      await wait(rootNode+".scope.at==='2026-09-12T10:00:00.000003Z'&&!document.querySelector('#timeDialog').open");
+      assert.equal(await evaluate("migloopViewer.report"),null);
+      assert.equal(await evaluate("new URLSearchParams(location.search).has('report')"),false);
       await send("Page.reload");
-      await wait("inquiryTree.model?.root.coordinate.at==='2026-09-12T10:00:00.000003Z' && inquiryTree.model.root.loaded");
-      assert.equal(await evaluate("inquiryTree.report"),null,"refresh preserves manual scope");
-      await evaluate("document.querySelector('#z1').click();document.querySelector('#railtog').click()");
-      assert.equal(await evaluate("inquiryTree.zoom"),1);
+      await wait("migloopViewer.tree?.byId[migloopViewer.tree.root]?.scope.at==='2026-09-12T10:00:00.000003Z' && !migloopViewer.tree.byId[migloopViewer.tree.root].busy");
+      await evaluate("document.querySelector('#z1').click()");
+      assert.equal(await evaluate("migloopViewer.zoom"),1);
+      await evaluate("document.querySelector('#graph').dispatchEvent(new WheelEvent('wheel',{ctrlKey:true,deltaY:-1,cancelable:true}))");
+      assert(await evaluate("migloopViewer.zoom>1"));
+      await evaluate("document.querySelector('#railtog').click()");
       assert.equal(await evaluate("document.querySelector('#rail').classList.contains('closed')"),true);
-      await evaluate("document.querySelector('#railtog').click();document.querySelectorAll('#railbody .rsec')[1].querySelector('.rrow').click()");
+      await evaluate("document.querySelector('#railtog').click()");
+      assert.equal(await evaluate("document.querySelectorAll('#railbody .rkind').length"),2,"grouped file catalog");
+      await evaluate("document.querySelector('#q').value='AudioPlayer';document.querySelector('#q').dispatchEvent(new Event('input'));document.querySelector('#railbody .ritem .rrow').click()");
       await wait("document.querySelector('#railbody .vline')");
-      // The host job is deliberately a fixture. Production stays disabled until configured.
-      await evaluate("migloopViewer.configure({investigate:async target=>{window.aiTarget=target;return 'tree-fixture'}});document.querySelector('#askai').click()");
-      await wait("inquiryTree.report?.report_id==='tree-fixture' && document.querySelector('#askai').textContent==='AI 帮我查'");
-      assert.equal(await evaluate("aiTarget.file"),report.target.file);
-      await evaluate("migloopViewer.configure({});document.querySelector('#finding').value='A';document.querySelector('#finding').dispatchEvent(new Event('change'));document.querySelector('#z1').click()");
+      assert.equal(JSON.stringify(traces),initial,"manual UI leaves trace alone");
+      assert(!requests.some(q=>q.op==="record_trace"));
+      const race=await evaluate("(async()=>{const slow=migloopViewer.loadReport('slow');await migloopViewer.loadReport('tree-fixture');await slow;return new URLSearchParams(location.search).get('report')})()");
+      assert.equal(race,"tree-fixture");
+      await evaluate("document.querySelector('#q').value='';document.querySelector('#q').dispatchEvent(new Event('input'));document.querySelector('#zf').click()");
     }
     assert.equal(errors.length, 0, errors.join("\n"));
     const screenshot = await send("Page.captureScreenshot", { format: "png" });
@@ -287,7 +255,7 @@ async function main() {
     const audit = { passed: true, url, errors, liveDiagnostic, queryCount: requests.length,
       checks: ["original compact shell", "single tree for saved and manual exploration", "ordinary candidates hidden",
         "model-review-only dashed edges", "write text and edit delta", "read observation expansion",
-        "trace isolation", "precise cutoff", "load dialog", "no fabricated AI runner", "no JavaScript errors"],
+        "trace isolation", "precise cutoff", "load dialog", "only load control", "original hover highlight", "colored inline diffs", "original grouped catalog", "Ctrl-wheel zoom", "no JavaScript errors"],
     };
     fs.writeFileSync(path.join(out, "audit.json"), JSON.stringify(audit, null, 2));
     console.log(JSON.stringify({ ...audit, artifacts: out }));
