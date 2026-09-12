@@ -1,5 +1,7 @@
 """A failed historical open is not a successful read or missing evidence."""
 
+import json
+
 import pytest
 
 from tests.test_inquiry_core import build, record, result, ts, use
@@ -25,6 +27,50 @@ def test_outside_open_explains_actual_and_requested_time_without_leaking_payload
     frame = engine.investigate([{"op": "open", "ref": ref, "at": ts(1)}])
     assert "PRIVATE_FUTURE_CONTENT" not in frame
     assert "record_at" in frame and "ERROR" in frame
+    engine.store.close()
+
+
+@pytest.mark.parametrize("kind,key", [("agent", "a"), ("file", "A.ets")])
+def test_borrowed_scope_keeps_actual_owner_interval_and_native_relations(
+    tmp_path, kind, key
+):
+    engine = build(
+        tmp_path,
+        [
+            record(1, use("w", file_path="A.ets", content="A")),
+            record(2, result("w")),
+        ],
+        [
+            record(2, use("r", "Read", file_path="B.kt")),
+            record(3, result("r", "B input")),
+        ],
+    )
+    parent = engine.query(
+        {"op": kind, "key": key, "at": ts(5), "since": ts(3)}
+    )
+    before = engine.store.rows("SELECT * FROM effects ORDER BY id")
+    data = engine.query(
+        {
+            "op": "open",
+            "ref": engine.store.locate("b.jsonl", 2),
+            "scope": parent["scope_id"],
+        }
+    )
+    assert data["record_owner"] == "b" and "B input" in data["text"]
+    assert data["at"].startswith(ts(3)[:-1])
+    assert engine.store.rows("SELECT * FROM effects ORDER BY id") == before
+    with pytest.raises(ValueError) as error:
+        engine.query(
+            {
+                "op": "open",
+                "ref": engine.store.locate("b.jsonl", 1),
+                "scope": parent["scope_id"],
+            }
+        )
+    diagnostic = json.loads(str(error.value).split("; ", 1)[1])
+    assert set(diagnostic) == {"ref", "record_at", "requested_scope", "note"}
+    assert diagnostic["requested_scope"]["since"].startswith(ts(3)[:-1])
+    assert diagnostic["requested_scope"]["at"].startswith(ts(5)[:-1])
     engine.store.close()
 
 
