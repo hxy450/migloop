@@ -117,13 +117,33 @@ async function main() {
           document.getElementById('findings').value=${JSON.stringify(id)};
           document.getElementById('findings').dispatchEvent(new Event('change'));
           const id=${JSON.stringify(id)};
-          return {expectedNodes:graph.nodes.filter(n=>n.finding===id).length,
+          const projected=typeof presentationGraph==='function'?presentationGraph(graph,id):
+            {nodes:graph.nodes.filter(n=>n.finding===id),edges:graph.edges.filter(e=>e.finding===id)};
+          return {expectedNodes:projected.nodes.length,
             actualNodes:document.querySelectorAll('#graph .node').length,
             expectedEdges:graph.edges.filter(e=>e.finding===id).length,
-            actualEdges:document.querySelectorAll('#graph path[marker-end]').length};
+            actualEdges:document.querySelectorAll('#graph path[marker-end]').length,
+            grouping:typeof presentationGraph==='function',
+            expectedClaims:graph.nodes.filter(n=>n.finding===id).length,
+            actualClaims:document.querySelectorAll('#graph .claim').length};
         })()`);
         assert.equal(counts.actualNodes, counts.expectedNodes);
         assert.equal(counts.actualEdges, counts.expectedEdges);
+        if(counts.grouping) {
+          assert.equal(counts.actualClaims,counts.expectedClaims,'grouping lost a submitted node claim');
+          const preserved=await evaluate(`(() => {
+            const before=JSON.stringify(graph);
+            for(const claim of document.querySelectorAll('#graph .claim')) {
+              claim.dispatchEvent(new MouseEvent('click',{bubbles:true}));
+              const node=graph.nodes.find(n=>n.id===claim.dataset.claim);
+              const shown=document.getElementById('reason').textContent;
+              if(!shown.includes(node.reason)||!shown.includes(node.id)) return false;
+              if(!(node.evidence||[]).every(ref=>shown.includes(ref))) return false;
+            }
+            return JSON.stringify(graph)===before;
+          })()`);
+          assert(preserved,'grouped member click changed or lost an original claim');
+        }
         if(process.argv.includes('--report-text')) {
           const textCheck=await evaluate(`(() => {
             const finding=graph.document.findings.find(f=>f.id===${JSON.stringify(id)});
@@ -141,6 +161,27 @@ async function main() {
         fs.writeFileSync(path.join(out, `finding-${id.replace(/[^a-zA-Z0-9_-]/g, "_")}.png`), Buffer.from(shot.data, "base64"));
       }
       await evaluate(`document.getElementById('findings').value=${JSON.stringify(ids[0])};draw()`);
+      if(await evaluate("typeof presentationGraph==='function'")) {
+        const grouping=await evaluate(`(async()=>{
+          const original=graph,before=JSON.stringify(graph);
+          const fixture=structuredClone(graph),base=graph.nodes[0],fid=graph.document.findings[0].id;
+          fixture.nodes=[{...base,id:'synthetic:context',finding:fid,exists:true,role:'context',reason:'Synthetic context only'},
+            {...base,id:'synthetic:origin',finding:fid,exists:true,role:'origin',reason:'Synthetic origin only'}];
+          fixture.edges=[{id:'synthetic:internal',finding:fid,from:'synthetic:context',to:'synthetic:origin',strength:'candidate'},
+            {id:'synthetic:self',finding:fid,from:'synthetic:origin',to:'synthetic:origin',strength:'confirmed'}];
+          await loadGraph(fixture);
+          const paths=[...document.querySelectorAll('#graph path[marker-end]')];
+          const result={groups:document.querySelectorAll('#graph .node').length,
+            claims:document.querySelectorAll('#graph .claim').length,edges:paths.length,
+            loopsVisible:paths.every(p=>p.getBBox().width>0&&!p.getAttribute('d').includes('NaN')),
+            dashed:paths.filter(p=>p.getAttribute('stroke-dasharray')==='5 4').length};
+          await loadGraph(original);
+          result.originalUnchanged=JSON.stringify(graph)===before;
+          return result;
+        })()`);
+        assert.deepEqual(grouping,{groups:1,claims:2,edges:2,loopsVisible:true,dashed:1,originalUnchanged:true});
+        fs.writeFileSync(path.join(out,'grouped-scope.json'),JSON.stringify({synthetic_display_only:true,...grouping},null,2));
+      }
       if(process.argv.includes('--report-text')) {
         const empty=await evaluate(`(async()=>{
           const original=graph;
