@@ -1,0 +1,214 @@
+{
+  "schema": "inquiry-tool-usage-audit/1",
+  "round": "i20-high",
+  "root": "C:\\Users\\hongy\\projects\\_migloop-eval-20260909\\file-first-10\\inquiry-iterations-20260911\\i20-high",
+  "model_calls": 0,
+  "method": "Count item.completed mcp_tool_call and command_execution in events.jsonl. Cross-check native host call names; exec wrappers are not shell calls. Logical queries/failures from delivery-audit.json. Completed MCP calls may contain failed logical queries. Counts are calls, not token share, evidence attention or causal contribution. No command stdout is republished.",
+  "summary": {
+    "cases": 10,
+    "mcp": {
+      "investigate": 255,
+      "page": 125,
+      "submit": 24
+    },
+    "mcp_total": 404,
+    "shell_total": 2,
+    "host_exec_total": 427,
+    "logical_queries": 937,
+    "logical_query_failures": 40
+  },
+  "cases": [
+    {
+      "case": "F10-01",
+      "mcp_completed": {
+        "investigate": 32,
+        "page": 16,
+        "submit": 3
+      },
+      "mcp_total": 51,
+      "shell_completed": [],
+      "shell_total": 0,
+      "host_calls": {
+        "exec": 53
+      },
+      "logical_queries": 107,
+      "logical_query_failures": 2,
+      "events_sha256": "0b7a4149ae33928ad48995fd76af16d955c867cea2c07eec09775dbb5c95257e",
+      "transcript_sha256": "5b93fb6a28a6995b6d7e04718e1169cfbaf04e42aa52fe0d7bb8f2ad96f473db"
+    },
+    {
+      "case": "F10-02",
+      "mcp_completed": {
+        "investigate": 32,
+        "page": 19,
+        "submit": 4
+      },
+      "mcp_total": 55,
+      "shell_completed": [],
+      "shell_total": 0,
+      "host_calls": {
+        "exec": 58
+      },
+      "logical_queries": 160,
+      "logical_query_failures": 5,
+      "events_sha256": "cb1f0944ac908a6ede12db3e246c7c4a8b0ef2946d383f75e2e18fbc08c0cbdd",
+      "transcript_sha256": "279dfb5bf86a3d3edc3a6a8d89975b3ae0bc8ebc6b2a52a69cf3fb4a0e6a7713"
+    },
+    {
+      "case": "F10-03",
+      "mcp_completed": {
+        "investigate": 18,
+        "page": 20,
+        "submit": 2
+      },
+      "mcp_total": 40,
+      "shell_completed": [],
+      "shell_total": 0,
+      "host_calls": {
+        "exec": 42
+      },
+      "logical_queries": 70,
+      "logical_query_failures": 9,
+      "events_sha256": "d55ff5af94b0939cf24c489538dbac2759adc0e777b8431c199b1c866996dc7c",
+      "transcript_sha256": "1fe67dc4eede9ea2fb09377a7339d8071d4454d8481c312a46b00c94a1449cdb"
+    },
+    {
+      "case": "F10-04",
+      "mcp_completed": {
+        "investigate": 25,
+        "page": 9,
+        "submit": 2
+      },
+      "mcp_total": 36,
+      "shell_completed": [],
+      "shell_total": 0,
+      "host_calls": {
+        "exec": 37
+      },
+      "logical_queries": 81,
+      "logical_query_failures": 2,
+      "events_sha256": "4c1ea6163f0ea5636e7ffd3a60b493937aa328b73a19ce1ac76d8701c9fefb8e",
+      "transcript_sha256": "0ae57e8d7573dc20ae8580e908a929917443a62fe8677fccb9eadc400242f9c8"
+    },
+    {
+      "case": "F10-05",
+      "mcp_completed": {
+        "investigate": 13,
+        "page": 6,
+        "submit": 2
+      },
+      "mcp_total": 21,
+      "shell_completed": [],
+      "shell_total": 0,
+      "host_calls": {
+        "exec": 24
+      },
+      "logical_queries": 56,
+      "logical_query_failures": 5,
+      "events_sha256": "951c6d5675e1cddaa319dd97cf20478434553116c4b13df1439efee0d02c2453",
+      "transcript_sha256": "c10e188de2feb2f8457062a42ef170380b364ddcd4d2252c2191dd5c0310b3c5"
+    },
+    {
+      "case": "F10-06",
+      "mcp_completed": {
+        "investigate": 48,
+        "page": 23,
+        "submit": 2
+      },
+      "mcp_total": 73,
+      "shell_completed": [],
+      "shell_total": 0,
+      "host_calls": {
+        "exec": 76
+      },
+      "logical_queries": 183,
+      "logical_query_failures": 12,
+      "events_sha256": "e4a94385911b5dff26caa8716fe1b95f59e967c1acd674fc36da32a6819d8ac5",
+      "transcript_sha256": "85fdf058905b5e92a659308129403620731763aa600ace0748e2b60a30029b8d"
+    },
+    {
+      "case": "F10-07",
+      "mcp_completed": {
+        "investigate": 14,
+        "page": 13,
+        "submit": 3
+      },
+      "mcp_total": 30,
+      "shell_completed": [
+        {
+          "command": "\"C:\\\\Windows\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg --files -g '*.jsonl' | Select-Object -First 20\"",
+          "exit_code": 0,
+          "status": "completed"
+        }
+      ],
+      "shell_total": 1,
+      "host_calls": {
+        "exec": 32
+      },
+      "logical_queries": 57,
+      "logical_query_failures": 1,
+      "events_sha256": "90b6d8668ffc41c87b4e128b27c2b0239619ae468aea67da98eb268e3397c64e",
+      "transcript_sha256": "0d3fb563de9f8472276109e3640b80ccdf8f810829aba4b86f176a23ab39ecbe"
+    },
+    {
+      "case": "F10-08",
+      "mcp_completed": {
+        "investigate": 18,
+        "page": 10,
+        "submit": 2
+      },
+      "mcp_total": 30,
+      "shell_completed": [],
+      "shell_total": 0,
+      "host_calls": {
+        "exec": 32
+      },
+      "logical_queries": 63,
+      "logical_query_failures": 2,
+      "events_sha256": "2dff126add8f7fcd19ecc152965c509d1f0c53baa82682344cabcade4e5e0561",
+      "transcript_sha256": "583e796dcad41273fa60d67be7f7fd15d117681f858b00547e6fb80d00c174dc"
+    },
+    {
+      "case": "F10-09",
+      "mcp_completed": {
+        "investigate": 26,
+        "page": 4,
+        "submit": 2
+      },
+      "mcp_total": 32,
+      "shell_completed": [
+        {
+          "command": "\"C:\\\\Windows\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n --glob '*.jsonl' 'HitTestMode\\\\.Block|hitTestBehavior\\\\(this\\\\.visible|build_status: PASS|entry-default-unsigned\\\\.hap|uitest|ui.?test|install.*hap|点击同意' .\"",
+          "exit_code": 0,
+          "status": "completed"
+        }
+      ],
+      "shell_total": 1,
+      "host_calls": {
+        "exec": 35
+      },
+      "logical_queries": 75,
+      "logical_query_failures": 1,
+      "events_sha256": "7db691f8f202c92d176919254b6d10cffc33c463487e9f02b00b7f105371be2e",
+      "transcript_sha256": "5047aab7ababaec145f0fba18619242e23d91b3590a38f157b686b0133bb211b"
+    },
+    {
+      "case": "F10-10",
+      "mcp_completed": {
+        "investigate": 29,
+        "page": 5,
+        "submit": 2
+      },
+      "mcp_total": 36,
+      "shell_completed": [],
+      "shell_total": 0,
+      "host_calls": {
+        "exec": 38
+      },
+      "logical_queries": 85,
+      "logical_query_failures": 1,
+      "events_sha256": "df3e4ad34a4a9b37fa27ee743047d3a33f1fa3832705f8b152dc569ff418c8a1",
+      "transcript_sha256": "7883b43bf4259632e2bd9386252e1378b4760e0c96c538baaf8bbbdd8c8add4f"
+    }
+  ]
+}
