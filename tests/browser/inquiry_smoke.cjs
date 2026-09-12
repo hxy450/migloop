@@ -115,6 +115,19 @@ async function main() {
         })()`);
         assert.equal(counts.actualNodes, counts.expectedNodes);
         assert.equal(counts.actualEdges, counts.expectedEdges);
+        if(process.argv.includes('--report-text')) {
+          const textCheck=await evaluate(`(() => {
+            const finding=graph.document.findings.find(f=>f.id===${JSON.stringify(id)});
+            const expected={reason:finding.reason,unknown:finding.unknown,hypothesis:finding.hypothesis,
+              recommendation:finding.recommendation,unexplained:graph.document.unexplained};
+            return {missing:Object.entries(expected).filter(([key,value])=>value && value.length &&
+              document.querySelector('#findingText [data-field="'+key+'"]')?.textContent !==
+              (typeof value==='string'?value:JSON.stringify(value,null,2))).map(([key])=>key),
+              complete:document.getElementById('structuredReport')?.textContent===JSON.stringify(graph.document,null,2)};
+          })()`);
+          assert.deepEqual(textCheck.missing,[],'report qualifications disappeared');
+          assert(textCheck.complete,'complete structured report not displayed');
+        }
         const shot = await send("Page.captureScreenshot", { format: "png" });
         fs.writeFileSync(path.join(out, `finding-${id.replace(/[^a-zA-Z0-9_-]/g, "_")}.png`), Buffer.from(shot.data, "base64"));
       }

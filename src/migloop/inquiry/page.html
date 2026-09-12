@@ -189,6 +189,7 @@
           未核关系不画连线
         </div>
         <div id="graph"></div>
+        <div id="findingText"></div>
         <div id="gaps"></div>
       </section>
       <section>
@@ -421,6 +422,7 @@
     function draw() {
       const host = $("graph");
       host.replaceChildren();
+      $("findingText").replaceChildren();
       $("gaps").replaceChildren();
       if (!graph) {
         element("p", "尚未载入结论。可先手动取证。", host, "muted");
@@ -430,6 +432,7 @@
         nodes = graph.nodes.filter((n) => n.finding === fid),
         edges = graph.edges.filter((e) => e.finding === fid),
         depth = new Map(nodes.map((n) => [n.id, 0]));
+      renderFindingText(graph.document.findings.find(f=>f.id===fid));
       // Finite layout even for cyclic/shared model arguments; drawing never invents relations.
       for (let i = 0; i < nodes.length; i++) {
         let changed = false;
@@ -571,6 +574,28 @@
       for (const row of graph.missing_evidence_links || [])
         element('div', `已引用但未接入图：${row.op} · ${row.path} · ${row.link}`, $('gaps'),'error small');
       renderReview(graph.evidence_review, $('gaps'));
+    }
+    function renderFindingText(finding) {
+      const host=$('findingText');
+      if(!finding) return;
+      const fields=[['reason','本条解释（模型主张）',finding.reason],
+        ['unknown','本条未证实事项',finding.unknown],
+        ['hypothesis','机制假设（尚未证实）',finding.hypothesis],
+        ['recommendation','优化建议（效果需另验）',finding.recommendation],
+        ['unexplained','整份报告的未解释事项 / 限制',graph.document.unexplained]];
+      for(const [field,label,value] of fields) {
+        if(!value || !value.length) continue;
+        const detail=element('details','',host);
+        element('summary',label,detail);
+        const text=typeof value==='string'?value:JSON.stringify(value,null,2);
+        const body=element('pre',text,detail);body.dataset.field=field;
+        for(const ref of new Set(text.match(/\be-[0-9a-f]{8,64}\b/g)||[]))
+          button(ref,detail,()=>open(ref,graph.target.at));
+      }
+      const full=element('details','',host);
+      element('summary','完整结构化结论（只读）',full);
+      element('p',`以下是提交内容的 JSON 展示，不是原始 YAML/JSON 字节。原始提交 SHA-256：${graph.source_sha256}。原因、假设和建议均不是工具认证。`,full,'small muted');
+      element('pre',JSON.stringify(graph.document,null,2),full).id='structuredReport';
     }
     function renderReview(review, container) {
       if(!review) return;
