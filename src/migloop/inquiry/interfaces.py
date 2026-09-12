@@ -66,6 +66,7 @@ calls仅筛原生工具调用入口，包含无法判断效应的脚本，result
 agent：把op改成agent、key改成目录中的agent身份。默认records是全文索引，不是全部原文。view:inputs给原生读文件、任务消息和工具返回三个有重叠的渠道；view:messages查非工具消息，view:returns查工具返回，都可分页和多词terms过滤。records/search仍搜整个范围，inputs不是完整有效上下文。
 检索：{op:search,kind:pool|agent|file,key:可选范围,at:ISO,terms:[字面词1,词2],offset:0,limit:20}，多词OR。
 展开：{op:open,ref:照抄记录ID,at:ISO,pointer:可选JSONPointer}；也可用source:逻辑源名称,line:物理行号代替ref。
+展开列表里的原文时，可直接用{op:open,ref:e-...,scope:该列表的scope_id}继承时间范围，避免手抄错截止；scope在open中只限制时间，不改变原文归属或创建关系。不要把某条记录的发生时刻当成整批不同原文的共同截止。遇outside time scope，核record_at与requested_scope；这是未成功读取，不是资料不存在，更不能算已经看过。
 每个file/agent视图返回scope_id=s-file-...或s-agent-...，锁定kind/key/at/since。后续可用{op:search,scope:已返回的scope_id,terms:[...]}
 或{op:agent,scope:s-...,view:relations}，不能再混写key/at/since。PARTICIPANT的scope可直接打开agent。
 原文引用优先照抄短cite=e-...，不能用RESULT id、agent名或注释拼进ref。原始长ref也可用。

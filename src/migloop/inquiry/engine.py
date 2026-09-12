@@ -533,7 +533,17 @@ class Engine:
                 ref = self.store.locate(request.get("source"), request.get("line"))
             record, text = self.store.source_record(ref)
             if not in_scope(record["at"], at, since, request.get("undated", False)):
-                raise ValueError("record outside requested time scope")
+                raise ValueError(
+                    "record outside requested time scope; "
+                    + encode(
+                        {
+                            "ref": ref,
+                            "record_at": iso(record["at"]),
+                            "requested_scope": {"since": iso(since), "at": iso(at)},
+                            "note": "The record exists but is not inside this requested interval (or has no timestamp). Locator metadata only; no content returned. For an item from a prior list, open it with that list's scope to inherit its cutoff instead of copying another event's time. Do not move a causal boundary merely to admit later evidence, or treat this failed open as missing input.",
+                        }
+                    )
+                )
             provenance = request_context(self.store, record, text, at)
             if "pointer" in request:
                 value = selected(json.loads(text), request["pointer"])

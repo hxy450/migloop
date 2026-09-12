@@ -49,6 +49,15 @@ def covered(ranges, total):
     return end >= total
 
 
+def query_stats(bodies):
+    queries = [q for b in bodies for q in b["queries"]]
+    opens = [q for q in queries if isinstance(q.get("query"), dict) and q["query"].get("op") == "open"]
+    return {"query_attempts": len(queries), "query_succeeded": sum(q["ok"] is True for q in queries),
+            "query_failed": sum(q["ok"] is not True for q in queries),
+            "open_attempts": len(opens), "open_succeeded": sum(q["ok"] is True for q in opens),
+            "open_failed": sum(q["ok"] is not True for q in opens)}
+
+
 def audit(out):
     started = time.perf_counter()
     manifest = json.loads((out / 'manifest.json').read_text(encoding='utf-8'))
@@ -92,7 +101,7 @@ def audit(out):
         item = event.get('item', {})
         if event.get('type') == 'item.completed' and item.get('type') == 'mcp_tool_call':
             for _, text in views(item.get('result')):
-                owned.update(re.findall(r'^RESULT ([0-9a-f]{16}) ', text, re.M))
+                owned.update(re.findall(r'^RESULT ([0-9a-f]{16}) ', text, re.MULTILINE))
     frames, bodies, observations = [], [], []
     for frame in store.rows("SELECT * FROM frames ORDER BY run,offset"):
         if frame['run'] not in owned:
@@ -100,7 +109,7 @@ def audit(out):
         match = next(((wrapper, path, text) for wrapper in wrappers for path, text in wrapper["views"]
                       if frame["text"] in text), None)
         if match:
-            wrapper, path, text = match
+            _wrapper, _path, text = match
         else:
             text = "No complete frame in recorded model-visible outputs"
         observations.append((frame["run"], frame["offset"], int(match is not None), text))
@@ -187,7 +196,9 @@ def audit(out):
               "tools": dict(Counter(i.get("tool", i.get("type")) for i in completed)),
               "host_wrappers": [{k: v for k, v in w.items() if k not in ("views", "output")} for w in wrappers],
               "frames": frames, "bodies": bodies,
-              "summary": {"frames_sent": len(frames), "frames_visible_complete": sum(f["visible_complete"] for f in frames),
+              "query_failures": [{"result_id": b["id"], "query": q["query"], "error": q["error"]}
+                                 for b in bodies for q in b["queries"] if q["ok"] is not True],
+              "summary": {**query_stats(bodies), "frames_sent": len(frames), "frames_visible_complete": sum(f["visible_complete"] for f in frames),
                           "bodies": len(bodies), "bodies_visible_complete": sum(b["body_visible_complete"] for b in bodies),
                           "host_truncated_wrappers": sum(w["truncated"] for w in wrappers)},
               "limit": "Recorded presentation only, not model attention or semantic correctness; no service packet used to fill visible gaps."}

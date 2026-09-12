@@ -1,0 +1,39 @@
+{
+  "schema": "inquiry-developer-score/1",
+  "round": "i19-high",
+  "commit": "170e6a8",
+  "model": "gpt-5.6-luna",
+  "effort": "high",
+  "reference": "../file-first-10/scoring-core.json",
+  "grading": "Same frozen Member-only gate and rubric, source review plus independent Luna review. No gold change, raw rerun, best-of selection or reviewer facts inserted into the investigator report. Pool existence alone is not evidence of delivery to the producing actor.",
+  "cases": [{
+    "id": "F10-01", "report_id": "d66f1294a6434188",
+    "units": {"mask": "correct", "images": "correct", "cta": "correct", "price": "partial", "indicator": "correct", "repair-compile": "correct"},
+    "basis": "All six repair families recovered. Price explains uniform versus segmented styles, but cites an earlier different actor's analysis Write e-5376932f8d0c without establishing delivery/read by the actual producer. The original Kotlin Read e-7bbf87ca6062 existed before the Slice8 output; the attempted open failed, and the final report does not establish an equivalent generation-input/output attribution. Mask correctly distinguishes three missing configurations from existing transparent H5. No major extra established within reviewed evidence."
+  }],
+  "summary": {"correct": 5, "partial": 1, "omitted": 0, "wrong": 0, "total": 6, "unit_weighted_percent": 83.3333333333, "files_run": 1, "files_not_run": 9},
+  "investigation_failures": [{
+    "case": "F10-01", "query_id": "bb40ce14b7544da4",
+    "ref": "e-7bbf87ca6062", "requested_at": "2026-07-24T15:33:36.641Z", "record_at": "2026-07-24T15:33:51.671Z",
+    "ok": false, "error": "record outside requested time scope",
+    "detail": "Unlike i17/i18, the input entry was delivered. But the model copied a cutoff 15.030 seconds before the original record returned, and did not recover from the failed open. This is not evidence that it successfully read the original and then forgot to cite it. Query attempts and fully visible ERROR frames must not be counted as successful source reading."
+  }],
+  "diagnosis_correction": "Initial commentary inferred successful reading from query.ref alone. Checking saved data[0].ok disproved it. An uncommitted unlinked-inputs prototype based on that mistaken diagnosis was removed; no model run used it. Current fix targets scope reuse and failed-open diagnostics, not additional attribution rules.",
+  "mechanical": {
+    "valid": 1, "frames_sent": 100, "frames_visible_complete": 100, "bodies": 77, "bodies_visible_complete": 58, "host_truncated_wrappers": 1,
+    "query_attempts": 77, "query_succeeded": 62, "query_failed": 15,
+    "open_attempts": 50, "open_succeeded": 35, "open_failed": 15,
+    "failed_open_categories": {"time_scope": 9, "unknown_coordinate": 6},
+    "nodes": 29, "edges": 12, "final_binding_errors": 0, "missing_evidence_links": 0,
+    "unassessed": 2, "unknown": 2, "semantic_verified": false,
+    "qualification": "First draft 834cdd2c49f74669 had 11 unknown-ID issues, then 5f7622fef3dd40aa had 3 unassessed items. Own revisions retained. Full emitted-frame visibility is neither full-body reading nor query success."
+  },
+  "cost": {
+    "input_plus_output": 5926905, "input_total": 5895808, "cached_input": 5663744, "uncached_input": 232064, "output": 31097,
+    "model_seconds_sum": 674.1472039000364,
+    "comparison": "About 9.9% fewer total tokens and 6.2% less model time than i18 Member, but still 5/6. Single-run observation, not causal/stability evidence; raw medium versus high and stronger Member task caveats remain."
+  },
+  "accepted": false,
+  "why_not": "Member gate requires 6/6. No other nine files or stability repeats run.",
+  "next": "Keep time filtering strict. Teach existing open(scope=parent_scope_id) inheritance, expose actual/requested times on rejected opens without returning excluded content, and audit attempted versus successful queries separately."
+}
