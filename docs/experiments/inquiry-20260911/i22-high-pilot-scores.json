@@ -1,0 +1,113 @@
+{
+  "schema": "inquiry-developer-score/1",
+  "round": "i22-high",
+  "investigator_commit": "289e3f2",
+  "model": "gpt-5.6-luna",
+  "effort": "high",
+  "reference": "../file-first-10/scoring-core.json",
+  "provisional": false,
+  "accepted": false,
+  "cases": [
+    {
+      "id": "F10-04",
+      "report_id": "052a50550c9949dc",
+      "units": {
+        "debug-wiring": "correct",
+        "wrong-class-repair": "correct"
+      },
+      "additional_errors": [],
+      "basis": "Fresh-context independent review and developer checks agree2/2. Missing startup debug wiring and repair-time wrong receiver are correctly distinguished; unknown effective delivery/mechanism is bounded. Prior global no-device-validation assertion is absent.",
+      "runtime_evidence_recovered": false,
+      "audit_caveats": "Later actual HMOS login remains omitted. This is not a core zero or false absence, but the predeclared positive evidence-recovery pilot criterion is not satisfied. 13 opens omitted both at/scope and failed, another reference was invalid; failures not counted as reads.",
+      "cost": {
+        "input_total": 6067685,
+        "cached_input": 5804800,
+        "uncached_input": 262885,
+        "output": 24133,
+        "input_plus_output": 6091818,
+        "seconds": 570.2026272000512
+      },
+      "mechanical": {
+        "status": "valid",
+        "queries": 141,
+        "query_failed": 14,
+        "opens": 86,
+        "open_failed": 14,
+        "frames": 174,
+        "frames_visible_complete": 172,
+        "bodies_visible_complete": 68,
+        "host_truncated_wrappers": 2,
+        "nodes": 12,
+        "edges": 10,
+        "unassessed": 0,
+        "unknown_calls": 0,
+        "missing_evidence_links": 0
+      }
+    },
+    {
+      "id": "F10-07",
+      "report_id": "b2891b51f87a472c",
+      "units": {
+        "test-bridge": "correct",
+        "error-observer": "correct"
+      },
+      "basis": "Both later-contract local causes remain supported. Canonical Hypium failure and unobservable bridge keys are real limitations, but a different later execution channel observed onNewWant reentry.",
+      "additional_errors": [
+        {
+          "major": true,
+          "kind": "overbroad_denial_of_runtime_observation",
+          "quote": "桥键写入、mock 注入和 onNewWant 重入没有被可执行 UI 用例证实；用例因 Driver.create() 返回 null 未执行。",
+          "counterevidence": [
+            "1595bf17223c1f0d:256:4b9a8792cb29dca7",
+            "1595bf17223c1f0d:260:e45b584caf18eb2e",
+            "1595bf17223c1f0d:265:68539b638a10c2bd",
+            "1595bf17223c1f0d:267:b1f42abbe4ec9edb"
+          ],
+          "detail": "Source-checked native execution of replay_ui_cases.py at21:01:14 followed by actual Bash output10/10 and AC16 onNewWant markers3, plus cat of captured device hilog with three corresponding times. Report edits alone were not accepted as sufficient gold. Counter concerns observed reentry specifically; bridge-key/mock consumption stays unobservable and canonical Hypium remains deferred."
+        },
+        {
+          "major": false,
+          "kind": "temporal_citation_mismatch",
+          "quote": "之后仍有 0 error、7 warning 或同类告警：e-3d920429c219、e-ffb770aff011。",
+          "detail": "Cited returns are20:16 and19:22, before observer edits21:19, not valid as post-observer support. Actual later successful build exists separately; coreB not zeroed and no second major absence claim invented from this ambiguity."
+        }
+      ],
+      "cost": {
+        "input_total": 3022561,
+        "cached_input": 2846720,
+        "uncached_input": 175841,
+        "output": 19677,
+        "input_plus_output": 3042238,
+        "seconds": 417.74953890009783
+      },
+      "mechanical": {
+        "status": "valid",
+        "queries": 63,
+        "query_failed": 1,
+        "opens": 41,
+        "open_failed": 1,
+        "frames": 82,
+        "frames_visible_complete": 82,
+        "bodies_visible_complete": 23,
+        "host_truncated_wrappers": 2,
+        "nodes": 15,
+        "edges": 9,
+        "unassessed": 0,
+        "unknown_calls": 0,
+        "missing_evidence_links": 0
+      }
+    }
+  ],
+  "summary": {
+    "files_run": 2,
+    "correct": 4,
+    "partial": 0,
+    "wrong": 0,
+    "major_extra_claims": 1,
+    "remaining_files_not_run": 8,
+    "input_plus_output": 9134056,
+    "model_seconds_sum": 987.952166100149,
+    "versus_i21": "~24.1% fewer cumulative input+output, ~22.7% fewer summed model seconds, n=1 per case; not a passed correctness/efficiency release."
+  },
+  "why_not": "No-major gate fails on F10-07; positive runtime evidence recovery also absent on F10-04. Do not run remaining8 or stability repeats. Preserve originals and no raw reruns. Next step isolates a generic investigation-protocol change, not more parser/filename heuristics."
+}
