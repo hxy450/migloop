@@ -841,7 +841,8 @@
     }
     async function reportsDialog() {
       reportNotes();document.getElementById("finding").hidden=!report;
-      document.getElementById("reportsDialog").showModal();
+      var dialog=document.getElementById("reportsDialog");dialog.showModal();
+      dialog.scrollTop=0; // Native autofocus on the lower selector must not hide the file summary.
     }
     function renderEmptyCanvas() {
       XT=null;nodeEls={};canvas.innerHTML="";canvas.appendChild(svg);svg.innerHTML="";layoutSize={w:600,h:200};

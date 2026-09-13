@@ -1,0 +1,25 @@
+{
+  "schema": "inquiry-developer-score/1",
+  "round": "narrative-boundary-member-20260913",
+  "investigator_commit": "156c11a",
+  "model": "gpt-5.6-luna",
+  "effort": "high",
+  "reference": "../file-first-10/scoring-core.json",
+  "cases": [{
+    "id": "F10-01",
+    "report_id": "1eceb6d2ba3f40fc",
+    "source_sha256": "ba33434080762dde5bb80ee67f0daa44f9225bf32ed0c9fe11ef615b2cb97a65",
+    "units": {"mask": "correct", "images": "correct", "cta": "correct", "price": "correct", "indicator": "correct", "repair-compile": "correct"},
+    "mapping": {"A": ["images"], "B": ["cta"], "C": ["indicator"], "D": ["price", "repair-compile"], "E": ["mask"]},
+    "basis": "Original six local core meanings recovered, including bounded mask unknowns and private-helper failure in repair rather than generation. The correctly owned Kotlin source supplies the price input/output contrast; its additional XML-receipt claim is separately unsupported. No invented earliest author is required by this reference.",
+    "additional_claim_issues": [
+      {"kind": "input_receipt_misattributed", "classification": "unsupported_asserted_as_fact", "where": "D.boundary and D.source", "quote": "Slice 8 实际收到并读取 Kotlin 源和商品 XML", "evidence": ["e-231e7f5e3492", "e-7bbf87ca6062"], "counterevidence": "The XML receipt is aconv-member line21, Kotlin receipt is aslice8-pay line24. The cited XML does not prove receipt by Slice8; no corresponding transfer was established."},
+      {"kind": "unverified_runtime_used_as_propagation", "classification": "unsupported_asserted_as_fact", "where": "A-E target nodes", "quote": "目标文件承载补丁；无运行时图像回归证据。", "detail": "All target nodes are propagated based on absence of runtime confirmation. The model's stated evidence supports a repair operation, not continued presence of the defect."},
+      {"kind": "not_checked_as_not_recorded", "classification": "unsupported_asserted_as_fact", "where": "summary and A", "quote": "初始 Write 前态和资源固有尺寸读取过程未保存。", "detail": "The boundary still asks for further records; current investigation does not establish absence across the complete pool."}
+    ],
+    "delivery": {"status": "draft", "mechanical_status": "valid", "problem_path_status": "complete", "unresolved_boundaries": ["A", "E"], "max_cited_hops": 2, "recommendations": 3, "browser_verified": true},
+    "protocol": {"model_runs": 1, "submits": 4, "planned_submit_maximum": 3, "model_ran_auditor": true, "full_skill_delivery": true, "manual_report_repair": false},
+    "cost": {"seconds": 858.4782452999934, "input_total": 5080573, "cached_input": 4837888, "uncached_input": 242685, "output": 42095, "input_plus_output": 5122668}
+  }],
+  "limit": "One already-exposed developer case, source-backed developer review, not blind or exhaustive precision. Local6/6 is unchanged and not an assertion that all causal/node claims are correct. No raw rerun, no global 28-unit score update, no proven depth/accuracy/generalization gain."
+}

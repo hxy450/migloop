@@ -241,8 +241,17 @@ async function main() {
       if(process.env.INQUIRY_CARD_ONLY==="1") {
         await evaluate("document.querySelector('#load').click()");
         await wait("document.querySelector('#reportsDialog').open");
+        if(process.env.INQUIRY_REQUIRE_NARRATIVE==="1")assert.equal(await evaluate("document.querySelector('#reportsDialog').scrollTop"),0,"real card opens at its file summary");
         await evaluate("document.querySelectorAll('#reportNotes details').forEach(n=>n.open=true);document.querySelectorAll('#reportNotes .quote .more').forEach(n=>n.click())");
         const cardDiagnostic=await evaluate("(()=>{const r=migloopViewer.report,t=migloopViewer.tree,text=document.querySelector('#reportNotes').textContent;return {report_id:r.report_id,source_sha256:r.source_sha256,nodes:Object.values(t.byId).length,seedEdges:Object.values(t.byId).filter(n=>n.row).length,unclosed:migloopViewer.hiddenPaths.length,recommendationsVisible:r.document.findings.filter(f=>typeof f.recommendation==='string'&&f.recommendation).every(f=>text.includes(f.recommendation)),reasonsVisible:r.document.findings.every(f=>text.includes(f.reason)),ordinaryCandidates:Object.values(t.byId).filter(n=>n.row?.strength==='candidate'&&n.row.source!=='model_review').length};})()");
+        cardDiagnostic.narrative=await evaluate("(()=>{const d=migloopViewer.report.document,text=document.querySelector('#reportNotes').textContent;return {present:!!d.summary,summaryVisible:!!d.summary&&[d.summary.generation,d.summary.repair,...d.summary.unknown].every(v=>text.includes(v)),actions:(d.recommendations||[]).length,actionsVisible:(d.recommendations||[]).every(r=>['target','action','reason','validation'].every(k=>text.includes(r[k]))),boundariesVisible:d.findings.filter(f=>f.boundary).every(f=>text.includes(f.boundary.reason))};})()");
+        if(process.env.INQUIRY_REQUIRE_NARRATIVE==="1") {
+          assert(cardDiagnostic.narrative.present&&cardDiagnostic.narrative.summaryVisible);
+          assert(cardDiagnostic.narrative.actions>0&&cardDiagnostic.narrative.actionsVisible&&cardDiagnostic.narrative.boundariesVisible);
+          await evaluate("document.querySelector('#reportsDialog').scrollTop=0");
+          const summaryShot=await send("Page.captureScreenshot",{format:"png"});
+          fs.writeFileSync(path.join(out,"file-summary.png"),Buffer.from(summaryShot.data,"base64"));
+        }
         assert(cardDiagnostic.recommendationsVisible);assert(cardDiagnostic.reasonsVisible);
         assert.equal(cardDiagnostic.ordinaryCandidates,0);assert.equal(errors.length,0,errors.join("\n"));
         await evaluate("document.querySelectorAll('#reportNotes details').forEach(n=>n.open=true)");
@@ -322,6 +331,7 @@ async function main() {
       await evaluate("document.querySelector('#load').click()");
       await wait("document.querySelector('#reportsDialog').open");
       assert.equal(await evaluate("document.querySelector('#card-summary').textContent.includes('文件级生成总结')"),true);
+      assert.equal(await evaluate("document.querySelector('#reportsDialog').scrollTop"),0,"open at file summary, not at the autofocused lower selector");
       assert.equal(await evaluate("document.querySelector('#card-summary').textContent.includes('文件级修复总结')"),true);
       assert.equal(await evaluate("document.querySelector('#card-summary img')"),null,"model prose is text, never executable HTML");
       assert.equal(await evaluate("document.querySelector('#card-recommendations').textContent.includes('比较同题输出并核对应属性')"),true);
