@@ -48,6 +48,12 @@ const report = {
 };
 const traces = [{ id: "model-session", origin: "mcp", queries: [{ query: { op: "agent", ...writer.node } }],
   frames: [{ offset: 0 }], visibility: [] }];
+const repairs = [report.target.file, "/migration/harmony/SettingsPage.ets", "/migration/harmony/GuidePage.ets"];
+const secondReport = {...report, report_id: "settings-report", target: {...report.target, file: repairs[1]},
+  document: {...report.document, target: {...report.document.target, file: repairs[1]}},
+  tree: {...report.tree, root: coordinate("file", repairs[1], times.root)}};
+const summaries = [report, secondReport].map(r=>({id:r.report_id,file:r.target.file,at:times.root,count:3,title:"测试调查"}));
+let noReports = false;
 const requests = [];
 let retryFailures=0;
 const liveUrl = process.env.INQUIRY_LIVE_URL;
@@ -64,7 +70,7 @@ async function main() {
       const url = new URL(req.url, "http://127.0.0.1");
       if (url.pathname === base + "/") {
         const page = fs.readFileSync(path.join(root, "src/migloop/inquiry/page.html"), "utf8")
-          .replace("__INQUIRY_CONFIG__", JSON.stringify({ api_base: base, project: "Fixture project" }))
+          .replace("__INQUIRY_CONFIG__", JSON.stringify({ api_base: base, project: "Fixture project", fixchain_data_url: base + "/repairs" }))
           .replaceAll("__INQUIRY_ASSET_BASE__", base);
         res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" }); return res.end(page);
       }
@@ -74,10 +80,11 @@ async function main() {
       }
       if (url.pathname === "/favicon.ico") { res.writeHead(204); return res.end(); }
       let data;
-      if (url.pathname === base + "/api/info") data = { sources: 3, records: 128, latest_at: times.root, reports: [{ id: report.report_id }] };
+      if (url.pathname === base + "/repairs") data = {chains: repairs.map(file=>({file_abs:file}))};
+      else if (url.pathname === base + "/api/info") data = { sources: 3, records: 128, latest_at: times.root, reports: [{ id: report.report_id }] };
       else if (url.pathname === base + "/api/report") {
         if(url.searchParams.get("id")==="slow")await sleep(150);
-        data = report;
+        data = url.searchParams.get("id")==="settings-report" ? secondReport : report;
       }
       else if (url.pathname === base + "/api/trace") data = traces;
       else if (url.pathname === base + "/api/frame") data = { text: "真实调查帧" };
@@ -90,7 +97,8 @@ async function main() {
           {id:"w2",number:2,at:times.root,op:"write",label:"写入",agent:"session:fixer",file:q.key,originals:[original]}] : [];
         const reads=q.key===report.target.file ? [{id:"read",number:1,at:times.read,op:"read",label:"读取原文",agent:"session:reader",file:q.key,originals:[original]}] : [];
         if(q.view==="catalog") data={at:times.root,files:[{path:report.target.file,n_events:2},{path:input.node.key,n_events:1}],agents:[{id:writer.node.key,label:"generator-worker",session:"session",parent:origin.node.key,n_events:1},{id:origin.node.key,label:"spec-author",session:"session",parent:null,n_events:1}]};
-        else if(q.view==="overview") data={at:times.root,files:2,agents:3,report_limit:100,reports:[{id:report.report_id,file:report.target.file,at:times.root,count:3,title:"测试调查"}]};
+        else if(q.view==="overview") data={at:times.root,files:2,agents:3,report_limit:100,reports:noReports?[]:summaries.slice(0,1),reports_total:noReports?0:2,reports_next:noReports?null:1};
+        else if(q.view==="reports") data={rows:summaries.slice(q.offset),total:2,next:null};
         else if(q.view==="history") {const rows=q.category==="all"?[...writes,...reads]:q.category==="reads"?reads:writes;data={scope,rows,total:rows.length,next:null,changes:writes.length,reads:reads.length};}
         else if(q.view==="operation") data={scope,id:q.id,at:q.id==="w1"?times.writer:times.root,content:q.id==="w1"?"WHOLE WRITE":q.id==="read"?"2\tPARTIAL READ":null,
           content_kind:q.id==="w1"?"write_body":q.id==="read"?"read_observation":null,
@@ -174,7 +182,47 @@ async function main() {
     await send("Runtime.enable");
     await send("Page.enable");
     await send("Emulation.setDeviceMetricsOverride", { width: 1720, height: 1020, deviceScaleFactor: 1, mobile: false });
-    await send("Page.navigate", { url });
+    if(!liveUrl) {
+      const migrationUrl=url.split("?")[0];
+      noReports=true;
+      await send("Page.navigate", {url:migrationUrl});
+      await wait("!document.querySelector('#wrap').hidden && document.querySelectorAll('#repair-entries .ritem').length===3");
+      assert.equal(await evaluate("document.querySelector('#attributions').textContent.includes('暂无归因结果')"),true);
+      assert.equal(await evaluate("document.querySelectorAll('.attribution-load').length"),0);
+      noReports=false;
+      await send("Page.navigate", {url:migrationUrl});
+      await wait("document.querySelectorAll('.attribution-load').length===2 && !document.querySelector('#wrap').hidden");
+      assert.equal(await evaluate("document.querySelector('#attributions').nextElementSibling.id"),"repair-entries");
+      assert.equal(await evaluate("document.querySelectorAll('#chips #load').length"),0);
+      const repairText=await evaluate("document.querySelector('#repair-entries').textContent");
+      await evaluate("document.querySelector('[data-report-id=\"settings-report\"] button').click()");
+      await wait("migloopViewer.report?.report_id==='settings-report'");
+      assert.equal(await evaluate("migloopViewer.tree.byId[migloopViewer.tree.root].scope.key"),repairs[1]);
+      assert.equal(await evaluate("document.querySelector('#repair-entries').textContent"),repairText);
+      await evaluate("document.querySelector('[data-report-id=\"tree-fixture\"] button').click()");
+      await wait("migloopViewer.report?.report_id==='tree-fixture'");
+      assert.equal(await evaluate("document.querySelector('#repair-entries').textContent"),repairText);
+      assert.equal(await evaluate("document.querySelector('[data-report-id=\"tree-fixture\"] button').textContent"),"已载入");
+    } else {
+      await send("Page.navigate", { url });
+      if(!new URL(url).searchParams.has("report") && !new URL(url).searchParams.has("report_id")) {
+        await wait("!document.querySelector('#wrap').hidden && document.querySelector('.attribution-load')");
+        const migrationShot=await send("Page.captureScreenshot", {format:"png"});
+        fs.writeFileSync(path.join(out,"migration-before-load.png"),Buffer.from(migrationShot.data,"base64"));
+        const entries=await evaluate("[...document.querySelectorAll('#repair-entries .ritem .lab')].map(n=>n.textContent)");
+        assert(entries.length>0,"Real migration must have repaired files independent of its cards");
+        const ids=await evaluate("[...document.querySelectorAll('.attribution-row')].map(n=>n.dataset.reportId)");
+        for(const id of ids) {
+          await evaluate("document.querySelector('[data-report-id=\""+id+"\"] button').click()");
+          await wait("migloopViewer.report?.report_id==="+JSON.stringify(id));
+          assert.deepEqual(await evaluate("[...document.querySelectorAll('#repair-entries .ritem .lab')].map(n=>n.textContent)"),entries);
+          assert.equal(await evaluate("Object.values(migloopViewer.tree.byId).filter(n=>n.row?.strength==='candidate'&&n.row.source!=='model_review').length"),0);
+        }
+        await evaluate("document.querySelector('[data-report-id=\""+ids[0]+"\"] button').click()");
+        await wait("migloopViewer.report?.report_id==="+JSON.stringify(ids[0]));
+        fs.writeFileSync(path.join(out,"migration-audit.json"),JSON.stringify({repairedFiles:entries,reportIds:ids,loadedAll:true},null,2));
+      }
+    }
     await wait(process.env.INQUIRY_CARD_ONLY==="1" ? "window.migloopViewer?.tree && migloopViewer.report" : "window.migloopViewer?.tree && document.querySelector('#side .vrow')");
     let liveDiagnostic = null;
     const rootNode="migloopViewer.tree.byId[migloopViewer.tree.root]";
@@ -207,7 +255,12 @@ async function main() {
       await evaluate("migloopViewer.select(migloopViewer.tree.root)");
       await wait("document.querySelector('#side .vrow')");
       await evaluate("[...document.querySelectorAll('#side .vrow .act .lnk')].find(n=>n.textContent==='原文').click()");
-      await wait("document.querySelector('#side .srcblock .ln')");
+      await wait("document.querySelector('#side .srcblock .ln') || [...document.querySelectorAll('#side .sec')].some(n=>n.firstChild?.textContent==='原始调用与回执'&&n.querySelector('.lnk'))");
+      if(!await evaluate("Boolean(document.querySelector('#side .srcblock .ln'))")) {
+        assert.equal(await evaluate("document.querySelector('#side').textContent.includes('完整内容未知')"),true);
+        await evaluate("[...document.querySelectorAll('#side .sec')].find(n=>n.firstChild?.textContent==='原始调用与回执').querySelector('.lnk').click()");
+        await wait("[...document.querySelectorAll('#side .sec')].find(n=>n.firstChild?.textContent==='原始调用与回执').querySelector('pre')?.textContent.length>20");
+      }
       assert.equal(await evaluate("document.querySelectorAll('#side .error').length"),0);
       await send("Page.navigate",{url:liveUrl.split('?')[0]+"#file=MemberCenterPage.ets"});
       await wait("migloopViewer.tree?.byId[migloopViewer.tree.root]?.scope.key.endsWith('/MemberCenterPage.ets') && !migloopViewer.tree.byId[migloopViewer.tree.root].busy && document.querySelector('#side .vrow')");
@@ -324,7 +377,7 @@ async function main() {
     const screenshot = await send("Page.captureScreenshot", { format: "png" });
     fs.writeFileSync(path.join(out, "inquiry-tree.png"), Buffer.from(screenshot.data, "base64"));
     const audit = { passed: true, url, errors, liveDiagnostic, queryCount: requests.length,
-      checks: ["original compact shell", "single tree for saved and manual exploration", "ordinary candidates hidden",
+      checks: ["migration-first report loading", "repair catalog independent of reports", "report list pagination", "load buttons above all repaired files", "original compact shell", "single tree for saved and manual exploration", "ordinary candidates hidden",
         "model-review-only dashed edges", "write text and edit delta", "read observation expansion",
         "trace isolation", "precise cutoff", "load dialog", "only load control", "original hover highlight", "colored inline diffs", "original grouped catalog", "Ctrl-wheel zoom", "write-only entry timeline", "empty upstream remains inspectable", "no JavaScript errors"],
     };

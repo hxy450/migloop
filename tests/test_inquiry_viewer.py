@@ -1,5 +1,7 @@
 """Display-only history: observe exact text without replaying or promoting effects."""
 
+import json
+
 import pytest
 
 from migloop.inquiry.viewer import viewer_query
@@ -165,3 +167,39 @@ def test_catalog_counts_native_changes_without_promoting_candidates(observed):
     assert data["agents"][0]["label"] == "a"
     assert before == observed.store.rows("SELECT * FROM effects")
     assert observed.trace() == []
+
+
+def test_report_listing_groups_before_paging_and_preserves_old_ids(observed):
+    def save(key, file):
+        data = {"target": {"file": file, "at": ts(12)}, "document": {
+            "findings": [{"title": key, "reason": "not needed to list a report"}]}}
+        observed.store.db.execute(
+            "INSERT INTO runs(id,kind,data) VALUES (?,'report',?)",
+            (key, json.dumps(data)),
+        )
+
+    save("old-b", "/proj/B.ets")
+    for n in range(110):
+        save(f"draft-{n}", "/proj/A.ets")
+    first = viewer_query(observed, {"view": "reports", "limit": 1})
+    assert first["total"] == 2 and first["next"] == 1
+    assert first["rows"][0]["id"] == "draft-109"
+    second = viewer_query(observed, {"view": "reports", "offset": first["next"]})
+    assert [r["id"] for r in second["rows"]] == ["old-b"]
+    assert second["next"] is None
+    assert observed.store.db.execute("SELECT data FROM runs WHERE id='draft-0'").fetchone()
+    for n in range(105):
+        save(f"other-{n}", f"/proj/Other{n:03}.ets")
+    overview = viewer_query(observed, {"view": "overview"})
+    assert overview["reports_total"] == 107 and overview["reports_next"] == 100
+    rest = viewer_query(observed, {"view": "reports", "offset": 100})
+    assert len(rest["rows"]) == 7 and rest["next"] is None
+    assert len({r["file"] for r in overview["reports"] + rest["rows"]}) == 107
+    assert observed.trace() == []
+
+
+@pytest.mark.parametrize("page_request", [{"limit": 0}, {"limit": 101}, {"offset": -1},
+                                     {"limit": True}, {"offset": "0"}])
+def test_report_listing_rejects_invalid_page(observed, page_request):
+    with pytest.raises(ValueError, match="reports require"):
+        viewer_query(observed, {"view": "reports", **page_request})

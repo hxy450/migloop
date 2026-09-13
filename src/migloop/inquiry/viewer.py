@@ -10,27 +10,24 @@ from .native_text import change_outline, change_payloads
 from .store import iso, parts, timestamp
 
 
-def reports_for_view(engine):
+def reports_for_view(engine, offset=0, limit=100):
+    """Latest saved result per file in this migration's index, not its repair list.
+
+    Group before pagination: repeated drafts of one file cannot hide another
+    file. Keep every original report addressable by id; listing needs no source
+    replay, graph rebuild or model call.
+    """
+    if type(offset) is not int or offset < 0 or type(limit) is not int or not 1 <= limit <= 100:
+        raise ValueError("reports require offset >= 0 and limit between 1 and 100")
     rows = engine.store.rows(
-        "SELECT id,data FROM runs WHERE kind='report' ORDER BY rowid DESC LIMIT 100"
+        "SELECT id, json_extract(data,'$.target.file') AS file, "
+        "json_extract(data,'$.target.at') AS at, "
+        "json_array_length(data,'$.document.findings') AS count, "
+        "COALESCE(json_extract(data,'$.document.findings[0].title'),'调查结果') AS title "
+        "FROM runs WHERE rowid IN (SELECT MAX(rowid) FROM runs WHERE kind='report' "
+        "GROUP BY json_extract(data,'$.target.file')) ORDER BY file,id"
     )
-    reports = []
-    for row in rows:
-        saved = json.loads(row["data"])
-        target = saved.get("target", {})
-        findings = saved.get("document", {}).get("findings", [])
-        reports.append(
-            {
-                "id": row["id"],
-                "file": target.get("file"),
-                "at": target.get("at"),
-                "count": len(findings),
-                "title": findings[0].get("title", "调查结果")
-                if findings
-                else "调查结果",
-            }
-        )
-    return reports
+    return engine._page(rows, offset, limit)
 
 
 def scope_for_view(engine, request):
@@ -203,7 +200,10 @@ def viewer_query(engine, request):
             candidates = parents.get(agent["id"], set())
             agent["parent"] = next(iter(candidates)) if len(candidates) == 1 else None
         return {"at": iso(at), "files": files, "agents": agents}
+    if view == "reports":
+        return reports_for_view(engine, request.get("offset", 0), request.get("limit", 100))
     if view == "overview":
+        reports = reports_for_view(engine)
         return {
             "at": iso(
                 engine.store.db.execute("SELECT MAX(at) FROM records").fetchone()[0]
@@ -214,7 +214,9 @@ def viewer_query(engine, request):
             "agents": engine.store.db.execute(
                 "SELECT COUNT(DISTINCT agent) FROM sources WHERE agent IS NOT NULL"
             ).fetchone()[0],
-            "reports": reports_for_view(engine),
+            "reports": reports["rows"],
+            "reports_total": reports["total"],
+            "reports_next": reports["next"],
             "report_limit": 100,
         }
     if view not in ("history", "operation"):

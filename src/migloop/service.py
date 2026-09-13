@@ -828,6 +828,7 @@ def fixchain_html(path: str) -> str:
     sid = owner.split(":", 1)[0] if owner else root_sid8(fmt, anchor)
     return render_page(f"/api/insight1/inquiry/{sid}",
                        {"sid": sid, "project": (cwd or "").rsplit("/", 1)[-1],
+                        "fixchain_data_url": f"/api/insight1/fixchain-data/{sid}",
                         "observation_scope": scope})
 
 

@@ -229,12 +229,15 @@
 .node-version { flex: 0 0 auto; }
 dialog{margin:auto;width:min(620px,90vw);max-height:80vh;overflow:auto;padding:20px;color:var(--ink);border:1px solid var(--ring);border-radius:14px}
 dialog::backdrop{background:#16202d55}dialog h3{font-size:16px;margin-bottom:12px}dialog .close{float:right}
-dialog .report-row{padding:10px 0;border-bottom:1px solid var(--ring);font-size:12px}dialog .report-row .more{float:right}
+.attribution-row{display:flex;align-items:center;gap:10px;padding:6px 8px;border-radius:10px;font-size:12px}
+.attribution-row:hover{background:var(--wash)}.attribution-row .lab{min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.attribution-load{flex:none;font:11px var(--sans);color:var(--c-spec);background:var(--paper,#fff);border:1px solid var(--ring);border-radius:7px;padding:4px 9px;cursor:pointer}
+.attribution-load:hover{background:var(--wash)}.attribution-load:disabled{opacity:.55;cursor:wait}.attribution-details{display:inline-block;margin:6px 8px}
 dialog input,dialog select{font:12px var(--sans);padding:6px;max-width:100%;border:1px solid var(--ring);border-radius:6px}
 dialog p,dialog details{margin-top:12px}dialog summary{cursor:pointer;font-size:12px}
 .error{color:var(--c-fix);white-space:pre-wrap}.sec.folded> :not(b){display:none}.sec.folded>b,.sec.foldable>b{cursor:pointer}
 </style>
-<dialog id="reportsDialog"><span class="more close" id="closeReports">关闭</span><h3>载入调查</h3><div id="reportsList"></div>
+<dialog id="reportsDialog"><span class="more close" id="closeReports">关闭</span><h3>归因详情</h3>
 <div id="reportNotes"></div><p><select id="finding" aria-label="选择问题"><option value="">全部问题</option></select></p>
 <details><summary>导入 YAML / JSON 结果文件</summary><input type="file" id="importReport" accept=".yaml,.yml,.json"></details><p class="error" id="reportError"></p></dialog>
 <dialog id="timeDialog"><span class="more close" id="closeTime">关闭</span><h3>查看这个时刻</h3><p id="timeName"></p>

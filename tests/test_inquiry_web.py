@@ -15,6 +15,19 @@ SID = test_service_serve.SID
 session = test_service_serve.session
 
 
+def test_migration_repair_catalog_exists_without_model_reports(session, tmp_path, monkeypatch):
+    path, _ = session
+    monkeypatch.setenv("MIGLOOP_CACHE_DIR", str(tmp_path / "cache"))
+    monkeypatch.setattr(service, "prior_roots", lambda *_: [])
+    page = service.fixchain_html(path)
+    assert f'"fixchain_data_url":"/api/insight1/fixchain-data/{SID}"' in page
+    repairs = service.fixchain_payload(path)
+    assert {c["file_abs"] for c in repairs["chains"]} == {"/proj/entry/A.ets"}
+    database = service.inquiry_database(path)
+    status, body, _ = dispatch_http(database, "/api/view", {"view": "overview"})
+    assert status == 200 and json.loads(body)["reports"] == []
+
+
 def test_session_tree_uses_same_http_and_kernel(session, tmp_path, monkeypatch):
     path, roots = session
     monkeypatch.setenv("MIGLOOP_CACHE_DIR", str(tmp_path / "cache"))

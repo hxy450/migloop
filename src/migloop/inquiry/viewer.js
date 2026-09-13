@@ -4,7 +4,7 @@
  */
 (function () {
     "use strict";
-    var config = window.INQUIRY_CONFIG || {}, DATA = {fixes: [], fixers: []};
+    var config = window.INQUIRY_CONFIG || {}, DATA = {fixes: [], fixers: [], reports: []};
     var IDX = null, XT = null, curRootKey = null, selTid = null, report = null;
     var navigation = 0, detailEpoch = 0, activeFinding = "", hiddenPaths = [], timeScope = null;
     var dataReady = false, agentById = {}, chainByFile = {}, fixerIds = {};
@@ -114,14 +114,47 @@
     }
     function fileVersLines(vers, path) { atomTimes(vers, "file", path); }
     function agentVersLines(vers, id) { atomTimes(vers, "agent", id); }
+    async function migrationEntries() {
+      if (Array.isArray(config.fixed_files)) return config.fixed_files.map(f=>typeof f==="string"?{id:f,label:baseName(f)}:f);
+      if (!config.fixchain_data_url) return [];
+      var response=await fetch(config.fixchain_data_url),data=await response.json();
+      if(!response.ok)throw Error(data.error||"返修入口读取失败");
+      var byFile=new Map();
+      (data.chains||[]).forEach(c=>{var file=c.file_abs||c.file;if(file&&!byFile.has(file))byFile.set(file,{id:file,label:baseName(file)});});
+      return [...byFile.values()];
+    }
+    async function refreshReports(meta) {
+      meta=meta||await api("/api/view",{view:"overview"});
+      var rows=(meta.reports||[]).slice(),next=meta.reports_next;
+      while(next!=null){var page=await api("/api/view",{view:"reports",offset:next,limit:100});rows.push(...page.rows);next=page.next;}
+      DATA.reports=rows;renderRail();
+    }
+    function attributionSection() {
+      var rows=DATA.reports.filter(r=>hit(r.file)||hit(r.title));
+      var section=rsec("模型归因",rows.length,"reports",function(list){
+        rows.forEach(function(r){
+          var item=el("div","attribution-row"),label=el("span","lab mono",baseName(r.file));
+          item.dataset.reportId=r.id;item.dataset.file=r.file;label.title=r.file+"\n"+r.title;
+          var button=el("button","attribution-load",report?.report_id===r.id?"已载入":"载入");
+          button.type="button";button.setAttribute("aria-label","载入 "+baseName(r.file)+" 的归因链");
+          button.onclick=function(){guard(async()=>{button.disabled=true;try{await loadReport(r.id);}finally{button.disabled=false;}});};
+          item.appendChild(label);item.appendChild(button);list.appendChild(item);
+        });
+        if(!rows.length)list.appendChild(el("div","rempty",railState.q?"无匹配归因":"本次迁移暂无归因结果"));
+        var action=lnk(report?"查看当前归因详情":"导入归因结果","more",()=>guard(reportsDialog));
+        action.id="load";action.classList.add("attribution-details");list.appendChild(action);
+      });
+      section.id="attributions";return section;
+    }
     function renderRail() {
       railBody.innerHTML = "";
       if (!dataReady && !IDX) { railBody.appendChild(el("div", "rempty", "账本装配中…")); return; }
+      railBody.appendChild(attributionSection());
       // 返修入口
       if (dataReady) {
         var fx = (DATA.fixes || []).filter(function (f) { return hit(f.label) || hit(f.id); });
         var fr = (DATA.fixers || []).filter(function (f) { return hit(f.label) || hit(f.id); });
-        railBody.appendChild(rsec("返修入口", fx.length + fr.length, "fix", function (list) {
+        var repairSection=rsec("返修入口", fx.length + fr.length, "fix", function (list) {
           fx.forEach(function (f) {
             var lab = el("span", "lab mono", "★ " + f.label);
             list.appendChild(ritem("F:" + f.id, lab, [pill("被修", "warn")], function (vers) { fileVersLines(vers, f.id); }));
@@ -131,8 +164,10 @@
             lab.style.color = "var(--c-fix)";
             list.appendChild(ritem("A:agent-" + agentKey(f.id), lab, [pill("修复方", "warn")], function (vers) { agentVersLines(vers, f.id); }));
           });
-          if (!fx.length && !fr.length) list.appendChild(el("div", "rempty", "无匹配"));
-        }));
+          if (DATA.fixesError) {list.appendChild(el("div","rempty error",DATA.fixesError));
+            list.appendChild(lnk("重试读取返修入口","more",()=>guard(async()=>{DATA.fixes=await migrationEntries();DATA.fixesError=null;indexRepairEntries();renderRail();})));}
+          else if (!fx.length && !fr.length) list.appendChild(el("div", "rempty",railState.q?"无匹配":"暂无返修入口"));
+        });repairSection.id="repair-entries";railBody.appendChild(repairSection);
       }
       if (!IDX) { railBody.appendChild(el("div", "rempty", "目录装配中…")); return; }
       // agent:按会话、按派发层级缩进
@@ -198,6 +233,11 @@
         });
         if (!files.length) list.appendChild(el("div", "rempty", "无匹配"));
       }));
+    }
+
+    function indexRepairEntries() {
+      chainByFile={};DATA.fixes.forEach(f=>chainByFile[f.id]={});
+      var count=document.getElementById("repairCount");if(count)count.textContent=DATA.fixes.length+" 个返修入口";
     }
 
 
@@ -750,6 +790,7 @@
       var select=document.getElementById("finding");select.innerHTML="";var all=el("option",null,"全部问题");all.value="";select.appendChild(all);
       graph.document.findings.forEach(function(f){var opt=el("option",null,f.id+" · "+f.title);opt.value=f.id;select.appendChild(opt);});
       document.getElementById("reportsDialog").close();reportNotes();
+      renderRail();
     }
     function reportNotes() {
       var host=document.getElementById("reportNotes");host.textContent="";if(!report)return;
@@ -770,10 +811,7 @@
       host.appendChild(details);host.appendChild(lnk("退出调查，手动查看此文件","more",function(){var scope=XT.byId[XT.root].scope;document.getElementById("reportsDialog").close();guard(()=>openRoot(scope));}));
     }
     async function reportsDialog() {
-      var meta=await api("/api/view",{view:"overview"}),host=document.getElementById("reportsList");host.textContent="";
-      meta.reports.forEach(function(r){var row=el("div","report-row");row.appendChild(lnk("载入","more",()=>guard(()=>loadReport(r.id))));
-        row.appendChild(el("div",null,baseName(r.file)+" · "+r.count+" 项"));row.appendChild(el("div","kv",r.title));row.title=r.id;host.appendChild(row);});
-      if(!meta.reports.length)host.appendChild(kv("","暂无已保存调查。"));reportNotes();document.getElementById("finding").hidden=!report;
+      reportNotes();document.getElementById("finding").hidden=!report;
       document.getElementById("reportsDialog").showModal();
     }
     function renderEmptyCanvas() {
@@ -800,7 +838,7 @@
     document.getElementById("finding").onchange=function(){if(report){activeFinding=this.value;applyReport(report,activeFinding);reportNotes();document.getElementById("reportsDialog").close();}};
     document.getElementById("importReport").onchange=async function(){
       if(!this.files[0])return;document.getElementById("reportError").textContent="";
-      try{var graph=await api("/api/report",{document:await this.files[0].text()});await loadReport(graph.report_id);}
+      try{var graph=await api("/api/report",{document:await this.files[0].text()});await refreshReports();await loadReport(graph.report_id);}
       catch(error){document.getElementById("reportError").textContent=error.message;}
     };
     window.migloopViewer={loadReport,openRoot,
@@ -810,15 +848,14 @@
       get layout(){return layoutSize;}};
     renderEmptyCanvas();
     guard(async function(){
-      var data=await Promise.all([api("/api/view",{view:"catalog"}),api("/api/view",{view:"overview"})]);
+      var data=await Promise.all([api("/api/view",{view:"catalog"}),api("/api/view",{view:"overview"}),
+        migrationEntries().catch(error=>{DATA.fixesError=error.message;return []})]);
       IDX=data[0];IDX.agents.forEach(a=>{agentById[a.id]=a;});
       IDX.files.forEach(f=>{var ext=f.path.split(".").pop().toLowerCase();f.kind=ext==="ets"?"ets":["md","json","yaml","yml"].includes(ext)?"spec":["kt","java","xml"].includes(ext)?"src":"other";f.has_writer=f.n_events>0;});
-      DATA.fixes=[...new Set(data[1].reports.map(r=>r.file))].map(file=>({id:file,label:baseName(file)}));
-      DATA.fixes.forEach(f=>chainByFile[f.id]={});dataReady=true;
+      DATA.fixes=data[2];indexRepairEntries();await refreshReports(data[1]);dataReady=true;
       if(config.project)chips.appendChild(el("span","chip",config.project));
-      chips.appendChild(el("span","chip",DATA.fixes.length+" 个返修入口"));
+      var count=el("span","chip",DATA.fixes.length+" 个返修入口");count.id="repairCount";chips.appendChild(count);
       chips.appendChild(el("span","chip","目录 · "+IDX.files.length+" 个文件 · "+IDX.agents.length+" 个 agent"));
-      var load=lnk("载入调查","chip",()=>guard(reportsDialog));load.id="load";chips.appendChild(load);
       document.getElementById("wrap").hidden=false;renderRail();applyZoom(1,true);
       var q=new URLSearchParams(location.search),h=new URLSearchParams(location.hash.slice(1));
       var id=q.get("report")||q.get("report_id")||(!(h.get("key")||h.get("file"))&&config.report_id);
