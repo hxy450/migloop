@@ -756,7 +756,17 @@
       if(hiddenPaths.length){var details=el("details");details.appendChild(el("summary",null,hiddenPaths.length+" 个报告节点尚未接入树"));
         hiddenPaths.forEach(p=>details.appendChild(kv((p.purpose==="context"?"参考材料 · ":"问题节点 · ")+p.node,p.diagnostic)));host.appendChild(details);}
       var details=el("details");details.appendChild(el("summary",null,"本次调查结论"));
-      report.document.findings.filter(f=>!activeFinding||f.id===activeFinding).forEach(f=>details.appendChild(quoteLong("cause",f.title,f.reason)));
+      details.appendChild(kv("核验",(report.mechanical_status==="valid"?"引用与关系机检通过":"引用与关系仍需复核")+"；节点原因是模型判断，不是机检认证。"));
+      if(report.coverage&&!report.coverage.complete)details.appendChild(kv("调查范围","修改对账尚未完成，保留未决项；此卡不能视为完整归因。"));
+      report.document.findings.filter(f=>!activeFinding||f.id===activeFinding).forEach(function(f){
+        details.appendChild(quoteLong("cause",f.title,f.reason));
+        [["unknown","尚未查明"],["hypothesis","机制假设 · 未认证"],["recommendation","改进建议 · 效果待验证"]].forEach(function(pair){
+          var value=f[pair[0]];if(value==null||value===""||(Array.isArray(value)&&!value.length))return;
+          var text=Array.isArray(value)?value.map(v=>typeof v==="string"?v:JSON.stringify(v)).join("\n"):typeof value==="string"?value:JSON.stringify(value);
+          details.appendChild(quoteLong("cause",pair[1],text));
+        });
+      });
+      if(report.document.unexplained?.length)details.appendChild(quoteLong("cause","未解释的修改或效应",Array.isArray(report.document.unexplained)?report.document.unexplained.join("\n"):String(report.document.unexplained)));
       host.appendChild(details);host.appendChild(lnk("退出调查，手动查看此文件","more",function(){var scope=XT.byId[XT.root].scope;document.getElementById("reportsDialog").close();guard(()=>openRoot(scope));}));
     }
     async function reportsDialog() {

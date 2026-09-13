@@ -182,6 +182,19 @@ async function main() {
         const reasonShot = await send("Page.captureScreenshot", { format: "png" });
         fs.writeFileSync(path.join(out, "loaded-node-reason.png"), Buffer.from(reasonShot.data, "base64"));
       }
+      if(process.env.INQUIRY_CARD_ONLY==="1") {
+        await evaluate("document.querySelector('#load').click()");
+        await wait("document.querySelector('#reportsDialog').open");
+        const cardDiagnostic=await evaluate("(()=>{const r=migloopViewer.report,t=migloopViewer.tree,text=document.querySelector('#reportNotes').textContent;return {report_id:r.report_id,source_sha256:r.source_sha256,nodes:Object.values(t.byId).length,seedEdges:Object.values(t.byId).filter(n=>n.row).length,unclosed:migloopViewer.hiddenPaths.length,recommendationsVisible:r.document.findings.filter(f=>typeof f.recommendation==='string'&&f.recommendation).every(f=>text.includes(f.recommendation)),reasonsVisible:r.document.findings.every(f=>text.includes(f.reason)),ordinaryCandidates:Object.values(t.byId).filter(n=>n.row?.strength==='candidate'&&n.row.source!=='model_review').length};})()");
+        assert(cardDiagnostic.recommendationsVisible);assert(cardDiagnostic.reasonsVisible);
+        assert.equal(cardDiagnostic.ordinaryCandidates,0);assert.equal(errors.length,0,errors.join("\n"));
+        await evaluate("document.querySelectorAll('#reportNotes details').forEach(n=>n.open=true)");
+        const cardShot=await send("Page.captureScreenshot",{format:"png"});
+        fs.writeFileSync(path.join(out,"case-card-details.png"),Buffer.from(cardShot.data,"base64"));
+        const audit={passed:true,url,errors,cardDiagnostic,checks:["saved report loaded by original tree UI","node claims inspectable","cause and recommendation text retained","ordinary candidates hidden","no JavaScript errors"]};
+        fs.writeFileSync(path.join(out,"audit.json"),JSON.stringify(audit,null,2));console.log(JSON.stringify(audit));
+        await send("Browser.close").catch(()=>{});return;
+      }
       liveDiagnostic=await evaluate("(async()=>{const t=migloopViewer.tree,getTrace=()=>fetch((INQUIRY_CONFIG.api_base||'')+'/api/trace?session='+encodeURIComponent(migloopViewer.report.trace_session)).then(r=>r.json());const before=await getTrace(),seedEdges=Object.values(t.byId).filter(n=>n.row).length;await migloopViewer.expand(t.root);const first=t.byId[t.root].children.map(id=>t.byId[id]).find(n=>n.kind==='agent');if(first)await migloopViewer.expand(first.tid);const after=await getTrace();return {seedEdges,nodes:Object.values(t.byId).length,gaps:migloopViewer.hiddenPaths.length,traceUnchanged:JSON.stringify(before)===JSON.stringify(after),ordinaryCandidates:Object.values(t.byId).filter(n=>n.row?.strength==='candidate'&&n.row.source!=='model_review').length,errors:Object.values(t.byId).filter(n=>n.error).map(n=>n.error)};})()");
       assert(liveDiagnostic.traceUnchanged);assert.equal(liveDiagnostic.ordinaryCandidates,0);assert.deepEqual(liveDiagnostic.errors,[]);
       await evaluate("migloopViewer.select(migloopViewer.tree.root)");
@@ -247,6 +260,8 @@ async function main() {
       await evaluate("document.querySelector('#load').click()");
       await wait("document.querySelector('#reportsDialog').open");
       assert.equal(await evaluate("document.querySelector('#reportNotes').textContent.includes('尚未接入树')"),true);
+      for(const text of ["尚缺运行验证","待核机制 A","建议 A","报告保留的未知事项","不是机检认证"])
+        assert.equal(await evaluate("document.querySelector('#reportNotes').textContent.includes("+JSON.stringify(text)+")"),true);
       await evaluate("document.querySelector('#finding').value='A';document.querySelector('#finding').dispatchEvent(new Event('change'))");
       await wait("!document.querySelector('#reportsDialog').open");
       assert.equal(await evaluate("document.querySelector('[data-edge=\"model:review\"]')"),null);

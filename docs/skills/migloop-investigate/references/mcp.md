@@ -62,9 +62,9 @@ findings:
         role: origin
         reason: 具体失误，不把读取或转述当写出
         evidence: ["e-实际写出"]
-    unknown: [尚未查明的环节与缺哪份证据]
+    unknown: [尚未查明的环节与缺哪份证据] # 无则 []
     hypothesis: 可选的机制假设
-    recommendation: 可选的环节改进与验证办法
+    recommendation: 针对环节的改进与验证办法；无法提出时说明依据
 unexplained: [仍未解释的修改或效应]
 reviewed:
   - {ref: "e-相关调用", effect: no_target_change, reason: 实际只读或只修改其它对象的依据}
@@ -92,3 +92,15 @@ from/to 必须是该 finding 内已声明的节点 id；read 方向相反。日�
 submit 返回 report_id/source_sha256、issues、path_status、review_query、coverage_query。用 investigate `{op:review,report_id,offset:0,limit:100}` 和 `{op:review,report_id,view:coverage,offset:0,limit:100}`，按两层 next 续完。review 给引用时序、写者错位、较早同文修改、写后和全池返回等线索，仍由你核原文；不能据此直接认证机制。
 
 修改差集的已知原生写并入 findings.changes；相关但非修改的调用用 reviewed，未知保留。path_status:complete 仅认证问题节点到目标的同问题时序路径；正常输入展示路径和未接入节点也可保留。坐标/引用错误要修；证据不足的断点不靠删结论消除。最终返回最后一次 submit 的 ID 和 hash，UI 按原稿展示。
+
+## 随附脚本审核
+
+提交后用 `investigation.json` 中 `runtime.python` 执行：
+
+```text
+<python> .agents/skills/migloop-investigate/scripts/check_card.py --task investigation.json --report <report_id>
+```
+
+宿主配置 `runtime.index_path` 指向这次 MCP 所用数据库，`runtime.code_root` 可指向同版代码包，未提供则使用已安装 migloop。不要更换这些配置来绕过审核。
+
+退出码 0 = ready_for_review（仍待语义复核），1 = draft（可载入但有缺口），2 = invalid。脚本没有浏览器，因此 `browser_verified:false`；实际网页加载由宿主另测。它不生成/删除边，不改理由，不根据关键词替模型判根因。看到断链时核实真实连接，不能靠画无关边通过。

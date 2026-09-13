@@ -10,6 +10,7 @@ import json
 import re
 import shutil
 import subprocess
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -38,12 +39,12 @@ def prepare(out, case_id):
     skill = workspace / ".agents/skills/migloop-investigate"
     skill.parent.mkdir(parents=True)
     shutil.copytree(REPO / "docs/skills/migloop-investigate", skill)
-    job = {"file": case["file"], "generation_end": case["generation_end"],
-           "observation_end": case["observation_end"], "pool": case["pool"]}
-    if case_id == "F10-06":
-        job["review_start"] = {"source": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-aa2d7cdfd6a5cf89f.jsonl", "line": 235}
-    BASE.save(workspace / "investigation.json", job)
     db = out / "index.sqlite"
+    job = {"file": case["file"], "generation_end": case["generation_end"],
+           "observation_end": case["observation_end"], "pool": case["pool"],
+           "runtime": {"python": str(BASE.DEFAULT_PYTHON), "code_root": str(out / "code/src"),
+                       "index_path": str(db)}}
+    BASE.save(workspace / "investigation.json", job)
     cmd = iteration.command(out, db)
     imported = subprocess.run(cmd + ["import", "--pool", case["pool"]], check=True,
                               capture_output=True, text=True, encoding="utf-8", timeout=180)
@@ -55,7 +56,7 @@ def prepare(out, case_id):
                               "required": True, "startup_timeout_sec": 45, "tool_timeout_sec": 120}}}
     # Keep host-skill suppression and all prior isolation flags. Explicit file
     # invocation remains available even if discovery is suppressed by this CLI.
-    prompt = "使用 $migloop-investigate（.agents/skills/migloop-investigate/SKILL.md），调查 investigation.json 指定文件的返修原因，保存可复查的原因链。"
+    prompt = "使用 $migloop-investigate，为 investigation.json 指定的被修文件制作并审核一张可载入的返修情景卡。"
     BASE.RAW.command(workspace, config)  # validate CLI/settings without a model call
     BASE.save(out / "settings.json", config)
     (out / "prompt.md").write_text(prompt, encoding="utf-8")
@@ -70,7 +71,7 @@ def prepare(out, case_id):
         "prompt_sha256": BASE.sha(out / "prompt.md"), "settings_sha256": BASE.sha(out / "settings.json"),
         "driver_sha256": BASE.sha(out / "driver.py"), "audit_sha256": BASE.sha(out / "luna-audit.py"),
         "instruction_delivery": "explicit skill path in short task; no inline skill/GUIDE/task rubric; unchanged MCP initialization instructions",
-        "comparison_limit": "Same source pool/model/effort as prior Guide run; instruction packaging/method and UI projection snapshot differ. Single development case, not a skill-only causal ablation or raw comparison."})
+        "comparison_limit": "Existing ten-file development set, original source pools and time bounds. Skill/card workflow and UI detail presentation changed; not a blind holdout, skill-only causal ablation or fresh raw comparison."})
     print(json.dumps({"prepared": str(out), "model_calls": 0, "task_chars": len(prompt)}), flush=True)
 
 
@@ -144,16 +145,77 @@ def run(out):
     print(json.dumps(audit_skill_delivery(out), ensure_ascii=False), flush=True)
     print(json.dumps({"audit_exit_code": audited.returncode, "audit": audited.stdout,
                       "stderr": audited.stderr}, ensure_ascii=False), flush=True)
+    run_dir = out / "runs/inquiry/rep1"
+    if (run_dir / "verdict.json").is_file():
+        graph = BASE.read(run_dir / "verdict.json")
+        report_id = graph.get("report_id") if isinstance(graph, dict) else None
+        if report_id:
+            checked = subprocess.run([str(BASE.DEFAULT_PYTHON), "-B", "-X", "utf8",
+                str(Path(m["workspace"]) / ".agents/skills/migloop-investigate/scripts/check_card.py"),
+                "--task", str(Path(m["workspace"]) / "investigation.json"), "--report", report_id],
+                capture_output=True, text=True, encoding="utf-8", timeout=180)
+            BASE.save(run_dir / "card-audit.json", json.loads(checked.stdout))
+            print(json.dumps({"card_audit_exit_code": checked.returncode, "report_id": report_id}), flush=True)
+
+
+def prepare_suite(out):
+    """Same ten frozen targets, separate databases so cases cannot read other reports."""
+    if out.exists():
+        raise FileExistsError(out)
+    cases = BASE.RAW.verify_manifest(iteration.BASELINE)["cases"]
+    if len(cases) != 10:
+        raise ValueError("Expected the existing ten-file benchmark")
+    out.mkdir(parents=True)
+    for case in cases:
+        prepare(out / case["id"], case["id"])
+    BASE.save(out / "suite.json", {"cases": [c["id"] for c in cases], "workers": 2,
+        "model": "gpt-5.6-luna", "effort": "high", "repetitions": 1,
+        "automatic_retry": False, "raw_rerun": False})
+
+
+def run_suite(out):
+    """Two processes maximum; preserve every failure and never replace a result."""
+    suite = BASE.read(out / "suite.json")
+    for case in suite["cases"]:
+        verify(out / case)
+        if (out / case / "runs/inquiry/rep1").exists():
+            raise FileExistsError("Suite already started: " + case)
+
+    def worker(case):
+        print(json.dumps({"started": case}), flush=True)
+        result = subprocess.run([str(BASE.DEFAULT_PYTHON), "-B", "-X", "utf8",
+            str(__file__), "run", "--out", str(out / case)], capture_output=True,
+            text=True, encoding="utf-8")
+        (out / case / "worker.stdout.txt").write_text(result.stdout, encoding="utf-8")
+        (out / case / "worker.stderr.txt").write_text(result.stderr, encoding="utf-8")
+        run_dir = out / case / "runs/inquiry/rep1"
+        metrics = BASE.read(run_dir / "metrics.json") if (run_dir / "metrics.json").is_file() else {}
+        card = BASE.read(run_dir / "card-audit.json") if (run_dir / "card-audit.json").is_file() else {}
+        return {"case": case, "worker_exit_code": result.returncode, "status": metrics.get("status"),
+                "seconds": metrics.get("elapsed_seconds"), "card_status": card.get("status"),
+                "report_id": card.get("report_id")}
+
+    results = []
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        pending = [executor.submit(worker, case) for case in suite["cases"]]
+        for future in as_completed(pending):
+            results.append(future.result())
+            BASE.save(out / "suite-results.json", results)
+            print(json.dumps(results[-1]), flush=True)
 
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("mode", choices=("prepare", "run", "verify", "delivery"))
+    ap.add_argument("mode", choices=("prepare", "run", "verify", "delivery", "prepare-suite", "run-suite"))
     ap.add_argument("--out", required=True, type=Path)
     ap.add_argument("--case", default="F10-06")
     args = ap.parse_args()
     target = args.out.resolve()
-    if args.mode == "prepare":
+    if args.mode == "prepare-suite":
+        prepare_suite(target)
+    elif args.mode == "run-suite":
+        run_suite(target)
+    elif args.mode == "prepare":
         prepare(target, args.case)
     elif args.mode == "run":
         run(target)
