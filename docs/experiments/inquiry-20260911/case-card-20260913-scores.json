@@ -1,0 +1,99 @@
+{
+  "schema": "inquiry-developer-score/1",
+  "round": "case-card-v1-20260913",
+  "model": "gpt-5.6-luna",
+  "effort": "high",
+  "investigator_code_commit": "6f593a1",
+  "reference": "../file-first-10/scoring-core.json",
+  "artifacts": "C:/Users/hongy/projects/_migloop-case-cards-20260913/v1",
+  "provisional": false,
+  "grading": "Original-source developer review of unedited final cards. Existing 28 core meanings; semantic equivalents accepted, different grouping allowed. Partial is not counted as correct. Additional erroneous node roles/causal claims are separately recorded. Not blind, not exhaustive sentence precision, not a generalization test. Post-run guard/display fixes are excluded from investigator results.",
+  "cases": [
+    {
+      "id": "F10-01", "report_id": "831c04af5b40461e",
+      "source_sha256": "451a87150adf4be079e5d5d01956b2b7f07b567cd98fa32e2056dcd9251332f8",
+      "units": {"mask": "correct", "images": "correct", "cta": "correct", "price": "correct", "indicator": "correct", "repair-compile": "correct"},
+      "basis": "All six modification families recovered. Actual S8 Read24 of replaceSpan/AbsoluteSizeSpan -> Write264 Text30 supports price input/output mismatch, a gap raw-high left unknown. Mask distinguishes ordinary dark versus AppLoad transparent in recommendation and explicitly leaves exact sites unresolved. Repair private-helper failure correctly separated.",
+      "additional_errors": [{"major": true, "kind": "preservation_mislabeled_origin", "quote": "输出保留宽度但未形成 ArkUI 比例/高度约束。", "quote2": "输出 width 100% 与横向 margin 的组合。", "location": "image-constraints.origin and pay-button-width.origin: role=origin, aslice8-pay", "counterevidence": ["eae088fd0f77ec14:61:3f16eadfab2d50a5", "e-c56d4d99ddee"], "detail": "Earlier converter Write61 already contains these image/CTA shapes; S8 Write264 preserves them. origin renders as 问题进入, not neutral also-wrote. Group repeated earliest-author confusion as one major class in this file, while local modification cores remain correct."}],
+      "audit_caveats": "One supplemental helper-write edge uses the later compiler actor's Edit as an event belonging to the earlier script actor. Quote-only v1 accepts it; post-run shared-kernel guard rejects it. Failed build node is also mislabeled propagated despite detecting the fault. Neither issue is silently corrected in original YAML."
+    },
+    {
+      "id": "F10-02", "report_id": "75390c909e8d43e8",
+      "source_sha256": "e19b7c88df66aec7981caaab3b3d4507c5a8670672dc3e8f2e9e4b178a2180a8",
+      "units": {"mask": "correct", "icon": "correct", "back-gate": "partial", "progress": "correct", "system-bars": "correct"},
+      "basis": "Mask/logo families missed by raw-high are recovered; visual Progress thickness and system-bar lifecycle are correct. Back correction and distinct protocol-return fallback recognized, but initial handler/deletion history not correctly attributed. Partial core plus explicit false actor below, not correct.",
+      "additional_errors": [{"major": true, "kind": "comment_edit_mislabeled_handler_deletion", "quote": "生成阶段移除页面返回处理，并保留 isModal 拦截系统返回的错误实现说明。", "location": "A.origin: aslice11-startup", "counterevidence": ["e-c52c74aa7422", "e-681ed9785c78", "agent-aentry-setup-07108f5df45c357c.jsonl:123/124", "e-255a14167055"], "detail": "Slice11 Edit250 changes comments only; initial converter Write71 has onBackPressed(true), actual removal is aentry-setup123/124 at02:32:52Z, already absent in Slice11 input Read46. A real later isModal misconception does not make Slice11 the handler-deleting actor."}],
+      "audit_caveats": "A/B lack reviewed repair-script edges; four problem nodes unclosed. Source e-537... is an analyzer's design Write, not proof the page author received raw theme; final does not explicitly claim that receipt. Return callback failure kept hypothetical, not a fabricated observation."
+    },
+    {
+      "id": "F10-03", "report_id": "c588467b6e454650",
+      "source_sha256": "2363f41d89a225bebe198c31c13374a68521eabcc5d2c61c7743c628602ad634",
+      "units": {"label": "partial", "button-style": "correct", "test-integration": "correct", "logging": "partial", "comment-policy": "correct"},
+      "basis": "Correct visual button shape, later UIIDs/UT export and later ECAT/comment policies. Label only establishes resource reference and no explicit textAllCaps, not concrete delivered Roll vs runtime ROLL. Logging replacement is late ECAT, but visual repair's introduction of console is not located. Grader does not supply these missing boundaries from source.",
+      "additional_errors": [],
+      "audit_caveats": "128 target-related calls unassessed and one unknown; native changes accounted for does not establish all script effects. UT3/3 is not treated as UI success."
+    },
+    {
+      "id": "F10-04", "report_id": "e950bf474bb7464c",
+      "source_sha256": "f45d031fbc49a4c5726b0cd2ed9933a0f93c07798751624078e31851eda9bec3",
+      "units": {"debug-wiring": "correct", "wrong-class-repair": "correct"},
+      "basis": "Missing startup injection/defaultfalse and repair-created wrong F013Service setter -> AppTrackConfig correctly distinguished; no unsupported unique earliest generation author.",
+      "additional_errors": [],
+      "audit_caveats": "Misses available later native login_hmos runs c657f0879a83d117:184/187/190. Final says it did not find a paired receipt and what its cited build proves; unlike a blanket claim no runtime evidence exists, bounded uncertainty is not counted as a major false assertion. Does not prove full input-boundary investigation or exclusive patch/build pairing."
+    },
+    {
+      "id": "F10-05", "report_id": "548a530bd91b46f0",
+      "source_sha256": "2726e29fda6887efece1788917cf4819d5046319290f8caa3298f7f6cb25f77f",
+      "units": {"android-id-unblock": "correct"},
+      "basis": "Explicit D010 HOLD/no invented identifier -> empty argument/backend blocker -> later DevicePrefs testing-unblock, not certified final platform/backend equivalence. Does not claim the predicted intervening runtime failure was observed.",
+      "additional_errors": [],
+      "audit_caveats": "No problem nodes; complete path flag is vacuous, not evidence of a generation fault. Runtime persistence/backend acceptance remains qualified unknown."
+    },
+    {
+      "id": "F10-06", "report_id": "1fb83ec7b5564176",
+      "source_sha256": "833d4372b6e28f8cc9f0b10a2a8d0ff6eaf5c3e18ce45f1ec99395e6af560373",
+      "units": {"back-image-box": "correct", "track-vs-control": "correct", "bottom-inset": "correct"},
+      "basis": "All local cores: initial converter vs later Slice15 preservation, image content/padding, control20 vs track4, actual hostSwiper bottom inset rather than childbutton edit. No inference that stage0 receipt proves pageconverter receipt.",
+      "additional_errors": [],
+      "audit_caveats": "Deep upstream0/3: misses stage0 summary loss, top-only handoff narrowing, actual guard PASS. Final calls late-contract theory possible and leaves ambiguity, not a proven new requirement; don't manufacture a major out of an explicit hypothesis. Old core3/3 is not an upstream-mechanism success.",
+      "upstream_review": {"resource_summary_loss": "not_found", "safearea_handoff_narrowing": "not_found", "executed_guard_missed_property": "not_found"}
+    },
+    {
+      "id": "F10-07", "report_id": "805984fc491942e3",
+      "source_sha256": "a9a7d8a330fc093ea3740e9410df11f879ddb83fb65953dc8c2a3ebc49b6a36b",
+      "units": {"test-bridge": "correct", "error-observer": "correct"},
+      "basis": "Both are separately evidenced late contracts, not initial page/window generation violations. Build success/UT3of3 not inflated into bridge or crash-injection success.",
+      "additional_errors": [],
+      "audit_caveats": "No problem nodes; full investigation completeness is not certified by a vacuous problem-path flag."
+    },
+    {
+      "id": "F10-08", "report_id": "743ce3012b304c77",
+      "source_sha256": "5e9c6cabddda6de00e455386a05f748df7631250a6247705b534cbd6fc26468f",
+      "units": {"identity-phase-and-conflict": "correct", "icon-scope": "partial"},
+      "basis": "Correct dev-identity no-touch bundle/vendor versus later expanded task. Icon reference/AppScope resolution identified, but report explicitly does not recover copying existing entry assets; actual cp command is agent-a87804892da9cfc8b.jsonl45 at21:19:00.755Z. Do not fill this gap from the grader's source review.",
+      "additional_errors": [],
+      "audit_caveats": "No problem nodes. V1 rendered root alone despite actual repair node; post-run display-path correction fixes visualization without adding fault or changing the card."
+    },
+    {
+      "id": "F10-09", "report_id": "c9a3a307786e424d",
+      "source_sha256": "4867117792df911b983bfbb778e5d6b116368c79ab21f5d00688c0635897bec7",
+      "units": {"hit-test": "correct"},
+      "basis": "Local Block→Default while preserving hiddenNone and onclick correctly explains patch; observed patchedsource not falsely certified as successful device click/newHAP.",
+      "additional_errors": [{"major": true, "kind": "fixer_mislabeled_problem_origin", "quote": "该 agent 将 Block 的子节点命中语义与用户症状对应起来，并实际写出 Block→Default 的补丁；这里归因于实际诊断/写入环节", "location": "A.origin: role=origin", "counterevidence": ["e-224b50c107f5", "e-aa085f527216", "e-27ade6888126"], "detail": "These records show diagnosis and correction of a preexisting Block, not introduction. UI labels the fixer 问题进入. This substantive role error is separate from the correct local hit-test core; path/quote validity cannot certify it."}],
+      "audit_caveats": "Initially invalid supplemental read edge removed in final; source left as context, not a completed delivery chain."
+    },
+    {
+      "id": "F10-10", "report_id": "6d7b28f61c254342",
+      "source_sha256": "7c7a084fcd8a02754d30df1b9823ffe0a7472461fe2a6f3a41f723b4d69cc75c",
+      "units": {"signing-reference": "correct"},
+      "basis": "Existing default signing configuration lacked product reference, actual patch restores reference, signed build and installation/startup receipts follow. Distinguishes reported earlier removal from actual unavailable write and does not invent original actor or certify business/UI equivalence.",
+      "additional_errors": [],
+      "audit_caveats": "No problem nodes; old display root-only is corrected after run to show actual repair without falsely inventing generation fault."
+    }
+  ],
+  "summary": {"files_graded": 10, "correct": 24, "partial": 4, "units_graded": 28, "unit_weighted_core_coverage": 0.8571428571428571, "file_weighted_core_coverage": 0.89, "files_with_major": 3, "all_core_files": 7, "all_core_and_no_major_files": 5, "all_claim_precision": null},
+  "mechanical": {"completed_runs": 10, "full_skill_delivery": 10, "model_executed_final_checker": 10, "loadable": 10, "native_schema_reference_valid": 10, "ready_for_review": 5, "draft": 5, "problem_path_complete_flags": 8, "zero_problem_node_cards": 4, "nonempty_problem_cards_with_complete_paths": 4, "nonempty_problem_cards": 6, "actual_browser_loads": 10, "independent_semantic_certification": false},
+  "cost": {"input_total": 30819772, "cached_input": 28986368, "uncached_input": 1833404, "output": 233495, "total": 31053267, "seconds": 4869.1407602999825, "mean_seconds": 486.9140760299982, "median_seconds": 468.9403373499954, "outer_tools_seconds": 64.59600043296814, "nested_mcp_seconds": 27.90500044822693, "compaction_seconds": 0, "unclassified_seconds": 2881.5537584994454},
+  "comparison": {"raw_high_correct": 25, "raw_high_total": 28, "raw_rerun": false, "total_token_reduction": 0.29661873878728895, "uncached_input_reduction": 0.38913167192437426, "elapsed_sum_reduction": 0.1609018971005528, "conclusion": "Lower recorded token/time costs, not higher core attribution correctness. Mechanism-level improvement and generalization not established."},
+  "limitations": ["Historical10x1, repeatedly used development set; not randomized or a skill-only ablation.", "Scores apply to frozen6f593a1 investigator outputs, not post-run code or manually repaired answers.", "Script receipts and causal path flags are not semantic proof. Origin role is a substantive claim, not cosmetic formatting.", "Suite monitor exited1 because exclusive BASE.save was reused for progress; all ten model runs completed with original metrics, reports and post-audit outputs preserved. Per-worker return codes beyond the first were not durably recorded by the broken monitor. Aggregate reconstructed separately, no investigator rerun.", "Original and post-run browser checks are distinct; one post-run browser attempt hit Windows DevToolsActivePort EBUSY before navigation. Bounded startup retry fixed the test harness; all ten then passed without rerunning models.", "YAML with short handles requires its saved index and original sources; this is not a self-contained portable evidence archive."]
+}

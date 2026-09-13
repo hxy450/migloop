@@ -96,3 +96,91 @@ def test_script_failure_is_json_and_nonzero(tmp_path, capsys):
     data = json.loads(capsys.readouterr().out)
     assert not data["loadable"] and data["status"] == "invalid"
     assert not (tmp_path / "absent.sqlite").exists()
+
+
+def test_real_but_unrelated_author_cannot_gain_a_path_by_being_cited(tmp_path):
+    engine = build(tmp_path,
+        [record(1, use("w", file_path="/proj/A.ets", content="bad")), record(2, result("w")),
+         record(4, use("fix", "Edit", file_path="/proj/A.ets", old_string="bad", new_string="good")),
+         record(5, result("fix"))],
+        second=[record(1, use("spec", file_path="/proj/spec.md", content="correct unused spec")),
+                record(2, result("spec"))])
+    try:
+        document = {"schema": "inquiry/1", "target": {"file": "A.ets", "since": ts(3), "at": ts(9)},
+            "findings": [{"id": "A", "title": "unrelated attribution", "reason": "claim must not create delivery",
+                "changes": [engine.store.locate("a.jsonl", 3)],
+                "nodes": [{"id": "suspect", "kind": "agent", "key": "b", "at": ts(2),
+                    "role": "origin", "reason": "claims this other author caused the target error",
+                    "evidence": [engine.store.locate("b.jsonl", 1)]}],
+                "unknown": [], "recommendation": "verify whether this spec was ever delivered"}], "unexplained": []}
+        task = {"file": "A.ets", "generation_end": ts(3), "observation_end": ts(9)}
+        graph, audit = save_and_audit(engine, task, document)
+        assert all(n["exists"] for n in graph["nodes"])
+        assert audit["loadable"] and audit["status"] == "draft" and audit["unclosed_paths"]
+        assert not any(e["relation"] == "read" for e in graph["edges"])
+    finally:
+        engine.store.close()
+
+
+def test_source_drift_cannot_reuse_a_previously_valid_card_check(tmp_path):
+    engine, task, document = fixture_card(tmp_path)
+    try:
+        graph = check(engine, json.dumps(document), save=True)
+        source = tmp_path / "a.jsonl"
+        source.write_text(source.read_text().replace('"bad"', '"BAD"'))
+        audit = card.audit(engine.store.path, graph["report_id"], task)
+        assert audit["status"] == "draft" and audit["issues"]
+        assert not audit["semantic_verified"]
+    finally:
+        engine.store.close()
+
+
+@pytest.mark.parametrize("wrong", ["actor", "file", "neither"])
+def test_review_quote_cannot_override_known_operation_endpoints(tmp_path, wrong):
+    engine = build(tmp_path,
+        [record(1, use("spec", file_path="/proj/spec.md", content="unrelated")), record(2, result("spec"))],
+        second=[record(3, use("bad", file_path="/proj/A.ets", content="bad")), record(4, result("bad")),
+                record(6, use("fix", "Edit", file_path="/proj/A.ets", old_string="bad", new_string="good")),
+                record(7, result("fix"))])
+    try:
+        evidence = engine.store.locate("b.jsonl", 1)
+        fix = engine.store.locate("b.jsonl", 3)
+        document = {"schema": "inquiry/1", "target": {"file": "A.ets", "since": ts(5), "at": ts(9)},
+            "findings": [{"id": "A", "title": "claimed author", "reason": "quoted body is real",
+                "changes": [fix], "nodes": [
+                    {"id": "author", "kind": "agent", "key": "a" if wrong == "actor" else "b", "at": ts(9),
+                     "role": "origin", "reason": "claimed write", "evidence": [evidence]},
+                    {"id": "output", "kind": "file", "key": "spec.md" if wrong == "file" else "A.ets", "at": ts(9),
+                     "role": "repaired", "reason": "claimed output", "evidence": [fix]}],
+                "reviewed_edges": [{"from": "author", "to": "output", "relation": "write",
+                    "claim": "claimed endpoints", "evidence": [evidence],
+                    "review": {"at": ts(3), "quotes": [{"ref": evidence, "text": "bad"}]}}],
+                "unknown": [], "recommendation": "verify original operation"}], "unexplained": []}
+        graph, audit = save_and_audit(engine, {"file": "A.ets", "generation_end": ts(5), "observation_end": ts(9)}, document)
+        overlays = [e for e in graph["edges"] if e.get("source") == "model_review"]
+        if wrong == "neither":
+            assert overlays and audit["status"] == "ready_for_review"
+        else:
+            assert not overlays
+            assert graph["unverified_edges"] and audit["status"] == "draft"
+        assert graph["document"] == document  # Never silently rewrite the model's allegation.
+    finally:
+        engine.store.close()
+
+
+def test_mixed_native_and_opaque_record_does_not_borrow_native_endpoints(tmp_path):
+    from tests.test_inquiry_tree import opaque_document
+
+    engine = build(tmp_path, [
+        record(1, use("known", file_path="/proj/Other.ets", content="known"),
+                  use("s", "Bash", command="python -c \"Path('/proj/A.ets').write_text('bad')\"")),
+        record(2, result("known"), result("s", "done"))])
+    try:
+        # Same transcript row is not the same call. The script quote cannot be
+        # rejected using the unrelated, indexed Write in the adjacent block.
+        graph = check(engine, json.dumps(opaque_document(engine)))
+        assert any(e.get("source") == "model_review" for e in graph["edges"])
+        assert not graph["unverified_edges"]
+        assert not graph["semantic_verified"]
+    finally:
+        engine.store.close()

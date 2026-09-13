@@ -200,7 +200,10 @@ def run_suite(out):
         pending = [executor.submit(worker, case) for case in suite["cases"]]
         for future in as_completed(pending):
             results.append(future.result())
-            BASE.save(out / "suite-results.json", results)
+            # This is a progress snapshot, not an immutable experiment artifact.
+            # BASE.save deliberately uses exclusive creation for original runs.
+            (out / "suite-results.json").write_text(
+                json.dumps(results, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
             print(json.dumps(results[-1]), flush=True)
 
 

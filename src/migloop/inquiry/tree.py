@@ -7,8 +7,9 @@ Model-reviewed links live in a report overlay; they never enter effects.
 from __future__ import annotations
 
 from collections import deque
+import json
 
-from .store import digest, encode, iso, timestamp
+from .store import digest, encode, iso, parts, timestamp
 
 _HISTORY = {
     op: "原始" + name + "关系；不认证问题内容传播。"
@@ -122,7 +123,7 @@ def reviewed_edge(engine, edge, origin, destination, fid):
             raise ValueError(
                 "each review quote requires ref and 1–10000 characters of text"
             )
-        record, _ = engine.store.source_record(quote["ref"])
+        record, raw = engine.store.source_record(quote["ref"])
         if record["ref"] not in records:
             raise ValueError("review quote is not in this edge's evidence")
         opened = engine.query(
@@ -141,6 +142,21 @@ def reviewed_edge(engine, edge, origin, destination, fid):
             raise ValueError(
                 "review quote does not occur in the cited original content"
             )
+        # A real quote cannot reassign an already indexed native operation.
+        # A mixed record can also contain an opaque script; without a unique
+        # call anchor its adjacent native block is not contradictory evidence.
+        if record["at"] == when:
+            native = engine.store.rows(
+                "SELECT op,agent,path FROM effects WHERE request=? OR result=?",
+                (record["ref"], record["ref"]),
+            )
+            actor, file = (destination, origin) if relation == "read" else (origin, destination)
+            if native and len(list(parts(json.loads(raw)))) == 1 and not any(
+                e["op"] == relation and e["agent"] == actor["key"]
+                and e["path"] == engine.store.resolve_file(file["key"])
+                for e in native
+            ):
+                raise ValueError("reviewed relation contradicts indexed operation endpoints")
         matched_time |= record["at"] == when
     if not matched_time:
         raise ValueError("review time must identify a quoted original event")
@@ -222,6 +238,7 @@ def tree_neighbors(engine, scope, request):
             indexed_event(row)
             for row in engine.dispatches(at, since, agent=scope["key"])
         )
+    rejected_reviews = []
     if request.get("report_id"):
         # The saved overlay was checked at submission. Verify selected source
         # bytes below; do not rebuild every report/review on each mouse click.
@@ -230,11 +247,26 @@ def tree_neighbors(engine, scope, request):
             f["id"] for f in graph["document"]["findings"]
         }:
             raise ValueError("unknown report finding")
-        events.extend(
-            e
-            for e in graph_events(graph, request.get("finding"))
-            if e["source"] == "model_review"
-        )
+        nodes = {n["id"]: n for n in graph["nodes"]}
+        for edge in graph["edges"]:
+            if edge.get("source") != "model_review" or (
+                request.get("finding") and edge["finding"] != request["finding"]
+            ):
+                continue
+            near = nodes[edge["to" if direction == "upstream" else "from"]]
+            if (near["kind"], near["key"]) != (scope["kind"], scope["key"]):
+                continue
+            when = timestamp(edge.get("at"))
+            if when is not None and (when > at or since is not None and when < since):
+                continue
+            try:
+                # Cached overlays must obey the same current rules as submit;
+                # recheck only incident supplemental edges, not the full report.
+                checked = reviewed_edge(engine, edge, nodes[edge["from"]], nodes[edge["to"]], edge["finding"])
+            except (ValueError, OSError) as exc:
+                rejected_reviews.append({"finding": edge["finding"], "error": str(exc)})
+                continue
+            events.extend(graph_events({**graph, "edges": [checked]}))
     elif request.get("finding"):
         raise ValueError("finding requires a report_id")
     rows = {}
@@ -257,6 +289,7 @@ def tree_neighbors(engine, scope, request):
         "scope_id": engine.store.handle("s", scope),
         "direction": direction,
         **page,
+        "rejected_reviews": rejected_reviews,
         "note": "历史范围的邻居，不是完整文件状态。模型复核边仅属于所载报告，虚线不认证语义。",
     }
 
@@ -297,7 +330,7 @@ def evidence_paths(engine, graph):
             n
             for n in graph["nodes"]
             if n["finding"] == fid
-            and n["role"] in ("origin", "propagated", "context")
+            and n["role"] in ("origin", "propagated", "context", "repaired")
             and (
                 not n["generated_context"]
                 or bool(
@@ -423,12 +456,15 @@ def evidence_paths(engine, graph):
             )
             # Normal inputs need the same temporal/source checks as problem
             # nodes, but their display coverage is not causal-path completion.
-            destination = context_paths if goal["role"] == "context" else paths
+            # Fixes/new contracts still belong on the display tree without
+            # inventing a generation-fault node to make their path visible.
+            display_only = goal["role"] in ("context", "repaired")
+            destination = context_paths if display_only else paths
             destination.append(
                 {
                     "finding": fid,
                     "node": goal["id"],
-                    "purpose": "context" if goal["role"] == "context" else "problem",
+                    "purpose": "context" if display_only else "problem",
                     "status": status,
                     "steps": found or [],
                     "anchor": anchor,

@@ -89,6 +89,8 @@ reviewed_edges:
 
 from/to 必须是该 finding 内已声明的节点 id；read 方向相反。日期/引文可核不等于语义认证。带 report_id 的 neighbors 才包含该报告的补边，不写入事实索引。
 
+补边不能覆盖已明确识别的原生操作身份：唯一调用锚点的实际 actor/文件与所画边矛盾时会被拒绝。多调用记录或不透明脚本仍需逐段核文，引用里的单个词不证明读写。`repaired` 节点也有展示路径，不计入问题路径完整性；不需要为展示修复而把它标成 `origin`。
+
 submit 返回 report_id/source_sha256、issues、path_status、review_query、coverage_query。用 investigate `{op:review,report_id,offset:0,limit:100}` 和 `{op:review,report_id,view:coverage,offset:0,limit:100}`，按两层 next 续完。review 给引用时序、写者错位、较早同文修改、写后和全池返回等线索，仍由你核原文；不能据此直接认证机制。
 
 修改差集的已知原生写并入 findings.changes；相关但非修改的调用用 reviewed，未知保留。path_status:complete 仅认证问题节点到目标的同问题时序路径；正常输入展示路径和未接入节点也可保留。坐标/引用错误要修；证据不足的断点不靠删结论消除。最终返回最后一次 submit 的 ID 和 hash，UI 按原稿展示。

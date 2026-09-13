@@ -62,6 +62,8 @@ description: 为迁移中的被修文件制作可复查的情景案例卡：调�
 
 核从问题节点到被修文件的历史连接。原生关系自动成边；少数工具没识别的脚本读写，只有核实原文后才能按约定补报告专属虚线。独立搜索、同名文件、时间相邻或调用次序不产生读写关系；连不上就留断点。
 
+`origin` 指错误进入的环节，不是本次调查的起点、诊断者或修复者。写出纠正补丁的节点用 `repaired`；只看到返修前坏状态、没有引入记录，就保留引入者未知。后置新要求可以没有任何 `origin`，已核实的修复路径仍能展示，不必为了画树捏造一个红节点。
+
 每项 `reason` 讲清情景、实际修了什么以及生成链的解释；`changes` 引实际修改；节点写各自原因和证据。`unknown` 明列未查明项，无则 `[]`；`hypothesis` 可选；`recommendation` 写针对环节的改进和验法，无合理建议就说明为何不改，不虚构优化。顶层 `unexplained` 明列未解释项，无则 `[]`。这些都是现有字段，不扩造 schema。建议不等于已证明能减少下次返修。
 
 调用 submit 保存后，执行 [check_card.py](scripts/check_card.py)：用任务 `runtime.python` 运行 `.agents/skills/migloop-investigate/scripts/check_card.py --task investigation.json --report <刚返回的ID>`。脚本调用与页面相同的核验/加载器，不调用模型、不改原稿。`loadable` 是可被加载器接受；`ready_for_review` 也不是归因认证，`draft` 可加载但有未完成项。

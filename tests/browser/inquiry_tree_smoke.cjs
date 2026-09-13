@@ -137,7 +137,13 @@ async function main() {
     let port;
     for (let i = 0; i < 150; i++) {
       const active = path.join(profile, "DevToolsActivePort");
-      if (fs.existsSync(active)) { port = fs.readFileSync(active, "utf8").split("\n")[0]; break; }
+      try {
+        const lines = fs.readFileSync(active, "utf8").trim().split(/\r?\n/);
+        if (/^\d+$/.test(lines[0]) && lines[1]?.startsWith("/devtools/")) { port = lines[0]; break; }
+      } catch (error) {
+        // On Windows Chrome can briefly lock the file while publishing it.
+        if (!["ENOENT", "EBUSY", "EPERM"].includes(error.code)) throw error;
+      }
       await sleep(100);
     }
     assert(port, "Chrome did not become ready");
@@ -169,7 +175,7 @@ async function main() {
     await send("Page.enable");
     await send("Emulation.setDeviceMetricsOverride", { width: 1720, height: 1020, deviceScaleFactor: 1, mobile: false });
     await send("Page.navigate", { url });
-    await wait("window.migloopViewer?.tree && document.querySelector('#side .vrow')");
+    await wait(process.env.INQUIRY_CARD_ONLY==="1" ? "window.migloopViewer?.tree && migloopViewer.report" : "window.migloopViewer?.tree && document.querySelector('#side .vrow')");
     let liveDiagnostic = null;
     const rootNode="migloopViewer.tree.byId[migloopViewer.tree.root]";
     if(liveUrl) {
@@ -185,6 +191,7 @@ async function main() {
       if(process.env.INQUIRY_CARD_ONLY==="1") {
         await evaluate("document.querySelector('#load').click()");
         await wait("document.querySelector('#reportsDialog').open");
+        await evaluate("document.querySelectorAll('#reportNotes details').forEach(n=>n.open=true);document.querySelectorAll('#reportNotes .quote .more').forEach(n=>n.click())");
         const cardDiagnostic=await evaluate("(()=>{const r=migloopViewer.report,t=migloopViewer.tree,text=document.querySelector('#reportNotes').textContent;return {report_id:r.report_id,source_sha256:r.source_sha256,nodes:Object.values(t.byId).length,seedEdges:Object.values(t.byId).filter(n=>n.row).length,unclosed:migloopViewer.hiddenPaths.length,recommendationsVisible:r.document.findings.filter(f=>typeof f.recommendation==='string'&&f.recommendation).every(f=>text.includes(f.recommendation)),reasonsVisible:r.document.findings.every(f=>text.includes(f.reason)),ordinaryCandidates:Object.values(t.byId).filter(n=>n.row?.strength==='candidate'&&n.row.source!=='model_review').length};})()");
         assert(cardDiagnostic.recommendationsVisible);assert(cardDiagnostic.reasonsVisible);
         assert.equal(cardDiagnostic.ordinaryCandidates,0);assert.equal(errors.length,0,errors.join("\n"));

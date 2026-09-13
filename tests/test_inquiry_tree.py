@@ -147,6 +147,38 @@ def test_normal_input_paths_are_displayed_without_changing_problem_closure(chain
         scope = step["node"]
 
 
+def test_repair_without_generation_fault_still_has_a_display_path(chain):
+    doc = document(chain)
+    doc["findings"][0]["nodes"] = [{
+        "id": "fixer", "kind": "agent", "key": "a", "at": ts(13),
+        "role": "repaired", "reason": "later requirement, not a generation fault",
+        "evidence": [chain.store.locate("a.jsonl", 3)],
+    }]
+    graph = report.check(chain, json.dumps(doc))
+    assert graph["tree"]["problem_nodes"] == 0 and graph["tree"]["paths"] == []
+    path, = graph["tree"]["context_paths"]
+    assert path["node"] == "A:fixer" and path["status"] == "native"
+    assert len(path["steps"]) == 1 and path["steps"][0]["relation"] == "write"
+
+
+def test_cached_supplement_cannot_reintroduce_a_contradictory_author(chain, monkeypatch):
+    graph = report.check(chain, json.dumps(document(chain)), save=True)
+    # Simulate a cache produced by the earlier quote-only validator. All refs
+    # remain real; the allegation incorrectly assigns b's B write to a.
+    target = next(n for n in graph["nodes"] if n["kind"] == "file" and n["key"] == "/proj/B.ets")
+    author = next(n for n in graph["nodes"] if n["id"] == "A:origin")
+    author["at"] = ts(15)
+    ref = chain.store.locate("b.jsonl", 3)
+    graph["edges"].append({"from": author["id"], "to": target["id"], "finding": "A",
+        "relation": "write", "source": "model_review", "strength": "candidate", "operation": "old-overlay",
+        "at": ts(7), "evidence": [ref], "claim": "a wrote B", "review": {
+            "at": ts(7), "quotes": [{"ref": ref, "text": "bad"}]}})
+    monkeypatch.setattr(report, "load_report", lambda *_a, **_k: graph)
+    result = chain.query({"op": "file", "key": "B.ets", "at": ts(15), "view": "neighbors", "report_id": graph["report_id"]})
+    assert not any(r["source"] == "model_review" for r in result["rows"])
+    assert result["rejected_reviews"]
+
+
 def test_cited_input_endpoint_is_visible_but_not_a_new_model_judgment(chain):
     graph = report.check(chain, json.dumps(document(chain)))
     path, = graph["tree"]["context_paths"]
