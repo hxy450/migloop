@@ -23,6 +23,7 @@ def fixture_card(tmp_path, opaque=False):
             record(5, result("fix"))]
     if opaque:
         rows += [record(6, use("opaque", "Bash", command="python opaque.py /proj/A.ets")), record(7, result("opaque"))]
+    rows += [record(0, use("input", "Read", file_path="/proj/spec.md")), record(0, result("input", "required: good"))]
     engine = build(tmp_path, rows)
     refs = [engine.store.locate("a.jsonl", line) for line in range(1, 5)]
     task = {"file": "A.ets", "generation_end": ts(3), "observation_end": ts(9)}
@@ -30,7 +31,13 @@ def fixture_card(tmp_path, opaque=False):
                 "findings": [{"id": "A", "title": "local mismatch", "reason": "original claim",
                     "changes": refs[2:], "nodes": [{"id": "writer", "kind": "agent", "key": "a", "at": ts(2),
                         "role": "origin", "reason": "original node claim", "evidence": refs[:2]}],
-                    "unknown": [], "recommendation": "candidate check; effect not measured"}], "unexplained": []}
+                    "unknown": [], "recommendation": "candidate check; effect not measured",
+                    "boundary": {"status": "supported_input", "nodes": ["input"], "reason": "required good was received before the bad write"}}],
+                "summary": {"generation": "Input required good, output was bad.", "repair": "Edit corrects bad to good; runtime result unknown.",
+                            "unknown": ["behavior not tested"], "findings": ["A"]},
+                "recommendations": [], "unexplained": []}
+    document["findings"][0]["nodes"].append({"id": "input", "kind": "agent", "key": "a", "at": ts(2),
+        "role": "context", "reason": "received required good", "evidence": [engine.store.locate("a.jsonl", len(rows))]})
     return engine, task, document
 
 
@@ -159,7 +166,8 @@ def test_review_quote_cannot_override_known_operation_endpoints(tmp_path, wrong)
         graph, audit = save_and_audit(engine, {"file": "A.ets", "generation_end": ts(5), "observation_end": ts(9)}, document)
         overlays = [e for e in graph["edges"] if e.get("source") == "model_review"]
         if wrong == "neither":
-            assert overlays and audit["status"] == "ready_for_review"
+            assert overlays and not graph["unverified_edges"]
+            assert audit["status"] == "draft" and audit["investigation_gaps"]  # Old shape loads, but lacks new case-card synthesis.
         else:
             assert not overlays
             assert graph["unverified_edges"] and audit["status"] == "draft"

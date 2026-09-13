@@ -30,7 +30,7 @@ def parse(text):
             raise ValueError("invalid YAML") from exc
     if not isinstance(result, dict) or result.get("schema") != "inquiry/1":
         raise ValueError("schema must be inquiry/1")
-    if set(result) - {"schema", "target", "findings", "unexplained", "reviewed"}:
+    if set(result) - {"schema", "target", "findings", "unexplained", "reviewed", "summary", "recommendations"}:
         raise ValueError("unknown report fields")
     if not isinstance(result.get("reviewed", []), list):
         raise TypeError("reviewed must be a list")
@@ -117,6 +117,7 @@ def check(engine, text, *, save=False):
             "unknown",
             "hypothesis",
             "recommendation",
+            "boundary",
         }:
             raise ValueError("invalid finding fields")
         fid = finding.get("id")
@@ -137,7 +138,7 @@ def check(engine, text, *, save=False):
             raise ValueError("reviewed_edges must contain explicit relation reviews")
         automatic_edges = "edges" not in finding
         finding = attach(engine, finding, target)
-        for field in ("title", "reason", "unknown", "hypothesis", "recommendation"):
+        for field in ("title", "reason", "unknown", "hypothesis", "recommendation", "boundary"):
             verify_text(
                 finding.get(field),
                 timestamp(target["at"], required=True),
@@ -426,6 +427,11 @@ def check(engine, text, *, save=False):
                 edges.append(bound)
             else:
                 unverified.append({**edge, "finding": fid, "diagnostic": reason})
+    from .narrative import validate as validate_narrative
+
+    validate_narrative(document)
+    for field in ("summary", "recommendations"):
+        verify_text(document.get(field), timestamp(target["at"], required=True), field)
     verify_text(
         document.get("unexplained"),
         timestamp(target["at"], required=True),

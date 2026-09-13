@@ -46,6 +46,17 @@ neighbors 与 UI 共用投影，默认上游；`direction:downstream` 看下游�
 ```yaml
 schema: inquiry/1
 target: {scope: "目标文件修复区间的 s-file-..."}
+summary:
+  generation: 完整说明生成要求、实际输入、偏差如何进入与保留；区分已证与假设
+  repair: 后续具体修了什么，哪些是修复中新问题，实际验证到哪里
+  unknown: [文件级未查明边界] # 无则 []
+  findings: [A] # 总结涵盖的全部 finding id
+recommendations:
+  - target: 要改进的具体生成或交接环节
+    action: 具体怎么改；不宜改时说明暂不改
+    reason: 为何这项行动针对已发现的问题，而非泛泛补测试
+    validation: 如何验证预期改进；效果仍待验证
+    findings: [A] # 本行动针对哪些 finding
 findings:
   - id: A
     title: 简短原因
@@ -64,7 +75,10 @@ findings:
         evidence: ["e-实际写出"]
     unknown: [尚未查明的环节与缺哪份证据] # 无则 []
     hypothesis: 可选的机制假设
-    recommendation: 针对环节的改进与验证办法；无法提出时说明依据
+    boundary:
+      status: supported_input
+      nodes: [input] # 本 finding 已声明的节点 id，不是 scope
+      reason: 何时送达的哪项正确输入足够指导实现，为什么可在这里停
 unexplained: [仍未解释的修改或效应]
 reviewed:
   - {ref: "e-相关调用", effect: no_target_change, reason: 实际只读或只修改其它对象的依据}
@@ -72,6 +86,10 @@ reviewed:
 ```
 
 节点 role 仅 `origin / propagated / context / repaired / unknown`。origin 是实际引入偏差的环节；propagated 是保留问题，不是已修好；repaired 是检查/修复方。一个 agent 可以在不同时间/问题中承担不同角色。也可显式 target:{file,at,since}、node:{kind,key,at,since}；不得和 scope 混写。节点时间须涵盖证据，不凭空加减毫秒。
+
+summary、recommendations 和 boundary 是同一 inquiry/1 的扩展字段，旧卡可不含，新技能交付必须给出。summary 的四个字段、每条 recommendations 的五个字段均按模板提供；findings 数组只填实际 finding id，不能写节点或源引用。原文引用可内联写在文本中，仍受原文与观察截止核验；新增事实先在对应 finding/节点落实，不靠文件总结额外归责。
+
+boundary 只含 status/nodes/reason。status 仅 supported_input（相关输入充分，须指向 context 节点）、not_generation_error（此项非生成错误的依据）、unresolved（本分支未查明，nodes 可为 []）。每条 finding 都明确选择并说明；非 unresolved 须给本 finding 已声明、可连接的节点，机检只核形式与连接，不认证“输入充分”或“不是生成错”的判断。finding.recommendation 仍兼容，可由文件级 recommendations 覆盖该项后省略。
 
 一般不填 edges：按本 finding 已引原生读写/派发自动连线，中性端点不是模型归责。脚本效应须人工核文，可在 finding 的 `reviewed_edges` 给报告专属虚线（始终是候选，不能把词法命中升级事实）：
 

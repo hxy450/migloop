@@ -792,8 +792,36 @@
       document.getElementById("reportsDialog").close();reportNotes();
       renderRail();
     }
+    function findingLinks(parent, ids) {
+      var links=el("div","kv");links.appendChild(document.createTextNode("对应问题："));
+      (ids||[]).forEach(function(id,index){
+        var f=report.document.findings.find(f=>f.id===id);if(!f)return;
+        if(index)links.appendChild(document.createTextNode(" · "));
+        links.appendChild(lnk(f.title,"lnk",function(){activeFinding=id;document.getElementById("finding").value=id;
+          applyReport(report,id);reportNotes();document.getElementById("reportsDialog").close();}));
+      });parent.appendChild(links);
+    }
+    function narrativeSection(host) {
+      var doc=report.document;
+      if(doc.summary){
+        var section=sec("文件级总结 · 模型主张");section.id="card-summary";
+        section.appendChild(quote("inbox","生成期问题总结",doc.summary.generation));
+        section.appendChild(quote("inbox","后续修复与结果",doc.summary.repair));
+        if(doc.summary.unknown.length)section.appendChild(quote("inbox","尚未查明",doc.summary.unknown.join("\n")));
+        findingLinks(section,doc.summary.findings);host.appendChild(section);
+      }
+      if(doc.recommendations?.length){
+        var section=sec("优化建议 · 效果待验证");section.id="card-recommendations";
+        doc.recommendations.forEach(function(r){
+          var item=el("div","quote inbox");item.appendChild(el("b",null,r.target));
+          item.appendChild(kv("具体改动",r.action));item.appendChild(kv("为什么",r.reason));
+          item.appendChild(kv("如何验证",r.validation));section.appendChild(item);findingLinks(section,r.findings);
+        });host.appendChild(section);
+      }
+    }
     function reportNotes() {
       var host=document.getElementById("reportNotes");host.textContent="";if(!report)return;
+      narrativeSection(host);
       if(hiddenPaths.length){var details=el("details");details.appendChild(el("summary",null,hiddenPaths.length+" 个报告节点尚未接入树"));
         hiddenPaths.forEach(p=>details.appendChild(kv((p.purpose==="context"?"参考材料 · ":"问题节点 · ")+p.node,p.diagnostic)));host.appendChild(details);}
       var details=el("details");details.appendChild(el("summary",null,"本次调查结论"));
@@ -801,6 +829,7 @@
       if(report.coverage&&!report.coverage.complete)details.appendChild(kv("调查范围","修改对账尚未完成，保留未决项；此卡不能视为完整归因。"));
       report.document.findings.filter(f=>!activeFinding||f.id===activeFinding).forEach(function(f){
         details.appendChild(quoteLong("cause",f.title,f.reason));
+        if(f.boundary)details.appendChild(quoteLong("inbox","停止上溯依据 · "+({supported_input:"模型认为输入充分",not_generation_error:"模型认为非生成错误",unresolved:"尚未查明"}[f.boundary.status]||f.boundary.status),f.boundary.reason));
         [["unknown","尚未查明"],["hypothesis","机制假设 · 未认证"],["recommendation","改进建议 · 效果待验证"]].forEach(function(pair){
           var value=f[pair[0]];if(value==null||value===""||(Array.isArray(value)&&!value.length))return;
           var text=Array.isArray(value)?value.map(v=>typeof v==="string"?v:JSON.stringify(v)).join("\n"):typeof value==="string"?value:JSON.stringify(value);

@@ -16,6 +16,7 @@ from pathlib import Path
 def audit(index_path, report_id, task):
     from migloop.inquiry.engine import Engine
     from migloop.inquiry.report import load_report
+    from migloop.inquiry.narrative import review_gaps
     from migloop.inquiry.store import Store, timestamp
 
     store = Store(index_path)
@@ -34,6 +35,7 @@ def audit(index_path, report_id, task):
 
         document = graph["document"]
         content_errors = []
+        advised = {fid for item in document.get("recommendations", []) for fid in item["findings"]}
         for finding in document["findings"]:
             fid = finding["id"]
             if not finding.get("changes"):
@@ -42,7 +44,7 @@ def audit(index_path, report_id, task):
                 content_errors.append({"finding": fid, "error": "No explanatory nodes"})
             if not isinstance(finding.get("unknown"), list):
                 content_errors.append({"finding": fid, "error": "unknown must be an explicit list; [] when none recorded"})
-            if not isinstance(finding.get("recommendation"), str) or not finding["recommendation"].strip():
+            if fid not in advised and (not isinstance(finding.get("recommendation"), str) or not finding["recommendation"].strip()):
                 content_errors.append({"finding": fid, "error": "State a bounded recommendation and verification, or why none is justified"})
             for node in finding.get("nodes", []):
                 if not node.get("evidence"):
@@ -55,7 +57,8 @@ def audit(index_path, report_id, task):
         coverage = graph["coverage"]
         paths = graph["tree"]["paths"]
         unresolved_paths = [p for p in paths if p["status"] == "unclosed"]
-        ready = (not target_errors and not content_errors
+        investigation_gaps = review_gaps(graph)
+        ready = (not target_errors and not content_errors and not investigation_gaps
                  and graph["mechanical_status"] == "valid"
                  and graph["path_status"] == "complete" and coverage["complete"])
         return {
@@ -67,6 +70,7 @@ def audit(index_path, report_id, task):
             "browser_verified": False,
             "target_errors": target_errors,
             "card_content_errors": content_errors,
+            "investigation_gaps": investigation_gaps,
             "mechanical_status": graph["mechanical_status"],
             "path_status": graph["path_status"],
             "issues": graph["issues"],

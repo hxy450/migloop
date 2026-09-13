@@ -24,9 +24,11 @@ const repair = row("native:repair", "write", coordinate("agent", "session:fixer"
 const report = {
   report_id: "tree-fixture", trace_session: "model-session", source_sha256: "fixture-sha",
   target: { file: "/migration/harmony/AudioPlayer.ets", at: times.root, since: null },
-  document: { version: "inquiry/1", target: { file: "/migration/harmony/AudioPlayer.ets", at: times.root },
+  document: { schema: "inquiry/1", target: { file: "/migration/harmony/AudioPlayer.ets", at: times.root },
+    summary: {generation:"文件级生成总结：输入整理存在待核缺口。<img src=x onerror=alert(1)>",repair:"文件级修复总结：后续修改了输出，运行效果未证实。",unknown:["文件级未查明"],findings:["A","B","C"]},
+    recommendations:[{target:"规格交接",action:"保留关键属性和来源",reason:"避免属性丢失而不是简单多查几层",validation:"比较同题输出并核对应属性",findings:["A"]}],
     findings: [
-      { id: "A", title: "规格输入中的问题", reason: "完整原因 A", unknown: ["尚缺运行验证"], hypothesis: "待核机制 A", recommendation: "建议 A" },
+      { id: "A", title: "规格输入中的问题", reason: "完整原因 A", unknown: ["尚缺运行验证"], hypothesis: "待核机制 A", recommendation: "建议 A", boundary:{status:"unresolved",nodes:[],reason:"停止依据仍未查清，不能把局部写者当首因"} },
       { id: "B", title: "候选输入", reason: "完整原因 B" },
       { id: "C", title: "未闭合来源", reason: "没有原生边，不画伪路径" },
     ], unexplained: ["报告保留的未知事项"] },
@@ -319,11 +321,17 @@ async function main() {
       const initial=JSON.stringify(traces);
       await evaluate("document.querySelector('#load').click()");
       await wait("document.querySelector('#reportsDialog').open");
+      assert.equal(await evaluate("document.querySelector('#card-summary').textContent.includes('文件级生成总结')"),true);
+      assert.equal(await evaluate("document.querySelector('#card-summary').textContent.includes('文件级修复总结')"),true);
+      assert.equal(await evaluate("document.querySelector('#card-summary img')"),null,"model prose is text, never executable HTML");
+      assert.equal(await evaluate("document.querySelector('#card-recommendations').textContent.includes('比较同题输出并核对应属性')"),true);
+      assert.equal(await evaluate("document.querySelector('#reportNotes').textContent.includes('停止依据仍未查清')"),true);
       assert.equal(await evaluate("document.querySelector('#reportNotes').textContent.includes('尚未接入树')"),true);
       for(const text of ["尚缺运行验证","待核机制 A","建议 A","报告保留的未知事项","不是机检认证"])
         assert.equal(await evaluate("document.querySelector('#reportNotes').textContent.includes("+JSON.stringify(text)+")"),true);
-      await evaluate("document.querySelector('#finding').value='A';document.querySelector('#finding').dispatchEvent(new Event('change'))");
+      await evaluate("document.querySelector('#card-recommendations .lnk').click()");
       await wait("!document.querySelector('#reportsDialog').open");
+      assert.equal(await evaluate("document.querySelector('#finding').value"),"A","recommendation returns to its actual finding, not a fabricated edge");
       assert.equal(await evaluate("document.querySelector('[data-edge=\"model:review\"]')"),null);
       await evaluate("migloopViewer.select(Object.values(migloopViewer.tree.byId).find(n=>n.claims.some(c=>c.id==='A:origin')).tid)");
       await wait("document.querySelector('#side').textContent.includes('原稿原因与范围都必须保留')");

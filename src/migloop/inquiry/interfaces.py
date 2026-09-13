@@ -45,6 +45,7 @@ inputs的tool_return_total/tool_return_query单列全部已记录工具返回入
 “检查报告只提结构”只能证明报告这么写，不能据此认证“仅做结构检查/确认漏验”。
 声称某阶段没有成功回执/输入/检查前，在该阶段完整范围搜索并展开正反例；写前范围不能用于否定写后检查。停止时对照原文核结论中的确定性句子，不把hypothesis搬成最终摘要中的事实。
 6. 最后提交节点原因和证据，通常不必手工拼edges。服务端从这些引用核回原生读写与派发、自动连线；补出的中性端点不是你认定有问题的节点。
+制作情景卡时，文件级 summary:{generation,repair,unknown:[文本],findings:[finding-id]} 连贯解释问题，recommendations:[{target,action,reason,validation,findings:[finding-id]}] 合并行动及验法；不要把未查明改写成确定事实。finding 可含 boundary:{status:supported_input|not_generation_error|unresolved,nodes:[该finding节点id],reason:停止上溯依据}。正确输入须指向context；未核清就unresolved，旧卡可不含这些扩展。具体格式按调查skill，原生边和时间规则不变。
 你只需给真正要归因的节点填scope、role、reason、evidence。原文引用e-...、agent范围s-agent-...、文件范围s-file-...各有不同类型，不能换前缀猜ID。
 mechanical_status只核坐标/引用/原生关系及原生写对账，不是正确率、全文覆盖或因果认证。needs_revision须处理错误，不靠删证据回避。
 机械通过也不证明因果正确；“没查到检查”不能写成“确认遗漏检查”，这也适用于最后的简短摘要。

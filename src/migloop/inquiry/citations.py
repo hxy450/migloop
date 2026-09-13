@@ -28,7 +28,7 @@ def cited_refs(finding, store):
             refs.extend(ref for ref in value if isinstance(ref, str))
 
     explicit(finding.get("changes"))
-    for field in ("title", "reason", "unknown", "hypothesis", "recommendation"):
+    for field in ("title", "reason", "unknown", "hypothesis", "recommendation", "boundary"):
         refs.extend(inline_refs(finding.get(field)))
     for node in finding.get("nodes", []):
         explicit(node.get("evidence"))
