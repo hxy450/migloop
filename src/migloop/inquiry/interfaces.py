@@ -99,7 +99,7 @@ diff明确比较两个原始引用：{op:diff,before:ref,after:ref,before_pointe
 传输建议直接转发MCP content.text，不再把整个MCP对象JSON转义包一遍。续读每次只打印1–2帧，避免宿主二次截断。
 server_sent_only不证明模型侧完整呈现，遇宿主truncated要续取，不能宣称看全。
 
-自由调查后submit完整YAML/JSON，推荐引用已返回坐标，不手抄时刻：
+自由调查后submit完整YAML/JSON，节点可声明转录名/文件路径+ISO时间，也可复用已返回scope：
 schema: inquiry/1
 target: {scope: "s-file-文件修复区间"}
 findings:
@@ -110,6 +110,7 @@ findings:
     nodes:
       - {id: author, scope: "s-agent范围", role: origin, reason: 节点原因, evidence: ["e-写出"]}
       - {id: output, scope: "s-file范围", role: propagated, reason: 节点原因, evidence: ["e-写出"]}
+    edges: [{from: author, to: output}]
     unknown: [仍未证明的环节]
     hypothesis: 可选机制假设
     recommendation: 可选建议与验证办法
@@ -118,7 +119,7 @@ reviewed:
   - {ref: "e-调用", effect: no_target_change, reason: 原文为什么仅查询或改了别的文件}
   - {ref: "e-调用", effect: unknown, reason: 缺哪份执行/内容证据，当前无法确认}
 省略edges时系统只按已引用原生操作生成历史连接；未知脚本不会自动变成写边，独立搜到spec也不变成曾被生成者读取。
-relations返回的link可绑定一条明确原生操作。交付edges时声明关键中间节点，各节点时间须容纳其实际交接；不同时间的同文件节点不合并成捷径。
+edges最简只填from/to，服务端按两端身份/类型/时间附上全部匹配的确定读写/派发及原始引用，不任挑某次操作。节点key可用agent的完整转录名/唯一文件名或原有agent key；file用完整路径。不必先开原子获得scope。要限定某次操作仍可选填relations返回的link。各节点时间须容纳实际交接，不同时间的同文件节点不合并成捷径。
 节点role只用origin/propagated/context/repaired/unknown。未知关系可省略边并写unknown，不编造link。
 origin是写出坏结果的环节，不是发现问题/提出修复的环节；propagated是仍保留问题的节点，不是已经修好的文件。发现并修复问题的检查者用repaired；只提供任务/契约/证据用context。判断不了则unknown。
 初版按当时契约正确、后续只是新增测试/平台要求时，初版节点用context；不要一边说不是生成错，一边把初版标为问题节点。
@@ -133,16 +134,16 @@ file/agent可用view:neighbors按当前scope分页展开上游（direction:downs
 submit另给path_status及每个问题节点的路径状态。声明edges时只沿声明的节点ID连接，须有目标文件@观察截止的末端节点（历史范围可不带since）；省略时为cited_history背景。complete不认证内容连续传播或因果正确；needs_path不能说已完成调用链。missing_evidence_links仅为相关操作导航，不要求独立对照材料连边。
 检查执行证据可给finding.checks:[{node:本项agent节点ID,request:原请求引用,result:原回执引用,tool:原工具名,claim:具体检查范围与局限}]；多调用原文可加request_block/result_block。核验只认证实际调用配对、身份与时间，不认证目标状态验证通过。
 未闭合时可自由补查并引用缺的中间读写/派发，或明确保留unknown；不要为了画树发明证据。原始查询顺序与最后的证据路径分别保存，不能把整理后的树叫作模型实际查阅顺序。
-少数未识别脚本效应，经你核原文后可在finding.reviewed_edges补报告专属虚线：
+首次绝不加force/review/reviewed_edges。普通连接校验后，只有unverified_edges中force_eligible:true的同一条未确认读写才可复核补虚线：顶层revision_of填上次submit的report_id（不是自报轮数），finding.edges里：
   - from: author
     to: output
-    relation: write
+    force: true
     claim: 模型复核这次脚本对该文件写入；说明依据及不确定性
     evidence: ["e-原始记录"]
     review:
       at: "原始事件实际时刻（含时区），不是节点查询截止"
       quotes: [{ref: "e-原始记录", text: "该记录中逐字可核的命令或回执摘录"}]
-两端必须是真实file/agent节点且时间范围覆盖事件。摘录与时刻核回原文不等于语义成立：补边始终是candidate/model_review，不写入事实索引；无摘录或时间错的边不会画。
+两端必须是真实file/agent节点且时间范围覆盖该agent自己的工具调用/回执。改姓名/时间或新增边须重新普通校验；未校验的首次force、虚构引用、别人调用或消息声明不会放行。claim/evidence/review必填。摘录与时刻核回原文不等于语义成立：补边始终是candidate/model_review，不写入事实索引。旧reviewed_edges不能绕过首次校验；旧已保存卡片仍可载入。
 带report_id（可另带finding）的neighbors包含所载报告的虚线补边，不带则只看索引。文件历史根不沿用修复区间since；原稿节点的since仍保留，不能借画图越界引用。
 """
 
@@ -229,8 +230,11 @@ def build_mcp(path):
                     "mechanical_status",
                     "path_status",
                     "check_results",
+                    "submission_policy",
                 )
             } | {"nodes": len(graph["nodes"]), "bound_edges": len(graph["edges"])}
+            summary["revision_hint"] = {"revision_of": graph["report_id"],
+                "note": "Revise this saved draft. Only unchanged endpoints marked force_eligible may add force:true with claim, evidence and review; force stays a report-local dashed model claim."}
             summary["paths"] = [
                 {k: p[k] for k in ("finding", "node", "status", "basis", "diagnostic")}
                 for p in graph["tree"]["paths"]

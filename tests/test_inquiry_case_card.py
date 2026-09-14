@@ -163,7 +163,10 @@ def test_review_quote_cannot_override_known_operation_endpoints(tmp_path, wrong)
                     "claim": "claimed endpoints", "evidence": [evidence],
                     "review": {"at": ts(3), "quotes": [{"ref": evidence, "text": "bad"}]}}],
                 "unknown": [], "recommendation": "verify original operation"}], "unexplained": []}
-        graph, audit = save_and_audit(engine, {"file": "A.ets", "generation_end": ts(5), "observation_end": ts(9)}, document)
+        # Archived pre-feedback cards remain loadable, with current source and
+        # actor checks. New submissions cannot use this internal loader flag.
+        graph = check(engine, json.dumps(document), save=True, _legacy_reviews=True)
+        audit = card.audit(engine.store.path, graph["report_id"], {"file": "A.ets", "generation_end": ts(5), "observation_end": ts(9)})
         overlays = [e for e in graph["edges"] if e.get("source") == "model_review"]
         if wrong == "neither":
             assert overlays and not graph["unverified_edges"]
@@ -186,7 +189,7 @@ def test_mixed_native_and_opaque_record_does_not_borrow_native_endpoints(tmp_pat
     try:
         # Same transcript row is not the same call. The script quote cannot be
         # rejected using the unrelated, indexed Write in the adjacent block.
-        graph = check(engine, json.dumps(opaque_document(engine)))
+        graph = check(engine, json.dumps(opaque_document(engine)), _legacy_reviews=True)
         assert any(e.get("source") == "model_review" for e in graph["edges"])
         assert not graph["unverified_edges"]
         assert not graph["semantic_verified"]

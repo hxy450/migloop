@@ -13,6 +13,7 @@ from .evidence_review import review
 from .store import digest, encode, iso, timestamp
 from .tree import evidence_paths, reviewed_edge
 from .check_receipts import bind_checks
+from .edge_submission import agent_key, call_window, confirmed_edges, edge_key, previous_feedback
 
 
 def parse(text):
@@ -31,8 +32,10 @@ def parse(text):
             raise ValueError("invalid YAML") from exc
     if not isinstance(result, dict) or result.get("schema") != "inquiry/1":
         raise ValueError("schema must be inquiry/1")
-    if set(result) - {"schema", "target", "findings", "unexplained", "reviewed", "summary", "recommendations"}:
+    if set(result) - {"schema", "target", "findings", "unexplained", "reviewed", "summary", "recommendations", "revision_of"}:
         raise ValueError("unknown report fields")
+    if "revision_of" in result and (not isinstance(result["revision_of"], str) or not result["revision_of"]):
+        raise ValueError("revision_of must be a returned report_id")
     if not isinstance(result.get("reviewed", []), list):
         raise TypeError("reviewed must be a list")
     findings = result.get("findings")
@@ -51,7 +54,7 @@ def parse(text):
     return result
 
 
-def check(engine, text, *, save=False):
+def check(engine, text, *, save=False, _legacy_reviews=False):
     document = parse(text)
     target = document["target"]
     if "scope" in target:
@@ -64,6 +67,7 @@ def check(engine, text, *, save=False):
             "since": coordinate.get("since"),
         }
     nodes, edges, unverified, issues = [], [], [], []
+    allowed_force = previous_feedback(engine, document, target)
     referenced = set()
     explained_changes = set()
 
@@ -208,15 +212,14 @@ def check(engine, text, *, save=False):
             if not isinstance(node.get("reason"), str) or not node["reason"].strip():
                 raise ValueError("every node requires its original reason")
             at, since = bounds(node)
-            key = (
-                engine.store.resolve_file(node["key"])
-                if node["kind"] == "file"
-                else node["key"]
-            )
+            key = node["key"]
             try:
+                key = (engine.store.resolve_file(key) if node["kind"] == "file"
+                       else agent_key(engine.store, key))
                 exists = engine.store.has_records(node["kind"], key, min(at, timestamp(target["at"], required=True)), since=since)
-            except ValueError:
+            except ValueError as exc:
                 exists = False
+                issues.append({"where": f"{fid}.{nid}", "error": str(exc)})
             refs = verify_refs(
                 node.get("evidence", []), at, f"{fid}.{nid}", since, "node"
             )
@@ -240,7 +243,32 @@ def check(engine, text, *, save=False):
             }
             local[nid] = bound
             nodes.append(bound)
+        declared_edges = []
         for edge in finding.get("edges", []):
+            if not isinstance(edge, dict):
+                raise ValueError("invalid edge fields")
+            origin, destination = local.get(edge.get("from")), local.get(edge.get("to"))
+            if "link" not in edge and "relation" not in edge and origin and destination:
+                relation = {("agent", "file"): "write", ("file", "agent"): "read",
+                            ("agent", "agent"): "dispatch"}.get((origin["kind"], destination["kind"]))
+                if relation:
+                    edge = {**edge, "relation": relation}
+            if not edge.get("force") and "review" not in edge:
+                edge = {"claim": "历史关系声明；不认证问题传播。", **edge}
+            # A bare connection asks about historical relations, not a particular
+            # content version. Return ALL confirmed matches with their own times.
+            if (not any(k in edge for k in ("link", "evidence", "review")) and not edge.get("force")
+                    and origin and destination and origin["exists"] and destination["exists"]
+                    and edge.get("relation") in ("read", "write", "dispatch")
+                    and (origin["kind"], destination["kind"]) == {"read": ("file", "agent"),
+                        "write": ("agent", "file"), "dispatch": ("agent", "agent")}[edge["relation"]]):
+                matches = confirmed_edges(engine, origin, destination, edge["relation"], target["at"])
+                if matches:
+                    for binding in matches:
+                        declared_edges.append({**{k: v for k, v in edge.items() if k != "relation"}, **binding})
+                    continue
+            declared_edges.append(edge)
+        for edge in declared_edges:
             operation_id = None
             if not isinstance(edge, dict) or set(edge) - {
                 "from",
@@ -250,8 +278,15 @@ def check(engine, text, *, save=False):
                 "claim",
                 "link",
                 "review",
+                "force",
             }:
                 raise ValueError("invalid edge fields")
+            if "force" in edge and type(edge["force"]) is not bool:
+                raise ValueError("force must be a boolean")
+            if any(edge.get(k) not in local for k in ("from", "to")):
+                unverified.append({**edge, "finding": fid, "force_eligible": False,
+                    "diagnostic": "unknown node ID: " + ", ".join(str(edge.get(k)) for k in ("from", "to") if edge.get(k) not in local)})
+                continue
             if "link" in edge:
                 if "evidence" in edge or "relation" in edge:
                     raise ValueError(
@@ -275,6 +310,8 @@ def check(engine, text, *, save=False):
             bound = None
             supporting_request = None
             supporting_result = None
+            signature = None
+            force_eligible = False
             if origin and destination:
                 relation = edge.get("relation")
                 op = {
@@ -300,6 +337,18 @@ def check(engine, text, *, save=False):
                     if n.get("since") is not None
                 ]
                 start = max(starts) if starts else None
+                signature = edge_key(origin, destination, {"possible_read": "read", "possible_write": "write"}.get(relation, relation))
+                forced = edge.get("force") is True or "review" in edge
+                legacy_review = _legacy_reviews and "review" in edge and "force" not in edge
+                if forced and not legacy_review and signature not in allowed_force:
+                    unverified.append({**edge, "finding": fid, "edge_key": signature,
+                        "force_eligible": False, "code": "force_before_feedback",
+                        "diagnostic": "Submit this exact connection without force/review first. Then use the returned report_id as revision_of; only server-checked unresolved endpoints may be forced."})
+                    continue
+                if forced and "review" not in edge:
+                    unverified.append({**edge, "finding": fid, "code": "force_missing_review",
+                        "diagnostic": "force requires a reason (claim), original evidence, and review:{at,quotes}."})
+                    continue
                 dispatch_edge = (
                     "review" not in edge
                     and relation == "dispatch"
@@ -324,7 +373,10 @@ def check(engine, text, *, save=False):
                         }
                     )
                     continue
-                reason = "no matching indexed operation; independent lookup is not a read/write edge"
+                reason = (f"No matching confirmed {relation}: {origin['key']} -> {destination['key']} "
+                          f"inside [{iso(start)}, {iso(cutoff)}]. This is not proof the operation never happened. "
+                          "Check the original tool calls; unresolved read/write may be resubmitted with force after this feedback.")
+                force_eligible = bool(op and origin["exists"] and destination["exists"] and not forced)
                 if "review" in edge:
                     try:
                         bound = reviewed_edge(engine, edge, origin, destination, fid)
@@ -387,6 +439,7 @@ def check(engine, text, *, save=False):
                             and expected.intersection(refs)
                         ):
                             if not in_scope(operation["at"], cutoff, start):
+                                force_eligible = False
                                 reason = (f"Referenced {op} occurs at {iso(operation['at'])}, outside endpoint interval "
                                           f"[{iso(start)}, {iso(cutoff)}]. Reopen this entity's history with the appropriate bounds; "
                                           "a repair-window since excludes generation evidence. No scope was changed.")
@@ -418,6 +471,7 @@ def check(engine, text, *, save=False):
                             supporting_request = next(
                                 r["request"] for r in operations if r["id"] == bound["operation"])
                     elif len(matches) > 1:
+                        force_eligible = False
                         reason = "multiple operations share these record references; use the returned link to select its exact block"
                 if (
                     bound
@@ -438,13 +492,22 @@ def check(engine, text, *, save=False):
                         bound = None
                         reason = "Additional edge evidence falls outside the endpoint interval; only the bound native request and dispatch confirmation have timing exceptions."
             if bound:
+                if bound.get("source") == "model_review" and not legacy_review:
+                    bound.update(force=True, edge_key=signature, checked_after=document.get("revision_of"))
                 if bound.get("source") != "model_review":
                     bound["source"] = (
                         "native_evidence" if automatic_edges else "model_edge"
                     )
                 edges.append(bound)
             else:
-                unverified.append({**edge, "finding": fid, "diagnostic": reason})
+                if force_eligible:
+                    force_eligible, next_call = call_window(engine, agent["key"], cutoff, start, target["at"])
+                    if not force_eligible:
+                        reason = (f"No tool call/return owned by {agent['key']} inside [{iso(start)}, {iso(cutoff)}]; force cannot anchor here. "
+                                  f"Next recorded call by report cutoff: {iso(next_call)}. Node at is a history cutoff, not its last write time. "
+                                  "If you meant a later interaction, correct the endpoint cutoff and submit that connection normally first.")
+                unverified.append({**edge, "finding": fid, "diagnostic": reason,
+                    "edge_key": signature, "force_eligible": force_eligible})
     from .narrative import validate as validate_narrative
 
     validate_narrative(document)
@@ -497,10 +560,14 @@ def check(engine, text, *, save=False):
         "check_results": check_results,
         "source_sha256": digest(text.encode()),
         "trace_session": engine.session,
+        "submission_policy": "checked-force/1",
+        "force_permissions": sorted(allowed_force),
         "note": "Reasons are model claims. Bound references/operations are not causal proof.",
     }
     result["tree"] = evidence_paths(engine, result)
     result["path_status"] = "complete" if result["tree"]["complete"] else "needs_path"
+    if _legacy_reviews:
+        result.pop("submission_policy")  # Historical cards do not acquire a fictitious first-check receipt.
     if save:
         identity = uuid.uuid4().hex[:16]
         with engine.store.db:
@@ -527,7 +594,8 @@ def load_report(engine, identity, *, recheck=True):
     from .engine import Engine
 
     result = check(
-        Engine(engine.store, session=saved["trace_session"]), rows[0]["request"]
+        Engine(engine.store, session=saved["trace_session"]), rows[0]["request"],
+        _legacy_reviews="submission_policy" not in saved,
     )
     result["report_id"] = identity
     return result

@@ -157,9 +157,12 @@ def reviewed_edge(engine, edge, origin, destination, fid):
                 for e in native
             ):
                 raise ValueError("reviewed relation contradicts indexed operation endpoints")
-        matched_time |= record["at"] == when
+        actor = destination if relation == "read" else origin
+        is_call = engine.store.rows("SELECT 1 FROM calls WHERE record=? UNION ALL SELECT 1 FROM tool_returns WHERE record=? LIMIT 1",
+                                    (record["ref"], record["ref"]))
+        matched_time |= record["at"] == when and record["agent"] == actor["key"] and bool(is_call)
     if not matched_time:
-        raise ValueError("review time must identify a quoted original event")
+        raise ValueError("review time must identify a quoted tool call/return owned by the declared agent; messages or another agent's calls cannot anchor force")
     identity = digest(
         encode(
             {
@@ -424,6 +427,17 @@ def evidence_paths(engine, graph):
                 # The root's repair is independently anchored in changes.
                 if (not steps and goal["kind"] == "file" and repair
                         and set(repair["evidence"]).intersection(goal["valid_refs"])
+                        and in_scope(repair_at, at, goal_since)):
+                    supporting = repair
+                # A declared repaired endpoint IS the root. Its reason may cite
+                # a later Read observation instead of repeating the write ref.
+                # Require an actual declared incoming repair, not a fabricated
+                # connection or a claim of first authorship at another scope.
+                if (declared and not steps and goal["role"] == "repaired"
+                        and goal["exists"] and goal["kind"] == "file"
+                        and node_id == identities[goal["id"]] and repair
+                        and any(e["id"] == repair["id"] for e in incoming_edges)
+                        and (repair["strength"] == "confirmed" or repair["source"] == "model_review")
                         and in_scope(repair_at, at, goal_since)):
                     supporting = repair
                 hit = (

@@ -332,6 +332,11 @@ def test_reviewed_script_edge_is_report_local_and_automatically_expandable(tmp_p
     )
     before = engine.store.rows("SELECT * FROM effects")
     doc = opaque_document(engine)
+    first_doc = json.loads(json.dumps(doc))
+    first_doc["findings"][0].pop("reviewed_edges")
+    first_doc["findings"][0]["edges"] = [{"from": "agent", "to": "file"}]
+    first = report.check(engine, json.dumps(first_doc), save=True)
+    doc["revision_of"] = first["report_id"]
     graph = report.check(engine, json.dumps(doc), save=True)
     assert graph["tree"]["complete"] and len(graph["edges"]) == 1
     assert (

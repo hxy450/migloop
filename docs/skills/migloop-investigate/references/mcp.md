@@ -81,8 +81,8 @@ findings:
         reason: 目标历史端点，修复结果与运行期效果分别说明
         evidence: ["e-修复调用"]
     edges:
-      - {from: input, to: author, relation: read, evidence: ["e-读取请求", "e-读取返回"], claim: 实際收到哪项输入；为何与本项实现有关}
-      - {from: author, to: output, relation: write, evidence: ["e-写入请求", "e-写入返回"], claim: 写入了什么；其后是否保留另由证据说明}
+      - {from: input, to: author}
+      - {from: author, to: output}
     unknown: [尚未查明的环节与缺哪份证据] # 无则 []
     hypothesis: 可选的机制假设
     boundary:
@@ -101,7 +101,9 @@ summary、recommendations 和 boundary 是同一 inquiry/1 的扩展字段，旧
 
 boundary 只含 status/nodes/reason。status 仅 supported_input（相关输入充分，须指向 context 节点）、not_generation_error（此项非生成错误的依据）、unresolved（本分支未查明，nodes 可为 []）。每条 finding 都明确选择并说明；非 unresolved 须给本 finding 已声明、可连接的节点，机检只核形式与连接，不认证“输入充分”或“不是生成错”的判断。finding.recommendation 仍兼容，可由文件级 recommendations 覆盖该项后省略。
 
-新情景卡明确填写 edges：from/to 是本 finding 的节点 ID，不是 scope；原生边用 `{from,to,link,claim}` 或 `{from,to,relation,evidence:[原生调用或回执],claim}`，不能混用。单条引用能唯一选中原生操作时，服务端补全并重核配对原文，不要求手抄两条；多调用不唯一时用返回的 link 消歧。未返回不借未来回执升级。read:file→agent、write:agent→file、dispatch:parent→child。每条边核实际身份/时间，claim 的内容传播解释仍是模型主张。节点 at 要涵盖关联操作，例如被后继读到的中间文件节点可取读取返回时刻，不表示那时发生了写。
+新情景卡明确填写 edges：from/to 是本 finding 的节点 ID，不是 scope。最简只填 `{from,to}`，服务端按 read:file→agent、write:agent→file、dispatch:parent→child 查两端范围内的全部已确认操作并附引用，不任挑一次。节点 `{kind:agent,key:完整转录名或唯一文件名,at:ISO}` 会解析为实际 agent；也接受已有 agent key。文件优先完整路径，歧义会报错。无需先打开原子取得 scope。节点 at 是历史截止，例如中间文件可取读取返回时刻，不表示那时发生了写。
+
+需要精确限定操作时仍可填 `{from,to,link,claim}` 或 `{from,to,relation,evidence:[原生调用或回执],claim}`，不混用。单条引用唯一时补全并重核配对，多调用可用 link 消歧。未返回不借未来回执升级；关系、参与者和时间可核不等于内容传播成立。
 
 inputs 顶部的 scope_id 仍是 agent；要画真实读取，用该 read link 的 from_scope 指向文件，不要把 agent 输入视图当文件。相同实体、相同时间范围的多个节点 ID 只是同一原子的不同判断；context 可依据实际到达的输入标注同一 agent，不需要伪造 agent→agent 的 read。较宽查询范围中的晚到输入不能支持较早写入。中间文件需要生成期历史时，不要继承 target 的修复窗口 since。
 
@@ -121,13 +123,16 @@ checks:
 
 服务端核原生配对、执行者、时间和工具名；返回 native_pair 不是“验证通过”。读日志也有真实配对、脚本也可能只转述旧日志，须核命令的实际内容。没有原生回执就保留未知，不将总结声明填进 result。checks 引用照样受观察截止约束。
 
-脚本效应须人工核文，可在 finding 的 `reviewed_edges` 给报告专属虚线（始终是候选，不能把词法命中升级事实）：
+首次不加 force/review，先提交普通 edges。收到 `unverified_edges` 的 `force_eligible:true` 后，复核该 agent 的原始工具调用；若确实是解析遗漏，可修订同一条边：
 
 ```yaml
-reviewed_edges:
+# 顶层，引用真实存在的上次校验，不是自报轮数
+revision_of: 上次submit返回的report_id
+# 以下仍在 finding.edges 中，不另维护一套连接
+edges:
   - from: author
     to: output
-    relation: write
+    force: true
     claim: 核实该脚本写此文件的依据与限度
     evidence: ["e-调用或回执"]
     review:
@@ -135,7 +140,9 @@ reviewed_edges:
       quotes: [{ref: "e-调用或回执", text: "此记录内逐字可定位的相关原文"}]
 ```
 
-from/to 必须是该 finding 内已声明的节点 id；read 方向相反。日期/引文可核不等于语义认证。带 report_id 的 neighbors 才包含该报告的补边，不写入事实索引。
+服务端核 revision_of 是同一目标与时间范围、该边的两端身份/范围确实曾收到可复核反馈；改节点后不能借旧反馈。force 的 claim、evidence、review 必填。review.at 必须对应所声明 agent 的真实工具调用或回执，且在两端范围及报告观察截止内；原文摘录可定位，消息声明不能当调用。日期/引文可核不等于脚本语义认证；from/to 推导读写方向。补边固定 source:model_review/strength:candidate，仅带 report_id 的 neighbors 可见，不写入事实索引。
+
+没有调用、引用无效、姓名歧义、时刻越界不能 force。未识别不是未发生；不确定时保留断点。旧 reviewed_edges/review 写法仍可加载已有卡片，但新提交同样受先反馈再补边的规则约束，不能用旧字段绕过。
 
 补边不能覆盖已明确识别的原生操作身份：唯一调用锚点的实际 actor/文件与所画边矛盾时会被拒绝。多调用记录或不透明脚本仍需逐段核文，引用里的单个词不证明读写。`repaired` 节点也有展示路径，不计入问题路径完整性；不需要为展示修复而把它标成 `origin`。
 
