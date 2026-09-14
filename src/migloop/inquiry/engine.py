@@ -1393,7 +1393,17 @@ class Engine:
                     + encode(
                         {
                             k: relation.get(k)
-                            for k in ("link", "op", "path", "from_scope", "to_scope")
+                            for k in (
+                                "link",
+                                "op",
+                                "path",
+                                "agent",
+                                "at",
+                                "request",
+                                "result",
+                                "from_scope",
+                                "to_scope",
+                            )
                         }
                     )
                 )
@@ -1424,8 +1434,13 @@ class Engine:
             ):
                 auxiliary.append(
                     ("WRITER " if actor["writes"] else "READER ")
-                    + actor["agent"].split(":")[-1]
+                    + actor["agent"]
                     + f" scope={actor['scope']} writes={actor['writes']} reads={actor['reads']} candidates={actor['candidates']}"
+                    + (
+                        f" write_scope={actor['write_scope']}"
+                        if actor.get("write_scope")
+                        else ""
+                    )
                     + (
                         f" input_scope={actor['input_scope']} (agent view=inputs; before latest write request)"
                         if actor.get("input_scope")
