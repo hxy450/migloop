@@ -65,6 +65,10 @@ def validate(document):
 def review_gaps(graph):
     """Delivery gaps only. A connected, well-written boundary can still be wrong."""
     document = graph["document"]
+    if graph.get("submission_format") == "coordinates/1":
+        return [{"node": p["node"], "error": p["diagnostic"]}
+                for p in graph["tree"]["paths"] + graph["tree"].get("context_paths", [])
+                if p["status"] == "unclosed"]
     gaps = []
     if "summary" not in document:
         gaps.append({"error": "Add a file-level summary of generation, repairs and unknowns"})

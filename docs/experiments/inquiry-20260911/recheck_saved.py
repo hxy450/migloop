@@ -7,7 +7,7 @@ import time
 from pathlib import Path
 
 from migloop.inquiry.engine import Engine
-from migloop.inquiry.report import check, parse
+from migloop.inquiry.report import load_report, parse
 from migloop.inquiry.store import Store
 
 
@@ -37,12 +37,17 @@ def main():
         store = Store(copies[old_path])
         engine = Engine(store, session=old["trace_session"])
         started = time.perf_counter()
-        checked = check(engine, original)
+        # Reuse the original submission's frozen feedback parent. A new check
+        # would wrongly treat later drafts as prior authorization for force.
+        saved_source = store.rows("SELECT request FROM runs WHERE id=? AND kind='report'", (old["report_id"],))
+        if len(saved_source) != 1 or saved_source[0]["request"] != original:
+            raise ValueError("Exported original does not match its saved submission")
+        checked = load_report(engine, old["report_id"])
         row = {
             "case": case.name,
             "report_id": old["report_id"],
             "seconds": time.perf_counter() - started,
-            "document_unchanged": checked["document"] == parse(original),
+            "document_unchanged": checked.get("submitted_document", checked["document"]) == parse(original),
             "source_sha_unchanged": checked["source_sha256"] == old["source_sha256"],
             "mechanical_status": checked["mechanical_status"],
             "nodes_before": len(old["nodes"]),

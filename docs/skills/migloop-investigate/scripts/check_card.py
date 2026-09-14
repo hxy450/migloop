@@ -33,6 +33,23 @@ def audit(index_path, report_id, task, *, require_declared=False):
             if timestamp(target.get(field)) != timestamp(task[expected], required=True):
                 target_errors.append("Card target." + field + " differs from task." + expected)
 
+        if graph.get("submission_format") == "coordinates/1":
+            from migloop.inquiry.feedback import compact_feedback
+            feedback = compact_feedback(graph)
+            paths = graph["tree"]["paths"] + graph["tree"].get("context_paths", [])
+            return {**feedback, "loadable": True, "browser_verified": False,
+                "status": "draft" if target_errors else graph["delivery"]["status"],
+                "semantic_verified": False, "target_errors": target_errors,
+                "card_content_errors": [], "investigation_gaps": review_gaps(graph),
+                "declared_tree_required": True,
+                "unclosed_paths": [p for p in paths if p["status"] == "unclosed"],
+                "counts": {"nodes": len(graph["nodes"]), "bound_edges": len(graph["edges"]),
+                    "problem_nodes": graph["tree"]["problem_nodes"],
+                    "closed_problem_nodes": len({p["node"] for p in graph["tree"]["paths"]}
+                        - {p["node"] for p in graph["tree"]["paths"] if p["status"] == "unclosed"}),
+                    "model_review_edges": sum(e.get("source") == "model_review" for e in graph["edges"])},
+                "note": graph["delivery"]["note"]}
+
         document = graph["document"]
         content_errors = []
         advised = {fid for item in document.get("recommendations", []) for fid in item["findings"]}

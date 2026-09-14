@@ -340,7 +340,7 @@ def evidence_paths(engine, graph):
             n
             for n in graph["nodes"]
             if n["finding"] == fid
-            and n["role"] in ("origin", "propagated", "context", "repaired")
+            and n["role"] in ("origin", "propagated", "problem", "context", "repaired")
             and (
                 not n["generated_context"]
                 or bool(
@@ -353,6 +353,18 @@ def evidence_paths(engine, graph):
         change_refs = set()
         target_at = timestamp(target["at"], required=True)
         target_since = timestamp(target.get("since"))
+        # Compact cards identify a repaired file/window, not a hand-filled
+        # per-change ledger. These anchors certify a recorded repair only;
+        # they are deliberately NOT added to coverage.explained.
+        if graph.get("submission_format") == "coordinates/1":
+            for operation in engine.relations("file", root["key"], target_at, target_since):
+                if operation["op"] == "write" and operation["strength"] == "confirmed":
+                    change_refs.update(r for r in (operation["request"], operation["result"]) if r)
+            for event in events:
+                if (event["source"] == "model_review" and event["relation"] == "write"
+                        and tuple(event["to"]) == ("file", root["key"])
+                        and in_scope(event["at"], target_at, target_since)):
+                    change_refs.update(event["refs"])
         for ref in finding.get("changes", []):
             try:
                 record, _ = engine.store.source_record(ref)
@@ -394,7 +406,21 @@ def evidence_paths(engine, graph):
         roots = [identities[n["id"]] for n in goals if n["kind"] == "file"
                  and n["key"] == root["key"]
                  and timestamp(n["at"], required=True) == target_at] if declared else [None]
+        obligations = []
         for goal in goals:
+            branches = {}
+            if graph.get("submission_format") == "coordinates/1":
+                # One fact node can feed several declared downstream scopes.
+                # Check/display each handoff, not just the first route found.
+                # Alternative operations on the SAME handoff are not new arms.
+                for event in events:
+                    if event["from_node"] == goal["id"]:
+                        branches.setdefault(event["to_node"], set()).add((event["id"], event["to_node"]))
+            if branches:
+                obligations.extend((goal, required) for required in branches.values())
+            else:
+                obligations.append((goal, None))
+        for goal, required_handoff in obligations:
             observations = []
             if goal["kind"] == "agent" and goal["role"] == "context":
                 for ref in goal["valid_refs"]:
@@ -403,13 +429,13 @@ def evidence_paths(engine, graph):
                         "SELECT 1 FROM input_messages WHERE record=? UNION ALL SELECT 1 FROM tool_returns WHERE record=? LIMIT 1",
                         (record["ref"], record["ref"])):
                         observations.append(record)
-            queue = deque((root, [], frozenset(), frozenset(), nid) for nid in roots)
+            queue = deque((root, [], frozenset(), frozenset(), nid, None) for nid in roots)
             found = None
             anchor = None
             inspected = 0
             blocked = {}
             while queue and inspected < 10000 and repair_at is not None:
-                scope, steps, seen, incident, node_id = queue.popleft()
+                scope, steps, seen, incident, node_id, arrived_from = queue.popleft()
                 inspected += 1
                 current = (scope["kind"], scope["key"])
                 incoming_edges = incoming.get(node_id if declared else current, [])
@@ -449,6 +475,7 @@ def evidence_paths(engine, graph):
                     and at <= timestamp(goal["at"], required=True)
                     and (goal_since is None or at >= goal_since)
                     and (bool(incident.intersection(goal["valid_refs"])) or supporting is not None or bool(received))
+                    and (required_handoff is None or bool(steps and (steps[-1]["id"], arrived_from) in required_handoff))
                 )
                 # A target-file claim is already at the root, but still needs an
                 # actual cited incoming write corresponding to its history.
@@ -464,13 +491,20 @@ def evidence_paths(engine, graph):
                         # Keep the precise rejected pair from this traversal,
                         # not a guessed path. Report it only if no path succeeds.
                         downstream = steps[-1] if steps else repair_row
-                        blocked[(event["id"], downstream["id"])] = time_conflict({**event, "at": iso(event["at"])}, downstream)
+                        conflict = time_conflict({**event, "at": iso(event["at"])}, downstream)
+                        if graph.get("submission_format") == "coordinates/1":
+                            conflict["note"] = (
+                                "实际操作倒序，扩大截止或 force 不会把晚读变早。核原调用：若它只是事后读回，"
+                                "找到真正较早的输入，将相应文件截止设为涵盖那次交付、排除事后读回的真实范围，先普通提交。"
+                                "仅确有未解析读写且获得原坐标反馈后，才补 force/reason/evidence；不能为原判断编时间。")
+                        blocked[(event["id"], downstream["id"])] = conflict
                         continue
                     row = neighbor_row(event, scope)
                     if row is None:
                         continue
                     if (
                         not steps
+                        and required_handoff is None
                         and current == (goal["kind"], goal["key"])
                         and (not declared or node_id == identities[goal["id"]])
                         and event["refs"].intersection(goal["valid_refs"])
@@ -485,7 +519,7 @@ def evidence_paths(engine, graph):
                         for ref in row["evidence"]
                     )
                     queue.append(
-                        (row["node"], steps + [row], seen | {event["id"]}, visible_refs, identities[event["from_node"]])
+                        (row["node"], steps + [row], seen | {event["id"]}, visible_refs, identities[event["from_node"]], event["to_node"])
                     )
                 if found is not None:
                     break
@@ -513,6 +547,11 @@ def evidence_paths(engine, graph):
             time_note = (f" 已遍历分支时间倒序：{conflicts[0]['upstream']['relation']}@{conflicts[0]['upstream']['at']}"
                          f" 晚于下游 {conflicts[0]['downstream']['relation']}@{conflicts[0]['downstream']['at']}；"
                          "较晚读取不能作为较早写入的输入。请核原调用，扩大节点截止或 force 不会改变事件先后。") if conflicts else ""
+            gap_note = "缺少目标修改引用或到此节点的同问题、非倒序证据路径。"
+            if graph.get("submission_format") == "coordinates/1":
+                gap_note = ("目标修复窗口中尚无可核写入锚点；查实际修复命令/回执，未解析脚本先普通声明、获反馈后复核补虚线。"
+                            if repair is None else
+                            "该节点尚无通向目标的已声明、非倒序读写/派发路径。查缺少的真实交接并补 from/to；独立对照不能伪造为输入。")
             destination.append(
                 {
                     "finding": fid,
@@ -526,7 +565,7 @@ def evidence_paths(engine, graph):
                     "blocked_branches": conflicts[:4],
                     "blocked_branch_count": len(conflicts),
                     "diagnostic": (
-                        "缺少目标修改引用或到此节点的同问题、非倒序证据路径。"
+                        gap_note
                         + time_note
                         + (
                             " 路径搜索达到预算，未证明不存在。"
@@ -543,6 +582,6 @@ def evidence_paths(engine, graph):
         "paths": paths,
         "context_paths": context_paths,
         "complete": all(p["status"] != "unclosed" for p in paths),
-        "problem_nodes": len(paths),
+        "problem_nodes": len({p["node"] for p in paths}),
         "note": "自动展开与手动展开共用邻居投影；不是模型实际查询顺序，也不认证文件状态连续。",
     }

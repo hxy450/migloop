@@ -166,7 +166,10 @@ def audit(out):
     native_bound = False
     if report:
         for submitted in submissions:
-            if submitted.get("arguments", {}).get("document") != report["request"]:
+            arguments = submitted.get("arguments", {})
+            from migloop.inquiry.store import encode
+            submitted_text = encode(arguments["card"]) if isinstance(arguments.get("card"), dict) else arguments.get("document")
+            if submitted_text != report["request"]:
                 continue
             for _, text in views(submitted.get("result")):
                 try:

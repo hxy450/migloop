@@ -14,6 +14,7 @@ from .store import digest, encode, iso, timestamp
 from .tree import evidence_paths, reviewed_edge
 from .check_receipts import bind_checks
 from .edge_submission import agent_key, call_window, confirmed_edges, edge_key, previous_feedback
+from .card import AUTO_PARENT, compact, prepare, force_review, bind_node_evidence, delivery_status
 
 
 def parse(text):
@@ -30,6 +31,8 @@ def parse(text):
             result = yaml.safe_load(text)
         except yaml.YAMLError as exc:
             raise ValueError("invalid YAML") from exc
+    if compact(result):
+        return result
     if not isinstance(result, dict) or result.get("schema") != "inquiry/1":
         raise ValueError("schema must be inquiry/1")
     if set(result) - {"schema", "target", "findings", "unexplained", "reviewed", "summary", "recommendations", "revision_of"}:
@@ -54,8 +57,10 @@ def parse(text):
     return result
 
 
-def check(engine, text, *, save=False, _legacy_reviews=False):
-    document = parse(text)
+def check(engine, text, *, save=False, _legacy_reviews=False, _compact_parent=AUTO_PARENT):
+    submitted = parse(text)
+    is_compact = compact(submitted)
+    document = prepare(engine, submitted, _compact_parent) if is_compact else submitted
     target = document["target"]
     if "scope" in target:
         coordinate = engine.store.handle_value(target["scope"], "s")
@@ -207,6 +212,7 @@ def check(engine, text, *, save=False, _legacy_reviews=False):
                 "context",
                 "repaired",
                 "unknown",
+                "problem",
             ):
                 raise ValueError("invalid node role")
             if not isinstance(node.get("reason"), str) or not node["reason"].strip():
@@ -343,7 +349,29 @@ def check(engine, text, *, save=False, _legacy_reviews=False):
                 if forced and not legacy_review and signature not in allowed_force:
                     unverified.append({**edge, "finding": fid, "edge_key": signature,
                         "force_eligible": False, "code": "force_before_feedback",
-                        "diagnostic": "Submit this exact connection without force/review first. Then use the returned report_id as revision_of; only server-checked unresolved endpoints may be forced."})
+                        "diagnostic": ("Submit this exact connection without force first. The server tracks revisions in this investigation; only checked unresolved endpoints may be forced."
+                                       if is_compact else "Submit this exact connection without force/review first. Then use the returned report_id as revision_of; only server-checked unresolved endpoints may be forced.")})
+                    continue
+                if forced and is_compact:
+                    try:
+                        variants = force_review(engine, edge, origin, destination)
+                    except (ValueError, TypeError, KeyError, OSError) as exc:
+                        unverified.append({**edge, "finding": fid, "edge_key": signature,
+                            "force_eligible": False, "code": "invalid_force_source", "diagnostic": str(exc)})
+                        continue
+                    for variant in variants:
+                        reviewed = {**edge, **variant}
+                        try:
+                            before = len(issues)
+                            verify_refs(reviewed["evidence"], cutoff, f"{fid}.edge", scope_kind="edge")
+                            if len(issues) != before:
+                                raise ValueError("Force evidence failed original source/time validation")
+                            bound = reviewed_edge(engine, reviewed, origin, destination, fid)
+                            bound.update(force=True, edge_key=signature, checked_after=document.get("revision_of"))
+                            edges.append(bound)
+                        except (ValueError, TypeError, KeyError, OSError) as exc:
+                            unverified.append({**reviewed, "finding": fid, "edge_key": signature,
+                                "force_eligible": False, "code": "invalid_force_source", "diagnostic": str(exc)})
                     continue
                 if forced and "review" not in edge:
                     unverified.append({**edge, "finding": fid, "code": "force_missing_review",
@@ -508,9 +536,12 @@ def check(engine, text, *, save=False, _legacy_reviews=False):
                                   "If you meant a later interaction, correct the endpoint cutoff and submit that connection normally first.")
                 unverified.append({**edge, "finding": fid, "diagnostic": reason,
                     "edge_key": signature, "force_eligible": force_eligible})
+    if is_compact:
+        bind_node_evidence(engine, nodes, edges)
     from .narrative import validate as validate_narrative
 
-    validate_narrative(document)
+    if not is_compact:
+        validate_narrative(document)
     check_results = bind_checks(engine, document, nodes, issues)
     for field in ("summary", "recommendations"):
         verify_text(document.get(field), timestamp(target["at"], required=True), field)
@@ -551,7 +582,7 @@ def check(engine, text, *, save=False, _legacy_reviews=False):
         "mechanical_status": "needs_revision"
         if issues
         or unverified
-        or coverage["unattributed_native_writes"]
+        or (not is_compact and coverage["unattributed_native_writes"])
         or coverage["issues"]
         else "valid",
         "missing_evidence_links": missing_links,
@@ -564,8 +595,15 @@ def check(engine, text, *, save=False, _legacy_reviews=False):
         "force_permissions": sorted(allowed_force),
         "note": "Reasons are model claims. Bound references/operations are not causal proof.",
     }
+    if is_compact:
+        result.update(submission_format="coordinates/1", submitted_document=submitted,
+                      revision_parent=document.get("revision_of"))
+        from .feedback import coordinate_feedback
+        coordinate_feedback(engine, result)
     result["tree"] = evidence_paths(engine, result)
     result["path_status"] = "complete" if result["tree"]["complete"] else "needs_path"
+    if is_compact:
+        result["delivery"] = delivery_status(result)
     if _legacy_reviews:
         result.pop("submission_policy")  # Historical cards do not acquire a fictitious first-check receipt.
     if save:
@@ -596,6 +634,7 @@ def load_report(engine, identity, *, recheck=True):
     result = check(
         Engine(engine.store, session=saved["trace_session"]), rows[0]["request"],
         _legacy_reviews="submission_policy" not in saved,
+        _compact_parent=saved.get("revision_parent"),
     )
     result["report_id"] = identity
     return result

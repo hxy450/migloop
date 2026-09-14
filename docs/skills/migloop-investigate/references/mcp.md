@@ -1,175 +1,90 @@
-# Inquiry MCP 调用与交付
+# MCP 调用与精简模板
 
-三个工具：`investigate(requests=[...])` 批量 1–24 个独立查询；`page` 续结果正文；`submit(card={完整 inquiry/1 对象})` 保存结论，避免把整份 JSON 再包成字符串。也接受 `submit(document="完整 YAML/JSON 原稿")`，两种不同时填。file/agent 等是 investigate 内的 op，不是独立 MCP 工具。不存在 guide/sessions/batch/check 工具。
+investigate(requests=[...]) 批量独立查询，page 续正文，submit(card={...}) 保存精简卡；也可传 document 原始 YAML/JSON 字符串，二者不同时填。工具发现只列匹配工具名，不输出整份目录。工具结果直接转发 content.text，避免再次 JSON 封装和宿主截断。
 
-## 时间、引用与续读
-
-- 查询使用含时区 ISO 的 `at`，可选 `since`，闭区间。生成输入另开生成期范围，不沿用修复窗口的 since。版本/via 不作为查询参数。
-- 每个 file/agent 查询返回 `scope_id`（`s-file-... / s-agent-...`）。继承 scope 时不要再混写 key/at/since。`WRITER.input_scope` 是写前输入范围；`write_scope` 是写入时刻；`WRITER.scope` 是查询截止，可看写后。
-- 原文引用为 `e-...` 或完整 ref。`RESULT` id、scope id、link id 不是原文，不能猜前缀或截短身份。
-- `next` 是记录列表下一页；`END FRAME next` 是本结果正文字符续帧。两者均读完才是本查询结果读完。每帧最多 9000 字符，选定全文保存在服务端，不必重新查。
-- `page(result_id="返回的 RESULT id", offset=返回的整数)`；可批量 `page(requests=[{result_id,offset}, ...])`，1–4 项，各用自己的 offset，不与单条参数混用。
-- 限额 `limit:1..100`（通常20，outline100）；`terms` 最多8个字面词，OR 匹配，不是正则；更换词/范围从 offset=0 开始。优先批量2–4项相关查询，避免一次塞满大量原文。
-- 读取以返回时刻计；未知时间、未返回、失败不冒充确定输入或写入。缺原生关系仍可看原始脚本、返回，不能假设未发生。
-
-## 常用查询
+## 查询和时间
 
 ```json
-{"op":"file","key":"唯一文件后缀或完整路径","since":"生成截止ISO","at":"观察截止ISO","view":"calls","limit":100}
-{"op":"file","key":"同一文件","at":"生成截止ISO","view":"outline","limit":100}
+{"op":"file","key":"任务文件路径","since":"任务generation_end","at":"任务observation_end","view":"calls","limit":100}
+{"op":"file","key":"任务文件路径","at":"生成截止ISO","view":"outline","limit":100}
 {"op":"agent","scope":"返回的写前input_scope","view":"inputs"}
-{"op":"agent","scope":"s-agent-...","view":"messages","limit":100}
-{"op":"search","scope":"s-agent-...","terms":["关键词一","关键词二"],"limit":100}
-{"op":"search","kind":"pool","at":"阶段截止ISO","since":"阶段起点ISO","terms":["关键词"],"group_by":"agent","limit":100}
-{"op":"catalog","kind":"agent","q":"名称子串","limit":100}
-{"op":"open","ref":"e-...","at":"涵盖该记录的截止ISO"}
-{"op":"open","source":"逻辑转录文件名","line":123,"at":"截止ISO"}
-{"op":"open","ref":"e-...","scope":"s-file-或s-agent-...","terms":["关键属性"],"context":6}
-{"op":"blame","key":"文件","at":"生成截止ISO","terms":["代码片段"],"limit":100}
+{"op":"agent","scope":"s-agent-...","view":"returns","terms":["字面词"],"limit":100}
+{"op":"search","kind":"pool","at":"阶段截止ISO","since":"阶段起点ISO","terms":["词一","词二"],"group_by":"agent","limit":100}
+{"op":"catalog","kind":"source","q":"转录名称片段","limit":100}
+{"op":"open","ref":"e-原文引用","at":"涵盖该记录的ISO"}
+{"op":"open","source":"注册转录名","line":123,"at":"涵盖该记录的ISO"}
+{"op":"open","ref":"e-原文引用","scope":"返回的scope_id","terms":["属性名"],"context":6}
+{"op":"blame","key":"文件路径","at":"生成截止ISO","terms":["代码片段"],"limit":100}
 {"op":"file","scope":"s-file-...","view":"neighbors","limit":100}
 ```
 
-file 的 `records` 是全部相关记录索引，`calls` 是相关调用（含未知脚本及其结果引用），`changes` 给原生 Write/Edit 参数全文，`outline` 给原生增删摘要；整文件 Write 不与假定前版重放。calls 默认折叠已知只读形状，`include_reads:true` 展开；折叠不影响 records/search。
+每批1–24项，通常2–4项；limit 1–100，terms最多8个字面词、OR匹配、每词<=500字符。换词或范围从offset=0。next是记录列表下一页，END FRAME next是本次正文的续帧，二者都须续完才是读完。page(result_id,offset)，或page(requests:[{result_id,offset},...])每批1–4项，建议2项。
 
-agent 的 `inputs` 给原生读文件、初始/近期消息、工具返回三个重叠渠道，不是完整有效上下文；`messages`、`returns`、`records` 和 search 可继续查。工具返回包括失败/未配对，不能将返回文档内的 PASS 当真实执行。
+file的records是全部相关记录索引；calls含未知脚本和结果入口，默认折叠已知只读形状，可include_reads:true；changes是原生修改参数全文，outline是原生增删摘要，二者都不是脚本修改全集。agent的inputs是原生读表、任务消息、返回入口三个重叠渠道，继续用messages/returns/records/search查完整已记录范围。pool/agent search可加view:returns；records/messages/returns支持order:newest|oldest。
 
-pool/agent search 可加 `view:returns`。返回的 actor 分布和 `NARROW SAME QUERY` 保持时间/关键词，可转查其它检查者。records/messages/returns 支持 `order:newest|oldest`，其它 view 不支持。
+查询用带时区ISO at，可选since，闭区间。scope_id锁定范围，继承scope后不再填key/at/since。生成输入不要继承修复窗口since。input_scope是写前输入，write_scope是写完成时刻，WRITER.scope是本次观察截止。
 
-open 默认完整原生正文，`pointer:""` 看完整 JSON 记录；显式 JSONPointer 选择字段。可给 terms 和 context(0–50)取所有字面匹配窗口，返回 literal_counts 和省略范围；窗口不是完整语法块。声称属性缺失，直接搜属性本身并核相关分支，不凭邻近片段。Edit/patch/未知写脚本的参数包不被关键词裁剪。`request_context` 给回执所答的真实调用，展开原请求核对象与时刻。
+at是查询截止，Read/Write的确定效应按完成/返回时刻。假如10:10:00.100发起、10:10:00.250返回，想纳入这次确定操作，两个端点都须覆盖.250，不能抄.100。这不让写后读取变成写前输入：链路沿原始操作时序检查，扩大截止也不会改变先后。
 
-diff 比两个明确原文：`{op:diff,before:ref,after:ref,before_pointer:字段,after_pointer:字段,at:ISO}`。blame 只列原生片段演变，不认证首次作者或脚本没改。
+open默认完整原生正文；pointer:""看完整原记录；terms/context(0–50)返回所有匹配窗口和literal_counts，片段不是完整分支。Edit/patch/未知写脚本的参数包不按词裁剪。request_context给回执对应的原调用；核实际对象，不把相似输出当成同文件。e-...是原文引用，不是调查工具调用编号/RESULT/scope/link；也可用注册转录名+物理行号精确定位。
 
-neighbors 与 UI 共用投影，默认上游；`direction:downstream` 看下游。read 是 file→agent，write 是 agent→file，dispatch 是 parent→child。关系支持身份/发生时间，不自动证明内容因果传播。
+diff比较两个明确原文{op:diff,before:ref,after:ref,before_pointer:可选字段,after_pointer:可选字段,at:ISO}。blame仅给原生片段演变，不认证脚本没改或首次作者。neighbors和UI共用历史投影，可带report_id展开该卡虚线；独立查阅不产生关系。
 
-## YAML：同一份原稿、节点原因与证据
+## 最终只填这些
 
-以下 YAML 说明字段结构；调用 MCP 时优先把同样结构作为 `card` 对象提交，不需手工双重转义脚本引文。服务端只序列化为 JSON 原稿，仍执行全部相同核验，保存原字段/内容与摘要；已有 `document` 字符串则逐字保留。两种均使用同一加载器/UI。
+以下是字段模板，不是真实案例；用任务和实际查到的坐标替换占位符。优先作为card对象提交，无需双重转义。
 
 ```yaml
-schema: inquiry/1
-target: {scope: "目标文件修复区间的 s-file-..."}
-summary:
-  generation: 完整说明生成要求、实际输入、偏差如何进入与保留；区分已证与假设
-  repair: 后续具体修了什么，哪些是修复中新问题，实际验证到哪里
-  unknown: [文件级未查明边界] # 无则 []
-  findings: [A] # 总结涵盖的全部 finding id
+target:
+  key: "<任务中的被修文件路径>"
+  since: "<任务generation_end，含时区ISO>"
+  at: "<任务observation_end，含时区ISO>"
+summary: |
+  实际修改了什么；生成期当时要求和输出如何不一致，问题如何保留。
+  哪些是新要求/修复中新生问题；修后实际验证与未查清项。
 recommendations:
-  - target: 要改进的具体生成或交接环节
-    action: 具体怎么改；不宜改时说明暂不改
-    reason: 为何这项行动针对已发现的问题，而非泛泛补测试
-    validation: 如何验证预期改进；效果仍待验证
-    findings: [A] # 本行动针对哪些 finding
-findings:
-  - id: A
-    title: 简短原因
-    reason: 已核事实、各环节关系与边界；具体引文可写在这里
-    changes: ["目标修复窗口的 e-调用", "e-回执"]
-    nodes:
-      - id: input
-        kind: file
-        key: 正确输入文件的完整路径
-        at: "涵盖实际交付的ISO截止"
-        role: context
-        reason: 此处要求已充分且正确，本分支可停止的依据；或只是相关背景
-        evidence: ["e-收到的原文"]
-      - id: author
-        kind: agent
-        key: 实际作者的转录文件名
-        at: "涵盖实际写入的ISO截止"
-        role: origin
-        reason: 具体失误，不把读取或转述当写出
-        evidence: ["e-实际写出"]
-      - id: output
-        kind: file
-        key: 目标文件的完整路径
-        at: "任务 observation_end 原样值"
-        role: repaired
-        reason: 目标历史端点，修复结果与运行期效果分别说明
-        evidence: ["e-修复调用"]
-    edges:
-      - {from: input, to: author}
-      - {from: author, to: output}
-    unknown: [尚未查明的环节与缺哪份证据] # 无则 []
-    hypothesis: 可选的机制假设
-    boundary:
-      status: supported_input
-      nodes: [input] # 本 finding 已声明的节点 id，不是 scope
-      reason: 何时送达的哪项正确输入足够指导实现，为什么可在这里停
-unexplained: [仍未解释的修改或效应]
-reviewed:
-  - {ref: "e-相关调用", effect: no_target_change, reason: 实际只读或只修改其它对象的依据}
-  - {ref: "e-相关调用", effect: unknown, reason: 当前缺少什么效应证据}
-```
-
-节点 role 仅 `origin / propagated / context / repaired / unknown`。origin 是实际引入偏差的环节；propagated 是保留问题，不是已修好；repaired 是检查/修复方。一个 agent 可以在不同时间/问题中承担不同角色。也可显式 target:{file,at,since}、node:{kind,key,at,since}；不得和 scope 混写。节点时间须涵盖证据，不凭空加减毫秒。
-
-summary、recommendations 和 boundary 是同一 inquiry/1 的扩展字段，旧卡可不含，新技能交付必须给出。summary 的四个字段、每条 recommendations 的五个字段均按模板提供；findings 数组只填实际 finding id，不能写节点或源引用。原文引用可内联写在文本中，仍受原文与观察截止核验；新增事实先在对应 finding/节点落实，不靠文件总结额外归责。
-
-boundary 只含 status/nodes/reason。status 仅 supported_input（相关输入充分，须指向 context 节点）、not_generation_error（此项非生成错误的依据）、unresolved（本分支未查明，nodes 可为 []）。每条 finding 都明确选择并说明；非 unresolved 须给本 finding 已声明、可连接的节点，机检只核形式与连接，不认证“输入充分”或“不是生成错”的判断。finding.recommendation 仍兼容，可由文件级 recommendations 覆盖该项后省略。
-
-新情景卡明确填写 edges：from/to 是本 finding 的节点 ID，不是 scope。最简只填 `{from,to}`，服务端按 read:file→agent、write:agent→file、dispatch:parent→child 查两端范围内的全部已确认操作并附引用，不任挑一次。节点 `{kind:agent,key:完整转录名或唯一文件名,at:ISO}` 会解析为实际 agent；也接受已有 agent key。文件优先完整路径，歧义会报错。无需先打开原子取得 scope。节点 at 是历史截止，例如中间文件可取读取返回时刻，不表示那时发生了写。
-
-时间小例：甲在10:00写文件，乙在10:10读到、10:11再写。交付节点可为 `甲@10:00 → 文件@10:10 → 乙@10:11 → 目标文件@观察截止`。中间文件若填10:00，会把要证明的10:10读取排除在范围外；不能仅因其角色是“生成输出”就缩到最后Write时刻。at约束相关操作范围，坏内容属于哪次写入由节点引用/原因说明，不把file@at宣称为该时刻已知的完整快照。脚本内部读写同理，复核时使用实际调用/回执时刻；写后的独立Read不能代替脚本内的输入。
-
-需要精确限定操作时仍可填 `{from,to,link,claim}` 或 `{from,to,relation,evidence:[原生调用或回执],claim}`，不混用。单条引用唯一时补全并重核配对，多调用可用 link 消歧。未返回不借未来回执升级；关系、参与者和时间可核不等于内容传播成立。
-
-inputs 顶部的 scope_id 仍是 agent；要画真实读取，用该 read link 的 from_scope 指向文件，不要把 agent 输入视图当文件。相同实体、相同时间范围的多个节点 ID 只是同一原子的不同判断；context 可依据实际到达的输入标注同一 agent，不需要伪造 agent→agent 的 read。较宽查询范围中的晚到输入不能支持较早写入。中间文件需要生成期历史时，不要继承 target 的修复窗口 since。
-
-不同时间的同文件节点不会合并成捷径。末端节点是目标文件@observation_end，历史范围可不设 since；顶层 target 的修复区间不变。只有缺口时也保留 edges:[] 和明确 unknown。旧卡省略 edges 仍可载入，但其自动路径是背景，不是新技能要求的已交付论证；不要通过省略边换取自动连通。
-
-submit 和审核中的 `related_evidence` 是可选参考操作（`required:false`），带实际操作时间、actor、调用和回执。它不是缺失边清单，不需要清空；其中的晚期读取可能只是修后验证。`paths[].blocked_branches` 给已遍历分支上实际倒序的两个操作及引用（预览最多4条，另附总数）：上游操作不能晚于它要解释的下游操作。边各自可定位不等于整条链时序成立；不能把写后的 Read 回执接成写前输入，也不能通过扩大节点截止或 force 改变原始事件先后。核实该次写真正用到的输入；缺证则保留断点。
-
-若默认 `{from,to}` 绑定的原生读取是错误的那次，不必保留它：保持真实交接的 from/to，明确填 `relation:read` 和实际更早输入的 `evidence`，先普通提交。较早输入可能在原始脚本中，服务端若未解析，会给这条明确声明可复核的反馈，下一稿再加 force。不能只把整条错误路径列为 unknown 就结束，也不能直接 force 一个未经普通反馈的新声明；先完成能核的纠正，确实缺证才留断点。
-
-执行检查可选 checks（位于 finding，与 edges 同级）：
-
-```yaml
-checks:
-  - node: checker # 本 finding 已声明的实际执行 agent
-    request: e-原始工具调用
-    result: e-对应原生回执
-    tool: Bash # 照原工具名；不是自己认为的用途
-    claim: 具体检查对象、结果、范围与未认证的部分
-    # 同一原文有多个调用时可加 request_block / result_block（原生块号）
-```
-
-服务端核原生配对、执行者、时间和工具名；返回 native_pair 不是“验证通过”。读日志也有真实配对、脚本也可能只转述旧日志，须核命令的实际内容。没有原生回执就保留未知，不将总结声明填进 result。checks 引用照样受观察截止约束。
-
-首次不加 force/review，先提交普通 edges。收到 `unverified_edges` 的 `force_eligible:true` 后，复核该 agent 的原始工具调用；若确实是解析遗漏，可修订同一条边：
-
-```yaml
-# 顶层，引用真实存在的上次校验，不是自报轮数
-revision_of: 上次submit返回的report_id
-# 以下仍在 finding.edges 中，不另维护一套连接
+  - "修改哪个规则/交付/实现/检查，依据是什么，怎样验证效果；假设须说明。"
+nodes:
+  - key: "<实际输入文件路径>"
+    at: "<涵盖实际交付的截止ISO>"
+    reason: "该输入中哪些要求充分、何时实际交付，为什么本分支可以在此停；或其形成仍未查明。"
+  - key: "<实际agent注册转录名>"
+    at: "<涵盖相关写完成的截止ISO>"
+    problem: true
+    reason: "实际收到什么、产生或保留了什么偏差、后继如何受影响；不是笼统说没做好。"
 edges:
-  - from: author
-    to: output
-    force: true
-    claim: 核实该脚本写此文件的依据与限度
-    evidence: ["e-调用或回执"]
-    review:
-      at: "该事件的真实ISO时刻"
-      quotes: [{ref: "e-调用或回执", text: "此记录内逐字可定位的相关原文"}]
+  - from: {key: "<实际输入文件路径>", at: "<与上面同一截止ISO>"}
+    to: {key: "<实际agent注册转录名>", at: "<与上面同一截止ISO>"}
+  - from: {key: "<实际agent注册转录名>", at: "<与上面同一截止ISO>"}
+    to: {key: "<任务文件路径>", at: "<任务observation_end>"}
 ```
 
-服务端核 revision_of 是同一目标与时间范围、该边的两端身份/范围确实曾收到可复核反馈；改节点后不能借旧反馈。force 的 claim、evidence、review 必填。review.at 必须对应所声明 agent 的真实工具调用或回执，且在两端范围及报告观察截止内；原文摘录可定位，消息声明不能当调用。日期/引文可核不等于脚本语义认证；from/to 推导读写方向。补边固定 source:model_review/strength:candidate，仅带 report_id 的 neighbors 可见，不写入事实索引。
+按实际需要添加中间file/agent，不要求恰好两跳。同坐标一次定义，多边引用；不同时间两次定义，哪怕内容相同。目标端点可只写target，系统补显示节点；要给目标具体原因也可在nodes声明。problem不填只是未标红，不表示机检证明正常。多个问题在reason中分段口述即可。
 
-没有调用、引用无效、姓名歧义、时刻越界不能 force。未识别不是未发生；不确定时保留断点。旧 reviewed_edges/review 写法仍可加载已有卡片，但新提交同样受先反馈再补边的规则约束，不能用旧字段绕过。
+系统绑定普通边的全部匹配确定读写/派发及原始请求/回执，自动附到相邻节点；不能证明节点reason，更不能证明每个修改已解释。语义关键证据（具体要求、检查结果等）可在reason/summary直接写原文引用，不要把不沾边材料强连成边。
 
-补边不能覆盖已明确识别的原生操作身份：唯一调用锚点的实际 actor/文件与所画边矛盾时会被拒绝。多调用记录或不透明脚本仍需逐段核文，引用里的单个词不证明读写。`repaired` 节点也有展示路径，不计入问题路径完整性；不需要为展示修复而把它标成 `origin`。
+## 机械失败如何修正
 
-submit 返回 report_id/source_sha256、issues、path_status、review_query、coverage_query。用 investigate `{op:review,report_id,offset:0,limit:100}` 和 `{op:review,report_id,view:coverage,offset:0,limit:100}`，按两层 next 续完。review 给引用时序、写者错位、较早同文修改、写后和全池返回等线索，仍由你核原文；不能据此直接认证机制。
+首次绝不加force。提交返回错误路径/坐标、实际事件时间和inspect查询；字段/身份错会尽量一起报。直接复制实际返回的身份和时间，不缩短目录、不改大小写、不把工具RESULT当原文引用。
 
-修改差集的已知原生写并入 findings.changes；相关但非修改的调用用 reviewed，未知保留。path_status:complete 仅认证问题节点到目标的同问题时序路径；正常输入展示路径和未接入节点也可保留。坐标/引用错误要修；证据不足的断点不靠删结论消除。最终返回最后一次 submit 的 ID 和 hash，UI 按原稿展示。
+普通边不确认且force_eligible:true时，核真实脚本或未解析调用。如果确实证明该agent对该file的读/写，下次在原坐标的同一条边加：
 
-## 随附脚本审核
-
-提交后用 `investigation.json` 中 `runtime.python` 执行：
-
-```text
-<python> .agents/skills/migloop-investigate/scripts/check_card.py --task investigation.json --report <report_id>
+```yaml
+force: true
+reason: "哪次原调用如何读/写该文件，为什么认为静态索引漏识别；保留不确定性。"
+evidence:
+  - "e-实际原文引用"
+  # 或 {source: "注册转录名", line: 物理行号}
 ```
 
-宿主配置 `runtime.index_path` 指向这次 MCP 所用数据库，`runtime.code_root` 可指向同版代码包，未提供则使用已安装 migloop。不要更换这些配置来绕过审核。
+列出你认为证明本边的实际调用及回执；同一关系可有多次调用，系统按调用分组、逐次核验，不合成一个虚构时刻，不需你拆填边。脚本定义等仅作背景的材料可在reason引用，不冒充执行调用。模型不填review、摘录、事件ID、修订ID；系统核原文并生成锚点，记录同次调查上次检查。其他agent的调用、消息里的自述、未来回执、伪造引用都不能force；不能倒置已知完成时间。两端身份或截止变了，先重新普通检查。
 
-退出码 0 = ready_for_review（仍待语义复核），1 = draft（可载入但有缺口），2 = invalid。脚本没有浏览器，因此 `browser_verified:false`；实际网页加载由宿主另测。它不生成/删除边，不改理由，不根据关键词替模型判根因。看到断链时核实真实连接，不能靠画无关边通过。
+“有真实边但路径倒序”也不是通过：按blocked_branches核两次操作，找实际较早输入；可能原来的读只是事后读回。若相同坐标只找到较晚原生读，应先把节点截止收窄到实际较早交付窗口，再普通检查；有真实未解析输入才能随后force。不要挪时间迎合已认定的原因。
+
+## 审核和交付
+
+调查员自己按反馈补查/修稿。review_query展开作者、时刻、字面前序等反证提示，coverage_query看修复窗口未对账调用；提示不是新增必填字段，不要求为所有提及连边。与真实修改有关的遗漏需补进summary/节点原因，未查清具体保留。
+
+用任务runtime.python执行scripts/check_card.py --task investigation.json --report <最后report_id>。ready_for_review表示声明的树可机械查验并加载；语义、停止边界和修改解释完备性仍待审阅。没有明确因果链或还有错误时交draft，不删难点拿通过。
+
+最终给report_id / source_sha256 / 审核状态。原稿与系统投影分开保存，实际查阅轨迹也另存；树不是伪造的一条固定调查路线。

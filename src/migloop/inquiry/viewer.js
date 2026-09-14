@@ -370,7 +370,7 @@
       var c = node.kind === "agent" ? node.isDispatch ? "dispatch" : (isFixAt(node.aid,node.at) ? "fix" : "gen") : node.kind === "leaf" ? "leaf" : "file";
       if (node.isRoot) c += " root"; if(node.isRight)c += " down";
       if (node.row && node.row.source === "model_review") c += " reviewed";
-      if (!node.isRoot && (node.claims||[]).some(n => ["origin","propagated"].includes(n.role))) c += " problem";
+      if (!node.isRoot && (node.claims||[]).some(n => ["origin","propagated","problem"].includes(n.role))) c += " problem";
       return c;
     }
     var NODE_W = 196, NODE_H = 30, GAP_Y = 8, GAP_X = 74, TOP = 34;
@@ -664,10 +664,12 @@
     }
     function claimsSection(node, body) {
       (node.claims||[]).filter(n=>!n.generated_context).forEach(function(claim) {
-        var q=quoteLong(["origin","propagated"].includes(claim.role)?"cause":"inbox",
-          "模型判断 · "+({origin:"问题进入",propagated:"问题保留",context:"输入与背景",repaired:"修复",unknown:"未知"}[claim.role]||claim.role),claim.reason);
+        var q=quoteLong(["origin","propagated","problem"].includes(claim.role)?"cause":"inbox",
+          "模型判断 · "+({origin:"问题进入",propagated:"问题保留",problem:"有问题 · 具体归因见原因",context:"输入与背景",repaired:"修复",unknown:"未知"}[claim.role]||claim.role),claim.reason);
         body.appendChild(q);
-        foldSection("原始依据",q,function(box){(claim.evidence||[]).forEach(ref=>{rawLink(box,ref,{at:claim.at,since:claim.since},"查看原文");box.appendChild(document.createTextNode(" "));});});
+        foldSection("原始依据",q,function(box){
+          if(claim.evidence_basis)box.appendChild(kv("关系依据","由系统绑定相邻读写；不自动认证以上原因。"));
+          (claim.evidence||[]).forEach(ref=>{rawLink(box,ref,{at:claim.at,since:claim.since},"查看原文");box.appendChild(document.createTextNode(" "));});});
       });
       if(node.row&&node.row.source==="model_review"){
         var q=quoteLong("inbox","虚线 · 模型复核补充",node.row.claim);body.appendChild(q);
@@ -805,14 +807,19 @@
       var doc=report.document;
       if(doc.summary){
         var section=sec("文件级总结 · 模型主张");section.id="card-summary";
+        if(typeof doc.summary==="string"){
+          section.appendChild(quoteLong("inbox","生成期原因、后续修复与未查明",doc.summary));host.appendChild(section);
+        }else{
         section.appendChild(quote("inbox","生成期问题总结",doc.summary.generation));
         section.appendChild(quote("inbox","后续修复与结果",doc.summary.repair));
         if(doc.summary.unknown.length)section.appendChild(quote("inbox","尚未查明",doc.summary.unknown.join("\n")));
         findingLinks(section,doc.summary.findings);host.appendChild(section);
+        }
       }
       if(doc.recommendations?.length){
         var section=sec("优化建议 · 效果待验证");section.id="card-recommendations";
         doc.recommendations.forEach(function(r){
+          if(typeof r==="string"){section.appendChild(quoteLong("inbox","建议与验证",r));return;}
           var item=el("div","quote inbox");item.appendChild(el("b",null,r.target));
           item.appendChild(kv("具体改动",r.action));item.appendChild(kv("为什么",r.reason));
           item.appendChild(kv("如何验证",r.validation));section.appendChild(item);findingLinks(section,r.findings);

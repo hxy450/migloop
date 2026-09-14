@@ -237,7 +237,7 @@ async function main() {
       await evaluate("new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))");
       const initialShot = await send("Page.captureScreenshot", { format: "png" });
       fs.writeFileSync(path.join(out, "loaded-report.png"), Buffer.from(initialShot.data, "base64"));
-      const problem = await evaluate("Object.values(migloopViewer.tree.byId).find(n=>n.claims.some(c=>c.role==='origin'))?.tid");
+      const problem = await evaluate("Object.values(migloopViewer.tree.byId).find(n=>n.claims.some(c=>['origin','propagated','problem'].includes(c.role)))?.tid");
       if(problem) {
         await evaluate("migloopViewer.select("+JSON.stringify(problem)+")");
         await wait("document.querySelector('#side .quote')?.textContent.includes('模型判断')");
@@ -251,7 +251,7 @@ async function main() {
         await evaluate("document.querySelectorAll('#reportNotes details').forEach(n=>n.open=true);document.querySelectorAll('#reportNotes .quote .more').forEach(n=>n.click())");
         const cardDiagnostic=await evaluate("(()=>{const r=migloopViewer.report,t=migloopViewer.tree,text=document.querySelector('#reportNotes').textContent;return {report_id:r.report_id,source_sha256:r.source_sha256,nodes:Object.values(t.byId).length,seedEdges:Object.values(t.byId).filter(n=>n.row).length,unclosed:migloopViewer.hiddenPaths.length,recommendationsVisible:r.document.findings.filter(f=>typeof f.recommendation==='string'&&f.recommendation).every(f=>text.includes(f.recommendation)),reasonsVisible:r.document.findings.every(f=>text.includes(f.reason)),ordinaryCandidates:Object.values(t.byId).filter(n=>n.row?.strength==='candidate'&&n.row.source!=='model_review').length};})()");
         cardDiagnostic.wires=wireDiagnostic;
-        cardDiagnostic.narrative=await evaluate("(()=>{const d=migloopViewer.report.document,text=document.querySelector('#reportNotes').textContent;return {present:!!d.summary,summaryVisible:!!d.summary&&[d.summary.generation,d.summary.repair,...d.summary.unknown].every(v=>text.includes(v)),actions:(d.recommendations||[]).length,actionsVisible:(d.recommendations||[]).every(r=>['target','action','reason','validation'].every(k=>text.includes(r[k]))),boundariesVisible:d.findings.filter(f=>f.boundary).every(f=>text.includes(f.boundary.reason))};})()");
+        cardDiagnostic.narrative=await evaluate("(()=>{const d=migloopViewer.report.document,text=document.querySelector('#reportNotes').textContent;return {present:!!d.summary,summaryVisible:typeof d.summary==='string'?text.includes(d.summary):!!d.summary&&[d.summary.generation,d.summary.repair,...d.summary.unknown].every(v=>text.includes(v)),actions:(d.recommendations||[]).length,actionsVisible:(d.recommendations||[]).every(r=>typeof r==='string'?text.includes(r):['target','action','reason','validation'].every(k=>text.includes(r[k]))),boundariesVisible:d.findings.filter(f=>f.boundary).every(f=>text.includes(f.boundary.reason))};})()");
         if(process.env.INQUIRY_REQUIRE_NARRATIVE==="1") {
           assert(cardDiagnostic.narrative.present&&cardDiagnostic.narrative.summaryVisible);
           assert(cardDiagnostic.narrative.actions>0&&cardDiagnostic.narrative.actionsVisible&&cardDiagnostic.narrative.boundariesVisible);
