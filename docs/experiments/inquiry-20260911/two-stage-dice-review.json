@@ -1,0 +1,94 @@
+{
+  "schema": "inquiry-two-stage-review/1",
+  "case": "F10-03",
+  "session_id": "01a0a0b6-cc73-7390-bf36-5352264bbe54",
+  "before_sha256": "c9adcf8dbb88bf016feae52fbeae6191b0cc1fa5cdd342494d72d16abd127cef",
+  "after_report_id": "2b859eacd4344bdb",
+  "after_sha256": "677faf8f77cb5f18997c877a1dea2f6ed009a71414c1a98931250a718a759d75",
+  "reviewer_only": true,
+  "fed_to_investigator": false,
+  "units": {
+    "label": {
+      "before": "partial",
+      "after": "partial",
+      "basis": "Both explain resource Roll -> uppercase presentation, but neither recovers the delivered F001 AC14 display-Roll criterion versus the later Android ROLL oracle. Neither should receive the missing explanation from the reviewer.",
+      "source": "81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a349784d2663f1f0a.jsonl:54,75; agent-a342b7d08c2ca580a.jsonl:19"
+    },
+    "button-style": {"before": "correct", "after": "correct", "basis": "Normal/radius/shadow repair of existing UI, not missing dice business functionality; deeper theme-resolution cause remains bounded."},
+    "test-integration": {"before": "correct", "after": "correct", "basis": "Dice export and UI ids retained as later test visibility/selector contracts. Different report grouping is accepted."},
+    "logging": {"before": "correct", "after": "correct", "basis": "Both explicitly recover visual repair introducing console.error, then later ECAT replacing it with hilog. The two-stage review did not newly discover this; it was already in the frozen first report."},
+    "comment-policy": {"before": "correct", "after": "correct", "basis": "Both distinguish source-faithful TODO and later hygiene/registry concerns from missing business behavior. Exact registry failure mechanism is not independently established."}
+  },
+  "core": {"before": {"correct": 4, "partial": 1, "wrong": 0, "omitted": 0}, "after": {"correct": 4, "partial": 1, "wrong": 0, "omitted": 0}},
+  "claim_precision": null,
+  "claim_review_limit": "Targeted review, not exhaustive fact-by-fact precision. Four complete core explanations retained; no new core correction demonstrated.",
+  "tree": {
+    "mechanically_loadable": true,
+    "browser_passed": true,
+    "nodes": 11,
+    "edges": 10,
+    "unverified_edges": 0,
+    "problem_nodes": 1,
+    "product_attribution_tree_accepted": false,
+    "issues": [
+      {
+        "kind": "generation_boundary_not_investigated_or_presented",
+        "detail": "Tree shows post-repair findings and test inputs, not the initial converter or its generation-period F001/page-spec/theme inputs. It does not establish the requested normal generation-input boundary. Initial missing F001 explanation remains missing."
+      },
+      {
+        "kind": "parallel_writers_not_propagation",
+        "detail": "All four modification actors connect directly to final target. Three readback files feed later actors but do not connect to earlier writers; a continuous retained-problem handoff spine is not delivered. Independent modifications may be parallel; do not claim this graph proves cross-stage content propagation."
+      },
+      {
+        "kind": "node_reason_extends_after_cutoff",
+        "node": "81e0a463-c9d3-4a7a-a671-b7f064830af1:a4874344c8fb6228d@2026-09-03T18:29:03.143Z",
+        "claim": "Node is red and claims aboutToAppear/console.error plus radius/shadow work.",
+        "counterevidence": "At this cutoff, only L66/67 (rollLabel field) is complete. aboutToAppear/console.error completes at L69 18:29:11.605Z; Normal/radius/shadow completes at L71 18:29:21.758Z. Actor is correctly identified globally, but those stated actions are not inside this node's cutoff."
+      },
+      {
+        "kind": "node_reason_extends_after_cutoff",
+        "node": "2f01bcdc-0a92-4961-a64d-5b181f03b3d3:a228e9716d833cbf3@2026-09-03T21:19:16.498Z",
+        "claim": "Node reason includes console.error -> hilog and subsequent comment cleanup.",
+        "counterevidence": "Cutoff covers L40/41 imports/constants/first comments. The console replacement at L57/58 completes 21:19:36.415Z; last cleanup at L68/69 completes 21:19:47.238Z. A valid early write edge does not certify every reason attached to it."
+      },
+      {
+        "kind": "revision_explanation_incomplete",
+        "detail": "Final response says only unauthenticated self-edges were removed. Saved drafts also remove/re-coordinate nodes and drop the generation-snapshot problem flag. Final summary has no explicit requested per-claim review-change section. This is not evidence of a core answer loss, but the audit trail does not satisfy the intended change-accounting contract."
+      }
+    ]
+  },
+  "delivery": {
+    "mcp_frames_complete": "54/54",
+    "phase2_host_truncations": 0,
+    "phase1_host_truncations": 8,
+    "queries_successful": 26,
+    "queries_total": 38,
+    "open_successful": 6,
+    "open_total": 18,
+    "main_skill_utf8_present": true,
+    "reference_utf8_delivery_confirmed": false,
+    "confound": "Investigator read the reference and first-report copy with PowerShell Get-Content without -Encoding utf8; output contains mojibake. The experimental skill omitted the original skill's explicit UTF-8 reading instruction. This was not an MCP pagination truncation; do not attribute all ensuing mistakes to the method or model."
+  },
+  "harness": {
+    "same_thread_and_exact_prefix": true,
+    "automatic_guard_stopped": true,
+    "guard_adjudication": "Generic host_skill_catalog_absent guard rejected the intentionally deployed migloop-build-card catalog. Full catalog contains this one allowed local skill only, no unexpected skill. Original metrics and failed harness exit preserved; independent post-audit appended without model rerun or report edit.",
+    "auditor_adapter": "Frozen auditor needed case time/import fields absent from the new runner manifest. Separate offline-audit manifest adds them from the frozen task; model inputs remain unchanged."
+  },
+  "cost": {
+    "phase1_seconds": 402.4457903000002,
+    "phase2_seconds": 826.4885403999942,
+    "total_seconds": 1228.9343306999945,
+    "phase1_input_output": 2457463,
+    "phase2_incremental_input_output": 2751486,
+    "total_input_output": 5208949,
+    "input_total": 5151185,
+    "cached_input": 4561664,
+    "uncached_input": 589521,
+    "output_including_reasoning": 57764,
+    "submit_attempts": 8,
+    "saved_drafts": 4,
+    "note": "Resume usage is cumulative: first resumed native total equals first-stage total plus that request's last_token_usage. Do not add the two cumulative metrics or add reasoning output twice."
+  },
+  "outcome": "Core explanations preserved but not improved. Tree renders and its declared edges bind, but generation-input boundary and reason-to-time alignment are not accepted. Instruction-delivery and harness issues prevent treating this as a clean efficacy test; no stable superiority or generalization claim."
+}
