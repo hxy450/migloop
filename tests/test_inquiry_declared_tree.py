@@ -146,6 +146,48 @@ def test_new_delivery_requires_declared_edges_but_legacy_still_loads(tmp_path):
         engine.store.close()
 
 
+@pytest.mark.parametrize("owner", ["consumer", "origin"])
+def test_two_judgments_of_the_same_atom_share_its_path_but_not_foreign_inputs(declared, owner):
+    engine, doc = declared
+    f = doc["findings"][0]
+    original = next(n for n in f["nodes"] if n["id"] == owner)
+    f["nodes"].append({**original, "id": "received", "role": "context", "reason": "received input",
+                       "evidence": [engine.store.locate("b.jsonl", 2)]})
+    graph = check(engine, json.dumps(doc))
+    path = next(p for p in graph["tree"]["context_paths"] if p["node"] == "A:received")
+    if owner == "consumer":
+        assert path["status"] == "native" and len(path["steps"]) == 1
+    else:
+        assert path["status"] == "unclosed"
+
+
+def test_received_context_can_be_a_node_annotation_without_a_fake_self_read(declared):
+    engine, doc = declared
+    f = doc["findings"][0]
+    # Focus on b's own output; its received input is a node observation rather
+    # than a fake agent(context) -> agent(origin) read edge.
+    f["nodes"] = [n for n in f["nodes"] if n["id"] in ("consumer", "target")]
+    f["edges"] = [f["edges"][2]]
+    f["nodes"].append({**f["nodes"][0], "id": "received", "role": "context", "reason": "actually received bad",
+                       "evidence": [engine.store.locate("b.jsonl", 2)]})
+    graph = check(engine, json.dumps(doc))
+    path = next(p for p in graph["tree"]["context_paths"] if p["node"] == "A:received")
+    assert path["status"] == "native"
+    assert len(graph["edges"]) == 1 and graph["edges"][0]["relation"] == "write"
+
+
+@pytest.mark.parametrize("line,expected", [(2, "native"), (6, "unclosed")])
+def test_broader_context_only_attaches_inputs_received_before_reached_write(declared, line, expected):
+    engine, doc = declared
+    f = doc["findings"][0]
+    consumer = next(n for n in f["nodes"] if n["id"] == "consumer")
+    f["nodes"].append({**consumer, "id": "received", "at": ts(9), "role": "context", "reason": "claimed received input",
+                       "evidence": [engine.store.locate("b.jsonl", line)]})
+    graph = check(engine, json.dumps(doc))
+    path = next(p for p in graph["tree"]["context_paths"] if p["node"] == "A:received")
+    assert path["status"] == expected  # Read@4 before Write@6; build return@8 is too late.
+
+
 @pytest.mark.parametrize("mode", ["success", "failure", "summary", "wrong_block", "ambiguous", "future"])
 def test_receipts_are_block_exact_and_do_not_certify_behavior(tmp_path, mode):
     engine = build(tmp_path, [

@@ -101,7 +101,9 @@ summary、recommendations 和 boundary 是同一 inquiry/1 的扩展字段，旧
 
 boundary 只含 status/nodes/reason。status 仅 supported_input（相关输入充分，须指向 context 节点）、not_generation_error（此项非生成错误的依据）、unresolved（本分支未查明，nodes 可为 []）。每条 finding 都明确选择并说明；非 unresolved 须给本 finding 已声明、可连接的节点，机检只核形式与连接，不认证“输入充分”或“不是生成错”的判断。finding.recommendation 仍兼容，可由文件级 recommendations 覆盖该项后省略。
 
-新情景卡明确填写 edges：from/to 是本 finding 的节点 ID，不是 scope；原生边用 `{from,to,link,claim}` 或 `{from,to,relation,evidence:[请求,回执],claim}`，不能混用。一个原文含多调用时用工具返回的 link 消歧。read:file→agent、write:agent→file、dispatch:parent→child。每条边核实际身份/时间，claim 的内容传播解释仍是模型主张。节点 at 要涵盖关联操作，例如被后继读到的中间文件节点可取读取返回时刻，不表示那时发生了写。
+新情景卡明确填写 edges：from/to 是本 finding 的节点 ID，不是 scope；原生边用 `{from,to,link,claim}` 或 `{from,to,relation,evidence:[原生调用或回执],claim}`，不能混用。单条引用能唯一选中原生操作时，服务端补全并重核配对原文，不要求手抄两条；多调用不唯一时用返回的 link 消歧。未返回不借未来回执升级。read:file→agent、write:agent→file、dispatch:parent→child。每条边核实际身份/时间，claim 的内容传播解释仍是模型主张。节点 at 要涵盖关联操作，例如被后继读到的中间文件节点可取读取返回时刻，不表示那时发生了写。
+
+inputs 顶部的 scope_id 仍是 agent；要画真实读取，用该 read link 的 from_scope 指向文件，不要把 agent 输入视图当文件。相同实体、相同时间范围的多个节点 ID 只是同一原子的不同判断；context 可依据实际到达的输入标注同一 agent，不需要伪造 agent→agent 的 read。较宽查询范围中的晚到输入不能支持较早写入。中间文件需要生成期历史时，不要继承 target 的修复窗口 since。
 
 不同时间的同文件节点不会合并成捷径。末端节点是目标文件@observation_end，历史范围可不设 since；顶层 target 的修复区间不变。只有缺口时也保留 edges:[] 和明确 unknown。旧卡省略 edges 仍可载入，但其自动路径是背景，不是新技能要求的已交付论证；不要通过省略边换取自动连通。missing_evidence_links 仅为可选导航，独立对照不用强行连边。
 

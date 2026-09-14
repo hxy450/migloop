@@ -73,6 +73,7 @@ def check(engine, text, *, save=False):
                 {"where": where, "error": "evidence must be a list of original refs"}
             )
             return set()
+        at = min(at, timestamp(target["at"], required=True))
         valid = set()
         for ref in refs:
             try:
@@ -82,7 +83,7 @@ def check(engine, text, *, save=False):
                         {
                             "where": where,
                             "ref": ref,
-                            "error": f"evidence outside {scope_kind} time range or undated",
+                            "error": f"evidence outside {scope_kind} / report observation time range or undated",
                             "scope_kind": scope_kind,
                             "record_at": iso(record["at"]),
                             "required_scope": {"since": iso(since), "at": iso(at)},
@@ -213,7 +214,7 @@ def check(engine, text, *, save=False):
                 else node["key"]
             )
             try:
-                exists = engine.store.has_records(node["kind"], key, at, since=since)
+                exists = engine.store.has_records(node["kind"], key, min(at, timestamp(target["at"], required=True)), since=since)
             except ValueError:
                 exists = False
             refs = verify_refs(
@@ -270,7 +271,7 @@ def check(engine, text, *, save=False):
             if not isinstance(edge.get("claim"), str) or not edge["claim"].strip():
                 raise ValueError("edge claim required")
             origin, destination = local.get(edge.get("from")), local.get(edge.get("to"))
-            reason = "node missing"
+            reason = "unknown node ID: " + ", ".join(str(edge[k]) for k in ("from", "to") if edge.get(k) not in local)
             bound = None
             supporting_request = None
             supporting_result = None
@@ -285,6 +286,10 @@ def check(engine, text, *, save=False):
                 file, agent = (
                     (origin, destination) if op == "read" else (destination, origin)
                 )
+                if op and (file["kind"] != "file" or agent["kind"] != "agent"):
+                    unverified.append({**edge, "finding": fid,
+                        "diagnostic": f"{relation} requires {'file -> agent' if op == 'read' else 'agent -> file'}; got {origin['kind']} -> {destination['kind']}. An agent input view is still an agent, not the file it received."})
+                    continue
                 cutoff = min(
                     timestamp(origin["at"], required=True),
                     timestamp(destination["at"], required=True),
@@ -378,13 +383,18 @@ def check(engine, text, *, save=False):
                                 operation_id is None or operation["id"] == operation_id
                             )
                             and operation["op"] == op
-                            and in_scope(operation["at"], cutoff, start)
                             and expected
-                            and expected <= refs
+                            and expected.intersection(refs)
                         ):
+                            if not in_scope(operation["at"], cutoff, start):
+                                reason = (f"Referenced {op} occurs at {iso(operation['at'])}, outside endpoint interval "
+                                          f"[{iso(start)}, {iso(cutoff)}]. Reopen this entity's history with the appropriate bounds; "
+                                          "a repair-window since excludes generation evidence. No scope was changed.")
+                                continue
                             matches.append(
                                 {
                                     **edge,
+                                    "evidence": sorted(refs | expected),
                                     "from": origin["id"],
                                     "to": destination["id"],
                                     "finding": fid,
@@ -396,11 +406,17 @@ def check(engine, text, *, save=False):
                             )
                     if len(matches) == 1:
                         bound = matches[0]
-                        supporting_request = next(
-                            r["request"]
-                            for r in operations
-                            if r["id"] == bound["operation"]
-                        )
+                        # Selecting one native call need not require copying its
+                        # receipt. Recheck the uniquely paired bytes; do not use
+                        # a missing/changed mate to disambiguate multiple calls.
+                        issue_count = len(issues)
+                        verify_refs(bound["evidence"], observed_at, f"{fid}.edge", scope_kind="edge")
+                        if len(issues) != issue_count:
+                            bound = None
+                            reason = "The native operation's paired source evidence failed revalidation."
+                        else:
+                            supporting_request = next(
+                                r["request"] for r in operations if r["id"] == bound["operation"])
                     elif len(matches) > 1:
                         reason = "multiple operations share these record references; use the returned link to select its exact block"
                 if (

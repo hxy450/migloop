@@ -1,0 +1,47 @@
+{
+  "schema": "inquiry-developer-score/1",
+  "round": "evidence-delivery-smoke-20260913",
+  "investigator_code_commit": "c668bd3",
+  "model": "gpt-5.6-luna",
+  "effort": "high",
+  "reference": "../file-first-10/scoring-core.json",
+  "artifacts": "C:/Users/hongy/projects/_migloop-evidence-delivery-20260913/smoke",
+  "grading": "Developer review of unedited final cards against retained source evidence. Three development files, not the full ten-file score. Citation/structure, 14 existing core units and additional false claims are separate. No causal claim of independent validator benefit, no model rerun, no raw rerun. Post-run parser fixes do not change frozen results.",
+  "cases": [
+    {
+      "id": "F10-01",
+      "report_id": "4e7bb0fa50794a63",
+      "source_sha256": "f0efa08c39b046e0ebd06eac7901d3614ee4daa13ec1227c056696b2bfd87c60",
+      "units": {"mask": "correct", "images": "correct", "cta": "correct", "price": "partial", "indicator": "correct", "repair-compile": "correct"},
+      "basis": "Five modification meanings retained, including mask purpose distinction and repair-created private helper compile failure. Price final does not establish received rich-text input -> uniform output, and substitutes an integer/fraction formulation for the numeric-span/suffix issue while leaving Kotlin explicitly unknown. Do not award the missing input/output attribution from the grader's own evidence. Initial converter is correctly used for the earliest visible image/CTA/indicator Write instead of treating later Slice8 preservation as first introduction.",
+      "additional_errors": [{"major": false, "kind": "target_site_count", "quote": "目标文件 4 个站点命中且 import 增加", "location": "E.reason", "counterevidence": ["e-827ccccf4976"], "detail": "The same card's reviewed edge quotes 3 sites import=+ for this exact target. The 4-site statement is wrong and survives self-review. Ancillary count is separate from the mask-purpose core; source/edge validity does not certify prose."}],
+      "frozen_delivery": {"status": "draft", "mechanical": "valid", "problem_paths": "3/3", "saved_submissions": 4, "boundary_or_context_gaps": 5, "unknown_effects": 8},
+      "limits": "Four saved submissions exceed the skill's three-cycle cap; rejected submissions and invalid investigate op:page attempts also remain in transcript. Longest declared problem path is one hop. Runtime absence statements are stronger than the actual bounded search warrants; no full-sentence precision claim."
+    },
+    {
+      "id": "F10-06",
+      "report_id": "875c638fce9043ed",
+      "source_sha256": "f5e58211d00d04752a4609c5e9749b316a9228e9166ec2f9b529b566b9e9f83f",
+      "units": {"back-image-box": "correct", "track-vs-control": "correct", "bottom-inset": "correct"},
+      "basis": "Correctly describes source box/padding, control20 versus track4, and host Swiper bottom padding; initial write and later Slice15 preservation distinguished. Relevant meta/skill historical receipt supports a bounded host-requirement claim. No claim that first missing attribute proves first observed runtime fault.",
+      "upstream_review": {"resource_summary_loss": "not_found", "safearea_handoff_narrowing": "not_found", "executed_guard_missed_property": "not_found"},
+      "frozen_delivery": {"status": "draft", "mechanical": "needs_revision", "problem_paths": "0/9", "saved_submissions": 3, "unbound_edges": 6, "unattributed_native_writes": 1, "unassessed_calls": 30},
+      "limits": "The final generated-file scope inherits repair since and excludes cited generation Writes; widening node at did not repair that error. One write receipt was removed to avoid a time error, yielding an unconfirmed candidate instead of correct completion time. These are structural failures, not three incorrect local causes. Existing deeper U1/U2/U3 facts still not found."
+    },
+    {
+      "id": "F10-02",
+      "report_id": "8a05143b03cf44f9",
+      "source_sha256": "b7656611571a9e876b97749cd9fecf48cfd33e4a628074173f5933ef25605ee4",
+      "units": {"mask": "correct", "icon": "correct", "back-gate": "partial", "progress": "correct", "system-bars": "correct"},
+      "basis": "Four local modification families recovered. Back finding attributes first cause to F001 wiring/isModal, but does not recover the initial handler and its earlier deletion by aentry-setup. Later incorrect isModal rationale is real, but not a replacement for the required initial/deletion history.",
+      "frozen_delivery": {"status": "draft", "mechanical": "needs_revision", "problem_paths": "0/10", "saved_submissions": 2, "unbound_edges": 5},
+      "limits": "The five rejected edges use a unique actual native Edit request without its receipt. Post-run pairing fix can bind those operations, but this does not supply the missing intermediate handoffs or the script-specific repair anchors. A later native write of the same file does not itself certify each earlier script correction."
+    }
+  ],
+  "core_correct": 12,
+  "core_total": 14,
+  "ready_cards": 0,
+  "claim_precision": null,
+  "upstream_found": 0,
+  "upstream_total": 3
+}
