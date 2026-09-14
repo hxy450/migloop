@@ -12,6 +12,7 @@ from .evidence_graph import attach
 from .evidence_review import review
 from .store import digest, encode, iso, timestamp
 from .tree import evidence_paths, reviewed_edge
+from .check_receipts import bind_checks
 
 
 def parse(text):
@@ -118,6 +119,7 @@ def check(engine, text, *, save=False):
             "hypothesis",
             "recommendation",
             "boundary",
+            "checks",
         }:
             raise ValueError("invalid finding fields")
         fid = finding.get("id")
@@ -138,7 +140,7 @@ def check(engine, text, *, save=False):
             raise ValueError("reviewed_edges must contain explicit relation reviews")
         automatic_edges = "edges" not in finding
         finding = attach(engine, finding, target)
-        for field in ("title", "reason", "unknown", "hypothesis", "recommendation", "boundary"):
+        for field in ("title", "reason", "unknown", "hypothesis", "recommendation", "boundary", "checks"):
             verify_text(
                 finding.get(field),
                 timestamp(target["at"], required=True),
@@ -430,6 +432,7 @@ def check(engine, text, *, save=False):
     from .narrative import validate as validate_narrative
 
     validate_narrative(document)
+    check_results = bind_checks(engine, document, nodes, issues)
     for field in ("summary", "recommendations"):
         verify_text(document.get(field), timestamp(target["at"], required=True), field)
     verify_text(
@@ -469,13 +472,13 @@ def check(engine, text, *, save=False):
         "mechanical_status": "needs_revision"
         if issues
         or unverified
-        or missing_links
         or coverage["unattributed_native_writes"]
         or coverage["issues"]
         else "valid",
         "missing_evidence_links": missing_links,
         "coverage": coverage,
         "evidence_review": review(engine, document, target, nodes),
+        "check_results": check_results,
         "source_sha256": digest(text.encode()),
         "trace_session": engine.session,
         "note": "Reasons are model claims. Bound references/operations are not causal proof.",

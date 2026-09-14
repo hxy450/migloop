@@ -830,6 +830,13 @@
       report.document.findings.filter(f=>!activeFinding||f.id===activeFinding).forEach(function(f){
         details.appendChild(quoteLong("cause",f.title,f.reason));
         if(f.boundary)details.appendChild(quoteLong("inbox","停止上溯依据 · "+({supported_input:"模型认为输入充分",not_generation_error:"模型认为非生成错误",unresolved:"尚未查明"}[f.boundary.status]||f.boundary.status),f.boundary.reason));
+        (f.checks||[]).forEach(function(c){
+          var bound=(report.check_results||[]).find(r=>r.finding===f.id&&r.request===c.request&&r.result===c.result&&r.node===f.id+":"+c.node);
+          var q=quoteLong("inbox",bound?"检查调用 · 配对可核，效果未认证":"检查调用 · 尚未核回",c.claim);
+          if(bound)q.appendChild(kv("实际调用",c.tool+" · "+bound.request_at+" → "+bound.result_at));
+          rawLink(q,c.request,{at:report.target.at},"原始命令");q.appendChild(document.createTextNode(" "));
+          rawLink(q,c.result,{at:report.target.at},"原始回执");details.appendChild(q);
+        });
         [["unknown","尚未查明"],["hypothesis","机制假设 · 未认证"],["recommendation","改进建议 · 效果待验证"]].forEach(function(pair){
           var value=f[pair[0]];if(value==null||value===""||(Array.isArray(value)&&!value.length))return;
           var text=Array.isArray(value)?value.map(v=>typeof v==="string"?v:JSON.stringify(v)).join("\n"):typeof value==="string"?value:JSON.stringify(value);

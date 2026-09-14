@@ -33,6 +33,10 @@ def cited_refs(finding, store):
     for node in finding.get("nodes", []):
         explicit(node.get("evidence"))
         refs.extend(inline_refs(node.get("reason")))
+    for check in finding.get("checks", []):
+        if isinstance(check, dict):
+            explicit([check.get("request"), check.get("result")])
+            refs.extend(inline_refs(check.get("claim")))
     for edge in finding.get("edges", []):
         if not isinstance(edge, dict):
             continue  # The report checker diagnoses malformed edge objects.

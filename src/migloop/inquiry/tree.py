@@ -202,6 +202,8 @@ def graph_events(graph, finding=None):
             "at": timestamp(edge.get("at")),
             "from": (origin["kind"], origin["key"]),
             "to": (destination["kind"], destination["key"]),
+            "from_node": origin["id"],
+            "to_node": destination["id"],
             "source": "model_review" if model else "indexed",
             "strength": edge["strength"],
             "evidence": edge["evidence"],
@@ -307,6 +309,7 @@ def evidence_paths(engine, graph):
     paths, context_paths = [], []
     for finding in graph["document"]["findings"]:
         fid = finding["id"]
+        declared = "edges" in finding
         events = graph_events(graph, fid)
         # Canonical evidence references are also needed when a report used handles.
         for event in events:
@@ -316,7 +319,8 @@ def evidence_paths(engine, graph):
         incoming = {}
         for event in events:
             if event["at"] is not None:
-                incoming.setdefault(tuple(event["to"]), []).append(event)
+                endpoint = event["to_node"] if declared else tuple(event["to"])
+                incoming.setdefault(endpoint, []).append(event)
         for values in incoming.values():
             values.sort(key=lambda e: (e["strength"] != "confirmed", -e["at"], e["id"]))
         # A model may cite a returned input on its agent judgment instead of
@@ -379,43 +383,53 @@ def evidence_paths(engine, graph):
         )
         repair_at = repair["at"] if repair else None
         repair_row = neighbor_row(repair, root) if repair else None
+        # A declared graph is over judgment IDs, not merely entity names.
+        # Two historical windows of the same file must not become a shortcut.
+        roots = [n["id"] for n in goals if n["kind"] == "file"
+                 and n["key"] == root["key"]
+                 and timestamp(n["at"], required=True) == target_at] if declared else [None]
         for goal in goals:
-            queue = deque([(root, [], frozenset(), frozenset())])
+            queue = deque((root, [], frozenset(), frozenset(), nid) for nid in roots)
             found = None
             anchor = None
             inspected = 0
             while queue and inspected < 10000 and repair_at is not None:
-                scope, steps, seen, incident = queue.popleft()
+                scope, steps, seen, incident, node_id = queue.popleft()
                 inspected += 1
                 current = (scope["kind"], scope["key"])
+                incoming_edges = incoming.get(node_id if declared else current, [])
                 at = timestamp(scope["at"], required=True)
                 goal_since = timestamp(goal.get("since"))
-                # A context judgment on an agent can cite its received input,
-                # not its output write. Certify that actual incoming operation
-                # within the reached window, without reclassifying the input.
-                received_context = (
-                    goal["role"] == "context"
-                    and goal["kind"] == "agent"
-                    and any(
-                        event["relation"] in ("read", "dispatch")
-                        and event["strength"] == "confirmed"
-                        and in_scope(event["at"], at, goal_since)
-                        and event["refs"].intersection(goal["valid_refs"])
-                        for event in incoming.get(current, [])
-                    )
-                )
+                # A file reached by a later read may cite its earlier write.
+                # An agent's context may cite an actual received input. Bind
+                # that incident evidence at this node, never a namesake node.
+                supporting = next((event for event in incoming_edges
+                    if (goal["kind"] == "file" and event["relation"] == "write"
+                        or goal["kind"] == "agent" and goal["role"] == "context"
+                        and event["relation"] in ("read", "dispatch"))
+                    and (event["strength"] == "confirmed" or event["source"] == "model_review")
+                    and in_scope(event["at"], min(at, repair_at), goal_since)
+                    and event["refs"].intersection(goal["valid_refs"])), None)
+                # The root's repair is independently anchored in changes.
+                if (not steps and goal["kind"] == "file" and repair
+                        and set(repair["evidence"]).intersection(goal["valid_refs"])
+                        and in_scope(repair_at, at, goal_since)):
+                    supporting = repair
                 hit = (
                     current == (goal["kind"], goal["key"])
+                    and (not declared or node_id == goal["id"])
                     and at <= timestamp(goal["at"], required=True)
                     and (goal_since is None or at >= goal_since)
-                    and (bool(incident.intersection(goal["valid_refs"])) or received_context)
+                    and (bool(incident.intersection(goal["valid_refs"])) or supporting is not None)
                 )
                 # A target-file claim is already at the root, but still needs an
                 # actual cited incoming write corresponding to its history.
                 if hit:
                     found = steps
+                    if supporting is not None:
+                        anchor = neighbor_row(supporting, scope)
                     break
-                for event in incoming.get(current, []):
+                for event in incoming_edges:
                     if event["id"] in seen or event["at"] > min(at, repair_at):
                         continue
                     row = neighbor_row(event, scope)
@@ -424,6 +438,7 @@ def evidence_paths(engine, graph):
                     if (
                         not steps
                         and current == (goal["kind"], goal["key"])
+                        and (not declared or node_id == goal["id"])
                         and event["refs"].intersection(goal["valid_refs"])
                         and (goal_since is None or event["at"] >= goal_since)
                         and event["at"] <= timestamp(goal["at"], required=True)
@@ -436,7 +451,7 @@ def evidence_paths(engine, graph):
                         for ref in row["evidence"]
                     )
                     queue.append(
-                        (row["node"], steps + [row], seen | {event["id"]}, visible_refs)
+                        (row["node"], steps + [row], seen | {event["id"]}, visible_refs, event["from_node"])
                     )
                 if found is not None:
                     break
@@ -465,6 +480,7 @@ def evidence_paths(engine, graph):
                     "finding": fid,
                     "node": goal["id"],
                     "purpose": "context" if display_only else "problem",
+                    "basis": "declared" if declared else "cited_history",
                     "status": status,
                     "steps": found or [],
                     "anchor": anchor,

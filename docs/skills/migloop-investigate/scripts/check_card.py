@@ -13,7 +13,7 @@ import sys
 from pathlib import Path
 
 
-def audit(index_path, report_id, task):
+def audit(index_path, report_id, task, *, require_declared=False):
     from migloop.inquiry.engine import Engine
     from migloop.inquiry.report import load_report
     from migloop.inquiry.narrative import review_gaps
@@ -58,6 +58,13 @@ def audit(index_path, report_id, task):
         paths = graph["tree"]["paths"]
         unresolved_paths = [p for p in paths if p["status"] == "unclosed"]
         investigation_gaps = review_gaps(graph)
+        if require_declared:
+            investigation_gaps.extend(
+                {"finding": f["id"], "error": "Declare the evidence handoffs in edges; automatic history is not a delivered argument"}
+                for f in document["findings"] if "edges" not in f)
+            investigation_gaps.extend(
+                {"finding": p["finding"], "node": p["node"], "error": "Unconfirmed native candidate is not a reviewed, displayable handoff"}
+                for p in paths + graph["tree"].get("context_paths", []) if p["status"] == "candidate")
         ready = (not target_errors and not content_errors and not investigation_gaps
                  and graph["mechanical_status"] == "valid"
                  and graph["path_status"] == "complete" and coverage["complete"])
@@ -71,6 +78,8 @@ def audit(index_path, report_id, task):
             "target_errors": target_errors,
             "card_content_errors": content_errors,
             "investigation_gaps": investigation_gaps,
+            "declared_tree_required": require_declared,
+            "check_results": graph.get("check_results", []),
             "mechanical_status": graph["mechanical_status"],
             "path_status": graph["path_status"],
             "issues": graph["issues"],
@@ -82,6 +91,8 @@ def audit(index_path, report_id, task):
                 "nodes": len(graph["nodes"]),
                 "bound_edges": len(graph["edges"]),
                 "model_review_edges": sum(e.get("source") == "model_review" for e in graph["edges"]),
+                "problem_nodes": len(paths),
+                "closed_problem_nodes": sum(p["status"] != "unclosed" for p in paths),
             },
             "coverage": {
                 "complete": coverage["complete"],
@@ -113,7 +124,7 @@ def main(argv=None):
         # Production may use an installed migloop package instead of code_root.
         if runtime.get("code_root"):
             sys.path.insert(0, str(Path(runtime["code_root"]).resolve()))
-        result = audit(runtime["index_path"], args.report, task)
+        result = audit(runtime["index_path"], args.report, task, require_declared=True)
         code = 0 if result["status"] == "ready_for_review" else 1
     except (ValueError, TypeError, KeyError, OSError, ImportError, sqlite3.Error) as exc:
         result = {"report_id": args.report, "status": "invalid", "loadable": False,

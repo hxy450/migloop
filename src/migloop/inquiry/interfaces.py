@@ -44,7 +44,7 @@ inputs的tool_return_total/tool_return_query单列全部已记录工具返回入
 5. 把事实、竞争解释和机制假设分开。全池出现不证明交付；局部搜索无结果不证明全阶段没有检查。
 “检查报告只提结构”只能证明报告这么写，不能据此认证“仅做结构检查/确认漏验”。
 声称某阶段没有成功回执/输入/检查前，在该阶段完整范围搜索并展开正反例；写前范围不能用于否定写后检查。停止时对照原文核结论中的确定性句子，不把hypothesis搬成最终摘要中的事实。
-6. 最后提交节点原因和证据，通常不必手工拼edges。服务端从这些引用核回原生读写与派发、自动连线；补出的中性端点不是你认定有问题的节点。
+6. 自由调查后交付节点原因、证据和finding.edges中的关键交接。服务端核关系，不替你补因果路径；省略edges的旧卡仍按引用展示历史背景。
 制作情景卡时，文件级 summary:{generation,repair,unknown:[文本],findings:[finding-id]} 连贯解释问题，recommendations:[{target,action,reason,validation,findings:[finding-id]}] 合并行动及验法；不要把未查明改写成确定事实。finding 可含 boundary:{status:supported_input|not_generation_error|unresolved,nodes:[该finding节点id],reason:停止上溯依据}。正确输入须指向context；未核清就unresolved，旧卡可不含这些扩展。具体格式按调查skill，原生边和时间规则不变。
 你只需给真正要归因的节点填scope、role、reason、evidence。原文引用e-...、agent范围s-agent-...、文件范围s-file-...各有不同类型，不能换前缀猜ID。
 mechanical_status只核坐标/引用/原生关系及原生写对账，不是正确率、全文覆盖或因果认证。needs_revision须处理错误，不靠删证据回避。
@@ -118,7 +118,7 @@ reviewed:
   - {ref: "e-调用", effect: no_target_change, reason: 原文为什么仅查询或改了别的文件}
   - {ref: "e-调用", effect: unknown, reason: 缺哪份执行/内容证据，当前无法确认}
 省略edges时系统只按已引用原生操作生成历史连接；未知脚本不会自动变成写边，独立搜到spec也不变成曾被生成者读取。
-relations返回的link及两端scope可以核关系，但不要求你为这些边手工创建中间节点。
+relations返回的link可绑定一条明确原生操作。交付edges时声明关键中间节点，各节点时间须容纳其实际交接；不同时间的同文件节点不合并成捷径。
 节点role只用origin/propagated/context/repaired/unknown。未知关系可省略边并写unknown，不编造link。
 origin是写出坏结果的环节，不是发现问题/提出修复的环节；propagated是仍保留问题的节点，不是已经修好的文件。发现并修复问题的检查者用repaired；只提供任务/契约/证据用context。判断不了则unknown。
 初版按当时契约正确、后续只是新增测试/平台要求时，初版节点用context；不要一边说不是生成错，一边把初版标为问题节点。
@@ -130,7 +130,8 @@ origin是写出坏结果的环节，不是发现问题/提出修复的环节；p
 
 时间树与模型自主调查：
 file/agent可用view:neighbors按当前scope分页展开上游（direction:downstream看下游），与页面点击共用一份关系投影。模型不用维护via；独立查阅不制造读写边。
-submit另给path_status及每个问题节点的路径状态。complete只表示已引用的历史操作能按时间连到目标，不认证问题内容连续传播或因果正确；needs_path不能说已完成调用链。
+submit另给path_status及每个问题节点的路径状态。声明edges时只沿声明的节点ID连接，须有目标文件@观察截止的末端节点（历史范围可不带since）；省略时为cited_history背景。complete不认证内容连续传播或因果正确；needs_path不能说已完成调用链。missing_evidence_links仅为相关操作导航，不要求独立对照材料连边。
+检查执行证据可给finding.checks:[{node:本项agent节点ID,request:原请求引用,result:原回执引用,tool:原工具名,claim:具体检查范围与局限}]；多调用原文可加request_block/result_block。核验只认证实际调用配对、身份与时间，不认证目标状态验证通过。
 未闭合时可自由补查并引用缺的中间读写/派发，或明确保留unknown；不要为了画树发明证据。原始查询顺序与最后的证据路径分别保存，不能把整理后的树叫作模型实际查阅顺序。
 少数未识别脚本效应，经你核原文后可在finding.reviewed_edges补报告专属虚线：
   - from: author
@@ -227,10 +228,11 @@ def build_mcp(path):
                     "semantic_verified",
                     "mechanical_status",
                     "path_status",
+                    "check_results",
                 )
             } | {"nodes": len(graph["nodes"]), "bound_edges": len(graph["edges"])}
             summary["paths"] = [
-                {k: p[k] for k in ("finding", "node", "status", "diagnostic")}
+                {k: p[k] for k in ("finding", "node", "status", "basis", "diagnostic")}
                 for p in graph["tree"]["paths"]
             ]
             summary["path_note"] = graph["tree"]["note"]

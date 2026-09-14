@@ -73,6 +73,16 @@ findings:
         role: origin
         reason: 具体失误，不把读取或转述当写出
         evidence: ["e-实际写出"]
+      - id: output
+        kind: file
+        key: 目标文件的完整路径
+        at: "任务 observation_end 原样值"
+        role: repaired
+        reason: 目标历史端点，修复结果与运行期效果分别说明
+        evidence: ["e-修复调用"]
+    edges:
+      - {from: input, to: author, relation: read, evidence: ["e-读取请求", "e-读取返回"], claim: 实際收到哪项输入；为何与本项实现有关}
+      - {from: author, to: output, relation: write, evidence: ["e-写入请求", "e-写入返回"], claim: 写入了什么；其后是否保留另由证据说明}
     unknown: [尚未查明的环节与缺哪份证据] # 无则 []
     hypothesis: 可选的机制假设
     boundary:
@@ -91,7 +101,25 @@ summary、recommendations 和 boundary 是同一 inquiry/1 的扩展字段，旧
 
 boundary 只含 status/nodes/reason。status 仅 supported_input（相关输入充分，须指向 context 节点）、not_generation_error（此项非生成错误的依据）、unresolved（本分支未查明，nodes 可为 []）。每条 finding 都明确选择并说明；非 unresolved 须给本 finding 已声明、可连接的节点，机检只核形式与连接，不认证“输入充分”或“不是生成错”的判断。finding.recommendation 仍兼容，可由文件级 recommendations 覆盖该项后省略。
 
-一般不填 edges：按本 finding 已引原生读写/派发自动连线，中性端点不是模型归责。脚本效应须人工核文，可在 finding 的 `reviewed_edges` 给报告专属虚线（始终是候选，不能把词法命中升级事实）：
+新情景卡明确填写 edges：from/to 是本 finding 的节点 ID，不是 scope；原生边用 `{from,to,link,claim}` 或 `{from,to,relation,evidence:[请求,回执],claim}`，不能混用。一个原文含多调用时用工具返回的 link 消歧。read:file→agent、write:agent→file、dispatch:parent→child。每条边核实际身份/时间，claim 的内容传播解释仍是模型主张。节点 at 要涵盖关联操作，例如被后继读到的中间文件节点可取读取返回时刻，不表示那时发生了写。
+
+不同时间的同文件节点不会合并成捷径。末端节点是目标文件@observation_end，历史范围可不设 since；顶层 target 的修复区间不变。只有缺口时也保留 edges:[] 和明确 unknown。旧卡省略 edges 仍可载入，但其自动路径是背景，不是新技能要求的已交付论证；不要通过省略边换取自动连通。missing_evidence_links 仅为可选导航，独立对照不用强行连边。
+
+执行检查可选 checks（位于 finding，与 edges 同级）：
+
+```yaml
+checks:
+  - node: checker # 本 finding 已声明的实际执行 agent
+    request: e-原始工具调用
+    result: e-对应原生回执
+    tool: Bash # 照原工具名；不是自己认为的用途
+    claim: 具体检查对象、结果、范围与未认证的部分
+    # 同一原文有多个调用时可加 request_block / result_block（原生块号）
+```
+
+服务端核原生配对、执行者、时间和工具名；返回 native_pair 不是“验证通过”。读日志也有真实配对、脚本也可能只转述旧日志，须核命令的实际内容。没有原生回执就保留未知，不将总结声明填进 result。checks 引用照样受观察截止约束。
+
+脚本效应须人工核文，可在 finding 的 `reviewed_edges` 给报告专属虚线（始终是候选，不能把词法命中升级事实）：
 
 ```yaml
 reviewed_edges:
