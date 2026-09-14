@@ -39,7 +39,10 @@ def literal_path_mentions(tool, payload):
     # These can change the directory or execute more shell code. Refuse the
     # whole hint set rather than guess which later token uses which directory.
     changing = {"cd", "pushd", "popd", "chdir", "source", ".", "eval", "env", "sudo", "chroot", "trap", "alias"}
-    if any(token.casefold() in changing or token.startswith(("-C", "--chdir", "--directory")) for token in tokens):
+    shells = {"sh", "bash", "dash", "ash", "zsh", "ksh", "fish", "csh", "tcsh", "pwsh", "powershell", "cmd", "cmd.exe"}
+    if any(token.casefold() in changing
+           or posixpath.basename(token).casefold() in shells
+           or token.startswith(("-C", "--chdir", "--directory")) for token in tokens):
         return []
     paths = set()
     for token in tokens:

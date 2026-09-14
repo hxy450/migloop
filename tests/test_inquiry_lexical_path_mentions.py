@@ -153,3 +153,18 @@ def test_old_index_does_not_gain_hints_on_open(tmp_path, monkeypatch):
         assert not reopened.has_records("file", XML, timestamp(ts(5)))
     finally:
         reopened.close()
+
+
+@pytest.mark.parametrize("shell", ["bash", "/bin/sh", "command /bin/bash", "zsh", "pwsh"])
+def test_nested_shell_does_not_assign_its_operands_to_outer_directory(tmp_path, shell):
+    command = f'''cd /source && {shell} -c 'cd /other; cat "$1"' _ app/one.xml'''
+    assert literal_path_mentions("Bash", {"command": command}) == []
+    engine = build(tmp_path, [record(1, use("nested", "Bash", command=command))])
+    try:
+        assert not engine.store.rows("SELECT * FROM files")
+        assert not engine.store.has_records("file", "/source/app/one.xml", timestamp(ts(5)))
+        assert not engine.store.rows("SELECT * FROM effects")
+        found = engine.query({"op": "search", "kind": "agent", "key": "a", "at": ts(5), "terms": ["app/one.xml"]})
+        assert found["total"] == 1  # Original call remains searchable.
+    finally:
+        engine.store.close()

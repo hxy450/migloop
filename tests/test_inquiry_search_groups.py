@@ -41,8 +41,9 @@ def test_actor_groups_cover_whole_match_set_and_narrow_same_time_terms(tmp_path)
     assert narrowed["scope"]["since"] == data["scope"]["since"]
     assert narrowed["scope"]["key"] == "b" and narrowed["total"] == 2
     assert actor["query"]["terms"] == ["needle"] and actor["query"]["view"] == "returns"
-    assert [r["line"] for r in narrowed["rows"]] == [2, 1]
-    assert narrowed["rows"][1]["return_blocks"][0]["success"] == 0
+    # Narrowing changes the actor, not the query's default chronological order.
+    assert [r["line"] for r in narrowed["rows"]] == [1, 2]
+    assert narrowed["rows"][0]["return_blocks"][0]["success"] == 0
     grouped = engine.query({**nav["query"], "limit": 1})
     assert grouped["kind"] == "matching_agents" and grouped["next"] == 1
     second = engine.query({**nav["query"], "limit": 1, "offset": 1})

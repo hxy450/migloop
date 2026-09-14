@@ -42,10 +42,9 @@ def matching_agents(store, request, scope, table, values, *, offset=0, limit=4):
                 key=group["agent"],
                 offset=0,
                 limit=20,
-                order=request.get(
-                    "order", "newest" if request.get("view") == "returns" else "oldest"
-                ),
             )
+            # Keep an explicit order above; otherwise let the shared query
+            # kernel apply the view's default, just as it did for the pool.
         rows.append(
             {
                 **group,

@@ -74,3 +74,26 @@ def test_undated_messages_do_not_count_tool_returns(messages):
     visible = messages.query({**q, "undated": True})
     assert visible["total"] == 3
     assert sum(row["at"] is None for row in visible["rows"]) == 1
+
+
+@pytest.mark.parametrize("view", ["messages", "returns", "records"])
+@pytest.mark.parametrize("order", [None, "newest", "oldest"])
+def test_narrow_navigation_preserves_effective_order_and_first_page(tmp_path, view, order):
+    rows = [message(n, "Please edit the page") for n in range(1, 22)]
+    rows.append(message(22, "Only diagnose now, do not edit"))
+    if view == "returns":
+        rows = [record(n, result(str(n), f"returned at {n}")) for n in range(1, 23)]
+    engine = build(tmp_path, rows)
+    try:
+        q = {"op": "search", "kind": "pool", "view": view, "at": ts(30), "limit": 20}
+        if order is not None:
+            q["order"] = order
+        pool = engine.query(q)
+        narrow = pool["matching_agents"]["rows"][0]["query"]
+        actual = engine.query(narrow)
+        assert [r["line"] for r in actual["rows"]] == [r["line"] for r in pool["rows"]]
+        assert actual["next"] == pool["next"] == 20
+        if view == "messages" and order != "oldest":
+            assert actual["rows"][0]["line"] == 22
+    finally:
+        engine.store.close()
