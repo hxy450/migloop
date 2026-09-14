@@ -10,6 +10,7 @@
 {"op":"file","key":"任务file","at":"任务observation_end","view":"relations","limit":100}
 {"op":"agent","scope":"返回的input_scope","view":"inputs","limit":100}
 {"op":"agent","key":"实际record_owner","at":"该次写入请求时刻","view":"inputs","limit":100}
+{"op":"search","kind":"agent","key":"实际record_owner","at":"该次调用请求时刻","view":"messages","order":"newest","limit":3}
 {"op":"search","kind":"pool","at":"历史截止ISO","terms":["实际关键词一","实际关键词二"],"group_by":"agent","limit":100}
 {"op":"open","ref":"返回的e-原文引用","at":"任务observation_end"}
 {"op":"open","source":"注册转录相对路径","line":123,"at":"任务observation_end"}
@@ -22,3 +23,5 @@ scope 继承身份与截止，不再混填 key/at/since。file 输出的 WRITER.
 `IDENTITY.source` 是 open 的注册转录路径，`record_owner` 是 agent 身份，不可互换。复制完整身份，不缩写。没有 e-ref 可用 catalog 找 source 后按物理行号 open。open 完整原文默认不设 context；要裁出匹配窗口则 terms 与 context 同时填。用 observation_end 读取历史记录不等于该记录在生成期已存在，归因仍以原文自身时间与真实交付为准。
 
 inputs 返回已识别读取、任务消息与工具返回入口；跟随 message_query / tool_return_query 可核未被原生 Read 表覆盖的输入。请求及回执都核对，request_context 预览不是效应证明。缺脚本效应时直接读原始调用；不得把没有索引行当成没执行。搜索 terms 为最多 8 个字面词 OR，不需要猜唯一正确关键词。
+
+判某次调用是否失职，先在其真实请求时刻查同agent最近消息，不带技术关键词：任务可能只写“请分析”，不含文件名。最近一条也可能是图片占位或本地包装，要打开实质要求；消息不是已认证的任务归属。owner_scope继承本次查询截止，不能拿观察终点代替当时职责边界。

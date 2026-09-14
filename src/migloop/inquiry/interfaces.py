@@ -33,7 +33,7 @@ agent views: records/messages/returns/inputs/relations。inputs含原生Read表�
 WRITER.input_scope 是写调用发起前输入范围；write_scope 是完成写入时刻；WRITER.scope 是当前查询截止，可看写后。
 search: {op:search,kind:pool|file|agent,key:可选,at:ISO,since:可选,terms:[词1,词2],limit:100,offset:0}，也可用scope。
 terms最多8个非空字面词，每词<=500字符，OR匹配；换词/范围从offset:0。search搜整个已记录范围，不仅当前已显示部分。
-pool/agent search 可加 view:returns；group_by:agent 看全池actor分布。records/messages/returns支持order:newest|oldest。
+search 可加 view:messages 或 returns；group_by:agent 看全池actor分布。records/messages/returns支持order:newest|oldest。
 open: {op:open,ref:e-原文引用,at:涵盖原文的ISO} 或 {op:open,source:注册转录名,line:物理行号,at:ISO}；可用scope继承时间。
 默认展开完整原生正文；pointer:"" 看完整JSON。可选 terms/context:0..50 取所有匹配窗口，literal_counts与省略范围会列出。
 Edit/patch/未知写脚本的已选参数包不因关键词裁剪；request_context给回执所答的真实请求，核对象/调用时刻。

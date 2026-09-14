@@ -22,7 +22,7 @@ investigate(requests=[...]) 批量独立查询，page 续正文，submit(card={.
 
 整包响应有字节预算，不按每项各自限长。`DEFERRED.requests` 是尚未送出的原游标，按每批最多4项继续 page；正文没有删除，也不用重查。已发送帧重取保持相同内容。不要在一个宿主输出中再次拼接多个独立 MCP 大响应；用 requests 批量、每次单独转发 content.text。
 
-file的records是全部相关记录索引；calls含未知脚本和结果入口，默认折叠已知只读形状，可include_reads:true；changes是原生修改参数全文，outline是原生增删摘要，二者都不是脚本修改全集。agent的inputs是原生读表、任务消息、返回入口三个重叠渠道，继续用messages/returns/records/search查完整已记录范围。pool/agent search可加view:returns；records/messages/returns支持order:newest|oldest。
+file的records是全部相关记录索引；calls含未知脚本和结果入口，默认折叠已知只读形状，可include_reads:true；changes是原生修改参数全文，outline是原生增删摘要，二者都不是脚本修改全集。agent的inputs是原生读表、任务消息、返回入口三个重叠渠道，继续用messages/returns/records/search查完整已记录范围。search可加view:messages或returns；records/messages/returns支持order:newest|oldest。
 
 查询用带时区ISO at，可选since，闭区间。scope_id锁定范围，继承scope后不再填key/at/since。生成输入不要继承修复窗口since。input_scope是写前输入，write_scope是写完成时刻，WRITER.scope是本次观察截止。
 

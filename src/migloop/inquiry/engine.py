@@ -765,8 +765,8 @@ class Engine:
             request["group_by"] != "agent" or scope["kind"] != "pool"
         ):
             raise ValueError("group_by=agent requires pool search")
-        if op == "search" and view not in ("records", "returns"):
-            raise ValueError("search view must be records or returns")
+        if op == "search" and view not in ("records", "returns", "messages"):
+            raise ValueError("search view must be records, returns or messages")
         if view not in (
             "records",
             "relations",
@@ -793,8 +793,8 @@ class Engine:
             return tree_neighbors(self, scope, request)
         if view == "inputs" and op != "agent":
             raise ValueError("inputs is an agent view")
-        if view == "messages" and op != "agent":
-            raise ValueError("messages is an agent view")
+        if view == "messages" and op not in ("agent", "search"):
+            raise ValueError("messages requires an agent view or search scope")
         if view == "returns" and op not in ("agent", "search"):
             raise ValueError("returns requires an agent view or search scope")
         if view in ("changes", "outline") and op != "file":
@@ -990,11 +990,12 @@ class Engine:
             + unknown_where,
             unknown_values,
         ).fetchone()[0]
-        if view == "returns":
+        if view in ("returns", "messages"):
+            channel_table = "tool_returns" if view == "returns" else "input_messages"
             unknown_count = self.store.db.execute(
                 "SELECT COUNT(*) FROM records r JOIN sources s ON r.source=s.id WHERE r.at IS NULL AND "
                 + unknown_where
-                + " AND r.ref IN (SELECT record FROM tool_returns)",
+                + f" AND r.ref IN (SELECT record FROM {channel_table})",
                 unknown_values,
             ).fetchone()[0]
         total = self.store.db.execute("SELECT COUNT(*)" + table, values).fetchone()[0]
