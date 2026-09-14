@@ -56,7 +56,8 @@ const secondReport = {...report, report_id: "settings-report", target: {...repor
   document: {...report.document, target: {...report.document.target, file: repairs[1]}},
   tree: {...report.tree, root: coordinate("file", repairs[1], times.root)}};
 const summaries = [report, secondReport].map(r=>({id:r.report_id,file:r.target.file,at:times.root,count:3,title:"测试调查"}));
-let noReports = false;
+  let noReports = false;
+  let holdNeighbors = null;
 const requests = [];
 let retryFailures=0;
 const liveUrl = process.env.INQUIRY_LIVE_URL;
@@ -113,6 +114,7 @@ async function main() {
         const q = JSON.parse(body); requests.push(q);
         if(q.include_reads && q.view!=="calls")throw Error("include_reads only belongs to calls");
         if (q.view === "neighbors") {
+          if (holdNeighbors && q.key===holdNeighbors.key) { holdNeighbors.started=true; await holdNeighbors.promise; }
           let rows = [];
           if (q.key === report.target.file) rows = [writer, { ...writer, id: "native:w2" }, repair];
           if (q.key === writer.node.key) rows = [input, {...candidate,id:"native:guess",source:"indexed"}, later,
@@ -128,7 +130,8 @@ async function main() {
               identity_known_at_cutoff: false, identity_basis: "子 Agent 身份来自稍后回执，本次查询截止时未知。", status: "identity_pending" })];
           if(q.direction==='downstream') rows=q.key===report.target.file ? [row('native:reader','read',coordinate('agent','session:reader',times.writer))] : [];
           data = { kind: "neighbors", scope: { kind: q.op, key: q.key, at: q.at }, rows, total: rows.length, next: q.key===input.node.key && !q.offset && q.direction!=="downstream" ? 1 : null };
-        } else if (q.op === 'catalog') data = {kind:'catalog',catalog_kind:q.kind,rows:[{key:q.kind==='file'?report.target.file:writer.node.key}],total:1,next:null};
+        } else if (q.view === 'relations') data = {dispatches:[]};
+        else if (q.op === 'catalog') data = {kind:'catalog',catalog_kind:q.kind,rows:[{key:q.kind==='file'?report.target.file:writer.node.key}],total:1,next:null};
         else if (q.op === "open") data = { source: "fixture.jsonl", line: 8, at: times.origin, text: q.pointer === "" ? "FULL RAW RECORD" : "ORIGINAL EVIDENCE", request_context: null };
         else if (q.view === "changes") data = { kind: "changes", rows: [{ at: times.origin, agent: "spec-author", strength: "confirmed",
           payloads: [{ tool: "Edit", block: 0, body: { old_string: "OLD_VALUE", new_string: "NEW_VALUE" } }],
@@ -229,6 +232,22 @@ async function main() {
     await wait(process.env.INQUIRY_CARD_ONLY==="1" ? "window.migloopViewer?.tree && migloopViewer.report" : "window.migloopViewer?.tree && document.querySelector('#side .vrow')");
     let liveDiagnostic = null;
     const rootNode="migloopViewer.tree.byId[migloopViewer.tree.root]";
+    assert.equal(await evaluate("migloopViewer.frozen"),true,"loaded reports freeze by default");
+    assert.equal(await evaluate("document.querySelector('#freeze').getAttribute('aria-pressed')"),"true");
+    assert.equal(await evaluate("document.querySelector('#summary').hidden"),false,"summary has a visible toolbar entry");
+    const frozenSnapshot="JSON.stringify({nodes:Object.values(migloopViewer.tree.byId).map(n=>[n.tid,n.scope,n.children,n.x,n.y]),wires:[...document.querySelectorAll('#wires path')].map(p=>[p.dataset.edge,p.getAttribute('d')]),zoom:migloopViewer.zoom,scroll:[document.querySelector('#graph').scrollLeft,document.querySelector('#graph').scrollTop]})";
+    const frozenBefore=await evaluate(frozenSnapshot);
+    const frozenBranch=await evaluate("Object.values(migloopViewer.tree.byId).find(n=>!n.isRoot&&n.children?.length)?.tid || migloopViewer.tree.root");
+    const neighborCount=requests.filter(q=>q.view==='neighbors').length;
+    await evaluate("window.savedTreeElement=document.querySelector('[data-tid=\""+frozenBranch+"\"]');savedTreeElement.click();savedTreeElement.click()");
+    await wait("document.querySelector('#side').dataset.node==="+JSON.stringify(frozenBranch));
+    assert.equal(await evaluate(frozenSnapshot),frozenBefore,"frozen clicks preserve nodes, edges, geometry, zoom and scroll");
+    assert.equal(await evaluate("savedTreeElement.isConnected"),true,"inspect does not rebuild the canvas");
+    assert.equal(requests.filter(q=>q.view==='neighbors').length,neighborCount,"frozen inspection does not fetch extra upstream relations");
+    await evaluate("document.querySelector('#summary').click()");
+    await wait("document.querySelector('#reportsDialog').open");
+    assert.equal(await evaluate("Boolean(document.querySelector('#card-summary')) && Boolean(document.querySelector('#card-recommendations'))"),true);
+    await evaluate("document.querySelector('#closeReports').click();migloopViewer.select(migloopViewer.tree.root)");
     if(liveUrl) {
       // Inspect drawn SVG paths, not merely the report's backing edge rows.
       const wireDiagnostic = await evaluate("(()=>{const expected=Object.values(migloopViewer.tree.byId).filter(n=>n.parent&&!n.noEdge),paths=[...document.querySelectorAll('#wires path')];return {expected:expected.length,drawn:paths.length,reviewed:paths.filter(p=>p.classList.contains('reviewed')).length,visibleGeometry:paths.every(p=>Number.isFinite(p.getTotalLength())&&p.getTotalLength()>0&&getComputedStyle(p).stroke!=='none'&&Number(getComputedStyle(p).strokeOpacity)>0)};})()");
@@ -268,6 +287,7 @@ async function main() {
         fs.writeFileSync(path.join(out,"audit.json"),JSON.stringify(audit,null,2));console.log(JSON.stringify(audit));
         await send("Browser.close").catch(()=>{});return;
       }
+      await evaluate("document.querySelector('#freeze').click()");
       liveDiagnostic=await evaluate("(async()=>{const t=migloopViewer.tree,getTrace=()=>fetch((INQUIRY_CONFIG.api_base||'')+'/api/trace?session='+encodeURIComponent(migloopViewer.report.trace_session)).then(r=>r.json());const before=await getTrace(),seedEdges=Object.values(t.byId).filter(n=>n.row).length;await migloopViewer.expand(t.root);const first=t.byId[t.root].children.map(id=>t.byId[id]).find(n=>n.kind==='agent');if(first)await migloopViewer.expand(first.tid);const after=await getTrace();return {seedEdges,nodes:Object.values(t.byId).length,gaps:migloopViewer.hiddenPaths.length,traceUnchanged:JSON.stringify(before)===JSON.stringify(after),ordinaryCandidates:Object.values(t.byId).filter(n=>n.row?.strength==='candidate'&&n.row.source!=='model_review').length,errors:Object.values(t.byId).filter(n=>n.error).map(n=>n.error)};})()");
       assert(liveDiagnostic.traceUnchanged);assert.equal(liveDiagnostic.ordinaryCandidates,0);assert.deepEqual(liveDiagnostic.errors,[]);
       await evaluate("migloopViewer.select(migloopViewer.tree.root)");
@@ -324,6 +344,8 @@ async function main() {
       await evaluate("document.querySelector('[data-operation=\"read\"] .act .lnk').click()");
       await wait("document.querySelector('#side .srcblock')?.textContent.includes('PARTIAL READ')");
       assert.equal(await evaluate("document.querySelector('#side').textContent.includes('可能是片段')"),true);
+      await evaluate("document.querySelector('#freeze').click()");
+      assert.equal(await evaluate("migloopViewer.frozen"),false);
       await evaluate("migloopViewer.expand(migloopViewer.tree.root)");
       assert.equal(await evaluate(rootNode+".children.filter(id=>migloopViewer.tree.byId[id].row).length"),1,"prototype groups repeated writes by one writer");
       assert.equal(await evaluate(rootNode+".children.map(id=>migloopViewer.tree.byId[id]).find(n=>n.groupRows?.length===2).groupRows.length"),2,"grouping retains both original event IDs");
@@ -367,6 +389,8 @@ async function main() {
       await evaluate("document.querySelector('#at').value='2026-09-12T10:00:00.000003Z';document.querySelector('#applyTime').click()");
       await wait(rootNode+".scope.at==='2026-09-12T10:00:00.000003Z'&&!document.querySelector('#timeDialog').open");
       assert.equal(await evaluate("migloopViewer.report"),null);
+      assert.equal(await evaluate("migloopViewer.frozen"),false,"manual roots default to unfrozen");
+      assert.equal(await evaluate("document.querySelector('#summary').hidden"),true);
       assert.equal(await evaluate("new URLSearchParams(location.search).has('report')"),false);
       await send("Page.reload");
       await wait("migloopViewer.tree?.byId[migloopViewer.tree.root]?.scope.at==='2026-09-12T10:00:00.000003Z' && !migloopViewer.tree.byId[migloopViewer.tree.root].busy");
@@ -385,6 +409,8 @@ async function main() {
       assert(!requests.some(q=>q.op==="record_trace"));
       const race=await evaluate("(async()=>{const slow=migloopViewer.loadReport('slow');await migloopViewer.loadReport('tree-fixture');await slow;return new URLSearchParams(location.search).get('report')})()");
       assert.equal(race,"tree-fixture");
+      assert.equal(await evaluate("migloopViewer.frozen"),true,"reloading restores the saved tree and freezes it");
+      await evaluate("document.querySelector('#freeze').click()");
       await evaluate("migloopViewer.expand(migloopViewer.tree.byId[migloopViewer.tree.root].children[0])");
       const emptyId=await evaluate("Object.values(migloopViewer.tree.byId).find(n=>n.scope?.key==='/migration/specs/External.md').tid");
       await evaluate("document.querySelector('[data-tid=\""+emptyId+"\"]').click()");
@@ -400,13 +426,35 @@ async function main() {
       await evaluate("document.querySelector('.expansion-note .lnk').click()");
       await wait("migloopViewer.tree.byId['"+retryId+"'].loaded && !migloopViewer.tree.byId['"+retryId+"'].error && migloopViewer.tree.byId['"+retryId+"'].children.length===1");
       assert.equal(await evaluate("document.querySelector('.expansion-note').hidden"),true,"successful retry clears failure instead of claiming no writer");
+      const expandableId=await evaluate("migloopViewer.tree.byId[migloopViewer.tree.root].children[0]");
+      const beforeCollapse=await evaluate("Object.keys(migloopViewer.tree.byId).length");
+      await evaluate("document.querySelector('[data-tid=\""+expandableId+"\"]').click()");
+      assert(await evaluate("Object.keys(migloopViewer.tree.byId).length")<beforeCollapse,"unfrozen click still collapses");
+      await evaluate("document.querySelector('[data-tid=\""+expandableId+"\"]').click()");
+      await wait("migloopViewer.tree.byId['"+expandableId+"'].children?.length>0 && !migloopViewer.tree.byId['"+expandableId+"'].busy");
+      await evaluate("migloopViewer.openRoot({kind:'file',key:"+JSON.stringify(report.target.file)+",at:"+JSON.stringify(times.root)+"})");
+      assert.equal(await evaluate("migloopViewer.frozen"),false);
+      const manualWriter=await evaluate("migloopViewer.tree.byId[migloopViewer.tree.root].children[0]");
+      let releaseNeighbors;
+      holdNeighbors={key:writer.node.key,started:false,promise:new Promise(resolve=>{releaseNeighbors=resolve;})};
+      await evaluate("window.pendingExpansion=migloopViewer.expand('"+manualWriter+"');void 0");
+      for(let i=0;i<100&&!holdNeighbors.started;i++)await sleep(10);
+      assert(holdNeighbors.started,"test holds a real in-flight upstream response");
+      await evaluate("document.querySelector('#freeze').click()");
+      const pendingSnapshot=await evaluate(frozenSnapshot);
+      releaseNeighbors();await evaluate("pendingExpansion");holdNeighbors=null;
+      assert.equal(await evaluate(frozenSnapshot),pendingSnapshot,"late responses cannot grow a tree after freeze");
+      await evaluate("document.querySelector('[data-tid=\""+manualWriter+"\"]').click()");
+      assert.equal(await evaluate(frozenSnapshot),pendingSnapshot,"manual freeze also permits inspect without expansion");
+      await evaluate("document.querySelector('#freeze').click();document.querySelector('[data-tid=\""+manualWriter+"\"]').click()");
+      await wait("migloopViewer.tree.byId['"+manualWriter+"'].children?.length>0 && !migloopViewer.tree.byId['"+manualWriter+"'].busy");
       await evaluate("document.querySelector('#q').value='';document.querySelector('#q').dispatchEvent(new Event('input'));document.querySelector('#zf').click()");
     }
     assert.equal(errors.length, 0, errors.join("\n"));
     const screenshot = await send("Page.captureScreenshot", { format: "png" });
     fs.writeFileSync(path.join(out, "inquiry-tree.png"), Buffer.from(screenshot.data, "base64"));
     const audit = { passed: true, url, errors, liveDiagnostic, queryCount: requests.length,
-      checks: ["migration-first report loading", "repair catalog independent of reports", "report list pagination", "load buttons above all repaired files", "original compact shell", "single tree for saved and manual exploration", "ordinary candidates hidden",
+      checks: ["report defaults frozen; manual defaults unfrozen", "frozen inspection preserves topology and viewport", "late expansion response discarded after freeze", "unfreeze restores expand/collapse", "visible summary and recommendations button", "migration-first report loading", "repair catalog independent of reports", "report list pagination", "load buttons above all repaired files", "original compact shell", "single tree for saved and manual exploration", "ordinary candidates hidden",
         "model-review-only dashed edges", "write text and edit delta", "read observation expansion",
         "trace isolation", "precise cutoff", "load dialog", "only load control", "original hover highlight", "colored inline diffs", "original grouped catalog", "Ctrl-wheel zoom", "write-only entry timeline", "empty upstream remains inspectable", "no JavaScript errors"],
     };

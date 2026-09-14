@@ -7,6 +7,7 @@
     var config = window.INQUIRY_CONFIG || {}, DATA = {fixes: [], fixers: [], reports: []};
     var IDX = null, XT = null, curRootKey = null, selTid = null, report = null;
     var navigation = 0, detailEpoch = 0, activeFinding = "", hiddenPaths = [], timeScope = null;
+    var treeFrozen = false, expansionEpoch = 0;
     var dataReady = false, agentById = {}, chainByFile = {}, fixerIds = {};
     var chips = document.getElementById("chips"), rail = document.getElementById("rail");
     var railBody = document.getElementById("railbody"), qInput = document.getElementById("q");
@@ -299,6 +300,8 @@
       return downstream ? addRight(parent, node) : addKid(parent, node);
     }
     async function expandRelations(node, direction, done) {
+      if (treeFrozen) return;
+      var epoch = expansionEpoch;
       var tree = XT, state = direction === "downstream" ? (node.downstream || (node.downstream = {})) : node;
       if (state.loaded && state.next == null) { node.busy = false; if(done)done(); return; }
       state.error = ""; node.busy = true;
@@ -308,7 +311,7 @@
         if (report) { q.report_id = report.report_id; if (activeFinding) q.finding = activeFinding; }
         var page;
         do {
-          page = await query(q); if (XT !== tree) return;
+          page = await query(q); if (XT !== tree || epoch !== expansionEpoch) return;
           if (page.rows.some(visibleRelation) || page.next == null) break;
           q.offset = page.next;
         } while (true);
@@ -329,23 +332,39 @@
         if (page.next != null && direction === "upstream") {
           addKid(node, xtNode("leaf", {label: "+ 继续展开", moreFor: node.tid, noEdge: true}));
         }
-      } catch (error) { state.error = error.message; }
+      } catch (error) { if (epoch === expansionEpoch) state.error = error.message; }
       finally { if(XT === tree) { node.busy = false; if(direction === "upstream")expansionFeedback(node); if(done)done(state.error); } }
     }
     function expandFile(node, done) { return expandRelations(node, "upstream", done); }
     function expandAgent(node, done) { return expandRelations(node, "upstream", done); }
+    function setFrozen(value) {
+      treeFrozen = Boolean(value); ++expansionEpoch;
+      var button = document.getElementById("freeze");
+      button.disabled = !XT;
+      button.setAttribute("aria-pressed", String(treeFrozen));
+      button.textContent = treeFrozen ? "已冻结" : "冻结展开";
+      button.title = treeFrozen ? "点击解冻，允许展开和收起；当前点击节点只查看详情。" : "冻结当前树，点击节点只查看详情。";
+      graphEl.classList.toggle("tree-frozen", treeFrozen);
+      document.getElementById("summary").hidden = !report;
+    }
+    function inspectNode(tid) {
+      var node = XT?.byId[tid]; if (!node || node.kind === "leaf") return;
+      selTid = tid;
+      Object.keys(nodeEls).forEach(id => nodeEls[id].classList.toggle("sel", id === tid));
+      side.scrollTop = 0;
+      if(node.kind === "file") drawerFile(node); else drawerAgent(node);
+    }
     function onNode(tid) {
       var node = XT.byId[tid]; if(!node)return;
-      if(node.moreFor) { const parent=XT.byId[node.moreFor]; parent.busy=true; expandRelations(parent, "upstream", ()=>renderTree(parent.tid)); return; }
-      selTid = tid;
-      if(node.kind === "file") drawerFile(node);
-      else if(node.kind === "agent") drawerAgent(node);
+      if(node.moreFor) { if(treeFrozen)return; const parent=XT.byId[node.moreFor]; parent.busy=true; expandRelations(parent, "upstream", ()=>renderTree(treeFrozen?null:parent.tid)); return; }
+      inspectNode(tid);
+      if(treeFrozen)return;
       if(node.busy || node.kind === "leaf" || node.isRight || node.reference) { renderTree(tid); return; }
       if(node.loaded && node.next == null && !(node.children || []).length && !node.error) { renderTree(tid); return; }
       if(node.expanded && !node.error) { collapse(node); node.loaded=false; node.next=null; renderTree(tid); return; }
       node.busy = true;
       renderTree(tid);
-      var done = function() { renderTree(tid); };
+      var done = function() { renderTree(treeFrozen?null:tid); };
       if(node.kind === "file") expandFile(node, done); else expandAgent(node, done);
     }
     function rootLabel(node) {
@@ -359,6 +378,7 @@
       const resolved = await view(scope, "history", {limit: 1}); if(epoch !== navigation)return;
       scope = resolved.scope; report = null; activeFinding = ""; hiddenPaths = [];
       XT = {byId: {}, seq: 0, root: null, rights: [], rootKind: scope.kind};
+      setFrozen(false);
       var root = decorateScope(scope, {isRoot: true, operation: spec.operation}); XT.root=root.tid;
       selTid=root.tid; autoFit=true; rootLabel(root);
       root.busy=true; renderTree(root.tid);
@@ -775,6 +795,7 @@
       var projection=new InquiryEvidenceTree.EvidenceTreeModel(graph.tree.root);
       projection.seed(graph,finding);hiddenPaths=projection.unclosed;
       XT={byId:{},seq:0,root:null,rights:[],rootKind:projection.root.coordinate.kind};
+      setFrozen(true);
       function copy(original,parent){
         var n=decorateScope(original.coordinate,{isRoot:!parent,claims:original.claims.slice(),row:original.row,
           isDispatch:original.row?.relation==="dispatch",reference:original.reference,expanded:original.children.length>0,
@@ -867,6 +888,7 @@
       ++navigation;++detailEpoch;report=null;activeFinding="";clearBtn.classList.remove("show");curRootKey=null;
       document.getElementById("rootlbl").textContent="两原子探索树 —— 文件 × agent，任何一个时刻都能当根";
       setUrl();renderEmptyCanvas();renderRail();side.innerHTML="";side.appendChild(el("div","placeholder","左栏选文件或 agent，再选一个时刻当根。"));
+      setFrozen(false);
     }
     rail.querySelector(".tog").onclick=function(){rail.classList.toggle("closed");this.textContent=rail.classList.contains("closed")?"▸":"◂";};
     qInput.oninput=function(){railState.q=qInput.value.trim().toLowerCase();renderRail();};
@@ -874,6 +896,8 @@
     document.getElementById("zo").addEventListener("click",function(){applyZoom(zoom/1.25);});
     document.getElementById("zf").addEventListener("click",function(){fitView();});
     document.getElementById("z1").addEventListener("click",function(){applyZoom(1);});
+    document.getElementById("freeze").onclick=function(){setFrozen(!treeFrozen);};
+    document.getElementById("summary").onclick=()=>guard(reportsDialog);
     graphEl.addEventListener("wheel",function(ev){if(!ev.ctrlKey)return;ev.preventDefault();applyZoom(zoom*(ev.deltaY<0?1.15:0.87));},{passive:false});
     clearBtn.addEventListener("click",reset);
     document.getElementById("closeReports").onclick=()=>document.getElementById("reportsDialog").close();
@@ -887,8 +911,8 @@
     };
     window.migloopViewer={loadReport,openRoot,
       get tree(){return XT;},get zoom(){return zoom;},get report(){return report;},get hiddenPaths(){return hiddenPaths;},
-      select:function(tid){var n=XT.byId[tid];selTid=tid;if(n.kind==="file")drawerFile(n);else drawerAgent(n);renderTree();},
-      expand:async function(tid,direction){var n=XT.byId[tid];await expandRelations(n,direction||"upstream");renderTree(tid);},
+      get frozen(){return treeFrozen;},select:inspectNode,
+      expand:async function(tid,direction){var tree=XT,n=tree.byId[tid];await expandRelations(n,direction||"upstream");if(XT===tree)renderTree(treeFrozen?null:tid);},
       get layout(){return layoutSize;}};
     renderEmptyCanvas();
     guard(async function(){

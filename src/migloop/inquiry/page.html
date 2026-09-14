@@ -206,7 +206,7 @@
         <i><span class="sw" style="border-color:var(--c-fix)"></span>修复方</i>
         <i>红色：模型判断</i><i>虚线：模型复核补充</i>
       </div>
-      <div class="zoomctl"><button id="zo">−</button><button id="zi">+</button><button id="zf">适应</button><button id="z1">1:1</button></div>
+      <div class="zoomctl"><button id="summary" hidden>总结与建议</button><button id="freeze" aria-pressed="false" disabled title="冻结当前树，点击节点只查看详情。">冻结展开</button><button id="zo">−</button><button id="zi">+</button><button id="zf">适应</button><button id="z1">1:1</button></div>
     </div>
     <div class="canvas" id="canvas"><svg class="wires" id="wires"></svg></div>
   </div>
@@ -223,6 +223,9 @@
 /* Only the time/review overlay and its load dialog supplement the prototype. */
 .node.dispatch,.node.down{border-style:solid}.node.reviewed{border-style:dashed}
 .wire.reviewed{stroke-dasharray:4 4}.node.problem{border-color:var(--c-fix);color:var(--c-fix)}
+.zoomctl button{white-space:nowrap}.zoomctl button[aria-pressed="true"]{color:var(--c-spec);border-color:var(--c-spec);background:color-mix(in srgb,var(--c-spec) 7%,var(--surface))}
+.zoomctl button:disabled{opacity:.5;cursor:default}.tree-frozen .node .chev{visibility:hidden}
+#freeze{min-width:72px}
 /* The name/coordinate split is retained from dev/fixchain, with time as suffix. */
 .node-caption { display: inline-flex; max-width: 100%; vertical-align: top; }
 .node-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
