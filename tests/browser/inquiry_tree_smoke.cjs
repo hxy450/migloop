@@ -307,7 +307,8 @@ async function main() {
       await evaluate("document.querySelector('#q').value='GuidePage.ets';document.querySelector('#q').dispatchEvent(new Event('input'));document.querySelector('#railbody .ritem .rrow').click()");
       await wait("document.querySelector('#railbody .vers .vline')");
       await evaluate("document.querySelector('#railbody .vers .vline').click()");
-      await wait("migloopViewer.tree?.byId[migloopViewer.tree.root]?.scope.key.endsWith('/GuidePage.ets') && !migloopViewer.tree.byId[migloopViewer.tree.root].busy");
+      // Parallel root loads can clear busy before renderTree paints the writer.
+      await wait("migloopViewer.tree?.byId[migloopViewer.tree.root]?.scope.key.endsWith('/GuidePage.ets') && !migloopViewer.tree.byId[migloopViewer.tree.root].busy && Object.values(migloopViewer.tree.byId).some(n=>n.aid?.includes(':aconv-guide-')&&document.querySelector('[data-tid=\"'+n.tid+'\"]'))");
       const guideWriter=await evaluate("Object.values(migloopViewer.tree.byId).find(n=>n.aid?.includes(':aconv-guide-')).tid");
       await evaluate("document.querySelector('[data-tid=\""+guideWriter+"\"]').click()");
       await wait("Object.values(migloopViewer.tree.byId).some(n=>n.path?.endsWith('/resource-mapping.md'))");
