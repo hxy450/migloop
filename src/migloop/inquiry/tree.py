@@ -302,6 +302,7 @@ def tree_neighbors(engine, scope, request):
 def evidence_paths(engine, graph):
     """Time-monotone paths in cited evidence only, never a global shortest guess."""
     from .engine import in_scope
+    from .feedback import time_conflict
 
     target = graph["target"]
     root = coordinate(
@@ -406,6 +407,7 @@ def evidence_paths(engine, graph):
             found = None
             anchor = None
             inspected = 0
+            blocked = {}
             while queue and inspected < 10000 and repair_at is not None:
                 scope, steps, seen, incident, node_id = queue.popleft()
                 inspected += 1
@@ -456,7 +458,13 @@ def evidence_paths(engine, graph):
                         anchor = neighbor_row(supporting, scope)
                     break
                 for event in incoming_edges:
-                    if event["id"] in seen or event["at"] > min(at, repair_at):
+                    if event["id"] in seen:
+                        continue
+                    if event["at"] > min(at, repair_at):
+                        # Keep the precise rejected pair from this traversal,
+                        # not a guessed path. Report it only if no path succeeds.
+                        downstream = steps[-1] if steps else repair_row
+                        blocked[(event["id"], downstream["id"])] = time_conflict({**event, "at": iso(event["at"])}, downstream)
                         continue
                     row = neighbor_row(event, scope)
                     if row is None:
@@ -501,6 +509,10 @@ def evidence_paths(engine, graph):
             # inventing a generation-fault node to make their path visible.
             display_only = goal["role"] in ("context", "repaired")
             destination = context_paths if display_only else paths
+            conflicts = list(blocked.values()) if found is None else []
+            time_note = (f" 已遍历分支时间倒序：{conflicts[0]['upstream']['relation']}@{conflicts[0]['upstream']['at']}"
+                         f" 晚于下游 {conflicts[0]['downstream']['relation']}@{conflicts[0]['downstream']['at']}；"
+                         "较晚读取不能作为较早写入的输入。请核原调用，扩大节点截止或 force 不会改变事件先后。") if conflicts else ""
             destination.append(
                 {
                     "finding": fid,
@@ -511,8 +523,11 @@ def evidence_paths(engine, graph):
                     "steps": found or [],
                     "anchor": anchor,
                     "repair_anchor": repair_row,
+                    "blocked_branches": conflicts[:4],
+                    "blocked_branch_count": len(conflicts),
                     "diagnostic": (
                         "缺少目标修改引用或到此节点的同问题、非倒序证据路径。"
+                        + time_note
                         + (
                             " 路径搜索达到预算，未证明不存在。"
                             if inspected >= 10000

@@ -230,6 +230,11 @@ async function main() {
     let liveDiagnostic = null;
     const rootNode="migloopViewer.tree.byId[migloopViewer.tree.root]";
     if(liveUrl) {
+      // Inspect drawn SVG paths, not merely the report's backing edge rows.
+      const wireDiagnostic = await evaluate("(()=>{const expected=Object.values(migloopViewer.tree.byId).filter(n=>n.parent&&!n.noEdge),paths=[...document.querySelectorAll('#wires path')];return {expected:expected.length,drawn:paths.length,reviewed:paths.filter(p=>p.classList.contains('reviewed')).length,visibleGeometry:paths.every(p=>Number.isFinite(p.getTotalLength())&&p.getTotalLength()>0&&getComputedStyle(p).stroke!=='none'&&Number(getComputedStyle(p).strokeOpacity)>0)};})()");
+      assert.equal(wireDiagnostic.drawn,wireDiagnostic.expected,"all visible tree relations have SVG paths");
+      assert(wireDiagnostic.visibleGeometry,"drawn paths have visible nonempty stroke geometry");
+      await evaluate("new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))");
       const initialShot = await send("Page.captureScreenshot", { format: "png" });
       fs.writeFileSync(path.join(out, "loaded-report.png"), Buffer.from(initialShot.data, "base64"));
       const problem = await evaluate("Object.values(migloopViewer.tree.byId).find(n=>n.claims.some(c=>c.role==='origin'))?.tid");
@@ -245,6 +250,7 @@ async function main() {
         if(process.env.INQUIRY_REQUIRE_NARRATIVE==="1")assert.equal(await evaluate("document.querySelector('#reportsDialog').scrollTop"),0,"real card opens at its file summary");
         await evaluate("document.querySelectorAll('#reportNotes details').forEach(n=>n.open=true);document.querySelectorAll('#reportNotes .quote .more').forEach(n=>n.click())");
         const cardDiagnostic=await evaluate("(()=>{const r=migloopViewer.report,t=migloopViewer.tree,text=document.querySelector('#reportNotes').textContent;return {report_id:r.report_id,source_sha256:r.source_sha256,nodes:Object.values(t.byId).length,seedEdges:Object.values(t.byId).filter(n=>n.row).length,unclosed:migloopViewer.hiddenPaths.length,recommendationsVisible:r.document.findings.filter(f=>typeof f.recommendation==='string'&&f.recommendation).every(f=>text.includes(f.recommendation)),reasonsVisible:r.document.findings.every(f=>text.includes(f.reason)),ordinaryCandidates:Object.values(t.byId).filter(n=>n.row?.strength==='candidate'&&n.row.source!=='model_review').length};})()");
+        cardDiagnostic.wires=wireDiagnostic;
         cardDiagnostic.narrative=await evaluate("(()=>{const d=migloopViewer.report.document,text=document.querySelector('#reportNotes').textContent;return {present:!!d.summary,summaryVisible:!!d.summary&&[d.summary.generation,d.summary.repair,...d.summary.unknown].every(v=>text.includes(v)),actions:(d.recommendations||[]).length,actionsVisible:(d.recommendations||[]).every(r=>['target','action','reason','validation'].every(k=>text.includes(r[k]))),boundariesVisible:d.findings.filter(f=>f.boundary).every(f=>text.includes(f.boundary.reason))};})()");
         if(process.env.INQUIRY_REQUIRE_NARRATIVE==="1") {
           assert(cardDiagnostic.narrative.present&&cardDiagnostic.narrative.summaryVisible);

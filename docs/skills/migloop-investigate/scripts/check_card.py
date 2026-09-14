@@ -68,6 +68,8 @@ def audit(index_path, report_id, task, *, require_declared=False):
         ready = (not target_errors and not content_errors and not investigation_gaps
                  and graph["mechanical_status"] == "valid"
                  and graph["path_status"] == "complete" and coverage["complete"])
+        from migloop.inquiry.feedback import related_evidence
+
         return {
             "report_id": report_id,
             "source_sha256": graph["source_sha256"],
@@ -85,7 +87,7 @@ def audit(index_path, report_id, task, *, require_declared=False):
             "issues": graph["issues"],
             "unverified_edges": graph["unverified_edges"],
             "unclosed_paths": unresolved_paths,
-            "missing_evidence_links": graph["missing_evidence_links"],
+            "related_evidence": related_evidence(graph),
             "counts": {
                 "findings": len(document["findings"]),
                 "nodes": len(graph["nodes"]),

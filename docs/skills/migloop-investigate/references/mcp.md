@@ -1,6 +1,6 @@
 # Inquiry MCP 调用与交付
 
-三个工具：`investigate(requests=[...])` 批量 1–24 个独立查询；`page` 续结果正文；`submit(document="完整 YAML/JSON")` 保存结论。file/agent 等是 investigate 内的 op，不是独立 MCP 工具。不存在 guide/sessions/batch/check 工具。
+三个工具：`investigate(requests=[...])` 批量 1–24 个独立查询；`page` 续结果正文；`submit(card={完整 inquiry/1 对象})` 保存结论，避免把整份 JSON 再包成字符串。也接受 `submit(document="完整 YAML/JSON 原稿")`，两种不同时填。file/agent 等是 investigate 内的 op，不是独立 MCP 工具。不存在 guide/sessions/batch/check 工具。
 
 ## 时间、引用与续读
 
@@ -43,6 +43,8 @@ neighbors 与 UI 共用投影，默认上游；`direction:downstream` 看下游�
 
 ## YAML：同一份原稿、节点原因与证据
 
+以下 YAML 说明字段结构；调用 MCP 时优先把同样结构作为 `card` 对象提交，不需手工双重转义脚本引文。服务端只序列化为 JSON 原稿，仍执行全部相同核验，保存原字段/内容与摘要；已有 `document` 字符串则逐字保留。两种均使用同一加载器/UI。
+
 ```yaml
 schema: inquiry/1
 target: {scope: "目标文件修复区间的 s-file-..."}
@@ -64,12 +66,16 @@ findings:
     changes: ["目标修复窗口的 e-调用", "e-回执"]
     nodes:
       - id: input
-        scope: "实际查询返回的 s-file-..."
+        kind: file
+        key: 正确输入文件的完整路径
+        at: "涵盖实际交付的ISO截止"
         role: context
         reason: 此处要求已充分且正确，本分支可停止的依据；或只是相关背景
         evidence: ["e-收到的原文"]
       - id: author
-        scope: "实际查询返回的 s-agent-..."
+        kind: agent
+        key: 实际作者的转录文件名
+        at: "涵盖实际写入的ISO截止"
         role: origin
         reason: 具体失误，不把读取或转述当写出
         evidence: ["e-实际写出"]
@@ -103,11 +109,17 @@ boundary 只含 status/nodes/reason。status 仅 supported_input（相关输入�
 
 新情景卡明确填写 edges：from/to 是本 finding 的节点 ID，不是 scope。最简只填 `{from,to}`，服务端按 read:file→agent、write:agent→file、dispatch:parent→child 查两端范围内的全部已确认操作并附引用，不任挑一次。节点 `{kind:agent,key:完整转录名或唯一文件名,at:ISO}` 会解析为实际 agent；也接受已有 agent key。文件优先完整路径，歧义会报错。无需先打开原子取得 scope。节点 at 是历史截止，例如中间文件可取读取返回时刻，不表示那时发生了写。
 
+时间小例：甲在10:00写文件，乙在10:10读到、10:11再写。交付节点可为 `甲@10:00 → 文件@10:10 → 乙@10:11 → 目标文件@观察截止`。中间文件若填10:00，会把要证明的10:10读取排除在范围外；不能仅因其角色是“生成输出”就缩到最后Write时刻。at约束相关操作范围，坏内容属于哪次写入由节点引用/原因说明，不把file@at宣称为该时刻已知的完整快照。脚本内部读写同理，复核时使用实际调用/回执时刻；写后的独立Read不能代替脚本内的输入。
+
 需要精确限定操作时仍可填 `{from,to,link,claim}` 或 `{from,to,relation,evidence:[原生调用或回执],claim}`，不混用。单条引用唯一时补全并重核配对，多调用可用 link 消歧。未返回不借未来回执升级；关系、参与者和时间可核不等于内容传播成立。
 
 inputs 顶部的 scope_id 仍是 agent；要画真实读取，用该 read link 的 from_scope 指向文件，不要把 agent 输入视图当文件。相同实体、相同时间范围的多个节点 ID 只是同一原子的不同判断；context 可依据实际到达的输入标注同一 agent，不需要伪造 agent→agent 的 read。较宽查询范围中的晚到输入不能支持较早写入。中间文件需要生成期历史时，不要继承 target 的修复窗口 since。
 
-不同时间的同文件节点不会合并成捷径。末端节点是目标文件@observation_end，历史范围可不设 since；顶层 target 的修复区间不变。只有缺口时也保留 edges:[] 和明确 unknown。旧卡省略 edges 仍可载入，但其自动路径是背景，不是新技能要求的已交付论证；不要通过省略边换取自动连通。missing_evidence_links 仅为可选导航，独立对照不用强行连边。
+不同时间的同文件节点不会合并成捷径。末端节点是目标文件@observation_end，历史范围可不设 since；顶层 target 的修复区间不变。只有缺口时也保留 edges:[] 和明确 unknown。旧卡省略 edges 仍可载入，但其自动路径是背景，不是新技能要求的已交付论证；不要通过省略边换取自动连通。
+
+submit 和审核中的 `related_evidence` 是可选参考操作（`required:false`），带实际操作时间、actor、调用和回执。它不是缺失边清单，不需要清空；其中的晚期读取可能只是修后验证。`paths[].blocked_branches` 给已遍历分支上实际倒序的两个操作及引用（预览最多4条，另附总数）：上游操作不能晚于它要解释的下游操作。边各自可定位不等于整条链时序成立；不能把写后的 Read 回执接成写前输入，也不能通过扩大节点截止或 force 改变原始事件先后。核实该次写真正用到的输入；缺证则保留断点。
+
+若默认 `{from,to}` 绑定的原生读取是错误的那次，不必保留它：保持真实交接的 from/to，明确填 `relation:read` 和实际更早输入的 `evidence`，先普通提交。较早输入可能在原始脚本中，服务端若未解析，会给这条明确声明可复核的反馈，下一稿再加 force。不能只把整条错误路径列为 unknown 就结束，也不能直接 force 一个未经普通反馈的新声明；先完成能核的纠正，确实缺证才留断点。
 
 执行检查可选 checks（位于 finding，与 edges 同级）：
 

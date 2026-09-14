@@ -214,11 +214,19 @@ def build_mcp(path):
         return execute(continuation)
 
     @server.tool(**options)
-    def submit(document: str) -> str:
-        """保存同一调查员的inquiry/1 YAML/JSON原稿，核引用/时间/原生边，不认证归因；不调用第二模型。"""
+    def submit(card: dict | None = None, document: str = "") -> str:
+        """保存inquiry/1：优先card对象，或document原稿字符串，不同时填。核引用/时间/边，不认证归因。"""
+
+        # Keep document's annotation exactly str: FastMCP otherwise pre-parses
+        # JSON strings and loses their original whitespace/source hash.
+        if card is not None and document:
+            raise ValueError("submit accepts card object or document text, not both")
+        source = encode(card) if card is not None else document
 
         def save(engine):
-            graph = check(engine, document, save=True)
+            from .feedback import related_evidence
+
+            graph = check(engine, source, save=True)
             summary = {
                 k: graph[k]
                 for k in (
@@ -236,7 +244,7 @@ def build_mcp(path):
             summary["revision_hint"] = {"revision_of": graph["report_id"],
                 "note": "Revise this saved draft. Only unchanged endpoints marked force_eligible may add force:true with claim, evidence and review; force stays a report-local dashed model claim."}
             summary["paths"] = [
-                {k: p[k] for k in ("finding", "node", "status", "basis", "diagnostic")}
+                {k: p[k] for k in ("finding", "node", "status", "basis", "diagnostic", "blocked_branches", "blocked_branch_count")}
                 for p in graph["tree"]["paths"]
             ]
             summary["path_note"] = graph["tree"]["note"]
@@ -255,10 +263,7 @@ def build_mcp(path):
                 summary["resolution_hint_note"] = (
                     "Exact owned original-query matches only. All errors remain; reopen each suggested source and correct your own report. No automatic rewriting or semantic proof."
                 )
-            summary["missing_evidence_links"] = [
-                {k: r.get(k) for k in ("link", "op", "path", "from_scope", "to_scope")}
-                for r in graph["missing_evidence_links"]
-            ]
+            summary["related_evidence"] = related_evidence(graph)
             c = graph["coverage"]
             review = graph["evidence_review"]
             summary["evidence_review"] = {
