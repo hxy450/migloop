@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 from functools import lru_cache
 from pathlib import Path
 
-from .command_shape import call_read_basis
+from .command_shape import call_read_basis, literal_path_mentions
 
 _FILE_TOKEN = re.compile(r"(?<![\w.])[\w@+-][\w@+.-]*\.[A-Za-z][A-Za-z0-9]{0,15}(?!\w)")
 
@@ -395,6 +395,12 @@ class Store:
                             "INSERT INTO calls VALUES(?,?,?,?)",
                             (ref, slot, tool, call_read_basis(tool, payload)),
                         )
+                    if role == "request":
+                        for mentioned_path in literal_path_mentions(tool, payload):
+                            # A source-backed lexical identity, not a read/write.
+                            # Rebuilt indexes gain hints; old indexes are not migrated.
+                            db.execute("INSERT OR IGNORE INTO files VALUES(?)", (mentioned_path,))
+                            db.execute("INSERT OR IGNORE INTO mentions VALUES(?,?)", (mentioned_path.casefold(), ref))
                     db.execute(
                         "INSERT INTO parts VALUES(?,?,?,?,?,?,?,?,?,?)",
                         (
@@ -637,6 +643,12 @@ class Store:
             "SELECT 1 FROM effects e LEFT JOIN records r ON r.ref=e.request WHERE e.path=? AND "
             "((e.at<=? AND (? IS NULL OR e.at>=?)) OR (r.at<=? AND (? IS NULL OR r.at>=?))) LIMIT 1",
             (key, at, since, since, at, since, since),
+        ).fetchone():
+            return True
+        if "/" in key and self.db.execute(
+            "SELECT 1 FROM mentions m JOIN records r ON r.ref=m.record WHERE m.name=? "
+            "AND r.at<=? AND (? IS NULL OR r.at>=?) LIMIT 1",
+            (key.casefold(), at, since, since),
         ).fetchone():
             return True
         name = posixpath.basename(key).casefold()

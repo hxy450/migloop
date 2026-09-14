@@ -93,8 +93,10 @@ def prepare(engine, source, parent=AUTO_PARENT):
                 raise ValueError("Entity has no recorded evidence before this cutoff; inspect its actual history/time")
             return kind, key, at
         except (ValueError, TypeError, OSError) as exc:
+            name = PurePosixPath(value["key"].replace("\\", "/")).name
+            catalog_kind = "file" if "." in name and not name.endswith(".jsonl") else "source"
             reject(where, str(exc), supplied=value,
-                   query={"op": "catalog", "kind": "source", "q": value["key"].split("/")[-1]})
+                   query={"op": "catalog", "kind": catalog_kind, "q": name})
             return None
 
     required = ("target", "summary", "recommendations", "nodes", "edges")
@@ -129,6 +131,7 @@ def prepare(engine, source, parent=AUTO_PARENT):
     if issues:
         raise CardError(issues)
     nodes, identities = [], {}
+    declared_coordinates = [None] * len(source["nodes"])
     for i, item in enumerate(source["nodes"]):
         where = f"nodes[{i}]"
         if not fields(item, ("key", "at", "reason", "problem"), ("key", "at", "reason"), where):
@@ -145,6 +148,7 @@ def prepare(engine, source, parent=AUTO_PARENT):
             continue
         nid = "n-" + digest(encode(identity).encode())[:16]
         identities[identity] = nid
+        declared_coordinates[i] = identity
         nodes.append({"id": nid, "kind": identity[0], "key": identity[1], "at": iso(identity[2]),
                       "reason": item["reason"], "role": "problem" if item.get("problem") else "context"})
     root_identity = ("file", target_key, observation)
@@ -153,12 +157,32 @@ def prepare(engine, source, parent=AUTO_PARENT):
         identities[root_identity] = nid
         nodes.append({"id": nid, "kind": "file", "key": target_key, "at": iso(observation),
                       "reason": "返修目标端点（系统坐标，无额外归因判断）。", "role": "repaired"})
+
+    def endpoint(value, where):
+        # Authoring shorthand only: resolve once to the exact same coordinates.
+        # Integers are positions in THIS submission, never persistent identities.
+        if type(value) is int:
+            if not 1 <= value <= len(declared_coordinates):
+                reject(where, "Node number is 1-based in this submission's nodes list; "
+                       "use 1 through " + str(len(declared_coordinates)) + " or 'target'", supplied=value)
+                return None
+            identity = declared_coordinates[value - 1]
+            if identity is None:
+                reject(where, f"Referenced nodes[{value - 1}] is invalid; fix that declaration first", supplied=value)
+            return identity
+        if value == "target":
+            return root_identity
+        if isinstance(value, dict):
+            return coord(value, where)
+        reject(where, "Expected a 1-based node number, 'target', or an explicit {key, at} coordinate", supplied=value)
+        return None
+
     edges = []
     for i, item in enumerate(source["edges"]):
         where = f"edges[{i}]"
         if not fields(item, ("from", "to", "force", "reason", "evidence"), ("from", "to"), where):
             continue
-        endpoints = [coord(item[k], where + "." + k) for k in ("from", "to")]
+        endpoints = [endpoint(item[k], where + "." + k) for k in ("from", "to")]
         if None in endpoints:
             continue
         if any(c not in identities for c in endpoints):
