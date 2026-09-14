@@ -1382,6 +1382,37 @@ class Engine:
             )
         }
         auxiliary = []
+        open_at = (data.get("scope") or {}).get("at") or result["query"].get("at")
+        if data["kind"] == "changes" and any(
+            row.get("payloads") for row in data.get("rows", [])
+        ):
+            lines.append(
+                "NATIVE INDEX (selected page only; not complete file history; full payloads follow)"
+            )
+            for row in data["rows"]:
+                entry = {
+                    k: row[k]
+                    for k in ("at", "agent", "op", "strength", "request", "result")
+                    if k in row
+                }
+                entry["payloads"] = [
+                    {
+                        k: item[k]
+                        for k in (
+                            "tool", "block", "step", "kind", "snapshot_lines",
+                            "snapshot_chars", "old_lines", "new_lines",
+                        )
+                        if k in item
+                    }
+                    for item in change_outline(row.get("payloads", []))
+                ]
+                ref = row.get("request") or row.get("result")
+                if ref:
+                    entry["open"] = {"op": "open", "ref": ref}
+                    if open_at is not None:
+                        entry["open"]["at"] = open_at
+                lines.append("NATIVE ENTRY " + encode(entry))
+            lines.append("END NATIVE INDEX")
         if data["kind"] in ("original", "diff"):
             lines += [
                 "SELECTED HISTORICAL CONTENT (not a verified claim)",
@@ -1470,8 +1501,24 @@ class Engine:
                         f"END NATIVE {row['request'] or row['result']} @ {row['at']}"
                     )
                 elif "excerpt" in row:
+                    ref = row.get("cite") or row["ref"]
+                    preview = {
+                        label: row[key]
+                        for key, label in (
+                            ("chars", "original_chars"),
+                            ("excerpt_offset", "excerpt_offset"),
+                            ("name", "source"),
+                            ("line", "line"),
+                        )
+                        if key in row
+                    }
+                    if "is_full_original" in row:
+                        preview["preview_only"] = not row["is_full_original"]
+                    preview["open"] = {"op": "open", "ref": ref}
+                    if open_at is not None:
+                        preview["open"]["at"] = open_at
                     lines.append(
-                        f"{row.get('cite', row['ref'])} {row['at'] or 'UNDATED'} {'/'.join(row.get('tools', []))} {row['agent'] or 'UNKNOWN OWNER'} owner_scope={row.get('agent_scope') or '-'} | {row['excerpt']}"
+                        f"{ref} {row['at'] or 'UNDATED'} {'/'.join(row.get('tools', []))} {row['agent'] or 'UNKNOWN OWNER'} owner_scope={row.get('agent_scope') or '-'} PREVIEW {encode(preview)} | {row['excerpt']}"
                         + (
                             f" results={encode(row['results'])}"
                             if row.get("results")
