@@ -44,7 +44,10 @@ file/agent view:neighbors 与UI共用历史投影；direction:downstream看下�
 
 limit范围1–100。列表next是下一页，END FRAME next是正文续帧，两者不同，选定全文须续完。
 page(result_id:RESULT编号,offset:END FRAME的next)，或page(requests:[{result_id,offset},...])每批1–4项，建议2项。
+整包按转义UTF-8字节限长；DEFERRED.requests是本包尚未发送的原游标，继续page即可，不用重新查询。
+submit若返回feedback:{result_id,offset,complete:false}，完整校验反馈已保存，用page续完再修稿。
 结果原文已保存，续读不用重新查；直接转发工具content.text，避免宿主再封一层JSON导致截断。
+不要在一次宿主输出里再次拼接多个独立MCP大响应；批量用工具的requests，每次单独转发返回文本。
 
 submit优先 card 对象，或 document 原稿字符串，二者不同时填。精简卡只需：
 target:{key:任务文件,since:任务生成截止,at:任务观察截止}
@@ -121,18 +124,7 @@ def build_mcp(path):
                 "page entries require a nonempty id and nonnegative integer offset"
             )
 
-        def continuation(engine):
-            frames = []
-            for request in requests:
-                try:
-                    frames.append(engine.page(request["result_id"], request["offset"]))
-                except (ValueError, TypeError) as exc:
-                    frames.append(
-                        "PAGE ERROR " + encode({**request, "error": str(exc)})
-                    )
-            return "\n\n".join(frames)
-
-        return execute(continuation)
+        return execute(lambda engine: engine.pages(requests))
 
     @server.tool(**options)
     def submit(card: dict | None = None, document: str = "") -> str:
@@ -150,7 +142,7 @@ def build_mcp(path):
             graph = check(engine, source, save=True)
             if graph.get("submission_format") == "coordinates/1":
                 from .feedback import compact_feedback
-                return encode(compact_feedback(graph))
+                return engine.feedback(compact_feedback(graph))
             summary = {
                 k: graph[k]
                 for k in (
@@ -283,7 +275,7 @@ def build_mcp(path):
                 ],
                 "note": c["note"],
             }
-            return encode(summary)
+            return engine.feedback(summary)
 
         return execute(save)
 

@@ -138,7 +138,7 @@ def run(out):
                              BASE.read(out / "settings.json"), m["timeout_seconds"])
     print(json.dumps(metrics, ensure_ascii=False), flush=True)
     audited = subprocess.run([str(BASE.DEFAULT_PYTHON), "-B", "-X", "utf8", str(out / "luna-audit.py"), str(out)],
-                             capture_output=True, text=True, encoding="utf-8", timeout=180)
+                             capture_output=True, text=True, encoding="utf-8", timeout=180, check=False)
     (out / "audit.stdout.txt").write_text(audited.stdout, encoding="utf-8")
     (out / "audit.stderr.txt").write_text(audited.stderr, encoding="utf-8")
     verify(out)
@@ -152,8 +152,8 @@ def run(out):
         if report_id:
             checked = subprocess.run([str(BASE.DEFAULT_PYTHON), "-B", "-X", "utf8",
                 str(Path(m["workspace"]) / ".agents/skills/migloop-investigate/scripts/check_card.py"),
-                "--task", str(Path(m["workspace"]) / "investigation.json"), "--report", report_id],
-                capture_output=True, text=True, encoding="utf-8", timeout=180)
+                "--task", str(Path(m["workspace"]) / "investigation.json"), "--report", report_id, "--full"],
+                capture_output=True, text=True, encoding="utf-8", timeout=180, check=False)
             BASE.save(run_dir / "card-audit.json", json.loads(checked.stdout))
             print(json.dumps({"card_audit_exit_code": checked.returncode, "report_id": report_id}), flush=True)
 
@@ -185,7 +185,7 @@ def run_suite(out):
         print(json.dumps({"started": case}), flush=True)
         result = subprocess.run([str(BASE.DEFAULT_PYTHON), "-B", "-X", "utf8",
             str(__file__), "run", "--out", str(out / case)], capture_output=True,
-            text=True, encoding="utf-8")
+            text=True, encoding="utf-8", check=False)
         (out / case / "worker.stdout.txt").write_text(result.stdout, encoding="utf-8")
         (out / case / "worker.stderr.txt").write_text(result.stderr, encoding="utf-8")
         run_dir = out / case / "runs/inquiry/rep1"

@@ -20,6 +20,8 @@ investigate(requests=[...]) 批量独立查询，page 续正文，submit(card={.
 
 每批1–24项，通常2–4项；limit 1–100，terms最多8个字面词、OR匹配、每词<=500字符。换词或范围从offset=0。next是记录列表下一页，END FRAME next是本次正文的续帧，二者都须续完才是读完。page(result_id,offset)，或page(requests:[{result_id,offset},...])每批1–4项，建议2项。
 
+整包响应有字节预算，不按每项各自限长。`DEFERRED.requests` 是尚未送出的原游标，按每批最多4项继续 page；正文没有删除，也不用重查。已发送帧重取保持相同内容。不要在一个宿主输出中再次拼接多个独立 MCP 大响应；用 requests 批量、每次单独转发 content.text。
+
 file的records是全部相关记录索引；calls含未知脚本和结果入口，默认折叠已知只读形状，可include_reads:true；changes是原生修改参数全文，outline是原生增删摘要，二者都不是脚本修改全集。agent的inputs是原生读表、任务消息、返回入口三个重叠渠道，继续用messages/returns/records/search查完整已记录范围。pool/agent search可加view:returns；records/messages/returns支持order:newest|oldest。
 
 查询用带时区ISO at，可选since，闭区间。scope_id锁定范围，继承scope后不再填key/at/since。生成输入不要继承修复窗口since。input_scope是写前输入，write_scope是写完成时刻，WRITER.scope是本次观察截止。
@@ -111,8 +113,12 @@ evidence:
 
 ## 审核和交付
 
+submit 若只返回 `feedback:{result_id,offset,complete:false}`，表示校验反馈过长、全文已保存；先用 page 续到 `END FRAME next=none` 再修稿。不能把简短回执当作全部错误，也不必重新提交才能拿到完整反馈。
+
 调查员自己按反馈补查/修稿。review_query展开作者、时刻、字面前序等反证提示，coverage_query看修复窗口未对账调用；提示不是新增必填字段，不要求为所有提及连边。但凡被用作归因或停止依据的实际输入必须以节点与交付边保留，不能仅移到reason消除断链；先核坐标与先读后写的连接方式。输入身份误判时撤回对应主张，真正无记录时说明证据边界，尚未查清就交草稿。
 
 用任务runtime.python执行scripts/check_card.py --task investigation.json --report <最后report_id>。ready_for_review表示声明的树可机械查验并加载；语义、停止边界和修改解释完备性仍待审阅。没有明确因果链或还有错误时交draft，不删难点拿通过。
+
+审核脚本若返回 `audit_page`，保持同一任务/报告，带 `--offset <next> --expect-sha256 <body_sha256>` 继续到 next 为 null；哈希变化会报错，须从头读。`--full` 仅供运行器直接捕获完整 JSON 到文件，不在模型可见终端中使用。
 
 最终给report_id / source_sha256 / 审核状态。原稿与系统投影分开保存，实际查阅轨迹也另存；树不是伪造的一条固定调查路线。

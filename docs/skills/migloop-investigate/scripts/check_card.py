@@ -7,6 +7,7 @@ No model calls, new reports, persisted handles, or edits to the evidence databas
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sqlite3
 import sys
@@ -15,8 +16,8 @@ from pathlib import Path
 
 def audit(index_path, report_id, task, *, require_declared=False):
     from migloop.inquiry.engine import Engine
-    from migloop.inquiry.report import load_report
     from migloop.inquiry.narrative import review_gaps
+    from migloop.inquiry.report import load_report
     from migloop.inquiry.store import Store, timestamp
 
     store = Store(index_path)
@@ -131,10 +132,44 @@ def audit(index_path, report_id, task, *, require_declared=False):
         store.close()
 
 
+def console_page(result, offset=0, expected=None):
+    """Read-only, hash-bound continuation; never silently shorten audit details."""
+    body = json.dumps(result, ensure_ascii=False, separators=(",", ":"))
+    identity = hashlib.sha256(body.encode("utf-8")).hexdigest()
+    if offset < 0 or offset > len(body):
+        raise ValueError("audit offset outside body")
+    if (offset and not expected) or (expected and expected != identity):
+        raise ValueError("audit changed or --expect-sha256 missing; restart at offset 0")
+    def size(text):
+        return len(json.dumps(text, ensure_ascii=False).encode("utf-8"))
+    if not offset and size(body) <= 9000:
+        return body
+    def render(end):
+        return json.dumps({k: result[k] for k in (
+            "report_id", "status", "loadable", "semantic_verified", "browser_verified") if k in result} | {
+            "audit_page": {"body_sha256": identity, "chars": len(body), "start": offset,
+                           "end": end, "next": end if end < len(body) else None, "text": body[offset:end]},
+            "note": "Continue this script with --offset next --expect-sha256 body_sha256; full details are not omitted."
+        }, ensure_ascii=False, separators=(",", ":"))
+    low, high = offset, min(len(body), offset + 9000)
+    while low < high:
+        middle = (low + high + 1) // 2
+        if size(render(middle)) <= 9000:
+            low = middle
+        else:
+            high = middle - 1
+    if size(render(low)) > 9000 or (low == offset and offset < len(body)):
+        raise ValueError("audit response header exceeds budget")
+    return render(low)
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--task", required=True, type=Path)
     parser.add_argument("--report", required=True)
+    parser.add_argument("--offset", type=int, default=0)
+    parser.add_argument("--expect-sha256")
+    parser.add_argument("--full", action="store_true", help="Unbounded JSON for programmatic capture to file, not model-visible stdout")
     args = parser.parse_args(argv)
     try:
         task = json.loads(args.task.read_text(encoding="utf-8-sig"))
@@ -149,7 +184,12 @@ def main(argv=None):
         result = {"report_id": args.report, "status": "invalid", "loadable": False,
                   "semantic_verified": False, "error": str(exc)}
         code = 2
-    print(json.dumps(result, ensure_ascii=False, separators=(",", ":")))
+    try:
+        text = json.dumps(result, ensure_ascii=False, separators=(",", ":")) if args.full else console_page(result, args.offset, args.expect_sha256)
+    except ValueError as exc:
+        text = json.dumps({"status": "invalid", "error": str(exc)})
+        code = 2
+    print(text)
     return code
 
 

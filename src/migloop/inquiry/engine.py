@@ -9,7 +9,7 @@ import uuid
 from bisect import bisect_right
 from functools import wraps
 
-from .delivery import initial_limits
+from .delivery import RESPONSE_BYTES, pack, wire_size
 from .native_text import change_outline, change_payloads, render_payloads, term_deltas
 from .request_context import request_context
 from .search_groups import matching_agents
@@ -1324,12 +1324,8 @@ class Engine:
                         body,
                     ),
                 )
-            pending.append((identity, len(body)))
-        limits = initial_limits([size for _, size in pending], self.FRAME)
-        return "\n\n".join(
-            self.page(identity, 0, _limit=limit)
-            for (identity, _), limit in zip(pending, limits)
-        )
+            pending.append({"result_id": identity, "offset": 0})
+        return self.pages(pending)
 
     @staticmethod
     def render(number, result):
@@ -1482,11 +1478,16 @@ class Engine:
         lines.append("DETAILS " + encode(details))
         return "\n".join(lines)
 
-    def page(self, identity, offset=0, *, _limit=None):
+    def _page_data(self, identity, offset):
+        if not isinstance(identity, str) or not identity or len(identity) > 64:
+            raise ValueError(
+                "result_id must be a nonempty result identifier (at most 64 characters)"
+            )
         if type(offset) is not int or offset < 0:
             raise ValueError("offset must be nonnegative")
         rows = self.store.rows(
-            "SELECT body,request FROM runs WHERE id=? AND kind=?", (identity, "query")
+            "SELECT body,request FROM runs WHERE id=? AND kind IN ('query','feedback')",
+            (identity,),
         )
         if not rows or offset > len(rows[0]["body"]):
             raise ValueError("result or offset does not exist")
@@ -1495,30 +1496,99 @@ class Engine:
             and json.loads(rows[0]["request"])["session"] != self.session
         ):
             raise ValueError("result belongs to a different investigator")
-        body = rows[0]["body"]
-        # An emitted (result,offset) is immutable, including a short batch preview.
         saved = self.store.rows(
             "SELECT text FROM frames WHERE run=? AND offset=?", (identity, offset)
         )
-        if saved:
-            return saved[0]["text"]
-        chunk = body[offset : offset + (_limit if _limit is not None else self.FRAME)]
-        end = offset + len(chunk)
-        next_offset = end if end < len(body) else None
-        context = json.loads(rows[0]["request"]).get("context")
-        frame = (
-            f"RESULT {identity} chars={len(body)} range={offset}:{end}\n"
-            + chunk
-            + f"\nEND FRAME next={next_offset if next_offset is not None else 'none'}; "
-            "server_sent_only; not proof of model visibility or understanding"
-            + ("; CONTEXT " + encode(context) if context else "")
-        )
+        return {
+            "result_id": identity,
+            "offset": offset,
+            "body": rows[0]["body"],
+            "context": json.loads(rows[0]["request"]).get("context"),
+            "text": saved[0]["text"] if saved else None,
+        }
+
+    def page(self, identity, offset=0):
+        return self.pages([{"result_id": identity, "offset": offset}], strict=True)
+
+    def pages(self, requests, *, strict=False):
+        """One response budget for first pages, continuations and cached frames."""
+        if not isinstance(requests, list) or not 1 <= len(requests) <= 24:
+            raise ValueError("batch must contain 1–24 continuations")
+        if any(
+            not isinstance(r, dict) or set(r) != {"result_id", "offset"}
+            for r in requests
+        ):
+            raise ValueError("each continuation requires result_id and offset only")
+        with self.store.db:
+            # Concurrent calls must not choose different lengths at one cursor.
+            if not self.store.db.in_transaction:
+                self.store.db.execute("BEGIN IMMEDIATE")
+            pages, seen = [], set()
+            for number, request in enumerate(requests, 1):
+                try:
+                    page = self._page_data(request["result_id"], request["offset"])
+                    cursor = (page["result_id"], page["offset"])
+                    if cursor in seen:
+                        continue
+                    seen.add(cursor)
+                    pages.append(page)
+                except (ValueError, TypeError) as exc:
+                    if strict:
+                        raise
+                    pages.append({"text": f"PAGE ERROR item={number}: {exc}"})
+            response, emitted = pack(pages)
+            for page, text in emitted:
+                if "result_id" in page:
+                    self.store.db.execute(
+                        "INSERT OR IGNORE INTO frames VALUES(?,?,?,?)",
+                        (
+                            page["result_id"],
+                            page["offset"],
+                            text,
+                            digest(text.encode()),
+                        ),
+                    )
+            return response
+
+    def feedback(self, summary):
+        """Large check feedback uses the same lossless continuation transport."""
+        body = encode(summary)
+        if wire_size(body) <= RESPONSE_BYTES:
+            return body
+        identity = uuid.uuid4().hex[:16]
         with self.store.db:
             self.store.db.execute(
-                "INSERT OR IGNORE INTO frames VALUES(?,?,?,?)",
-                (identity, offset, frame, digest(frame.encode())),
+                "INSERT INTO runs VALUES(?,?,?,?,?)",
+                (
+                    identity,
+                    "feedback",
+                    encode({"session": self.session, "origin": self.origin}),
+                    body,
+                    body,
+                ),
             )
-        return frame
+        return encode(
+            {
+                k: summary[k]
+                for k in (
+                    "report_id",
+                    "source_sha256",
+                    "mechanical_status",
+                    "path_status",
+                )
+                if k in summary
+            }
+            | {
+                "delivery": {"status": summary.get("delivery", {}).get("status")},
+                "feedback": {
+                    "result_id": identity,
+                    "offset": 0,
+                    "chars": len(body),
+                    "complete": False,
+                },
+                "note": "Full check feedback saved, not omitted. Read with page until END FRAME next=none before revising.",
+            }
+        )
 
     def observe_visibility(self, identity, offset, wrapper_text):
         """Harness-only observation. Not exposed as an MCP tool or model self-certification."""

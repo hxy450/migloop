@@ -2,7 +2,7 @@
 
 import re
 
-from migloop.inquiry.delivery import initial_limits
+from migloop.inquiry.delivery import allocate
 from migloop.inquiry.engine import Engine
 from tests.test_inquiry_core import build, record, ts, use
 
@@ -100,19 +100,17 @@ def test_batch_completes_short_body_and_retains_each_large_result_prefix(tmp_pat
     engine.store.close()
 
 
-def test_allocation_never_starves_an_item_below_the_former_share():
+def test_allocation_never_starves_an_item_below_the_equal_share():
     for count in range(1, 25):
         for sizes in (
             [5000] + [10000] * (count - 1),
             [80 + i * 1700 for i in range(count)],
             [40000] * count,
         ):
-            limits = initial_limits(sizes, 9000)
-            old_floor = 9000 if count == 1 else max(40, 9000 // count - 225)
+            limits = allocate(sizes, 9000)
+            old_floor = 9000 // count
             assert all(
                 min(size, old_floor) <= limit <= size
                 for size, limit in zip(sizes, limits)
             )
-            assert sum(limits) <= (
-                9000 if count == 1 else max(40 * count, 9000 - 225 * count)
-            )
+            assert sum(limits) <= 9000
