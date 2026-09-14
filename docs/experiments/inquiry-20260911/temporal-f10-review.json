@@ -1,0 +1,211 @@
+{
+  "schema": "temporal-f10-review/1",
+  "status": "completed_core_and_targeted_audit",
+  "scope": "Fixed 28 core units; semantic review of final unchanged submissions, separate from machine/UI delivery. No exhaustive claim precision or generalization certification.",
+  "cases": {
+    "F10-01": {
+      "report_id": "87f066f40fcf4cb5",
+      "source_sha256": "a1a8da24e8fa729244e046d8107f2c92ec7c2d1b2350212b6e8e568ee8b9b1c7",
+      "core": {
+        "mask": {"status": "correct", "basis": "Explains explicit mask configuration and retains the loading-dialog transparent exception. Target site count is wrong, recorded separately, not a reversal of the core cause."},
+        "images": {"status": "correct", "basis": "Explains width-only retention images gaining intrinsic ratio/height constraints, with post-repair visual certification withheld."},
+        "cta": {"status": "correct", "basis": "Explains width100% plus horizontal margins replaced by outer Row padding."},
+        "price": {"status": "partial", "basis": "Final mentions post-repair numeric/suffix 30/16vp spans and includes Android source as a node, but labels it only Android 行为源. It does not explain the actual delivered replaceSpan/AbsoluteSizeSpan input versus uniform Text output. A mechanically bound source-read edge does not supply that missing causal explanation on the model's behalf. The first saved draft also failed to establish this delivered-input/output mismatch; do not claim it was fully correct before formatting.", "reference": "aslice8-pay:21-24,264-265; aconv-member:61-62; a68daf720e780b4c2:528-529,592-593"},
+        "indicator": {"status": "correct", "basis": "Explains default indicator appearance replaced with explicit color and left alignment; original unique contract author is not asserted."},
+        "repair-compile": {"status": "correct", "basis": "Places cross-struct private-helper access errors and visibility edits in the later repair/build sequence, with build PASS, not initial generation or runtime pixel proof."}
+      },
+      "additional_review": [
+        "Final states 回执明确列出 MemberCenterPage.ets 4 sites. The cited receipt e-827ccccf4976 actually says 3 sites for this file; 4 sites belong to neighbouring Mine/Refund rows. This is a concrete evidence-reading error, not automatically loss of the mask core or a major author error.",
+        "Final price node says the 21:24 script produced two spans. That request actually uses ForEach(splitPriceRuns) with conditional 30/16 sizes; the fixed two-Span priceDigits/priceSuffix implementation is the later 21:30 script. General segmented repair is correct; exact node reason is inaccurate.",
+        "No intermediate target-file coordinates remain. Generator, Slice8 and every repair window connect directly to the final file; input nodes survive, but the claimed preservation across generator/Slice8 is not represented as a read-back propagation spine.",
+        "The sufficient-input stopping argument is weaker than the mechanical tree: generic spec/common.md reasons name inputs without establishing that they supplied each missing attribute. No-visual-validation therefore bad-output is a mechanism interpretation, not an independently validated causal intervention."
+      ],
+      "force_review": {
+        "declared_force_edges": 5,
+        "paired_completion_evidence": ["e-b8ad2c92a1c0/e-827ccccf4976", "e-ae356f729f31/e-cb24bdb91948"],
+        "request_only_evidence": ["e-df6b6f3d170f", "e-68ce7f991dc3", "e-3d78dd386466"],
+        "judgment": "All five commands address the target, but three final forced nodes use invocation cutoffs and only the request as evidence; their reason still says 回执确认. These satisfy the current reviewed-candidate policy, not a completed-write fact at those timestamps. Earlier future-evidence/unfinished-native-write attempts were rejected. Preserve the five dashed edges; do not silently relabel them native."
+      },
+      "delivery": "ready_for_review",
+      "browser": {"passed": true, "nodes": 13, "edges": 12, "dashed": 5, "errors": 0},
+      "extra_major_errors": [],
+      "precision_fully_reviewed": false
+    },
+    "F10-03": {
+      "report_id": "30687fa74c584280",
+      "source_sha256": "e5f3a25936d37c99d385f3e1cb00c4a58f0e687bbf532f3d0055ee83c6ac93ee",
+      "core": {
+        "label": {"status": "partial", "basis": "Explains Roll-to-ROLL rendering and keeps the resource unchanged, but reduces F001 to functional behavior and assigns omission of textAllCaps to the generator. Does not recover the specific delivered AC14 display-Roll oracle versus the later uppercase runtime oracle; generic theme input is not an explicit ROLL instruction.", "reference": "a349784d2663f1f0a:53-54,75-76; a342b7d08c2ca580a:18-19; a4874344c8fb6228d:68-69"},
+        "button-style": {"status": "correct", "basis": "Existing button's capsule/default presentation changed to Normal, small radius and shadow, not new dice behavior."},
+        "test-integration": {"status": "correct", "basis": "Separately explains export Dice and three UI IDs as later test access, not missing generation business behavior."},
+        "logging": {"status": "partial", "basis": "Calls later hilog work observability and not a generation defect, but never identifies console.error as introduced by the visual repair and then replaced by ECAT. The repair-stage source of the code is the frozen core, not an optional helper name.", "reference": "a349784d2663f1f0a:75; a4874344c8fb6228d:68; a228e9716d833cbf3:57-58"},
+        "comment-policy": {"status": "correct", "basis": "Keeps later comment/quality work separate from missing initial business functionality; no claim that source TODO represented an unimplemented dice feature."}
+      },
+      "additional_review": [
+        "Final still reports early UI TDD Driver/null and ten unreachable cases, without the later 593d root 256/260 actual replay command/result: ten cases, 21 hard checks, ROLL and seven explicitly unobservable assertions. That later replay is not pixel-complete certification or a post-ECAT exact-build regression; the final sentence is scoped to TDD enough that this omission alone is not automatically counted as an absolute no-tests major error.",
+        "Problem route is closed, but two finding write-time nodes are dead-end children. Their writers also have alternate routes through finding read-time nodes; the checker requires every declared branch, not just existence of one route, so four context obligations remain open.",
+        "Nine saved drafts remain, plus any rejected tool submissions in the native transcript. Final is honestly draft, not timeout. No human repair or replacement run.",
+        "During intermediate drafts, reverse traversal of another possible old read added a 16:51/18:29 conflict to diagnostics for structurally disconnected finding branches. Read-only code inspection found each root-wide traversal records its first conflict if no route succeeds; it is not a goal-specific cut explanation. Product code was not changed mid-run."
+      ],
+      "force_review": {"declared_force_edges": 1, "evidence": ["e-b36ea4332843"], "judgment": "Historical same-agent Bash theme read is retained as a dashed reviewed edge, not proof that all Material default style values were explicitly delivered."},
+      "delivery": "draft",
+      "unclosed_obligations": 4,
+      "browser": {"passed": true, "nodes": 17, "edges": 16, "dashed": 1, "errors": 0, "note": "Partial-tree rendering with four warnings is successful; this is NOT complete evidence-tree delivery. Saved declared graph has 18 canonical nodes including target."},
+      "extra_major_errors": [],
+      "precision_fully_reviewed": false
+    },
+    "F10-04": {
+      "report_id": "53608a3bd2ce4a59",
+      "source_sha256": "0ab8c648ba23893d77e99b41e721c7d1317baff21df43feda004b60f8cc1aa35",
+      "core": {
+        "debug-wiring": {"status": "correct", "basis": "Existing debug/release regex depended on default-false startup flags; late wiring enabled the testing branch. Shared-file discipline and handoff ambiguity are distinguished from unique initial authorship."},
+        "wrong-class-repair": {"status": "correct", "basis": "F013Service.setDebug was introduced during repair, compiler rejected it, then import/call changed to AppTrackConfig and build passed. Actual late UI-login success is not erased or equated to proof of this one intervention."}
+      },
+      "additional_review": [
+        "Unlike the old raw/high and i20 responses, acknowledges later actual UI-login evidence while withholding single-change causal certification.",
+        "Summary's Base-3/F001 handoff mechanism is not represented as input nodes: final contains only a generation writer, a bad target snapshot and four repair windows. The new critical-input-boundary display requirement is not satisfied by naming a handoff only in prose.",
+        "Source a12beec25dbdcfc1:272-273 explicitly orders HttpLog.setDebug in Slice11 startup; separate F013Service source delivered at 6ceea69133ba233e:78 states AppTrackConfig injection at the same time. Do not collapse this into an independently certified single Base-3 paragraph mandating both setters. Exact blame across handoffs remains bounded."
+      ],
+      "force_review": {"declared_force_edges": 0},
+      "delivery": "ready_for_review",
+      "browser": {"passed": true, "nodes": 7, "edges": 6, "dashed": 0, "errors": 0},
+      "extra_major_errors": [],
+      "precision_fully_reviewed": false
+    },
+    "F10-05": {
+      "report_id": "104bc14f8d5d4463",
+      "source_sha256": "2abd98d5d62bf5feb69c76f27605eb7596deeff811d4374645fd9a095c7afe97",
+      "core": {
+        "android-id-unblock": {"status": "correct", "basis": "Explicit D-010 deferral/non-invention instruction explains the intentional empty identifier and real backend blocker; later persistent random hex is test unlocking, not proven Android-id equivalence. Does not blame the compliant generator or erase the actual unresolved capability."}
+      },
+      "additional_review": [
+        "Four relevant generation input branches remain, followed by compliant generator -> observed bad file -> repair agent -> observation endpoint. Only the bad file is problem:true; normal generator and fixer are not indiscriminately red.",
+        "One input-specific reason over-combines material: chain-auth at 11:57:46 was a first-40-lines plus L4/L5/L6 grep read. Its return confirms the NOT NULL probe history but does not contain 无等价 API/方案未定. Those constraints are available in the separately declared F003/AppFormInfoManager inputs; global core remains supported, but this node's reason is not fully supported by that partial return.",
+        "Post-repair login replay is acknowledged without promoting the testing identifier into a final backend-approved scheme. Full behavioral precision of all auxiliary claims is not certified."
+      ],
+      "force_review": {"declared_force_edges": 1, "evidence": ["e-9015ec34b9b1", "e-60ee4b468b27"], "reference": "cc323ade2b39d25e:107:9f7b1e058165ff37; cc323ade2b39d25e:108:cfb79d77603999c3", "judgment": "Same-agent sed/grep explicitly names chain-auth, receipt is before the declared cutoff. Supports the partial-read relationship, not full-document delivery."},
+      "delivery": "ready_for_review",
+      "browser": {"passed": true, "nodes": 8, "edges": 7, "dashed": 1, "errors": 0},
+      "extra_major_errors": [],
+      "precision_fully_reviewed": false
+    },
+    "F10-06": {
+      "report_id": "88b45280a8ab4f26",
+      "source_sha256": "a19aaad38e0b7c5d04b61b718bb89dc87ed4a533565daee656ab6ba561956836",
+      "core": {
+        "back-image-box": {"status": "correct", "basis": "Explains 24x24 plus padding20 versus content-derived 10x16 plus padding; describes Slice15 as retaining a pre-existing shape instead of claiming its whole-file Write was first introduction. Missing exact earliest writer is not a new mandatory name requirement."},
+        "track-vs-control": {"status": "correct", "basis": "Explains 200x20 control versus two height100% rows and later 4vp rail; records subsequent preservation. Its separate false claim that upstream generation material was not preserved is counted below, not silently treated as a sound stopping boundary."},
+        "bottom-inset": {"status": "correct", "basis": "Correctly locates the actual edit on the host Swiper's windowBottomPadding, not an invented child-button size change."}
+      },
+      "extra_major_errors": [
+        {"claim": "seekbar drawable生成期读取也未保存 / 轨道4dp的上游形成记录未保存", "counterevidence": "a7093c0c7e37cafa:155:81eb26a5dcbe9b42 (astage0-resources) is a preserved generation-period Bash return explicitly naming seekbar_horizontal_style.xml and three 4dp layers. It is not proof Slice15 received the body; it refutes the claimed absence of the upstream record.", "category": "false_absence_of_generation_evidence"},
+        {"claim": "没有证据显示其承担或复核视觉尺寸/安全区问题", "counterevidence": "33066309f98e8b1e:304:dfcadcaa054ac2be runs check-fullscreen-immersive-safearea.sh; paired result 33066309f98e8b1e:306:c479fd6725d9736b explicitly includes GuidePage L3 and PASS. This proves a recorded check, not that its coverage was adequate.", "category": "false_absence_of_validation"},
+        {"claim": "残留具体问题是progressBar仍为Stack({alignContent:Alignment.Start})却注释称垂直居中 ... problem仅针对该代码—行为不一致风险", "counterevidence": "Official Alignment.Start means vertically centered start, also in the OpenHarmony-5.0.0 release documentation predating the recorded migration. This enum is compatible with vertical centering; lack of a screenshot does not justify marking the fixer problematic on this premise.", "source": "https://github.com/openharmony/docs/blob/OpenHarmony-5.0.0-Release/en/application-dev/reference/apis-arkui/arkui-ts/ts-appendix-enums.md#alignment", "category": "unsupported_fixer_blame_from_wrong_api_semantics"}
+      ],
+      "additional_review": [
+        "Continuous Slice15 -> file -> group3 -> file -> fixer -> target spine is preserved, but initial converter and historical safearea input are omitted. Available records were not exhausted before declaring an evidence boundary.",
+        "Repair read at 20:45:43 still claims rail/Swiper details; original e-606b8e9cf63e at repairer160 is only 70/258 lines, with no progressBar definition. The read edge is real but not sufficient for every attached reason.",
+        "Three core local explanations do not mean the whole report is correct: extra errors about evidence availability, existing validation and fixer blame prevent full-file acceptance. No artificial new core denominator for upstream U1/U2/U3."
+      ],
+      "force_review": {"declared_force_edges": 0},
+      "delivery": "ready_for_review",
+      "browser": {"passed": true, "nodes": 9, "edges": 8, "dashed": 0, "errors": 0},
+      "precision_fully_reviewed": false
+    },
+    "F10-07": {
+      "report_id": "83a4b3a05dad445b",
+      "source_sha256": "7e6cadd380b0c5537b57ba40be7ca6c73c8101b8b2e9bd29cf8d85a37e8911dc",
+      "core": {
+        "test-bridge": {"status": "correct", "basis": "Explains post-generation Want/AppStorage/mock and cold/hot entry bridge from later test design, retaining existing immersive window logic; empty mock set is not missing initial business behavior."},
+        "error-observer": {"status": "correct", "basis": "Explains later ECAT work list adding errorManager observer, explicitly withholds proof that initial dispatch mandated it, acknowledges later actual builds and does not certify crash-injection behavior."}
+      },
+      "additional_review": [
+        "Three specific later UI-test inputs and chronological file handoffs survive; initial generator has only the old scaffold as an incoming file, not the cited original dispatch/safearea contract.",
+        "Initial generator is problem:true solely for lacking an observer that the same reason says was not an original requirement. The responsibility caveat is explicit, so core is not reversed as if it claimed an ignored mandatory instruction; however this is a misleading actor-color choice. Output lacking a later feature is not by itself evidence that the actor erred.",
+        "Normal test-bridge and observer repairers remain unmarked. Later actual build receipts are acknowledged, improving on the old false all-pool no-build claim."
+      ],
+      "problem_mark_warning": true,
+      "force_review": {"declared_force_edges": 0},
+      "delivery": "ready_for_review",
+      "browser": {"passed": true, "nodes": 10, "edges": 9, "dashed": 0, "errors": 0},
+      "extra_major_errors": [],
+      "precision_fully_reviewed": false
+    },
+    "F10-09": {
+      "report_id": "de41b3f4740b42ce",
+      "source_sha256": "911b8113d805bf6e4363c254bfb358538caf8f4f34674b9d6d1702ac112b9705",
+      "core": {
+        "hit-test": {"status": "correct", "basis": "Actual Block-to-Default patch, child/parent callbacks already wired, hit-test routing explains the symptom; first Block writer is explicitly unknown, and immediate failed validation is not presented as successful device repair."}
+      },
+      "additional_review": [
+        "Short tree is appropriate to missing child-generation records: bad observed file and historical SDK input lead to the known repairer and final target. Does not invent an initial author merely to lengthen the tree.",
+        "Parent SplashPage callback evidence is used in summary but omitted as an input node. SDK excerpt contains Default and the neighbouring blocking comment, not the complete Block enum identifier; absence of that secondary detail alone does not invalidate the frozen core.",
+        "No-successful-build wording describes the immediate failed validate sequence. Later B:7694 build/install exists but cannot certify the original patch's unchanged lineage after further reported modifications. Do not turn this scoped wording into a claimed global denial without stronger textual evidence."
+      ],
+      "force_review": {"declared_force_edges": 2, "reference": "2098fb5a430cd82b:8026-8027; 2098fb5a430cd82b:8047-8048", "judgment": "Original exec loops explicitly read target source and SDK enums/common.d.ts; outputs precede cutoffs and have matching call IDs. The two reviewed partial-read relationships are supported; SDK/source semantics still require review."},
+      "delivery": "ready_for_review",
+      "browser": {"passed": true, "nodes": 4, "edges": 3, "dashed": 2, "errors": 0},
+      "extra_major_errors": [],
+      "precision_fully_reviewed": false
+    },
+    "F10-08": {
+      "report_id": "24eb3fe708434b98",
+      "source_sha256": "08ee45b07ce3f7a15428b4a6db1b45b3290dad3e5b733bb3a0d7ed4de1bfa343",
+      "core": {
+        "identity-phase-and-conflict": {"status": "correct", "basis": "Historical dev-identity explicitly skips bundle/vendor, later ECAT scope changes them; distinguishes rule conflict about vendor and the com.example prefix false alarm from disobedience by the original generator."},
+        "icon-scope": {"status": "correct", "basis": "Identifies copying existing entry layered assets to AppScope and changing the media reference, not certified Android launcher migration or a formerly broken app_icon reference."}
+      },
+      "additional_review": [
+        "Historical skill, feature-base and decision-ledger inputs remain, then generator -> observed old config -> later repairer -> target. No problem:true is invented merely because the file changed after generation.",
+        "Later actual compilation is acknowledged; vendor diceroller is treated as a conflicted choice rather than an independently verified company identity. Recommendation distinguishes scope decisions from prefix heuristics.",
+        "Feature-base node overstates 该输入的形成过程不在材料中: the pool contains a root Write payload at 56c56621f98c3e50:255:a660fe7de023fab0. That does not certify every antecedent decision, but it is a concrete earlier provenance entry. Clear historical instructions suffice to stop the original-violation branch without making this blanket absence claim."
+      ],
+      "force_review": {"declared_force_edges": 2, "reference": "de75207173f4250e:45-46; 23388ad8fde7d6c3:23,25", "judgment": "First command explicitly reads decision-ledger with paired output; second Skill invocation is followed by actual skill-body delivery including its base directory. Supports delivered input relationships; Skill text arrival is not a claim that a native filesystem Read was detected."},
+      "delivery": "ready_for_review",
+      "browser": {"passed": true, "nodes": 8, "edges": 7, "dashed": 2, "errors": 0},
+      "extra_major_errors": [],
+      "precision_fully_reviewed": false
+    },
+    "F10-10": {
+      "report_id": "23a887f51a9e448b",
+      "source_sha256": "4ede17d26bbd0a158ec665a55359a8259073e05165baa70c40c961226b113632",
+      "core": {
+        "signing-reference": {"status": "correct", "basis": "Explains product.default lacking a reference to the existing signingConfigs.default, adding only that reference under the development-signing decision, and retaining unknown initial authorship. Does not confuse the patch with production credentials or API request signing."}
+      },
+      "additional_review": [
+        "Old bad config and applicable D-019 input connect to the normal repairer and observation endpoint. Initial report about removing an empty reference is explicitly reported speech, not proof of the first author.",
+        "e-f007e3793b47 is the child signed-build report (B4966), not direct parent-visible SignHap stdout. Later B7843 is a signing-material/config check; B7879 actually runs assembleHap successfully with SignHap UP-TO-DATE. These support bounded build/config status, not a new cryptographic signing action or business login certification."
+      ],
+      "force_review": {"declared_force_edges": 2, "reference": "731e8e9a9fc5966b:4929-4930; 731e8e9a9fc5966b:4933-4934", "judgment": "Original same-agent sed and ledger grep calls have paired outputs before the patch. The later single-field patch is separately native-confirmed."},
+      "delivery": "ready_for_review",
+      "browser": {"passed": true, "nodes": 4, "edges": 3, "dashed": 2, "errors": 0},
+      "extra_major_errors": [],
+      "precision_fully_reviewed": false
+    },
+    "F10-02": {
+      "report_id": "afc387fba602467c",
+      "source_sha256": "0f3ee57686a152549abe81b9c5d5ffbf31242cfd2ce152535c47d638c8bd256d",
+      "core": {
+        "mask": {"status": "correct", "basis": "Summary and systemic input describe adding explicit maskColor to address the default-mask discrepancy, without backdating the quantified criterion."},
+        "icon": {"status": "correct", "basis": "Identifies explicit sizing of the existing app-name image, not a new feature; input sufficiency and visual verification remain bounded."},
+        "back-gate": {"status": "partial", "basis": "Correct Slice11 isModal assumption and onWillDismiss close interception; omits the initial page handler, its assembly deletion, and the separate onNavBarStateChange restoration patch. Recommendation to test protocol-page return is not an explanation of that actual modification.", "reference": "aconv-splash:71-72; aentry-setup:123-124; a68daf720e780b4c2:346-347,352-353"},
+        "progress": {"status": "partial", "basis": "Final says 进度条渲染/13vp 高度 and 进度 UI/13vp 修订, but does not explain the already-existing height(13) versus added style.strokeWidth:13 / enableScanEffect:false. It instead attributes visibility defaults and cites the XML 13dp frame as the mismatch. The first draft's explicit missing-render claim was softened in the final; do not grade the discarded wording as a final assertion.", "reference": "e5caff50ab03f76a:71:6625d15fe9638569; 064a4e53cc1cc8cc:330:b432ce9d5b0e85e8; 064a4e53cc1cc8cc:346:9241d7b98db0806c"},
+        "system-bars": {"status": "correct", "basis": "Explains restoring system bars on actual navigation away from the Navigation host, rather than merely treating the final author as the origin. Exact earlier input sufficiency is not overclaimed; does not list every line of the earlier hide/restore script."}
+      },
+      "additional_review": [
+        "Visibility=true really appears both in the initial Write and repairer grep at line333. It is not an invented value. However the initial Write explicitly says runtime loading shows it and delegates business gating to F001; XML gone alone is not a complete behavioral-causality proof. Treat the unconditional wrong-input boundary claim cautiously, not as a newly certified core unit.",
+        "The summary mentions the historical immersive skill, but it is not a declared input node. The page-spec/medium-bounds reason does not prove no other sizing input existed.",
+        "The loaded chain has real early/middle file coordinates and subsequent actors, but omits the assembly actor that actually removed page-level back handling. A longer tree does not close the back-gate attribution."
+      ],
+      "force_review": {
+        "declared_force_edges": 1,
+        "native_pairs": ["a68daf720e780b4c2:322-323", "a68daf720e780b4c2:324-325", "a68daf720e780b4c2:329-330", "a68daf720e780b4c2:332-333", "a68daf720e780b4c2:337-338"],
+        "judgment": "Actual same-agent sed/grep calls name the target and return source before the declared cutoff; supports a model-reviewed partial-read relationship, not every reason about rendering or full-file content. Five bound pairs project to one dashed UI edge."
+      },
+      "delivery": "ready_for_review",
+      "browser": {"passed": true, "nodes": 18, "edges": 17, "dashed": 1, "errors": 0},
+      "extra_major_errors": [],
+      "precision_fully_reviewed": false
+    }
+  }
+}

@@ -1,0 +1,739 @@
+{
+  "schema": "temporal-f10-audit/1",
+  "suite_root": "C:/Users/hongy/projects/_migloop-evidence-delivery-20260913/temporal-f10-v1",
+  "product_commit": "de174f8",
+  "review_sha256": "937ad4111c2131fe7c407e68505548a67866a168ab67ca0b5784c8cfdd5e5f0a",
+  "totals": {
+    "runs": 10,
+    "core_correct": 23,
+    "core_total": 28,
+    "file_equal_coverage": 0.9033333333333333,
+    "core_full_files": 7,
+    "core_full_without_known_major": 6,
+    "known_major_errors": 3,
+    "ready_cards": 9,
+    "seconds_sum": 7582.372956700012,
+    "seconds_mean": 758.2372956700012,
+    "seconds_median": 733.4981603500055,
+    "queue_wall_seconds": 4077.106324,
+    "after_first_submit_seconds_sum": 3473.7855640000002,
+    "usage": {
+      "input_total": 40120292,
+      "cache_read": 37742592,
+      "input_uncached": 2377700,
+      "output": 344761
+    },
+    "processed_tokens": 40465053,
+    "delivery": {
+      "query_attempts": 665,
+      "query_succeeded": 614,
+      "query_failed": 51,
+      "open_attempts": 249,
+      "open_succeeded": 231,
+      "open_failed": 18,
+      "frames_sent": 944,
+      "frames_visible_complete": 939,
+      "bodies": 665,
+      "bodies_visible_complete": 309,
+      "host_truncated_wrappers": 7
+    },
+    "submits": 51
+  },
+  "limits": [
+    "Core review is not exhaustive causal-claim precision.",
+    "Post-first-submit time includes revision, extra investigation and tool waits, not just CPU validation.",
+    "Truncation markers may occur inside historical source text; complete frames do not mean every body was requested."
+  ],
+  "cases": [
+    {
+      "case": "F10-01",
+      "report_id": "87f066f40fcf4cb5",
+      "source_sha256": "a1a8da24e8fa729244e046d8107f2c92ec7c2d1b2350212b6e8e568ee8b9b1c7",
+      "core_correct": 5,
+      "core_total": 6,
+      "major_errors": 0,
+      "card_status": "ready_for_review",
+      "seconds": 1218.7668594999996,
+      "usage": {
+        "input_total": 6328674,
+        "cache_read": 5971456,
+        "cache_creation": 0,
+        "input_uncached": 357218,
+        "output": 49902,
+        "thinking_reported": 14676,
+        "output_includes_thinking": "Codex output_tokens is used once; reasoning is not added",
+        "input_semantics": "Codex input_tokens is the total; reported cache read/write are not added to it. input_uncached means input_tokens minus cached_input_tokens."
+      },
+      "first_submit_at": "2026-09-14T13:43:27.776Z",
+      "after_first_submit_seconds": 542.338055,
+      "tools": {
+        "error": 1,
+        "agent_message": 16,
+        "command_execution": 3,
+        "investigate": 22,
+        "page": 22,
+        "submit": 9
+      },
+      "delivery": {
+        "query_attempts": 88,
+        "query_succeeded": 81,
+        "query_failed": 7,
+        "open_attempts": 40,
+        "open_succeeded": 36,
+        "open_failed": 4,
+        "frames_sent": 140,
+        "frames_visible_complete": 140,
+        "bodies": 88,
+        "bodies_visible_complete": 38,
+        "host_truncated_wrappers": 1
+      },
+      "browser": {
+        "passed": true,
+        "report_id": "87f066f40fcf4cb5",
+        "source_sha256": "a1a8da24e8fa729244e046d8107f2c92ec7c2d1b2350212b6e8e568ee8b9b1c7",
+        "nodes": 13,
+        "seedEdges": 12,
+        "unclosed": 0,
+        "recommendationsVisible": true,
+        "reasonsVisible": true,
+        "ordinaryCandidates": 0,
+        "wires": {
+          "expected": 12,
+          "drawn": 12,
+          "reviewed": 5,
+          "visibleGeometry": true
+        },
+        "narrative": {
+          "present": true,
+          "summaryVisible": true,
+          "actions": 3,
+          "actionsVisible": true,
+          "boundariesVisible": true
+        }
+      },
+      "code_digest": "8e6e0675f882b205ac2a917022413fd89318989538c469870b915ca107acf396",
+      "skill_digest": "d794838a2d5152f20093cab0de4f33638b4ac79f1d1027aa7b15800c0a8307d0"
+    },
+    {
+      "case": "F10-02",
+      "report_id": "afc387fba602467c",
+      "source_sha256": "0f3ee57686a152549abe81b9c5d5ffbf31242cfd2ce152535c47d638c8bd256d",
+      "core_correct": 3,
+      "core_total": 5,
+      "major_errors": 0,
+      "card_status": "ready_for_review",
+      "seconds": 876.0534099999932,
+      "usage": {
+        "input_total": 4850714,
+        "cache_read": 4598272,
+        "cache_creation": 0,
+        "input_uncached": 252442,
+        "output": 41998,
+        "thinking_reported": 10793,
+        "output_includes_thinking": "Codex output_tokens is used once; reasoning is not added",
+        "input_semantics": "Codex input_tokens is the total; reported cache read/write are not added to it. input_uncached means input_tokens minus cached_input_tokens."
+      },
+      "first_submit_at": "2026-09-14T13:39:05.489Z",
+      "after_first_submit_seconds": 461.924929,
+      "tools": {
+        "error": 1,
+        "agent_message": 11,
+        "command_execution": 3,
+        "investigate": 16,
+        "page": 13,
+        "submit": 5
+      },
+      "delivery": {
+        "query_attempts": 84,
+        "query_succeeded": 65,
+        "query_failed": 19,
+        "open_attempts": 36,
+        "open_succeeded": 27,
+        "open_failed": 9,
+        "frames_sent": 117,
+        "frames_visible_complete": 117,
+        "bodies": 84,
+        "bodies_visible_complete": 45,
+        "host_truncated_wrappers": 0
+      },
+      "browser": {
+        "passed": true,
+        "report_id": "afc387fba602467c",
+        "source_sha256": "0f3ee57686a152549abe81b9c5d5ffbf31242cfd2ce152535c47d638c8bd256d",
+        "nodes": 18,
+        "seedEdges": 17,
+        "unclosed": 0,
+        "recommendationsVisible": true,
+        "reasonsVisible": true,
+        "ordinaryCandidates": 0,
+        "wires": {
+          "expected": 17,
+          "drawn": 17,
+          "reviewed": 1,
+          "visibleGeometry": true
+        },
+        "narrative": {
+          "present": true,
+          "summaryVisible": true,
+          "actions": 4,
+          "actionsVisible": true,
+          "boundariesVisible": true
+        }
+      },
+      "code_digest": "8e6e0675f882b205ac2a917022413fd89318989538c469870b915ca107acf396",
+      "skill_digest": "d794838a2d5152f20093cab0de4f33638b4ac79f1d1027aa7b15800c0a8307d0"
+    },
+    {
+      "case": "F10-03",
+      "report_id": "30687fa74c584280",
+      "source_sha256": "e5f3a25936d37c99d385f3e1cb00c4a58f0e687bbf532f3d0055ee83c6ac93ee",
+      "core_correct": 3,
+      "core_total": 5,
+      "major_errors": 0,
+      "card_status": "draft",
+      "seconds": 1277.2391113000049,
+      "usage": {
+        "input_total": 3897281,
+        "cache_read": 3591424,
+        "cache_creation": 0,
+        "input_uncached": 305857,
+        "output": 61526,
+        "thinking_reported": 17846,
+        "output_includes_thinking": "Codex output_tokens is used once; reasoning is not added",
+        "input_semantics": "Codex input_tokens is the total; reported cache read/write are not added to it. input_uncached means input_tokens minus cached_input_tokens."
+      },
+      "first_submit_at": "2026-09-14T13:52:56.461Z",
+      "after_first_submit_seconds": 919.176616,
+      "tools": {
+        "error": 1,
+        "agent_message": 16,
+        "command_execution": 5,
+        "investigate": 15,
+        "page": 7,
+        "submit": 10
+      },
+      "delivery": {
+        "query_attempts": 56,
+        "query_succeeded": 56,
+        "query_failed": 0,
+        "open_attempts": 22,
+        "open_succeeded": 22,
+        "open_failed": 0,
+        "frames_sent": 69,
+        "frames_visible_complete": 67,
+        "bodies": 56,
+        "bodies_visible_complete": 5,
+        "host_truncated_wrappers": 3
+      },
+      "browser": {
+        "passed": true,
+        "report_id": "30687fa74c584280",
+        "source_sha256": "e5f3a25936d37c99d385f3e1cb00c4a58f0e687bbf532f3d0055ee83c6ac93ee",
+        "nodes": 17,
+        "seedEdges": 16,
+        "unclosed": 4,
+        "recommendationsVisible": true,
+        "reasonsVisible": true,
+        "ordinaryCandidates": 0,
+        "wires": {
+          "expected": 16,
+          "drawn": 16,
+          "reviewed": 1,
+          "visibleGeometry": true
+        },
+        "narrative": {
+          "present": true,
+          "summaryVisible": true,
+          "actions": 3,
+          "actionsVisible": true,
+          "boundariesVisible": true
+        }
+      },
+      "code_digest": "8e6e0675f882b205ac2a917022413fd89318989538c469870b915ca107acf396",
+      "skill_digest": "d794838a2d5152f20093cab0de4f33638b4ac79f1d1027aa7b15800c0a8307d0"
+    },
+    {
+      "case": "F10-04",
+      "report_id": "53608a3bd2ce4a59",
+      "source_sha256": "0ab8c648ba23893d77e99b41e721c7d1317baff21df43feda004b60f8cc1aa35",
+      "core_correct": 2,
+      "core_total": 2,
+      "major_errors": 0,
+      "card_status": "ready_for_review",
+      "seconds": 835.5824446000042,
+      "usage": {
+        "input_total": 6893578,
+        "cache_read": 6549504,
+        "cache_creation": 0,
+        "input_uncached": 344074,
+        "output": 28069,
+        "thinking_reported": 8428,
+        "output_includes_thinking": "Codex output_tokens is used once; reasoning is not added",
+        "input_semantics": "Codex input_tokens is the total; reported cache read/write are not added to it. input_uncached means input_tokens minus cached_input_tokens."
+      },
+      "first_submit_at": "2026-09-14T14:02:06.843Z",
+      "after_first_submit_seconds": 262.36599,
+      "tools": {
+        "error": 1,
+        "agent_message": 8,
+        "command_execution": 10,
+        "investigate": 27,
+        "page": 20,
+        "submit": 3
+      },
+      "delivery": {
+        "query_attempts": 101,
+        "query_succeeded": 96,
+        "query_failed": 5,
+        "open_attempts": 20,
+        "open_succeeded": 19,
+        "open_failed": 1,
+        "frames_sent": 145,
+        "frames_visible_complete": 142,
+        "bodies": 101,
+        "bodies_visible_complete": 43,
+        "host_truncated_wrappers": 2
+      },
+      "browser": {
+        "passed": true,
+        "report_id": "53608a3bd2ce4a59",
+        "source_sha256": "0ab8c648ba23893d77e99b41e721c7d1317baff21df43feda004b60f8cc1aa35",
+        "nodes": 7,
+        "seedEdges": 6,
+        "unclosed": 0,
+        "recommendationsVisible": true,
+        "reasonsVisible": true,
+        "ordinaryCandidates": 0,
+        "wires": {
+          "expected": 6,
+          "drawn": 6,
+          "reviewed": 0,
+          "visibleGeometry": true
+        },
+        "narrative": {
+          "present": true,
+          "summaryVisible": true,
+          "actions": 3,
+          "actionsVisible": true,
+          "boundariesVisible": true
+        }
+      },
+      "code_digest": "8e6e0675f882b205ac2a917022413fd89318989538c469870b915ca107acf396",
+      "skill_digest": "d794838a2d5152f20093cab0de4f33638b4ac79f1d1027aa7b15800c0a8307d0"
+    },
+    {
+      "case": "F10-05",
+      "report_id": "104bc14f8d5d4463",
+      "source_sha256": "2abd98d5d62bf5feb69c76f27605eb7596deeff811d4374645fd9a095c7afe97",
+      "core_correct": 1,
+      "core_total": 1,
+      "major_errors": 0,
+      "card_status": "ready_for_review",
+      "seconds": 428.14115159999346,
+      "usage": {
+        "input_total": 2090631,
+        "cache_read": 1942016,
+        "cache_creation": 0,
+        "input_uncached": 148615,
+        "output": 19966,
+        "thinking_reported": 8300,
+        "output_includes_thinking": "Codex output_tokens is used once; reasoning is not added",
+        "input_semantics": "Codex input_tokens is the total; reported cache read/write are not added to it. input_uncached means input_tokens minus cached_input_tokens."
+      },
+      "first_submit_at": "2026-09-14T14:11:50.349Z",
+      "after_first_submit_seconds": 109.269855,
+      "tools": {
+        "error": 1,
+        "agent_message": 7,
+        "command_execution": 2,
+        "investigate": 14,
+        "page": 5,
+        "submit": 2
+      },
+      "delivery": {
+        "query_attempts": 53,
+        "query_succeeded": 50,
+        "query_failed": 3,
+        "open_attempts": 22,
+        "open_succeeded": 22,
+        "open_failed": 0,
+        "frames_sent": 65,
+        "frames_visible_complete": 65,
+        "bodies": 53,
+        "bodies_visible_complete": 25,
+        "host_truncated_wrappers": 0
+      },
+      "browser": {
+        "passed": true,
+        "report_id": "104bc14f8d5d4463",
+        "source_sha256": "2abd98d5d62bf5feb69c76f27605eb7596deeff811d4374645fd9a095c7afe97",
+        "nodes": 8,
+        "seedEdges": 7,
+        "unclosed": 0,
+        "recommendationsVisible": true,
+        "reasonsVisible": true,
+        "ordinaryCandidates": 0,
+        "wires": {
+          "expected": 7,
+          "drawn": 7,
+          "reviewed": 1,
+          "visibleGeometry": true
+        },
+        "narrative": {
+          "present": true,
+          "summaryVisible": true,
+          "actions": 3,
+          "actionsVisible": true,
+          "boundariesVisible": true
+        }
+      },
+      "code_digest": "8e6e0675f882b205ac2a917022413fd89318989538c469870b915ca107acf396",
+      "skill_digest": "d794838a2d5152f20093cab0de4f33638b4ac79f1d1027aa7b15800c0a8307d0"
+    },
+    {
+      "case": "F10-06",
+      "report_id": "88b45280a8ab4f26",
+      "source_sha256": "a19aaad38e0b7c5d04b61b718bb89dc87ed4a533565daee656ab6ba561956836",
+      "core_correct": 3,
+      "core_total": 3,
+      "major_errors": 3,
+      "card_status": "ready_for_review",
+      "seconds": 778.8476622000162,
+      "usage": {
+        "input_total": 4511080,
+        "cache_read": 4272640,
+        "cache_creation": 0,
+        "input_uncached": 238440,
+        "output": 38691,
+        "thinking_reported": 14916,
+        "output_includes_thinking": "Codex output_tokens is used once; reasoning is not added",
+        "input_semantics": "Codex input_tokens is the total; reported cache read/write are not added to it. input_uncached means input_tokens minus cached_input_tokens."
+      },
+      "first_submit_at": "2026-09-14T14:14:43.333Z",
+      "after_first_submit_seconds": 393.060559,
+      "tools": {
+        "error": 1,
+        "agent_message": 13,
+        "command_execution": 2,
+        "investigate": 13,
+        "page": 13,
+        "submit": 7
+      },
+      "delivery": {
+        "query_attempts": 50,
+        "query_succeeded": 47,
+        "query_failed": 3,
+        "open_attempts": 19,
+        "open_succeeded": 19,
+        "open_failed": 0,
+        "frames_sent": 83,
+        "frames_visible_complete": 83,
+        "bodies": 50,
+        "bodies_visible_complete": 30,
+        "host_truncated_wrappers": 0
+      },
+      "browser": {
+        "passed": true,
+        "report_id": "88b45280a8ab4f26",
+        "source_sha256": "a19aaad38e0b7c5d04b61b718bb89dc87ed4a533565daee656ab6ba561956836",
+        "nodes": 9,
+        "seedEdges": 8,
+        "unclosed": 0,
+        "recommendationsVisible": true,
+        "reasonsVisible": true,
+        "ordinaryCandidates": 0,
+        "wires": {
+          "expected": 8,
+          "drawn": 8,
+          "reviewed": 0,
+          "visibleGeometry": true
+        },
+        "narrative": {
+          "present": true,
+          "summaryVisible": true,
+          "actions": 3,
+          "actionsVisible": true,
+          "boundariesVisible": true
+        }
+      },
+      "code_digest": "8e6e0675f882b205ac2a917022413fd89318989538c469870b915ca107acf396",
+      "skill_digest": "d794838a2d5152f20093cab0de4f33638b4ac79f1d1027aa7b15800c0a8307d0"
+    },
+    {
+      "case": "F10-07",
+      "report_id": "83a4b3a05dad445b",
+      "source_sha256": "7e6cadd380b0c5537b57ba40be7ca6c73c8101b8b2e9bd29cf8d85a37e8911dc",
+      "core_correct": 2,
+      "core_total": 2,
+      "major_errors": 0,
+      "card_status": "ready_for_review",
+      "seconds": 444.92678390000947,
+      "usage": {
+        "input_total": 2125078,
+        "cache_read": 1966592,
+        "cache_creation": 0,
+        "input_uncached": 158486,
+        "output": 21413,
+        "thinking_reported": 10051,
+        "output_includes_thinking": "Codex output_tokens is used once; reasoning is not added",
+        "input_semantics": "Codex input_tokens is the total; reported cache read/write are not added to it. input_uncached means input_tokens minus cached_input_tokens."
+      },
+      "first_submit_at": "2026-09-14T14:19:29.802Z",
+      "after_first_submit_seconds": 96.65939,
+      "tools": {
+        "error": 1,
+        "agent_message": 7,
+        "command_execution": 3,
+        "investigate": 11,
+        "page": 11,
+        "submit": 2
+      },
+      "delivery": {
+        "query_attempts": 46,
+        "query_succeeded": 40,
+        "query_failed": 6,
+        "open_attempts": 12,
+        "open_succeeded": 12,
+        "open_failed": 0,
+        "frames_sent": 67,
+        "frames_visible_complete": 67,
+        "bodies": 46,
+        "bodies_visible_complete": 25,
+        "host_truncated_wrappers": 0
+      },
+      "browser": {
+        "passed": true,
+        "report_id": "83a4b3a05dad445b",
+        "source_sha256": "7e6cadd380b0c5537b57ba40be7ca6c73c8101b8b2e9bd29cf8d85a37e8911dc",
+        "nodes": 10,
+        "seedEdges": 9,
+        "unclosed": 0,
+        "recommendationsVisible": true,
+        "reasonsVisible": true,
+        "ordinaryCandidates": 0,
+        "wires": {
+          "expected": 9,
+          "drawn": 9,
+          "reviewed": 0,
+          "visibleGeometry": true
+        },
+        "narrative": {
+          "present": true,
+          "summaryVisible": true,
+          "actions": 3,
+          "actionsVisible": true,
+          "boundariesVisible": true
+        }
+      },
+      "code_digest": "8e6e0675f882b205ac2a917022413fd89318989538c469870b915ca107acf396",
+      "skill_digest": "d794838a2d5152f20093cab0de4f33638b4ac79f1d1027aa7b15800c0a8307d0"
+    },
+    {
+      "case": "F10-08",
+      "report_id": "24eb3fe708434b98",
+      "source_sha256": "08ee45b07ce3f7a15428b4a6db1b45b3290dad3e5b733bb3a0d7ed4de1bfa343",
+      "core_correct": 2,
+      "core_total": 2,
+      "major_errors": 0,
+      "card_status": "ready_for_review",
+      "seconds": 594.0073675999884,
+      "usage": {
+        "input_total": 3619763,
+        "cache_read": 3403520,
+        "cache_creation": 0,
+        "input_uncached": 216243,
+        "output": 28563,
+        "thinking_reported": 10240,
+        "output_includes_thinking": "Codex output_tokens is used once; reasoning is not added",
+        "input_semantics": "Codex input_tokens is the total; reported cache read/write are not added to it. input_uncached means input_tokens minus cached_input_tokens."
+      },
+      "first_submit_at": "2026-09-14T14:27:05.959Z",
+      "after_first_submit_seconds": 235.985672,
+      "tools": {
+        "error": 1,
+        "agent_message": 9,
+        "command_execution": 5,
+        "investigate": 13,
+        "page": 9,
+        "submit": 4
+      },
+      "delivery": {
+        "query_attempts": 63,
+        "query_succeeded": 60,
+        "query_failed": 3,
+        "open_attempts": 20,
+        "open_succeeded": 19,
+        "open_failed": 1,
+        "frames_sent": 94,
+        "frames_visible_complete": 94,
+        "bodies": 63,
+        "bodies_visible_complete": 25,
+        "host_truncated_wrappers": 0
+      },
+      "browser": {
+        "passed": true,
+        "report_id": "24eb3fe708434b98",
+        "source_sha256": "08ee45b07ce3f7a15428b4a6db1b45b3290dad3e5b733bb3a0d7ed4de1bfa343",
+        "nodes": 8,
+        "seedEdges": 7,
+        "unclosed": 0,
+        "recommendationsVisible": true,
+        "reasonsVisible": true,
+        "ordinaryCandidates": 0,
+        "wires": {
+          "expected": 7,
+          "drawn": 7,
+          "reviewed": 2,
+          "visibleGeometry": true
+        },
+        "narrative": {
+          "present": true,
+          "summaryVisible": true,
+          "actions": 3,
+          "actionsVisible": true,
+          "boundariesVisible": true
+        }
+      },
+      "code_digest": "8e6e0675f882b205ac2a917022413fd89318989538c469870b915ca107acf396",
+      "skill_digest": "d794838a2d5152f20093cab0de4f33638b4ac79f1d1027aa7b15800c0a8307d0"
+    },
+    {
+      "case": "F10-09",
+      "report_id": "de41b3f4740b42ce",
+      "source_sha256": "911b8113d805bf6e4363c254bfb358538caf8f4f34674b9d6d1702ac112b9705",
+      "core_correct": 1,
+      "core_total": 1,
+      "major_errors": 0,
+      "card_status": "ready_for_review",
+      "seconds": 440.65950750000775,
+      "usage": {
+        "input_total": 1927751,
+        "cache_read": 1782016,
+        "cache_creation": 0,
+        "input_uncached": 145735,
+        "output": 21322,
+        "thinking_reported": 10202,
+        "output_includes_thinking": "Codex output_tokens is used once; reasoning is not added",
+        "input_semantics": "Codex input_tokens is the total; reported cache read/write are not added to it. input_uncached means input_tokens minus cached_input_tokens."
+      },
+      "first_submit_at": "2026-09-14T14:26:12.183Z",
+      "after_first_submit_seconds": 147.153296,
+      "tools": {
+        "error": 1,
+        "agent_message": 9,
+        "command_execution": 4,
+        "investigate": 12,
+        "page": 9,
+        "submit": 3
+      },
+      "delivery": {
+        "query_attempts": 51,
+        "query_succeeded": 46,
+        "query_failed": 5,
+        "open_attempts": 26,
+        "open_succeeded": 23,
+        "open_failed": 3,
+        "frames_sent": 65,
+        "frames_visible_complete": 65,
+        "bodies": 51,
+        "bodies_visible_complete": 33,
+        "host_truncated_wrappers": 0
+      },
+      "browser": {
+        "passed": true,
+        "report_id": "de41b3f4740b42ce",
+        "source_sha256": "911b8113d805bf6e4363c254bfb358538caf8f4f34674b9d6d1702ac112b9705",
+        "nodes": 4,
+        "seedEdges": 3,
+        "unclosed": 0,
+        "recommendationsVisible": true,
+        "reasonsVisible": true,
+        "ordinaryCandidates": 0,
+        "wires": {
+          "expected": 3,
+          "drawn": 3,
+          "reviewed": 2,
+          "visibleGeometry": true
+        },
+        "narrative": {
+          "present": true,
+          "summaryVisible": true,
+          "actions": 3,
+          "actionsVisible": true,
+          "boundariesVisible": true
+        }
+      },
+      "code_digest": "8e6e0675f882b205ac2a917022413fd89318989538c469870b915ca107acf396",
+      "skill_digest": "d794838a2d5152f20093cab0de4f33638b4ac79f1d1027aa7b15800c0a8307d0"
+    },
+    {
+      "case": "F10-10",
+      "report_id": "23a887f51a9e448b",
+      "source_sha256": "4ede17d26bbd0a158ec665a55359a8259073e05165baa70c40c961226b113632",
+      "core_correct": 1,
+      "core_total": 1,
+      "major_errors": 0,
+      "card_status": "ready_for_review",
+      "seconds": 688.1486584999948,
+      "usage": {
+        "input_total": 3875742,
+        "cache_read": 3665152,
+        "cache_creation": 0,
+        "input_uncached": 210590,
+        "output": 33311,
+        "thinking_reported": 14702,
+        "output_includes_thinking": "Codex output_tokens is used once; reasoning is not added",
+        "input_semantics": "Codex input_tokens is the total; reported cache read/write are not added to it. input_uncached means input_tokens minus cached_input_tokens."
+      },
+      "first_submit_at": "2026-09-14T14:35:02.649Z",
+      "after_first_submit_seconds": 305.851202,
+      "tools": {
+        "error": 1,
+        "agent_message": 10,
+        "command_execution": 3,
+        "investigate": 14,
+        "page": 10,
+        "submit": 6
+      },
+      "delivery": {
+        "query_attempts": 73,
+        "query_succeeded": 73,
+        "query_failed": 0,
+        "open_attempts": 32,
+        "open_succeeded": 32,
+        "open_failed": 0,
+        "frames_sent": 99,
+        "frames_visible_complete": 99,
+        "bodies": 73,
+        "bodies_visible_complete": 40,
+        "host_truncated_wrappers": 1
+      },
+      "browser": {
+        "passed": true,
+        "report_id": "23a887f51a9e448b",
+        "source_sha256": "4ede17d26bbd0a158ec665a55359a8259073e05165baa70c40c961226b113632",
+        "nodes": 4,
+        "seedEdges": 3,
+        "unclosed": 0,
+        "recommendationsVisible": true,
+        "reasonsVisible": true,
+        "ordinaryCandidates": 0,
+        "wires": {
+          "expected": 3,
+          "drawn": 3,
+          "reviewed": 2,
+          "visibleGeometry": true
+        },
+        "narrative": {
+          "present": true,
+          "summaryVisible": true,
+          "actions": 3,
+          "actionsVisible": true,
+          "boundariesVisible": true
+        }
+      },
+      "code_digest": "8e6e0675f882b205ac2a917022413fd89318989538c469870b915ca107acf396",
+      "skill_digest": "d794838a2d5152f20093cab0de4f33638b4ac79f1d1027aa7b15800c0a8307d0"
+    }
+  ]
+}
