@@ -1,0 +1,652 @@
+{
+  "schema": "inquiry-paired-review-costs/1",
+  "date": "2026-09-14",
+  "scope": "20 fixed forks; incremental review only, excludes shared original investigation and import. No targeted retries or tree completion included.",
+  "artifact_root": "C:/Users/hongy/projects/_migloop-paired-review-20260914",
+  "totals": {
+    "raw": {
+      "seconds": 2078.135583199997,
+      "input": 14751898,
+      "cached_input": 12620544,
+      "uncached_input": 2131354,
+      "output": 68132,
+      "tokens": 14820030,
+      "host_truncations": 24,
+      "frames_sent": 0,
+      "frames_visible": 0
+    },
+    "inquiry": {
+      "seconds": 2437.396826400014,
+      "input": 25065408,
+      "cached_input": 22787328,
+      "uncached_input": 2278080,
+      "output": 83341,
+      "tokens": 25148749,
+      "host_truncations": 7,
+      "frames_sent": 280,
+      "frames_visible": 280
+    }
+  },
+  "rows": [
+    {
+      "case": "F10-01",
+      "arm": "raw",
+      "root": "remaining-v1",
+      "report_sha256": "0fd4d273887b977e4a00a641870339ab8adff5430dfd459dd0d89bfe6a481d3a",
+      "native_sha256": "db7bec78ec441064249403d8d14337477fc718f1d1c980c57027b9a0084b56c8",
+      "status": "completed",
+      "model": [
+        "gpt-5.6-luna"
+      ],
+      "effort": "high",
+      "seconds": 201.78576569998404,
+      "parent_bound": true,
+      "final_authenticated": true,
+      "input": 1433246,
+      "cached_input": 1261824,
+      "uncached_input": 171422,
+      "output": 7113,
+      "tokens": 1440359,
+      "host_truncations": 5,
+      "queries": {
+        "query_attempts": 0,
+        "query_succeeded": 0,
+        "query_failed": 0,
+        "open_attempts": 0,
+        "open_succeeded": 0,
+        "open_failed": 0
+      },
+      "frames_sent": 0,
+      "frames_visible": 0
+    },
+    {
+      "case": "F10-01",
+      "arm": "inquiry",
+      "root": "remaining-v1",
+      "report_sha256": "8aad2f1621e92f5145b67581812371319f112d5e899e396f980979b700de40d2",
+      "native_sha256": "f83f2d1a1c3e5eb43205e8d632cdd16c4a3a6016f881291d6bc8f17d1f0d5101",
+      "status": "completed",
+      "model": [
+        "gpt-5.6-luna"
+      ],
+      "effort": "high",
+      "seconds": 295.88082020002184,
+      "parent_bound": true,
+      "final_authenticated": true,
+      "input": 2471088,
+      "cached_input": 2304256,
+      "uncached_input": 166832,
+      "output": 12328,
+      "tokens": 2483416,
+      "host_truncations": 0,
+      "queries": {
+        "query_attempts": 52,
+        "query_succeeded": 52,
+        "query_failed": 0,
+        "open_attempts": 11,
+        "open_succeeded": 11,
+        "open_failed": 0
+      },
+      "frames_sent": 56,
+      "frames_visible": 56
+    },
+    {
+      "case": "F10-02",
+      "arm": "raw",
+      "root": "remaining-v1",
+      "report_sha256": "4b051d3826bfa7ac53203f9fca8c8c40060daec063cb498796db5ff737ad121a",
+      "native_sha256": "0780692298b8066d04e018f6461a2e328645c9b7c5e3f0a3a38f91ef764dcbc6",
+      "status": "completed",
+      "model": [
+        "gpt-5.6-luna"
+      ],
+      "effort": "high",
+      "seconds": 210.56327549999696,
+      "parent_bound": true,
+      "final_authenticated": true,
+      "input": 2829650,
+      "cached_input": 2601216,
+      "uncached_input": 228434,
+      "output": 9014,
+      "tokens": 2838664,
+      "host_truncations": 1,
+      "queries": {
+        "query_attempts": 0,
+        "query_succeeded": 0,
+        "query_failed": 0,
+        "open_attempts": 0,
+        "open_succeeded": 0,
+        "open_failed": 0
+      },
+      "frames_sent": 0,
+      "frames_visible": 0
+    },
+    {
+      "case": "F10-02",
+      "arm": "inquiry",
+      "root": "remaining-v1",
+      "report_sha256": "ec67f93eb1315afa26bf21c775dd29c55adf55d82d87587087d82871a7f945a2",
+      "native_sha256": "832f681a7c679536b482491483a110b5560ccf775e282b0e795266689cff8bf3",
+      "status": "completed",
+      "model": [
+        "gpt-5.6-luna"
+      ],
+      "effort": "high",
+      "seconds": 206.411437200004,
+      "parent_bound": true,
+      "final_authenticated": true,
+      "input": 3707011,
+      "cached_input": 3474688,
+      "uncached_input": 232323,
+      "output": 9041,
+      "tokens": 3716052,
+      "host_truncations": 1,
+      "queries": {
+        "query_attempts": 15,
+        "query_succeeded": 12,
+        "query_failed": 3,
+        "open_attempts": 6,
+        "open_succeeded": 3,
+        "open_failed": 3
+      },
+      "frames_sent": 17,
+      "frames_visible": 17
+    },
+    {
+      "case": "F10-03",
+      "arm": "raw",
+      "root": "remaining-v1",
+      "report_sha256": "190a19586955e1173b9cdc696b61a2dedaab4a17b98347cb96e1ee2e68190aa3",
+      "native_sha256": "7fd59f3920fccbfabefdec59b9ab404131405e09686aea04ff136136ccd0a69a",
+      "status": "completed",
+      "model": [
+        "gpt-5.6-luna"
+      ],
+      "effort": "high",
+      "seconds": 273.02871440001763,
+      "parent_bound": true,
+      "final_authenticated": true,
+      "input": 2842871,
+      "cached_input": 2594304,
+      "uncached_input": 248567,
+      "output": 7826,
+      "tokens": 2850697,
+      "host_truncations": 4,
+      "queries": {
+        "query_attempts": 0,
+        "query_succeeded": 0,
+        "query_failed": 0,
+        "open_attempts": 0,
+        "open_succeeded": 0,
+        "open_failed": 0
+      },
+      "frames_sent": 0,
+      "frames_visible": 0
+    },
+    {
+      "case": "F10-03",
+      "arm": "inquiry",
+      "root": "remaining-v1",
+      "report_sha256": "8cc1b7d8ec67e2a8c7c7cacf0106f83b2dd18ccd62f17c9c5f1be4f3c05eb967",
+      "native_sha256": "d910a2f27db1dbcee83a09093974a346e2012913b10a209e91e325cd655cf1ec",
+      "status": "completed",
+      "model": [
+        "gpt-5.6-luna"
+      ],
+      "effort": "high",
+      "seconds": 358.78686110000126,
+      "parent_bound": true,
+      "final_authenticated": true,
+      "input": 4528473,
+      "cached_input": 4232192,
+      "uncached_input": 296281,
+      "output": 9875,
+      "tokens": 4538348,
+      "host_truncations": 2,
+      "queries": {
+        "query_attempts": 6,
+        "query_succeeded": 6,
+        "query_failed": 0,
+        "open_attempts": 0,
+        "open_succeeded": 0,
+        "open_failed": 0
+      },
+      "frames_sent": 48,
+      "frames_visible": 48
+    },
+    {
+      "case": "F10-04",
+      "arm": "raw",
+      "root": "remaining-v1",
+      "report_sha256": "fd2448869f0a3dceb5a51205f5d7b16a7bc7f5f6b30c07dbe64040553f2fd877",
+      "native_sha256": "fa2587059c2e74b9cff2aba456562117faeee647fe4fa7e30252649cd6710449",
+      "status": "completed",
+      "model": [
+        "gpt-5.6-luna"
+      ],
+      "effort": "high",
+      "seconds": 130.4779342999973,
+      "parent_bound": true,
+      "final_authenticated": true,
+      "input": 1214549,
+      "cached_input": 985856,
+      "uncached_input": 228693,
+      "output": 5887,
+      "tokens": 1220436,
+      "host_truncations": 1,
+      "queries": {
+        "query_attempts": 0,
+        "query_succeeded": 0,
+        "query_failed": 0,
+        "open_attempts": 0,
+        "open_succeeded": 0,
+        "open_failed": 0
+      },
+      "frames_sent": 0,
+      "frames_visible": 0
+    },
+    {
+      "case": "F10-04",
+      "arm": "inquiry",
+      "root": "remaining-v1",
+      "report_sha256": "36e2e41af483e00584e139449704e723225f7a542c0edc8718b4795d305b90c1",
+      "native_sha256": "4d45f764d86dd02eb93654ceb32fbdf3a0aabcf6012e830a8fc0eefc54fd9617",
+      "status": "completed",
+      "model": [
+        "gpt-5.6-luna"
+      ],
+      "effort": "high",
+      "seconds": 387.72613520000596,
+      "parent_bound": true,
+      "final_authenticated": true,
+      "input": 3385259,
+      "cached_input": 3058432,
+      "uncached_input": 326827,
+      "output": 13198,
+      "tokens": 3398457,
+      "host_truncations": 2,
+      "queries": {
+        "query_attempts": 25,
+        "query_succeeded": 24,
+        "query_failed": 1,
+        "open_attempts": 3,
+        "open_succeeded": 3,
+        "open_failed": 0
+      },
+      "frames_sent": 44,
+      "frames_visible": 44
+    },
+    {
+      "case": "F10-05",
+      "arm": "raw",
+      "root": "remaining-v1",
+      "report_sha256": "fd0f182f14d0713291cd1137ff71947dd26ba002cf12c6dc32b8d36c802e8151",
+      "native_sha256": "3b8a3357ed544d6eae80bac03370d058a357550697b36b9e1d64f45114f2095a",
+      "status": "completed",
+      "model": [
+        "gpt-5.6-luna"
+      ],
+      "effort": "high",
+      "seconds": 159.162774299999,
+      "parent_bound": true,
+      "final_authenticated": true,
+      "input": 873379,
+      "cached_input": 633088,
+      "uncached_input": 240291,
+      "output": 2903,
+      "tokens": 876282,
+      "host_truncations": 2,
+      "queries": {
+        "query_attempts": 0,
+        "query_succeeded": 0,
+        "query_failed": 0,
+        "open_attempts": 0,
+        "open_succeeded": 0,
+        "open_failed": 0
+      },
+      "frames_sent": 0,
+      "frames_visible": 0
+    },
+    {
+      "case": "F10-05",
+      "arm": "inquiry",
+      "root": "remaining-v1",
+      "report_sha256": "5b1c440015b09c050a37c5dc0d5d0c2fe29d18144016eb387ef06725435c4127",
+      "native_sha256": "10a65e7fc3ee65b5fe43124099b204444ec6da5670c2607974ffe8bfa7a191c0",
+      "status": "completed",
+      "model": [
+        "gpt-5.6-luna"
+      ],
+      "effort": "high",
+      "seconds": 141.56097209997824,
+      "parent_bound": true,
+      "final_authenticated": true,
+      "input": 1318782,
+      "cached_input": 1083904,
+      "uncached_input": 234878,
+      "output": 2443,
+      "tokens": 1321225,
+      "host_truncations": 0,
+      "queries": {
+        "query_attempts": 6,
+        "query_succeeded": 6,
+        "query_failed": 0,
+        "open_attempts": 0,
+        "open_succeeded": 0,
+        "open_failed": 0
+      },
+      "frames_sent": 9,
+      "frames_visible": 9
+    },
+    {
+      "case": "F10-06",
+      "arm": "raw",
+      "root": "v1",
+      "report_sha256": "3a145443231611a99a73bf313b84d0dcf29425569d0044a3e3197bcadeb74970",
+      "native_sha256": "5b41c04326792f6ba9a84713320feca097dcece6b1a019bce1a78ed532b5c2fa",
+      "status": "completed",
+      "model": [
+        "gpt-5.6-luna"
+      ],
+      "effort": "high",
+      "seconds": 289.05377050000243,
+      "parent_bound": true,
+      "final_authenticated": true,
+      "input": 2774656,
+      "cached_input": 2591232,
+      "uncached_input": 183424,
+      "output": 12594,
+      "tokens": 2787250,
+      "host_truncations": 4,
+      "queries": {
+        "query_attempts": 0,
+        "query_succeeded": 0,
+        "query_failed": 0,
+        "open_attempts": 0,
+        "open_succeeded": 0,
+        "open_failed": 0
+      },
+      "frames_sent": 0,
+      "frames_visible": 0
+    },
+    {
+      "case": "F10-06",
+      "arm": "inquiry",
+      "root": "v1",
+      "report_sha256": "a45632c244233231d724eeb8d655cd52172d2cf500569e4a41b5e10f8941ca17",
+      "native_sha256": "d0ec2c55d1811b9a6d0cbd1c1cfc58223a0a9c5f0ed62901dbbba2a868597833",
+      "status": "completed",
+      "model": [
+        "gpt-5.6-luna"
+      ],
+      "effort": "high",
+      "seconds": 232.99094309998327,
+      "parent_bound": true,
+      "final_authenticated": true,
+      "input": 3734146,
+      "cached_input": 3546368,
+      "uncached_input": 187778,
+      "output": 9961,
+      "tokens": 3744107,
+      "host_truncations": 0,
+      "queries": {
+        "query_attempts": 38,
+        "query_succeeded": 38,
+        "query_failed": 0,
+        "open_attempts": 18,
+        "open_succeeded": 18,
+        "open_failed": 0
+      },
+      "frames_sent": 51,
+      "frames_visible": 51
+    },
+    {
+      "case": "F10-07",
+      "arm": "raw",
+      "root": "remaining-v1",
+      "report_sha256": "33e5d2cdfded578a7bc353a4a6e3ec1bf0378d5a38ed79eeaa7d157a7c5bea9b",
+      "native_sha256": "e9d9c08eef49ea53e2cc7058734ae0113e92dd1035db2aa4fb9b067355664ada",
+      "status": "completed",
+      "model": [
+        "gpt-5.6-luna"
+      ],
+      "effort": "high",
+      "seconds": 297.5378377000161,
+      "parent_bound": true,
+      "final_authenticated": true,
+      "input": 553704,
+      "cached_input": 484864,
+      "uncached_input": 68840,
+      "output": 11940,
+      "tokens": 565644,
+      "host_truncations": 3,
+      "queries": {
+        "query_attempts": 0,
+        "query_succeeded": 0,
+        "query_failed": 0,
+        "open_attempts": 0,
+        "open_succeeded": 0,
+        "open_failed": 0
+      },
+      "frames_sent": 0,
+      "frames_visible": 0
+    },
+    {
+      "case": "F10-07",
+      "arm": "inquiry",
+      "root": "remaining-v1",
+      "report_sha256": "6cef567ce8aa9b0ace41d42146210ed2459f63c4dd6f7b3db2a5008a52698820",
+      "native_sha256": "e6e7364f0fdec8fb4173ee6a258ac1f76d3fca07b6404f1a64285172ab047ad6",
+      "status": "completed",
+      "model": [
+        "gpt-5.6-luna"
+      ],
+      "effort": "high",
+      "seconds": 277.97816180001246,
+      "parent_bound": true,
+      "final_authenticated": true,
+      "input": 838066,
+      "cached_input": 743168,
+      "uncached_input": 94898,
+      "output": 9843,
+      "tokens": 847909,
+      "host_truncations": 2,
+      "queries": {
+        "query_attempts": 13,
+        "query_succeeded": 12,
+        "query_failed": 1,
+        "open_attempts": 0,
+        "open_succeeded": 0,
+        "open_failed": 0
+      },
+      "frames_sent": 17,
+      "frames_visible": 17
+    },
+    {
+      "case": "F10-08",
+      "arm": "raw",
+      "root": "remaining-v1",
+      "report_sha256": "e323a5933355c2a6cf4fc309a4508e1bce36490e0d23ca889f6d975cb10e7d98",
+      "native_sha256": "06d0ce953db381a2c9b762aa95f808b9b6303f2c824cb2410f9741bff4b98d1a",
+      "status": "completed",
+      "model": [
+        "gpt-5.6-luna"
+      ],
+      "effort": "high",
+      "seconds": 168.99326879999717,
+      "parent_bound": true,
+      "final_authenticated": true,
+      "input": 305849,
+      "cached_input": 25344,
+      "uncached_input": 280505,
+      "output": 3019,
+      "tokens": 308868,
+      "host_truncations": 1,
+      "queries": {
+        "query_attempts": 0,
+        "query_succeeded": 0,
+        "query_failed": 0,
+        "open_attempts": 0,
+        "open_succeeded": 0,
+        "open_failed": 0
+      },
+      "frames_sent": 0,
+      "frames_visible": 0
+    },
+    {
+      "case": "F10-08",
+      "arm": "inquiry",
+      "root": "remaining-v1",
+      "report_sha256": "1c0ebc8ddd35fcd71f9524888e470cf3d0a38076283d6f8ebd93b51a78dbcb8d",
+      "native_sha256": "f288d5ada23837f7f27863bb50bfd10d737affaa8f70a438ba508b8c39c0d617",
+      "status": "completed",
+      "model": [
+        "gpt-5.6-luna"
+      ],
+      "effort": "high",
+      "seconds": 120.88197750001564,
+      "parent_bound": true,
+      "final_authenticated": true,
+      "input": 252148,
+      "cached_input": 9728,
+      "uncached_input": 242420,
+      "output": 1535,
+      "tokens": 253683,
+      "host_truncations": 0,
+      "queries": {
+        "query_attempts": 0,
+        "query_succeeded": 0,
+        "query_failed": 0,
+        "open_attempts": 0,
+        "open_succeeded": 0,
+        "open_failed": 0
+      },
+      "frames_sent": 0,
+      "frames_visible": 0
+    },
+    {
+      "case": "F10-09",
+      "arm": "raw",
+      "root": "v1",
+      "report_sha256": "f6e242d2291750a91781d6a30e47f9c2c85efd4c9586473c0efdc965596575fa",
+      "native_sha256": "09a21cd403465889e9a77753d78d8e2def6bd782317535decbeb49b2a8adb55c",
+      "status": "completed",
+      "model": [
+        "gpt-5.6-luna"
+      ],
+      "effort": "high",
+      "seconds": 161.8953574000043,
+      "parent_bound": true,
+      "final_authenticated": true,
+      "input": 898725,
+      "cached_input": 656384,
+      "uncached_input": 242341,
+      "output": 3416,
+      "tokens": 902141,
+      "host_truncations": 1,
+      "queries": {
+        "query_attempts": 0,
+        "query_succeeded": 0,
+        "query_failed": 0,
+        "open_attempts": 0,
+        "open_succeeded": 0,
+        "open_failed": 0
+      },
+      "frames_sent": 0,
+      "frames_visible": 0
+    },
+    {
+      "case": "F10-09",
+      "arm": "inquiry",
+      "root": "v1",
+      "report_sha256": "2e09ece012fbf8238948f0d827e0b1bee3a305f374499f89f9d4f4d499bf159a",
+      "native_sha256": "7d28cfdb98819c5361de6852ce7bd99e929c568e8136cdb66989bc0bc37cb969",
+      "status": "completed",
+      "model": [
+        "gpt-5.6-luna"
+      ],
+      "effort": "high",
+      "seconds": 223.48636079998687,
+      "parent_bound": true,
+      "final_authenticated": true,
+      "input": 1514285,
+      "cached_input": 1250304,
+      "uncached_input": 263981,
+      "output": 6455,
+      "tokens": 1520740,
+      "host_truncations": 0,
+      "queries": {
+        "query_attempts": 13,
+        "query_succeeded": 13,
+        "query_failed": 0,
+        "open_attempts": 3,
+        "open_succeeded": 3,
+        "open_failed": 0
+      },
+      "frames_sent": 15,
+      "frames_visible": 15
+    },
+    {
+      "case": "F10-10",
+      "arm": "raw",
+      "root": "remaining-v1",
+      "report_sha256": "38432606dcf2b6e59b33e393735c94eaca5528c6823ff0fb406fce72f4b294c1",
+      "native_sha256": "0eceec2bbf53e3ff1c3f92480692ca03ce754c6ddeb2648b703c2fb67e8889aa",
+      "status": "completed",
+      "model": [
+        "gpt-5.6-luna"
+      ],
+      "effort": "high",
+      "seconds": 185.6368845999823,
+      "parent_bound": true,
+      "final_authenticated": true,
+      "input": 1025269,
+      "cached_input": 786432,
+      "uncached_input": 238837,
+      "output": 4420,
+      "tokens": 1029689,
+      "host_truncations": 2,
+      "queries": {
+        "query_attempts": 0,
+        "query_succeeded": 0,
+        "query_failed": 0,
+        "open_attempts": 0,
+        "open_succeeded": 0,
+        "open_failed": 0
+      },
+      "frames_sent": 0,
+      "frames_visible": 0
+    },
+    {
+      "case": "F10-10",
+      "arm": "inquiry",
+      "root": "remaining-v1",
+      "report_sha256": "739a58b3e825fc8d56b475aa8943e627cb783576ff129a931817ba16c0be550e",
+      "native_sha256": "9a198eed270a86c8ac44afda01231cbb62e7d47f3aa60c041693c4d09aba2093",
+      "status": "completed",
+      "model": [
+        "gpt-5.6-luna"
+      ],
+      "effort": "high",
+      "seconds": 191.69315740000457,
+      "parent_bound": true,
+      "final_authenticated": true,
+      "input": 3316150,
+      "cached_input": 3084288,
+      "uncached_input": 231862,
+      "output": 8662,
+      "tokens": 3324812,
+      "host_truncations": 0,
+      "queries": {
+        "query_attempts": 21,
+        "query_succeeded": 19,
+        "query_failed": 2,
+        "open_attempts": 6,
+        "open_succeeded": 6,
+        "open_failed": 0
+      },
+      "frames_sent": 23,
+      "frames_visible": 23
+    }
+  ]
+}

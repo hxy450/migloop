@@ -1,0 +1,96 @@
+{
+  "schema": "inquiry-paired-review-adjudication/1",
+  "date": "2026-09-14",
+  "status": "all_20_reviews_completed_and_56_units_adjudicated",
+  "contract": "../file-first-10/bounded-attribution-v2.md",
+  "plan": "paired-review-plan.md",
+  "method": "Non-blind developer source adjudication of the SAME immutable original report plus each arm's own delta. No human repair of model reports. Established measures completed bounded attribution, NOT binary factual accuracy.",
+  "roots": {
+    "pilot": "C:/Users/hongy/projects/_migloop-paired-review-20260914/v1",
+    "remaining": "C:/Users/hongy/projects/_migloop-paired-review-20260914/remaining-v1"
+  },
+  "artifact_pattern": "<root>/<case>/<raw|inquiry>/rep1/report.md; original report in workspace/initial-report.md; task/pool in workspace/investigation.json",
+  "cases": [
+    {
+      "id": "F10-01",
+      "units": {
+        "mask": ["partial", "partial"],
+        "images": ["partial", "established"],
+        "cta": ["partial", "established"],
+        "price": ["partial", "wrong"],
+        "indicator": ["partial", "partial"],
+        "repair-compile": ["established", "established"]
+      },
+      "basis": "Tool delta 12,16 restores initial Write C:61/62; original C:18/19 already supplies the same agent's Android XML input, closing images and CTA. Width 254/280 already existed; later addition is height/aspect, not absence of all dimensions. Native/script distinctions and three mask sites corrected. Both retain missing runtime verification.",
+      "new_errors": [{"arm": "inquiry", "severity": "core_attribution", "report_lines": "10,16-17", "claim": "Price-suffix defect already established in Stage 1", "counterevidence": "C:61 defines rolling numeric priceText (example 598), defaults empty and defers business to S8. S8:264 binds stripCurrency(product.showNowPrice) to the shared Text30; S8:24 received numeric replaceSpan/AbsoluteSizeSpan. Same textual code alone does not establish the same earlier activated defect."}],
+      "remaining": "Raw D-008 mechanism remains unverified; mask generation input and indicator requirements-to-output not closed. Stronger local evidence does not remove the tool's new price error.",
+      "sources": {"C": "member-center/pool/9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aconv-member-08b3dcf6deb3c515.jsonl", "S8": "member-center/pool/9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aslice8-pay-80bbb1f44b77da0f.jsonl", "F": "member-center/pool/ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl"}
+    },
+    {
+      "id": "F10-02",
+      "units": {"mask": ["omitted", "omitted"], "icon": ["omitted", "omitted"], "back-gate": ["established", "established"], "progress": ["partial", "partial"], "system-bars": ["partial", "partial"]},
+      "basis": "Both correct the earlier missing Delete history: aentry-setup:123/124 removed onBackPressed at 2026-07-24T02:32:52.166Z (raw delta 9-20, tool 7-16). This strengthens a preserved family; it is not another completed family.",
+      "remaining": "Mask and icon edits remain omitted (fixer:103/104,233/234). Progress and system-bars relevant generation input boundary not closed.",
+      "new_errors": []
+    },
+    {
+      "id": "F10-03",
+      "units": {"label": ["partial", "partial"], "button-style": ["partial", "partial"], "test-integration": ["established", "established"], "logging": ["established", "established"], "comment-policy": ["established", "established"]},
+      "basis": "Both withdraw the claim of no independent visual-fixer / ID-injector Edits: visual:66/67,68/69,70/71 and injector:22/23,25/26,28/29. Original already attributes console to visual-fixer, retained in both; do not require delta to repeat it. Original logging chain visual:68/69 -> cleanup:57/58 remains valid.",
+      "new_errors": [{"arm": "raw", "severity": "citation", "report_lines": "48-54", "claim": "cleanup subagent lines 180-182,224", "counterevidence": "Cleanup has 91 lines; these are dice-fix-root coordinates, correctly named in original lines111-121. Does not overturn the preserved attribution."}],
+      "remaining": "Label/style default semantics or parsing obligations and initial deviation still not closed. getStringSync deprecation in tool delta21 is supported by agent-ac20d808e5bc6be60:77/78."
+    },
+    {
+      "id": "F10-04",
+      "units": {"debug-wiring": ["partial", "partial"], "wrong-class-repair": ["established", "established"]},
+      "basis": "Both preserve wrong F013Service.setDebug, compile failure, AppTrackConfig lookup and correcting Edits (CC root:5099,5110,5115,5123,5126,5131). Tool finds Base3:272/273 Step3d HttpLog duty and S5:161/162 separate AppTrackConfig startup comment, but explicitly lacks delivery to the blamed shared closer. Requirements existing somewhere is not the recipient's received input.",
+      "remaining": "Raw's pool-wide no explicit startup assignee wording is too strong given Base3 assigns Slice11 startup steps. Group1:482 is handoff/install text, not executing install. Tool cites the C2 PASS summary493; independent review confirms actual command413 and receipt414 total C2=12, so the execution claim is not fabricated. These checks do not verify debug initialization or replace the missing responsibility recipient's actual inputs. Both distinguish compile from device verification and keep profile policy unknown.",
+      "new_errors": []
+    },
+    {
+      "id": "F10-05",
+      "units": {"android-id-unblock": ["established", "established"]},
+      "basis": "Auth:1 D010/D011 explicitly pending; auth:351/421 empty value follows that contract; CC root:5214,5221 actual Edits,5203 cached hex,5226/5227 build. Later test unblock remains established in both. Tool delta9,23 downgrades actual failure-after-debug to hypothesis; raw delta49 still overstates that trigger.",
+      "new_errors": [{"arm": "both", "severity": "temporal_inference", "report_lines": "raw40 / inquiry13", "claim": "20260727_013xxx artifacts postdate UTC cutoff 2026-07-26T21:48", "counterevidence": "Observation root:1531 event is 2026-07-26T17:39:39.203Z; names 013422/013516/013805 are compatible with +08 local 17:34/17:35/17:38Z. Filename date without timezone cannot establish lateness. Final-package/payload verification may remain unknown for other reasons."}],
+      "remaining": "Raw trigger overstatement: CC root:5138 says still possible,5164/5166 are static diagnosis,5329 not device-tested."
+    },
+    {
+      "id": "F10-06",
+      "units": {"back-image-box": ["established", "established"], "track-vs-control": ["partial", "partial"], "bottom-inset": ["partial", "established"]},
+      "basis": "See paired-review-guide-adjudication.md. Tool uses actual generator received safearea at guide:43, omitted bottom in initial Write64/65 and actual later patch. Raw correctly restores final WindowModel/top history. Stage0:155 source4dp is real, but not proof converter received that drawable; the mapping formation chain remains unfinished.",
+      "new_errors": [{"arm": "inquiry", "severity": "citation_and_author_wording", "report_lines": "27", "claim": "Read six components and marked them sub_component", "counterevidence": "Cites Slice15:38(host),42(one child). Actual six child receipts40,42,45,47,49,51 contain pre-existing classifications; read is not first authorship. This does not overturn the generator's established safearea deviation."}]
+    },
+    {
+      "id": "F10-07",
+      "units": {"test-bridge": ["established", "established"], "error-observer": ["established", "established"]},
+      "basis": "Both correctly narrow generation blame to actual later-phase duties: UI test task a711:1 and Edits35,37,39; ECAT257fed22:1,repair-root:3 and observer Edits41,43,45. Original already had enough bounded stage explanation, so this does not add a family.",
+      "retained_errors": [{"arm": "both", "severity": "verification_claim", "report_lines": "original75 / raw25 / inquiry41", "claim": "No compile after adding the observer", "counterevidence": "dice-entry/pool/2f01bcdc-0a92-4961-a64d-5b181f03b3d3/subagents/agent-a635575c78cd15ff6.jsonl:1 explicitly tasks checking new errorManager;44 at21:23:58 has CompileArkTS/BUILD SUCCESSFUL;64 at21:25:34 ohosTest success;82 reports EntryAbility errorManager PASS. Does not prove untested runtime semantics."}],
+      "new_errors": [{"arm": "inquiry", "severity": "citation", "report_lines": "16", "claim": "593d4e86-a947-4e62-8027-013014c2bafc.jsonl:1 supports later 10/10 and onNewWant", "counterevidence": "Line1 is a 0/10 blocked report. The same source's260/264 support 10/10,267 onNewWant x3,291 summary retains canonical DEFERRED and7 UNOBSERVABLE. Fact not fabricated, citation wrong. Does not correct observer post-build error."}],
+      "remaining": "Tool Step2 no-EntryAbility-edit restriction is real but is in aa1ccf93d575837a2:1, not cited a711:1/21. Raw improves bridge grep coordinates to a711:24,30."
+    },
+    {
+      "id": "F10-08",
+      "units": {"identity-phase-and-conflict": ["established", "established"], "icon-scope": ["established", "established"]},
+      "basis": "Both preserve genuine post-generation identity/icon scope; raw delta11 adds actual first D004 Write 70f369a3:265 at21:48:33.129Z, after identity-fix:49/50 at21:19:08. Both constrain the claim old icon was unusable and unverified cache explanations; vendor authority and visual/runtime benefits remain unknown.",
+      "new_errors": [],
+      "retained_errors": [{"arm": "both", "severity": "verification_claim", "report_lines": "raw original70 retained; inquiry delta47 repeated", "claim": "No build after modification", "counterevidence": "dice-entry/pool/2f01bcdc-0a92-4961-a64d-5b181f03b3d3/subagents/agent-a635575c78cd15ff6.jsonl:23/26 reads new bundle/vendor/layered,29 runs assembleHap,48 at21:24:08 returns BUILD_EXIT_CODE=0/ERROR=0 and HAP. Fixer not building does not mean no downstream builder. Compile success still does not prove vendor semantics or visual benefit."}]
+    },
+    {"id": "F10-09", "units": {"hit-test": ["bounded_unknown", "bounded_unknown"]}, "basis": "See paired-review-codex-adjudication.md. Both correct the original worker overattribution. Fixed pool has only A/B root logs; A5717/5774 contain close_batch_02 creation summaries, not its original writes. A8026/8027 is later snapshot;8066/8067 is actual repair. Missing generator subthread is a concrete source boundary. Raw delta28,49 and tool7,24 both preserve it; no exact withdrawal keyword required."},
+    {
+      "id": "F10-10",
+      "units": {"signing-reference": ["established", "established"]},
+      "basis": "Both retain original actual unsigned contract and later existing-material -> product-reference repair. Both newly constrain Stage1 deletion to a subagent summary, not a saved original patch. Tool finds earlier skill A1566 explicitly removing signingConfigs/product refs in unsigned mode; raw adds actual A6923/6924 WARN No signingConfig followed by BUILD SUCCESSFUL. Both are real refinements but original bounded scope explanation was already established.",
+      "remaining": "Later material-block writer and compatibleSdkVersion change stay unknown; do not attribute them to the only documented later signingConfig patch. Raw additionally limits targetSdkVersion to observed snapshots, not universal unchanged history. Sources A1566,5407,6923/6924,7970; B4929/4930,4943/4944. No new core error found in cited comparison.",
+      "new_errors": []
+    }
+  ],
+  "unit_value_order": ["raw", "inquiry"],
+  "counts": {
+    "raw": {"established": 13, "partial": 12, "bounded_unknown": 1, "omitted": 2, "wrong": 0, "total": 28},
+    "inquiry": {"established": 16, "partial": 8, "bounded_unknown": 1, "omitted": 2, "wrong": 1, "total": 28}
+  },
+  "preregistered_large_gain_met": false,
+  "large_gain_note": "Established gain is 3/28, below the preregistered 6/28. Tool also introduces one core price-attribution error. Additional assertion errors remain itemized separately and are not canceled out by completed families.",
+  "source_base": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v1",
+  "limits": ["Same ten development files, not held-out generalization", "One review per arm, no repeated-seed stability estimate", "Reviewer checked cited primary evidence, not every sentence in all source transcripts", "No mandatory tree in this semantic-review comparison; follow-up tree completion is separately measured", "Targeted member-v2 and guide-v3 must not replace these frozen results"]
+}

@@ -1,0 +1,907 @@
+{
+  "schema": "inquiry-bounded-attribution-full-review/2",
+  "date": "2026-09-14",
+  "rubric": "../file-first-10/bounded-attribution-v2.md",
+  "scope": "10 fixed files, 28 unchanged core families per arm. Review of the original final reports only; no new investigator runs or human report repair.",
+  "status": "all_56_unit_decisions_completed",
+  "arms": {
+    "raw": "raw-high-i20-match-20260912",
+    "tool": "temporal-f10-v1"
+  },
+  "selection": "Selected in bounded-attribution-v2 before this full rescoring; no replacement with compact-real-guide-v4 or i20 best cases.",
+  "review_method": "Developer source-backed retrospective adjudication, not blinded/independent gold and not an automatic semantic judge. All final narratives/reasons read; supporting source evidence and prior targeted audits reused, with additional source checks. Does not certify exhaustive whole-report claim precision.",
+  "source_pool_base": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v1",
+  "source_aliases": {
+    "member": "member-center/pool/9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aconv-member-08b3dcf6deb3c515.jsonl",
+    "slice8": "member-center/pool/9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aslice8-pay-80bbb1f44b77da0f.jsonl",
+    "fixer": "member-center/pool/ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl",
+    "build": "member-center/pool/ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-af0e3d2ae54dbf769.jsonl",
+    "splash": "member-center/pool/9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aconv-splash-9d5902d803bbcde6.jsonl",
+    "slice11": "member-center/pool/9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aslice11-startup-50a0622bcfe4a588.jsonl",
+    "auth": "member-center/pool/9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aslice2-auth-ac8d92aebe3693fc.jsonl",
+    "base3": "member-center/pool/9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-abase3-network-f9a03317492be8c4.jsonl",
+    "guide": "member-center/pool/9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aconv-guide-979179ee8c5e2b3d.jsonl",
+    "resources": "member-center/pool/9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-astage0-resources-a72c95c804e188d5.jsonl",
+    "cc-root": "member-center/pool/9b3105a2-85ec-4889-9786-b3c220f06754.jsonl",
+    "dice-root": "dice-entry/pool/81e0a463-c9d3-4a7a-a671-b7f064830af1.jsonl",
+    "dice-fix-root": "dice-entry/pool/2f01bcdc-0a92-4961-a64d-5b181f03b3d3.jsonl",
+    "dice-judge-root": "dice-entry/pool/257fed22-fb0e-48de-bee9-0791c45a90a9.jsonl",
+    "dice-generator": "dice-entry/pool/81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a349784d2663f1f0a.jsonl",
+    "dice-visual": "dice-entry/pool/81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a4874344c8fb6228d.jsonl",
+    "dice-cleanup": "dice-entry/pool/2f01bcdc-0a92-4961-a64d-5b181f03b3d3/subagents/agent-a228e9716d833cbf3.jsonl",
+    "dice-ui-test": "dice-entry/pool/81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a711c5d09fb676814.jsonl",
+    "dice-observer": "dice-entry/pool/2f01bcdc-0a92-4961-a64d-5b181f03b3d3/subagents/agent-a27497cfed8c44856.jsonl",
+    "dice-identity": "dice-entry/pool/81e0a463-c9d3-4a7a-a671-b7f064830af1/subagents/agent-a39c5351955d3cd6b.jsonl",
+    "dice-identity-fix": "dice-entry/pool/2f01bcdc-0a92-4961-a64d-5b181f03b3d3/subagents/agent-a87804892da9cfc8b.jsonl",
+    "codex-A": "codex-c1/pool/rollout-2026-08-16T17-54-23-01a009fe-68e3-7f42-b76b-5e863c555976.jsonl",
+    "codex-B": "codex-c1/pool/rollout-2026-08-21T09-18-20-01a021e5-c150-7b12-a610-d40c07816b98.jsonl"
+  },
+  "old_core_sha256": "0d48f30f9e501eedd55b87e086590c72e8b7fb8096a939f56842b71703426497",
+  "all_original_report_hashes_match": true,
+  "integrity_validation": {
+    "reports_hash_matched": 20,
+    "exact_report_quotes_matched": 54,
+    "quote_free_omitted_units": 2,
+    "unchanged_core_keys": 28,
+    "source_line_endpoints_resolved": 167,
+    "per_unit_and_aggregate_counts_recomputed": true,
+    "old_core_hash_unchanged": true,
+    "note": "Only artifact identity, quote location, source endpoints and arithmetic are mechanically checked; this does not certify semantic truth."
+  },
+  "models_rerun": 0,
+  "model_reports_edited": false,
+  "old_scores_edited": false,
+  "adjudication_rules": [
+    "Semantic sufficiency is not string matching. Quotes anchor the judgment; empty quote only for omitted units. No exact tool/evidence ID or YAML requirement for raw.",
+    "Do not supply missing input/output reasoning on behalf of the model from automatically attached evidence or reviewer discoveries.",
+    "Positive, specific later test/quality contracts can establish a scope-extension explanation with bounded earlier responsibility; this is not a claim that every earlier message lacked similar words.",
+    "Back-gate contains both close interception and return-to-page restoration under the frozen family. A correct local BACK subclaim does not explain the separate actual restoration patch.",
+    "Partial = local explanation/provenance incomplete, not necessarily false. Optional mechanism/verification errors are separately retained unless they overturn the core generation responsibility judgment.",
+    "Codex unknown original write/author may be a justified stop, not a fabricated normal input; source-bounded stop is separately counted, not declared an established generation cause."
+  ],
+  "counts": {
+    "raw": {
+      "established": 13,
+      "partial": 12,
+      "bounded_unknown": 0,
+      "omitted": 2,
+      "wrong": 1,
+      "reviewed": 28,
+      "established_rate": 0.4642857142857143,
+      "file_equal_established_rate": 0.5800000000000001,
+      "fully_established_files": 4
+    },
+    "tool": {
+      "established": 7,
+      "partial": 20,
+      "bounded_unknown": 1,
+      "omitted": 0,
+      "wrong": 0,
+      "reviewed": 28,
+      "established_rate": 0.25,
+      "file_equal_established_rate": 0.36666666666666664,
+      "fully_established_files": 3
+    }
+  },
+  "original_costs": {
+    "raw": {
+      "input_output_tokens": 44148556,
+      "investigator_seconds": 5802.826562799979
+    },
+    "tool": {
+      "input_output_tokens": 40465053,
+      "investigator_seconds": 7582.372956700012
+    }
+  },
+  "known_additional_major_errors": {
+    "raw": {
+      "count": 5,
+      "cases": [
+        "F10-01",
+        "F10-04",
+        "F10-05",
+        "F10-07",
+        "F10-08"
+      ],
+      "source": "raw-high-scores.json",
+      "note": "Original6 includes Codex Dialog's unproven generation-stage assertion, now core wrong in F10-09; counted once, not duplicated as an extra."
+    },
+    "tool": {
+      "count": 3,
+      "cases": [
+        "F10-06"
+      ],
+      "source": "temporal-f10-review.json",
+      "note": "False absence of generation drawable record, false absence of existing safearea check, and false fixer blame from Alignment.Start interpretation. Core local descriptions remain partial; extras disallow all-claims-correct certification."
+    }
+  },
+  "tree_review": {
+    "source": "temporal-f10-review.json",
+    "ready_for_review": 9,
+    "draft": 1,
+    "note": "Inherited declared-relationship/UI audit, NOT9 fully truthful causal trees. Input omissions, partial-read/full-read overclaims, wrong node reasons/colors and timestamps remain separately documented. Raw was not assigned YAML, so no raw semantic deduction for no tree."
+  },
+  "cases": [
+    {
+      "id": "F10-01",
+      "units": {
+        "mask": {
+          "raw": {
+            "status": "partial",
+            "quote": "生成阶段只迁移了 `CustomDialogController` 结构",
+            "basis": "解释遮罩和透明例外，但依据主要是后期finding；没有说明哪项生成期dimAmount输入实际交给相应控制器写者。",
+            "refs": [
+              "raw §2.5",
+              "fixer:103-104"
+            ]
+          },
+          "tool": {
+            "status": "partial",
+            "quote": "Slice 8 保留这些形式并在 4 个目标弹窗控制器上缺少显式 maskColor",
+            "basis": "列出spec/公共约束但未证明实际交付了该遮罩要求；后期systemic标准不能自动成为生成期正常输入。站点数错另记。",
+            "refs": [
+              "tool summary",
+              "tool nodes[0:6]",
+              "fixer:103-104"
+            ]
+          }
+        },
+        "images": {
+          "raw": {
+            "status": "partial",
+            "quote": "medium confidence 规则造成了过度保守",
+            "basis": "XML的wrap_content/adjustViewBounds与后修比例解释可核，但初始C收件到S8保留的具体约束对照未建立；把D008当原因的额外过断另计，不因此抹掉局部布局解释。",
+            "refs": [
+              "raw §2.4,§3",
+              "member:18-21,61-62",
+              "slice8:264-265"
+            ]
+          },
+          "tool": {
+            "status": "partial",
+            "quote": "首次整写输出已含 width-only 会员图片",
+            "basis": "定位坏输出及后修，但通用spec节点没有说明传入的图片尺寸/比例语义；没有完成好输入到偏离的解释。",
+            "refs": [
+              "tool generator reason",
+              "tool image repair reason"
+            ]
+          }
+        },
+        "cta": {
+          "raw": {
+            "status": "partial",
+            "quote": "Android 期望按钮左右各留约 5%",
+            "basis": "说明100%+margin与外层padding的局部差别，数值期望引用后期visual finding；没有把生成期实际收件中的match_parent+margin约束绑定到对应输出。",
+            "refs": [
+              "raw §2.3",
+              "slice8:264-265",
+              "fixer:436"
+            ]
+          },
+          "tool": {
+            "status": "partial",
+            "quote": "消除 width('100%') 与横向 margin 叠加",
+            "basis": "写出/修复形式明确，但没有解释已交付输入中的按钮布局条款；只有组件名称和泛化公共约束。",
+            "refs": [
+              "tool summary and CTA repair node"
+            ]
+          }
+        },
+        "price": {
+          "raw": {
+            "status": "partial",
+            "quote": "是否在初始阶段完整读取并理解 `replaceSpan` 逻辑没有足够证据",
+            "basis": "未把Slice8实际收到的Kotlin富文本逻辑与它的统一Text输出接起来；审阅者不能用slice8:24替模型补答案。",
+            "refs": [
+              "raw §2.2",
+              "slice8:24,264-265"
+            ]
+          },
+          "tool": {
+            "status": "partial",
+            "quote": "Slice 8 读取的 Android 行为源。",
+            "basis": "源码节点和读边存在，但reason没有说明replaceSpan数字段与统一Text的偏离。图中有源码不自动完成这个归因。",
+            "refs": [
+              "tool Kotlin node",
+              "slice8:24,264-265"
+            ]
+          }
+        },
+        "indicator": {
+          "raw": {
+            "status": "partial",
+            "quote": "可能是 spec 信息损失，也可能是 converter 对源 XML/style 的提取不完整",
+            "basis": "确认颜色/位置修复；报告自己保留两个可查竞争解释，未核清生成时的具体样式输入及偏离处。",
+            "refs": [
+              "raw §2.1"
+            ]
+          },
+          "tool": {
+            "status": "partial",
+            "quote": "默认居中的蓝色 DotIndicator",
+            "basis": "指出默认样式和后修，但未证明传入了颜色/位置要求或哪个上游摘要遗漏已收到的样式。",
+            "refs": [
+              "tool summary and generator reason"
+            ]
+          }
+        },
+        "repair-compile": {
+          "raw": {
+            "status": "established",
+            "quote": "这是后期修复引入的问题，不是生成阶段原始问题",
+            "basis": "已定位返修新加private helper、另一struct调用、编译失败及去private纠正。此类错误不要求追一个不存在的生成期好输入。",
+            "refs": [
+              "raw §2.2",
+              "build:54"
+            ]
+          },
+          "tool": {
+            "status": "established",
+            "quote": "编译阶段再修正两个跨 struct helper 的可见性",
+            "basis": "具体返修代码形状、错误类别和两次Edit纠正已交代；本项修中引错边界完整。",
+            "refs": [
+              "tool summary and compile node",
+              "build:54"
+            ]
+          }
+        }
+      },
+      "artifact": {
+        "id": "F10-01",
+        "target": "entry/src/main/ets/pages/MemberCenterPage.ets",
+        "raw_path": "C:\\Users\\hongy\\projects\\_migloop-eval-20260909\\file-first-10\\raw-high-i20-match-20260912\\runs\\F10-01\\rep1\\report.md",
+        "raw_sha256": "2efbeadaba8ee08559a0a415fabed8e30510eb668a2fb50ce9d57fd00f72b757",
+        "tool_path": "C:\\Users\\hongy\\projects\\_migloop-evidence-delivery-20260913\\temporal-f10-v1\\F10-01\\runs\\inquiry\\rep1\\verdict.yaml",
+        "tool_sha256": "a1a8da24e8fa729244e046d8107f2c92ec7c2d1b2350212b6e8e568ee8b9b1c7",
+        "tool_report_id": "87f066f40fcf4cb5",
+        "raw_seconds": 672.1680370999966,
+        "tool_seconds": 1218.7668594999996,
+        "raw_tokens": 5198527,
+        "tool_tokens": 6378576,
+        "raw_extra_major": 1,
+        "tool_extra_major": 0
+      }
+    },
+    {
+      "id": "F10-02",
+      "units": {
+        "mask": {
+          "raw": {
+            "status": "omitted",
+            "quote": "",
+            "basis": "原稿只解释返回、进度和系统栏，漏目标弹窗遮罩这类实际修改。",
+            "refs": [
+              "raw file conclusion",
+              "fixer:103-104"
+            ]
+          },
+          "tool": {
+            "status": "partial",
+            "quote": "生成期是否有同等具体约束仍不明",
+            "basis": "后修和具体finding可核，但生成期输入边界明确尚不明，不算完整生成归因。",
+            "refs": [
+              "tool systemic-mask node"
+            ]
+          }
+        },
+        "icon": {
+          "raw": {
+            "status": "omitted",
+            "quote": "",
+            "basis": "没有解释目标App名图的实际尺寸补丁。",
+            "refs": [
+              "raw file conclusion",
+              "fixer:233-234"
+            ]
+          },
+          "tool": {
+            "status": "partial",
+            "quote": "尺寸分支停在此处",
+            "basis": "medium/bounds空的page spec与ObjectFit规则不能证明其它相关尺寸输入都不足；没有完成所需尺寸/解析义务的边界判断。",
+            "refs": [
+              "tool page-spec and pitfalls nodes"
+            ]
+          }
+        },
+        "back-gate": {
+          "raw": {
+            "status": "established",
+            "quote": "D-020 的架构决策覆盖了原始 F001 的行为要求",
+            "basis": "明确区分页面返回豁免与隐私弹窗必须拦截；指出Slice11收到的D020约束、isModal错误判断及输出，恢复初版曾有回调、后续消失，并解释关闭拦截与协议返回复位两个修改。不要求查清最早删除操作的唯一作者。",
+            "refs": [
+              "raw §1",
+              "splash:71,86",
+              "slice11:1,249-251",
+              "fixer:346-347,352-353"
+            ]
+          },
+          "tool": {
+            "status": "partial",
+            "quote": "F001 要求吞掉返回键，实测该断言错误",
+            "basis": "BACK关闭这一子问题已经给出充分F001收件→Slice11错误输出，应认可；但同一冻结修改家族里的协议返回onNavBarStateChange复位未解释，不能据一句建议当作覆盖实际第二项补丁。不是因没无限追D020形成而扣分。",
+            "refs": [
+              "tool F001 and Slice11 nodes",
+              "fixer:352-353"
+            ]
+          }
+        },
+        "progress": {
+          "raw": {
+            "status": "partial",
+            "quote": "Android drawable 的“组件高度”和 ArkUI Progress 的“实际 strokeWidth”语义没有拆开处理",
+            "basis": "局部解释正确，但参数依据主要取自修复者说明；未把生成者实际读到的绘制条款/解析义务与当时输出核成充分输入边界。",
+            "refs": [
+              "raw §2",
+              "fixer:346-347,610"
+            ]
+          },
+          "tool": {
+            "status": "partial",
+            "quote": "进度条渲染/13vp 高度",
+            "basis": "没有清楚解释原本已有height(13)与后来strokeWidth(13)的区别，转而讨论visibility；该数值出现不是输入→实际修补语义的完整证明。",
+            "refs": [
+              "tool summary and XML/generator nodes",
+              "fixer:346-347"
+            ]
+          }
+        },
+        "system-bars": {
+          "raw": {
+            "status": "partial",
+            "quote": "把窗口全屏设置归为 EntryAbility/基础层职责",
+            "basis": "指出生成报告的分工和后修生命周期，但没有核具体窗口义务如何实际交付给负责执行者、在哪个输出中丢失。仍是有界的局部解释。",
+            "refs": [
+              "raw §3",
+              "splash:86",
+              "fixer:482-489"
+            ]
+          },
+          "tool": {
+            "status": "partial",
+            "quote": "跳离 Navigation 宿主时的系统栏恢复",
+            "basis": "解释修复方向，summary提到历史沉浸式skill，却未说明具体相关条款、实际收件和窗口生命周期偏离如何对应；不因没有画skill节点扣分，而因因果论证本身不足。",
+            "refs": [
+              "tool summary",
+              "tool repair node"
+            ]
+          }
+        }
+      },
+      "artifact": {
+        "id": "F10-02",
+        "target": "entry/src/main/ets/pages/SplashPage.ets",
+        "raw_path": "C:\\Users\\hongy\\projects\\_migloop-eval-20260909\\file-first-10\\raw-high-i20-match-20260912\\runs\\F10-02\\rep1\\report.md",
+        "raw_sha256": "402c178a068cd0ff23c04ab2fa3d0d598eb8a68be740b3ec95beb294e85db88b",
+        "tool_path": "C:\\Users\\hongy\\projects\\_migloop-evidence-delivery-20260913\\temporal-f10-v1\\F10-02\\runs\\inquiry\\rep1\\verdict.yaml",
+        "tool_sha256": "0f3ee57686a152549abe81b9c5d5ffbf31242cfd2ce152535c47d638c8bd256d",
+        "tool_report_id": "afc387fba602467c",
+        "raw_seconds": 727.7733785000164,
+        "tool_seconds": 876.0534099999932,
+        "raw_tokens": 7174238,
+        "tool_tokens": 4892712,
+        "raw_extra_major": 0,
+        "tool_extra_major": 0
+      }
+    },
+    {
+      "id": "F10-03",
+      "units": {
+        "label": {
+          "raw": {
+            "status": "partial",
+            "quote": "具体是“生成器没有读取默认样式”还是“读取了但转换规则有意忽略”",
+            "basis": "解释Roll规格和ROLL运行差异，但对于UI spec/converter的具体义务和输入充分性仍保留分歧，没有完成继承样式在哪个交付/输出被丢失的局部证明。",
+            "refs": [
+              "raw §1",
+              "dice-root:183,192",
+              "dice-generator:54,75"
+            ]
+          },
+          "tool": {
+            "status": "partial",
+            "quote": "框架默认样式上游形成记录止于证据边界",
+            "basis": "主题parent已收件不等于已经明确交付textAllCaps；F001实际也含Roll显示条款，不能仅称它是行为spec就认证输入充分。",
+            "refs": [
+              "tool page/F001/theme/generator nodes",
+              "dice-generator:54,75"
+            ]
+          }
+        },
+        "button-style": {
+          "raw": {
+            "status": "partial",
+            "quote": "问题环节在 UI spec / converter",
+            "basis": "小圆角/阴影修复解释对，但两个可能的丢失位置没有被输入/输出证据区分；没有要求追主题作者，只要求具体相关默认样式或解析义务。",
+            "refs": [
+              "raw §1"
+            ]
+          },
+          "tool": {
+            "status": "partial",
+            "quote": "是相关外观输入",
+            "basis": "报告明确只有Material父主题，未交代该条目提供哪些明确默认形态或必执行的解析义务，却声称已到输入边界。",
+            "refs": [
+              "tool theme node",
+              "tool generator node"
+            ]
+          }
+        },
+        "test-integration": {
+          "raw": {
+            "status": "established",
+            "quote": "测试直接执行",
+            "basis": "UI设计明确新增三个ID并派工注入；UT要求跨文件import Dice，真实Edit加export。交代初始内部类与后置测试访问策略，足以完成范围变化解释。",
+            "refs": [
+              "raw §2-3",
+              "dice-root:3329,3342,3231-3233",
+              "dice-fix-root:44"
+            ]
+          },
+          "tool": {
+            "status": "partial",
+            "quote": "正常测试准备改动：export class Dice",
+            "basis": "能识别后续测试改动和其作者，但没有说明实际交付的UT导入/ID设计要求及与原始访问范围的对照；把输出标签写成正常测试不等于已经证明任务边界。",
+            "refs": [
+              "tool main and ID-injector nodes"
+            ]
+          }
+        },
+        "logging": {
+          "raw": {
+            "status": "established",
+            "quote": "visual-fixer 新增的异常兜底最初使用",
+            "basis": "明确visual-fixer先引入console，ECAT后要求hilog并纠正；代码与阶段边界可核。不要求倒追初始生成者。",
+            "refs": [
+              "raw §4",
+              "dice-visual:68-69",
+              "dice-cleanup:57-58"
+            ]
+          },
+          "tool": {
+            "status": "partial",
+            "quote": "正常后续可观测性改动",
+            "basis": "只把hilog放在后续阶段，没有定位console实际由视觉返修引入；缺的是归因主干，不是辅助API名称。",
+            "refs": [
+              "tool summary and cleanup node",
+              "dice-visual:68-69"
+            ]
+          }
+        },
+        "comment-policy": {
+          "raw": {
+            "status": "established",
+            "quote": "原始 `accessibilityText($r('app.string.todo'))` 是经 D-002 批准的忠实复刻",
+            "basis": "实际后置清理派单要求保留真实TODO资源，仅改注释；结合已批准的源忠实约束解释不是补缺业务。",
+            "refs": [
+              "raw §4",
+              "dice-fix-root:84,180-182,224"
+            ]
+          },
+          "tool": {
+            "status": "partial",
+            "quote": "hilog、TAG/DOMAIN、日志调用和注释整理",
+            "basis": "描述了清理结果，却没有解释后置质量策略与生成期源忠实要求的具体关系；缺少本项正常约束边界。",
+            "refs": [
+              "tool cleanup node"
+            ]
+          }
+        }
+      },
+      "artifact": {
+        "id": "F10-03",
+        "target": "entry/src/main/ets/pages/Index.ets",
+        "raw_path": "C:\\Users\\hongy\\projects\\_migloop-eval-20260909\\file-first-10\\raw-high-i20-match-20260912\\runs\\F10-03\\rep1\\report.md",
+        "raw_sha256": "46562fa22d608ad262423bc51af05483104c151f3655f9f91911784445d92a93",
+        "tool_path": "C:\\Users\\hongy\\projects\\_migloop-evidence-delivery-20260913\\temporal-f10-v1\\F10-03\\runs\\inquiry\\rep1\\verdict.yaml",
+        "tool_sha256": "e5f3a25936d37c99d385f3e1cb00c4a58f0e687bbf532f3d0055ee83c6ac93ee",
+        "tool_report_id": "30687fa74c584280",
+        "raw_seconds": 935.8142218000721,
+        "tool_seconds": 1277.2391113000049,
+        "raw_tokens": 6341818,
+        "tool_tokens": 3958807,
+        "raw_extra_major": 0,
+        "tool_extra_major": 0
+      }
+    },
+    {
+      "id": "F10-04",
+      "units": {
+        "debug-wiring": {
+          "raw": {
+            "status": "partial",
+            "quote": "证据已经存在，但没有被转化为共享启动接线的强制验收项",
+            "basis": "证明消费逻辑/默认false/启动缺setter，但没有证明具体共享接线责任方在其输出前收到哪些必须接线要求。其它agent看到源注释不能自动补齐该收件。",
+            "refs": [
+              "raw cause1-2",
+              "auth:169,330,421",
+              "cc-root:5072"
+            ]
+          },
+          "tool": {
+            "status": "partial",
+            "quote": "Base-3 handoff 明确要求这两个 debug 开关",
+            "basis": "更具体地查到交接时序，但Base3正文只显式列HttpLog，AppTrackConfig来自另份已交付源码；不能把两项合写成同一明确handoff，也未把对应实际收件到具体交接输出的证明讲清。不因没有画输入节点而扣分。",
+            "refs": [
+              "tool summary",
+              "base3:272-273",
+              "slice11:78"
+            ]
+          }
+        },
+        "wrong-class-repair": {
+          "raw": {
+            "status": "established",
+            "quote": "`setDebug` 实际属于 `AppTrackConfig`",
+            "basis": "误用类、实际编译错误、源码归属核查和纠正Edit齐全；返修引错边界完成。",
+            "refs": [
+              "raw cause3",
+              "cc-root:5099,5110,5115,5123,5126"
+            ]
+          },
+          "tool": {
+            "status": "established",
+            "quote": "首次错误使用 F013Service.setDebug 导致编译失败",
+            "basis": "同样定位了返修误调用及导入/调用两步纠正，不倒归生成期。",
+            "refs": [
+              "tool summary and repair nodes",
+              "cc-root:5099,5110,5123,5126"
+            ]
+          }
+        }
+      },
+      "artifact": {
+        "id": "F10-04",
+        "target": "entry/src/main/ets/entryability/EntryAbility.ets",
+        "raw_path": "C:\\Users\\hongy\\projects\\_migloop-eval-20260909\\file-first-10\\raw-high-i20-match-20260912\\runs\\F10-04\\rep1\\report.md",
+        "raw_sha256": "517fd851ab7d8d9d330cd530b2f06847c9b26f4bea701cbf86c8c75903f4f755",
+        "tool_path": "C:\\Users\\hongy\\projects\\_migloop-evidence-delivery-20260913\\temporal-f10-v1\\F10-04\\runs\\inquiry\\rep1\\verdict.yaml",
+        "tool_sha256": "0ab8c648ba23893d77e99b41e721c7d1317baff21df43feda004b60f8cc1aa35",
+        "tool_report_id": "53608a3bd2ce4a59",
+        "raw_seconds": 368.07571999996435,
+        "tool_seconds": 835.5824446000042,
+        "raw_tokens": 1895876,
+        "tool_tokens": 6921647,
+        "raw_extra_major": 1,
+        "tool_extra_major": 0
+      }
+    },
+    {
+      "id": "F10-05",
+      "units": {
+        "android-id-unblock": {
+          "raw": {
+            "status": "established",
+            "quote": "D-010/D-011 保持挂起、不要臆造取值",
+            "basis": "实际生成派单明确延期，生成空值遵从；后置持久随机hex测试解锁及正式方案未决均交代。后修触发的额外过断另计。",
+            "refs": [
+              "raw §2,§4",
+              "auth:1,351,421",
+              "cc-root:5214,5221"
+            ]
+          },
+          "tool": {
+            "status": "established",
+            "quote": "与当时“D-010 方案未定且不要臆造取值”的交付约束一致",
+            "basis": "相关feature与注入口的实际输入、生成输出及测试解锁可核，不归责遵从指令的生成者。chain-auth节点把多份材料合说的细节另列，不否定独立成立的feature/注入口证明。",
+            "refs": [
+              "tool F003/AppFormInfo/generator nodes",
+              "auth:1,351,421"
+            ]
+          }
+        }
+      },
+      "artifact": {
+        "id": "F10-05",
+        "target": "entry/src/main/ets/repositories/F003Repository.ets",
+        "raw_path": "C:\\Users\\hongy\\projects\\_migloop-eval-20260909\\file-first-10\\raw-high-i20-match-20260912\\runs\\F10-05\\rep1\\report.md",
+        "raw_sha256": "587a1e4a27be2324f13c433bd1197657ebb238a5d78784b46a87c917b8071fa2",
+        "tool_path": "C:\\Users\\hongy\\projects\\_migloop-evidence-delivery-20260913\\temporal-f10-v1\\F10-05\\runs\\inquiry\\rep1\\verdict.yaml",
+        "tool_sha256": "2abd98d5d62bf5feb69c76f27605eb7596deeff811d4374645fd9a095c7afe97",
+        "tool_report_id": "104bc14f8d5d4463",
+        "raw_seconds": 480.79389689990785,
+        "tool_seconds": 428.14115159999346,
+        "raw_tokens": 3928250,
+        "tool_tokens": 2110597,
+        "raw_extra_major": 1,
+        "tool_extra_major": 0
+      }
+    },
+    {
+      "id": "F10-06",
+      "units": {
+        "back-image-box": {
+          "raw": {
+            "status": "established",
+            "quote": "生成阶段确实读取了 Android XML",
+            "basis": "已有真实XML收件与初始24+padding输出对照，后修对应同一代码形状；与先前Guide校准保持一致，不要求查正常XML的作者。",
+            "refs": [
+              "raw §1",
+              "guide:19,64-65",
+              "fixer:168-169"
+            ]
+          },
+          "tool": {
+            "status": "partial",
+            "quote": "Slice15写回前实际读到已有GuidePage",
+            "basis": "本批只有坏的旧Guide、功能F002和controller输入，没有给出有关尺寸的正常XML收件或具体解析义务；可证明保留坏代码，但还不能证明该输入边界已到头。不是v4那份完整输入稿。",
+            "refs": [
+              "tool input nodes and Slice15 reason"
+            ]
+          }
+        },
+        "track-vs-control": {
+          "raw": {
+            "status": "partial",
+            "quote": "resource mapping 只显示了颜色、渐变和圆角",
+            "basis": "与校准一致：正确定位控件框/轨道，但mapping形成或明确解析义务未完成，不能把后修4dp倒算已交付。",
+            "refs": [
+              "raw §2",
+              "guide:19,39,64"
+            ]
+          },
+          "tool": {
+            "status": "partial",
+            "quote": "轨道4dp的上游形成记录未保存",
+            "basis": "局部20→4解释正确，正常输入边界未建立；停止所用的记录缺失声明还有反证，另记重大额外错误，不把这项局部修改描述清零。",
+            "refs": [
+              "tool summary and Slice15 reason",
+              "resources:155"
+            ]
+          }
+        },
+        "bottom-inset": {
+          "raw": {
+            "status": "partial",
+            "quote": "跨组件的底部避让责任没有在页面外壳阶段闭合",
+            "basis": "没有使用历史safearea实际收件证明哪个输出未落实已知宿主职责，与校准一致。",
+            "refs": [
+              "raw §3",
+              "guide:43,64-65"
+            ]
+          },
+          "tool": {
+            "status": "partial",
+            "quote": "输入正常但不单独说明drawable厚度",
+            "basis": "列出的输入为F002功能/controller/已有坏文件，缺相关safearea条款到生成/保留输出的对照；不能凭其它输入正常就停止底部分支。",
+            "refs": [
+              "tool input and Slice15 nodes",
+              "guide:43"
+            ]
+          }
+        }
+      },
+      "artifact": {
+        "id": "F10-06",
+        "target": "entry/src/main/ets/pages/GuidePage.ets",
+        "raw_path": "C:\\Users\\hongy\\projects\\_migloop-eval-20260909\\file-first-10\\raw-high-i20-match-20260912\\runs\\F10-06\\rep1\\report.md",
+        "raw_sha256": "26d7168c01699093fa3a4b1c498d34ac180ac35ad8b2b3fc4b0e2aa273e55917",
+        "tool_path": "C:\\Users\\hongy\\projects\\_migloop-evidence-delivery-20260913\\temporal-f10-v1\\F10-06\\runs\\inquiry\\rep1\\verdict.yaml",
+        "tool_sha256": "a19aaad38e0b7c5d04b61b718bb89dc87ed4a533565daee656ab6ba561956836",
+        "tool_report_id": "88b45280a8ab4f26",
+        "raw_seconds": 917.3755933999782,
+        "tool_seconds": 778.8476622000162,
+        "raw_tokens": 4132086,
+        "tool_tokens": 4549771,
+        "raw_extra_major": 0,
+        "tool_extra_major": 3
+      }
+    },
+    {
+      "id": "F10-07",
+      "units": {
+        "test-bridge": {
+          "raw": {
+            "status": "established",
+            "quote": "这是下游 UI 测试生成阶段才显式落地的测试基础设施需求",
+            "basis": "已指出原迁移业务范围、后续设计§F的明确要求、三次真实Edit及桥的测试专用性质；保留未证明原生成者有义务，不把晚出现等同早期违规。这个有据的阶段扩展解释足以停止，不强求证明全池绝无同类词。",
+            "refs": [
+              "raw §1",
+              "dice-ui-test:21,35,37,39,52",
+              "dice-root:1514,1521"
+            ]
+          },
+          "tool": {
+            "status": "established",
+            "quote": "该要求来自生成截止之后的测试设计/manifest/模板输入",
+            "basis": "明确初始页面迁移范围、实际收到后置设计§F/模板/manifest、前态和三个Edit，解释完整。",
+            "refs": [
+              "tool summary and UI test input/actor nodes",
+              "dice-ui-test:12-18,35-40"
+            ]
+          }
+        },
+        "error-observer": {
+          "raw": {
+            "status": "established",
+            "quote": "这是后期 discriminator 新增的 HarmonyOS 专项标准",
+            "basis": "具体后置ECAT要求、修改调用与原Android业务/编译范围对照，并未证明原作者本应具备它的边界写清。接受这一有据的后置标准解释，不认证规范在所有历史材料中绝不存在。误报全池无后修编译另计。",
+            "refs": [
+              "raw §2",
+              "dice-judge-root:1",
+              "dice-fix-root:3",
+              "dice-observer:41-45"
+            ]
+          },
+          "tool": {
+            "status": "established",
+            "quote": "原始派工未提出该横切观察者",
+            "basis": "明确原派工范围与后置ECAT/SDK输入、前态、输出和构建，不用后期要求倒归原作者。初始agent仍标红属于图义与已写责任边界不一致，另记。",
+            "refs": [
+              "tool summary and generator/observer nodes",
+              "dice-generator:1",
+              "dice-observer:41-45"
+            ]
+          }
+        }
+      },
+      "artifact": {
+        "id": "F10-07",
+        "target": "entry/src/main/ets/entryability/EntryAbility.ets",
+        "raw_path": "C:\\Users\\hongy\\projects\\_migloop-eval-20260909\\file-first-10\\raw-high-i20-match-20260912\\runs\\F10-07\\rep1\\report.md",
+        "raw_sha256": "0e4c97f3775e0f22bd372dc1113e78b4f67287834154711a1bb977e4acc4e500",
+        "tool_path": "C:\\Users\\hongy\\projects\\_migloop-evidence-delivery-20260913\\temporal-f10-v1\\F10-07\\runs\\inquiry\\rep1\\verdict.yaml",
+        "tool_sha256": "7e6cadd380b0c5537b57ba40be7ca6c73c8101b8b2e9bd29cf8d85a37e8911dc",
+        "tool_report_id": "83a4b3a05dad445b",
+        "raw_seconds": 494.5986907000188,
+        "tool_seconds": 444.92678390000947,
+        "raw_tokens": 4034757,
+        "tool_tokens": 2146491,
+        "raw_extra_major": 1,
+        "tool_extra_major": 0
+      }
+    },
+    {
+      "id": "F10-08",
+      "units": {
+        "identity-phase-and-conflict": {
+          "raw": {
+            "status": "established",
+            "quote": "初始身份代理的派单明确要求“不碰 bundleName / vendor”",
+            "basis": "实际派单边界、Android源值、遵从的初次Edit和后置扩范围均核对；vendor冲突有界说明。",
+            "refs": [
+              "raw cause1,3",
+              "dice-identity:1,40,59-60",
+              "dice-identity-fix:28,43,49-50"
+            ]
+          },
+          "tool": {
+            "status": "established",
+            "quote": "没有违反当时明确的 dev-identity",
+            "basis": "历史skill收件与初始输出一致，后置prompt覆盖和vendor冲突定位明确；不用再追正常skill作者。",
+            "refs": [
+              "tool skill/generator/repair nodes",
+              "dice-identity:1,13,40,59-60"
+            ]
+          }
+        },
+        "icon-scope": {
+          "raw": {
+            "status": "established",
+            "quote": "生成阶段已有决策 `D-003`",
+            "basis": "D003允许脚手架图标，后置复制entry已有分层资源并切引用，不声称迁移了真实Androidlauncher；范围解释成立。",
+            "refs": [
+              "raw cause2",
+              "dice-identity:43,70-72",
+              "dice-identity-fix:45-50"
+            ]
+          },
+          "tool": {
+            "status": "established",
+            "quote": "launcher 图标按 D-资源-图标沿用脚手架",
+            "basis": "实际交付的feature/ledger边界、初始保留与后置作用域复制可核；形成记录不存在的可选过断不抹掉已成立的输入约束。",
+            "refs": [
+              "tool feature/ledger/generator/repair nodes",
+              "dice-identity:43,45-46",
+              "dice-identity-fix:45-50"
+            ]
+          }
+        }
+      },
+      "artifact": {
+        "id": "F10-08",
+        "target": "AppScope/app.json5",
+        "raw_path": "C:\\Users\\hongy\\projects\\_migloop-eval-20260909\\file-first-10\\raw-high-i20-match-20260912\\runs\\F10-08\\rep1\\report.md",
+        "raw_sha256": "7688eb3ac61c5358800d8d93ce66a756e6ad3023d81188e7c9e55c371633a849",
+        "tool_path": "C:\\Users\\hongy\\projects\\_migloop-evidence-delivery-20260913\\temporal-f10-v1\\F10-08\\runs\\inquiry\\rep1\\verdict.yaml",
+        "tool_sha256": "08ee45b07ce3f7a15428b4a6db1b45b3290dad3e5b733bb3a0d7ed4de1bfa343",
+        "tool_report_id": "24eb3fe708434b98",
+        "raw_seconds": 475.53736930002924,
+        "tool_seconds": 594.0073675999884,
+        "raw_tokens": 5270501,
+        "tool_tokens": 3648326,
+        "raw_extra_major": 1,
+        "tool_extra_major": 0
+      }
+    },
+    {
+      "id": "F10-09",
+      "units": {
+        "hit-test": {
+          "raw": {
+            "status": "wrong",
+            "quote": "这能定位到“生成实现阶段的 ArkUI 事件语义错误”",
+            "basis": "Block→Default局部原因正确，但把只在生成结束后快照直接看到的Block断言为生成阶段引入；没有创建patch/子线程正文证明该阶段。v2责任边界错误，不是扣缺YAML。",
+            "refs": [
+              "raw §1",
+              "codex-A:7687,8026-8027,8066-8067"
+            ]
+          },
+          "tool": {
+            "status": "bounded_unknown",
+            "quote": "卡片不归责首次作者",
+            "basis": "实际坏快照、SDK语义、修复patch成立；由于未保存生成子流程逐行写入，明确不认证最初作者/输入。允许有界停止，但不算已找到生成期好输入→偏离输出。",
+            "refs": [
+              "tool summary and SDK/file nodes",
+              "codex-A:8026-8027,8047-8048,8066-8067"
+            ]
+          }
+        }
+      },
+      "artifact": {
+        "id": "F10-09",
+        "target": "entry/src/main/ets/pages/LaunchAgreementDialog.ets",
+        "raw_path": "C:\\Users\\hongy\\projects\\_migloop-eval-20260909\\file-first-10\\raw-high-i20-match-20260912\\runs\\F10-09\\rep1\\report.md",
+        "raw_sha256": "b15278716b4a817ae843ec10ed558a3e2c7294902075e687f9b42403970d0f93",
+        "tool_path": "C:\\Users\\hongy\\projects\\_migloop-evidence-delivery-20260913\\temporal-f10-v1\\F10-09\\runs\\inquiry\\rep1\\verdict.yaml",
+        "tool_sha256": "911b8113d805bf6e4363c254bfb358538caf8f4f34674b9d6d1702ac112b9705",
+        "tool_report_id": "de41b3f4740b42ce",
+        "raw_seconds": 414.7051846999675,
+        "tool_seconds": 440.65950750000775,
+        "raw_tokens": 4060478,
+        "tool_tokens": 1949073,
+        "raw_extra_major": 1,
+        "tool_extra_major": 0
+      }
+    },
+    {
+      "id": "F10-10",
+      "units": {
+        "signing-reference": {
+          "raw": {
+            "status": "established",
+            "quote": "更早读取到的构建代理契约还规定 `SIGNED=false` 时默认生成 unsigned HAP",
+            "basis": "实际历史unsigned契约及生成unsigned结果、后置出现材料却缺product引用的补丁已对照；说明环境/交付范围改变，不武断认定早期已有有效签名。这一有界范围解释可完成，配置块具体作者可保留未知。",
+            "refs": [
+              "raw §1,final",
+              "codex-A:5407,7686-7687,7970",
+              "codex-B:4929-4930,4943-4944"
+            ]
+          },
+          "tool": {
+            "status": "partial",
+            "quote": "首次引入/生成期具体责任保留未知",
+            "basis": "有后修D019输入/坏配置/补引用，但未恢复池中实际存在的生成期unsigned契约(A:5407)。原始写入作者未知可以保留，但不必知道唯一作者也能继续核验范围变化；有可查而未使用的关键合同，所以本项不是已穷尽材料的bounded_unknown。不能由后修正常输入就计为生成期因果已找全。",
+            "refs": [
+              "tool summary and D019/file nodes",
+              "codex-A:4444",
+              "codex-B:4929-4934,4943-4944"
+            ]
+          }
+        }
+      },
+      "artifact": {
+        "id": "F10-10",
+        "target": "/Users/ventiu/Desktop/HUAWEI/AIPPT_830_test/build-profile.json5",
+        "raw_path": "C:\\Users\\hongy\\projects\\_migloop-eval-20260909\\file-first-10\\raw-high-i20-match-20260912\\runs\\F10-10\\rep1\\report.md",
+        "raw_sha256": "c91e19ea98666f9fa58848ea0374f000855c4bee0a49bb03af1749511acc624a",
+        "tool_path": "C:\\Users\\hongy\\projects\\_migloop-evidence-delivery-20260913\\temporal-f10-v1\\F10-10\\runs\\inquiry\\rep1\\verdict.yaml",
+        "tool_sha256": "4ede17d26bbd0a158ec665a55359a8259073e05165baa70c40c961226b113632",
+        "tool_report_id": "23a887f51a9e448b",
+        "raw_seconds": 315.98447040002793,
+        "tool_seconds": 688.1486584999948,
+        "raw_tokens": 2112025,
+        "tool_tokens": 3909053,
+        "raw_extra_major": 0,
+        "tool_extra_major": 0
+      }
+    }
+  ],
+  "limitations": [
+    "New definition was developed after observing historical outputs; these are retrospective development results, not unbiased prospective evidence.",
+    "Source contract changes and actual API/repair effects require human semantic judgment; another reviewer can challenge individual decisions using saved quotes and references.",
+    "Tool cohort predates response-budget b8dc835; earlier native audit found5 incomplete frames. This review measures those frozen outputs, not post-fix model effectiveness.",
+    "Raw and tools differ in instructions/structured-output burden and run date; no isolated claim about MCP, two atoms or skill causality.",
+    "Do not sum two good single-case Guide results into this complete cohort; the current tool Guide artifact is88b45280a8ab4f26.",
+    "Original investigator costs are retained, excluding this offline reviewer; no claim of equal completed work or end-to-end saving."
+  ]
+}

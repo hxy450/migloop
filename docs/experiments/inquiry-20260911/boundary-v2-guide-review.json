@@ -1,0 +1,103 @@
+{
+  "schema": "inquiry-bounded-attribution-review/2",
+  "rubric": "../file-first-10/bounded-attribution-v2.md",
+  "case": "F10-06",
+  "scope": "Retrospective calibration on one already discussed Guide sample, not a new investigator run or full-cohort superiority test.",
+  "reviewer_only": true,
+  "fed_to_investigator": false,
+  "reports_edited": false,
+  "old_scores_edited": false,
+  "arms": {
+    "raw": {
+      "round": "raw-high-i20-match-20260912",
+      "path": "C:/Users/hongy/projects/_migloop-eval-20260909/file-first-10/raw-high-i20-match-20260912/runs/F10-06/rep1/report.md",
+      "sha256": "26d7168c01699093fa3a4b1c498d34ac180ac35ad8b2b3fc4b0e2aa273e55917"
+    },
+    "tool": {
+      "round": "compact-real-guide-v4",
+      "report_id": "261ce0bdd6054e45",
+      "path": "C:/Users/hongy/projects/_migloop-evidence-delivery-20260913/compact-real-guide-v4/runs/inquiry/rep1/verdict.yaml",
+      "sha256": "d64730fff728ad573aa20eac10d0d81bdb5169cde2ed57c212f4976e56c7c55f",
+      "selection_note": "Previously displayed temporal Guide example. Do not substitute it for temporal-f10-v1/F10-06 when computing cohort results."
+    }
+  },
+  "source_pool": "C:/Users/hongy/projects/_migloop-eval-20260909/attribution10/formal-v1/member-center/pool",
+  "source_aliases": {
+    "converter": "9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aconv-guide-979179ee8c5e2b3d.jsonl",
+    "slice15": "9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-aslice15-guide-a061e53a1d9503b4.jsonl",
+    "closer": "9b3105a2-85ec-4889-9786-b3c220f06754/subagents/agent-agroup3-closer-5aab096130b8eb86.jsonl",
+    "fixer": "ff019d8a-5172-4cdd-8ce3-77a21682c1b6/subagents/agent-a68daf720e780b4c2.jsonl"
+  },
+  "units": {
+    "back-image-box": {
+      "raw": {
+        "status": "established",
+        "report_location": "report.md section 1, source XML at converter:19 and original conversion output at converter:64-65",
+        "basis": "The report connects the actually received wrap_content/padding XML with the converter's fixed24-plus-padding output and corresponding repair. It explicitly bounds later resource-density inference and does not claim the generator had an explicit10x16 numeric instruction. No obligation to identify the author of a normal XML input."
+      },
+      "tool": {
+        "status": "established",
+        "report_location": "activity_guide.xml input node, aconv-guide problem node, summary and repair node",
+        "basis": "Same local input/output contrast, supported by original Write and later target repair. It also retains explicit input and chronological handoff nodes. The unrelated full-read overclaim below does not erase the initial contrast."
+      },
+      "source": ["converter:19", "converter:64-65", "fixer:168-169"]
+    },
+    "track-vs-control": {
+      "raw": {
+        "status": "partial",
+        "report_location": "report.md section 2, especially lines62,66,76",
+        "basis": "Correctly explains 20vp control box versus drawable rail and notes generation mapping lacks4dp. Does not finish the mapping writer's input/output explanation or establish the alternative precise obligation-and-failure to resolve that drawable; later-fixer4dp evidence is not generator receipt. This is incompleteness, not a wrong local modification explanation."
+      },
+      "tool": {
+        "status": "partial",
+        "report_location": "activity_guide.xml node and aconv-guide reason",
+        "basis": "XML correctly contains a progressDrawable reference and20dp control height, but that alone is not receipt of the4dp body. The report does not complete an alternative explicit parsing-duty failure proof. No demand to trace upstream after such a proof is actually supplied."
+      },
+      "source": ["converter:19", "converter:39", "converter:64", "fixer:469-474"]
+    },
+    "bottom-inset": {
+      "raw": {
+        "status": "partial",
+        "report_location": "report.md lines98-100,115-116 and recommendations",
+        "basis": "Identifies missing host padding and later correction but does not use the received historical responsibility contract to locate the input/output divergence. Its stage-split explanation does not prove the host obligation was unspecified. Do not award missing skill-receipt reasoning supplied by the reviewer."
+      },
+      "tool": {
+        "status": "established",
+        "report_location": "historical safearea skill input node, aconv-guide problem node and summary",
+        "basis": "Explicitly identifies the actually delivered Layer3 host responsibility and bottom inset rule, the converter output lacking it, later retention and the target Swiper repair. This is enough for bounded local attribution; tracing the skill author, explaining every handoff failure or proving why the checker passed is not additionally mandatory.",
+        "limit": "This identifies an observed generation-output gap and preservation, not exclusive personal blame or proof that the initial provisional implementation violated every stage-specific allowance."
+      },
+      "source": ["converter:13", "converter:43", "converter:63-65", "slice15:38", "slice15:181", "closer:63", "fixer:580-581"]
+    }
+  },
+  "counts": {
+    "reviewed_units_per_arm": 3,
+    "raw": {"established": 1, "partial": 2, "bounded_unknown": 0, "omitted": 0, "wrong": 0},
+    "tool": {"established": 2, "partial": 1, "bounded_unknown": 0, "omitted": 0, "wrong": 0},
+    "full_ten_file_v2_score": null
+  },
+  "separate_tree_review": {
+    "tool_mechanically_loadable": true,
+    "tool_nodes": 12,
+    "tool_declared_edges": 11,
+    "known_issue": {
+      "claim": "修复 agent 在首个实际修复前完整读回目标",
+      "source": "fixer:160",
+      "counterevidence": "Actual Read returns70/258 lines, including the icon but not the progressBar definition. Its real read edge does not certify a full snapshot or whole-file negative search.",
+      "impact": "Needs correction in that node reason before declaring the whole displayed card faithful. Does not invalidate the independently supported generator input/output contrast."
+    },
+    "raw_tree_status": "not_assigned_in_original_run; do not deduct semantic points for absent YAML"
+  },
+  "optional_mechanisms_not_required": [
+    "Authorship and upstream derivation of an already sufficient historical skill",
+    "All causes of top-only handoff wording after the established local bottom-inset gap",
+    "All reasons the existing safearea checker returned PASS",
+    "Measured improvement on a future real migration"
+  ],
+  "caveats": [
+    "Retrospective rubric revision after observing artifacts, not a blinded preregistered comparison.",
+    "The raw and tool reports used different instruction/delivery workflows and the tool sample was repeatedly developed; a local evidence improvement is not isolated MCP causality.",
+    "Complete historical batch temporal-f10-v1 remains the preregistered artifact set for the future full v2 review; do not replace its poorer Guide result with this sample.",
+    "Core establishment counts are not exhaustive whole-report claim precision or a certificate that all displayed reasons are correct."
+  ]
+}

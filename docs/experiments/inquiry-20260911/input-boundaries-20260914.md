@@ -1,5 +1,7 @@
 # 多输入边界：GuidePage 单次开发验证
 
+后续验收澄清（2026-09-14）：下文保留当时实验记录。按用户新确认的[有界归因 v2](../file-first-10/bounded-attribution-v2.md)，v4 中“历史 safearea 已交付但生成输出漏底部避让”这一项应判局部归因完成；不再因未解释全部 U1/U2/U3 而否定它。轨道输入充分性、修复者部分 Read 被称作完整 Read 的问题仍分别保留，见[对称复审](boundary-v2-guide-review.json)。未改任何模型原稿或旧分数。
+
 运行前固定：继续 F10-06 原池、原生成/观察截止、Luna/high，短任务 + 完整调查 skill，一次自由调查；不发本文件或参考答案，不重跑原始组，不人工改最终卡。只改 skill 与 API 模板说明，不改查询/校验内核或 UI，不新增模型必填字段。
 
 产物目录：`C:/Users/hongy/projects/_migloop-evidence-delivery-20260913/compact-real-guide-v3`。上一轮是同目录族的 `compact-real-guide-v2`；比较属于已反复研究的开发单例，不是泛化或优于原始组的证明。
