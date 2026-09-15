@@ -632,6 +632,7 @@
     }
     async function contentSection(holder, scope, operation) {
       holder.textContent="";var box=sec("原文观察"+(operation?" · 此次调用":""));
+      if(operation)holder.dataset.shownOperation=operation;
       holder.appendChild(box);
       if(!operation){box.appendChild(kv("状态","从下方选择一次写入或读取，查看记录中的原文；不推演时刻之间的完整文件。"));return;}
       try {
@@ -673,6 +674,11 @@
       var preview=Math.min(240,Math.max(80,(bounds.bottom-top)/2));
       if(rect.top<top||rect.bottom+preview>bounds.bottom)side.scrollTop+=rect.top-top;
     }
+    function setHistoryDisclosure(control, open) {
+      var original=control.dataset.historyView==="original";
+      control.textContent=open?(original?"收起原文":"收起 diff"):(original?"原文":"diff");
+      control.setAttribute("aria-expanded",String(open));
+    }
     async function historyRows(parent, scope, category, holder, offset) {
       try {
         var data=await view(scope,"history",{category:category,offset:offset||0,limit:20});
@@ -686,23 +692,33 @@
           mid.appendChild(el("span","meta",dateTime(event.at)+" · "+event.label+(event.at===scope.at?" · ◀ 走访锚点":"")));
           mid.title=event.at;row.appendChild(mid);
           var act=el("span","act");
-          act.appendChild(lnk("原文","",async function(){
+          var original=lnk("原文","",async function(){
             side.dataset.historyFocus=event.id;
-            // Reuse the one original-content panel, but put it at the clicked
-            // record instead of silently replacing an off-screen panel above.
-            row.after(holder);holder.dataset.shownOperation=event.id;
+            var closing=holder.isConnected&&holder.dataset.shownOperation===event.id;
+            // This drawer has one original observation. Release its previous
+            // control when switching records, or remove it when toggled closed.
+            if(holder.originalControl)setHistoryDisclosure(holder.originalControl,false);
+            holder.originalControl=null;holder.remove();holder.textContent="";
+            delete holder.dataset.shownOperation;
+            if(closing)return;
+            row.after(holder);holder.originalControl=original;setHistoryDisclosure(original,true);
             var loading=contentSection(holder,scope,event.id);revealHistoryRow(row);
             await loading;
             if(holder.dataset.shownOperation===event.id)revealHistoryRow(row);
-          }));
+          });
+          original.dataset.historyView="original";
+          var active=holder.isConnected&&holder.dataset.shownOperation===event.id;
+          if(active)holder.originalControl=original;
+          setHistoryDisclosure(original,active);act.appendChild(original);
           if(category!=="reads"){act.appendChild(document.createTextNode(" · "));var pre=null;
             var diff=lnk("diff","",async function(){
               side.dataset.historyFocus=event.id;
-              if(pre){pre.remove();pre=null;diff.textContent="diff";return;}
-              pre=el("pre","diffblock");row.after(pre);diff.textContent="收起";
-              var loading=diffInto(pre,scope,event.id);revealHistoryRow(row);
-              await loading;if(pre?.isConnected)revealHistoryRow(row);
+              if(pre){pre.remove();pre=null;setHistoryDisclosure(diff,false);return;}
+              pre=el("pre","diffblock");row.after(pre);setHistoryDisclosure(diff,true);
+              const panel=pre,loading=diffInto(panel,scope,event.id);revealHistoryRow(row);
+              await loading;if(pre===panel&&panel.isConnected)revealHistoryRow(row);
             });
+            diff.dataset.historyView="diff";setHistoryDisclosure(diff,false);
             act.appendChild(diff);}
           row.appendChild(act);parent.appendChild(row);
         });
