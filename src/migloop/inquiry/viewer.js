@@ -654,6 +654,15 @@
         });
       }catch(error){holder.textContent=error.message;holder.classList.add("error");}
     }
+    function revealHistoryRow(row) {
+      // Scroll this drawer only, never the graph/page. A late response from a
+      // previous click must not steal focus from the currently inspected row.
+      if(!row.isConnected||side.dataset.historyFocus!==row.dataset.operation)return;
+      var bounds=side.getBoundingClientRect(),header=side.querySelector(".head");
+      var top=bounds.top+(header?header.getBoundingClientRect().height:0)+8,rect=row.getBoundingClientRect();
+      var preview=Math.min(240,Math.max(80,(bounds.bottom-top)/2));
+      if(rect.top<top||rect.bottom+preview>bounds.bottom)side.scrollTop+=rect.top-top;
+    }
     async function historyRows(parent, scope, category, holder, offset) {
       try {
         var data=await view(scope,"history",{category:category,offset:offset||0,limit:20});
@@ -667,9 +676,23 @@
           mid.appendChild(el("span","meta",dateTime(event.at)+" · "+event.label+(event.at===scope.at?" · ◀ 走访锚点":"")));
           mid.title=event.at;row.appendChild(mid);
           var act=el("span","act");
-          act.appendChild(lnk("原文","",function(){contentSection(holder,scope,event.id);}));
+          act.appendChild(lnk("原文","",async function(){
+            side.dataset.historyFocus=event.id;
+            // Reuse the one original-content panel, but put it at the clicked
+            // record instead of silently replacing an off-screen panel above.
+            row.after(holder);holder.dataset.shownOperation=event.id;
+            var loading=contentSection(holder,scope,event.id);revealHistoryRow(row);
+            await loading;
+            if(holder.dataset.shownOperation===event.id)revealHistoryRow(row);
+          }));
           if(category!=="reads"){act.appendChild(document.createTextNode(" · "));var pre=null;
-            var diff=lnk("diff","",function(){if(pre){pre.remove();pre=null;diff.textContent="diff";return;}pre=el("pre","diffblock");row.after(pre);diff.textContent="收起";diffInto(pre,scope,event.id);});
+            var diff=lnk("diff","",async function(){
+              side.dataset.historyFocus=event.id;
+              if(pre){pre.remove();pre=null;diff.textContent="diff";return;}
+              pre=el("pre","diffblock");row.after(pre);diff.textContent="收起";
+              var loading=diffInto(pre,scope,event.id);revealHistoryRow(row);
+              await loading;if(pre?.isConnected)revealHistoryRow(row);
+            });
             act.appendChild(diff);}
           row.appendChild(act);parent.appendChild(row);
         });
