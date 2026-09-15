@@ -394,7 +394,7 @@ async function main() {
       assert.equal(await evaluate("document.querySelector('#summary').hidden"),true);
       assert.equal(await evaluate("new URLSearchParams(location.search).has('report')"),false);
       await send("Page.reload");
-      await wait("migloopViewer.tree?.byId[migloopViewer.tree.root]?.scope.at==='2026-09-12T10:00:00.000003Z' && !migloopViewer.tree.byId[migloopViewer.tree.root].busy");
+      await wait("window.migloopViewer && migloopViewer.tree?.byId[migloopViewer.tree.root]?.scope.at==='2026-09-12T10:00:00.000003Z' && !migloopViewer.tree.byId[migloopViewer.tree.root].busy");
       await evaluate("document.querySelector('#z1').click()");
       assert.equal(await evaluate("migloopViewer.zoom"),1);
       await evaluate("document.querySelector('#graph').dispatchEvent(new WheelEvent('wheel',{ctrlKey:true,deltaY:-1,cancelable:true}))");

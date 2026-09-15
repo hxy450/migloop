@@ -221,6 +221,10 @@
 
 <style>
 /* Only the time/review overlay and its load dialog supplement the prototype. */
+/* Match history controls' hit areas to their visible height; preserve the base theme. */
+.vrow .act{display:inline-flex;align-items:stretch;cursor:auto}
+.vrow .act:hover{text-decoration:none}
+.vrow .act>.lnk{display:block;padding:2px 3px}
 .node.dispatch,.node.down{border-style:solid}.node.reviewed{border-style:dashed}
 .wire.reviewed{stroke-dasharray:4 4}.node.problem{border-color:var(--c-fix);color:var(--c-fix)}
 .zoomctl button{white-space:nowrap}.zoomctl button[aria-pressed="true"]{color:var(--c-spec);border-color:var(--c-spec);background:color-mix(in srgb,var(--c-spec) 7%,var(--surface))}

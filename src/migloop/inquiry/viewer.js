@@ -639,22 +639,29 @@
         box.firstChild.textContent="原文观察 · "+dateTime(data.at);
         box.appendChild(pills([{cls:data.content!=null?"ok":"warn",t:data.content_kind==="write_body"?"这次写入的全文":data.content_kind==="read_observation"?"Read 返回 · 可能是片段":"只有修改片段，完整内容未知"}]));
         if(data.content!=null)paintOriginal(box,data.content);
+        else {
+          var parts=data.changes.filter(x=>x.kind!=="snapshot_folded");
+          if(parts.length){var patch=el("pre","diffblock");box.appendChild(patch);paintDiff(patch,parts);}
+        }
         box.appendChild(kv("边界",data.note));
         var raw=sec("原始调用与回执");box.appendChild(raw);
         data.originals.forEach(function(ref){rawLink(raw,ref.ref,scope,ref.source.split("/").pop()+":"+ref.line);raw.appendChild(document.createTextNode(" "));});
       }catch(error){fail(error,box);}
+    }
+    function paintDiff(holder, parts) {
+      holder.textContent="";
+      parts.map(x=>x.text).join("\n").split("\n").forEach(function(ln){
+        var row=document.createElement("span");row.textContent=ln;
+        row.className=ln.charAt(0)==="+"?"dl-add":ln.charAt(0)==="-"?"dl-del":ln.charAt(0)==="@"?"dl-ctx":"";
+        holder.appendChild(row);holder.appendChild(document.createTextNode("\n"));
+      });
     }
     async function diffInto(holder, scope, operation) {
       holder.textContent="加载 diff…";
       try {
         var data=await view(scope,"operation",{id:operation}),parts=data.changes.filter(x=>x.kind!=="snapshot_folded");
         if(!parts.length){holder.textContent="整文件写入；没有可核的前态差异。点「原文」看这次提交的全文。";return;}
-        holder.innerHTML="";
-        parts.map(x=>x.text).join("\n").split("\n").forEach(function(ln){
-          var row=document.createElement("span");row.textContent=ln;
-          row.className=ln.charAt(0)==="+"?"dl-add":ln.charAt(0)==="-"?"dl-del":ln.charAt(0)==="@"?"dl-ctx":"";
-          holder.appendChild(row);holder.appendChild(document.createTextNode("\n"));
-        });
+        paintDiff(holder,parts);
       }catch(error){holder.textContent=error.message;holder.classList.add("error");}
     }
     function revealHistoryRow(row) {
