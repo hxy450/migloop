@@ -617,8 +617,11 @@
       var pre=null, link=lnk(title||"原文", "more", async function() {
         if(pre){pre.remove();pre=null;link.textContent=title||"原文";return;}
         pre=el("pre","diffblock","加载原文…");parent.appendChild(pre);link.textContent="收起";
-        try {var raw=await query({op:"open",ref:ref,at:scope.at,...(scope.since?{since:scope.since}:{})});pre.textContent=raw.text;}
-        catch(error){pre.textContent=error.message;pre.classList.add("error");}
+        const panel=pre; // A closed/reopened disclosure belongs to a new request.
+        try {
+          var raw=await query({op:"open",ref:ref,at:scope.at,...(scope.since?{since:scope.since}:{})});
+          if(pre===panel&&panel.isConnected)panel.textContent=raw.text;
+        } catch(error){if(pre===panel&&panel.isConnected){panel.textContent=error.message;panel.classList.add("error");}}
       });parent.appendChild(link);return link;
     }
     function paintOriginal(parent, text) {
@@ -750,10 +753,12 @@
       var pre=null,link=lnk(" 原文","more",async function(){
         if(pre){pre.remove();pre=null;link.textContent=" 原文";return;}
         pre=el("pre","diffblock","加载原文…");r.appendChild(pre);link.textContent=" 收起";
+        const panel=pre;
         try {
           const refs=[row.cite||row.ref,...(row.results||[])],texts=await Promise.all(refs.map(ref=>query({op:"open",ref,at:scope.at,...(scope.since?{since:scope.since}:{})})));
-          pre.textContent="";texts.forEach(function(data,i){pre.appendChild(el("span","dl-ctx",(i?"── 返回 ──":"── 原始记录 ──")+"\n"));pre.appendChild(document.createTextNode(data.text+"\n"));});
-        }catch(error){pre.textContent=error.message;pre.classList.add("error");}
+          if(pre!==panel||!panel.isConnected)return;
+          panel.textContent="";texts.forEach(function(data,i){panel.appendChild(el("span","dl-ctx",(i?"── 返回 ──":"── 原始记录 ──")+"\n"));panel.appendChild(document.createTextNode(data.text+"\n"));});
+        }catch(error){if(pre===panel&&panel.isConnected){panel.textContent=error.message;panel.classList.add("error");}}
       });r.appendChild(link);return r;
     }
     async function rawRows(container, scope, name, terms, offset) {
