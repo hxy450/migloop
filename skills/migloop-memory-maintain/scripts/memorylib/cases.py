@@ -207,23 +207,27 @@ def pack(job_path, draft_path, out, db=None):
             "graphs": len(draft["graphs"]), "views": str(views) if draft["graphs"] else None, "validation": card["validation"]}
 
 
-def main():
-    parser = argparse.ArgumentParser(description="Collect provenance, dispatch issue jobs, package cards. No model calls.")
+def main(role):
+    if role not in ("triage", "card"):
+        raise ValueError("Unknown skill role: " + str(role))
+    parser = argparse.ArgumentParser(description="Prepare issue jobs." if role == "triage" else "Package one issue card.")
     commands = parser.add_subparsers(dest="command", required=True)
-    metadata = commands.add_parser("metadata")
-    metadata.add_argument("--pool", required=True)
-    metadata.add_argument("--server-metadata")
-    metadata.add_argument("--session-id")
-    metadata.add_argument("--out", required=True)
-    jobs = commands.add_parser("dispatch")
-    jobs.add_argument("--tasks", required=True)
-    jobs.add_argument("--metadata", required=True)
-    jobs.add_argument("--out", required=True)
-    packing = commands.add_parser("pack")
-    packing.add_argument("--job", required=True)
-    packing.add_argument("--draft", required=True)
-    packing.add_argument("--out", required=True)
-    packing.add_argument("--db")
+    if role == "triage":
+        metadata = commands.add_parser("metadata")
+        metadata.add_argument("--pool", required=True)
+        metadata.add_argument("--server-metadata")
+        metadata.add_argument("--session-id")
+        metadata.add_argument("--out", required=True)
+        jobs = commands.add_parser("dispatch")
+        jobs.add_argument("--tasks", required=True)
+        jobs.add_argument("--metadata", required=True)
+        jobs.add_argument("--out", required=True)
+    else:
+        packing = commands.add_parser("pack")
+        packing.add_argument("--job", required=True)
+        packing.add_argument("--draft", required=True)
+        packing.add_argument("--out", required=True)
+        packing.add_argument("--db")
     args = parser.parse_args()
     if args.command == "metadata":
         result = collect(args.pool, args.server_metadata, args.session_id)

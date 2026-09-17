@@ -1,14 +1,15 @@
-# 迁移经验闭环：独立三 skill 包
+# 迁移经验闭环：独立四 skill 包
 
 本目录在 `dev/memory-skills` 开发，独立于 `src/migloop/inquiry`、旧 UI 和服务端。Python 3.10+；JSON 无额外依赖，YAML 输入需要 PyYAML。图校验可选复用已安装的 `migloop[inquiry]`，不包含第二套读写内核。
 
 | Skill | 输入 → 输出 |
 |---|---|
-| `migloop-build-cards` | 完整迁移转录 → 问题清单 → 独立调查任务 → 带来源元数据的问题卡 |
+| `migloop-repair-triage` | 完整迁移转录 → 问题清单与逐问题 job；只拆分，不归因 |
+| `migloop-build-cards` | 一个 job + 完整转录 → 正确输入/首次偏差/最终修复的总结与最小证据链卡片 |
 | `migloop-memory-maintain` | 上一版 memory + 新/修订/撤回卡 → 有明确来源的经验及索引新版本 |
 | `migloop-memory-recall` | 当前任务与输入 → 目录/全库搜索 → 按需读取适用经验；证据卡默认不加载 |
 
-三个目录一起安装到同一个 skills 根。共享 Python 实现只放在 `migloop-memory-maintain/scripts/memorylib/`，另外两个 scripts 是薄入口；不复制多份内核。入口说明保持短，详细模式见各自 references。
+四个目录一起安装到同一个 skills 根。共享 Python 实现只放在 `migloop-memory-maintain/scripts/memorylib/`，另外三个 scripts 是薄入口；不复制多份内核。入口说明保持短，详细模式见各自 references。拆分 agent 不制卡，制卡 agent 不重新拆整池；派工由宿主负责。
 
 ## 安装与验证
 
@@ -17,7 +18,9 @@ python skills/migloop-memory-maintain/scripts/install_bundle.py --destination YO
 python -m pytest skills/tests -q -o pythonpath=src
 ```
 
-安装只创建不存在的三个技能目录；已有目标拒绝覆盖，不修改全局配置、hook 或应用代码。已安装的同名旧版本应由用户有意识地更新/备份，不自动删除。宿主重新发现 skills 后使用完整路径或 `$migloop-build-cards` 等调用。
+安装只创建不存在的四个技能目录；已有目标拒绝覆盖，不修改全局配置、hook 或应用代码。已安装的同名旧版本应有意识地更新/备份，不自动删除。宿主重新发现 skills 后使用完整路径或 `$migloop-repair-triage`、`$migloop-build-cards` 等调用。
+
+制卡的目标约定：观察截止时最终保留状态相对生成结束状态是正确目标；不要求重新证明修复有效。历史上被后续修复推翻的内容不能当最终经验。图允许多个偏差起点，各自经必要交接连到被修文件；最好带上证明各起点输入正确的关键输入节点，但不枚举全部输入、写者或调查调用。when 描述未来任务事前可识别的情境，recommendations 描述可执行的预防动作；历史时间与节点只作为证据。
 
 `recall.py notice --store STORE` 输出适合首次修改前提醒的宿主无关 payload，**不是已经安装的 Claude/Codex/DevEco hook**。执行调度、云端 OBS/API 和跨租户权限不在本地初版中；不得将此本地文件接口直接公开为无鉴权服务。
 

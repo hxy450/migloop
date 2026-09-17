@@ -313,6 +313,26 @@ def test_view_conflict_does_not_leave_partial_case(prepared):
     assert not out.exists()
 
 
+def test_pack_preserves_shared_input_and_multiple_problem_branches(prepared):
+    draft = copy.deepcopy(prepared["draft"])
+    graph = draft["graphs"][0]
+    graph["nodes"] = [
+        {"key": "/app/spec.md", "at": "2026-01-01T00:00:01Z", "reason": "Shared relevant input", "problem": False},
+        {"key": "agent-a.jsonl", "at": "2026-01-01T00:00:02Z", "reason": "Deviation A", "problem": True},
+        {"key": "agent-b.jsonl", "at": "2026-01-01T00:00:03Z", "reason": "Deviation B", "problem": True},
+    ]
+    graph["edges"] = [{"from": 1, "to": 2}, {"from": 1, "to": 3},
+                      {"from": 2, "to": "target"}, {"from": 3, "to": "target"}]
+    path = prepared["root"] / "branches.json"
+    write_new(path, draft)
+    output = prepared["root"] / "branches-card.json"
+    result = pack(prepared["job"], path, output)
+    # The wrapper preserves branches; only the existing checker may certify edges.
+    assert load(output)["draft"]["graphs"] == draft["graphs"]
+    assert result["validation"]["graph_check"] == "not_run"
+    assert load(output.with_name("branches-card.views") / "target-1.json") == graph
+
+
 def test_force_without_checker_is_not_accepted(prepared):
     draft = copy.deepcopy(prepared["draft"])
     draft["graphs"][0]["edges"][0].update(force=True, reason="Claim", evidence=[])
@@ -358,6 +378,7 @@ def test_installed_bundle_runs_outside_repo_and_refuses_overwrite(tmp_path):
     installed = subprocess.run([sys.executable, "-B", "-X", "utf8", str(SCRIPTS / "install_bundle.py"),
                                 "--destination", str(destination)], capture_output=True, text=True, encoding="utf-8")
     assert installed.returncode == 0, installed.stderr
+    assert len(installed.stdout.strip().splitlines()) == 4
     store = tmp_path / "isolated-store"
     initialized = subprocess.run([sys.executable, "-B", "-X", "utf8",
         str(destination / "migloop-memory-maintain/scripts/memory.py"), "init", "--store", str(store)],
@@ -372,6 +393,21 @@ def test_installed_bundle_runs_outside_repo_and_refuses_overwrite(tmp_path):
     again = subprocess.run([sys.executable, "-B", "-X", "utf8", str(SCRIPTS / "install_bundle.py"),
                              "--destination", str(destination)], capture_output=True, text=True, encoding="utf-8")
     assert again.returncode != 0 and "Refusing to overwrite" in again.stderr
+
+
+@pytest.mark.parametrize("skill,script,expected,rejected", [
+    ("migloop-repair-triage", "triage.py", "dispatch", "pack"),
+    ("migloop-build-cards", "cases.py", "pack", "dispatch"),
+])
+def test_role_specific_cli_does_not_mix_triage_and_cards(tmp_path, skill, script, expected, rejected):
+    entry = SCRIPTS.parents[1] / skill / "scripts" / script
+    result = subprocess.run([sys.executable, "-B", "-X", "utf8", str(entry), "--help"],
+                            cwd=tmp_path, capture_output=True, text=True, encoding="utf-8")
+    assert result.returncode == 0, result.stderr
+    assert expected in result.stdout
+    result = subprocess.run([sys.executable, "-B", "-X", "utf8", str(entry), rejected],
+                            cwd=tmp_path, capture_output=True, text=True, encoding="utf-8")
+    assert result.returncode != 0 and "invalid choice" in result.stderr
 
 
 def test_placeholder_model_is_not_a_real_model(tmp_path):

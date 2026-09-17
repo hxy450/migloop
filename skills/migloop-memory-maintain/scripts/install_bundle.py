@@ -1,9 +1,9 @@
-"""Install all three sibling skills together without overwriting existing skills."""
+"""Install all four sibling skills together without overwriting existing skills."""
 import argparse
 import shutil
 from pathlib import Path
 
-NAMES = ("migloop-build-cards", "migloop-memory-maintain", "migloop-memory-recall")
+NAMES = ("migloop-repair-triage", "migloop-build-cards", "migloop-memory-maintain", "migloop-memory-recall")
 
 
 def install(destination):

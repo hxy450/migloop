@@ -7,7 +7,7 @@ description: 基于已有经验库和新增、修订或撤回的问题卡，提�
 
 把问题卡中的事实和建议提炼为短经验，维护明确的适用条件、例外和证据。经验目录只帮助检索；分类相同不构成因果或合并依据。
 
-先读 [维护协议](references/protocol.md)。命令相对于本 skill 目录执行，召回命令位于相邻 `migloop-memory-recall/scripts/recall.py`。三个 skill 应保留相邻分发结构；操作本地经验库不等于部署云端或安装 hook。
+先读 [维护协议](references/protocol.md)。命令相对于本 skill 目录执行，召回命令位于相邻 `migloop-memory-recall/scripts/recall.py`。四个 skill 应保留相邻分发结构；操作本地经验库不等于部署云端或安装 hook。
 
 ## 工作顺序
 

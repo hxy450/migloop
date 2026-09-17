@@ -1,4 +1,4 @@
 interface:
   display_name: "迁移问题制卡"
-  short_description: "从完整迁移记录拆分修复问题，逐项调查并保存可追溯的证据卡片"
-  default_prompt: "使用 $migloop-build-cards 从这次迁移的完整记录盘点修复问题，逐项调查并生成问题卡。"
+  short_description: "调查已拆出的一个修复问题，核实输入与输出偏差并保存可追溯的问题卡"
+  default_prompt: "使用 $migloop-build-cards 调查 job.json 中的问题，根据完整转录生成情景卡。"

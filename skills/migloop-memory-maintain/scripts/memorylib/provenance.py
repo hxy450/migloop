@@ -13,7 +13,7 @@ from .common import fields, fingerprint, load, now
 def _bundle_hash():
     root = Path(__file__).resolve().parents[3]
     files = []
-    for name in ("migloop-build-cards", "migloop-memory-maintain", "migloop-memory-recall"):
+    for name in ("migloop-repair-triage", "migloop-build-cards", "migloop-memory-maintain", "migloop-memory-recall"):
         for path in sorted((root / name).rglob("*")):
             if path.is_file() and path.suffix in (".py", ".md", ".yaml") and "__pycache__" not in path.parts:
                 files.append([path.relative_to(root).as_posix(), hashlib.sha256(path.read_bytes()).hexdigest()])
