@@ -15,6 +15,16 @@
 !scripts/**
 !docs/
 !docs/**
+!skills/
+!skills/README.md
+!skills/migloop-build-cards/
+!skills/migloop-build-cards/**
+!skills/migloop-memory-maintain/
+!skills/migloop-memory-maintain/**
+!skills/migloop-memory-recall/
+!skills/migloop-memory-recall/**
+!skills/tests/
+!skills/tests/**
 **/__pycache__/
 *.py[cod]
 *.egg-info/

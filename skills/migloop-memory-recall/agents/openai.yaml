@@ -1,0 +1,4 @@
+interface:
+  display_name: "迁移经验召回"
+  short_description: "按当前迁移任务查目录与关键词，批量读取短经验并核实适用条件"
+  default_prompt: "使用 $migloop-memory-recall 为当前任务查找相关经验，并判断哪些条件和检查适用。"
