@@ -171,7 +171,7 @@ def observation_scope(path: str) -> dict[str, Any]:
     """Return the single observation range used by all high-level service entrypoints."""
     pool = _frozen_pool()
     if pool is None:
-        requested = os.path.abspath(path)
+        requested = _root_path(path)
         return {"requested_root": requested, "anchor": requested, "roots": [requested], "mode": "live_dynamic"}
     requested = _frozen_root(path, pool)
     anchor = _frozen_anchor(pool)
@@ -229,6 +229,14 @@ def _validate_frozen_tree(pool: str) -> None:
             _frozen_path(os.path.join(directory, name), pool)
 
 
+def _root_path(path: str) -> str:
+    """文件路径规范成绝对路径;DevEco 的裸 session id 不是路径,原样保留(abspath 会拼上 cwd,
+    detect 就认不出它了 —— 2026-09-09 CLI ``migloop ses_xxx`` 的回归)。"""
+    if not os.path.isfile(path) and adapters.get("deveco").is_session(path):
+        return path
+    return os.path.abspath(path)
+
+
 def locate_session(target: str, roots: dict[str, str] | None = None) -> str:
     """jsonl 路径 | session-id 前缀 | 项目名片段 → 唯一 root 转录路径(最新者优先)。"""
     pool = _frozen_pool()
@@ -256,7 +264,7 @@ def locate_session(target: str, roots: dict[str, str] | None = None) -> str:
         hits = [r for r in rows if want and want.lower() in str(r.project or "").lower()]
     if not hits:
         raise SessionLookupError(f"找不到会话: {target}")
-    return os.path.abspath(hits[0].path)          # discover 已按 mtime 新→旧
+    return _root_path(hits[0].path)               # discover 已按 mtime 新→旧
 
 
 def _stat_key(paths: list[str]) -> list[Any]:
