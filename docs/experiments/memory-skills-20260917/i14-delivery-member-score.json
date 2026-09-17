@@ -1,0 +1,26 @@
+{
+  "schema": "inquiry-developer-score/1",
+  "round": "current-core-i14-skill-delivery-member-v1",
+  "model": "gpt-5.6-luna",
+  "effort": "high",
+  "reference": "../file-first-10/scoring-core.json",
+  "grading": "One file, developer review of the model's final original submission and original sources. Core explanation coverage, not statement accuracy. No reviewer edits, no original-group rerun, no best-of selection.",
+  "cases": [{
+    "id": "F10-01",
+    "report_id": "e655edfca1da4ceb",
+    "source_sha256": "2670f46e74af0720407426b0d8f3f50f5061522a4bc642a1c7872900002938e5",
+    "units": {"mask": "omitted", "images": "omitted", "cta": "omitted", "price": "omitted", "indicator": "omitted", "repair-compile": "correct"},
+    "basis": "Only finding A explains repair-created private helpers, cross-struct access compilation failure, subsequent visibility edits and successful build. Span mention supports that compile issue but does not explain price styling and delivered generation input versus actual output. Other repair families remain in a generic unexplained item.",
+    "mechanical_status": "valid",
+    "path_status": "complete",
+    "native_submission_bound": true,
+    "model_omitted_edges": true,
+    "auto_bound_nodes": 4,
+    "auto_bound_edges": 4,
+    "cost": {"input_total": 4324227, "cached_input": 4125696, "uncached_input": 198531, "output": 22666, "input_plus_output": 4346893, "seconds": 514.363320000004}
+  }],
+  "summary": {"correct": 1, "partial": 0, "omitted": 5, "wrong": 0, "total": 6},
+  "claim_precision": null,
+  "accepted": false,
+  "why_not": "Lower cost is accompanied by five unexplained core modification families; no equal-quality efficiency gain established. Mechanical validity does not certify cause or modification completeness."
+}
