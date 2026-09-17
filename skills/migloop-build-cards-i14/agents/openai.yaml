@@ -1,0 +1,4 @@
+interface:
+  display_name: "MigLoop i14 调查方法对照"
+  short_description: "从实际修改与片段历史核写前输入，再形成可查验的单问题卡片"
+  default_prompt: "使用 $migloop-build-cards-i14，根据这份 job 和完整迁移转录调查并制作问题卡。"
