@@ -1,0 +1,94 @@
+{
+  "schema": "migloop-i14-exact-input-score/1",
+  "case": "F10-01",
+  "file": "entry/src/main/ets/pages/MemberCenterPage.ets",
+  "reference": "../file-first-10/scoring-core.json",
+  "grading": "Developer source review, not blind and not exhaustive assertion precision. Same frozen six-unit contract. Partial earns no full-correct credit. Extra inaccurate assertions are recorded separately, not hidden by core coverage. No model retry or best-of selection.",
+  "historical_archive": {
+    "report_id": "a18bad53f1e34fdc",
+    "correct": 6,
+    "total": 6,
+    "price_rechecked": "Finding D actually distinguishes the initial numeric placeholder from Slice8 receipt of e-7bbf87ca6062 and the later showNowPrice binding in e-c56d4d99ddee.",
+    "elapsed_seconds": 836.6632224000059,
+    "input_total": 7001101,
+    "cached_input": 6720768,
+    "uncached_input": 280333,
+    "output": 37031,
+    "input_plus_output": 7038132
+  },
+  "runs": [
+    {
+      "backend": "historical",
+      "artifact": "C:/Users/hongy/projects/_migloop-four-skills-trial-20260917/i14-exact-historical-v2",
+      "report_id": "9a5f138aed694ed4",
+      "source_sha256": "88826fe935dd918cb934c4e8fafbb6193cb37494010f437535d0c6e2e829a187",
+      "units": {"mask": "correct", "images": "correct", "cta": "correct", "price": "partial", "indicator": "correct", "repair-compile": "correct"},
+      "basis": {
+        "mask": "E distinguishes pre-existing H5 transparent mask from three missing sites and cites the actual 3-site receipt.",
+        "images": "D identifies width-only image output, retained by Slice8, and actual aspectRatio/height repair. Further D-008 mechanism is presented with hypotheses, not independently certified here.",
+        "cta": "C recovers width100% + horizontal margin -> parent Row padding; does not claim runtime alignment was verified.",
+        "price": "A identifies uniform Text -> Span repair and both historical writes, but relies on a later visual finding for the rich-text requirement. It does not recover Slice8's actual Kotlin rich-text input or distinguish numeric placeholder from real showNowPrice suffix binding. This misses the frozen input/output attribution requirement, not a formatting or missing exact-actor penalty.",
+        "indicator": "B identifies missing explicit color/left configuration and repair; earlier full requirement delivery remains bounded.",
+        "repair-compile": "E separately identifies repair-born private helper access errors and subsequent visibility edits, not an initial generation defect. Finding count is five because E combines two units; grouping is not penalized."
+      },
+      "correct": 5, "partial": 1, "omitted": 0, "wrong": 0, "total": 6,
+      "elapsed_seconds": 677.7461997999926,
+      "input_total": 3889102, "cached_input": 3693312, "uncached_input": 195790,
+      "output": 30765, "input_plus_output": 3919867,
+      "calls": {"investigate": 24, "page": 12, "submit": 4, "shell": 0},
+      "mechanical": {"status": "valid", "nodes": 30, "edges": 14, "path_status": null, "path_status_note": "Historical backend has no equivalent field; null is not a complete-path certification.", "coverage_complete": false, "explained_calls": 9, "unassessed_calls": 25},
+      "additional_claims": "Price origin node is not accepted as proof of the first suffix-bearing business defect. Other prose is not certified by this limited core review."
+    },
+    {
+      "backend": "current",
+      "artifact": "C:/Users/hongy/projects/_migloop-four-skills-trial-20260917/i14-exact-current-v2",
+      "report_id": "68d4d9e0accc43b6",
+      "source_sha256": "9e40f98f26a6d2dbc40eb226c908b434401396de9cfa55fd93cab045e92d0377",
+      "units": {"mask": "correct", "images": "correct", "cta": "correct", "price": "partial", "indicator": "correct", "repair-compile": "correct"},
+      "basis": {
+        "mask": "E recovers missing mask configuration, later batch patch, and purpose-dependent transparent exception. Its site count and claim that H5 lacked maskColor are false; recorded separately below, so correct core coverage is not a clean finding.",
+        "images": "A identifies missing image ratio/height constraints in generation writes, then actual aspectRatio and height repair.",
+        "cta": "D correctly explains parent padding instead of width100% plus horizontal margin; does not certify repaired pixels.",
+        "price": "C recovers uniform -> segmented text but fails to establish actual generation rich-text input. It labels initial UI converter as origin without distinguishing numeric placeholder from later business binding, and uses a pre-write Read as final Slice8 output.",
+        "indicator": "B recovers explicit colors/left added to a previously size-only indicator; screenshot effect remains unknown.",
+        "repair-compile": "F recovers repair-born private helper errors, two visibility fixes and actual successful build, without conflating compile success with visual success."
+      },
+      "correct": 5, "partial": 1, "omitted": 0, "wrong": 0, "total": 6,
+      "elapsed_seconds": 607.7051417999901,
+      "input_total": 8782456, "cached_input": 8500224, "uncached_input": 282232,
+      "output": 26960, "input_plus_output": 8809416,
+      "calls": {"investigate": 42, "page": 23, "submit": 2, "shell": 0},
+      "mechanical": {"status": "valid", "nodes": 29, "edges": 13, "path_status": "needs_path", "coverage_complete": false, "explained_calls": 9, "unassessed_calls": 31},
+      "additional_errors": [
+        {
+          "finding": "E",
+          "classification": "contradicted",
+          "quote": "新增 loadDialog/payAgreementDialog/renewRuleDialog/h5PayDialog 等 CustomDialogController，但参数中没有 maskColor",
+          "also": "对 MemberCenterPage 报 4 sites",
+          "counterevidence": "agent-aslice8-pay-80bbb1f44b77da0f.jsonl L264 (e-c56d4d99ddee) already gives H5 maskColor: Color.Transparent. agent-a68daf720e780b4c2.jsonl L104 (e-827ccccf4976) explicitly reports MemberCenterPage 3 sites, not 4. Neighboring MinePage has 4. Missing-config cause remains valid for three other sites, not all four."
+        },
+        {
+          "finding": "C",
+          "classification": "wrong_temporal_evidence",
+          "quote": "最终 Slice 8 版本也保留数字整体 30vp（e-daaa7b0b3e91）",
+          "counterevidence": "e-daaa7b0b3e91 is Slice8's incoming Read at 15:35:45.935Z, agent-aslice8-pay-80bbb1f44b77da0f.jsonl L76, not its output at 16:04:37.440Z L264. Final whole-text rendering is true elsewhere, but this cited record does not establish the claimed output. The actual delivered rich-text source is L24 (e-7bbf87ca6062)."
+        }
+      ]
+    }
+  ],
+  "comparison": {
+    "current_to_historical_same_day_total_token_ratio": 2.247376250265634,
+    "current_to_historical_same_day_uncached_input_ratio": 1.4415036518719035,
+    "current_to_historical_same_day_elapsed_ratio": 0.896655919250197,
+    "accounting": "Input includes cached input once; reasoning is already included in output. Total token ratio is not billed-cost ratio. Elapsed is the recorded CLI run time including investigation/submissions; index import is separate.",
+    "conclusion": "Original instructions recover all repair families on the current backend, unlike the earlier skill-packaged 1/6 trial. Both contemporaneous arms miss the same price input/output boundary; old code alone did not reproduce the archived 6/6. Current backend uses substantially more cumulative input despite slightly shorter elapsed time. One run per arm cannot isolate individual code changes or establish stable performance."
+  },
+  "integrity": {
+    "actual_model_both": "gpt-5.6-luna", "actual_effort_both": "high",
+    "original_prompt_identical": true, "recorded_developer_messages_identical": true,
+    "original_cwd_and_source_pool": true, "old_mcp_guide_schema_transport_both": true,
+    "no_fork_no_parent_hints": true, "source_and_frozen_inputs_unchanged": true,
+    "historical_archive_verify": true,
+    "v1_unscored": "Both runs stopped after detecting extra host skill catalog in actual developer messages. Preserved with invalidation.json; not semantic task failures or selected-out low scores."
+  }
+}
