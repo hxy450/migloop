@@ -469,7 +469,7 @@ def test_card_template_examples_validate_without_declaring_repairer(prepared):
     write_new(root / "example-meta.json", collect(prepared["pool"], root / "server.json"))
     dispatch(root / "example-tasks.json", root / "example-meta.json", root / "example-jobs")
     job = load(root / "example-jobs/jobs.json")["jobs"][0]["job"]
-    reference = SCRIPTS.parents[1] / "migloop-build-cards/references/card.md"
+    reference = SCRIPTS.parents[1] / "migloop-build-cards/SKILL.md"
     template = yaml.safe_load(re.search(r"```yaml\n(.*?)\n```", reference.read_text(encoding="utf-8"), re.S)[1])
     draft = copy.deepcopy(template)
     draft["graphs"] = []
@@ -490,3 +490,83 @@ def test_card_template_examples_validate_without_declaring_repairer(prepared):
         assert receipt["delivery"]["status"] == "ready_for_review"
         assert all(n["key"] != "repairer" for n in receipt["document"]["findings"][0]["nodes"])
         assert {e["relation"] for e in receipt["edges"]} == {"read", "write"}
+
+
+def test_card_preserves_stage_and_description_without_changing_graph(prepared):
+    draft = copy.deepcopy(prepared["draft"])
+    draft.update(when="界面实现阶段，确定图片约束时", description="源图片依赖adjustViewBounds和固有比例")
+    path, out = prepared["root"] / "context-draft.json", prepared["root"] / "context-card.json"
+    write_new(path, draft)
+    pack(prepared["job"], path, out)
+    card = load(out)
+    assert card["draft"] == draft
+    assert card["id"] == prepared["card"]["id"]
+    assert card["revision"] != prepared["card"]["revision"]
+    assert load(out.with_suffix(".views") / "target-1.json") == draft["graphs"][0]
+    memory = memory_with(prepared)
+    memory.ingest([out], memory.current()["revision"])
+    assert memory.case(card["id"])["draft"]["description"] == draft["description"]
+    assert memory.current()["lessons"]["lesson-text"]["status"] == "needs_review"
+
+
+@pytest.mark.parametrize("description", [None, "", "  ", [], {}])
+def test_invalid_card_description_fails_before_writing(prepared, description):
+    draft = {**prepared["draft"], "description": description}
+    path, out = prepared["root"] / "invalid-context.json", prepared["root"] / "invalid-context-card.json"
+    write_new(path, draft)
+    with pytest.raises(ValueError, match="draft.description"):
+        pack(prepared["job"], path, out)
+    assert not out.exists()
+
+
+def test_description_is_searchable_and_previewed_without_evidence(prepared):
+    card = prepared["card"]
+    lessons = [make_lesson(card, "spec-lesson", title="Image constraints", when="spec extraction",
+                          description="Source uses adjustViewBounds intrinsic ratio"),
+               make_lesson(card, "ui-lesson", title="Image constraints", when="interface implementation",
+                          description="Source uses adjustViewBounds intrinsic ratio")]
+    memory = memory_with(prepared, lessons)
+    matched = search(memory, "adjustViewBounds")
+    assert {x["id"] for x in matched["items"]} == {"spec-lesson", "ui-lesson"}
+    # Prefer matching stage/action, without excluding the other contextual match.
+    routed = search(memory, "spec extraction adjustViewBounds")
+    assert routed["items"][0]["id"] == "spec-lesson" and len(routed["items"]) == 2
+    for value in routed["items"] + browse(memory, "ui/text")["items"]:
+        assert value["description"] == lessons[0]["description"]
+        assert not {"why", "how", "check", "evidence", "graphs", "provenance"} & value.keys()
+    full = read(memory, ["spec-lesson"])["lessons"][0]
+    assert full["description"] == lessons[0]["description"] and "how" in full and "evidence" in full
+
+
+def test_legacy_description_remains_absent_in_storage_and_snapshots(prepared):
+    memory = memory_with(prepared)
+    original = memory.current()
+    old_case = memory.case(prepared["card"]["id"])
+    assert "description" not in old_case["draft"]
+    assert search(memory, "styled")["total"] == 0  # Card text is not automatically injected into lessons.
+    assert search(memory, "text")["items"][0]["description"] == ""
+    assert browse(memory, "ui/text")["items"][0]["description"] == ""
+    assert "description" not in read(memory, ["lesson-text"])["lessons"][0]
+    assert memory.current() == original and memory.case(old_case["id"]) == old_case
+
+
+@pytest.mark.parametrize("description", [None, "", "  ", [], {}])
+def test_invalid_lesson_description_does_not_publish(prepared, description):
+    memory = memory_with(prepared)
+    old = memory.current()["revision"]
+    with pytest.raises(ValueError, match="lesson.description"):
+        memory.apply({"base_revision": old, "upsert": [make_lesson(prepared["card"], description=description)]})
+    assert memory.current()["revision"] == old
+
+
+def test_stage_description_update_keeps_id_and_invalidates_dependents(prepared):
+    card = prepared["card"]
+    memory = memory_with(prepared, [make_lesson(card), make_lesson(card, "child", requires=["lesson-text"])])
+    old = memory.current()["revision"]
+    memory.apply({"base_revision": old, "upsert": [make_lesson(card, when="规格提取阶段，描述源图片时",
+                  description="源布局依赖固有图片比例")]})
+    assert memory.current()["lessons"]["lesson-text"]["version"] == 2
+    assert memory.current()["lessons"]["child"]["status"] == "needs_review"
+    assert memory.current(old)["lessons"]["child"]["status"] == "active"
+    assert search(memory, "固有图片比例")["items"][0]["id"] == "lesson-text"
+    assert "description" not in memory.current(old)["lessons"]["lesson-text"]

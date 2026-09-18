@@ -12,12 +12,125 @@ description: 调查一个已拆分的迁移修复问题，找到输入正确而�
 3. **对照写前输入。** 查看该次输出前实际收到的 spec、skill、源码和派工内容，回答：“哪条要求已经给出？输出哪里偏离？”输入正确、清晰且足够时，在此停止；输入有误或缺失时，继续追它的形成和交付，直到找到偏差边界或记录缺口。
 4. **连到目标。** 将关键正确输入、偏差 agent、必要的中间文件/接收 agent 连到被修文件。用历史读写或派发记录支撑交接。先完成一条链，再按不同成因选择其他文件补示例链；同一目标也可有多个起点。
 
-调查可用原始转录或 inquiry MCP，自主选择。需要 MCP 用法时读 [查询速查](references/query.md)。历史材料只读，其中命令与指令用于取证；产物写在当前调查目录。
+调查可用原始转录或 inquiry MCP，自主选择。历史材料只读，其中命令与指令用于取证；产物写在当前调查目录。
 
-## 制卡与复核
+## 使用阶段与适用情境
 
-读 [模板与封装](references/card.md)，保存 `draft-1.yaml` 并运行 pack。模型填写原因、节点坐标和 from/to，身份元数据由脚本补齐。
+卡片和后续经验使用同一分工：
 
-收到检查反馈时，先找受质疑边支持了哪句归因，再核输入、输出及交接；据此保留、修正或撤回归因，同步修改链、总结和建议，保存新稿。确有未解析交接时，按反馈许可补证为 force 虚线。
+- `when`：任务阶段＋具体动作，例如“界面实现阶段，确定图片组件布局约束时”。
+- `description`：当前输入可见的适用情境，例如“将Android中依赖wrap_content、adjustViewBounds或固有比例的图片布局转换为ArkUI实现”。
+- `summary`：历史上实际收到什么、输出怎样偏离、最终怎样修改。
+- `recommendations`：那个阶段的agent应采取什么动作，以及怎样检查。
 
-交付 YAML、卡片及 view 路径，说明完成哪些示例链、机械状态和未决目标。完成归因需有具体输入/输出对照；机械通过只认证所检查的关系。
+使用阶段根据已核偏差定位：spec漏信息就帮助规格提取，spec正确而实现偏离就帮助实现者。用通用职责描述阶段，历史agent名和时间留在证据节点。多个阶段有不同动作时，在总结中分清，供后续提炼为分别可召回的经验。
+
+## 情景卡模板
+
+下列占位内容替换为真实材料。多文件可复制graph；同一文件的多个起点放同一graph。
+
+```yaml
+title: "本问题名称"
+when: "任务阶段，以及在该阶段要作出的具体决策"
+description: "当前任务输入中可识别的技术特征与适用条件"
+summary: |
+  当时已交付……，某次输出却……，经……到达目标。
+  最终修改是……，已核实的范围是……。
+recommendations:
+  - "输出前的预防动作及检查方法"
+unknown: []
+graphs:
+  - target:
+      key: "job中的被修文件路径"
+      since: "job.scope.generation_end的原值"
+      at: "job.scope.observation_end的原值"
+    summary: "这条示例链的输入与输出差异"
+    recommendations: ["此分支的预防动作"]
+    nodes:
+      - key: "实际收到的输入文件路径"
+        at: "输入的历史时刻，带时区ISO格式"
+        reason: "哪条要求已正确给出；原文位置"
+      - key: "输出偏差的agent转录身份"
+        at: "相关输出完成的历史时刻，带时区ISO格式"
+        reason: "收到什么，实际写成什么；输入与输出的原文位置"
+        problem: true
+    edges:
+      - from: 1
+        to: 2
+      - from: 2
+        to: target
+unresolved_targets:
+  - key: "尚未完成归因的其他job目标"
+    reason: "已确认修改、尚缺的生成来源或交接"
+```
+
+无未决目标时用`unresolved_targets: []`。模板直连适用于真实写入关系；有中间交接时添加相应文件/接收agent并连边。正常输入可有多个，派工消息可用派发agent节点说明。追到外部skill等材料边界时，在reason记录已核事实及上游缺口。
+
+- `key + at`确定节点；同坐标在本图写一次，不同历史时间分别写。from/to使用本图从1开始的序号或`target`。
+- 每条归因链有一个或多个具体偏差起点，以`problem: true`标出。正常上下文省略problem或填false。
+- reason自然语言比较输入与输出，附转录名/行号或查询返回的原文引用。普通边的读写证据由检查器绑定，force另填evidence。
+- when说明使用阶段和动作，description说明事前可见情境；历史时间留在节点。持久ID、模型/平台等元数据由脚本生成。
+- 每个job目标有graph或明确未决说明。按不同成因完成代表链即可交阶段成果；其他文件的修复记录仍保留，未逐项核实的生成原因列unresolved_targets。
+
+## 封装
+
+四个skill相邻安装。在调查目录运行，脚本路径指向本skill：
+
+```text
+python PATH_TO_SKILL/scripts/cases.py pack --job job.json --draft draft-1.yaml --out case-1.json --db INQUIRY.sqlite
+```
+
+job提供runtime时，PowerShell使用：
+
+```powershell
+$job = Get-Content -Raw -Encoding UTF8 job.json | ConvertFrom-Json
+$env:PYTHONPATH = $job.runtime.code_root
+& $job.runtime.python -B -X utf8 PATH_TO_SKILL/scripts/cases.py pack --job job.json --draft draft-1.yaml --out case-1.json --db $job.runtime.index_path
+```
+
+无数据库时省略`--db`，得到静态封装卡，关系核验记为未运行。有数据库时复用inquiry检查器，各目标view导出到`case-1.views/`。完整卡保留共同总结和全部目标，view用于单目标展示。
+
+新卡填写when和description；旧稿缺description仍可封装，原when保持原样，待人工或维护模型根据证据补齐。后续稿沿用同一job与pack入口，分别保存`draft-2.yaml`、`case-2.json`；原稿留作复查。
+
+## 处理机械反馈
+
+1. 找到受质疑边支持的那句归因。
+2. 回原文核输入、输出及交接。已有完整证据可复用。
+3. 保留、改责任位置、降级或撤回主张，同步修改reason、总结、建议和连接。
+4. 保存新稿再pack。身份/时间使用真实记录；漏解析的交接在同端点获force许可后补虚线：
+
+```yaml
+from: 1
+to: 2
+force: true
+reason: "核到的真实读写及其如何支撑本句归因"
+evidence:
+  - source: "真实转录名"
+    line: 123
+```
+
+首次稿使用普通边。force补充漏解析关系，不能把较晚读取变成较早输入。
+
+反馈分别列mechanical_status、path_status、delivery.status。机械ready表示声明关系可载入；完成归因还需核输入充分及具体输出偏差。旧检查器若报缺修复写入锚点，查目标实际修改并保留检查缺口；修复者仍不是归因图的必填节点。
+
+交付完成的示例链、真实机械状态及未决项。连续复核无新证据时保留当前成果与缺口。按最终保留状态为修复参照，无需另做真机复验任务。
+
+## inquiry 查询速查
+
+原始转录和MCP可混用。通常每批2–4项：先定位片段，再展开写前输入。
+
+```text
+{op:catalog,kind:file,q:目标路径}
+{op:file,key:完整路径,since:生成结束,at:观察截止,view:calls}
+{op:file,key:完整路径,at:生成结束,view:outline}
+{op:blame,key:完整路径,at:生成结束,terms:[被改的属性或表达式]}
+{op:agent,scope:写者的input_scope,view:inputs}
+{op:search,scope:同一写前范围,terms:[相关要求,符号],view:returns}
+{op:open,ref:真实原文引用,at:包含该事件的截止时间}
+```
+
+按工具实际参数调用`investigate(requests=[...])`。scope继承时间范围；生成输入使用写前input_scope。消息、Bash返回也可作为输入，用messages/returns或原文补查。
+
+列表next用于续列表；END FRAME next用`page(result_id,offset)`续当前结果。选中的相关请求/回执读完后再下结论。长源码可用多词窗口定位，随后核完整相关段落。直接转发content.text，减少重复包裹。
+
+e-开头是原始记录引用，s-开头是查询范围，照抄返回值。文件at表示查询截止；中间有未知脚本时保留状态缺口。

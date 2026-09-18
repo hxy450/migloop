@@ -204,14 +204,16 @@ class Memory:
 
     @staticmethod
     def _lesson(item, state):
-        allowed = {"id", "title", "topic", "when", "unless", "why", "how", "check", "evidence", "requires", "status"}
-        fields(item, allowed, allowed - {"id", "requires", "unless", "status"}, "lesson")
+        allowed = {"id", "title", "topic", "when", "description", "unless", "why", "how", "check", "evidence", "requires", "status"}
+        fields(item, allowed, allowed - {"id", "requires", "unless", "status", "description"}, "lesson")
         value = copy.deepcopy(item)
         value.setdefault("requires", [])
         value.setdefault("unless", [])
         value.setdefault("status", "candidate")
         for field in ("title", "when", "why"):
             nonempty(value[field], "lesson." + field)
+        if "description" in value:
+            nonempty(value["description"], "lesson.description")
         for field in ("how", "check"):
             strings(value[field], "lesson." + field, empty=False)
         for field in ("unless", "requires"):

@@ -2,6 +2,13 @@
 
 Scope: standalone skill instructions and scripts only. No change to `src/`, inquiry, renderer, service API or global hook configuration on this feature branch.
 
+## Stage/context routing (0.4.0)
+
+- Cards and lessons preserve `when` as the task stage/action and `description` as the observable input context. New templates carry both; old records remain accepted without inferred text, ID changes or snapshot rewrites.
+- Browse/search expose description in compact previews. Full-body lexical search also includes description, with title/when/description matches weighted above body matches. There is no hard stage gate.
+- The first three skills now contain their complete procedures and templates in SKILL.md. Recall alone retains progressive reading of experience. The old card.md path redirects to the canonical template for existing callers.
+- **139 passed, 1 skipped in 14.23 seconds** on the same bundle + 80-test integration subset. The skip remains Windows symlink creation. Four static skill validations passed. Coverage includes new-field roundtrip, real checker/view compatibility, old-card/old-lesson reads, invalid field types, context-only search, cross-stage retrieval, compact previews and dependency invalidation after a context update. These are contract tests, not a new model attribution or semantic-recall score.
+
 ## Instruction rewrite and recoverable installation (0.3.0)
 
 - Four concise, action-first SKILL entrypoints; task formats and queries are loaded at the relevant step. Card graphs describe input → deviation → repaired file, without a required repair-agent node. Multi-file issues can deliver representative chains while explicitly retaining unresolved targets.

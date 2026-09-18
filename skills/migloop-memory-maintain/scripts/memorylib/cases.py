@@ -126,10 +126,13 @@ def pack(job_path, draft_path, out, db=None):
     if fingerprint(metadata) != job["provenance_sha256"]:
         raise ValueError("Frozen job provenance changed; recollect and create a new job")
     verify_materials(metadata)
-    fields(draft, ("title", "when", "summary", "recommendations", "unknown", "graphs", "unresolved_targets"),
+    fields(draft, ("title", "when", "description", "summary", "recommendations", "unknown", "graphs", "unresolved_targets"),
            ("title", "when", "summary", "recommendations", "unknown", "graphs"), "draft")
     for key in ("title", "when", "summary"):
         nonempty(draft[key], "draft." + key)
+    # Older drafts keep their original when and identity; no inferred phase/context.
+    if "description" in draft:
+        nonempty(draft["description"], "draft.description")
     strings(draft["recommendations"], "draft.recommendations")
     strings(draft["unknown"], "draft.unknown")
     if not isinstance(draft["graphs"], list):

@@ -9,7 +9,7 @@
 | `migloop-memory-maintain` | 上一版 memory + 新/修订/撤回卡 → 有明确来源的经验及索引新版本 |
 | `migloop-memory-recall` | 当前任务与输入 → 目录/全库搜索 → 按需读取适用经验；证据卡默认不加载 |
 
-四个目录一起安装到同一个 skills 根。共享 Python 实现只放在 `migloop-memory-maintain/scripts/memorylib/`，另外三个 scripts 是薄入口；不复制多份内核。入口说明保持短，详细模式见各自 references。拆分 agent 不制卡，制卡 agent 不重新拆整池；派工由宿主负责。
+四个目录一起安装到同一个 skills 根。共享 Python 实现只放在 `migloop-memory-maintain/scripts/memorylib/`，另外三个 scripts 是薄入口；不复制多份内核。前三个skill的操作、模板和命令集中在各自SKILL.md，完整读取即可；第四个按目录/预览→经验正文→来源卡渐进读取经验。旧card.md只作兼容指路，正式模板只有一份。拆分agent不制卡，制卡agent不重新拆整池；派工由宿主负责。
 
 ## 安装与验证
 
@@ -26,7 +26,11 @@ python -m pytest skills/tests -q -o pythonpath=src
 
 宿主重新发现skills后使用完整路径或`$migloop-repair-triage`、`$migloop-build-cards`等调用。符号链接/junction包不做原地替换。
 
-制卡目标：以观察截止时最终保留状态为正确参照，定位“已收到正确输入，输出却偏离”的位置，再经必要交接连到被修文件。图保留关键正常输入与偏差起点，修复者不是必填节点。多文件可按不同成因选代表文件形成多条示例链，其余目标保留修复记录并明确列为生成归因未决；示例链数与整卡目标覆盖分别报告。when描述未来可识别的条件，recommendations描述预防动作。每条链使用现有检查器核验；当前检查器仍可能对未解析脚本要求修复锚点，未通过时如实保留缺口。
+制卡目标：以观察截止时最终保留状态为正确参照，定位“已收到正确输入，输出却偏离”的位置，再经必要交接连到被修文件。图保留关键正常输入与偏差起点，修复者不是必填节点。多文件可按不同成因选代表文件形成多条示例链，其余目标保留修复记录并明确列为生成归因未决；示例链数与整卡目标覆盖分别报告。每条链使用现有检查器核验；当前检查器仍可能对未解析脚本要求修复锚点，未通过时如实保留缺口。
+
+卡片与经验共用召回语义：`when`写**任务阶段＋具体动作**，`description`写**当前输入可见的适用情境**。阶段来自偏差定位及预防动作，不取修复者角色、固定Stage编号或历史时刻。summary/why解释历史机制，recommendations/how/check说明动作和检查。搜索与浏览预览返回title/when/description；搜索给这三个字段更高匹配权重，没有阶段枚举或硬过滤。
+
+0.4.0新模板填写description；兼容读取、封装和维护旧的case/1与memory/1。旧记录缺字段时不补造语义、不迁移hash或改ID；预览description为空，原when仍可检索。维护者有依据时通过普通提案补齐，发布新版本并沿用依赖复查规则。
 
 `recall.py notice --store STORE` 输出适合首次修改前提醒的宿主无关 payload，**不是已经安装的 Claude/Codex/DevEco hook**。执行调度、云端 OBS/API 和跨租户权限不在本地初版中；不得将此本地文件接口直接公开为无鉴权服务。
 

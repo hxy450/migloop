@@ -15,7 +15,8 @@ def _visible(state, all_statuses=False):
 
 
 def preview(lesson):
-    return {k: lesson[k] for k in ("id", "title", "when", "topic", "status")}
+    return {**{k: lesson[k] for k in ("id", "title", "when", "topic", "status")},
+            "description": lesson.get("description", "")}
 
 
 def browse(memory, topic="", offset=0, limit=8, all_statuses=False):
@@ -57,9 +58,10 @@ def search(memory, query, topic="", offset=0, limit=8, all_statuses=False):
         route = "/".join(value["topic"])
         if topic and route != topic and not route.startswith(topic + "/"):
             continue
-        text = " ".join([value["title"], value["when"], value["why"], route,
+        routing = " ".join([value["title"], value["when"], value.get("description", "")])
+        text = " ".join([routing, value["why"], route,
                          *value["unless"], *value["how"], *value["check"]])
-        documents.append((value, tokens(text), tokens(value["title"] + " " + value["when"])))
+        documents.append((value, tokens(text), tokens(routing)))
     frequency = {term: sum(term in words for _, words, _ in documents) for term in terms}
     scored = []
     for value, words, highlights in documents:
@@ -94,7 +96,7 @@ def read(memory, identities, all_statuses=False):
 def notice(memory):
     state = memory.current()
     return {"skill": "migloop-memory-recall", "store": str(memory.root), "revision": state["revision"],
-            "instruction": "已理解任务后、首次修改前，用 migloop-memory-recall 按任务和输入特征查相关经验；批量读正文、核适用条件后返回原任务。没匹配可继续，不为放行强行采用；无需默认读取历史卡片。",
+            "instruction": "理解任务后、首次修改前，用 migloop-memory-recall 按任务阶段、具体动作和输入特征查经验。先看title/when/description选条目，再批量读正文。阶段作为线索，必要时跨阶段搜索；核适用条件后返回原任务，历史卡片按需展开。",
             "hook_installed": False,
             "boundary": "This is a runtime-neutral reminder payload; your host must schedule/deliver it. No hook config was changed."}
 
