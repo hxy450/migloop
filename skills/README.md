@@ -15,12 +15,18 @@
 
 ```text
 python skills/migloop-memory-maintain/scripts/install_bundle.py --destination YOUR_SKILLS_ROOT
+python skills/migloop-memory-maintain/scripts/install_bundle.py --destination YOUR_SKILLS_ROOT --update
+python skills/migloop-memory-maintain/scripts/install_bundle.py --destination YOUR_SKILLS_ROOT --restore BACKUP_DIRECTORY
 python -m pytest skills/tests -q -o pythonpath=src
 ```
 
-安装只创建不存在的四个技能目录；已有目标拒绝覆盖，不修改全局配置、hook 或应用代码。已安装的同名旧版本应有意识地更新/备份，不自动删除。宿主重新发现 skills 后使用完整路径或 `$migloop-repair-triage`、`$migloop-build-cards` 等调用。
+首次安装遇同名目录仍拒绝覆盖；明确加`--update`才替换四个包。更新前先完整暂存新版，再把现有包（包括本地改动）移动到`YOUR_SKILLS_ROOT/../.migloop-skill-backups/<时间-随机ID>/previous/`，stderr打印备份目录，其中manifest.json记录原目录和事务状态。更新会移除活跃包里的旧文件，但它们保留在备份中；其他skill、全局配置、hook与应用代码保持原样。
 
-制卡的目标约定：观察截止时最终保留状态相对生成结束状态是正确目标；不要求重新证明修复有效。历史上被后续修复推翻的内容不能当最终经验。图允许多个偏差起点，各自经必要交接连到被修文件；最好带上证明各起点输入正确的关键输入节点，但不枚举全部输入、写者或调查调用。when 描述未来任务事前可识别的情境，recommendations 描述可执行的预防动作；历史时间与节点只作为证据。
+使用`--restore BACKUP_DIRECTORY`恢复该次操作前的四包状态，包含原先不存在的包；恢复本身也先备份当前安装，支持反向恢复。备份绑定原安装根。更新/恢复期间请结束使用这四个包的任务。安装锁防止并发安装；普通复制/发布错误会回滚，回滚失败保留备份、暂存及恢复记录。进程被强杀或断电时可能留下`installing`事务与锁，需要按manifest核对恢复；四目录替换不是跨进程读者可见的原子切换。
+
+宿主重新发现skills后使用完整路径或`$migloop-repair-triage`、`$migloop-build-cards`等调用。符号链接/junction包不做原地替换。
+
+制卡目标：以观察截止时最终保留状态为正确参照，定位“已收到正确输入，输出却偏离”的位置，再经必要交接连到被修文件。图保留关键正常输入与偏差起点，修复者不是必填节点。多文件可按不同成因选代表文件形成多条示例链，其余目标保留修复记录并明确列为生成归因未决；示例链数与整卡目标覆盖分别报告。when描述未来可识别的条件，recommendations描述预防动作。每条链使用现有检查器核验；当前检查器仍可能对未解析脚本要求修复锚点，未通过时如实保留缺口。
 
 `recall.py notice --store STORE` 输出适合首次修改前提醒的宿主无关 payload，**不是已经安装的 Claude/Codex/DevEco hook**。执行调度、云端 OBS/API 和跨租户权限不在本地初版中；不得将此本地文件接口直接公开为无鉴权服务。
 

@@ -2,10 +2,19 @@
 
 Scope: standalone skill instructions and scripts only. No change to `src/`, inquiry, renderer, service API or global hook configuration on this feature branch.
 
+## Instruction rewrite and recoverable installation (0.3.0)
+
+- Four concise, action-first SKILL entrypoints; task formats and queries are loaded at the relevant step. Card graphs describe input → deviation → repaired file, without a required repair-agent node. Multi-file issues can deliver representative chains while explicitly retaining unresolved targets.
+- Installer now supports `--update` with a durable backup and `--restore` to the same destination. All replacement packages are staged first; publication errors roll back; rollback failures retain recovery data. A lock prevents concurrent installations. Unrelated skills and global configuration are untouched. Force-kill/power-loss recovery is manual, not an atomic four-directory guarantee.
+- **125 passed, 1 skipped in 11.35 seconds**: bundle/install tests plus the existing 80-test inquiry/DevEco/product subset. The skip is a symlink-creation test unavailable under the host's Windows permissions. Tests exercise copy failure, partial publication rollback, retained recovery data, restore/re-restore, source overlap, unrelated packages and explicit unresolved targets.
+- The current card template was instantiated with two synthetic input → deviation → target examples and an unresolved third file; both graphs passed the real checker without a model-declared repairer. This covers native repair anchors, not opaque-script anchor completeness.
+- Four skill-creator validations passed; relative documentation links resolve. Installed four packages exactly match repository content (excluding Python cache files).
+- Actual developer update backup: `C:/Users/hongy/.codex/.migloop-skill-backups/20260918T035403Z-6c3062c55d66`. This was produced by the new installer, not a manual copy. Instruction simplification is not a new attribution-accuracy claim.
+
 ## Four-skill revision (0.2.0)
 
 - Split migration-wide triage from single-issue investigation; their CLI entrypoints reject each other's commands.
-- Four packages pass skill-creator's static validator. Installed previous packages are backed up, not discarded.
+- Four packages passed skill-creator's static validator. The development installation was manually backed up for that revision; the 0.2.0 installer itself supported first installation only. Automated update/backup/restore is introduced in 0.3.0 above.
 - Cards retain when, summary, recommendations and compact graph views. Multiple deviation origins and shared input nodes are preserved. The existing inquiry checker remains the only read/write graph checker.
 - Final retained state is the operational repair target; no additional task to prove repair effectiveness. Historical reversals and new requirements must still be distinguished.
 - **111 targeted tests passed in 9.77 seconds** (31 bundle tests plus the same 80 existing tests below). These are contracts, not attribution-accuracy scores.

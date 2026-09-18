@@ -1,25 +1,17 @@
 ---
 name: migloop-memory-maintain
-description: 基于已有经验库和新增、修订或撤回的问题卡，提炼候选经验、比较归并并发布有来源的版本。用于维护迁移经验及其依赖关系，不执行当前迁移任务。
+description: 将新增、修订或撤回的迁移情景卡融入已有经验库，提炼有适用条件和来源的短经验，维护目录及版本依赖。
 ---
 
-# 维护迁移经验
+# 把卡片提炼成经验
 
-把问题卡中的事实和建议提炼为短经验，维护明确的适用条件、例外和证据。经验目录只帮助检索；分类相同不构成因果或合并依据。
+输入指定经验库与卡片，输出经验库新版本和变更说明。经验保留 when、unless、why、how、check；证据树留在来源卡中。
 
-先读 [维护协议](references/protocol.md)。命令相对于本 skill 目录执行，召回命令位于相邻 `migloop-memory-recall/scripts/recall.py`。四个 skill 应保留相邻分发结构；操作本地经验库不等于部署云端或安装 hook。
+1. **读取版本并入卡。** 已有库运行 snapshot，新库运行 init。用 ingest 导入卡，或用 withdraw 撤回整卡/指定结论，再读取新的 revision。
+2. **比较已有经验。** 用相邻 recall 的 search/read/browse 加 `--all-statuses` 查相关条目。比较适用条件、偏差机制与预防动作：相同则补证，不同则分支，条件内冲突则保留争议。
+3. **写提案。** 按 [维护格式与命令](references/protocol.md) 填写短经验，绑定真实 `case + claim + revision`；实际依赖的其他经验列 requires。目录负责导航，每条经验保持一个稳定身份。
+4. **审核并发布。** 核对来源是否支持条件和建议，审核完成的标 active，待补的留 candidate，冲突的标 disputed。用 apply 发布；版本冲突时重读并比较变化，重新形成提案。
 
-## 工作顺序
+来源修改或撤回后，检查 impact 给出的受影响条目，复核后再恢复使用。语义审核由本维护任务完成，机械检查负责引用、版本和依赖。
 
-1. 确认用户指定的经验库与卡片范围。已有库先 `python scripts/memory.py snapshot --store STORE`；新库才用 `init --store STORE`。记录当前 revision。
-2. 通过 `python scripts/memory.py ingest --store STORE --cards CASE.json --base-revision REV` 入卡；多份卡可在同次请求提供，空库首次导入可省 base revision。撤回使用 `withdraw --store STORE --case ID --reason TEXT --base-revision REV`，可用 `--claim diagnosis` 或 `--claim recommendation:1` 仅撤回某条结论。它们保留来源版本，并使已记录的失效依赖进入复查，不替模型生成或审核经验。
-3. 读取反馈并 snapshot 取得当前 revision，检查新增、修订、撤回卡影响的经验及上层依赖。用相邻召回脚本的 `search/read/browse --all-statuses` 找少量相关既有经验，涵盖候选、争议及待复查记录，不能只比较 active。
-4. 对每个具体主张判断新增、补证、条件分支、冲突、退役或无可复用经验。按当时证据判断，不能把多文件同批修改当作多次独立验证。当前范围不足时保留 candidate 或 disputed。
-5. 写包含 `base_revision`、`upsert`、`retire` 与必要目录描述的提案。每条经验绑定具体卡片 claim 及卡片 revision；依赖其他经验时显式写 `requires`。标题、when、unless、why、how、check 保持短而可执行。
-6. 在模型语义审核后，用 `python scripts/memory.py apply --store STORE --plan PLAN.yaml` 做机械校验并发布版本。语义审核是本维护任务的一部分；不用额外请求一次笼统批准。版本冲突时读取最新 snapshot、比较变化并重做提案，不能只改 revision 强行覆盖。
-
-`active` 表示本次维护者审核后可供默认召回的历史建议，不能描述为系统认证的真值。机械校验能检查引用、版本、结构和依赖，却不能证明归因或建议有效。
-
-来源修订、撤回或下层依赖失效时，上层经验应停止默认使用；查清之前不得绕过 `needs_review`。重新激活必须核实新的依据、条件和所有依赖，不因新卡同名而自动恢复。
-
-交付新 revision、增加/更新/退役及待复查范围、主要归并理由与仍存在的争议。只保留一份规范经验正文，主题移动或多个目录入口不制造重复经验、不删除源卡。
+交付新 revision、主要归并理由、更新/退役范围及待复查项。命令在本 skill 目录执行，完整用法按需读取协议。云端发布和 hook 接入由宿主负责。

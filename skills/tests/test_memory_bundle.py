@@ -437,3 +437,56 @@ def test_same_db_different_root_sessions_do_not_share_case_identity(tmp_path):
         dispatch(tasks, meta, destination)
         identities.append(load(destination / "jobs.json")["jobs"][0]["id"])
     assert identities[0] != identities[1]
+
+
+def test_card_template_examples_validate_without_declaring_repairer(prepared):
+    """Two synthetic input/deviation chains; a third target stays explicitly unresolved."""
+    import re
+    import yaml
+    from migloop.inquiry.store import Store, Source
+    from tests.test_inquiry_core import record, use, result, ts
+
+    root = prepared["root"]
+    generation = [record(1, use("r", "Read", file_path="/app/spec.md")),
+                  record(2, result("r", "Use good for both targets.")),
+                  record(3, use("a", file_path="/app/src/Page.ets", content="bad")), record(4, result("a")),
+                  record(5, use("b", file_path="/app/src/Other.ets", content="bad")), record(6, result("b"))]
+    repairs = [record(8, use("fix-a", "Edit", file_path="/app/src/Page.ets", old_string="bad", new_string="good")),
+               record(9, result("fix-a")),
+               record(10, use("fix-b", "Edit", file_path="/app/src/Other.ets", old_string="bad", new_string="good")),
+               record(11, result("fix-b"))]
+    sources = []
+    for name, rows in [("agent", generation), ("repairer", repairs)]:
+        path = prepared["pool"] / (name + ".jsonl")
+        path.write_text("\n".join(json.dumps(r) for r in rows), encoding="utf-8")
+        sources.append(Source(str(path), path.name, name, "/app"))
+    db = root / "examples.sqlite"
+    Store.build(db, sources).close()
+    task = load(prepared["tasks"])
+    task["scope"].update(generation_end=ts(7), observation_end=ts(15))
+    task["issues"][0]["changes"][0]["files"] += ["src/Other.ets", "src/Uninvestigated.ets"]
+    write_new(root / "example-tasks.json", task)
+    write_new(root / "example-meta.json", collect(prepared["pool"], root / "server.json"))
+    dispatch(root / "example-tasks.json", root / "example-meta.json", root / "example-jobs")
+    job = load(root / "example-jobs/jobs.json")["jobs"][0]["job"]
+    reference = SCRIPTS.parents[1] / "migloop-build-cards/references/card.md"
+    template = yaml.safe_load(re.search(r"```yaml\n(.*?)\n```", reference.read_text(encoding="utf-8"), re.S)[1])
+    draft = copy.deepcopy(template)
+    draft["graphs"] = []
+    for filename, end in [("Page.ets", 4), ("Other.ets", 6)]:
+        graph = copy.deepcopy(template["graphs"][0])
+        graph["target"] = {"key": "/app/src/" + filename, "since": ts(7), "at": ts(15)}
+        graph["nodes"][0].update(key="/app/spec.md", at=ts(2), reason="Synthetic received good input")
+        graph["nodes"][1].update(key="agent", at=ts(end), reason="Synthetic wrong output despite good input")
+        draft["graphs"].append(graph)
+    draft["unresolved_targets"] = [{"key": "src/Uninvestigated.ets", "reason": "Not investigated in these examples"}]
+    write_new(root / "example-draft.json", draft)
+    packed = pack(job, root / "example-draft.json", root / "examples.json", db)
+    assert packed["validation"]["unresolved_targets"] == ["/app/src/Uninvestigated.ets"]
+    assert len(packed["validation"]["graph_checks"]) == 2
+    for checked in packed["validation"]["graph_checks"]:
+        receipt = checked["receipt"]
+        assert receipt["mechanical_status"] == "valid"
+        assert receipt["delivery"]["status"] == "ready_for_review"
+        assert all(n["key"] != "repairer" for n in receipt["document"]["findings"][0]["nodes"])
+        assert {e["relation"] for e in receipt["edges"]} == {"read", "write"}
