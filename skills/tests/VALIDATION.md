@@ -2,6 +2,16 @@
 
 Scope: standalone skill instructions and scripts only. No change to `src/`, inquiry, renderer, service API or global hook configuration on this feature branch.
 
+## File-readable memory publication (0.5.0, 2026-09-19)
+
+- Added `memory.py export`: root and per-topic `index.md` files expose only direct children/direct lesson previews; individual `*.lesson.md` files preserve full text, applicability, exceptions, dependencies and exact case/claim/revision bindings. Only active lessons are published. No model call or re-distillation is performed.
+- Default application bundles contain no cards or local store paths. `--link-cards` adds development-only relative links to exact stored card versions, without copying cards. A manifest records the source snapshot and content hashes. Existing output is refused; a new directory is published only after all files have been staged. The source store remains unchanged.
+- The recall skill now uses ordinary file reading, parallel branch selection and task-based stopping. Source review includes the card's unknowns. The maintenance skill publishes the reading bundle after semantic maintenance; JSON store operations and legacy recall diagnostics remain compatible.
+- **157 passed, 1 skipped in 28.08 seconds**, using the existing bundle/inquiry integration subset plus **18 new publication tests**. New checks cover one-level disclosure, mixed direct lessons/subtopics, exact source links, portable application packages, dependency links, identity preservation after recategorization, withdrawal exclusion in new releases, missing descriptions, existing-output/store-overlap rejection, partial-write failure, damaged evidence, complete long text and the CLI outside the repo. These are software contracts, not model recall or migration-improvement scores.
+- Both updated skills passed the skill-creator validator. GitNexus reports the shared maintenance CLI as touching multiple existing flows; all those operations remain covered by the regression suite, and the change adds a dispatch branch rather than rewriting store methods.
+- Real Jetsnack915 smoke export: source `7e883fd5…` retained, **24 active lessons / 23 topic directories / 49 files / 127 checked links**. All source-store file SHA256 values were unchanged. The 3 candidate lessons remain in the store, not in the reading bundle. Root index is 657 UTF-8 bytes; this is an entry-size measurement, **not** an end-to-end token saving.
+- Existing releases are immutable historical copies. Withdrawal does not erase distributed copies: the maintainer must export and hand off a new entry point. Automatic host/hook/OBS publication remains unimplemented. No new Opus/Luna behavioral trial was run for this change.
+
 ## Stage/context routing (0.4.0)
 
 - Cards and lessons preserve `when` as the task stage/action and `description` as the observable input context. New templates carry both; old records remain accepted without inferred text, ID changes or snapshot rewrites.

@@ -1,4 +1,4 @@
 interface:
   display_name: "迁移经验维护"
-  short_description: "将新增和修订问题卡归并为有条件的短经验，并维护来源及失效依赖"
+  short_description: "将问题卡归并为有来源的短经验，维护依赖并发布分层 Markdown 阅读目录"
   default_prompt: "使用 $migloop-memory-maintain 比较这些问题卡与已有经验，提出归并并发布可追溯的新版本。"

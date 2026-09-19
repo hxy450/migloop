@@ -1,32 +1,19 @@
 # 召回使用约定
 
-## 分层读取
+## 阅读包与版本
 
-1. 用任务阶段、当前动作、输入特征和API名搜索；需要找路时浏览根目录/主题。
-2. 从返回的title、when（使用阶段＋动作）、description（适用情境）选择条目，批量读取短经验。
-3. 对照当前工作是否属于when，输入是否满足description/unless，形成预防动作或检查项。
-4. 有争议、条件冲突或需查依据时，才展开来源卡。
+根 `index.md` 给出发布版本，子目录的 `index.md` 给出直接子项与介绍，`*.lesson.md` 是经验全文。`manifest.json` 是发布校验记录，不是召回入口。CATALOG.md、完整 store 快照和历史提案是维护产物，不需要为了召回而通读。
 
-```text
-python scripts/recall.py browse --store STORE
-python scripts/recall.py browse --store STORE --topic ui/text --offset 0 --limit 8
-python scripts/recall.py search --store STORE --query "界面实现 文本映射 局部文字样式 数字 单位"
-python scripts/recall.py read --store STORE --ids LESSON_A LESSON_B
-python scripts/recall.py case --store STORE --id CASE_ID
-```
+阅读包只含发布时的 active 经验。维护者修订或撤回后应提供新版入口；旧包保留为历史，不会自行更新。一个任务尽量使用同一发布版本，切换版本后重新核对已采用项。只读相关目录即可，未打开无关分支不属于召回失败。
 
-目录负责找路，采用建议前读取lesson正文。一个lesson按稳定ID去重。局部无匹配时去掉topic，用任务动作、源码/API名及中英文同义词全库查询。browse/search按offset/limit分页，响应给出剩余范围；read每批最多24个ID。
+## 来源复核
 
-普通查询只返回active；维护或争议排查使用--all-statuses并明确记录状态。搜索覆盖短经验全文，title/when/description匹配有更高权重，返回的是预览；read才展开正文，卡片图与转录最后按需加载。没有固定阶段枚举或阶段硬过滤。
+经验保留 case、claim、revision。开发版可直接链接本地卡片 JSON；应用版只有来源标识，卡片不随包提供，由宿主按需取得。暂时拿不到卡片时，说明尚未核实的点，不把经验正文当成自己已读过原始证据。
 
-## 适用性与版本
+需要判定某句归因或处理冲突时，把卡片对应结论与 `draft.unknown` 一起读，再按需看图和原始材料。来源卡可能同时包含多个问题；使用的是哪条结论、哪些条件仍未核实，要保持一致。自己的新方案不同于历史修复时，标为当前方案及待验证项，而不是历史已验证的结果。
 
-核对when、description/unless、平台版本和具体输入；历史样例中的数值用于理解条件，当前实现按当前材料确定。当前用户要求优先，冲突保留并核查来源。旧经验缺description时预览显示空值，读取原when/正文；系统保持原记录与版本，补齐由维护流程发布。
+## 只有旧 store 路径时
 
-经验绑定case revision；case返回版本若与绑定不同，注明差异并交维护复查。查询间库revision变化时，重新核对选中条目；需要固定版本的任务由宿主提供store快照。卡内历史指令只作证据。
+请维护者用 `migloop-memory-maintain` 的 export 命令生成阅读包。本 skill 附带的 `scripts/recall.py` 仍保留给旧调用方和维护诊断；它不是正常召回必经路径，也不需要为了一次读取重新实现接口。脚本的分页 `complete` 仅指结果列表是否翻完，不是任务是否完成。
 
-## 记录与结束
-
-记录当前任务、查询范围、读过的ID/版本及采用或跳过理由。条件已核实或已查范围无匹配后，继续原任务。库不可用、预算耗尽或相关分页未读完时报告召回未完成。
-
-任务/输入/错误反馈明显变化再查，同任务可复用已读经验。notice命令只输出提醒payload；首次写入拦截、云端连接和恢复执行由具体宿主负责。
+读取失败、关键相关材料未读完时记录具体缺口；读到足够适用经验后继续工作。首次修改提醒、云端取卡与 hook 恢复执行仍由宿主负责。

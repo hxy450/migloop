@@ -314,7 +314,7 @@ def main():
     import argparse
     parser = argparse.ArgumentParser(description="Maintain versioned memory; no automatic causal judgment or model calls.")
     commands = parser.add_subparsers(dest="command", required=True)
-    for name in ("init", "snapshot", "ingest", "apply", "impact", "withdraw"):
+    for name in ("init", "snapshot", "ingest", "apply", "impact", "withdraw", "export"):
         sub = commands.add_parser(name)
         sub.add_argument("--store", required=True)
         if name == "snapshot":
@@ -324,6 +324,9 @@ def main():
             sub.add_argument("--base-revision")
         elif name == "apply":
             sub.add_argument("--plan", required=True)
+        elif name == "export":
+            sub.add_argument("--out", required=True, help="New Markdown reading directory; existing output is never overwritten")
+            sub.add_argument("--link-cards", action="store_true", help="Development view: link to exact local card versions without copying them")
         elif name in ("impact", "withdraw"):
             sub.add_argument("--case" if name == "withdraw" else "--id", required=True)
             sub.add_argument("--claim")
@@ -348,6 +351,9 @@ def main():
         result = memory.apply(load(args.plan))
     elif args.command == "impact":
         result = memory.impact(args.id, args.claim)
+    elif args.command == "export":
+        from .publication import export_memory
+        result = export_memory(memory, args.out, link_cards=args.link_cards)
     else:
         result = memory.withdraw(args.case, args.reason, args.base_revision, args.claim)
     print(json.dumps(result, ensure_ascii=False, indent=2))

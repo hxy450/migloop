@@ -6,10 +6,10 @@
 |---|---|
 | `migloop-repair-triage` | 完整迁移转录 → 问题清单与逐问题 job；只拆分，不归因 |
 | `migloop-build-cards` | 一个 job + 完整转录 → 正确输入/首次偏差/最终修复的总结与最小证据链卡片 |
-| `migloop-memory-maintain` | 上一版 memory + 新/修订/撤回卡 → 有明确来源的经验及索引新版本 |
-| `migloop-memory-recall` | 当前任务与输入 → 目录/全库搜索 → 按需读取适用经验；证据卡默认不加载 |
+| `migloop-memory-maintain` | 上一版 memory + 新/修订/撤回卡 → 有明确来源的经验新版本 + 分层 Markdown 阅读包 |
+| `migloop-memory-recall` | 当前任务与输入 + index.md → 用普通文件读取按需展开相关目录和经验；证据卡默认不加载 |
 
-四个目录一起安装到同一个 skills 根。共享 Python 实现只放在 `migloop-memory-maintain/scripts/memorylib/`，另外三个 scripts 是薄入口；不复制多份内核。前三个skill的操作、模板和命令集中在各自SKILL.md，完整读取即可；第四个按目录/预览→经验正文→来源卡渐进读取经验。旧card.md只作兼容指路，正式模板只有一份。拆分agent不制卡，制卡agent不重新拆整池；派工由宿主负责。
+开发维护时四个目录一起安装到同一个 skills 根。共享 Python 实现只放在 `migloop-memory-maintain/scripts/memorylib/`，另外三个 scripts 是薄入口；不复制多份内核。前三个skill的操作、模板和命令集中在各自SKILL.md，完整读取即可；第四个按目录/预览→经验正文→来源卡渐进读取经验，正常使用只需召回指引与阅读包，不依赖 Python/MCP。旧card.md只作兼容指路，正式模板只有一份。拆分agent不制卡，制卡agent不重新拆整池；派工由宿主负责。
 
 ## 安装与验证
 
@@ -28,11 +28,24 @@ python -m pytest skills/tests -q -o pythonpath=src
 
 制卡目标：以观察截止时最终保留状态为正确参照，定位“已收到正确输入，输出却偏离”的位置，再经必要交接连到被修文件。图保留关键正常输入与偏差起点，修复者不是必填节点。多文件可按不同成因选代表文件形成多条示例链，其余目标保留修复记录并明确列为生成归因未决；示例链数与整卡目标覆盖分别报告。每条链使用现有检查器核验；当前检查器仍可能对未解析脚本要求修复锚点，未通过时如实保留缺口。
 
-卡片与经验共用召回语义：`when`写**任务阶段＋具体动作**，`description`写**当前输入可见的适用情境**。阶段来自偏差定位及预防动作，不取修复者角色、固定Stage编号或历史时刻。summary/why解释历史机制，recommendations/how/check说明动作和检查。搜索与浏览预览返回title/when/description；搜索给这三个字段更高匹配权重，没有阶段枚举或硬过滤。
+卡片与经验共用召回语义：`when`写**任务阶段＋具体动作**，`description`写**当前输入可见的适用情境**。阶段来自偏差定位及预防动作，不取修复者角色、固定Stage编号或历史时刻。summary/why解释历史机制，recommendations/how/check说明动作和检查。阅读目录提供时机、情境和例外预览；只有相关经验才展开正文。
 
 0.4.0新模板填写description；兼容读取、封装和维护旧的case/1与memory/1。旧记录缺字段时不补造语义、不迁移hash或改ID；预览description为空，原when仍可检索。维护者有依据时通过普通提案补齐，发布新版本并沿用依赖复查规则。
 
-`recall.py notice --store STORE` 输出适合首次修改前提醒的宿主无关 payload，**不是已经安装的 Claude/Codex/DevEco hook**。执行调度、云端 OBS/API 和跨租户权限不在本地初版中；不得将此本地文件接口直接公开为无鉴权服务。
+0.5.0增加文件阅读发布：维护者运行`memory.py export --store STORE --out NEW_DIRECTORY`，宿主向迁移agent提供召回skill和生成的`index.md`。首次修改提醒应指向这个入口；自动 Claude/Codex/DevEco hook、云端 OBS/API 和跨租户权限尚未接入。旧`recall.py notice`仍是兼容诊断payload，不是已经安装的hook，也不是新版阅读入口。
+
+## 文件夹式阅读
+
+```text
+python skills/migloop-memory-maintain/scripts/memory.py export --store STORE --out NEW_APPLICATION_DIRECTORY
+python skills/migloop-memory-maintain/scripts/memory.py export --store STORE --out NEW_DEVELOPMENT_DIRECTORY --link-cards
+```
+
+导出根`index.md`只列一级主题；每个子目录有自己的`index.md`，列直接子主题与本级经验预览；一条经验一个`*.lesson.md`。可以同时读多个分支，按当前任务选择，未遍历全库不等于召回未完成。目录不复制后代全文，经验正文不截断。
+
+只导出active记录，保留ID、版本、when/description/unless/why/how/check及来源绑定。默认阅读包不包含来源卡或本机路径，可单独分发；开发版`--link-cards`指向store中确切版本的卡片文件，链接只适用于保持相对位置的本地目录。manifest.json记录版本和文件校验和供维护审计，不是模型入口。两者是同一份store的派生视图，不维护第二份经验真理源。
+
+导出前检查所有可见主题的介绍及来源版本，完整暂存后再发布到**全新**目录。既有目录拒绝覆盖，修订后导出新版本并交付新入口；旧包不会随来源撤回而自行失效。经验和目录调整通过维护提案回到store，再重新export。CATALOG.md全量汇总仍可供人审阅，但不作为召回入口。
 
 ## 数据与身份
 
@@ -47,10 +60,10 @@ python -m pytest skills/tests -q -o pythonpath=src
 
 ## Memory 的边界
 
-本地库保存不可变快照与卡片版本，通过原子 HEAD 更新发布。写入锁与 base_revision 防止覆盖新版本；失败不发布半套索引。目录由 lesson 记录即时生成，无独立手写链接账本。
+本地库保存不可变快照与卡片版本，通过原子 HEAD 更新发布。写入锁与 base_revision 防止覆盖新版本；失败不发布半套索引。阅读目录从固定快照导出，无独立手写链接账本。
 
 经验绑定 `case + claim + revision`；卡变更/结论撤回会使直接与传递依赖进入 needs_review，默认不召回。其他证据可能足够时也须显式重新审核，不根据多数票自动恢复。旧卡保留用于审计。
 
-首版检索是目录导航 + 全库词项/CJK 双字匹配，可分页/批量读；不是 embedding 检索，也不承诺召回率。默认只有 active 经验，维护可显式查所有状态。模型、平台筛选保留数据基础，当前不实现过滤 UI/API；整个迁移用过某模型不等于每条原因都由该模型造成。
+使用侧为模型自主导航 Markdown 文件，普通文件搜索可作补查，不承诺召回率。原词项/CJK双字匹配脚本留给旧调用方和维护诊断；维护可显式查所有状态。模型、平台筛选保留数据基础，当前不实现过滤 UI/API；整个迁移用过某模型不等于每条原因都由该模型造成。
 
 本目录测试是合成契约与安全边界测试，不是新的真实迁移正确率。真实评估应分别测归因、召回/误用和生成收益，不能把脚本通过当成三者的替代。

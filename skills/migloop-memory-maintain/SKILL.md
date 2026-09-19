@@ -1,20 +1,21 @@
 ---
 name: migloop-memory-maintain
-description: 将新增、修订或撤回的迁移情景卡融入已有经验库，提炼有适用条件和来源的短经验，维护目录及版本依赖。
+description: 将新增、修订或撤回的迁移情景卡融入已有经验库，提炼有来源的短经验，维护版本依赖并发布分层 Markdown 阅读目录。
 ---
 
 # 把卡片提炼成经验
 
-输入指定经验库与卡片，输出经验库新版本和变更说明。经验保留 when、description、unless、why、how、check；证据树留在来源卡中。
+输入指定经验库与卡片，输出经验库新版本、分层 Markdown 阅读包和变更说明。经验保留 when、description、unless、why、how、check；证据树留在来源卡中。只调整阅读形态时，直接 export 已有版本，无需重新归并卡片。
 
 1. **读取版本并入卡。** 已有库运行 snapshot，新库运行 init。用 ingest 导入卡，或用 withdraw 撤回整卡/指定结论，再读取新的 revision。
 2. **比较已有经验。** 用相邻 recall 的 search/read/browse 加 `--all-statuses` 查相关条目。比较使用阶段、适用情境、偏差机制与预防动作：相同则补证，不同则分支，条件内冲突则保留争议。
 3. **写提案。** 按下方模板填写短经验，绑定真实 `case + claim + revision`；实际依赖的其他经验列 requires。目录负责导航，每条经验保持一个稳定身份。
 4. **审核并发布。** 核对来源是否支持条件和建议，审核完成的标 active，待补的留 candidate，冲突的标 disputed。用 apply 发布；版本冲突时重读并比较变化，重新形成提案。
+5. **生成阅读目录。** 用 export 把该版本的 active 经验生成到新文件夹，把根 `index.md` 路径交给使用者。迁移模型直接读这些文件，不需要运行查询脚本。
 
 来源修改或撤回后，检查 impact 给出的受影响条目，复核后再恢复使用。语义审核由本维护任务完成，机械检查负责引用、版本和依赖。
 
-交付新 revision、主要归并理由、更新/退役范围及待复查项。命令在本 skill 目录执行。云端发布和 hook 接入由宿主负责。
+交付新 revision、阅读包入口、主要归并理由、更新/退役范围及待复查项。命令在本 skill 目录执行。云端发布和 hook 接入由宿主负责。
 
 ## 两个召回字段
 
@@ -87,7 +88,9 @@ topic_descriptions:
   ui/text: "文本内容、分段样式、数字与单位"
 ```
 
-新lesson省略id；更新时填写原id。topic使用最多三层slug路径，按条目增长形成主题。诊断和建议索引来自脚本生成的claims；核对引用的具体主张支持why/how。建议依赖多项来源时分别列出。
+新lesson省略id；更新时填写原id。topic使用最多三层slug路径，优先复用已有主题；目录拥挤且能分出清晰子主题时再拆分，不要求每条经验都放在最深层。每一级topic_descriptions写一句能判断何时进入的介绍，包括中间目录。诊断和建议索引来自脚本生成的claims；核对引用的具体主张支持why/how。建议依赖多项来源时分别列出。
+
+把会影响采用的来源unknown保留在经验的why/unless中；不要把某次修复数值或未验证假设扩成无条件规则。调整分类沿用lesson身份，合并或拆分时显式处理来源与依赖。
 
 requires只填结论真正依赖的其他lesson ID，供失效传播；循环和缺失依赖由脚本拒绝。源卡树无需复制到经验正文。保留原job/card身份；材料搬迁、问题更名或合拆时显式处理身份沿用/替代。
 
@@ -110,3 +113,16 @@ python scripts/memory.py apply --store STORE --plan PLAN.yaml
 apply串行发布。遇版本冲突，重读当前状态并比较变化，再形成新提案。卡片内容或claim顺序变化后，旧版本绑定需重新核实；withdraw与依赖失效会让相关上层经验停止默认召回。检查impact，核实剩余依据及全部依赖后再激活。
 
 交付发布revision、增加/更新/退役条目及理由、仍待复查的范围，保留提案。底层快照与HEAD由脚本维护，直接编辑内部文件会破坏版本协议。
+
+## 发布分层阅读包
+
+```text
+python scripts/memory.py export --store STORE --out NEW_READING_DIRECTORY
+python scripts/memory.py export --store STORE --out NEW_DEVELOPMENT_DIRECTORY --link-cards
+```
+
+第一条生成可独立阅读的经验目录，只有来源ID/claim/版本，不复制卡片或转录。第二条用于本地开发，在同样的经验文件中加相对路径链接，指向store里的确切卡片JSON版本；移动阅读包后这些本地链接可能失效。云端来源解析尚未接入。
+
+每一级`index.md`只列直接子主题和本级经验预览；`*.lesson.md`保留完整经验、例外、依赖和来源。根目录不会列出全库经验。manifest.json记录版本、文件校验和及来源绑定，供维护检查，不要求迁移模型读取。
+
+export会检查主题介绍和来源版本，输出目录必须全新；生成完整后才发布目录，不覆盖历史包，不改变store、卡片或经验正文。修改卡片/经验或撤回后，重新apply/withdraw并export到新版目录，再把新入口交给宿主；旧包是历史快照，不能自动撤销已经分发的副本。阅读包为生成产物，内容或归类调整应回到提案，再重新导出。
