@@ -117,7 +117,7 @@ def _graph_shape(graph):
                 raise ValueError("Edge endpoint must be a declared 1-based node number or target")
 
 
-def pack(job_path, draft_path, out, db=None):
+def pack(job_path, draft_path, out, db=None, debug_receipts=None):
     job_path, out = Path(job_path).resolve(), Path(out).resolve()
     job, draft = load(job_path), load(draft_path)
     if job.get("schema") != "migloop-issue-job/1":
@@ -159,6 +159,8 @@ def pack(job_path, draft_path, out, db=None):
         raise ValueError("Targets without a graph or explicit unresolved reason: " + ", ".join(sorted(expected - covered - unresolved)))
     if out.exists():
         raise ValueError("Card output exists; use a new revision filename")
+    if debug_receipts and (Path(debug_receipts).resolve() == out or Path(debug_receipts).exists()):
+        raise ValueError("Debug receipt output must be a new, separate file")
     views = out.parent / (out.stem + ".views")
     if views.exists():
         raise ValueError("View output exists; choose another output basename")
@@ -203,6 +205,10 @@ def pack(job_path, draft_path, out, db=None):
                            "causal_correctness": "not_certified", "unresolved_targets": sorted(unresolved)}}
     # Timestamp does not manufacture a new semantic revision on an identical repack.
     card["revision"] = revision_of(card)
+    from .card_storage import compact_card
+    card = compact_card(card)
+    if debug_receipts:
+        write_new(debug_receipts, checks)
     write_new(out, card)
     for index, graph in enumerate(draft["graphs"], 1):
         write_new(views / f"target-{index}.json", graph)
@@ -231,6 +237,7 @@ def main(role):
         packing.add_argument("--draft", required=True)
         packing.add_argument("--out", required=True)
         packing.add_argument("--db")
+        packing.add_argument("--debug-receipts", help="Optional full checker replies for local debugging, not memory")
     args = parser.parse_args()
     if args.command == "metadata":
         result = collect(args.pool, args.server_metadata, args.session_id)
@@ -239,5 +246,5 @@ def main(role):
     elif args.command == "dispatch":
         result = dispatch(args.tasks, args.metadata, args.out)
     else:
-        result = pack(args.job, args.draft, args.out, args.db)
+        result = pack(args.job, args.draft, args.out, args.db, args.debug_receipts)
     print(json.dumps(result, ensure_ascii=False, indent=2))

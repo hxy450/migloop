@@ -147,6 +147,8 @@ $env:PYTHONPATH = $job.runtime.code_root
 
 无数据库时省略`--db`，得到静态封装卡，关系核验记为未运行。有数据库时复用inquiry检查器，各目标view导出到`case-1.views/`。完整卡保留共同总结和全部目标，view用于单目标展示。
 
+封装为精简的 `migloop-case/2`：正文和树保持原样，自动补充少量会话信息、相关来源指纹、边的证据定位及校验状态摘要。全会话逐转录统计和完整检查器回执不进入卡片。排查检查器时可显式加 `--debug-receipts LOCAL_DEBUG.json` 保存完整回执；调试文件不入经验库。
+
 新卡填写when和description；旧稿缺description仍可封装，原when保持原样，待人工或维护模型根据证据补齐。后续稿沿用同一job与pack入口，分别保存`draft-2.yaml`、`case-2.json`；原稿留作复查。
 
 ## 处理机械反馈

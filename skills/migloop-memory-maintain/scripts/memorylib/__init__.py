@@ -1,3 +1,3 @@
 """Shared, standalone runtime for the four migloop memory skills."""
 
-VERSION = "0.5.0"
+VERSION = "0.6.0"

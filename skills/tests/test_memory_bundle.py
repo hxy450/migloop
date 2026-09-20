@@ -119,7 +119,9 @@ def test_pack_autofills_identity_and_no_false_graph_certification(prepared):
     card = prepared["card"]
     assert card["provenance"]["observed"]["session_ids"] == ["session-1"]
     assert card["claims"]["diagnosis"]["text"] == prepared["draft"]["summary"]
-    assert "agent.jsonl" in card["node_provenance"]
+    assert card["schema"] == "migloop-case/2"
+    assert "agent.jsonl" in card["provenance"]["sources"]
+    assert "node_provenance" not in card
     assert card["validation"]["graph_check"] == "not_run"
     assert card["validation"]["causal_correctness"] == "not_certified"
     assert load(prepared["root"] / "case.views/target-1.json") == prepared["draft"]["graphs"][0]
@@ -488,8 +490,11 @@ def test_card_template_examples_validate_without_declaring_repairer(prepared):
         receipt = checked["receipt"]
         assert receipt["mechanical_status"] == "valid"
         assert receipt["delivery"]["status"] == "ready_for_review"
-        assert all(n["key"] != "repairer" for n in receipt["document"]["findings"][0]["nodes"])
-        assert {e["relation"] for e in receipt["edges"]} == {"read", "write"}
+        assert "document" not in receipt and "edges" not in receipt
+    stored = load(root / "examples.json")
+    for graph in stored["graph_evidence"]:
+        assert all(n["key"] != "repairer" for n in graph["nodes"])
+        assert {e["relation"] for e in graph["edges"]} == {"read", "write"}
 
 
 def test_card_preserves_stage_and_description_without_changing_graph(prepared):

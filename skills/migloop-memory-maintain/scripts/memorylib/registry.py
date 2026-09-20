@@ -19,8 +19,8 @@ def revision_of(card):
 
 
 def validate_case(card):
-    if not isinstance(card, dict) or card.get("schema") != "migloop-case/1":
-        raise ValueError("Expected a packaged migloop-case/1, not a bare draft or UI graph")
+    if not isinstance(card, dict) or card.get("schema") not in {"migloop-case/1", "migloop-case/2"}:
+        raise ValueError("Expected a packaged migloop-case/1 or /2, not a bare draft or UI graph")
     slug(card.get("id"), "case.id")
     if card.get("revision") != revision_of(card):
         raise ValueError("Case content differs from its revision hash; repack the source draft")
@@ -32,6 +32,14 @@ def validate_case(card):
         raise ValueError("Claims must match the packaged draft, not a separately edited assertion list")
     for claim in expected.values():
         nonempty(claim["text"], "case claim")
+    if card["schema"] == "migloop-case/2":
+        if card.get("provenance", {}).get("schema") != "migloop-case-provenance/1":
+            raise ValueError("Compact card requires compact provenance")
+        if not isinstance(card["provenance"].get("sources"), dict) or "node_provenance" in card:
+            raise ValueError("Compact card cannot embed a full session inventory")
+        for checked in card.get("validation", {}).get("graph_checks", []):
+            if {"document", "submitted_document", "nodes", "edges", "coverage", "tree"} & set(checked["receipt"]):
+                raise ValueError("Full checker replies belong in optional debug output, not a compact card")
 
 
 class Memory:
@@ -314,7 +322,7 @@ def main():
     import argparse
     parser = argparse.ArgumentParser(description="Maintain versioned memory; no automatic causal judgment or model calls.")
     commands = parser.add_subparsers(dest="command", required=True)
-    for name in ("init", "snapshot", "ingest", "apply", "impact", "withdraw", "export"):
+    for name in ("init", "snapshot", "ingest", "apply", "impact", "withdraw", "export", "compact"):
         sub = commands.add_parser(name)
         sub.add_argument("--store", required=True)
         if name == "snapshot":
@@ -327,6 +335,8 @@ def main():
         elif name == "export":
             sub.add_argument("--out", required=True, help="New Markdown reading directory; existing output is never overwritten")
             sub.add_argument("--link-cards", action="store_true", help="Development view: link to exact local card versions without copying them")
+        elif name == "compact":
+            sub.add_argument("--out", required=True, help="New compact store; the original store is preserved")
         elif name in ("impact", "withdraw"):
             sub.add_argument("--case" if name == "withdraw" else "--id", required=True)
             sub.add_argument("--claim")
@@ -354,6 +364,9 @@ def main():
     elif args.command == "export":
         from .publication import export_memory
         result = export_memory(memory, args.out, link_cards=args.link_cards)
+    elif args.command == "compact":
+        from .card_storage import compact_store
+        result = compact_store(memory, args.out)
     else:
         result = memory.withdraw(args.case, args.reason, args.base_revision, args.claim)
     print(json.dumps(result, ensure_ascii=False, indent=2))
