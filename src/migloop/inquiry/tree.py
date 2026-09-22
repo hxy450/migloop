@@ -434,14 +434,16 @@ def evidence_paths(engine, graph):
             anchor = None
             inspected = 0
             blocked = {}
-            while queue and inspected < 10000 and repair_at is not None:
+            # The task identifies the repaired target. A declared history path
+            # ends at that file; it does not need a second repair-proof branch.
+            while queue and inspected < 10000:
                 scope, steps, seen, incident, node_id, arrived_from = queue.popleft()
                 inspected += 1
                 current = (scope["kind"], scope["key"])
                 incoming_edges = incoming.get(node_id if declared else current, [])
                 at = timestamp(scope["at"], required=True)
                 goal_since = timestamp(goal.get("since"))
-                received = [r["ref"] for r in observations if in_scope(r["at"], min(at, repair_at), goal_since)]
+                received = [r["ref"] for r in observations if in_scope(r["at"], at, goal_since)]
                 # A file reached by a later read may cite its earlier write.
                 # An agent's context may cite an actual received input. Bind
                 # that incident evidence at this node, never a namesake node.
@@ -450,7 +452,7 @@ def evidence_paths(engine, graph):
                         or goal["kind"] == "agent" and goal["role"] == "context"
                         and event["relation"] in ("read", "dispatch"))
                     and (event["strength"] == "confirmed" or event["source"] == "model_review")
-                    and in_scope(event["at"], min(at, repair_at), goal_since)
+                    and in_scope(event["at"], at, goal_since)
                     and event["refs"].intersection(goal["valid_refs"])), None)
                 # The root's repair is independently anchored in changes.
                 if (not steps and goal["kind"] == "file" and repair
@@ -487,10 +489,12 @@ def evidence_paths(engine, graph):
                 for event in incoming_edges:
                     if event["id"] in seen:
                         continue
-                    if event["at"] > min(at, repair_at):
+                    if event["at"] > at:
                         # Keep the precise rejected pair from this traversal,
                         # not a guessed path. Report it only if no path succeeds.
-                        downstream = steps[-1] if steps else repair_row
+                        downstream = steps[-1] if steps else {
+                            "id": "target-cutoff", "relation": "target_cutoff",
+                            "at": iso(at), "evidence": []}
                         conflict = time_conflict({**event, "at": iso(event["at"])}, downstream)
                         if graph.get("submission_format") == "coordinates/1":
                             conflict["note"] = (
@@ -526,7 +530,6 @@ def evidence_paths(engine, graph):
             support = (
                 (found or [])
                 + ([anchor] if anchor else [])
-                + ([repair_row] if repair_row else [])
             )
             status = (
                 "unclosed"
@@ -547,23 +550,26 @@ def evidence_paths(engine, graph):
             time_note = (f" 已遍历分支时间倒序：{conflicts[0]['upstream']['relation']}@{conflicts[0]['upstream']['at']}"
                          f" 晚于下游 {conflicts[0]['downstream']['relation']}@{conflicts[0]['downstream']['at']}；"
                          "较晚读取不能作为较早写入的输入。请核原调用，扩大节点截止或 force 不会改变事件先后。") if conflicts else ""
-            gap_note = "缺少目标修改引用或到此节点的同问题、非倒序证据路径。"
-            if graph.get("submission_format") == "coordinates/1":
-                gap_note = ("目标修复窗口中尚无可核写入锚点；查实际修复命令/回执，未解析脚本先普通声明、获反馈后复核补虚线。"
-                            if repair is None else
-                            "该节点尚无通向目标的已声明、非倒序读写/派发路径。查缺少的真实交接并补 from/to；独立对照不能伪造为输入。")
+            gap_note = ("该节点尚无通向目标的已声明、非倒序读写/派发路径。"
+                        "核查该分支缺少的真实交接并补 from/to；目标不要求额外的修复者或修复写入锚点。")
             destination.append(
                 {
                     "finding": fid,
                     "node": goal["id"],
                     "purpose": "context" if display_only else "problem",
+                    "via": next(iter(required_handoff))[1] if required_handoff else None,
                     "basis": "declared" if declared else "cited_history",
                     "status": status,
                     "steps": found or [],
                     "anchor": anchor,
-                    "repair_anchor": repair_row,
+                    # Explicit trees display only declared handoffs. Optional
+                    # legacy repair context must not add a new actor to them.
+                    "repair_anchor": repair_row if not declared else None,
                     "blocked_branches": conflicts[:4],
                     "blocked_branch_count": len(conflicts),
+                    "code": ("time_reversal" if conflicts else
+                             "path_search_limit" if inspected >= 10000 else
+                             "disconnected_path") if found is None else None,
                     "diagnostic": (
                         gap_note
                         + time_note
@@ -581,7 +587,8 @@ def evidence_paths(engine, graph):
         "root": root,
         "paths": paths,
         "context_paths": context_paths,
-        "complete": all(p["status"] != "unclosed" for p in paths),
+        "complete": bool(paths or context_paths) and all(
+            p["status"] in ("native", "model_review") for p in paths + context_paths),
         "problem_nodes": len({p["node"] for p in paths}),
         "note": "自动展开与手动展开共用邻居投影；不是模型实际查询顺序，也不认证文件状态连续。",
     }

@@ -601,6 +601,8 @@ def check(engine, text, *, save=False, _legacy_reviews=False, _compact_parent=AU
         from .feedback import coordinate_feedback
         coordinate_feedback(engine, result)
     result["tree"] = evidence_paths(engine, result)
+    from .feedback import path_feedback
+    result["path_feedback"] = path_feedback(result)
     result["path_status"] = "complete" if result["tree"]["complete"] else "needs_path"
     if is_compact:
         result["delivery"] = delivery_status(result)

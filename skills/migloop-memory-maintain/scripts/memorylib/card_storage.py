@@ -10,8 +10,8 @@ from .common import fingerprint, load, write_new
 
 def check_summary(receipt):
     """Keep outcomes and actionable errors, never the expanded document/coverage."""
-    keys = ("schema", "report_id", "mechanical_status", "path_status", "status", "error",
-            "semantic_verified", "submission_format", "issues", "missing_evidence_links")
+    keys = ("schema", "report_id", "mechanical_status", "path_status", "status", "error", "code",
+            "semantic_verified", "submission_format", "issues", "path_feedback")
     summary = {k: copy.deepcopy(receipt[k]) for k in keys if k in receipt}
     if "delivery" in receipt:
         summary["delivery"] = {k: receipt["delivery"][k] for k in
@@ -21,11 +21,13 @@ def check_summary(receipt):
             {k: copy.deepcopy(edge[k]) for k in ("from", "to", "code", "diagnostic", "force_eligible", "next_call",
                 "where", "coordinates", "nearby_operations", "operation_count", "inspect", "next_step")
              if k in edge} for edge in receipt["unverified_edges"]]
-    tree = receipt.get("tree", {})
-    diagnostics = list(dict.fromkeys(p["diagnostic"] for p in
-                       tree.get("paths", []) + tree.get("context_paths", []) if p.get("diagnostic")))
-    if diagnostics:
-        summary["path_diagnostics"] = diagnostics
+    if "path_feedback" not in receipt:
+        # Old persisted receipts predate the shared diagnostic projection.
+        tree = receipt.get("tree", {})
+        diagnostics = list(dict.fromkeys(p["diagnostic"] for p in
+                           tree.get("paths", []) + tree.get("context_paths", []) if p.get("diagnostic")))
+        if diagnostics:
+            summary["path_diagnostics"] = diagnostics
     return summary
 
 

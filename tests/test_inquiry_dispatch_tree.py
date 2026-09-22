@@ -249,7 +249,9 @@ def test_read_or_lexical_target_reference_is_not_a_repair_anchor(tmp_path, tool)
         }
         graph = report.check(engine, json.dumps(doc))
         path = graph["tree"]["paths"][0]
-        assert path["status"] == "unclosed" and path["repair_anchor"] is None
+        # A later read is still not a repair, but the confirmed old write
+        # independently connects the origin to the target file.
+        assert path["status"] == "native" and path["repair_anchor"] is None
     finally:
         engine.store.close()
 
@@ -303,7 +305,9 @@ def test_candidate_repair_cannot_make_native_or_zero_step_path_verified(
         }
         graph = report.check(engine, json.dumps(doc))
         path = graph["tree"]["paths"][0]
-        assert path["status"] == "candidate"
+        # The failed repair stays candidate; it neither certifies a repair nor
+        # downgrades the separately confirmed generation-history path.
+        assert path["status"] == "native"
         assert path["repair_anchor"]["strength"] == "candidate"
         if kind == "file":
             assert path["steps"] == [] and path["anchor"]["strength"] == "confirmed"

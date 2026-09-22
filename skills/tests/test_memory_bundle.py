@@ -50,7 +50,7 @@ def prepared(tmp_path):
              "recommendations": ["Keep segment styles"], "unknown": ["Synthetic test only"], "graphs": [graph]}
     draft_path, card_path = tmp_path / "draft.json", tmp_path / "case.json"
     write_new(draft_path, draft)
-    pack(job, draft_path, card_path)
+    pack(job, draft_path, card_path, draft_only=True)
     return {"pool": pool, "meta": meta, "tasks": tasks, "job": job, "draft": draft, "card_path": card_path,
             "card": load(card_path), "root": tmp_path}
 
@@ -264,7 +264,7 @@ def test_no_identity_drift_when_sources_grow_or_tasks_reorder(prepared):
     out = prepared["root"] / "new-jobs"
     dispatch(prepared["tasks"], updated_metadata, out)
     new_job = load(out / "jobs.json")["jobs"][0]["job"]
-    packed = pack(new_job, prepared["root"] / "draft.json", prepared["root"] / "new-case.json")
+    packed = pack(new_job, prepared["root"] / "draft.json", prepared["root"] / "new-case.json", draft_only=True)
     assert packed["id"] == old_id
     assert packed["revision"] != prepared["card"]["revision"]
     memory = memory_with(prepared)
@@ -280,7 +280,7 @@ def test_metadata_recapture_does_not_invalidate_identical_case(prepared):
     out = prepared["root"] / "recaptured-jobs"
     dispatch(prepared["tasks"], new_meta, out)
     job = load(out / "jobs.json")["jobs"][0]["job"]
-    result = pack(job, prepared["root"] / "draft.json", prepared["root"] / "recaptured-case.json")
+    result = pack(job, prepared["root"] / "draft.json", prepared["root"] / "recaptured-case.json", draft_only=True)
     assert result["revision"] == prepared["card"]["revision"]
 
 
@@ -328,7 +328,7 @@ def test_pack_preserves_shared_input_and_multiple_problem_branches(prepared):
     path = prepared["root"] / "branches.json"
     write_new(path, draft)
     output = prepared["root"] / "branches-card.json"
-    result = pack(prepared["job"], path, output)
+    result = pack(prepared["job"], path, output, draft_only=True)
     # The wrapper preserves branches; only the existing checker may certify edges.
     assert load(output)["draft"]["graphs"] == draft["graphs"]
     assert result["validation"]["graph_check"] == "not_run"
@@ -341,7 +341,7 @@ def test_force_without_checker_is_not_accepted(prepared):
     path = prepared["root"] / "force.json"
     write_new(path, draft)
     with pytest.raises(ValueError, match="force requires"):
-        pack(prepared["job"], path, prepared["root"] / "force-case.json")
+        pack(prepared["job"], path, prepared["root"] / "force-case.json", draft_only=True)
 
 
 def test_real_inquiry_checker_is_reused_without_core_changes(prepared):
@@ -502,7 +502,7 @@ def test_card_preserves_stage_and_description_without_changing_graph(prepared):
     draft.update(when="界面实现阶段，确定图片约束时", description="源图片依赖adjustViewBounds和固有比例")
     path, out = prepared["root"] / "context-draft.json", prepared["root"] / "context-card.json"
     write_new(path, draft)
-    pack(prepared["job"], path, out)
+    pack(prepared["job"], path, out, draft_only=True)
     card = load(out)
     assert card["draft"] == draft
     assert card["id"] == prepared["card"]["id"]

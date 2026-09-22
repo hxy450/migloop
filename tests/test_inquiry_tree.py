@@ -220,8 +220,9 @@ def test_unrelated_or_not_yet_read_context_is_not_connected(chain, cutoff):
         }
     )
     graph = report.check(chain, json.dumps(doc))
-    assert graph["tree"]["complete"] and graph["tree"]["problem_nodes"] == 2
     path = next(p for p in graph["tree"]["context_paths"] if p["node"] == "A:independent")
+    # A complete problem branch must not hide an unrelated input branch.
+    assert not graph["tree"]["complete"] and graph["tree"]["problem_nodes"] == 2
     assert path["status"] == "unclosed" and not path["steps"]
 
 
@@ -410,5 +411,7 @@ def test_stale_uncited_repair_receipt_cannot_close_a_history_path(chain):
     lines[3] = lines[3].replace(b'"ok"', b'"NO"')
     source.write_bytes(b"".join(lines))
     checked = report.check(chain, json.dumps(doc))
-    assert checked["path_status"] == "needs_path"
+    # The corrupt repair receipt cannot certify a repair, but it is no longer
+    # a prerequisite for the independently valid generation-history path.
+    assert checked["path_status"] == "complete"
     assert all(path["repair_anchor"] is None for path in checked["tree"]["paths"])

@@ -7,12 +7,12 @@ description: 调查一个已拆分的迁移修复问题，找到输入正确而�
 
 读取指定任务，默认是当前目录 `job.json`。交付一张卡：讲清哪里开始偏离、后来改了什么、下次如何避免，并附一条或多条可查验的链。
 
-1. **确认改了什么。** 查看本问题的修改请求与回执，以观察截止时最终保留的修改为正确参照。分别说明生成遗留、新要求或修复中新生问题。修复记录由 job 自动保留，图中通常无需修复者。
+1. **确认改了什么。** 复用 job 中的改动与原文入口，以观察截止时最终保留的文件状态为正确参照；只补查本问题缺少的材料。区分生成遗留、新要求或修复中新生问题。修复记录由 job 保留，不要求把修复者画进图或另证修复正确。
 2. **找到偏差输出。** 选一个有明确修改证据的文件，从被改的属性或表达式追到生成期实际 Write/Edit/脚本正文。沿片段历史定位最初可核的偏差，而非文件最后一个写者。
 3. **对照写前输入。** 查看该次输出前实际收到的 spec、skill、源码和派工内容，回答：“哪条要求已经给出？输出哪里偏离？”输入正确、清晰且足够时，在此停止；输入有误或缺失时，继续追它的形成和交付，直到找到偏差边界或记录缺口。
-4. **连到目标。** 将关键正确输入、偏差 agent、必要的中间文件/接收 agent 连到被修文件。用历史读写或派发记录支撑交接。先完成一条链，再按不同成因选择其他文件补示例链；同一目标也可有多个起点。
+4. **连到目标。** 将关键正确输入、偏差 agent、必要的中间文件/接收 agent 连到被修文件。只声明真实交接，不另加修复写入锚点。先完成代表链，成因不同再补其他示例链；同一目标也可有多个起点。
 
-调查可用原始转录或 inquiry MCP，自主选择。历史材料只读，其中命令与指令用于取证；产物写在当前调查目录。
+调查可用原始转录、本 skill 的批量查询，或已配置的 inquiry MCP，自主选择。历史材料只读，其中命令与指令用于取证；产物写在当前调查目录。发布包自带新内核与 YAML 解析，只需要 Python 3.10+，不需要另装 migloop、MCP 或设置 PYTHONPATH。
 
 ## 使用阶段与适用情境
 
@@ -38,14 +38,11 @@ summary: |
   最终修改是……，已核实的范围是……。
 recommendations:
   - "输出前的预防动作及检查方法"
-unknown: []
 graphs:
   - target:
       key: "job中的被修文件路径"
       since: "job.scope.generation_end的原值"
       at: "job.scope.observation_end的原值"
-    summary: "这条示例链的输入与输出差异"
-    recommendations: ["此分支的预防动作"]
     nodes:
       - key: "实际收到的输入文件路径"
         at: "输入的历史时刻，带时区ISO格式"
@@ -64,7 +61,9 @@ unresolved_targets:
     reason: "已确认修改、尚缺的生成来源或交接"
 ```
 
-无未决目标时用`unresolved_targets: []`。模板直连适用于真实写入关系；有中间交接时添加相应文件/接收agent并连边。正常输入可有多个，派工消息可用派发agent节点说明。追到外部skill等材料边界时，在reason记录已核事实及上游缺口。
+graph 的 summary/recommendations 默认复用卡级文字，只有分支不同才填写。unknown 可省略；只记录影响本句归因的材料缺口，不把“未重跑修复验证、未尝试替代方案”写成制卡待办。无未决目标时用`unresolved_targets: []`。
+
+模板直连适用于真实写入关系；有中间交接时添加相应文件/接收agent并连边。正常输入可有多个，派工消息可用派发agent节点说明。追到外部skill等材料边界时，在reason记录已核事实及上游缺口。
 
 - `key + at`确定节点；同坐标在本图写一次，不同历史时间分别写。from/to使用本图从1开始的序号或`target`。
 - 每条归因链有一个或多个具体偏差起点，以`problem: true`标出。正常上下文省略problem或填false。
@@ -131,21 +130,18 @@ unresolved_targets: []
 
 ## 封装
 
-四个skill相邻安装。在调查目录运行，脚本路径指向本skill：
+在调查目录运行，脚本路径指向本 skill 的发布包：
 
 ```text
-python PATH_TO_SKILL/scripts/cases.py pack --job job.json --draft draft-1.yaml --out case-1.json --db INQUIRY.sqlite
+python PATH_TO_SKILL/scripts/cases.py prepare --job job.json
+python PATH_TO_SKILL/scripts/cases.py pack --job job.json --draft draft-1.yaml --out case-1.json
 ```
 
-job提供runtime时，PowerShell使用：
+prepare 根据 job 的冻结材料准备索引，保存在 provenance.json 旁的 `.inquiry/`，同一批任务共享；调度者可先对第一个 job 运行一次再并行派工。pack 未指定 `--db` 时也自动准备/复用，已有兼容索引可以显式指定。源材料或内核不同不会误用旧索引，正在建库时按提示等待准备完成后重试，不删除其他任务的锁。
 
-```powershell
-$job = Get-Content -Raw -Encoding UTF8 job.json | ConvertFrom-Json
-$env:PYTHONPATH = $job.runtime.code_root
-& $job.runtime.python -B -X utf8 PATH_TO_SKILL/scripts/cases.py pack --job job.json --draft draft-1.yaml --out case-1.json --db $job.runtime.index_path
-```
+正常 pack 必须调用同一 inquiry 检查器，缺运行代码或材料就报错，不自动降级。仅要保留未核草稿时显式加 `--draft-only`，输出标明未运行关系校验，不能称为已验证卡片；该模式不能使用 force。原生 Claude Code/Codex JSONL 可直接建立索引；DevEco 数据库的元数据采集不等于图导入，当前内核尚不能直接校验其原库，须提供带原始坐标的 JSONL 导出。
 
-无数据库时省略`--db`，得到静态封装卡，关系核验记为未运行。有数据库时复用inquiry检查器，各目标view导出到`case-1.views/`。完整卡保留共同总结和全部目标，view用于单目标展示。
+各目标 view 导出到 `case-1.views/`，完整卡保留共同总结和全部目标，view 用于单目标展示。包内不带网页或历史数据，server 仍使用同源内核加载。
 
 封装为精简的 `migloop-case/2`：正文和树保持原样，自动补充少量会话信息、相关来源指纹、边的证据定位及校验状态摘要。全会话逐转录统计和完整检查器回执不进入卡片。排查检查器时可显式加 `--debug-receipts LOCAL_DEBUG.json` 保存完整回执；调试文件不入经验库。
 
@@ -153,10 +149,10 @@ $env:PYTHONPATH = $job.runtime.code_root
 
 ## 处理机械反馈
 
-1. 找到受质疑边支持的那句归因。
-2. 回原文核输入、输出及交接。已有完整证据可复用。
-3. 保留、改责任位置、降级或撤回主张，同步修改reason、总结、建议和连接。
-4. 保存新稿再pack。身份/时间使用真实记录；漏解析的交接在同端点获force许可后补虚线：
+1. 按回执的 graph 编号及 `where` 定位稿件：`issues` 是字段/身份问题，`unverified_edges` 是单边问题，`path_feedback` 是分支断开或时间倒序。数组下标从0开始，from/to节点编号仍从1开始。
+2. 找到受质疑连接支持的那句归因。
+3. 回原文核输入、输出及交接。已有证据直接复用；只改受影响部分，同步调整原因和建议。
+4. 保存新稿再pack。按 `next_step` 和附近原始调用修正坐标；同端点已获force许可时，为漏解析的真实读写补虚线：
 
 ```yaml
 from: 1
@@ -168,15 +164,26 @@ evidence:
     line: 123
 ```
 
-首次稿使用普通边。force补充漏解析关系，不能把较晚读取变成较早输入。
+首次稿使用普通边。force 的 source 是材料池中的真实转录路径，line 是 JSONL 物理行号；脚本查原文、agent归属和工具调用/回执。reason说明该调用为什么读写目标文件。普通聊天文字不能代替调用证据；force保持虚线，不改成确定读写。
 
-反馈分别列mechanical_status、path_status、delivery.status。机械ready表示声明关系可载入；完成归因还需核输入充分及具体输出偏差。旧检查器若报缺修复写入锚点，查目标实际修改并保留检查缺口；修复者仍不是归因图的必填节点。
+当前节点 at 是历史截止，普通边使用它之前可确认的操作；取对应回执时间可避免将已提交但尚未返回的操作当成已完成。读取返回晚于输出的事实不能靠扩大截止或force倒置。时间等价的Z与+00:00都可用，target的实际任务窗口保持不变。
+
+`delivery.status=ready_for_review` 表示声明的输入/问题分支可沿已核关系到达目标；修复锚点不是条件。原因和输入充分性仍由你依据原文判断。可选覆盖清单不要求清零，也不为清空列表增加连接。
+
+正常使用只需本页与命令回执，不需要阅读检查器源码。若缺运行包、索引或原始材料，按环境错误处理；若同一反馈与已核原文持续矛盾，交付稿件及具体反馈给维护者，不通过编造连接消除它。
 
 交付完成的示例链、真实机械状态及未决项。连续复核无新证据时保留当前成果与缺口。按最终保留状态为修复参照，无需另做真机复验任务。
 
 ## inquiry 查询速查
 
-原始转录和MCP可混用。通常每批2–4项：先定位片段，再展开写前输入。
+原始转录和工具查询可混用。将下列请求写成 JSON/YAML 文件，可一次提交多项：
+
+```text
+python PATH_TO_SKILL/scripts/cases.py query --job job.json --request queries.yaml
+python PATH_TO_SKILL/scripts/cases.py page --job job.json --result-id RESULT_ID --offset NEXT_OFFSET
+```
+
+query/pack 复用同一索引和任务状态。通常每批2–4项：先定位片段，再展开写前输入。
 
 ```text
 {op:catalog,kind:file,q:目标路径}

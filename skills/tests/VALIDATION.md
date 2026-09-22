@@ -1,6 +1,25 @@
 # Skill bundle validation — 2026-09-17
 
-Scope: standalone skill instructions and scripts only. No change to `src/`, inquiry, renderer, service API or global hook configuration on this feature branch.
+The initial 2026-09-17 checks covered skill instructions and scripts only. Later dated checks below include the shared inquiry changes needed by self-contained card validation; they do not deploy the renderer/server or modify global hook configuration.
+
+## Self-contained skills and transferable lessons (0.7.1, 2026-09-21)
+
+- Published skills carry their required pure-Python runtime and YAML parser. The build-cards package uses the canonical inquiry core; other packages do not include that core. Build outputs are generated outside the repository, not a second maintained implementation.
+- Card packing prepares/reuses a source- and kernel-fingerprinted index. A checked declared path must reach its target but does not require a separate repair-writer anchor. Coordinate and path diagnostics identify affected fields, branches and next checks. Tests retain rejection of missing/invalid relations and reversed time.
+- Optional card `unknown` and inherited per-graph summary/recommendations reduce repeated authoring without altering the original draft. Force remains review-gated and requires original tool-call evidence.
+- The Claude Code first-write checkpoint and its standard-library installer are included. Installing skills does not install project hooks automatically.
+- The maintenance skill now defaults to file-based navigation and includes a transferability test, positive/negative examples and a complete lesson-body example. Cases retain historical details; lessons express conditional mechanisms and actions, not project identifiers or historical measurements as new defaults.
+- **590 passed, 1 skipped in 64.26 seconds** across all `skills/tests` and `tests/test_inquiry*.py`, with the existing environment's Python and `PYTHONPATH=src`. A dedicated external pytest directory avoided unrelated temporary-directory permissions.
+- Independent GPT-5.6 Sol high, zero-context run: unchanged 15 source cards into an empty store produced 12 active lessons. All 43 source references resolved, covering 15 cards; the input and stored cards matched byte-for-byte. This verifies output structure/source integrity, not cross-project migration benefit or every technical claim.
+- The earlier run that was given the previous 27 lessons was stopped and excluded from the from-cards experiment. It was a revision exercise, not a clean reconstruction.
+
+Reproduce the regression subset from the checkout using Python with pytest and the source development dependencies:
+
+```text
+python -m pytest skills/tests tests/test_inquiry*.py -q -o pythonpath=src --basetemp NEW_EXTERNAL_TEST_DIRECTORY
+```
+
+Shells that do not expand globs (including PowerShell for native commands) should enumerate `tests/test_inquiry*.py` into an argument array first.
 
 ## File-readable memory publication (0.5.0, 2026-09-19)
 

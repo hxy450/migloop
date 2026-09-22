@@ -79,45 +79,77 @@ def _absolute(path, scope):
     return str(PurePosixPath(roots[0].replace("\\", "/")) / path)
 
 
-def _graph_shape(graph):
-    fields(graph, ("target", "summary", "recommendations", "nodes", "edges"),
-           ("target", "summary", "recommendations", "nodes", "edges"), "graph")
-    fields(graph["target"], ("key", "since", "at"), ("key", "at"), "graph.target")
-    def time(value):
-        if not isinstance(value, str):
-            raise ValueError("Graph timestamps must be timezone-aware ISO strings, not unknown/null")
+class DraftError(ValueError):
+    def __init__(self, issues):
+        self.issues = issues
+        super().__init__(json.dumps({"code": "invalid_draft", "issues": issues,
+            "next_step": "Correct the listed fields together and resubmit the same task; no investigation restart is required."},
+            ensure_ascii=False))
+
+
+def _graph_shape(graph, where="graph"):
+    """Collect independent authoring errors before opening the history index."""
+    issues = []
+
+    def check(action, location):
         try:
+            action()
+            return True
+        except (ValueError, TypeError) as exc:
+            issues.append({"where": location, "error": str(exc)})
+            return False
+
+    def time(value, location):
+        try:
+            if not isinstance(value, str):
+                raise ValueError("Graph timestamps must be timezone-aware ISO strings, not unknown/null")
             result = datetime.fromisoformat(value.replace("Z", "+00:00"))
+            if result.tzinfo is None:
+                raise ValueError("Historical timestamps must include a timezone")
+            return result
         except ValueError as exc:
-            raise ValueError("Invalid historical ISO timestamp: " + value) from exc
-        if result.tzinfo is None:
-            raise ValueError("Historical timestamps must include a timezone")
-        return result
-    end = time(graph["target"]["at"])
-    if "since" in graph["target"] and time(graph["target"]["since"]) > end:
-        raise ValueError("Graph target since is later than at")
-    nonempty(graph["target"]["key"], "graph.target.key")
-    nonempty(graph["summary"], "graph.summary")
-    strings(graph["recommendations"], "graph.recommendations")
+            issues.append({"where": location, "error": str(exc), "supplied": value})
+            return None
+
+    required = ("target", "summary", "recommendations", "nodes", "edges")
+    if not check(lambda: fields(graph, required, required, where), where):
+        return issues
+    end = None
+    if check(lambda: fields(graph["target"], ("key", "since", "at"), ("key", "at"), where + ".target"), where + ".target"):
+        end = time(graph["target"]["at"], where + ".target.at")
+        start = time(graph["target"]["since"], where + ".target.since") if "since" in graph["target"] else None
+        if start is not None and end is not None and start > end:
+            issues.append({"where": where + ".target.since", "error": "Graph target since is later than at"})
+        check(lambda: nonempty(graph["target"]["key"], "target.key"), where + ".target.key")
+    check(lambda: nonempty(graph["summary"], "summary"), where + ".summary")
+    check(lambda: strings(graph["recommendations"], "recommendations"), where + ".recommendations")
     if not isinstance(graph["nodes"], list) or not graph["nodes"] or not isinstance(graph["edges"], list):
-        raise ValueError("graph.nodes and graph.edges must be lists; declare real nodes")
-    for node in graph["nodes"]:
-        fields(node, ("key", "at", "reason", "problem"), ("key", "at", "reason"), "graph.node")
+        issues.append({"where": where, "error": "graph.nodes and graph.edges must be lists; declare real nodes"})
+        return issues
+    for i, node in enumerate(graph["nodes"]):
+        location = f"{where}.nodes[{i}]"
+        if not check(lambda: fields(node, ("key", "at", "reason", "problem"), ("key", "at", "reason"), location), location):
+            continue
         for key in ("key", "at", "reason"):
-            nonempty(node[key], "graph.node." + key)
-        if time(node["at"]) > end:
-            raise ValueError("Node timestamp exceeds observation end")
+            check(lambda: nonempty(node[key], key), location + "." + key)
+        at = time(node["at"], location + ".at")
+        if at is not None and end is not None and at > end:
+            issues.append({"where": location + ".at", "error": "Node timestamp exceeds observation end", "supplied": node["at"]})
         if type(node.get("problem", False)) is not bool:
-            raise ValueError("problem must be boolean")
-    # Full temporal/effect validation belongs to the unchanged inquiry checker.
-    for edge in graph["edges"]:
-        fields(edge, ("from", "to", "force", "reason", "evidence"), ("from", "to"), "graph.edge")
-        for endpoint in (edge["from"], edge["to"]):
+            issues.append({"where": location + ".problem", "error": "problem must be boolean"})
+    for i, edge in enumerate(graph["edges"]):
+        location = f"{where}.edges[{i}]"
+        if not check(lambda: fields(edge, ("from", "to", "force", "reason", "evidence"), ("from", "to"), location), location):
+            continue
+        for key in ("from", "to"):
+            endpoint = edge[key]
             if endpoint != "target" and (type(endpoint) is not int or not 1 <= endpoint <= len(graph["nodes"])):
-                raise ValueError("Edge endpoint must be a declared 1-based node number or target")
+                issues.append({"where": location + "." + key, "supplied": endpoint,
+                               "error": "Edge endpoint must be a declared 1-based node number or target"})
+    return issues
 
 
-def pack(job_path, draft_path, out, db=None, debug_receipts=None):
+def pack(job_path, draft_path, out, db=None, debug_receipts=None, *, draft_only=False):
     job_path, out = Path(job_path).resolve(), Path(out).resolve()
     job, draft = load(job_path), load(draft_path)
     if job.get("schema") != "migloop-issue-job/1":
@@ -127,26 +159,36 @@ def pack(job_path, draft_path, out, db=None, debug_receipts=None):
         raise ValueError("Frozen job provenance changed; recollect and create a new job")
     verify_materials(metadata)
     fields(draft, ("title", "when", "description", "summary", "recommendations", "unknown", "graphs", "unresolved_targets"),
-           ("title", "when", "summary", "recommendations", "unknown", "graphs"), "draft")
+           ("title", "when", "summary", "recommendations", "graphs"), "draft")
     for key in ("title", "when", "summary"):
         nonempty(draft[key], "draft." + key)
     # Older drafts keep their original when and identity; no inferred phase/context.
     if "description" in draft:
         nonempty(draft["description"], "draft.description")
     strings(draft["recommendations"], "draft.recommendations")
-    strings(draft["unknown"], "draft.unknown")
+    strings(draft.get("unknown", []), "draft.unknown")
     if not isinstance(draft["graphs"], list):
         raise ValueError("graphs must be a list")
+    # Inherit authored card-level text for display/checking; preserve the draft
+    # bytes/claims in storage instead of asking the model to repeat itself.
+    graphs = [{"summary": draft["summary"], "recommendations": draft["recommendations"], **g}
+              if isinstance(g, dict) else g for g in draft["graphs"]]
+    errors = [error for i, graph in enumerate(graphs) for error in _graph_shape(graph, f"graphs[{i}]")]
+    if errors:
+        raise DraftError(errors)
     expected = {_absolute(p, job["scope"]) for p in job["targets"]}
     covered, unresolved = set(), set()
-    for graph in draft["graphs"]:
-        _graph_shape(graph)
+    for i, graph in enumerate(graphs):
         target = _absolute(graph["target"]["key"], job["scope"])
         if target not in expected or target in covered:
             raise ValueError("Graph targets must be distinct members of this issue, not another issue's files")
         for field, scope_field in (("since", "generation_end"), ("at", "observation_end")):
-            if graph["target"].get(field) != job["scope"].get(scope_field):
-                raise ValueError(f"graph.target.{field} must preserve the dispatched task window")
+            supplied, expected_time = graph["target"].get(field), job["scope"].get(scope_field)
+            def instant(value):
+                return datetime.fromisoformat(value.replace("Z", "+00:00")) if value is not None else None
+            if instant(supplied) != instant(expected_time):
+                raise DraftError([{"where": f"graphs[{i}].target.{field}", "supplied": supplied,
+                                   "expected": expected_time, "error": f"graph.target.{field} must preserve the dispatched task window"}])
         covered.add(target)
     for item in draft.get("unresolved_targets", []):
         fields(item, ("key", "reason"), ("key", "reason"), "unresolved target")
@@ -164,27 +206,27 @@ def pack(job_path, draft_path, out, db=None, debug_receipts=None):
     views = out.parent / (out.stem + ".views")
     if views.exists():
         raise ValueError("View output exists; choose another output basename")
-    if not db and any(edge.get("force") for graph in draft["graphs"] for edge in graph["edges"]):
-        raise ValueError("force requires the existing inquiry checker and its previous feedback; no --db supplied")
+    if draft_only and db:
+        raise ValueError("--draft-only cannot be combined with --db")
+    if draft_only and any(edge.get("force") for graph in graphs for edge in graph["edges"]):
+        raise ValueError("force requires the inquiry checker and its previous feedback; draft-only is not a checked submission")
     checks = []
-    if db and draft["graphs"]:
-        if not Path(db).is_file():
-            raise ValueError("Inquiry DB does not exist; import the provided pool first")
-        try:
-            from migloop.inquiry.engine import Engine
-            from migloop.inquiry.report import check
-            from migloop.inquiry.store import Store
-        except ImportError as exc:
-            raise ValueError("Optional graph check needs installed migloop[inquiry]; core/UI are not bundled here") from exc
-        store = Store(str(db))
+    prepared_index = None
+    if not draft_only and graphs:
+        from .inquiry_runtime import prepare, kernel
+        prepared_index = prepare(job_path, db)
+        Engine, check, Store, _, _ = kernel()
+        store = Store(prepared_index["db"])
         try:
             engine = Engine(store, session="memory-card:" + job["id"], origin="memory-skill")
-            for index, graph in enumerate(draft["graphs"]):
+            for index, graph in enumerate(graphs):
                 try:
                     receipt = check(engine, json.dumps(graph, ensure_ascii=False), save=True)
                 except (ValueError, TypeError) as exc:
                     receipt = {"status": "rejected", "error": str(exc)}
-                checks.append({"graph": index + 1, "draft_sha256": fingerprint(graph), "receipt": receipt})
+                    if hasattr(exc, "issues"):
+                        receipt.update(code="invalid_card", error="Correct the listed card fields/coordinates together.", issues=exc.issues)
+                checks.append({"graph": index + 1, "draft_sha256": fingerprint(draft["graphs"][index]), "receipt": receipt})
         finally:
             store.close()
     claims = {"diagnosis": {"text": draft["summary"], "kind": "diagnosis", "status": "model_claim"}}
@@ -202,6 +244,8 @@ def pack(job_path, draft_path, out, db=None, debug_receipts=None):
             "packager": {"name": "migloop-memory-skills", "version": VERSION, "bundle_sha256": _bundle_hash()},
             "validation": {"schema": "passed", "graph_checks": checks,
                            "graph_check": "performed" if checks else "not_run",
+                           "mode": "draft_only" if draft_only else "checked" if checks else "not_run",
+                           "kernel_sha256": prepared_index["kernel_sha256"] if prepared_index else None,
                            "causal_correctness": "not_certified", "unresolved_targets": sorted(unresolved)}}
     # Timestamp does not manufacture a new semantic revision on an identical repack.
     card["revision"] = revision_of(card)
@@ -210,10 +254,11 @@ def pack(job_path, draft_path, out, db=None, debug_receipts=None):
     if debug_receipts:
         write_new(debug_receipts, checks)
     write_new(out, card)
-    for index, graph in enumerate(draft["graphs"], 1):
+    for index, graph in enumerate(graphs, 1):
         write_new(views / f"target-{index}.json", graph)
     return {"card": str(out), "id": card["id"], "revision": card["revision"],
-            "graphs": len(draft["graphs"]), "views": str(views) if draft["graphs"] else None, "validation": card["validation"]}
+            "graphs": len(draft["graphs"]), "views": str(views) if draft["graphs"] else None,
+            "index": prepared_index, "validation": card["validation"]}
 
 
 def main(role):
@@ -237,7 +282,20 @@ def main(role):
         packing.add_argument("--draft", required=True)
         packing.add_argument("--out", required=True)
         packing.add_argument("--db")
+        packing.add_argument("--draft-only", action="store_true", help="Explicit unvalidated draft; no relation checks")
         packing.add_argument("--debug-receipts", help="Optional full checker replies for local debugging, not memory")
+        preparation = commands.add_parser("prepare", help="Prepare or reuse one shared session index")
+        preparation.add_argument("--job", required=True)
+        preparation.add_argument("--cache-dir")
+        querying = commands.add_parser("query", help="Query the same inquiry kernel used by the checker")
+        querying.add_argument("--job", required=True)
+        querying.add_argument("--request", required=True, help="JSON/YAML request file, single or batch")
+        querying.add_argument("--db")
+        paging = commands.add_parser("page", help="Continue a previous query result")
+        paging.add_argument("--job", required=True)
+        paging.add_argument("--result-id", required=True)
+        paging.add_argument("--offset", type=int, required=True)
+        paging.add_argument("--db")
     args = parser.parse_args()
     if args.command == "metadata":
         result = collect(args.pool, args.server_metadata, args.session_id)
@@ -245,6 +303,14 @@ def main(role):
         result = {"metadata": args.out, "sources": len(result["sources"]), "observed": result["observed"], "unknown": result["unknown"]}
     elif args.command == "dispatch":
         result = dispatch(args.tasks, args.metadata, args.out)
+    elif args.command == "prepare":
+        from .inquiry_runtime import prepare
+        result = prepare(args.job, cache_dir=args.cache_dir)
+    elif args.command in ("query", "page"):
+        from .inquiry_runtime import query
+        print(query(args.job, getattr(args, "request", None), args.db,
+                    getattr(args, "result_id", None), getattr(args, "offset", 0)))
+        return
     else:
-        result = pack(args.job, args.draft, args.out, args.db, args.debug_receipts)
+        result = pack(args.job, args.draft, args.out, args.db, args.debug_receipts, draft_only=args.draft_only)
     print(json.dumps(result, ensure_ascii=False, indent=2))

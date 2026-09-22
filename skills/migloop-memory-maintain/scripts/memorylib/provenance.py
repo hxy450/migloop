@@ -11,6 +11,14 @@ from .common import fields, fingerprint, load, now
 
 
 def _bundle_hash():
+    # A released skill is independent of siblings and carries its own checked manifest.
+    for parent in Path(__file__).resolve().parents:
+        manifest = parent / "package-manifest.json"
+        if manifest.is_file():
+            package = load(manifest)
+            if package.get("schema") != "migloop-skill-package/1":
+                raise ValueError("Unsupported skill package manifest")
+            return package["content_sha256"]
     root = Path(__file__).resolve().parents[3]
     files = []
     for name in ("migloop-repair-triage", "migloop-build-cards", "migloop-memory-maintain", "migloop-memory-recall"):

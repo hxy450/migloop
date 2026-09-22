@@ -136,7 +136,7 @@ def test_connected_problem_does_not_certify_unrelated_stopping_input(tmp_path):
                           {"id": "input", "kind": "agent", "key": "b", "at": ts(2), "role": "context", "reason": "received correct input", "evidence": [engine.store.locate("b.jsonl", 2)]}],
                 "boundary": {"status": "supported_input", "nodes": ["input"], "reason": "claimed stopping point"}}]}
         graph = check(engine, json.dumps(document), save=True)
-        assert graph["path_status"] == "complete"
+        assert graph["path_status"] == "needs_path"  # Includes the claimed stopping input.
         audit = card.audit(engine.store.path, graph["report_id"], {"file": "A.ets", "generation_end": ts(3), "observation_end": ts(9)})
         assert audit["status"] == "draft"
         assert any(g.get("node") == "input" for g in audit["investigation_gaps"])

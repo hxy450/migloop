@@ -123,7 +123,18 @@ def _replace(source, destination, names, *, update, restoring=False):
 
 
 def install(destination, update=False):
-    return _replace(Path(__file__).resolve().parents[2], destination, NAMES, update=update)
+    source = Path(__file__).resolve().parents[2]
+    if (source.parent / "src/migloop/inquiry").is_dir():
+        # Development checkout: publish independent runtime packages before installing.
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("migloop_release", source / "migloop-memory-maintain/scripts/build_bundle.py")
+        builder = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(builder)
+        with tempfile.TemporaryDirectory(prefix="migloop-install-release-") as temporary:
+            release = Path(temporary) / "skills"
+            builder.build(source, release)
+            return _replace(release, destination, NAMES, update=update)
+    return _replace(source, destination, NAMES, update=update)
 
 
 def restore(destination, backup):

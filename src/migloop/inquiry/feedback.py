@@ -39,16 +39,64 @@ def coordinate_feedback(engine, graph):
             "Fix the reported identity/time/source problem and resubmit normally. force cannot bypass it. Nearby operations are navigation, not automatically selected replacements.")
 
 
+def path_feedback(graph):
+    """One lossless, small path diagnostic shared by all submission frontends."""
+    from .store import timestamp
+    nodes = {n["id"]: n for n in graph["nodes"]}
+    declared = graph.get("document", {}).get("findings", [])
+    positions = {f["id"] + ":" + n["id"]: i for f in declared
+                 for i, n in enumerate(f.get("nodes", []))}
+    def coordinate(nid):
+        n = nodes[nid]
+        where = nid
+        if graph.get("submission_format") == "coordinates/1":
+            i = positions.get(nid, len(graph["submitted_document"]["nodes"]))
+            where = f"nodes[{i}]" if i < len(graph["submitted_document"]["nodes"]) else "target"
+        return {"key": n["key"], "at": n["at"], "where": where}
+
+    outgoing = {}
+    for edge in graph["edges"]:
+        outgoing.setdefault(edge["from"], set()).add(edge["to"])
+    root = graph["tree"]["root"]
+    def dead_ends(start):
+        pending, seen, ends = [start], set(), []
+        while pending:
+            nid = pending.pop()
+            if nid in seen:
+                continue
+            seen.add(nid)
+            node = nodes[nid]
+            if (node["kind"], node["key"], timestamp(node["at"])) == (root["kind"], root["key"], timestamp(root["at"])):
+                continue
+            children = outgoing.get(nid, set())
+            if not children:
+                ends.append(coordinate(nid))
+            pending.extend(sorted(children))
+        return sorted(ends, key=lambda row: row["where"])
+
+    paths = graph["tree"]["paths"] + graph["tree"].get("context_paths", [])
+    return [{**coordinate(p["node"]),
+             "status": p["status"], "code": p.get("code"),
+             "diagnostic": p["diagnostic"], "blocked_branches": p["blocked_branches"],
+             "via": coordinate(p["via"]) if p.get("via") else None,
+             "dead_ends": dead_ends(p.get("via") or p["node"]),
+             "next_step": ("核对列出的上游与下游原始调用；晚到输入不能解释较早输出。"
+                           if p.get("code") == "time_reversal" else
+                           "按列出的分支局部核查；搜索达到预算不证明关系不存在。"
+                           if p.get("code") == "path_search_limit" else
+                           "检查 via 分支与 dead_ends 末端的真实后续交接；若只是读后未写的旁支查阅，"
+                           "保留在说明中而非伪造写边。无需补修复者。")}
+            for p in paths if p["status"] not in ("native", "model_review")]
+
+
 def compact_feedback(graph):
     """One concise mechanical response; full histories remain expandable."""
     from .store import iso
 
     nodes = {n["id"]: n for n in graph["nodes"]}
-    paths = graph["tree"]["paths"] + graph["tree"].get("context_paths", [])
     return {**{k: graph[k] for k in ("report_id", "source_sha256", "mechanical_status", "path_status", "delivery", "issues", "unverified_edges")},
         "nodes": len(nodes), "bound_edges": len(graph["edges"]),
-        "paths": [{"key": nodes[p["node"]]["key"], "at": nodes[p["node"]]["at"], "status": p["status"],
-                   "diagnostic": p["diagnostic"], "blocked_branches": p["blocked_branches"]} for p in paths],
+        "paths": graph["path_feedback"],
         "revision": {"tracked_by_server": True, "parent": graph["revision_parent"],
                      "note": "Correct the same card and resubmit. Only previously checked unchanged endpoints may use force; no model-written IDs or revision field."},
         "coverage": {"semantic_coverage_verified": False,
