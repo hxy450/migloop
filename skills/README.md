@@ -42,7 +42,7 @@ python -m pytest skills/tests -q -o pythonpath=src
 
 制卡的 unknown 可省略；graph 的 summary/recommendations 默认复用卡级文字，只有分支不同才填写。封装保持原始 draft，单目标 view 补入这些已由模型填写的卡级文字，不生成新结论。字段错误按 graph/node/edge 位置返回，等价时区表达不算更改任务窗口。
 
-卡片与经验共用召回语义：`when`写**任务阶段＋具体动作**，`description`写**当前输入可见的适用情境**。阶段来自偏差定位及预防动作，不取修复者角色、固定Stage编号或历史时刻。summary/why解释历史机制，recommendations/how/check说明动作和检查。阅读目录提供时机、情境和例外预览；只有相关经验才展开正文。
+卡片与经验共用召回语义：`when`写**任务阶段＋具体动作**，`description`写**当前输入可见的适用情境**。阶段来自偏差定位及预防动作，不取修复者角色、固定Stage编号或历史时刻。summary/why解释历史机制，recommendations/how说明动作。0.7.2 起 lesson 的 `check` 可省略或为空，阅读包仅在有内容时显示“可选检查”；只在条件疑问、输入冲突或关键假设需要核实时按需执行，优先复用正常测试，不改变来源/版本的机械校验。阅读目录提供时机、情境和例外预览；只有相关经验才展开正文。
 
 0.4.0新模板填写description；兼容读取、封装和维护旧的case/1与memory/1。旧记录缺字段时不补造语义、不迁移hash或改ID；预览description为空，原when仍可检索。维护者有依据时通过普通提案补齐，发布新版本并沿用依赖复查规则。
 

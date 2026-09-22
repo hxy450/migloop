@@ -38,8 +38,12 @@ def _lesson_text(lesson, state, memory, output, paths, link_cards):
     if lesson["unless"]:
         lines += ["## 例外与边界", "", *[f"- {x}" for x in lesson["unless"]], ""]
     lines += ["## 原因", "", lesson["why"], "", "## 做法", "",
-              *[f"{i}. {x}" for i, x in enumerate(lesson["how"], 1)], "",
-              "## 检查", "", *[f"- {x}" for x in lesson["check"]], ""]
+              *[f"{i}. {x}" for i, x in enumerate(lesson["how"], 1)], ""]
+    if lesson.get("check"):
+        lines += ["## 可选检查", "",
+                  "仅在适用条件不确定、与当前输入冲突或需要验证关键假设时按需执行；优先复用已有证据和正常测试。",
+                  "不因读取本条经验而额外启动验证流程；项目原有必需测试照常执行。", "",
+                  *[f"- {x}" for x in lesson["check"]], ""]
     if lesson["requires"]:
         lines += ["## 依赖经验", ""]
         for identity in lesson["requires"]:

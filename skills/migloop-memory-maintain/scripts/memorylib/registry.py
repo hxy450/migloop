@@ -213,18 +213,18 @@ class Memory:
     @staticmethod
     def _lesson(item, state):
         allowed = {"id", "title", "topic", "when", "description", "unless", "why", "how", "check", "evidence", "requires", "status"}
-        fields(item, allowed, allowed - {"id", "requires", "unless", "status", "description"}, "lesson")
+        fields(item, allowed, allowed - {"id", "requires", "unless", "status", "description", "check"}, "lesson")
         value = copy.deepcopy(item)
         value.setdefault("requires", [])
         value.setdefault("unless", [])
+        value.setdefault("check", [])
         value.setdefault("status", "candidate")
         for field in ("title", "when", "why"):
             nonempty(value[field], "lesson." + field)
         if "description" in value:
             nonempty(value["description"], "lesson.description")
-        for field in ("how", "check"):
-            strings(value[field], "lesson." + field, empty=False)
-        for field in ("unless", "requires"):
+        strings(value["how"], "lesson.how", empty=False)
+        for field in ("unless", "requires", "check"):
             strings(value[field], "lesson." + field)
         if not isinstance(value["topic"], list) or not 1 <= len(value["topic"]) <= 3:
             raise ValueError("topic must contain 1–3 path segments")

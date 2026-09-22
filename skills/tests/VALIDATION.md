@@ -2,6 +2,15 @@
 
 The initial 2026-09-17 checks covered skill instructions and scripts only. Later dated checks below include the shared inquiry changes needed by self-contained card validation; they do not deploy the renderer/server or modify global hook configuration.
 
+## Optional checks and actionable lessons (0.7.2, 2026-09-22)
+
+- Lesson proposals may omit `check` or supply `[]`; normalization retains the legacy field as an empty list. Nonempty actions and exact case/claim/revision evidence remain required. Invalid check types fail before publication.
+- Reading exports show nonempty checks as optional, with task-triggered use and reuse of existing evidence/tests. Empty checks have no section. Existing stored lessons and historical snapshots are not rewritten by export.
+- Maintenance examples retain public API/mechanism details, add small Builder/unit-order contrasts, separate unrelated mechanisms, and make the proposal template's check field optional. Recall adopts the same semantics, including old packages headed “检查”.
+- **135 passed, 1 skipped in 28.02 seconds** across `skills/tests`. The Windows symlink skip is unchanged. Eleven new parameterized cases cover omitted/empty/malformed checks, retained action/evidence requirements, old-store export, and actual publication of the skill's YAML example/template with synthetic valid evidence. Both changed skills passed the skill-creator validator.
+- The existing 12-lesson real memory was locally refined to 13 lessons by separating Material sizing and unilateral inset. Its 43 evidence bindings still cover the same 15 unchanged cards; the exported 33 Markdown files have valid hashes and 79 resolving links. This is an incremental editorial revision, not another independent model run or evidence of migration speed/accuracy improvement.
+- No inquiry core, UI, server, application code or project hook changes.
+
 ## Self-contained skills and transferable lessons (0.7.1, 2026-09-21)
 
 - Published skills carry their required pure-Python runtime and YAML parser. The build-cards package uses the canonical inquiry core; other packages do not include that core. Build outputs are generated outside the repository, not a second maintained implementation.

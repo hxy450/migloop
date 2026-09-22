@@ -72,6 +72,82 @@ def memory_with(prepared, lessons=None):
     return memory
 
 
+@pytest.mark.parametrize("omit", [True, False])
+def test_optional_checks_roundtrip_without_empty_reading_section(prepared, omit):
+    from memorylib.publication import export_memory
+
+    lesson = make_lesson(prepared["card"], check=[])
+    if omit:
+        lesson.pop("check")
+    memory = memory_with(prepared, [lesson])
+    original = memory.current()
+    assert original["lessons"][lesson["id"]]["check"] == []
+    assert read(memory, [lesson["id"]])["lessons"][0]["how"] == lesson["how"]
+    assert search(memory, "text")["total"] == 1
+    directory = prepared["root"] / "reading"
+    export_memory(memory, directory, link_cards=True)
+    body = (directory / "ui/text/lesson-text.lesson.md").read_text(encoding="utf-8")
+    assert "## 可选检查" not in body and "## 检查" not in body
+    assert lesson["how"][0] in body and prepared["card"]["revision"] in body
+    assert memory.current() == original
+
+
+def test_legacy_checks_export_as_optional_without_mutating_history(prepared):
+    from memorylib.publication import export_memory
+
+    memory = memory_with(prepared)
+    original = memory.current()
+    directory = prepared["root"] / "reading"
+    export_memory(memory, directory)
+    body = (directory / "ui/text/lesson-text.lesson.md").read_text(encoding="utf-8")
+    assert "## 可选检查" in body and "## 检查\n" not in body
+    assert "Compare each segment" in body
+    assert memory.current() == original
+
+
+@pytest.mark.parametrize("check", [None, "", "run tests", {}, [None], ["  "]])
+def test_optional_checks_reject_malformed_values_without_publishing(prepared, check):
+    memory = memory_with(prepared)
+    original = memory.current()
+    with pytest.raises(ValueError, match="lesson.check"):
+        memory.apply({"base_revision": original["revision"],
+                      "upsert": [make_lesson(prepared["card"], check=check)]})
+    assert memory.current() == original
+
+
+def test_optional_checks_do_not_relax_actions_or_evidence(prepared):
+    memory = memory_with(prepared)
+    original = memory.current()
+    for changes, message in [({"how": []}, "lesson.how"),
+                             ({"evidence": []}, "case-claim evidence")]:
+        with pytest.raises(ValueError, match=message):
+            memory.apply({"base_revision": original["revision"],
+                          "upsert": [make_lesson(prepared["card"], check=[], **changes)]})
+        assert memory.current() == original
+
+
+def test_maintain_skill_example_and_template_publish_with_real_bindings(prepared):
+    import re
+    import yaml
+    from memorylib.publication import export_memory
+
+    skill = (SCRIPTS.parent / "SKILL.md").read_text(encoding="utf-8")
+    examples = [yaml.safe_load(block) for block in re.findall(r"```yaml\n(.*?)\n```", skill, re.S)]
+    for index, example in enumerate(examples):
+        lesson = example["upsert"][0] if "upsert" in example else example
+        lesson["evidence"] = make_lesson(prepared["card"])["evidence"]
+        lesson["status"] = "active"
+        memory = Memory(prepared["root"] / f"example-memory-{index}")
+        memory.init()
+        memory.ingest([prepared["card_path"]])
+        descriptions = {"/".join(lesson["topic"][:depth]): "Synthetic topic"
+                        for depth in range(1, len(lesson["topic"]) + 1)}
+        memory.apply({"base_revision": memory.current()["revision"], "upsert": [lesson],
+                      "topic_descriptions": descriptions})
+        output = export_memory(memory, prepared["root"] / f"example-reading-{index}")
+        assert output["lessons"] == 1
+
+
 def test_metadata_preserves_mixed_models_and_distinguishes_analyst(prepared):
     meta = load(prepared["meta"])
     assert meta["observed"]["models"] == ["another-recorded-model", "recorded-generation-model"]
