@@ -23,9 +23,13 @@ def prepared(tmp_path):
     pool.mkdir()
     rows = [
         {"type": "assistant", "sessionId": "session-1", "agentId": "worker-1", "version": "2.0", "cwd": "/app",
-         "timestamp": "2026-01-01T00:00:01Z", "message": {"model": "recorded-generation-model"}},
+         "timestamp": "2026-01-01T00:00:01Z", "message": {"model": "recorded-generation-model", "content": [
+             {"type": "tool_use", "id": "read", "name": "Read", "input": {"file_path": "/app/spec.md"}},
+             {"type": "tool_use", "id": "write", "name": "Write", "input": {"file_path": "/app/src/Page.ets", "content": "bad"}}]}},
         {"type": "assistant", "sessionId": "session-1", "agentId": "worker-1", "version": "2.0",
-         "timestamp": "2026-01-01T00:00:02Z", "message": {"model": "another-recorded-model"}},
+         "timestamp": "2026-01-01T00:00:02Z", "message": {"model": "another-recorded-model", "content": [
+             {"type": "tool_result", "tool_use_id": "read", "content": "good input"},
+             {"type": "tool_result", "tool_use_id": "write", "content": "ok"}]}},
     ]
     (pool / "agent.jsonl").write_text("\n".join(json.dumps(x) for x in rows), encoding="utf-8")
     server = tmp_path / "server.json"
@@ -46,11 +50,11 @@ def prepared(tmp_path):
              "summary": "Test claim, not a real historical finding", "recommendations": ["Check current input"],
              "nodes": [{"key": "agent.jsonl", "at": "2026-01-01T00:00:02Z", "reason": "Test", "problem": True}],
              "edges": [{"from": 1, "to": "target"}]}
-    draft = {"title": "Test issue", "when": "Working on styled text", "summary": "Test diagnosis",
+    draft = {"title": "Test issue", "when": "Working on styled text", "description": "Synthetic input", "summary": "Test diagnosis",
              "recommendations": ["Keep segment styles"], "unknown": ["Synthetic test only"], "graphs": [graph]}
     draft_path, card_path = tmp_path / "draft.json", tmp_path / "case.json"
     write_new(draft_path, draft)
-    pack(job, draft_path, card_path, draft_only=True)
+    pack(job, draft_path, card_path)
     return {"pool": pool, "meta": meta, "tasks": tasks, "job": job, "draft": draft, "card_path": card_path,
             "card": load(card_path), "root": tmp_path}
 
@@ -198,7 +202,8 @@ def test_pack_autofills_identity_and_no_false_graph_certification(prepared):
     assert card["schema"] == "migloop-case/2"
     assert "agent.jsonl" in card["provenance"]["sources"]
     assert "node_provenance" not in card
-    assert card["validation"]["graph_check"] == "not_run"
+    assert card["validation"]["graph_check"] == "performed"
+    assert card["validation"]["status"] == "valid"
     assert card["validation"]["causal_correctness"] == "not_certified"
     assert load(prepared["root"] / "case.views/target-1.json") == prepared["draft"]["graphs"][0]
 
@@ -209,16 +214,18 @@ def test_pack_rejects_model_metadata_and_missing_target(prepared):
     with pytest.raises(ValueError, match="unknown"):
         pack(prepared["job"], path, prepared["root"] / "bad-card.json")
     write_new(prepared["root"] / "missing.json", {**prepared["draft"], "graphs": []})
-    with pytest.raises(ValueError, match="Targets without"):
+    with pytest.raises(ValueError, match="at least one"):
         pack(prepared["job"], prepared["root"] / "missing.json", prepared["root"] / "missing-card.json")
 
 
-def test_missing_target_can_remain_explicitly_unresolved(prepared):
+def test_unresolved_only_investigation_stays_yaml_not_a_card(prepared):
     draft = {**prepared["draft"], "graphs": [], "unresolved_targets": [{"key": "src/Page.ets", "reason": "Missing source evidence"}]}
     path = prepared["root"] / "unresolved.json"
     write_new(path, draft)
-    result = pack(prepared["job"], path, prepared["root"] / "unresolved-card.json")
-    assert result["validation"]["unresolved_targets"] == ["/app/src/Page.ets"]
+    out = prepared["root"] / "unresolved-card.json"
+    with pytest.raises(ValueError, match="at least one"):
+        pack(prepared["job"], path, out)
+    assert not out.exists()
 
 
 def test_browse_is_paginated_and_search_reaches_other_topics(prepared):
@@ -340,7 +347,7 @@ def test_no_identity_drift_when_sources_grow_or_tasks_reorder(prepared):
     out = prepared["root"] / "new-jobs"
     dispatch(prepared["tasks"], updated_metadata, out)
     new_job = load(out / "jobs.json")["jobs"][0]["job"]
-    packed = pack(new_job, prepared["root"] / "draft.json", prepared["root"] / "new-case.json", draft_only=True)
+    packed = pack(new_job, prepared["root"] / "draft.json", prepared["root"] / "new-case.json")
     assert packed["id"] == old_id
     assert packed["revision"] != prepared["card"]["revision"]
     memory = memory_with(prepared)
@@ -356,7 +363,7 @@ def test_metadata_recapture_does_not_invalidate_identical_case(prepared):
     out = prepared["root"] / "recaptured-jobs"
     dispatch(prepared["tasks"], new_meta, out)
     job = load(out / "jobs.json")["jobs"][0]["job"]
-    result = pack(job, prepared["root"] / "draft.json", prepared["root"] / "recaptured-case.json", draft_only=True)
+    result = pack(job, prepared["root"] / "draft.json", prepared["root"] / "recaptured-case.json")
     assert result["revision"] == prepared["card"]["revision"]
 
 
@@ -395,29 +402,31 @@ def test_pack_preserves_shared_input_and_multiple_problem_branches(prepared):
     draft = copy.deepcopy(prepared["draft"])
     graph = draft["graphs"][0]
     graph["nodes"] = [
-        {"key": "/app/spec.md", "at": "2026-01-01T00:00:01Z", "reason": "Shared relevant input", "problem": False},
-        {"key": "agent-a.jsonl", "at": "2026-01-01T00:00:02Z", "reason": "Deviation A", "problem": True},
-        {"key": "agent-b.jsonl", "at": "2026-01-01T00:00:03Z", "reason": "Deviation B", "problem": True},
+        {"key": "/app/spec.md", "at": "2026-01-01T00:00:02Z", "reason": "Shared relevant input", "problem": False},
+        {"key": "agent.jsonl", "at": "2026-01-01T00:00:02Z", "reason": "Deviation A", "problem": True},
+        {"key": "agent.jsonl", "at": "2026-01-01T00:00:03Z", "reason": "Deviation B", "problem": True},
     ]
     graph["edges"] = [{"from": 1, "to": 2}, {"from": 1, "to": 3},
                       {"from": 2, "to": "target"}, {"from": 3, "to": "target"}]
     path = prepared["root"] / "branches.json"
     write_new(path, draft)
     output = prepared["root"] / "branches-card.json"
-    result = pack(prepared["job"], path, output, draft_only=True)
+    result = pack(prepared["job"], path, output)
     # The wrapper preserves branches; only the existing checker may certify edges.
     assert load(output)["draft"]["graphs"] == draft["graphs"]
-    assert result["validation"]["graph_check"] == "not_run"
+    assert result["validation"]["graph_check"] == "performed"
     assert load(output.with_name("branches-card.views") / "target-1.json") == graph
 
 
-def test_force_without_checker_is_not_accepted(prepared):
+def test_force_without_evidence_is_not_published(prepared):
     draft = copy.deepcopy(prepared["draft"])
     draft["graphs"][0]["edges"][0].update(force=True, reason="Claim", evidence=[])
     path = prepared["root"] / "force.json"
     write_new(path, draft)
-    with pytest.raises(ValueError, match="force requires"):
-        pack(prepared["job"], path, prepared["root"] / "force-case.json", draft_only=True)
+    out = prepared["root"] / "force-case.json"
+    result = pack(prepared["job"], path, out)
+    assert result["status"] == "needs_revision" and result["card"] is None
+    assert not out.exists()
 
 
 def test_real_inquiry_checker_is_reused_without_core_changes(prepared):
@@ -578,7 +587,7 @@ def test_card_preserves_stage_and_description_without_changing_graph(prepared):
     draft.update(when="界面实现阶段，确定图片约束时", description="源图片依赖adjustViewBounds和固有比例")
     path, out = prepared["root"] / "context-draft.json", prepared["root"] / "context-card.json"
     write_new(path, draft)
-    pack(prepared["job"], path, out, draft_only=True)
+    pack(prepared["job"], path, out)
     card = load(out)
     assert card["draft"] == draft
     assert card["id"] == prepared["card"]["id"]
@@ -619,11 +628,11 @@ def test_description_is_searchable_and_previewed_without_evidence(prepared):
     assert full["description"] == lessons[0]["description"] and "how" in full and "evidence" in full
 
 
-def test_legacy_description_remains_absent_in_storage_and_snapshots(prepared):
+def test_legacy_lesson_description_remains_absent_in_storage_and_snapshots(prepared):
     memory = memory_with(prepared)
     original = memory.current()
     old_case = memory.case(prepared["card"]["id"])
-    assert "description" not in old_case["draft"]
+    assert old_case["draft"]["description"] == "Synthetic input"
     assert search(memory, "styled")["total"] == 0  # Card text is not automatically injected into lessons.
     assert search(memory, "text")["items"][0]["description"] == ""
     assert browse(memory, "ui/text")["items"][0]["description"] == ""

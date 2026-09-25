@@ -732,6 +732,9 @@
       foldSection("读取观察 · 已知时刻的返回原文",container,box=>historyRows(box,scope,"reads",holder));
     }
     function claimsSection(node, body) {
+      if((node.claims||[]).some(n=>n.existence_basis==="model_review"))
+        body.appendChild(quoteLong("inbox","文件节点 · 模型复核补充",
+          "本节点由所载卡片的原始调用证据支持，未进入全局确定读写索引；文件效应仍是模型复核判断。"));
       (node.claims||[]).filter(n=>!n.generated_context).forEach(function(claim) {
         var q=quoteLong(["origin","propagated","problem"].includes(claim.role)?"cause":"inbox",
           "模型判断 · "+({origin:"问题进入",propagated:"问题保留",problem:"有问题 · 具体归因见原因",context:"输入与背景",repaired:"修复",unknown:"未知"}[claim.role]||claim.role),claim.reason);

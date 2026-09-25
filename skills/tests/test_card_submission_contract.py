@@ -8,7 +8,8 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "migloop-memory-maintain/scripts"))
 from memorylib.card_storage import check_summary
-from memorylib.cases import DraftError, _graph_shape, pack
+from memorylib.cases import pack
+from memorylib.card_contract import DraftError, graph_shape
 from memorylib.common import load
 from test_memory_bundle import prepared
 
@@ -18,7 +19,7 @@ def test_shape_errors_name_all_bad_fields(prepared):
     graph["nodes"][0]["at"] = "not a timestamp"
     graph["nodes"][0]["problem"] = "true"
     graph["edges"][0]["from"] = 0
-    errors = _graph_shape(graph, "graphs[2]")
+    errors = graph_shape(graph, "graphs[2]")
     assert {e["where"] for e in errors} >= {
         "graphs[2].nodes[0].at", "graphs[2].nodes[0].problem", "graphs[2].edges[0].from"}
 
@@ -33,7 +34,7 @@ def test_optional_prose_inherits_without_rewriting_authored_card(prepared):
     path = prepared["root"] / "minimal.json"
     path.write_text(json.dumps(draft), encoding="utf-8")
     out = prepared["root"] / "minimal-case.json"
-    result = pack(prepared["job"], path, out, draft_only=True)
+    result = pack(prepared["job"], path, out)
     assert load(out)["draft"] == draft
     view = load(Path(result["views"]) / "target-1.json")
     assert view["summary"] == draft["summary"]
@@ -62,7 +63,9 @@ def test_core_coordinate_errors_remain_structured(prepared, monkeypatch):
         raise CardError(issues)
     monkeypatch.setattr("migloop.inquiry.report.check", reject)
     result = pack(prepared["job"], prepared["root"] / "draft.json", prepared["root"] / "rejected.json", db)
-    receipt = result["validation"]["graph_checks"][0]["receipt"]
+    receipt = result["graph_checks"][0]["receipt"]
+    assert result["status"] == "needs_revision"
+    assert not (prepared["root"] / "rejected.json").exists()
     assert receipt["code"] == "invalid_card" and isinstance(receipt["issues"], list)
     assert receipt["issues"][0]["where"] == ["nodes[0]"]
     assert receipt["issues"][0]["query"]["kind"] == "source"

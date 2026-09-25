@@ -42,9 +42,13 @@ python -m pytest skills/tests -q -o pythonpath=src
 
 制卡的 unknown 可省略；graph 的 summary/recommendations 默认复用卡级文字，只有分支不同才填写。封装保持原始 draft，单目标 view 补入这些已由模型填写的卡级文字，不生成新结论。字段错误按 graph/node/edge 位置返回，等价时区表达不算更改任务窗口。
 
+0.7.4 的制卡/归并模板采用配对真实示例：正确输入下的图片实现偏差，以及源码到规格的px/vp偏差。前者直接绑定生成者对目标的历史写入，无关接线留在文字；后者保留spec与接收者的跨文件桥梁。图是最小归因证据骨架，历史写入不等于最终全文作者。对应lesson展示如何保留API/公式而移除历史项目数值；本轮不改变检查器、卡片字段或归并协议。
+
+0.7.5 允许用已获反馈许可的force边证据补充未识别的输入/中间文件节点，节点稿仍只填key/at/reason。首次普通提交保存unrecorded_file反馈；补证后标为报告内模型复核，原索引exists仍为false，不创建全局文件或读写事实。已确认agent、任务target、真实调用与时间边界仍照常核验；节点、引用与虚线状态随卡片保存，UI节点详情明确标注来源等级。
+
 卡片与经验共用召回语义：`when`写**任务阶段＋具体动作**，`description`写**当前输入可见的适用情境**。阶段来自偏差定位及预防动作，不取修复者角色、固定Stage编号或历史时刻。summary/why解释历史机制，recommendations/how说明动作。0.7.2 起 lesson 的 `check` 可省略或为空，阅读包仅在有内容时显示“可选检查”；只在条件疑问、输入冲突或关键假设需要核实时按需执行，优先复用正常测试，不改变来源/版本的机械校验。阅读目录提供时机、情境和例外预览；只有相关经验才展开正文。
 
-0.4.0新模板填写description；兼容读取、封装和维护旧的case/1与memory/1。旧记录缺字段时不补造语义、不迁移hash或改ID；预览description为空，原when仍可检索。维护者有依据时通过普通提案补齐，发布新版本并沿用依赖复查规则。
+旧case/1、case/2与memory/1仍可读取，缺字段不补造语义、不自动改hash或状态。0.8.0正式制卡按当前模板要求description等字段；重新入库或引用旧卡时，需满足同一有效卡契约，未通过则用原job与稿件重新pack。已有经验库不会被本次升级自动重写。
 
 0.5.0增加文件阅读发布：维护者运行`memory.py export --store STORE --out NEW_DIRECTORY`，宿主向迁移agent提供召回skill和生成的`index.md`。Claude Code 可另行安装项目级首次修改提醒，见`migloop-memory-recall/references/claude-hook.md`；只有安装并验证项目配置后才算接通。Codex/DevEco hook、云端 OBS/API 和跨租户权限尚未接入。旧`recall.py notice`仍是兼容诊断payload，不是已经安装的hook，也不是新版阅读入口。
 
@@ -68,9 +72,10 @@ python skills/migloop-memory-maintain/scripts/memory.py export --store STORE --o
 - 每份转录保留模型切换顺序及原文位置，采集器与封装器各记录实际包版本/hash；不能将同 session 的所有模型都认作某一问题的作者模型。
 - 服务端补充文件只接受 migration/analysis 两个已知字段集合，不把工具输出或任意配置整包复制入卡。原始字段仍未由本地脚本鉴真。
 - 知道的信息必须由 server/harness 提供，不能让调查模型猜模型、工具、skill 版本。当前 collector 的版本不冒充历史迁移工具版本。
+- 0.7.3 起 metadata 在原有 CC/Codex 转录扫描中采集常见配置调用的版本字面值及有限的直接环境探针回执；pack 自动附 `environment`，enrich 可给已有卡生成仅补环境的新版本。记录配置声明与工具输出的依据、时间、来源指纹；不推断 BOM 解析结果、运行设备 API 或跨版本适用范围，不把对 API 的讨论当配置。未知项无需模型补齐。归并/召回逻辑不变；卡片 revision 更新后仍按既有 ingest/apply 复核和重新绑定来源。
 - job/card 身份与可变化的证据 hash 分开；服务端迁移 ID 优先，否则使用本地材料位置作为明确的局部身份。补充原文或重排问题不更改同名问题身份。更名/搬迁/合拆应保留既有身份或显式撤回旧卡，不悄悄重新命名成无关卡。
 - 卡片可包含多目标 graph；每目标导出原格式 compact JSON view，供旧 inquiry 提交器加载。整张新卡及 memory 不宣称已经接入旧网页上传。
-- 普通 pack 自动准备或复用同一迁移的索引并运行现有 checker；显式 `--db` 可使用材料匹配的既有索引。仅 `--draft-only` 可跳过关系校验，清楚标为未核草稿。不能把机械通过说成原因/建议已证明正确。
+- pack自动准备或复用同一迁移索引并运行唯一checker；显式`--db`可复用匹配索引。0.8.0移除`--draft-only`及失败卡封装：只有模板和链路均通过才生成正式case/views；否则非零退出并返回反馈，原YAML保留。ingest/apply复用同一有效卡契约，不存在失败卡先入库再转正的分支。语义判断仍由模型完成。
 
 ## 索引与数据放置
 

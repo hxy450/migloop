@@ -27,6 +27,8 @@ python scripts/triage.py dispatch --tasks repair-tasks.yaml --metadata METADATA.
 
 已有服务端元数据用 `--server-metadata FILE.json`；DevEco用 `--session-id ID` 指定根及后代。dispatch生成任务文件，模型调度由宿主负责。
 
+metadata 同次扫描会从 CC/Codex 已记录的配置调用与成功回执提取 SDK/API、关键依赖和工具链版本线索，供所有制卡任务共用；模型不手填、不为补齐版本额外运行工具。配置声明、实际工具输出、讨论中的 API 可用性分开处理；没有历史记录的字段保持未知，不读取当前工程冒充历史。DevEco 原库目前仍只采集会话头信息，版本环境需有可识别的历史 JSONL 回执。
+
 每个调查员使用独立新会话，只拿 `migloop-build-cards`、一个job和完整转录入口。任务提供修改线索，归因由调查员依据原文得出。
 
 ## 任务清单

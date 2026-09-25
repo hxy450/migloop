@@ -199,13 +199,14 @@ def test_equivalent_timezone_and_transcript_alias_resolve_to_same_coordinate(dec
     assert check(engine, json.dumps(doc))["delivery"]["status"] == "ready_for_review"
 
 
-def test_auto_edge_evidence_does_not_silence_bad_citations_in_reason(declared):
+def test_compact_reason_is_prose_not_an_implicit_evidence_submission(declared):
     engine, old = declared
     doc = compact_document(old)
     doc["nodes"][0]["reason"] += " asserted requirement e-deadbeef1234"
     graph = check(engine, json.dumps(doc))
-    assert graph["edges"] and any(i.get("ref") == "e-deadbeef1234" for i in graph["issues"])
-    assert graph["delivery"]["status"] == "draft"
+    assert graph["edges"] and not graph["issues"]
+    assert graph["delivery"]["status"] == "ready_for_review"
+    assert "e-deadbeef1234" in graph["submitted_document"]["nodes"][0]["reason"]
 
 
 def test_one_forced_relationship_can_bind_multiple_original_script_invocations(tmp_path):

@@ -64,6 +64,7 @@ edges:[{from:本稿nodes的1起始序号,to:另一个序号或target}]；也兼�
 首次不允许force。普通检查后，只有force_eligible:true且两端未变的边，下稿可加：
 force:true, reason:复核原调用后为何确认读写, evidence:[原文e-引用 或 {source:转录名,line:物理行号}]
 系统核实际所属agent的工具调用/回执并生成锚点，不需手填摘录、review或revision_of。同一关系可给多次调用，系统逐次核验、保留各自时刻，不需模型拆填边。
+完整路径的输入/中间文件未被识别时，普通提交会返回unrecorded_file；相连边获force_eligible后，同一份边证据可支持报告内的模型复核文件节点。节点不增加字段、不写全局索引；其他边仍逐条核验。未知agent或无依据的target仍拒绝。
 错误给edges下标、坐标、附近实际操作和inspect查询。名字/时间错直接修；真正未知脚本才force，不能用force倒置时间/冒用作者/伪造记录。
 同次调查自动关联上次检查；换身份或时间要先普通检查。原稿逐字存，后续重载不会倒过来授权首次force。
 delivery.status=ready_for_review只表示声明节点与证据路径可载入，不认证原因、正确输入边界或修改完备性。

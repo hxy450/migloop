@@ -36,7 +36,7 @@ const report = {
   nodes: [
     { id: "A:origin", finding: "A", ...origin.node, at: times.root, since: times.origin, scope: "s-original-claim",
       role: "origin", exists: true, reason: "原稿原因与范围都必须保留", evidence: ["e-abcdef12"] },
-    { id: "B:origin", finding: "B", ...candidate.node, role: "origin", exists: true,
+    { id: "B:origin", finding: "B", ...candidate.node, role: "origin", exists: false, existence_basis: "model_review",
       reason: "候选输入仍未认证因果", evidence: ["e-12345678"] },
     { id: "C:origin", finding: "C", ...coordinate("agent", "unknown-author", times.origin),
       role: "unknown", exists: false, reason: "缺少历史连接", evidence: [] },
@@ -231,6 +231,15 @@ async function main() {
     }
     await wait(process.env.INQUIRY_CARD_ONLY==="1" ? "window.migloopViewer?.tree && migloopViewer.report" : "window.migloopViewer?.tree && document.querySelector('#side .vrow')");
     let liveDiagnostic = null;
+    if (!liveUrl) {
+      const supplementalId = await evaluate("Object.values(migloopViewer.tree.byId).find(n=>n.claims?.some(c=>c.existence_basis==='model_review')).tid");
+      await evaluate("migloopViewer.select(" + JSON.stringify(supplementalId) + ")");
+      await wait("document.querySelector('#side').textContent.includes('文件节点 · 模型复核补充')");
+      assert.equal(await evaluate("document.querySelector('[data-tid=\"" + supplementalId + "\"]').classList.contains('reviewed')"), true);
+      assert.equal(await evaluate("document.querySelector('#side').textContent.includes('未进入全局确定读写索引')"), true);
+      await evaluate("migloopViewer.select(migloopViewer.tree.root)");
+      await wait("document.querySelector('#side .vrow')");
+    }
     const rootNode="migloopViewer.tree.byId[migloopViewer.tree.root]";
     assert.equal(await evaluate("migloopViewer.frozen"),true,"loaded reports freeze by default");
     assert.equal(await evaluate("document.querySelector('#freeze').getAttribute('aria-pressed')"),"true");
@@ -456,7 +465,7 @@ async function main() {
     fs.writeFileSync(path.join(out, "inquiry-tree.png"), Buffer.from(screenshot.data, "base64"));
     const audit = { passed: true, url, errors, liveDiagnostic, queryCount: requests.length,
       checks: ["report defaults frozen; manual defaults unfrozen", "frozen inspection preserves topology and viewport", "late expansion response discarded after freeze", "unfreeze restores expand/collapse", "visible summary and recommendations button", "migration-first report loading", "repair catalog independent of reports", "report list pagination", "load buttons above all repaired files", "original compact shell", "single tree for saved and manual exploration", "ordinary candidates hidden",
-        "model-review-only dashed edges", "write text and edit delta", "read observation expansion",
+        "model-review-only dashed edges", "supplemental file node labeled and dashed", "write text and edit delta", "read observation expansion",
         "trace isolation", "precise cutoff", "load dialog", "only load control", "original hover highlight", "colored inline diffs", "original grouped catalog", "Ctrl-wheel zoom", "write-only entry timeline", "empty upstream remains inspectable", "no JavaScript errors"],
     };
     fs.writeFileSync(path.join(out, "audit.json"), JSON.stringify(audit, null, 2));

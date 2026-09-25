@@ -100,8 +100,10 @@ def reviewed_edge(engine, edge, origin, destination, fid):
         or (origin["kind"], destination["kind"]) != expected
     ):
         raise ValueError("reviewed read/write has invalid endpoint direction")
-    if not origin["exists"] or not destination["exists"]:
-        raise ValueError("reviewed relation requires both recorded entities")
+    actor, file = (destination, origin) if relation == "read" else (origin, destination)
+    if not actor["exists"] or not (file["exists"] or
+            file.get("existence_basis") in ("unverified", "model_review")):
+        raise ValueError("reviewed relation requires a recorded agent and a recorded or report-local file declaration")
     review = edge["review"]
     if not isinstance(review, dict) or set(review) != {"at", "quotes"}:
         raise ValueError("review requires at and original quotes")

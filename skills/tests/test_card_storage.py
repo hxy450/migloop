@@ -14,7 +14,7 @@ from memorylib.registry import Memory, revision_of, validate_case
 from test_memory_bundle import prepared, memory_with
 
 
-def legacy_card(prepared):
+def legacy_card(prepared, *, complete=False):
     card = copy.deepcopy(prepared["card"])
     card["schema"] = "migloop-case/1"
     card["provenance"] = load(prepared["meta"])
@@ -23,8 +23,8 @@ def legacy_card(prepared):
     card["validation"]["graph_checks"] = [{"graph": 1,
         "draft_sha256": fingerprint(card["draft"]["graphs"][0]), "receipt": {
             "schema": "inquiry-graph/1", "report_id": "report-1", "mechanical_status": "valid",
-            "path_status": "needs_path", "semantic_verified": False,
-            "delivery": {"status": "draft", "coverage_verified": False},
+            "path_status": "complete" if complete else "needs_path", "semantic_verified": False,
+            "delivery": {"status": "ready_for_review" if complete else "draft", "coverage_verified": False},
             "nodes": [{"id": "a", "key": "agent.jsonl", "kind": "agent", "at": "2026-01-01T00:00:02Z", "reason": "long reason"},
                       {"id": "f", "key": "/app/src/Page.ets", "kind": "file", "at": "2026-01-01T00:00:10Z"}],
             "edges": [{"from": "a", "to": "f", "relation": "write", "source": "native_evidence",
@@ -83,7 +83,7 @@ def test_full_receipt_cannot_sneak_into_new_format(prepared):
 
 
 def test_store_migration_rebinds_all_history_without_reactivating(prepared):
-    old = legacy_card(prepared)
+    old = legacy_card(prepared, complete=True)
     path = prepared["root"] / "legacy.json"
     write_new(path, old)
     prepared.update(card=old, card_path=path)
@@ -141,7 +141,7 @@ def test_pack_full_receipt_is_opt_in_and_cannot_overwrite(prepared, monkeypatch,
     from migloop.inquiry.store import Store, Source
     db = prepared["root"] / "index.sqlite"
     Store.build(db, [Source(str(prepared["pool"] / "agent.jsonl"), "agent.jsonl", "agent", "/app")]).close()
-    raw = legacy_card(prepared)["validation"]["graph_checks"][0]["receipt"]
+    raw = legacy_card(prepared, complete=True)["validation"]["graph_checks"][0]["receipt"]
     monkeypatch.setattr("migloop.inquiry.report.check", lambda *a, **kw: copy.deepcopy(raw))
     output, debug_path = prepared["root"] / "checked.json", prepared["root"] / "debug.json"
     result = pack(prepared["job"], prepared["root"] / "draft.json", output, db,
@@ -158,7 +158,7 @@ def test_pack_full_receipt_is_opt_in_and_cannot_overwrite(prepared, monkeypatch,
 
 
 def test_migration_preserves_stale_lesson_source_revisions(prepared):
-    old = legacy_card(prepared)
+    old = legacy_card(prepared, complete=True)
     path = prepared["root"] / "legacy.json"
     write_new(path, old)
     prepared.update(card=old, card_path=path)

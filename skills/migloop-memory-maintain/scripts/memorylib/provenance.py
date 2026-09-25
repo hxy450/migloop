@@ -77,6 +77,8 @@ def _observe(info, row, ref):
 
 
 def _jsonl(path, root):
+    from .environment import Observer
+    environment = Observer()
     info, digest = _source(path.relative_to(root).as_posix()), hashlib.sha256()
     with path.open("rb") as stream:
         for number, raw in enumerate(stream, 1):
@@ -88,7 +90,9 @@ def _jsonl(path, root):
                 info["invalid_json_records"] += 1
                 continue
             _observe(info, row, f"{info['source']}:L{number}")
+            environment.observe(row, f"{info['source']}:L{number}")
     info["sha256"] = digest.hexdigest()
+    info["environment"] = list(environment.observations.values())
     return info
 
 

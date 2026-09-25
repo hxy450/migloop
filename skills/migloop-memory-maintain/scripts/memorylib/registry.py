@@ -7,6 +7,7 @@ from contextlib import contextmanager
 from pathlib import Path
 
 from .common import fields, fingerprint, load, nonempty, now, replace_json, slug, strings, write_new
+from .card_contract import require_valid_card
 
 STATUSES = {"candidate", "active", "disputed", "needs_review", "retired"}
 
@@ -139,6 +140,7 @@ class Memory:
             raise ValueError("No cards supplied")
         for card in cards:
             validate_case(card)
+            require_valid_card(card)
         if len({c["id"] for c in cards}) != len(cards):
             raise ValueError("One version per case per ingest; do not pick an arbitrary winner")
         with self.lock():
@@ -218,7 +220,7 @@ class Memory:
         value.setdefault("requires", [])
         value.setdefault("unless", [])
         value.setdefault("check", [])
-        value.setdefault("status", "candidate")
+        value.setdefault("status", "active")
         for field in ("title", "when", "why"):
             nonempty(value[field], "lesson." + field)
         if "description" in value:
@@ -271,6 +273,10 @@ class Memory:
             state = self._base(proposal["base_revision"])
             previous = copy.deepcopy(state["lessons"])
             updates = [self._lesson(x, state) for x in proposal.get("upsert", [])]
+            # Existing stores remain readable. New proposals use the same final
+            # card contract as ingest, not a second lesson approval process.
+            for identity, revision in {(r["case"], r["revision"]) for x in updates for r in x["evidence"]}:
+                require_valid_card(self.case(identity, revision, state))
             if len({x["id"] for x in updates}) != len(updates):
                 raise ValueError("Duplicate lesson ID in proposal")
             updated, changed = {x["id"] for x in updates}, set()

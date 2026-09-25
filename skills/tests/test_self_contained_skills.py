@@ -152,8 +152,9 @@ def test_bad_edge_is_not_certified_and_source_change_is_rejected(investigation):
     invalid = x["root"] / "invalid.yaml"
     dump(invalid, draft)
     checked = json.loads(run(x["cards"], "cases.py", "pack", "--job", x["jobs"][0], "--draft", invalid,
-                             "--out", x["root"] / "invalid.json").stdout)
-    receipt = checked["validation"]["graph_checks"][0]["receipt"]
+                             "--out", x["root"] / "invalid.json", ok=False).stdout)
+    receipt = checked["graph_checks"][0]["receipt"]
+    assert checked["card"] is None and not (x["root"] / "invalid.json").exists()
     assert receipt.get("mechanical_status") != "valid"
     assert receipt.get("status") == "rejected" or receipt.get("unverified_edges") or receipt.get("issues")
     source = x["pool"] / "worker.jsonl"
@@ -162,12 +163,12 @@ def test_bad_edge_is_not_certified_and_source_change_is_rejected(investigation):
     assert "Transcript changed" in error.stderr
 
 
-def test_draft_only_is_explicit_and_runtime_damage_fails_closed(investigation):
+def test_draft_only_bypass_removed_and_runtime_damage_fails_closed(investigation):
     x = investigation
-    draft = json.loads(run(x["cards"], "cases.py", "pack", "--job", x["jobs"][0], "--draft", x["draft"],
-                           "--out", x["root"] / "draft-only.json", "--draft-only").stdout)
-    assert draft["validation"]["mode"] == "draft_only" and draft["validation"]["graph_check"] == "not_run"
-    assert draft["index"] is None
+    error = run(x["cards"], "cases.py", "pack", "--job", x["jobs"][0], "--draft", x["draft"],
+                "--out", x["root"] / "draft-only.json", "--draft-only", ok=False)
+    assert "unrecognized arguments" in error.stderr
+    assert not (x["root"] / "draft-only.json").exists()
     core = x["cards"] / "scripts/_runtime/migloop/inquiry/store.py"
     core.write_text(core.read_text(encoding="utf-8") + "\n# accidental local patch\n", encoding="utf-8")
     error = run(x["cards"], "cases.py", "prepare", "--job", x["jobs"][0], ok=False)

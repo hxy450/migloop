@@ -103,7 +103,9 @@ def test_same_event_force_requires_prior_feedback_and_stays_dashed(shell_input):
     assert ordinary["unverified_edges"][0]["force_eligible"]
     effects = engine.store.rows("SELECT * FROM effects")
     final = check(engine, json.dumps(forced), save=True)
-    assert final["delivery"]["status"] == "ready_for_review"
+    assert final["mechanical_status"] == "valid" and final["path_status"] == "complete"
+    # This fixture declares only context, not an input/output deviation.
+    assert final["delivery"]["status"] == "draft"
     edge, = [e for e in final["edges"] if e["relation"] == "read"]
     assert edge["source"] == "model_review" and edge["strength"] == "candidate" and edge["force"]
     assert not edge["semantic_verified"] and edge["checked_after"] == ordinary["report_id"]
@@ -123,8 +125,16 @@ def test_full_identity_and_time_cannot_be_bypassed_by_a_basename(shell_input, fa
         assert not engine.store.has_records("file", XML, timestamp(ts(9)), since=timestamp(ts(3)))
         return
     card["edges"][0]["from"] = {k: source[k] for k in ("key", "at")}
-    with pytest.raises(CardError):
-        check(engine, json.dumps(card))
+    checked = check(engine, json.dumps(card))
+    # An unrecorded explicit file now yields retryable feedback, not a fabricated
+    # indexed identity. Basename coincidence still never binds an ordinary read.
+    assert checked["mechanical_status"] == "needs_revision"
+    assert checked["nodes"][0]["exists"] is False
+    assert checked["nodes"][0]["existence_basis"] == "unverified"
+    assert not any(e["relation"] == "read" for e in checked["edges"])
+    assert checked["path_status"] == "needs_path"
+    if fault == "future_node":
+        assert not checked["unverified_edges"][0]["force_eligible"]
 
 
 def test_future_receipt_cannot_be_forced_into_an_earlier_node(shell_input):

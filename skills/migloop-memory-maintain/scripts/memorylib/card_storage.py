@@ -60,7 +60,7 @@ def compact_card(card):
         if edges:
             endpoints = {e[k] for e in edges for k in ("from", "to")}
             bindings.append({"graph": checked["graph"],
-                             "nodes": [{k: n[k] for k in ("id", "kind", "key", "at")}
+                             "nodes": [{k: n[k] for k in ("id", "kind", "key", "at", "existence_basis") if k in n}
                                        for n in receipt.get("nodes", []) if n["id"] in endpoints],
                              "edges": edges})
         checks.append({"graph": checked["graph"], "draft_sha256": checked["draft_sha256"],

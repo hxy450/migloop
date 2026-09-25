@@ -113,7 +113,10 @@ def check(engine, text, *, save=False, _legacy_reviews=False, _compact_parent=AU
         return valid
 
     def verify_text(value, at, where, since=None, scope_kind="report_cutoff"):
-        verify_refs(inline_refs(value), at, where, since, scope_kind)
+        # Coordinate cards declare their relationships explicitly. Their prose
+        # is not a second, spelling-dependent evidence submission channel.
+        if not is_compact:
+            verify_refs(inline_refs(value), at, where, since, scope_kind)
 
     seen_findings = set()
     for index, finding in enumerate(document["findings"]):
@@ -230,7 +233,8 @@ def check(engine, text, *, save=False, _legacy_reviews=False, _compact_parent=AU
                 node.get("evidence", []), at, f"{fid}.{nid}", since, "node"
             )
             verify_text(node["reason"], at, f"{fid}.{nid}.reason", since, "node")
-            if not exists:
+            supplemental = is_compact and node["kind"] == "file" and not exists
+            if not exists and not supplemental:
                 issues.append(
                     {
                         "where": f"{fid}.{nid}",
@@ -247,6 +251,8 @@ def check(engine, text, *, save=False, _legacy_reviews=False, _compact_parent=AU
                 "semantic_verified": False,
                 "generated_context": nid not in original_node_ids,
             }
+            if supplemental:
+                bound["existence_basis"] = "unverified"
             local[nid] = bound
             nodes.append(bound)
         declared_edges = []
@@ -404,7 +410,13 @@ def check(engine, text, *, save=False, _legacy_reviews=False, _compact_parent=AU
                 reason = (f"No matching confirmed {relation}: {origin['key']} -> {destination['key']} "
                           f"inside [{iso(start)}, {iso(cutoff)}]. This is not proof the operation never happened. "
                           "Check the original tool calls; unresolved read/write may be resubmitted with force after this feedback.")
-                force_eligible = bool(op and origin["exists"] and destination["exists"] and not forced)
+                force_eligible = bool(op and agent["exists"] and not forced
+                    and (file["exists"] or is_compact and file.get("existence_basis") == "unverified"))
+                if force_eligible and not file["exists"]:
+                    reason = (f"Unrecorded file node {file['key']} at {file['at']}. Verify its exact path and "
+                              "original call/return. After this ordinary submission, the unchanged connection may "
+                              "use force + reason + evidence to support a report-local file node; "
+                              "the tool call does not itself prove the claimed file effect.")
                 if "review" in edge:
                     try:
                         bound = reviewed_edge(engine, edge, origin, destination, fid)
@@ -538,6 +550,22 @@ def check(engine, text, *, save=False, _legacy_reviews=False, _compact_parent=AU
                     "edge_key": signature, "force_eligible": force_eligible})
     if is_compact:
         bind_node_evidence(engine, nodes, edges)
+        reviewed_nodes = {e[k] for e in edges if e.get("source") == "model_review" and e.get("force")
+                          for k in ("from", "to")}
+        positions = {"card:" + n["id"]: i for i, n in enumerate(document["findings"][0]["nodes"])}
+        for node in nodes:
+            if node.get("existence_basis") != "unverified":
+                continue
+            if node["id"] in reviewed_nodes:
+                node["existence_basis"] = "model_review"
+            else:
+                issues.append({"where": f"nodes[{positions[node['id']]}]", "code": "unrecorded_file",
+                    "key": node["key"], "at": node["at"],
+                    "query": {"op": "catalog", "kind": "file", "q": node["key"].replace("\\", "/").rsplit("/", 1)[-1]},
+                    "error": "File node has no recorded evidence and no accepted incident force edge.",
+                    "next_step": "Check the path first. If an original call really accessed this file, use its "
+                                 "source/line on the unchanged edge only after force_eligible feedback. "
+                                 "Do not add node fields or invent an agent; otherwise correct or remove the claim."})
     from .narrative import validate as validate_narrative
 
     if not is_compact:

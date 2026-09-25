@@ -13,6 +13,14 @@ from .store import digest, encode, iso, timestamp
 AUTO_PARENT = object()
 
 
+def supplemental_file_key(key):
+    """Unindexed files need explicit paths; unknown transcript IDs stay errors."""
+    path = key.replace("\\", "/")
+    return ("/" in path and not path.endswith("/") and "://" not in path
+            and not any(ord(c) < 32 for c in path)
+            and not path.casefold().endswith((".jsonl", ".jsonl.gz")))
+
+
 class CardError(ValueError):
     def __init__(self, issues):
         grouped = {}
@@ -44,6 +52,7 @@ def latest_parent(engine, target):
 
 def prepare(engine, source, parent=AUTO_PARENT):
     issues, resolved = [], {}
+    pending_files = []
 
     def reject(where, error, **details):
         issues.append({"where": where, "error": error, **details})
@@ -72,6 +81,10 @@ def prepare(engine, source, parent=AUTO_PARENT):
         registered = engine.store.rows("SELECT 1 FROM files WHERE path=?", (file,))
         if (registered or not possibilities and "/" in file) and engine.store.has_records("file", file, observation):
             possibilities.append(("file", file))
+        elif not possibilities and supplemental_file_key(key):
+            # Retain a declaration for feedback, NOT an indexed entity. Only
+            # a later evidence-backed incident force can admit it to the tree.
+            possibilities.append(("file", file))
         if len(possibilities) != 1:
             name = PurePosixPath(key.replace("\\", "/")).name
             alternatives = engine.store.rows("SELECT path FROM files WHERE path LIKE ? LIMIT 8", ("%/" + name,))
@@ -90,7 +103,14 @@ def prepare(engine, source, parent=AUTO_PARENT):
                 raise ValueError("Node cutoff is later than task observation cutoff " + iso(observation))
             kind, key = resolve(value["key"])
             if not engine.store.has_records(kind, key, at):
-                raise ValueError("Entity has no recorded evidence before this cutoff; inspect its actual history/time")
+                if kind != "file" or not supplemental_file_key(key):
+                    raise ValueError("Entity has no recorded evidence before this cutoff; inspect its actual history/time")
+                alternatives = engine.store.rows("SELECT path FROM files WHERE path LIKE ? LIMIT 8",
+                                                ("%/" + PurePosixPath(key).name,))
+                pending_files.append({"where": where, "code": "unrecorded_file",
+                    "error": "File has no recorded evidence at cutoff; verify its path. Known candidates: "
+                             + encode([r["path"] for r in alternatives]), "supplied": value,
+                    "query": {"op": "catalog", "kind": "file", "q": PurePosixPath(key).name}})
             return kind, key, at
         except (ValueError, TypeError, OSError) as exc:
             name = PurePosixPath(value["key"].replace("\\", "/")).name
@@ -204,7 +224,7 @@ def prepare(engine, source, parent=AUTO_PARENT):
             edge.update(force=True, claim=item["reason"], evidence=item["evidence"])
         edges.append(edge)
     if issues:
-        raise CardError(issues)
+        raise CardError(issues + pending_files)
     parent = latest_parent(engine, target) if parent is AUTO_PARENT else parent
     document = {"schema": "inquiry/1", "target": target,
         "summary": source["summary"], "recommendations": source["recommendations"],
@@ -240,6 +260,8 @@ invented single timestamp, and a failed group must remain an explicit error.
     # A supplied native request cannot backdate its later completion.
     for r in anchors:
         late = engine.store.rows("SELECT at FROM effects WHERE (request=? OR result=?) AND at>?", (r["ref"], r["ref"], cutoff))
+        late += engine.store.rows("SELECT r.at FROM call_pairs p JOIN records r ON r.ref=p.result "
+                                  "WHERE p.request=? AND r.at>?", (r["ref"], cutoff))
         if late:
             raise ValueError("The cited operation completes after the endpoint cutoff: " + iso(late[0]["at"]) + "; force cannot backdate it")
     groups = {}
@@ -277,7 +299,7 @@ def bind_node_evidence(engine, nodes, edges):
 def delivery_status(graph):
     """Compact readiness is a renderable checked argument, NOT a coverage score."""
     paths = graph["tree"]["paths"] + graph["tree"].get("context_paths", [])
-    ready = (graph["mechanical_status"] == "valid" and bool(paths)
+    ready = (graph["mechanical_status"] == "valid" and bool(graph["tree"]["paths"])
              and all(p["status"] in ("native", "model_review") for p in paths))
     return {"status": "ready_for_review" if ready else "draft", "semantic_verified": False,
         "coverage_verified": False, "scope": "identities_sources_temporal_paths_only",
