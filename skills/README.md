@@ -76,6 +76,7 @@ python skills/migloop-memory-maintain/scripts/memory.py export --store STORE --o
 - job/card 身份与可变化的证据 hash 分开；服务端迁移 ID 优先，否则使用本地材料位置作为明确的局部身份。补充原文或重排问题不更改同名问题身份。更名/搬迁/合拆应保留既有身份或显式撤回旧卡，不悄悄重新命名成无关卡。
 - 卡片可包含多目标 graph；每目标导出原格式 compact JSON view，供旧 inquiry 提交器加载。整张新卡及 memory 不宣称已经接入旧网页上传。
 - pack自动准备或复用同一迁移索引并运行唯一checker；显式`--db`可复用匹配索引。0.8.0移除`--draft-only`及失败卡封装：只有模板和链路均通过才生成正式case/views；否则非零退出并返回反馈，原YAML保留。ingest/apply复用同一有效卡契约，不存在失败卡先入库再转正的分支。语义判断仍由模型完成。
+- 0.8.1由pack自动生成`validation_sha256`，将每图的序号、draft_sha256、mechanical_status和path_status摘要绑定进卡片revision。运行report_id、kernel_sha256等仍保留作追溯，不因这些字段变化制造新内容版本。手改回执而不更新绑定会被拒绝；旧卡保持原哈希可读，但重新入库/绑定经验须用原job和YAML正常pack。这是完整性检查，不是签名或对抗刻意重算哈希的鉴权机制；模型模板不增加字段，现有库不自动重写。
 
 ## 索引与数据放置
 

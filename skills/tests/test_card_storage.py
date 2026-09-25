@@ -11,6 +11,7 @@ from memorylib.card_storage import check_summary, compact_card, compact_store
 from memorylib.cases import pack
 from memorylib.common import fingerprint, load, write_new
 from memorylib.registry import Memory, revision_of, validate_case
+from memorylib.card_contract import validation_digest
 from test_memory_bundle import prepared, memory_with
 
 
@@ -32,6 +33,10 @@ def legacy_card(prepared, *, complete=False):
                        "review": {"quotes": [{"text": "long transcript"}]}}],
             "document": {"huge": "x" * 50000}, "submitted_document": {"huge": "x" * 50000},
             "coverage": {"unassessed": ["irrelevant operation"] * 1000}, "tree": {"huge": "x" * 50000}}}]
+    card.pop("validation_sha256", None)
+    if complete:
+        # Full-format test card with a current, successful bound receipt.
+        card["validation_sha256"] = validation_digest(card["validation"])
     card["revision"] = revision_of(card)
     return card
 

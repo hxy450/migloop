@@ -10,7 +10,7 @@ from .common import fields, fingerprint, load, nonempty, now, strings, write_new
 from . import VERSION
 from .provenance import collect, verify_materials, _bundle_hash
 from .registry import revision_of
-from .card_contract import DraftError, require_valid_card, validate_draft
+from .card_contract import DraftError, require_valid_card, validate_draft, validation_digest
 
 
 def dispatch(tasks_path, metadata_path, out):
@@ -143,8 +143,9 @@ def pack(job_path, draft_path, out, db=None, debug_receipts=None):
     validation = {"status": "valid", "schema": "passed", "graph_checks": checks,
                   "graph_check": "performed", "kernel_sha256": prepared_index["kernel_sha256"],
                   "causal_correctness": "not_certified", "unresolved_targets": sorted(unresolved)}
+    validation_sha256 = validation_digest(validation)
     try:
-        require_valid_card({"draft": draft, "validation": validation})
+        require_valid_card({"draft": draft, "validation": validation, "validation_sha256": validation_sha256})
     except ValueError as exc:
         return {"status": "needs_revision", "card": None, "error": str(exc),
                 "graph_checks": [{**c, "receipt": check_summary(c["receipt"])} for c in checks],
@@ -164,7 +165,7 @@ def pack(job_path, draft_path, out, db=None, debug_receipts=None):
             "environment": for_card(metadata, job["scope"]),
             "provenance": metadata, "node_provenance": matched,
             "packager": {"name": "migloop-memory-skills", "version": VERSION, "bundle_sha256": _bundle_hash()},
-            "validation": validation}
+            "validation": validation, "validation_sha256": validation_sha256}
     # Timestamp does not manufacture a new semantic revision on an identical repack.
     card["revision"] = revision_of(card)
     card = compact_card(card)

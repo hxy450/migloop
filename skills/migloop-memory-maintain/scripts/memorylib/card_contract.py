@@ -100,6 +100,16 @@ def validate_draft(draft):
     return graphs
 
 
+def validation_digest(validation):
+    """Bind stable checker outcomes, not run IDs or diagnostic presentation."""
+    return fingerprint([{
+        "graph": checked.get("graph"),
+        "draft_sha256": checked.get("draft_sha256"),
+        "mechanical_status": checked.get("receipt", {}).get("mechanical_status"),
+        "path_status": checked.get("receipt", {}).get("path_status"),
+    } for checked in validation.get("graph_checks", [])])
+
+
 def require_valid_card(card):
     """Admission contract shared by pack, ingest and lesson source binding.
 
@@ -109,6 +119,8 @@ result for each unchanged authored graph, not a separate semantic review.
     draft = card.get("draft", {})
     validate_draft(draft)
     validation = card.get("validation", {})
+    if card.get("validation_sha256") != validation_digest(validation):
+        raise ValueError("Card lacks a matching revision-bound validation summary; run cases.py pack on the final YAML (do not edit its receipt)")
     checks = validation.get("graph_checks", [])
     if validation.get("graph_check") != "performed" or validation.get("mode") == "draft_only":
         raise ValueError("Card has no completed relation check; run cases.py pack on its YAML draft")

@@ -2,6 +2,13 @@
 
 The initial 2026-09-17 checks covered skill instructions and scripts only. Later dated checks below include the shared inquiry changes needed by self-contained card validation; they do not deploy the renderer/server or modify global hook configuration.
 
+## Revision-bound checker outcome (0.8.1, 2026-09-25)
+
+- Pack automatically hashes each graph's number, draft_sha256, mechanical_status and path_status into `validation_sha256`; that stable binding is included in the existing card revision. Report IDs and diagnostic/kernel metadata do not enter this outcome digest. Model templates and inquiry relation rules are unchanged.
+- Changing receipt fields without updating the binding fails validation; changing the binding without updating the card revision fails the existing content hash. Ingest/apply require the binding. This detects inconsistent edits, not an attacker deliberately recomputing every hash; no signatures or new semantic review stage were added.
+- Legacy cards keep their original hashes and remain readable. They must be normally repacked before new admission/rebinding. Read-only verification loaded all **15 real stored cards**; changing the audited DestinationBar card from needs_path to complete in memory was rejected by the new admission rule. The existing store was not changed.
+- **34 focused tests passed in 5.95 seconds**, then **667 passed, 1 skipped in 68.40 seconds** across skills and inquiry. Tests cover all four bound fields, the failed-to-complete bypass, legacy reading/admission, stable revisions across genuine repacks, and ignored run metadata. Existing Windows symlink skip remains. No model migration experiment or browser change was introduced.
+
 ## Final-card contract, not a draft approval pipeline (0.8.0, 2026-09-25)
 
 - One shared `card_contract.py` owns the authored template and final checked-graph admission rules. Required title/when/description/summary, nonempty recommendations and graphs, and a declared deviation are checked; prose meaning is not. New cards require successful, unchanged graph receipts. No repair actor, final-version authorship or repair-window write anchor is required.

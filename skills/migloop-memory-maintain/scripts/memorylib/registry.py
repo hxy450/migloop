@@ -7,7 +7,7 @@ from contextlib import contextmanager
 from pathlib import Path
 
 from .common import fields, fingerprint, load, nonempty, now, replace_json, slug, strings, write_new
-from .card_contract import require_valid_card
+from .card_contract import require_valid_card, validation_digest
 
 STATUSES = {"candidate", "active", "disputed", "needs_review", "retired"}
 
@@ -25,6 +25,10 @@ def validate_case(card):
     slug(card.get("id"), "case.id")
     if card.get("revision") != revision_of(card):
         raise ValueError("Case content differs from its revision hash; repack the source draft")
+    # Legacy records remain readable under their original revision algorithm.
+    # New admissions require this binding through require_valid_card.
+    if "validation_sha256" in card and card["validation_sha256"] != validation_digest(card.get("validation", {})):
+        raise ValueError("Card validation summary differs from its revision-bound hash; repack the source draft")
     draft = card.get("draft", {})
     expected = {"diagnosis": {"text": draft.get("summary"), "kind": "diagnosis", "status": "model_claim"}}
     expected.update({f"recommendation:{i}": {"text": text, "kind": "recommendation", "status": "model_claim"}
