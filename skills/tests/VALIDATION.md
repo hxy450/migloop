@@ -2,6 +2,15 @@
 
 The initial 2026-09-17 checks covered skill instructions and scripts only. Later dated checks below include the shared inquiry changes needed by self-contained card validation; they do not deploy the renderer/server or modify global hook configuration.
 
+## Task-start recall and high-precision write reminder (0.8.3, 2026-09-25)
+
+- SubagentStart injects a short task-based recall instruction for every child; the main session receives it on its first UserPromptSubmit. A separate first explicit-write checkpoint remains even when the entry was already read. The second reminder reuses prior reading and requests only relevant additions or changes to the pending output, without a report or another compulsory read.
+- Replaced command-wide interpreter/keyword guessing with a small quote-aware shell subset. Native writes, direct file redirection, tee/cp/mv/sed-in-place/apply_patch and explicit PowerShell content commands are recognized. Discard sinks, descriptor duplication, quoted commands, comments and heredoc bodies do not trigger. Opaque scripts, dynamic destinations and unsupported syntax pass; this is a reminder, not a complete side-effect/security checker.
+- Project hook installation supports explicit --update with a recoverable backup. Tests cover preserved foreign hooks, config/enabled state, memory identity and runtime; old actor state is not reset. Startup and write reminders have distinct records, and neither is proof of adoption.
+- **85 focused tests passed**, followed by **731 passed, 1 skipped in 69.29 seconds** across skills and inquiry. Skill frontmatter validation passes. No inquiry/UI, card/lesson format, stored experience or migration source changed.
+- Read-only replay of JetNews9232 through execute completion (2026-09-24T03:09:18.878Z): 43 actors, 2,232 tool calls, 353 recognizable write-intent calls. The main session plus 39 of 42 children have a write checkpoint; their first matches are native Write/Edit. The other three children are one read-only verifier and two interrupted by the usage limit. Historical commands were not executed. Opaque API/metadata-generation scripts can precede the write checkpoint; startup context provides an earlier reminder, but its effectiveness needs the next live migration.
+- Replay artifact: `C:/Users/hongy/projects/_migloop-hook-null-fix-20260925/two-stage-replay.json`. These are hook contract/classification checks, not measured recall precision, a live model adoption result, or evidence of migration-quality improvement.
+
 ## Thin session-to-memory entrypoint (0.8.2, 2026-09-25)
 
 - Added `migloop-session-to-memory`: the parent performs triage, prepares one shared index, delegates independent per-job card investigations, then merges the final valid cards and exports the reading directory. Defaults to an isolated new store; no model API, second parser, extra semantic review or alternative checker was added.

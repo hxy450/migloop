@@ -53,7 +53,7 @@ python -m pytest skills/tests -q -o pythonpath=src
 
 旧case/1、case/2与memory/1仍可读取，缺字段不补造语义、不自动改hash或状态。0.8.0正式制卡按当前模板要求description等字段；重新入库或引用旧卡时，需满足同一有效卡契约，未通过则用原job与稿件重新pack。已有经验库不会被本次升级自动重写。
 
-0.5.0增加文件阅读发布：维护者运行`memory.py export --store STORE --out NEW_DIRECTORY`，宿主向迁移agent提供召回skill和生成的`index.md`。Claude Code 可另行安装项目级首次修改提醒，见`migloop-memory-recall/references/claude-hook.md`；只有安装并验证项目配置后才算接通。Codex/DevEco hook、云端 OBS/API 和跨租户权限尚未接入。旧`recall.py notice`仍是兼容诊断payload，不是已经安装的hook，也不是新版阅读入口。
+0.5.0增加文件阅读发布：维护者运行`memory.py export --store STORE --out NEW_DIRECTORY`，宿主向迁移agent提供召回skill和生成的`index.md`。Claude Code 可另行安装项目级提醒，0.8.3为任务开始召回 + 首次明确写入前复核，写入识别precision优先，见`migloop-memory-recall/references/claude-hook.md`；只有安装并验证项目配置后才算接通。Codex/DevEco hook、云端 OBS/API 和跨租户权限尚未接入。旧`recall.py notice`仍是兼容诊断payload，不是已经安装的hook，也不是新版阅读入口。
 
 ## 文件夹式阅读
 
