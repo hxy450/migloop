@@ -9,9 +9,10 @@ import subprocess
 import sys
 import tempfile
 
-NAMES = ("migloop-repair-triage", "migloop-build-cards", "migloop-memory-maintain", "migloop-memory-recall")
+NAMES = ("migloop-repair-triage", "migloop-build-cards", "migloop-memory-maintain", "migloop-memory-recall",
+         "migloop-session-to-memory")
 ENTRIES = {NAMES[0]: ("triage.py",), NAMES[1]: ("cases.py",),
-           NAMES[2]: ("memory.py", "recall.py"), NAMES[3]: ("recall.py",)}
+           NAMES[2]: ("memory.py", "recall.py"), NAMES[3]: ("recall.py",), NAMES[4]: ()}
 YAML_VERSION = "6.0.3"
 CORE_EXCLUDED = {"__main__.py", "interfaces.py", "web.py", "viewer.py"}
 
@@ -50,38 +51,40 @@ def build(source, out):
             src, dst = source / name, staged / name
             # Instructions/assets only; scripts are selected below, never copied from old installations.
             shutil.copytree(src, dst, ignore=shutil.ignore_patterns("scripts", "__pycache__", "*.pyc"))
-            target_scripts = dst / "scripts"
-            runtime = target_scripts / "_runtime"
-            runtime.mkdir(parents=True)
-            shutil.copytree(scripts / "memorylib", runtime / "memorylib",
-                            ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
-            (runtime / "yaml").mkdir()
-            for path in sorted(yaml_root.glob("*.py")):
-                shutil.copy2(path, runtime / "yaml" / path.name)
-            (dst / "licenses").mkdir()
-            shutil.copy2(license_path, dst / "licenses/PyYAML-LICENSE.txt")
-            if name == "migloop-build-cards":
-                target_core = runtime / "migloop/inquiry"
-                target_core.mkdir(parents=True)
-                shutil.copy2(repo / "src/migloop/__init__.py", runtime / "migloop/__init__.py")
-                for path in sorted(core.glob("*.py")):
-                    if path.name not in CORE_EXCLUDED:
-                        shutil.copy2(path, target_core / path.name)
-            for entry in ENTRIES[name]:
-                shutil.copy2(scripts / "package_entry.py", target_scripts / entry)
-            if name == "migloop-memory-maintain":
-                shutil.copy2(scripts / "install_bundle.py", target_scripts / "install_bundle.py")
-            if name == "migloop-memory-recall":
-                hook = src / "scripts/claude_hook.py"
-                if hook.is_file():
-                    shutil.copy2(hook, target_scripts / hook.name)
+            if ENTRIES[name]:
+                target_scripts = dst / "scripts"
+                runtime = target_scripts / "_runtime"
+                runtime.mkdir(parents=True)
+                shutil.copytree(scripts / "memorylib", runtime / "memorylib",
+                                ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+                (runtime / "yaml").mkdir()
+                for path in sorted(yaml_root.glob("*.py")):
+                    shutil.copy2(path, runtime / "yaml" / path.name)
+                (dst / "licenses").mkdir()
+                shutil.copy2(license_path, dst / "licenses/PyYAML-LICENSE.txt")
+                if name == "migloop-build-cards":
+                    target_core = runtime / "migloop/inquiry"
+                    target_core.mkdir(parents=True)
+                    shutil.copy2(repo / "src/migloop/__init__.py", runtime / "migloop/__init__.py")
+                    for path in sorted(core.glob("*.py")):
+                        if path.name not in CORE_EXCLUDED:
+                            shutil.copy2(path, target_core / path.name)
+                for entry in ENTRIES[name]:
+                    shutil.copy2(scripts / "package_entry.py", target_scripts / entry)
+                if name == "migloop-memory-maintain":
+                    shutil.copy2(scripts / "install_bundle.py", target_scripts / "install_bundle.py")
+                if name == "migloop-memory-recall":
+                    hook = src / "scripts/claude_hook.py"
+                    if hook.is_file():
+                        shutil.copy2(hook, target_scripts / hook.name)
             files = {p.relative_to(dst).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
                      for p in sorted(dst.rglob("*")) if p.is_file()}
             digest = hashlib.sha256(json.dumps(files, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
             manifest = {"schema": "migloop-skill-package/1", "skill": name,
                         "version": version_scope["VERSION"], "source_commit": commit, "source_dirty": dirty,
                         "content_sha256": digest, "files": files,
-                        "dependencies": {"Python": ">=3.10", "PyYAML": YAML_VERSION},
+                        "dependencies": ({"Python": ">=3.10", "PyYAML": YAML_VERSION} if ENTRIES[name]
+                                         else {"skills": list(NAMES[:3])}),
                         "inquiry_included": name == "migloop-build-cards"}
             (dst / "package-manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
         # Publishing only after every package is complete. Never replace an existing release.

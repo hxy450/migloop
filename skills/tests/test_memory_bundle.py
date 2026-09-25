@@ -465,7 +465,9 @@ def test_installed_bundle_runs_outside_repo_and_refuses_overwrite(tmp_path):
     installed = subprocess.run([sys.executable, "-B", "-X", "utf8", str(SCRIPTS / "install_bundle.py"),
                                 "--destination", str(destination)], capture_output=True, text=True, encoding="utf-8")
     assert installed.returncode == 0, installed.stderr
-    assert len(installed.stdout.strip().splitlines()) == 4
+    installed_skills = {Path(path).parent.name for path in installed.stdout.strip().splitlines()}
+    assert installed_skills == {"migloop-repair-triage", "migloop-build-cards", "migloop-memory-maintain",
+                                "migloop-memory-recall", "migloop-session-to-memory"}
     store = tmp_path / "isolated-store"
     initialized = subprocess.run([sys.executable, "-B", "-X", "utf8",
         str(destination / "migloop-memory-maintain/scripts/memory.py"), "init", "--store", str(store)],

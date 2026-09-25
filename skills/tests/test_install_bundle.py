@@ -38,7 +38,7 @@ def inventory(root):
 def test_first_install_and_refusal_leave_existing_intact(bundle):
     source, destination = bundle
     result = installer.install(destination)
-    assert len(result["skills"]) == 4
+    assert len(result["skills"]) == len(installer.NAMES)
     assert inventory(destination) == inventory(source)
     before = inventory(destination)
     with pytest.raises(ValueError, match="Refusing to overwrite"):
@@ -76,6 +76,18 @@ def test_restore_partial_install_recovers_absence_as_well_as_content(bundle):
     installer.restore(destination, result["backup"])
     assert inventory(destination) == before
     assert all(not (destination / n).exists() for n in installer.NAMES[1:])
+
+
+def test_update_four_package_install_adds_entry_and_restore_removes_it(bundle):
+    _, destination = bundle
+    entry = "migloop-session-to-memory"
+    seed(destination, [name for name in installer.NAMES if name != entry])
+    before = inventory(destination)
+    updated = installer.install(destination, update=True)
+    assert (destination / entry / "SKILL.md").is_file()
+    installer.restore(destination, updated["backup"])
+    assert inventory(destination) == before
+    assert not (destination / entry).exists()
 
 
 def test_staging_failure_never_touches_installed_packages(bundle, monkeypatch):

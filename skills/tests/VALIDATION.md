@@ -2,6 +2,13 @@
 
 The initial 2026-09-17 checks covered skill instructions and scripts only. Later dated checks below include the shared inquiry changes needed by self-contained card validation; they do not deploy the renderer/server or modify global hook configuration.
 
+## Thin session-to-memory entrypoint (0.8.2, 2026-09-25)
+
+- Added `migloop-session-to-memory`: the parent performs triage, prepares one shared index, delegates independent per-job card investigations, then merges the final valid cards and exports the reading directory. Defaults to an isolated new store; no model API, second parser, extra semantic review or alternative checker was added.
+- The entrypoint ships only instructions and a package manifest declaring its three sibling skill dependencies. The existing four processing skills remain independently runnable. The recoverable installer now ships five packages; restoring a previous four-package installation removes the newly added entrypoint and restores the prior bytes.
+- **669 passed, 1 skipped in 67.11 seconds** across all skill and inquiry tests. Added tests for dependency-link resolution, absence of an unnecessary entrypoint runtime, and four-to-five installation/restore. An older installer test's hardcoded four-package expectation was updated to the exact five package names. Skill frontmatter validation also passes; the existing Windows symlink skip remains.
+- These are instruction/package/contract checks, not a real model orchestration or attribution-quality result. The user will run the independent Claude trial on the frozen Jetsnack924 generation + repair pool. No inquiry core, UI, case/lesson template, old memory or migration source changed.
+
 ## Revision-bound checker outcome (0.8.1, 2026-09-25)
 
 - Pack automatically hashes each graph's number, draft_sha256, mechanical_status and path_status into `validation_sha256`; that stable binding is included in the existing card revision. Report IDs and diagnostic/kernel metadata do not enter this outcome digest. Model templates and inquiry relation rules are unchanged.

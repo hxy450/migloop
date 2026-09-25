@@ -17,6 +17,8 @@
 !docs/**
 !skills/
 !skills/README.md
+!skills/migloop-session-to-memory/
+!skills/migloop-session-to-memory/**
 !skills/migloop-build-cards/
 !skills/migloop-build-cards/**
 !skills/migloop-build-cards-i14/

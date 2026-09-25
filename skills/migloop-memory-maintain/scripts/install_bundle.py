@@ -1,4 +1,4 @@
-"""Install four sibling skills; explicit updates keep a recoverable backup."""
+"""Install the memory skill bundle; explicit updates keep a recoverable backup."""
 import argparse
 import json
 import os
@@ -10,7 +10,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
 
-NAMES = ("migloop-repair-triage", "migloop-build-cards", "migloop-memory-maintain", "migloop-memory-recall")
+NAMES = ("migloop-repair-triage", "migloop-build-cards", "migloop-memory-maintain", "migloop-memory-recall",
+         "migloop-session-to-memory")
 
 
 def _plain(path):
@@ -153,7 +154,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--destination", required=True)
     mode = parser.add_mutually_exclusive_group()
-    mode.add_argument("--update", action="store_true", help="Back up existing packages before replacing all four")
+    mode.add_argument("--update", action="store_true", help="Back up existing packages before replacing the bundle")
     mode.add_argument("--restore", metavar="BACKUP", help="Restore the pre-install state from a completed backup")
     args = parser.parse_args()
     result = restore(args.destination, args.restore) if args.restore else install(args.destination, args.update)

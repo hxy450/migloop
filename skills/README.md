@@ -1,9 +1,12 @@
-# 迁移经验闭环：独立四 skill 包
+# 迁移经验闭环：统一入口 + 四个处理 skill
 
-本目录维护四个 skill 的源模板与共享业务代码；发布包各自自包含，只需 Python 3.10+。制卡包携带从 `src/migloop/inquiry` 构建的同一新内核，其他包不携带内核。YAML 的纯 Python 依赖随包提供；运行时无需 pip、MCP、migloop 源码仓或 PYTHONPATH。不包含第二套读写实现，也不打包旧 UI/服务端。
+本目录维护一个薄编排入口与四个处理 skill 的源模板及共享业务代码。只给完整 session 时使用 `migloop-session-to-memory`，由主 agent 拆分、派独立子代理制卡，再归并出 memory；具体模板和脚本仍由原有三个阶段 skill 提供，入口本身没有运行代码，需与它们一起安装。
+
+四个处理 skill 的发布包各自自包含，只需 Python 3.10+。制卡包携带从 `src/migloop/inquiry` 构建的同一新内核，其他包不携带内核。YAML 的纯 Python 依赖随包提供；运行时无需 pip、MCP、migloop 源码仓或 PYTHONPATH。不包含第二套读写实现，也不打包旧 UI/服务端。
 
 | Skill | 输入 → 输出 |
 |---|---|
+| `migloop-session-to-memory` | 完整 session → 主代理拆分、子代理制卡、主代理归并 → 卡片 + memory/index.md；默认新库 |
 | `migloop-repair-triage` | 完整迁移转录 → 问题清单与逐问题 job；只拆分，不归因 |
 | `migloop-build-cards` | 一个 job + 完整转录 → 正确输入/首次偏差/最终修复的总结与最小证据链卡片 |
 | `migloop-memory-maintain` | 空库或上一版 memory + 新/修订/撤回卡 → 有明确来源的经验新版本 + 分层 Markdown 阅读包 |
@@ -19,7 +22,7 @@
 python skills/migloop-memory-maintain/scripts/build_bundle.py --out NEW_RELEASE_OUTSIDE_REPO
 ```
 
-将生成的任意 skill 文件夹单独复制到目标 skills 目录即可使用。制卡包含完整查询/校验所需的新内核 Python 模块，CLI 直接调用，不另起 MCP 服务；网页和服务端仍使用原来的内核源码。每包 `package-manifest.json` 记录版本、源码提交/脏状态、逐文件摘要与第三方依赖；运行入口验证文件，避免包内被另行修补而不知情。PyYAML 纯 Python 实现及许可证随包交付，不包含平台二进制扩展。
+生成的四个处理 skill 可以各自单独复制使用；总入口需同时保留同级 triage、build-cards、maintain，包清单明确记录这三个依赖。制卡包含完整查询/校验所需的新内核 Python 模块，CLI 直接调用，不另起 MCP 服务；网页和服务端仍使用原来的内核源码。每包 `package-manifest.json` 记录版本、源码提交/脏状态、逐文件摘要与依赖；运行入口验证文件，避免包内被另行修补而不知情。处理包附 PyYAML 纯 Python 实现及许可证，不包含平台二进制扩展；总入口只有指令和清单。
 
 批量安装仍使用已有可恢复安装器；从源码调用时先构建完整发布包，再安装：
 
@@ -32,9 +35,9 @@ python -m pytest skills/tests -q -o pythonpath=src
 
 新增独立发布测试以 `python -I -S` 运行，禁用 site-packages/PYTHONPATH，把各 skill 分开放置，验证 YAML 输入、元数据/派工、自动建库、索引复用、正常/错误关系、经验维护/导出及 hook 安装。源码模板不是面向最终用户的安装包。
 
-首次安装遇同名目录仍拒绝覆盖；明确加`--update`才替换四个包。更新前先完整暂存新版，再把现有包（包括本地改动）移动到`YOUR_SKILLS_ROOT/../.migloop-skill-backups/<时间-随机ID>/previous/`，stderr打印备份目录，其中manifest.json记录原目录和事务状态。更新会移除活跃包里的旧文件，但它们保留在备份中；其他skill、全局配置、hook与应用代码保持原样。
+首次安装遇同名目录仍拒绝覆盖；明确加`--update`才替换整套包（0.8.2起包含总入口，共五个）。更新前先完整暂存新版，再把现有包（包括本地改动）移动到`YOUR_SKILLS_ROOT/../.migloop-skill-backups/<时间-随机ID>/previous/`，stderr打印备份目录，其中manifest.json记录原目录和事务状态。更新会移除活跃包里的旧文件，但它们保留在备份中；其他skill、全局配置、hook与应用代码保持原样。
 
-使用`--restore BACKUP_DIRECTORY`恢复该次操作前的四包状态，包含原先不存在的包；恢复本身也先备份当前安装，支持反向恢复。备份绑定原安装根。更新/恢复期间请结束使用这四个包的任务。安装锁防止并发安装；普通复制/发布错误会回滚，回滚失败保留备份、暂存及恢复记录。进程被强杀或断电时可能留下`installing`事务与锁，需要按manifest核对恢复；四目录替换不是跨进程读者可见的原子切换。
+使用`--restore BACKUP_DIRECTORY`恢复该次操作前的技能包状态，包含原先不存在的包；恢复本身也先备份当前安装，支持反向恢复。备份绑定原安装根。更新/恢复期间请结束使用这套包的任务。安装锁防止并发安装；普通复制/发布错误会回滚，回滚失败保留备份、暂存及恢复记录。进程被强杀或断电时可能留下`installing`事务与锁，需要按manifest核对恢复；多目录替换不是跨进程读者可见的原子切换。
 
 宿主重新发现skills后使用完整路径或`$migloop-repair-triage`、`$migloop-build-cards`等调用。符号链接/junction包不做原地替换。
 

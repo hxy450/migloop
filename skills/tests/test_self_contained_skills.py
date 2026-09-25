@@ -202,6 +202,22 @@ def test_release_has_no_ui_native_extensions_or_session_artifacts(release):
         package = release / skill
         manifest = json.loads((package / "package-manifest.json").read_text(encoding="utf-8"))
         assert manifest["inquiry_included"] == (skill == "migloop-build-cards")
-        assert manifest["dependencies"]["PyYAML"] == "6.0.3"
-        assert (package / "licenses/PyYAML-LICENSE.txt").is_file()
+        if builder.ENTRIES[skill]:
+            assert manifest["dependencies"]["PyYAML"] == "6.0.3"
+            assert (package / "licenses/PyYAML-LICENSE.txt").is_file()
+        else:
+            assert not (package / "scripts").exists()
+            assert manifest["dependencies"]["skills"] == list(builder.NAMES[:3])
         assert not any(p.suffix in (".html", ".js", ".pyd", ".so", ".sqlite", ".jsonl", ".pyc") for p in package.rglob("*") if p.is_file())
+
+
+def test_orchestrator_links_resolve_in_the_published_bundle(release):
+    import re
+
+    package = release / "migloop-session-to-memory"
+    text = (package / "SKILL.md").read_text(encoding="utf-8")
+    links = re.findall(r"\]\((\.\./[^)]+/SKILL\.md)\)", text)
+    dependencies = json.loads((package / "package-manifest.json").read_text())["dependencies"]["skills"]
+    assert {Path(link).parts[1] for link in links} == set(dependencies)
+    assert all((package / link).resolve().is_file() for link in links)
+    assert set(builder.NAMES) == set(dependencies) | {"migloop-session-to-memory", "migloop-memory-recall"}
