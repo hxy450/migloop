@@ -1,0 +1,30 @@
+"""Single platform registry used by indexing, original evidence and mechanical checks."""
+from .claude import ClaudeAdapter
+from .codex import CodexAdapter
+from .deveco import DevEcoAdapter
+from ..tool_contracts import normalize_input
+
+ADAPTERS = (DevEcoAdapter(), CodexAdapter(), ClaudeAdapter())
+
+
+def adapter_for(record):
+    return next((a for a in ADAPTERS if a.matches(record)), None)
+
+
+def parts(record):
+    adapter = adapter_for(record)
+    if adapter:
+        for slot, family, role, cid, tool, payload, success in adapter.parts(record):
+            if role == "request":
+                payload = normalize_input(tool, payload)
+            yield slot, family, role, cid, tool, payload, success
+
+
+def input_role(record):
+    adapter = adapter_for(record)
+    return adapter.input_role(record) if adapter else None
+
+
+def identity(record):
+    adapter = adapter_for(record)
+    return adapter.identity(record) if adapter else None

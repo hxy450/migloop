@@ -22,6 +22,11 @@ def change_payloads(store, operation):
             if not isinstance(tool, str):
                 continue
             name = tool.split(".")[-1].casefold()
+            if name == "apply_patch":
+                for path, detail in data.get("changes", {}).items():
+                    if path_key(path, record["cwd"]) == operation["path"]:
+                        result.append({"block": slot, "tool": tool, "body": detail})
+                continue
             path = data.get("file_path") or data.get("path")
             if (
                 name not in {"write", "write_file", "edit", "multiedit", "delete_file"}

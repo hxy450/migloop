@@ -66,9 +66,11 @@ def build(source, out):
                     target_core = runtime / "migloop/inquiry"
                     target_core.mkdir(parents=True)
                     shutil.copy2(repo / "src/migloop/__init__.py", runtime / "migloop/__init__.py")
-                    for path in sorted(core.glob("*.py")):
-                        if path.name not in CORE_EXCLUDED:
-                            shutil.copy2(path, target_core / path.name)
+                    for path in sorted(core.rglob("*.py")):
+                        relative = path.relative_to(core)
+                        if not (path.parent == core and path.name in CORE_EXCLUDED):
+                            (target_core / relative).parent.mkdir(parents=True, exist_ok=True)
+                            shutil.copy2(path, target_core / relative)
                 for entry in ENTRIES[name]:
                     shutil.copy2(scripts / "package_entry.py", target_scripts / entry)
                 if name == "migloop-memory-maintain":
