@@ -79,6 +79,13 @@ def build(source, out):
                     hook = src / "scripts/claude_hook.py"
                     if hook.is_file():
                         shutil.copy2(hook, target_scripts / hook.name)
+            # Portable release bytes must not depend on Git's core.autocrlf on
+            # the maintainer's machine. Normalize generated text BEFORE hashing.
+            for path in dst.rglob("*"):
+                if path.is_file() and path.suffix in (".py", ".md", ".yaml", ".yml", ".json", ".txt"):
+                    raw = path.read_bytes()
+                    if b"\r\n" in raw:
+                        path.write_bytes(raw.replace(b"\r\n", b"\n"))
             files = {p.relative_to(dst).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
                      for p in sorted(dst.rglob("*")) if p.is_file()}
             digest = hashlib.sha256(json.dumps(files, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
