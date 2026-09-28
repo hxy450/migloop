@@ -19,7 +19,9 @@ def kernel():
     except ImportError as exc:
         raise ValueError("Inquiry runtime missing. Use the published build-cards skill; graph checks were not run.") from exc
     root = Path(inquiry.__file__).parent
-    digest = fingerprint({p.relative_to(root).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
+    # Releases normalize text to LF; source checkouts may have Git CRLF. Both
+    # run the same Python program. Package manifests still verify exact bytes.
+    digest = fingerprint({p.relative_to(root).as_posix(): hashlib.sha256(p.read_bytes().replace(b"\r\n", b"\n")).hexdigest()
                           for p in sorted(root.rglob("*.py"))
                           if not (p.parent == root and p.name in CORE_EXCLUDED)})
     return Engine, check, Store, describe_source, digest

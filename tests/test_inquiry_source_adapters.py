@@ -143,3 +143,22 @@ def test_selected_db_export_is_read_only_stable_and_excludes_other_sessions(tmp_
 def test_unknown_record_never_creates_calls():
     assert adapter_for({"documentation": {"tool": "write"}}) is None
     assert list(parts({"documentation": {"tool": "write"}})) == []
+
+
+@pytest.mark.parametrize("status,owner,confirmed", [("completed", "cx", True), ("failed", "cx", False),
+                                                ("running", "cx", False), ("completed", "other", False)])
+def test_codex_native_file_change_receipt(tmp_path, status, owner, confirmed):
+    event = {"type": "event_msg", "timestamp": ts(4), "payload": {
+        "type": "item_completed", "thread_id": owner, "item": {"type": "FileChange", "id": "exec-native",
+        "status": status, "changes": {"/proj/A.ets": {"type": "update", "unified_diff": "-gap=4\n+gap=8"}}}}}
+    rows = rows_for("codex")[:1] + [event]
+    s = index(tmp_path, rows)
+    try:
+        writes = s.rows("SELECT * FROM effects WHERE strength='confirmed'")
+        assert bool(writes) == confirmed
+        if confirmed:
+            assert writes[0]["basis"] == "codex_file_change"
+            assert writes[0]["request"] is None
+            assert "-gap=4" in change_outline(change_payloads(s, writes[0]))[0]["text"]
+    finally:
+        s.close()

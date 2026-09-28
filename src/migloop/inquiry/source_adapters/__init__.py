@@ -11,9 +11,12 @@ def adapter_for(record):
     return next((a for a in ADAPTERS if a.matches(record)), None)
 
 
-def parts(record):
+def parts(record, *, owner=None):
     adapter = adapter_for(record)
     if adapter:
+        recorded_owner = getattr(adapter, "observation_owner", lambda _: None)(record)
+        if owner is not None and recorded_owner and recorded_owner != owner:
+            return  # A copied observation remains searchable, not this actor's write.
         for slot, family, role, cid, tool, payload, success in adapter.parts(record):
             if role == "request":
                 payload = normalize_input(tool, payload)

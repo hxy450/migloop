@@ -25,11 +25,25 @@ class CodexAdapter:
             return "user"
         return message_role(p) if p.get("type") == "message" else None
 
+    def observation_owner(self, record):
+        payload = record.get("payload") or {}
+        if record.get("type") == "event_msg" and payload.get("type") == "item_completed":
+            return payload.get("thread_id")
+
     def parts(self, record):
         payload = record.get("payload")
         if not isinstance(payload, dict):
             return
         kind = payload.get("type")
+        if record.get("type") == "event_msg" and kind == "item_completed":
+            item = payload.get("item")
+            if isinstance(item, dict) and item.get("type") == "FileChange":
+                # Native execution receipt from the runtime, not an apply_patch
+                # string found inside exec. Do not pair it to a guessed outer call.
+                success = {"completed": 1, "failed": 0}.get(item.get("status"))
+                yield (0, "codex_file_change", "patch", item.get("id"), "apply_patch",
+                       item.get("changes"), success)
+            return
         if record.get("type") == "response_item":
             if kind in ("function_call", "custom_tool_call"):
                 value = (

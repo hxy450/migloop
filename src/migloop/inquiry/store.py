@@ -267,7 +267,7 @@ class Store:
                 role = input_role(record)
                 if role:
                     db.execute("INSERT INTO input_messages VALUES(?,?)", (ref, role))
-                for slot, family, role, cid, tool, payload, success in parts(record):
+                for slot, family, role, cid, tool, payload, success in parts(record, owner=source.agent):
                     if role in ("result", "patch"):
                         db.execute(
                             "INSERT INTO tool_returns VALUES(?,?,?,?)",
@@ -490,7 +490,7 @@ class Store:
                         None,
                         part["record"],
                         "native_observation",
-                        "patch_apply_end",
+                        "codex_file_change" if part["family"] == "codex_file_change" else "patch_apply_end",
                         None,
                         part["slot"],
                     )
