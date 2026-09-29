@@ -638,7 +638,7 @@
       try {
         var data=await view(scope,"operation",{id:operation});
         box.firstChild.textContent="原文观察 · "+dateTime(data.at);
-        box.appendChild(pills([{cls:data.content!=null?"ok":"warn",t:data.content_kind==="write_body"?"这次写入的全文":data.content_kind==="read_observation"?"Read 返回 · 可能是片段":"只有修改片段，完整内容未知"}]));
+        box.appendChild(pills([{cls:data.content!=null?"ok":"warn",t:data.content_kind==="write_body"?"这次写入的全文":data.content_kind==="read_observation"?"Read 返回 · 可能是片段":data.content_kind==="command_read_observation"?"命令读取回执 · 可能含多个文件":"只有修改片段，完整内容未知"}]));
         if(data.content!=null)paintOriginal(box,data.content);
         else {
           var parts=data.changes.filter(x=>x.kind!=="snapshot_folded");

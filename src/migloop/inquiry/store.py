@@ -470,6 +470,22 @@ class Store:
                        result["at"] if ordered else request["at"], request["record"],
                        result["record"] if ordered else None, "copied_owner" if copied else status,
                        basis, request["slot"], result["slot"] if ordered else None)
+        # Adapters may expose a read observed in a runtime execution receipt.
+        # Its command and returned output must still form one unambiguous pair.
+        for part in db.execute("SELECT * FROM parts WHERE role='read_observation'").fetchall():
+            data = json.loads(part["payload"])
+            if not isinstance(data, dict):
+                continue
+            pair = db.execute(
+                "SELECT * FROM call_pairs WHERE request=? AND request_slot=? AND result=? AND result_slot=?",
+                (part["record"], data.get("request_slot"), part["record"], data.get("result_slot")),
+            ).fetchone()
+            if pair is None:
+                continue
+            effect(data.get("path"), sources[part["source"]], "read",
+                   "confirmed" if part["success"] == 1 and part["at"] is not None else "candidate",
+                   part["at"], pair["request"], pair["result"], "native_observation",
+                   "native_command_read", pair["request_slot"], pair["result_slot"])
         for part in db.execute("SELECT * FROM parts WHERE role='patch'").fetchall():
             changes = json.loads(part["payload"])
             if isinstance(changes, dict):

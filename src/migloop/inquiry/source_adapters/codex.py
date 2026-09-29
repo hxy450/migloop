@@ -1,6 +1,7 @@
 """Codex native rollout JSONL; shell/JS bodies are opaque calls, not nested executions."""
 import json
 from .base import Identity, message_role
+from .codex_commands import execution_parts
 
 
 class CodexAdapter:
@@ -43,6 +44,8 @@ class CodexAdapter:
                 success = {"completed": 1, "failed": 0}.get(item.get("status"))
                 yield (0, "codex_file_change", "patch", item.get("id"), "apply_patch",
                        item.get("changes"), success)
+            elif isinstance(item, dict) and item.get("type") == "CommandExecution":
+                yield from execution_parts(item)
             return
         if record.get("type") == "response_item":
             if kind in ("function_call", "custom_tool_call"):

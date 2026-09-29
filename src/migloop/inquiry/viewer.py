@@ -141,6 +141,9 @@ def viewer_operation(engine, scope, request):
                 )
                 break
         note = "这是此次 Read 实际返回的原文，可能只有片段；不等于已知完整文件。"
+        if operation["basis"] == "native_command_read":
+            content_kind = "command_read_observation"
+            note = "这是原生命令执行回执中的输出；同一次命令可能读取多个文件，下面保留合并输出，不将其冒充当前文件的独立全文。"
     else:
         payloads = change_payloads(engine.store, operation)
         changes = change_outline(payloads)
