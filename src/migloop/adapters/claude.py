@@ -31,6 +31,8 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from .base import SessionCandidate
+from ..audit_events import ClaudeCalls
+from ..stage_signals import claude_boundaries
 from ..blame import replay_file as _blame_replay
 
 
@@ -204,12 +206,15 @@ def result_text(block: dict[str, Any], tur: Any) -> str:
 def load_main_session(path: str) -> list[dict[str, Any]]:
     records: list[dict[str, Any]] = []
     with open(path, encoding="utf-8") as f:
-        for line in f:
+        for line_no, line in enumerate(f, 1):
             line = line.strip()
             if not line:
                 continue
             try:
-                records.append(json.loads(line))
+                record = json.loads(line)
+                if isinstance(record, dict):
+                    record["_source_line"] = line_no
+                    records.append(record)
             except json.JSONDecodeError:
                 continue
     return records
@@ -729,7 +734,7 @@ def _abort_reason(last_rec: Any) -> str | None:
         return None
     msg = last_rec.get("message")
     if not isinstance(msg, dict):
-        return "interrupted"
+        return None  # A trailing metadata record does not prove interruption.
     c = msg.get("content")
     txt = ""
     if isinstance(c, str):
@@ -740,10 +745,6 @@ def _abort_reason(last_rec: Any) -> str | None:
     low = txt.lower()
     if "request interrupted" in low or "stopped by the user" in low:
         return "interrupted"
-    if last_rec.get("type") != "assistant":
-        return "interrupted"
-    if msg.get("stop_reason") not in (None, "end_turn"):
-        return "api_error" if "api error" in low else "interrupted"
     if "api error" in low and "connection" in low:
         return "api_error"
     return None
@@ -1479,6 +1480,7 @@ def load_workflow_runs(
 
 def extract(path: str) -> dict[str, Any]:
     records = load_main_session(path)
+    audit_capture = ClaudeCalls(path)
     # 主会话记录的 uuid 集:子代理转录若整段落在其中,说明上传上来的是主会话快照,不是该代理
     # 自己的轨迹(migbot-runtime-src#46)。只标记不剔除 —— 分析页忠实呈现,审计规则据此点名
     main_uuids: set[str] = {str(r.get("uuid")) for r in records
@@ -1552,6 +1554,7 @@ def extract(path: str) -> dict[str, Any]:
 
     prev_ts = None  # 上一条带时间戳记录
     for i, rec in enumerate(records):
+        audit_capture.observe(rec, i)
         ts = rec.get("timestamp")
         if ts:
             if meta["started_at"] is None:
@@ -1701,21 +1704,7 @@ def extract(path: str) -> dict[str, Any]:
     def norm_skill(name: Any) -> str:
         return (name or "").split(":")[-1]
 
-    pipe_boundaries: list[tuple[int, str]] = []
-    seen_pipeline: set[str] = set()
-    cur_stage: str | None = None
-    for i, rec in enumerate(records):
-        attr = norm_skill(rec.get("attributionSkill"))
-        if attr in PIPELINE_SKILLS and attr != cur_stage:
-            pipe_boundaries.append((i, attr))
-            cur_stage = attr
-            seen_pipeline.add(attr)
-    # 兜底:仅有 Skill 工具调用、没有 attributionSkill 归属的管线 skill 也补一个边界
-    for idx, ts, skill, _ in skill_calls:
-        nskill = norm_skill(skill)
-        if nskill in PIPELINE_SKILLS and nskill not in seen_pipeline:
-            pipe_boundaries.append((idx, nskill))
-            seen_pipeline.add(nskill)
+    pipe_boundaries = claude_boundaries(records, skill_calls)
     # Workflow 模式:主线每次 Workflow 调用开一个阶段(阶段名取脚本 meta.name)。
     # 这样"整段一个 Session"会按编排单元自然拆开，与管线 skill 的阶段等价。
     wf_stage_of_run: dict[str, str] = {}
@@ -1762,6 +1751,7 @@ def extract(path: str) -> dict[str, Any]:
         ts_list: list[str] = [str(r["timestamp"]) for r in seg_records if r.get("timestamp")]
         stages.append({
             "id": f"s{b}",
+            "signal": "native-stage-event" if stage_key != "setup" else "unassigned",
             "stage": stage_key,
             "label": (stage_key[3:] if stage_key.startswith("wf:")
                       else STAGE_LABELS.get(stage_key, stage_key)),
@@ -1784,7 +1774,7 @@ def extract(path: str) -> dict[str, Any]:
         })
 
     # 无任何管线 Skill 调用的通用会话:整段作为单一 Session 阶段展示
-    if len(stages) == 1:
+    if not pipe_boundaries:
         stages[0]["stage"] = "session"
         stages[0]["label"] = "Session"
 
@@ -1917,12 +1907,14 @@ def extract(path: str) -> dict[str, Any]:
                     pending_read: dict[Any, str] = {}   # tool_use_id -> file_path(待从结果取 numLines)
                     # tool_use_id -> (name, input)，从最终输出还原源码行
                     pending_visible: dict[Any, tuple[str, Any]] = {}
+                    child_audit = ClaudeCalls(jl)
                     with open(jl, encoding="utf-8") as f:
-                        for line in f:
+                        for line_no, line in enumerate(f):
                             try:
                                 rec = json.loads(line)
                             except json.JSONDecodeError:
                                 continue
+                            child_audit.observe(rec, line_no)
                             if rec.get("uuid"):
                                 sub_uuids.add(str(rec["uuid"]))
                             ts = rec.get("timestamp")
@@ -2112,6 +2104,8 @@ def extract(path: str) -> dict[str, Any]:
                         entry["active_ms"] = sum(
                             (ms_between(s0, s1) or 0) for s0, s1 in act_segs)
                     entry["aborted"] = _abort_reason(last_rec)
+                    entry["abort_explicit"] = entry["aborted"] is not None
+                    entry["audit_tools"] = child_audit.finish()
                     entry["snapshot_of_main"] = bool(sub_uuids) and sub_uuids <= main_uuids
 
                 if _sig is not None:
@@ -2326,7 +2320,11 @@ def extract(path: str) -> dict[str, Any]:
         tool.pop("_visible_source_lines", None)
         tool.pop("_probed_paths", None)
 
-    return {"meta": meta, "totals": totals, "stages": stages,
+    audit_tools = audit_capture.finish()
+    for item in audit_tools:
+        st = stage_of(item["idx"])
+        item.update(stage=st["stage"], segment=st["id"])
+    return {"meta": meta, "totals": totals, "stages": stages, "audit_tools": audit_tools,
             "tools": tools, "agents": agents, "prompts": prompts, "markers": markers,
             "context_timeline": context_timeline, "billing": billing, "lineage": lineage,
             "workflows": [wf_runs[k] for k in sorted(wf_runs)]}

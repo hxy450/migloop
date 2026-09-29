@@ -2617,8 +2617,18 @@
       box.innerHTML = '<span class="hint">本次渲染没有携带审计数据(旧端点或独立打开)。</span>';
       return;
     }
+    var assessments = A.assessments || [];
+    var unknown = assessments.filter(function(c) { return c.status === "unknown"; }).length;
+    var na = assessments.filter(function(c) { return c.status === "not_applicable"; }).length;
+    var cov = A.coverage || {};
+    var summary = el("p", "hint", "观测审计 · " + (cov.owners || 0) + " 个会话/代理 · " + (cov.calls || 0) +
+      " 条调用 · " + unknown + " 项证据不足 · " + na + " 项不适用。未发现告警不等于迁移验收通过。");
+    box.appendChild(summary);
+    if (cov.material_gaps || (cov.unavailable_owners || []).length) {
+      box.appendChild(el("p", "hint", "材料或代理明细不完整；缺失动作不作否定判断。"));
+    }
     if (!A.findings.length) {
-      box.innerHTML = '<div class="risk-pass">✓ 自动审计通过 · ' + (A.checked || []).length + ' 项检查</div>';
+      box.appendChild(el("div", "hint", "当前可见材料未产生需提示的记录。"));
       return;
     }
     var list = el("div", "risk-list");

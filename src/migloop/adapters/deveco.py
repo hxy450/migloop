@@ -329,6 +329,7 @@ def _attach_bash(entry, inp, output, cwd):
 
 
 def _build_tool_entry(seq, idx, ts, name, inp, call_id, output, state, cwd):
+    from ..audit_events import observation
     state = state or {}
     display = TOOL_MAP.get(name, name)
     entry = {
@@ -342,6 +343,7 @@ def _build_tool_entry(seq, idx, ts, name, inp, call_id, output, state, cwd):
         "tuid": call_id,
         "result": (output or "").strip()[:220],
         "_inp": inp,
+        "audit": observation(display, inp, output, None if state.get("status") not in ("completed", "error", "failed") else not _tool_failed(state, output), call=call_id, idx=idx, ts=ts),
     }
     st = state.get("time")
     if isinstance(st, dict) and isinstance(st.get("start"), (int, float)) \
@@ -1190,6 +1192,7 @@ def _build_child_agents(children, load_parts, stages, cwd, model, billing, wf_in
         result = _texts[-1] if _texts else ((info or {}).get("summary") or "")
         entry = {
             "agent_id": "subagent:" + ch["id"],
+            "audit_tools": [dict(t["audit"]) for t in tools],
             "type": wtype,
             "desc": ch["title"][:240],
             "wf_run": (info or {}).get("run_name"),
@@ -1528,6 +1531,8 @@ def _parse(data, storage_root=None, source_file=None, child_documents=None):
 
     # ---- 失败信号:"Workflow aborted" → aborted ----
     _mark_aborted(agents, workflow_calls)
+    for agent in agents:
+        agent["abort_explicit"] = bool(agent.get("aborted"))
 
     # ---- 有效活动时间 = (主代理 reasoning ∪ tool) ∪ (子代理 reasoning ∪ tool) 的并集 ----
     # 自底向上:凡是没有代理在"思考"或"动手"的时间(等待用户/API 卡顿/编排空档)都不算
@@ -1680,7 +1685,9 @@ def _parse(data, storage_root=None, source_file=None, child_documents=None):
                     "_read_iv", "_read_total", "_read_sources", "_write_events", "_probed"):
             a.pop(key, None)
 
-    return {"meta": meta, "totals": totals, "stages": stages,
+    audit_tools = [{**t["audit"], "stage": t.get("stage"), "segment": t.get("seg"),
+                    "source": source_file, "message_index": t.get("idx")} for t in tools]
+    return {"meta": meta, "totals": totals, "stages": stages, "audit_tools": audit_tools,
             "tools": tools, "agents": agents, "prompts": prompts, "markers": markers,
             "context_timeline": context_timeline, "billing": billing,
             "lineage": lineage, "workflows": workflows,

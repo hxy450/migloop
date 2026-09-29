@@ -147,22 +147,14 @@ def test_spec_orphan_fires_once_code_started() -> None:
 
 
 def test_aborted_agents_grouped_per_stage() -> None:
-    """已启用规则:按阶段聚合一条,汇总浪费 token、点名、锚定阶段。"""
     t = _trace(agents=[
-        {"agent_id": "a1", "desc": "w1", "stage": "a2h-execute",
-         "aborted": "api_error", "output_tokens": 4200, "start_ts": "2026-08-20T01:00:00Z"},
-        {"agent_id": "a2", "desc": "w2", "stage": "a2h-execute",
-         "aborted": "interrupted", "output_tokens": 800},
-        {"agent_id": "a3", "desc": "ok", "stage": "a2h-execute",
-         "aborted": None, "output_tokens": 10},
+        {"agent_id": "a1", "stage": "a2h-execute", "aborted": "api_error", "abort_explicit": True, "output_tokens": 4200},
+        {"agent_id": "a2", "stage": "a2h-execute", "aborted": "interrupted", "abort_explicit": True, "output_tokens": 800},
+        {"agent_id": "a3", "stage": "a2h-execute", "aborted": "interrupted", "output_tokens": 10},
     ])
     fs = [f for f in build_audit(t)["findings"] if f["rule"] == "aborted-agent"]
-    assert len(fs) == 1, "同阶段聚合一条"
-    f = fs[0]
-    assert "5000" in f["detail"], "浪费 token 汇总"
-    assert f["agents"] == ["a1", "a2"]
-    assert f["anchor"]["stage"] == "a2h-execute"
-    assert "白烧" not in f["detail"], "取证词汇不出客户面"
+    assert {a for f in fs for a in f["agents"]} == {"a1", "a2"}
+    assert all("浪费约" not in f["detail"] for f in fs)
 
 
 def test_normal_agents_stay_quiet() -> None:
@@ -208,18 +200,12 @@ def test_rework_lists_multi_writer_files() -> None:
 
 
 def test_findings_sorted_by_severity_and_counted() -> None:
-    t = _trace(
-        stages=[{"stage": "a2h-run"}, {"stage": "a2h-execute"}],   # error
-        agents=[{"agent_id": "aX", "aborted": "interrupted", "output_tokens": 1}],  # warn
-        lineage={"agents": [], "specs": [], "files": [
-            {"path": "e/A.ets", "kind": "ets", "writers": ["a1", "a2"]},  # info
-        ]},
-    )
-    audit = build_audit(t)
-    # 此夹具触发 execute-no-build(error) + aborted-agent(warn,已启用)
-    assert [f["level"] for f in audit["findings"]] == ["error", "warn"]
-    assert audit["counts"] == {"error": 1, "warn": 1, "info": 0}
-    assert len(audit["checked"]) == 11
+    t = _trace(stages=[{"stage": "a2h-execute"}],
+               agents=[{"agent_id": "aX", "aborted": "interrupted", "abort_explicit": True}])
+    result = build_audit(t)
+    assert [f["level"] for f in result["findings"]] == ["warn", "info"]
+    assert result["counts"] == {"error": 0, "warn": 1, "info": 1}
+    assert next(c for c in result["assessments"] if c["rule"] == "execute-no-build")["status"] == "unknown"
 
 
 def test_clean_trace_yields_empty_findings() -> None:
@@ -234,82 +220,48 @@ def test_clean_trace_yields_empty_findings() -> None:
 def test_skill_fail_names_the_skill() -> None:
     t = _trace(tools=[{"name": "Skill", "brief": "a2h-spec", "ok": False, "stage": "a2h-spec"}])
     f = next(x for x in build_audit(t)["findings"] if x["rule"] == "skill-fail")
-    assert f["level"] == "error"
-    assert "a2h-spec" in f["detail"]
+    assert f["level"] == "warn" and "a2h-spec" in f["detail"]
+    assert f["evidence"]
     ok = _trace(tools=[{"name": "Skill", "brief": "a2h-spec", "ok": True, "stage": "a2h-spec"}])
     assert "skill-fail" not in _rules_hit(ok)
 
 
 def test_script_failures_split_per_stage_and_graded() -> None:
-    """按阶段各出一条(点击跳转语义对齐),级别按该阶段自身次数定。"""
     t = _trace(tools=[{"name": "Bash", "ok": False, "stage": "a2h-execute",
                        "ts": "2026-08-19T08:00:00Z"}] * 6
-                     + [{"name": "Bash", "ok": False, "stage": "a2h-spec"}] * 2)
-    fs = [x for x in build_audit(t)["findings"] if x["rule"] == "script-fail"]
-    assert len(fs) == 2, "两个阶段各一条"
-    by = {f["anchor"]["stage"]: f for f in fs}
-    assert by["a2h-execute"]["level"] == "warn"
-    assert "6 次脚本失败" in by["a2h-execute"]["detail"]
-    assert "08:00" in by["a2h-execute"]["detail"], "首次失败时刻要写明"
-    assert by["a2h-spec"]["level"] == "info"
+                     + [{"name": "PowerShell", "ok": False, "stage": "a2h-spec"}] * 2)
+    result = build_audit(t)
+    check = next(c for c in result["assessments"] if c["rule"] == "script-fail")
+    assert check["failed_calls"] == 8
+    fs = [x for x in result["findings"] if x["rule"] == "script-fail"]
+    assert len(fs) == 1 and fs[0]["level"] == "warn"
+    assert len(fs[0]["evidence"]) == 8
 
 
 def test_execute_no_build_only_when_execute_lacks_markers() -> None:
-    base_stages = [{"stage": "a2h-run"}, {"stage": "a2h-spec"}, {"stage": "a2h-plan"},
-                   {"stage": "a2h-execute"}]
-    silent = _trace(stages=base_stages,
-                    tools=[{"name": "Bash", "brief": "ls -la", "ok": True, "stage": "a2h-execute"}])
-    f = next(x for x in build_audit(silent)["findings"] if x["rule"] == "execute-no-build")
-    assert f["level"] == "error"
-    built = _trace(stages=base_stages,
-                   tools=[{"name": "Bash", "brief": "ohpm install --all", "ok": True,
-                           "stage": "a2h-execute"}])
+    stages = [{"stage": "a2h-execute"}]
+    dependency = _trace(stages=stages, tools=[{"name": "Bash", "brief": "ohpm install --all", "ok": True, "stage": "a2h-execute"}])
+    f = next(f for f in build_audit(dependency)["findings"] if f["rule"] == "execute-no-build")
+    assert f["level"] == "info"
+    built = _trace(stages=stages, tools=[{"name": "PowerShell", "brief": "hvigorw assembleHap", "ok": True, "stage": "a2h-execute"}])
     assert "execute-no-build" not in _rules_hit(built)
-    # 没进 execute 阶段就不评这条
     assert "execute-no-build" not in _rules_hit(_trace())
 
 
 def test_spec_stage_dispatch_disciplines() -> None:
-    """spec 阶段要起 analyzer;spec 要由子代理写 —— 两条独立报。"""
-    t = _trace(
-        stages=[{"stage": "a2h-run"}, {"stage": "a2h-spec"}, {"stage": "a2h-plan"}],
-        lineage={"agents": [
-            {"agent_id": "w1", "stage": "a2h-spec", "type": "a2h-migration-worker",
-             "n_spec_w": 0},
-        ], "specs": [], "files": []},
-    )
-    hit = _rules_hit(t)
-    assert "spec-no-analyzer" in hit
-    assert "spec-main-write" in hit
-    # spec 仍是末阶段(进行中)不评 —— analyzer 可能还没起
-    ongoing = _trace(stages=[{"stage": "a2h-run"}, {"stage": "a2h-spec"}],
-                     lineage={"agents": [], "specs": [], "files": []})
-    assert "spec-no-analyzer" not in _rules_hit(ongoing)
-    good = _trace(
-        stages=[{"stage": "a2h-run"}, {"stage": "a2h-spec"}, {"stage": "a2h-plan"}],
-        lineage={"agents": [
-            {"agent_id": "an1", "stage": "a2h-spec", "type": "a2h-android-analyzer",
-             "n_spec_w": 0},
-            {"agent_id": "w1", "stage": "a2h-spec", "type": "a2h-migration-worker",
-             "n_spec_w": 4},
-        ], "specs": [], "files": []},
-    )
-    hit2 = _rules_hit(good)
-    assert "spec-no-analyzer" not in hit2
-    assert "spec-main-write" not in hit2
+    t = _trace(stages=[{"stage": "a2h-spec"}, {"stage": "a2h-plan"}],
+               lineage={"agents": [{"agent_id": "worker", "stage": "a2h-spec", "n_spec_w": 0}], "specs": [], "files": []})
+    result = build_audit(t)
+    assert not {"spec-no-analyzer", "spec-main-write"} & _rules_hit(t)
+    assert all(c["status"] == "not_applicable" for c in result["assessments"] if c["rule"].startswith("spec-"))
 
 
 def test_verify_emulator_rule() -> None:
-    pipeline_done = [{"stage": "a2h-run"}, {"stage": "a2h-spec"}, {"stage": "a2h-plan"},
-                     {"stage": "a2h-execute"}, {"stage": "a2h-verify"}]
-    silent = _trace(stages=pipeline_done,
-                    tools=[{"name": "Bash", "brief": "cat report.md", "ok": True,
-                            "stage": "a2h-verify"}])
+    silent = _trace(stages=[{"stage": "a2h-verify"}], tools=[])
     f = next(x for x in build_audit(silent)["findings"] if x["rule"] == "verify-no-emulator")
-    assert f["level"] == "warn"
-    live = _trace(stages=pipeline_done,
-                  tools=[{"name": "Bash", "brief": "hdc shell aa start ...", "ok": True,
-                          "stage": "a2h-verify"}])
+    assert f["level"] == "info" and "证据不足" in f["title"]
+    live = _trace(stages=[{"stage": "a2h-verify"}],
+                  tools=[{"name": "PowerShell", "brief": "hdc shell aa start ...", "ok": True, "stage": "a2h-verify"}])
     assert "verify-no-emulator" not in _rules_hit(live)
     assert "verify-no-emulator" not in _rules_hit(_trace())
 
@@ -334,17 +286,12 @@ def test_verify_dependency_chain_layers() -> None:
 
 
 def test_findings_carry_evidence_anchor() -> None:
-    """报告页「查看现场」跳转吃 anchor:skill-fail 带阶段+时刻,缺失类带阶段。"""
-    t = _trace(
-        stages=[{"stage": "a2h-run"}, {"stage": "a2h-spec"}, {"stage": "a2h-plan"},
-                {"stage": "a2h-execute"}],
-        tools=[{"name": "Skill", "brief": "a2h-plan", "ok": False, "stage": "a2h-plan",
-                "ts": "2026-08-19T08:20:00Z"},
-               {"name": "Bash", "brief": "ls", "ok": True, "stage": "a2h-execute"}])
+    t = _trace(stages=[{"stage": "a2h-execute"}],
+               tools=[{"name": "Skill", "brief": "missing", "ok": False, "stage": "a2h-execute", "ts": "2026-01-01T00:00:00Z"}])
     by = {f["rule"]: f for f in build_audit(t)["findings"]}
-    assert by["skill-fail"]["anchor"] == {"stage": "a2h-plan", "ts": "2026-08-19T08:20:00Z"}
-    assert "08:20" in by["skill-fail"]["detail"], "detail 要写发生时刻"
     assert by["execute-no-build"]["anchor"] == {"stage": "a2h-execute"}
+    assert by["skill-fail"]["anchor"]["ts"] == "2026-01-01T00:00:00Z"
+    assert by["skill-fail"]["evidence"][0]["outcome"] == "failed"
 
 
 def test_fix_chains_card_wraps_ledger_chains() -> None:
@@ -381,7 +328,7 @@ def test_snapshot_agents_named_and_kept_out_of_aborted() -> None:
         {"agent_id": "a2", "type": "hmos-builder", "stage": "arkts-visual-verify",
          "aborted": "interrupted", "output_tokens": 100, "snapshot_of_main": True},
         {"agent_id": "a3", "desc": "real", "stage": "a2h-execute",
-         "aborted": "api_error", "output_tokens": 7},
+         "aborted": "api_error", "abort_explicit": True, "output_tokens": 7},
     ])
     found = {f["rule"]: f for f in build_audit(t)["findings"]}
     snap = found["agent-snapshot"]
@@ -400,48 +347,19 @@ def test_snapshot_rule_quiet_without_flag() -> None:
 
 
 def test_execute_no_build_defers_to_builds_elsewhere_in_pool() -> None:
-    """DiceRoller 0903:主线 execute 里确实没跑构建,构建发生在 loop engine 后起的 a2h-build 会话里。
-    报告页只看主线一个 root 就报 error,是误报 —— 池子里别的会话有构建时降为 info 并点名在哪一会话何时构建。"""
-    stages = [{"stage": "a2h-run"}, {"stage": "a2h-spec"}, {"stage": "a2h-execute"}, {"stage": "a2h-verify"}]
-    silent = _trace(stages=stages, tools=[{"name": "Bash", "brief": "ls", "ok": True, "stage": "a2h-execute"}])
-    assert next(f for f in build_audit(silent)["findings"] if f["rule"] == "execute-no-build")["level"] == "error"
-    pool = [{"sid8": "5bee19c2", "ts": "2026-09-03T20:25:10Z", "stage": "a2h-build",
-             "cmd": "hvigorw assembleHap --mode module -p product=default"},
-            {"sid8": "efdc8b71", "ts": "2026-09-03T20:40:00Z", "stage": "a2h-build", "cmd": "ohpm install --all"}]
-    a = build_audit(silent, pool_builds=pool)
-    f = next(x for x in a["findings"] if x["rule"] == "execute-no-build")
-    assert f["level"] == "info"
-    assert "5bee19c2" in f["detail"] and "a2h-build" in f["detail"] and "20:25" in f["detail"]
-    assert a["counts"]["error"] == 0
-    # 账本证据显示主线自己在 execute 期间构建过(trace 的 brief 被长 cd 前缀截断才没看见)→ 不出项
-    silent["meta"] = {"session_id": "81e0a463-c9d3-4a7a-a671-b7f064830af1"}
-    own = [{"sid8": "81e0a463", "ts": "2026-09-03T15:22:00Z", "stage": "a2h-execute",
-            "cmd": "cd /very/long/prefix/… && hvigorw assembleHap"}]
-    assert "execute-no-build" not in {x["rule"] for x in build_audit(silent, pool_builds=own)["findings"]}
-    # 主线自己构建过,池子证据不改变结论(本来就不报)
-    built = _trace(stages=stages, tools=[{"name": "Bash", "brief": "hvigorw assembleHap", "ok": True,
-                                          "stage": "a2h-execute"}])
-    assert "execute-no-build" not in _rules_hit(built)
+    silent = _trace(stages=[{"stage": "a2h-execute"}], tools=[])
+    old = [{"sid8": "other", "cmd": "hvigorw assembleHap", "stage": "a2h-build"}]
+    # The old marker-only ledger has no tool receipt and cannot certify a build.
+    assert "execute-no-build" in {f["rule"] for f in build_audit(silent, pool_builds=old)["findings"]}
+    other = _trace(stages=[{"stage": "a2h-build"}], tools=[{"name": "Bash", "brief": "hvigorw assembleHap", "ok": True, "stage": "a2h-build"}])
+    other["meta"] = {"session_id": "other"}
+    assert "execute-no-build" not in {f["rule"] for f in build_audit(silent, pool_traces=[other])["findings"]}
 
 
 def test_spec_no_analyzer_defers_to_analyzers_elsewhere_in_pool() -> None:
-    """DiceRoller 0903:spec 从首启会话 aab6a114 开始(analyzer 在那里起),在 loop engine 续接的主线里收尾;
-    只看主线一个 root 就报「未起分析代理」是误报 —— 池子里别的会话起过就降为 info 并点名。"""
-    t = _trace(
-        stages=[{"stage": "a2h-run"}, {"stage": "a2h-spec"}, {"stage": "a2h-plan"}],
-        lineage={"agents": [{"agent_id": "w1", "stage": "a2h-spec", "type": "a2h-migration-worker",
-                             "n_spec_w": 2}], "specs": [], "files": []},
-    )
-    assert next(f for f in build_audit(t)["findings"] if f["rule"] == "spec-no-analyzer")["level"] == "warn"
-    pool = [{"agent_id": "x1", "stage": "a2h-spec", "type": "a2h-android-analyzer", "sid8": "aab6a114"},
-            {"agent_id": "x2", "stage": "a2h-execute", "type": "a2h-android-analyzer", "sid8": "aab6a114"}]
-    a = build_audit(t, pool_agents=pool)
-    f = next(x for x in a["findings"] if x["rule"] == "spec-no-analyzer")
-    assert f["level"] == "info" and "aab6a114" in f["detail"] and "1 个" in f["detail"]
-    assert a["counts"]["warn"] == 0
-    # 池子里只有非 spec 阶段的 analyzer:仍是 warn
-    assert next(f for f in build_audit(t, pool_agents=pool[1:])["findings"]
-                if f["rule"] == "spec-no-analyzer")["level"] == "warn"
+    t = _trace(stages=[{"stage": "a2h-spec"}, {"stage": "a2h-plan"}])
+    for pool in ([], [{"agent_id": "a", "type": "analyzer", "stage": "a2h-spec"}]):
+        assert "spec-no-analyzer" not in {f["rule"] for f in build_audit(t, pool_agents=pool)["findings"]}
 
 
 def test_fixer_policy_counts_post_pipeline_stages() -> None:

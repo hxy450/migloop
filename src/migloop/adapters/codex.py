@@ -521,12 +521,14 @@ def _tool_entry(
     idx: int, ts: str | None, name: str, inp: Any, call_id: Any,
     output: str | None, output_ts: str | None, brief: str | None = None,
 ) -> dict[str, Any]:
+    from ..audit_events import observation
     return {
         "idx": idx, "ts": ts, "name": name,
         "brief": brief if brief is not None else common.brief_tool_target(name, inp),
         "ok": not _tool_failed(output),
         "dur_ms": _duration_ms(ts, output_ts, output),
         "tuid": call_id, "result": (output or "").strip()[:220], "_inp": inp,
+        "audit": observation(name, inp, output, None if output_ts is None else not _tool_failed(output), call=call_id, idx=idx, ts=ts),
     }
 
 
@@ -828,6 +830,8 @@ def _child_product(tree_item: dict[str, Any]) -> dict[str, Any]:
 
     rollout = _parse_rollout(path, tree_item)
     entry = _agent_entry(rollout, _NO_STAGE, None)
+    for event in entry.get("audit_tools", []):
+        event.update(source=path, line=(event.get("idx") or 0) + 1)
     product = {
         "id": rollout["id"],
         "parent": rollout.get("parent"),
@@ -898,12 +902,30 @@ def _ts_seconds(ts: Any) -> float | None:
 
 
 def _stage_boundaries(root: dict[str, Any]) -> list[tuple[int, str]]:
+    from ..stage_signals import normalize
+    from ..audit_events import segments
     markers: list[tuple[int, str]] = []
     for call in root["calls"]:
-        for skill in _skill_names(call.get("raw") or ""):
-            skill = skill.split(":")[-1]
-            if skill in _CODEX_STAGE_SKILLS:
+        raw = call.get("raw") or ""
+        args = _decode_arguments(raw)
+        if str(call.get("name", "")).lower() == "skill":
+            skill = normalize(args.get("skill") or args.get("name"))
+            if skill:
                 markers.append((call["idx"], skill))
+            continue
+        commands = [s["command"] for s in _extract_shell_calls(raw, root.get("cwd"))]
+        if not commands:
+            commands = [args.get("command") or args.get("cmd") or raw]
+        names = []
+        for command in commands:
+            for words in segments(command):
+                if words and words[0].lower() in ("cat", "get-content", "sed", "head", "type"):
+                    names.extend(normalize(s) for s in _skill_names(" ".join(words)))
+        names = list(dict.fromkeys(n for n in names if n))
+        # Reading several stage skills together is preparation, not a timeline
+        # of phase transitions. A single read remains a labelled weak signal.
+        if len(names) == 1:
+            markers.append((call["idx"], names[0]))
     # Preserve textual/call order for multiple skill paths in one command.
     # Tuple sorting would alphabetize equal-index skills (Build before Run),
     # inventing a stage transition that never happened.
@@ -917,32 +939,6 @@ def _stage_boundaries(root: dict[str, Any]) -> list[tuple[int, str]]:
         transitions.append((idx, skill))
         used_idx.add(idx)
         current = skill
-    # 浏览批次去噪:开场技能清单/一条命令引用多个技能,会造出几秒到几十秒的
-    # 假阶段(实测 AIPPT 生成会话开场 1 分钟连环 execute/plan/spec/verify)。
-    # 持续不足 _STAGE_MIN_SPAN_S 的段不是真实阶段:删掉后其区间归前段
-    # (开场批次归 setup),同名相邻合并,迭代至稳定;真实的多轮循环保留。
-    ts_by_idx: dict[int, float] = {}
-    for call in root["calls"]:
-        sec = _ts_seconds(call.get("ts"))
-        if sec is not None:
-            ts_by_idx[call["idx"]] = sec
-    changed = True
-    while changed and len(transitions) > 1:
-        changed = False
-        for i in range(len(transitions)):
-            t0 = ts_by_idx.get(transitions[i][0])
-            t1 = (ts_by_idx.get(transitions[i + 1][0])
-                  if i + 1 < len(transitions) else None)
-            if t0 is not None and t1 is not None and t1 - t0 < _STAGE_MIN_SPAN_S:
-                del transitions[i]
-                j = 1
-                while j < len(transitions):
-                    if transitions[j][1] == transitions[j - 1][1]:
-                        del transitions[j]
-                    else:
-                        j += 1
-                changed = True
-                break
     if not transitions:
         return [(0, "session")]
     rows = [(0, "setup")] if transitions[0][0] > 0 else []
@@ -965,6 +961,7 @@ def _build_stages(root: dict[str, Any]) -> list[dict[str, Any]]:
             label += " ·%d" % seen[key]
         stages.append({
             "id": "s%d" % pos, "stage": key, "label": label,
+            "signal": "skill-load-hint" if key not in ("session", "setup") else "unassigned",
             "start_idx": start_idx, "end_idx": end_idx,
             "start_ts": min(times) if times else None,
             "end_ts": max(times) if times else None,
@@ -1068,7 +1065,9 @@ def _agent_entry(
         "output_tokens": output, "tool_uses": len(rollout["tools"]),
         "tool_counts": dict(Counter(tool["name"] for tool in rollout["tools"])),
         "status": "completed" if rollout["completed"] else "unknown",
-        "aborted": None if rollout["completed"] else "interrupted",
+        "aborted": None,  # Missing completion may be live/truncated, not an interruption.
+        "abort_explicit": False,
+        "audit_tools": [dict(t["audit"]) for t in rollout["tools"] if "audit" in t],
         "model": rollout["model"], "result": rollout["result"],
         "skills": dict(skills), "skill_calls": [],
         "out_split": {"thinking": reasoning, "text": text_out,
@@ -1204,6 +1203,8 @@ def extract(path: str, sessions_root: str | None = None) -> dict[str, Any]:
         "record_count": root["record_count"] + sum(c["record_count"] for c in children),
     }
     lineage = common.build_lineage(agents, root["tools"], root["cwd"])
+    audit_tools = [{**t["audit"], "stage": t.get("stage"), "segment": t.get("seg"), "source": path,
+                    "line": t.get("idx", 0) + 1} for t in root["tools"] if "audit" in t]
 
     for agent in agents:
         # 与 claude.py 同款:派发指令摘录保留(抽屉「派发指令」栏用),其余临时字段剥离
@@ -1240,7 +1241,7 @@ def extract(path: str, sessions_root: str | None = None) -> dict[str, Any]:
                               if tool["name"] in ("Write", "Edit") and tool.get("brief")}),
         "compactions": len(root["markers"]),
     }
-    return {"meta": meta, "totals": totals, "stages": stages,
+    return {"meta": meta, "totals": totals, "stages": stages, "audit_tools": audit_tools,
             "tools": root["tools"], "agents": agents, "prompts": root["prompts"],
             "markers": root["markers"], "context_timeline": context_timeline,
             "billing": billing, "lineage": lineage, "workflows": []}
