@@ -1192,7 +1192,7 @@ def _build_child_agents(children, load_parts, stages, cwd, model, billing, wf_in
         result = _texts[-1] if _texts else ((info or {}).get("summary") or "")
         entry = {
             "agent_id": "subagent:" + ch["id"],
-            "audit_tools": [dict(t["audit"]) for t in tools],
+            "audit_tools": [{**t["audit"], "source": "deveco:" + ch["id"]} for t in tools],
             "type": wtype,
             "desc": ch["title"][:240],
             "wf_run": (info or {}).get("run_name"),
@@ -1667,7 +1667,8 @@ def _parse(data, storage_root=None, source_file=None, child_documents=None):
         "main_output_tokens": main_out + reasoning_tokens,
         "subagent_output_tokens": sum(a["output_tokens"] for a in agents),
         "aborted_agents": sum(1 for a in agents if a.get("aborted")),
-        "waste_output_tokens": sum(a["output_tokens"] for a in agents if a.get("aborted")),
+        "interrupted_output_tokens": sum(a["output_tokens"] for a in agents if a.get("abort_explicit")),
+        "waste_output_tokens": None,
         "output_split": {k: int(v) for k, v in split.items()},
         "user_prompts": len(prompts),
         "files_touched": len({t.get("brief") for t in tools

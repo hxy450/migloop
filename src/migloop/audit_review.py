@@ -1,5 +1,15 @@
 """Migration-wide, evidence-bounded audit. No absence-to-failure inference."""
+from datetime import datetime
+
 from .audit_events import collect, observation, phase
+
+
+def instant(value):
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        return parsed.timestamp() if parsed.tzinfo is not None else None
+    except (TypeError, AttributeError, ValueError, OverflowError):
+        return None
 
 
 def run(traces, *, material_gaps=False):
@@ -25,14 +35,14 @@ def run(traces, *, material_gaps=False):
             key = (row.get("owner"), row.get("call") or row.get("idx"), row.get("ts"), row.get("input_hash"))
             if key not in unique or (not unique[key].get("stage") and row.get("stage")):
                 unique[key] = row
-    rows = sorted(unique.values(), key=lambda r: str(r.get("ts") or ""))
+    rows = sorted(unique.values(), key=lambda r: instant(r.get("ts")) or 0)
     findings, checks = [], []
 
     def finding(rule, level, title, detail, evidence):
         first = evidence[0] if evidence else {}
         findings.append({"rule": rule, "level": level, "title": title, "detail": detail,
                          "agents": sorted({str(r.get("owner")) for r in evidence}), "paths": [],
-                         "anchor": {"stage": first.get("stage"), "ts": first.get("ts")},
+                         "anchor": {"stage": first.get("stage"), "segment": first.get("segment"), "ts": first.get("ts"), "owner": first.get("owner")},
                          "evidence": [{k: r.get(k) for k in ("owner", "call", "source", "line", "ts", "outcome")} for r in evidence[:12]]})
 
     # Count actual failed calls across all agents. A retry is only recognized for
@@ -43,7 +53,8 @@ def run(traces, *, material_gaps=False):
         for row in failures:
             retry = any(r.get("owner") == row.get("owner") and r["name"] == row["name"]
                         and r["input_hash"] == row["input_hash"] and r["outcome"] == "returned"
-                        and r.get("ts") and row.get("ts") and r["ts"] > row["ts"] for r in rows)
+                        and instant(r.get("ts")) is not None and instant(row.get("ts")) is not None
+                        and instant(r["ts"]) > instant(row["ts"]) for r in rows)
             (recovered if retry else unresolved).append(row)
         state = "failed" if unresolved else ("recovered" if recovered else "unknown" if material_gaps or unavailable or not rows else "observed")
         checks.append({"rule": rule, "status": state, "failed_calls": len(failures), "recovered_calls": len(recovered)})
@@ -70,8 +81,8 @@ def run(traces, *, material_gaps=False):
                     phase(r.get("stage")) == "verify" or r.get("stage") in verify_names]
         returned = [r for r in relevant if r["outcome"] == "returned"]
         failed = [r for r in relevant if r["outcome"] == "failed"]
-        status = ("not_applicable" if not applicable else
-                  "observed" if returned else "failed" if failed else "unknown")
+        status = ("observed" if returned else "not_applicable" if not applicable else
+                  "failed" if failed else "unknown")
         checks.append({"rule": rule, "status": status, "observed_calls": len(returned),
                        "failed_calls": len(failed), "context_calls": len(candidates),
                        "build_success_receipts": sum(bool(r.get("build_success")) for r in returned)})
@@ -100,5 +111,6 @@ def run(traces, *, material_gaps=False):
                    {"rule": "spec-main-write", "status": "not_applicable", "reason": "由谁写规格是流水线策略，不是通用缺陷"}])
     return {"findings": findings, "assessments": checks,
             "coverage": {"owners": len(owners), "calls": len(rows), "material_gaps": bool(material_gaps),
+                         "hint_stages": sum(s.get("signal") == "skill-load-hint" for _, s in stages),
                          "unavailable_owners": sorted(set(str(x) for x in unavailable)),
                          "scope": "provided migration roots and their descendants"}}

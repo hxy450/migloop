@@ -2293,7 +2293,8 @@ def extract(path: str) -> dict[str, Any]:
         "subagent_output_tokens": sum(a["output_tokens"] for a in agents),
         # 白烧 = 异常收尾(中断/断连)agent 烧掉的 output——产物多半作废、还要补跑
         "aborted_agents": sum(1 for a in agents if a.get("aborted")),
-        "waste_output_tokens": sum(a["output_tokens"] for a in agents if a.get("aborted")),
+        "interrupted_output_tokens": sum(a["output_tokens"] for a in agents if a.get("abort_explicit")),
+        "waste_output_tokens": None,  # Unknown: interrupted output may be reused.
         "output_split": {k: int(round(v)) for k, v in g_split.items()},
         "user_prompts": len(prompts),
         "files_touched": len({t["brief"] for t in tools if t["name"] in ("Write", "Edit")}),

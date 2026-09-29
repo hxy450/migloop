@@ -734,6 +734,15 @@ def report_trace(path: str, *, static: bool = False, with_chains: bool = True,
     pool_agents: list[dict[str, Any]] | None = None
     pool_traces = []
     cwd = str((data.get("meta") or {}).get("cwd") or "")
+    audit_gaps = False
+    # Only explicitly frozen roots belong to this audit scope. Same-directory
+    # historical migrations may be useful for lineage, not for clearing warnings.
+    for pp in scope["roots"]:
+        if pp != path:
+            try:
+                pool_traces.append(extract_trace(pp, storage_root))
+            except Exception:
+                audit_gaps = True
     if with_chains and fmt in _ATOM_FORMATS:
         try:
             chains = list(fixchain_payload(path).get("chains") or [])
@@ -743,14 +752,13 @@ def report_trace(path: str, *, static: bool = False, with_chains: bool = True,
             pool_agents = []
             for pp in prior_roots(fmt, path, cwd):
                 tr = extract_trace(pp)
-                pool_traces.append(tr)
                 sid8 = str((tr.get("meta") or {}).get("session_id") or "")[:8]
                 pool_agents += [{**a, "sid8": sid8} for a in (tr.get("lineage") or {}).get("agents") or []
                                 if isinstance(a, dict)]
         except Exception:
             chains = None                          # 链算不出不拖垮报告
     data["audit"] = audit.build_audit(data, fix_chains=chains, pool_builds=pool_builds,
-                                      pool_agents=pool_agents, pool_traces=pool_traces)
+                                      pool_agents=pool_agents, pool_traces=pool_traces, material_gaps=audit_gaps)
     fixed_scope = scope["mode"] == "frozen_anchor"
     later = [] if fixed_scope else later_roots(fmt, path, cwd)
     prior = [] if fixed_scope else prior_roots(fmt, path, cwd)[:1]

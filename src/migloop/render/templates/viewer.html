@@ -2624,6 +2624,22 @@
     var summary = el("p", "hint", "观测审计 · " + (cov.owners || 0) + " 个会话/代理 · " + (cov.calls || 0) +
       " 条调用 · " + unknown + " 项证据不足 · " + na + " 项不适用。未发现告警不等于迁移验收通过。");
     box.appendChild(summary);
+    if (cov.hint_stages) {
+      box.appendChild(el("p", "hint", cov.hint_stages + " 个阶段依据 Skill 读取推定，代表加载线索，不证明阶段已经执行完成。"));
+    }
+    if (assessments.length) {
+      var coverageDetails = el("details", "");
+      coverageDetails.appendChild(el("summary", "hint", "检查范围与结果"));
+      var checkNames = {"skill-fail":"Skill 调用", "script-fail":"脚本调用", "execute-no-build":"构建调用",
+        "verify-no-emulator":"设备操作", "verify-no-install":"安装调用", "verify-no-screenshot":"设备截图",
+        "spec-no-analyzer":"分析代理命名策略", "spec-main-write":"规格写者策略"};
+      var stateNames = {observed:"已观测", failed:"有失败记录", recovered:"已见同参重试成功", unknown:"证据不足", not_applicable:"不适用"};
+      assessments.forEach(function(c) {
+        coverageDetails.appendChild(el("p", "hint", (checkNames[c.rule] || c.rule) + "：" + (stateNames[c.status] || c.status) +
+          (c.observed_calls !== undefined ? " · " + c.observed_calls + " 次返回成功的调用" : "") + (c.reason ? " · " + c.reason : "")));
+      });
+      box.appendChild(coverageDetails);
+    }
     if (cov.material_gaps || (cov.unavailable_owners || []).length) {
       box.appendChild(el("p", "hint", "材料或代理明细不完整；缺失动作不作否定判断。"));
     }
@@ -2640,6 +2656,16 @@
       var t = el("p", "risk-t", f.title);
       bd.appendChild(t);
       bd.appendChild(el("p", "risk-d", f.detail));
+      if (f.evidence && f.evidence.length) {
+        var evidenceDetails = el("details", "");
+        evidenceDetails.addEventListener("click", function(ev) { ev.stopPropagation(); });
+        evidenceDetails.appendChild(el("summary", "hint", "调用依据"));
+        f.evidence.forEach(function(e) {
+          evidenceDetails.appendChild(el("p", "hint", [e.owner, e.ts, e.call,
+            e.source ? e.source.split(/[\\/]/).pop() + (e.line ? ":" + e.line : "") : "", e.outcome].filter(Boolean).join(" · ")));
+        });
+        bd.appendChild(evidenceDetails);
+      }
       // 链路可视化在独立页(纯文字版没人看得懂) —— 这里只留跳转按钮
       if (f.chain && f.chain.length && !(D.urls && !D.urls.fixchain)) {
         var goChain = el("p", "risk-d");
@@ -2655,8 +2681,11 @@
       it.appendChild(bd);
       // 证据锚点:点击跳到 06 对应阶段卡并闪烁;带时刻的顺便放大时间轴
       var anc = f.anchor || {};
-      var target = anc.stage
-        ? document.querySelector('[data-stage-card="' + anc.stage + '"]') : null;
+      var localOwner = !anc.owner || anc.owner === (D.meta || {}).session_id;
+      var target = localOwner && anc.segment ? document.getElementById("card-" + anc.segment) : localOwner && anc.stage
+        ? Array.from(document.querySelectorAll('[data-stage-card]')).find(function(node) {
+            return node.getAttribute("data-stage-card") === anc.stage;
+          }) : null;
       if (target) {
         it.classList.add("go");
         it.appendChild(el("span", "risk-go", "查看现场 →"));

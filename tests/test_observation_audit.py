@@ -100,6 +100,14 @@ def test_ongoing_agent_and_metadata_tail_are_not_abort():
     assert not [f for f in build_audit(trace(agents=[{"agent_id": "live", "aborted": "interrupted"}]))["findings"] if f["rule"] == "aborted-agent"]
 
 
+def test_codex_native_abort_cleared_by_resumed_turn():
+    state = codex._new_scan_state()
+    codex._scan_record(state, 0, {"type": "event_msg", "payload": {"type": "turn_aborted"}})
+    assert state["abort_explicit"] and not state["completed"]
+    codex._scan_record(state, 1, {"type": "event_msg", "payload": {"type": "task_started"}})
+    assert not state["abort_explicit"] and not state["completed"]
+
+
 def test_claude_result_projection_retains_action_and_source():
     c = ClaudeCalls("worker.jsonl")
     c.observe({"timestamp": "2026-01-01T00:00:00Z", "message": {"content": [{"type": "tool_use", "name": "Bash", "id": "a", "input": {"command": "hvigorw assembleHap"}}]}}, 4)
@@ -133,3 +141,4 @@ def test_codex_short_stage_preserved_and_bulk_read_not_a_transition():
     assert codex._stage_boundaries({"calls":calls}) == [(0,"a2h-execute"),(1,"a2h-verify")]
     assert codex._stage_boundaries({"calls":[{"idx":0,"raw":"cat /skills/a2h-spec/SKILL.md /skills/a2h-plan/SKILL.md"}]}) == [(0,"session")]
     assert codex._stage_boundaries({"calls":[{"idx":0,"raw":"echo /skills/a2h-verify/SKILL.md"}]}) == [(0,"session")]
+    assert codex._stage_boundaries({"calls":[{"idx":0,"raw":"// /skills/a2h-verify/SKILL.md\nconst x = 1;"}]}) == [(0,"session")]

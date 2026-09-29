@@ -688,6 +688,13 @@ def _scan_record(s: dict[str, Any], idx: int, record: dict[str, Any]) -> None:
             s["last_message"] = str(payload.get("message"))[:300]
         elif ptype == "task_complete":
             s["completed"] = True
+            s["abort_explicit"] = False
+        elif ptype == "task_started":
+            s["completed"] = False
+            s["abort_explicit"] = False
+        elif ptype in ("turn_aborted", "task_aborted"):
+            s["completed"] = False
+            s["abort_explicit"] = True
         elif ptype == "token_count" and isinstance(payload.get("info"), dict):
             info = payload["info"]
             total = dict(info.get("total_token_usage") or {})
@@ -788,6 +795,7 @@ def _emit(s: dict[str, Any], path: str, tree_item: dict[str, Any] | None = None)
         "token_points": token_points,
         "markers": [dict(m) for m in s["markers"]],
         "completed": s["completed"], "result": s["last_message"],
+        "abort_explicit": s.get("abort_explicit", False),
         "first_message": s["first_message"],
         "text_chars": s["text_chars"], "tool_chars": s["tool_chars"],
     }
@@ -1065,8 +1073,8 @@ def _agent_entry(
         "output_tokens": output, "tool_uses": len(rollout["tools"]),
         "tool_counts": dict(Counter(tool["name"] for tool in rollout["tools"])),
         "status": "completed" if rollout["completed"] else "unknown",
-        "aborted": None,  # Missing completion may be live/truncated, not an interruption.
-        "abort_explicit": False,
+        "aborted": "interrupted" if rollout.get("abort_explicit") else None,
+        "abort_explicit": rollout.get("abort_explicit", False),
         "audit_tools": [dict(t["audit"]) for t in rollout["tools"] if "audit" in t],
         "model": rollout["model"], "result": rollout["result"],
         "skills": dict(skills), "skill_calls": [],
@@ -1235,7 +1243,8 @@ def extract(path: str, sessions_root: str | None = None) -> dict[str, Any]:
         "agent_calls": len(agents), "subagent_transcripts": len(agents),
         "main_output_tokens": main_out, "subagent_output_tokens": sub_out,
         "aborted_agents": sum(1 for agent in agents if agent.get("aborted")),
-        "waste_output_tokens": sum(agent["output_tokens"] for agent in agents if agent.get("aborted")),
+        "interrupted_output_tokens": sum(agent["output_tokens"] for agent in agents if agent.get("abort_explicit")),
+        "waste_output_tokens": None,
         "output_split": split, "user_prompts": len(root["prompts"]),
         "files_touched": len({tool.get("brief") for tool in root["tools"]
                               if tool["name"] in ("Write", "Edit") and tool.get("brief")}),
