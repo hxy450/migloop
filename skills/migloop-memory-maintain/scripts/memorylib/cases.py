@@ -168,13 +168,17 @@ def pack(job_path, draft_path, out, db=None, debug_receipts=None):
             "validation": validation, "validation_sha256": validation_sha256}
     # Timestamp does not manufacture a new semantic revision on an identical repack.
     card["revision"] = revision_of(card)
-    card = compact_card(card)
+    feedback = compact_card(card)["validation"]
+    from .case_format import finalize, write_shared
+    shared = {}
+    card = finalize(card, shared)
+    write_shared(out.parent / "sessions", shared)
     write_new(out, card)
     for index, graph in enumerate(graphs, 1):
         write_new(views / f"target-{index}.json", graph)
     return {"status": "valid", "card": str(out), "id": card["id"], "revision": card["revision"],
             "graphs": len(draft["graphs"]), "views": str(views) if draft["graphs"] else None,
-            "index": prepared_index, "validation": card["validation"]}
+            "index": prepared_index, "validation": feedback}
 
 
 def main(role):

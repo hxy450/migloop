@@ -35,7 +35,7 @@ def compact_card(card):
     """Preserve authored content exactly; replace session inventories/debug replies."""
     from .registry import revision_of, validate_case
     validate_case(card)
-    if card["schema"] == "migloop-case/2":
+    if card["schema"] in ("migloop-case/2", "migloop-case/3"):
         return copy.deepcopy(card)
     result = copy.deepcopy({k: v for k, v in card.items()
                             if k not in ("provenance", "node_provenance", "validation", "revision")})
@@ -76,19 +76,21 @@ def compact_card(card):
 def compact_store(memory, out):
     """Migrate into a new directory, remapping every historical source binding."""
     from .registry import Memory
+    from .case_format import finalize, content, claims, shared_objects, write_shared
     out = Path(out).resolve()
     if out.exists() or out.is_relative_to(memory.root) or memory.root.is_relative_to(out):
         raise ValueError("Compact output must be a new directory outside the source store")
     head = memory.current()["revision"]
     states = {p.stem: memory.current(p.stem) for p in (memory.root / "snapshots").glob("*.json")}
-    cards, card_map, snapshots, revision_map = {}, {}, {}, {}
+    cards, card_map, snapshots, revision_map, objects = {}, {}, {}, {}, {}
     for state in states.values():
         for identity, item in state["cases"].items():
             key = (identity, item["revision"])
             if key not in card_map:
                 original = memory.case(identity, item["revision"], state=state)
-                packed = compact_card(original)
-                assert packed["draft"] == original["draft"] and packed["claims"] == original["claims"]
+                objects.update(shared_objects(original, memory.root / "sessions"))
+                packed = finalize(original, objects)
+                assert content(packed) == content(original) and claims(packed) == claims(original)
                 card_map[key] = packed["revision"]
                 cards[(identity, packed["revision"])] = packed
     # Parent-first traversal, independent of file order. Reject cycles/broken history.
@@ -104,13 +106,16 @@ def compact_store(memory, out):
                 state["parent"] = revision_map[state["parent"]]
             for identity, item in state["cases"].items():
                 item["revision"] = card_map[(identity, item["revision"])]
+                for metadata_key in ("observed", "migration", "analysis"):
+                    item.pop(metadata_key, None)
             for lesson in state["lessons"].values():
                 for ref in lesson["evidence"]:
                     old_key = (ref["case"], ref["revision"])
                     if old_key not in card_map:
                         # A historical source may no longer be a case HEAD.
                         original = memory.case(*old_key, state=states[key])
-                        packed = compact_card(original)
+                        objects.update(shared_objects(original, memory.root / "sessions"))
+                        packed = finalize(original, objects)
                         card_map[old_key] = packed["revision"]
                         cards[(old_key[0], packed["revision"])] = packed
                     ref["revision"] = card_map[old_key]
@@ -118,6 +123,7 @@ def compact_store(memory, out):
             revision_map[key] = state["revision"]
             snapshots[state["revision"]] = state
     # No output exists until all inputs and hashes have been checked.
+    write_shared(out / "sessions", objects)
     for (identity, revision), card in cards.items():
         write_new(out / "cases" / identity / (revision + ".json"), card)
     for revision, state in snapshots.items():

@@ -14,6 +14,7 @@ from memorylib.cases import dispatch, pack
 from memorylib.common import fingerprint, load, write_new
 from memorylib.provenance import collect
 from memorylib.registry import Memory, revision_of
+from memorylib.case_format import content, claims, context, shared_objects
 from memorylib.retrieval import browse, notice, read, search
 
 
@@ -197,14 +198,14 @@ def test_deveco_only_selected_descendants_and_model_not_message_id(tmp_path):
 
 def test_pack_autofills_identity_and_no_false_graph_certification(prepared):
     card = prepared["card"]
-    assert card["provenance"]["observed"]["session_ids"] == ["session-1"]
-    assert card["claims"]["diagnosis"]["text"] == prepared["draft"]["summary"]
-    assert card["schema"] == "migloop-case/2"
-    assert "agent.jsonl" in card["provenance"]["sources"]
+    metadata = context(card, shared_objects(card, prepared["root"] / "sessions"))
+    assert metadata["provenance"]["observed"]["session_ids"] == ["session-1"]
+    assert claims(card)["diagnosis"]["text"] == prepared["draft"]["summary"]
+    assert card["schema"] == "migloop-case/3"
+    assert "agent.jsonl" in metadata["provenance"]["sources"]
     assert "node_provenance" not in card
-    assert card["validation"]["graph_check"] == "performed"
-    assert card["validation"]["status"] == "valid"
-    assert card["validation"]["causal_correctness"] == "not_certified"
+    assert card["check"]["mechanical_status"] == "valid"
+    assert "semantic_verified" not in card["check"]
     assert load(prepared["root"] / "case.views/target-1.json") == prepared["draft"]["graphs"][0]
 
 
@@ -272,8 +273,7 @@ def test_reingest_does_not_resurrect_withdrawn_card(prepared):
 def test_changed_card_revision_requires_rereview(prepared):
     memory = memory_with(prepared)
     card = copy.deepcopy(prepared["card"])
-    card["draft"]["summary"] = "Revised diagnosis"
-    card["claims"]["diagnosis"]["text"] = "Revised diagnosis"
+    card["summary"] = "Revised diagnosis"
     card["revision"] = revision_of(card)
     revised = prepared["root"] / "revised.json"
     write_new(revised, card)
@@ -413,7 +413,7 @@ def test_pack_preserves_shared_input_and_multiple_problem_branches(prepared):
     output = prepared["root"] / "branches-card.json"
     result = pack(prepared["job"], path, output)
     # The wrapper preserves branches; only the existing checker may certify edges.
-    assert load(output)["draft"]["graphs"] == draft["graphs"]
+    assert content(load(output))["graphs"] == draft["graphs"]
     assert result["validation"]["graph_check"] == "performed"
     assert load(output.with_name("branches-card.views") / "target-1.json") == graph
 
@@ -579,9 +579,9 @@ def test_card_template_examples_validate_without_declaring_repairer(prepared):
         assert receipt["delivery"]["status"] == "ready_for_review"
         assert "document" not in receipt and "edges" not in receipt
     stored = load(root / "examples.json")
-    for graph in stored["graph_evidence"]:
+    for graph in stored["graphs"]:
         assert all(n["key"] != "repairer" for n in graph["nodes"])
-        assert {e["relation"] for e in graph["edges"]} == {"read", "write"}
+        assert {op["relation"] for e in graph["edges"] for op in e["operations"]} == {"read", "write"}
 
 
 def test_card_preserves_stage_and_description_without_changing_graph(prepared):
@@ -591,13 +591,13 @@ def test_card_preserves_stage_and_description_without_changing_graph(prepared):
     write_new(path, draft)
     pack(prepared["job"], path, out)
     card = load(out)
-    assert card["draft"] == draft
+    assert content(card) == draft
     assert card["id"] == prepared["card"]["id"]
     assert card["revision"] != prepared["card"]["revision"]
     assert load(out.with_suffix(".views") / "target-1.json") == draft["graphs"][0]
     memory = memory_with(prepared)
     memory.ingest([out], memory.current()["revision"])
-    assert memory.case(card["id"])["draft"]["description"] == draft["description"]
+    assert content(memory.case(card["id"]))["description"] == draft["description"]
     assert memory.current()["lessons"]["lesson-text"]["status"] == "needs_review"
 
 
@@ -634,7 +634,7 @@ def test_legacy_lesson_description_remains_absent_in_storage_and_snapshots(prepa
     memory = memory_with(prepared)
     original = memory.current()
     old_case = memory.case(prepared["card"]["id"])
-    assert old_case["draft"]["description"] == "Synthetic input"
+    assert content(old_case)["description"] == "Synthetic input"
     assert search(memory, "styled")["total"] == 0  # Card text is not automatically injected into lessons.
     assert search(memory, "text")["items"][0]["description"] == ""
     assert browse(memory, "ui/text")["items"][0]["description"] == ""

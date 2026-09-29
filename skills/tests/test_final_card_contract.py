@@ -9,6 +9,8 @@ from memorylib.cases import pack
 from memorylib.card_contract import require_valid_card
 from memorylib.common import load, write_new
 from memorylib.registry import Memory, revision_of
+from memorylib.case_format import content
+from test_card_storage import legacy_card
 
 
 @pytest.mark.parametrize("field", ["title", "when", "description", "summary", "recommendations", "graphs"])
@@ -56,14 +58,14 @@ def test_free_prose_does_not_create_spelling_dependent_checks(prepared):
     write_new(path, draft)
     result = pack(prepared["job"], path, out)
     assert result["status"] == "valid"
-    assert load(out)["draft"] == draft
+    assert content(load(out)) == draft
     # The synthetic history has no repair call. Its original write is enough.
-    assert len(load(out)["graph_evidence"][0]["edges"]) == 1
+    assert len(load(out)["graphs"][0]["edges"]) == 1
 
 
 @pytest.mark.parametrize("failure", ["not_run", "needs_revision", "needs_path", "changed_graph", "missing_graph_check"])
 def test_failed_or_stale_card_cannot_enter_memory(prepared, failure):
-    card = copy.deepcopy(prepared["card"])
+    card = legacy_card(prepared, complete=True)
     validation = card["validation"]
     if failure == "not_run":
         validation.update(graph_check="not_run", mode="draft_only")
@@ -91,12 +93,12 @@ def test_stored_receipt_mutation_cannot_support_new_lesson(prepared):
     state = memory.current()
     card = memory.case(prepared["card"]["id"])
     # A stored outcome cannot be edited independently of the hashed summary.
-    card["validation"]["graph_checks"][0]["receipt"]["path_status"] = "needs_path"
+    card["check"]["path_status"] = "needs_path"
     path = memory.root / "cases" / card["id"] / (card["revision"] + ".json")
     path.write_text(json.dumps(card), encoding="utf-8")
-    with pytest.raises(ValueError, match="validation summary"):
+    with pytest.raises(ValueError, match="revision hash"):
         memory.case(card["id"])
-    with pytest.raises(ValueError, match="validation summary"):
+    with pytest.raises(ValueError, match="revision hash"):
         memory.apply({"base_revision": state["revision"], "upsert": [make_lesson(card)]})
     assert memory.current() == state
 
@@ -107,7 +109,7 @@ def test_valid_final_card_flows_directly_to_published_lesson(prepared):
     lesson.pop("status")
     memory = memory_with(prepared, [lesson])
     assert memory.current()["lessons"]["lesson-text"]["status"] == "active"
-    assert memory.case(prepared["card"]["id"])["validation"]["status"] == "valid"
+    assert memory.case(prepared["card"]["id"])["check"]["mechanical_status"] == "valid"
 
 
 @pytest.mark.parametrize("field,value", [("graph", 2), ("draft_sha256", "f" * 64),
@@ -115,12 +117,13 @@ def test_valid_final_card_flows_directly_to_published_lesson(prepared):
 def test_editing_bound_receipt_fields_is_rejected_before_ingest(prepared, field, value):
     from memorylib.registry import validate_case
 
-    card = copy.deepcopy(prepared["card"])
+    card = legacy_card(prepared, complete=True)
+    original_revision = card["revision"]
     check = card["validation"]["graph_checks"][0]
     (check if field in ("graph", "draft_sha256") else check["receipt"])[field] = value
     # The unchanged top-level binding keeps the old revision, but cannot match
     # the edited receipt. Both validation and admission must reject it.
-    assert revision_of(card) == prepared["card"]["revision"]
+    assert revision_of(card) == original_revision
     with pytest.raises(ValueError, match="validation summary"):
         validate_case(card)
     path = prepared["root"] / "edited-receipt.json"
@@ -137,7 +140,7 @@ def test_failed_to_complete_edit_reproduces_and_closes_the_reported_bypass(prepa
     from memorylib.card_contract import validation_digest
     from memorylib.registry import validate_case
 
-    card = copy.deepcopy(prepared["card"])
+    card = legacy_card(prepared, complete=True)
     receipt = card["validation"]["graph_checks"][0]["receipt"]
     receipt["path_status"] = "needs_path"
     card["validation_sha256"] = validation_digest(card["validation"])
@@ -159,7 +162,7 @@ def test_failed_to_complete_edit_reproduces_and_closes_the_reported_bypass(prepa
 def test_legacy_card_read_compatible_but_receipt_edit_cannot_grant_admission(prepared):
     from memorylib.registry import validate_case
 
-    card = copy.deepcopy(prepared["card"])
+    card = legacy_card(prepared, complete=True)
     card.pop("validation_sha256")
     card["validation"]["graph_checks"][0]["receipt"]["path_status"] = "needs_path"
     card["revision"] = revision_of(card)
@@ -173,10 +176,11 @@ def test_legacy_card_read_compatible_but_receipt_edit_cannot_grant_admission(pre
 def test_repack_run_metadata_does_not_change_revision(prepared):
     from memorylib.registry import validate_case
 
-    card = copy.deepcopy(prepared["card"])
+    card = legacy_card(prepared, complete=True)
+    old_revision = card["revision"]
     card["validation"]["graph_checks"][0]["receipt"]["report_id"] = "another-run"
     card["validation"]["kernel_sha256"] = "another-kernel-fingerprint"
     validate_case(card)
-    assert revision_of(card) == prepared["card"]["revision"]
+    assert revision_of(card) == old_revision
     packed = pack(prepared["job"], prepared["root"] / "draft.json", prepared["root"] / "repacked.json")
     assert packed["revision"] == prepared["card"]["revision"]

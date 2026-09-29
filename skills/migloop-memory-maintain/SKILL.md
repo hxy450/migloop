@@ -145,6 +145,8 @@ how:
 
 ## 入卡与自主阅读
 
+正式 `case/3` 的 summary、recommendations 和 graphs 直接在卡片顶层；`diagnosis` 引用 summary，`recommendation:N` 引用第 N 条 recommendations（从 1 开始），不另存重复的 claims 正文。旧 case/1、case/2 仍可读。共享会话元数据由脚本存于 `sessions/` 并在 ingest 时自动带入；移动卡片目录时一起保留它，不需要你填写或整理这些文件。模型提案格式不变。
+
 ```text
 python scripts/memory.py init --store STORE
 python scripts/memory.py snapshot --store STORE

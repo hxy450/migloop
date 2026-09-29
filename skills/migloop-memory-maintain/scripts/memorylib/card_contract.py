@@ -116,6 +116,10 @@ def require_valid_card(card):
 The inquiry kernel checks the actual relations. Here we require its successful
 result for each unchanged authored graph, not a separate semantic review.
 """
+    from .case_format import SCHEMA, validate_formal
+    if card.get("schema") == SCHEMA:
+        validate_formal(card)
+        return
     draft = card.get("draft", {})
     validate_draft(draft)
     validation = card.get("validation", {})

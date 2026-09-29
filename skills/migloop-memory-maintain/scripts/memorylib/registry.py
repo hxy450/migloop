@@ -8,11 +8,14 @@ from pathlib import Path
 
 from .common import fields, fingerprint, load, nonempty, now, replace_json, slug, strings, write_new
 from .card_contract import require_valid_card, validation_digest
+from .case_format import SCHEMA, claims, content, shared_objects, write_shared, validate_formal
 
 STATUSES = {"candidate", "active", "disputed", "needs_review", "retired"}
 
 
 def revision_of(card):
+    if card.get("schema") == SCHEMA:
+        return fingerprint({k: v for k, v in card.items() if k not in ("revision", "created_at")})
     payload = copy.deepcopy({k: v for k, v in card.items() if k not in ("revision", "created_at", "validation")})
     if isinstance(payload.get("provenance"), dict):
         payload["provenance"].pop("captured_at", None)
@@ -20,11 +23,14 @@ def revision_of(card):
 
 
 def validate_case(card):
-    if not isinstance(card, dict) or card.get("schema") not in {"migloop-case/1", "migloop-case/2"}:
-        raise ValueError("Expected a packaged migloop-case/1 or /2, not a bare draft or UI graph")
+    if not isinstance(card, dict) or card.get("schema") not in {"migloop-case/1", "migloop-case/2", SCHEMA}:
+        raise ValueError("Expected a packaged migloop-case/1, /2 or /3, not a bare draft or UI graph")
     slug(card.get("id"), "case.id")
     if card.get("revision") != revision_of(card):
         raise ValueError("Case content differs from its revision hash; repack the source draft")
+    if card["schema"] == SCHEMA:
+        validate_formal(card)
+        return
     # Legacy records remain readable under their original revision algorithm.
     # New admissions require this binding through require_valid_card.
     if "validation_sha256" in card and card["validation_sha256"] != validation_digest(card.get("validation", {})):
@@ -111,6 +117,7 @@ class Memory:
             raise ValueError("Invalid case revision")
         value = load(self.root / "cases" / identity / (revision + ".json"))
         validate_case(value)
+        shared_objects(value, self.root / "sessions")
         return value
 
     @staticmethod
@@ -145,6 +152,9 @@ class Memory:
         for card in cards:
             validate_case(card)
             require_valid_card(card)
+        objects = {}
+        for card, path in zip(cards, paths):
+            objects.update(shared_objects(card, Path(path).parent / "sessions"))
         if len({c["id"] for c in cards}) != len(cards):
             raise ValueError("One version per case per ingest; do not pick an arbitrary winner")
         with self.lock():
@@ -152,6 +162,7 @@ class Memory:
             if base_revision is None and not state["cases"] and not state["lessons"]:
                 base_revision = state["revision"]
             state = self._base(base_revision)
+            write_shared(self.root / "sessions", objects)
             changed = []
             for card in cards:
                 old = state["cases"].get(card["id"])
@@ -163,11 +174,8 @@ class Memory:
                 else:
                     write_new(path, card)
                 state["cases"][card["id"]] = {
-                    "revision": card["revision"], "title": card["draft"]["title"], "status": "available",
-                    "withdrawn_claims": [], "claims": sorted(card["claims"]),
-                    "observed": card["provenance"].get("observed", {}),
-                    "migration": card["provenance"].get("migration", {}),
-                    "analysis": card["provenance"].get("analysis", {})}
+                    "revision": card["revision"], "title": content(card)["title"], "status": "available",
+                    "withdrawn_claims": [], "claims": sorted(claims(card))}
                 changed.append(card["id"])
             if not changed:
                 return {"revision": state["revision"], "changes": [], "affected": []}

@@ -200,7 +200,7 @@ def test_failed_generation_never_publishes_partial_directory(prepared, monkeypat
 def test_damaged_card_rejects_export_even_without_card_links(prepared):
     memory = memory_with(prepared)
     card = copy.deepcopy(prepared["card"])
-    card["draft"]["summary"] = "modified without revision"
+    card["summary"] = "modified without revision"
     path = memory.root / "cases" / card["id"] / (card["revision"] + ".json")
     path.write_text(json.dumps(card), encoding="utf-8")
     with pytest.raises(ValueError, match="revision hash"):

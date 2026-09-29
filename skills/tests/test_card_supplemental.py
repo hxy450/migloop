@@ -47,12 +47,13 @@ def test_pack_retains_report_local_existence_basis(tmp_path):
     final = pack(job, tmp_path / "final.json", tmp_path / "case-final.json", db)
     assert final["validation"]["graph_checks"][0]["receipt"]["delivery"]["status"] == "ready_for_review"
     card = load(tmp_path / "case-final.json")
-    assert card["draft"] == draft
-    declared, = [n for n in card["graph_evidence"][0]["nodes"] if n["key"] == "/app/inputs/spec.md"]
+    from memorylib.case_format import content
+    assert content(card) == draft
+    declared, = [n["resolved"] for n in card["graphs"][0]["nodes"] if n["key"] == "/app/inputs/spec.md"]
     assert declared["existence_basis"] == "model_review"
     assert load(tmp_path / "case-final.views/target-1.json")["edges"] == draft["graphs"][0]["edges"]
     store = Store(db)
     try:
-        assert not store.rows("SELECT * FROM files WHERE path=?", (declared["key"],))
+        assert not store.rows("SELECT * FROM files WHERE path=?", ("/app/inputs/spec.md",))
     finally:
         store.close()

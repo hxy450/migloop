@@ -2,6 +2,14 @@
 
 The initial 2026-09-17 checks covered skill instructions and scripts only. Later dated checks below include the shared inquiry changes needed by self-contained card validation; they do not deploy the renderer/server or modify global hook configuration.
 
+## Single-graph formal cards (0.9.0, 2026-09-29)
+
+- The authoring template and inquiry relation rules are unchanged. New pack/enrich outputs use case/3; legacy case/1 and case/2 keep their original read/validation rules. Common accessors derive authored graphs and claims; scope/environment/provenance use immutable shared objects.
+- **258 passed / 1 skipped** across skills/tests. Added coverage for receipt/content/context tampering, missing context, path traversal, parallel atomic context writes, same-line different-source anchors, multiple operations per edge, derived version nodes/edges, migration/history/source rebinding, and refusal to promote failed legacy cards. Both edited skill frontmatters pass validation.
+- Converted the real multi-app store into a separate directory: **183 cards, 331 graphs, 1,248 authored edges (762 force), 1,560 bound operations, 182 lessons, 26 historical snapshots**. Exact authored content, checked node/operation coordinates, all anchors, force flags/reasons, scope/environment/provenance and lesson semantic versions/statuses match. All historical source bindings resolve; original HEAD is unchanged.
+- Card bytes: 6,980,036 → 3,553,897, plus 270,572 bytes of shared context (45.2% net reduction for cards/context). Snapshots: 18,059,084 → 6,528,164 bytes. Total JSON store: 25,039,120 → 10,352,633 bytes (58.7% reduction). The 1,514-line sample becomes 894 lines / 43,283 bytes (original 81,446 bytes); this general format is larger than the earlier all-force one-card prototype, and also supports ordinary/extra-version relations.
+- Read-only acceptance report: `C:/Users/hongy/projects/_migloop-case3-migration-20260929/validation.json`; reading package at the sibling `memory/index.md`. No model calls, new semantic review, lesson rewrite, or in-place old-store migration.
+
 ## Decision-oriented maintenance and shared reading guidance (2026-09-29)
 
 - Maintenance compares applicable conditions, mechanisms and actions before stage labels. Examples show role-specific branches without mandatory spec/implementation duplication; equivalent new cases normally add evidence rather than more historical narrative. No new fields, model reports or semantic-review steps.

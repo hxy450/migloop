@@ -181,6 +181,7 @@ def enrich_cards(paths, metadata_path, out):
     """Create additive card revisions; preserve all authored claims, graph evidence and validation."""
     from .provenance import verify_materials
     from .registry import revision_of, validate_case
+    from .case_format import context, shared_objects, finalize, write_shared
 
     metadata, output = load(metadata_path), Path(out).resolve()
     if metadata.get("schema") != "migloop-provenance/1":
@@ -189,25 +190,32 @@ def enrich_cards(paths, metadata_path, out):
         raise ValueError("Enrichment output must be a new directory; existing cards are preserved")
     verify_materials(metadata)
     source_hashes = {s["source"]: s["sha256"] for s in metadata["sources"]}
-    prepared = []
+    prepared, objects = [], {}
     for path in paths:
         card = load(path)
         validate_case(card)
-        provenance = card.get("provenance", {})
+        objects.update(shared_objects(card, Path(path).parent / "sessions"))
+        card_context = context(card, objects)
+        provenance = card_context["provenance"]
         if Path(provenance.get("materials", "")).resolve() != Path(metadata["materials"]).resolve():
             raise ValueError(f"{card['id']}: environment pool differs from the card's migration materials")
         sources = provenance.get("sources", {})
         sources = sources if isinstance(sources, dict) else {s["source"]: s["sha256"] for s in sources}
         if not sources or any(source_hashes.get(name) != digest for name, digest in sources.items()):
             raise ValueError(f"{card['id']}: original transcript hashes do not match; do not relabel another history")
-        enriched = copy.deepcopy(card)
-        enriched["environment"] = for_card(metadata, card.get("scope", {}))
+        enriched = finalize(card, objects)
+        environment = {"schema": "migloop-session-context/1", "kind": "environment",
+                       "value": for_card(metadata, card_context["scope"])}
+        env_digest = fingerprint(environment)
+        objects[env_digest] = environment
+        enriched["context"]["environment"] = env_digest
         enriched["revision"] = revision_of(enriched)
         validate_case(enriched)
         prepared.append((card, enriched))
     if not prepared or len({new["id"] for _, new in prepared}) != len(prepared):
         raise ValueError("Supply one existing card per identity")
     results = []
+    write_shared(output / "sessions", objects)
     for old, new in prepared:
         target = output / (new["id"] + ".json")
         write_new(target, new)

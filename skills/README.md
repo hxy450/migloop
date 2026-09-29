@@ -51,7 +51,7 @@ python -m pytest skills/tests -q -o pythonpath=src
 
 卡片与经验共用召回语义：`when`写**任务阶段＋具体动作**，`description`写**当前输入可见的适用情境**。阶段来自偏差定位及预防动作，不取修复者角色、固定Stage编号或历史时刻。summary/why解释历史机制，recommendations/how说明动作。0.7.2 起 lesson 的 `check` 可省略或为空，阅读包仅在有内容时显示“可选检查”；只在条件疑问、输入冲突或关键假设需要核实时按需执行，优先复用正常测试，不改变来源/版本的机械校验。阅读目录提供时机、情境和例外预览；只有相关经验才展开正文。
 
-旧case/1、case/2与memory/1仍可读取，缺字段不补造语义、不自动改hash或状态。0.8.0正式制卡按当前模板要求description等字段；重新入库或引用旧卡时，需满足同一有效卡契约，未通过则用原job与稿件重新pack。已有经验库不会被本次升级自动重写。
+旧case/1、case/2与memory/1仍可读取，缺字段不补造语义、不自动改hash或状态。0.9.0正式制卡写case/3：正文在顶层，一套graphs保留声明及全部实际操作，claims按正文解析，最小通过凭据绑定图和引用；共享会话元数据按内容指纹保存在sessions/。模型模板不变，ingest、enrich、归并、导出和云端传输共用case_format读取接口。转移正式卡时保留其同目录sessions/。已有库不会被升级自动重写；memory.py compact只在指定新目录迁移所有历史快照及来源绑定，经验正文、身份、语义版本和状态保持不变。失败稿不能通过格式转换升格为正式卡。
 
 0.5.0增加文件阅读发布：维护者运行`memory.py export --store STORE --out NEW_DIRECTORY`，宿主向迁移agent提供召回skill和生成的`index.md`。Claude Code 可另行安装项目级提醒，0.8.3为任务开始召回 + 首次明确写入前复核，写入识别precision优先，见`migloop-memory-recall/references/claude-hook.md`；只有安装并验证项目配置后才算接通。Codex/DevEco hook、云端 OBS/API 和跨租户权限尚未接入。旧`recall.py notice`仍是兼容诊断payload，不是已经安装的hook，也不是新版阅读入口。
 

@@ -12,12 +12,16 @@ from memorylib.cases import pack
 from memorylib.common import fingerprint, load, write_new
 from memorylib.registry import Memory, revision_of, validate_case
 from memorylib.card_contract import validation_digest
+from memorylib.case_format import content, claims, context, shared_objects
 from test_memory_bundle import prepared, memory_with
 
 
 def legacy_card(prepared, *, complete=False):
-    card = copy.deepcopy(prepared["card"])
-    card["schema"] = "migloop-case/1"
+    formal = prepared["card"]
+    card = {k: copy.deepcopy(formal[k]) for k in ("id", "created_at", "job", "migration_key", "packager")}
+    card.update(schema="migloop-case/1", draft=content(formal), claims=claims(formal),
+                **context(formal, shared_objects(formal, prepared["root"] / "sessions")))
+    card["validation"] = {"status": "valid", "graph_check": "performed", "kernel_sha256": "fixture-kernel"}
     card["provenance"] = load(prepared["meta"])
     card.pop("graph_evidence", None)
     card["node_provenance"] = {"agent.jsonl": card["provenance"]["sources"][0]}
@@ -106,10 +110,10 @@ def test_store_migration_rebinds_all_history_without_reactivating(prepared):
         state = migrated.current(p.stem)
         for identity, info in state["cases"].items():
             card = migrated.case(identity, info["revision"], state)
-            assert card["schema"] == "migloop-case/2" and card["draft"] == old["draft"]
+            assert card["schema"] == "migloop-case/3" and content(card) == old["draft"]
         for lesson in state["lessons"].values():
             for ref in lesson["evidence"]:
-                assert ref["claim"] in migrated.case(ref["case"], ref["revision"], state)["claims"]
+                assert ref["claim"] in claims(migrated.case(ref["case"], ref["revision"], state))
     assert before == {str(p.relative_to(memory.root)): p.read_bytes() for p in memory.root.rglob('*.json')}
     assert result["claims_changed"] is False
     with pytest.raises(ValueError, match="new directory"):
@@ -152,7 +156,7 @@ def test_pack_full_receipt_is_opt_in_and_cannot_overwrite(prepared, monkeypatch,
     result = pack(prepared["job"], prepared["root"] / "draft.json", output, db,
                   debug_path if debug else None)
     assert "document" not in result["validation"]["graph_checks"][0]["receipt"]
-    assert load(output)["draft"] == prepared["draft"]
+    assert content(load(output)) == prepared["draft"]
     if debug:
         assert load(debug_path)[0]["receipt"] == raw
         with pytest.raises(ValueError, match="new, separate"):
@@ -183,5 +187,5 @@ def test_migration_preserves_stale_lesson_source_revisions(prepared):
     assert lesson["status"] == "needs_review"
     evidence = lesson["evidence"][0]
     assert evidence["revision"] != head["cases"][old["id"]]["revision"]
-    assert migrated.case(old["id"], evidence["revision"])["draft"] == old["draft"]
-    assert migrated.case(old["id"])["draft"] == updated["draft"]
+    assert content(migrated.case(old["id"], evidence["revision"])) == old["draft"]
+    assert content(migrated.case(old["id"])) == updated["draft"]

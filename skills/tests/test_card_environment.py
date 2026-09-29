@@ -101,12 +101,15 @@ def test_metadata_pack_automatically_attaches_environment_without_draft_fields(p
     output = prepared["root"] / "new-card.json"
     pack(job, prepared["root"] / "draft.json", output)
     card = load(output)
-    assert card["draft"] == prepared["draft"]
-    assert card["environment"]["facts"][0]["value"] == "23"
+    from memorylib.case_format import content, context, shared_objects
+    assert content(card) == prepared["draft"]
+    assert context(card, shared_objects(card, output.parent / "sessions"))["environment"]["facts"][0]["value"] == "23"
     validate_case(card)
 
 
 def test_enrichment_preserves_original_and_does_not_bypass_existing_review_gate(prepared):
+    from memorylib.case_format import content, claims, context, shared_objects
+    from test_card_storage import legacy_card
     memory = memory_with(prepared)
     old = memory.current()
     original = prepared["card_path"].read_bytes()
@@ -114,13 +117,13 @@ def test_enrichment_preserves_original_and_does_not_bypass_existing_review_gate(
     enriched = enrich_cards([prepared["card_path"]], prepared["meta"], out)
     new_card = load(enriched["cards"][0]["path"])
     assert prepared["card_path"].read_bytes() == original
-    assert new_card["draft"] == prepared["card"]["draft"]
-    assert new_card["claims"] == prepared["card"]["claims"]
-    assert new_card["validation"] == prepared["card"]["validation"]
-    assert new_card["environment"]["unknown"]
+    assert content(new_card) == content(prepared["card"])
+    assert claims(new_card) == claims(prepared["card"])
+    assert new_card["check"] == prepared["card"]["check"]
+    assert context(new_card, shared_objects(new_card, out / "sessions"))["environment"]["unknown"]
     # The fresh card already had identical empty environment metadata: re-enrichment is idempotent.
     assert new_card["revision"] == prepared["card"]["revision"]
-    legacy = copy.deepcopy(prepared["card"])
+    legacy = legacy_card(prepared, complete=True)
     legacy.pop("environment")
     from memorylib.registry import revision_of
     legacy["revision"] = revision_of(legacy)
