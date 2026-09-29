@@ -40,17 +40,13 @@ def _lesson_text(lesson, state, memory, output, paths, link_cards):
     lines += ["## 原因", "", lesson["why"], "", "## 做法", "",
               *[f"{i}. {x}" for i, x in enumerate(lesson["how"], 1)], ""]
     if lesson.get("check"):
-        lines += ["## 可选检查", "",
-                  "仅在适用条件不确定、与当前输入冲突或需要验证关键假设时按需执行；优先复用已有证据和正常测试。",
-                  "不因读取本条经验而额外启动验证流程；项目原有必需测试照常执行。", "",
-                  *[f"- {x}" for x in lesson["check"]], ""]
+        lines += ["## 可选检查", "", *[f"- {x}" for x in lesson["check"]], ""]
     if lesson["requires"]:
         lines += ["## 依赖经验", ""]
         for identity in lesson["requires"]:
             lines.append("- " + _link(state["lessons"][identity]["title"], output / paths[identity], current))
         lines.append("")
-    lines += ["## 来源（按需复核）", "",
-              "经验是有适用范围的历史建议。核查来源时同时看结论与 unknown；来源卡未随阅读包复制。", ""]
+    lines += ["## 来源（按需复核）", ""]
     sources = {}
     for ref in lesson["evidence"]:
         sources.setdefault((ref["case"], ref["revision"]), []).append(ref["claim"])
@@ -123,6 +119,11 @@ def _render(memory, state, output, link_cards):
             lines.append("")
         if not directory["children"] and not directory["lessons"]:
             lines += ["本版暂无可发布的 active 经验。", ""]
+        if not topic:
+            lines += ["## 阅读约定", "",
+                      "经验是有适用范围的历史建议。核查来源时同时看结论与 unknown；来源卡未随阅读包复制。", "",
+                      "可选检查仅在适用条件不确定、与当前输入冲突或需要验证关键假设时按需执行；优先复用已有证据和正常测试。",
+                      "不因读取经验而额外启动验证流程；项目原有必需测试照常执行。", ""]
         files[str(relative)] = "\n".join(lines)
     for identity, lesson in sorted(lessons.items()):
         files[str(paths[identity])] = _lesson_text(lesson, state, memory, output, paths, link_cards)

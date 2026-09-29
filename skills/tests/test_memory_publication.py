@@ -57,6 +57,37 @@ def test_direct_lessons_and_subtopics_can_coexist(prepared):
     assert output / "ui/text/lesson-text.lesson.md" not in links
 
 
+@pytest.mark.parametrize("link_cards", [False, True])
+def test_shared_guidance_is_at_root_without_dropping_lesson_data(prepared, link_cards):
+    lessons = [make_lesson(prepared["card"], description="Known input condition"),
+               make_lesson(prepared["card"], "lesson-second", check=[], requires=["lesson-text"])]
+    memory = memory_with(prepared, lessons)
+    original = memory.current()
+    output = prepared["root"] / "reading"
+    export_memory(memory, output, link_cards=link_cards)
+    root = (output / "index.md").read_text(encoding="utf-8")
+    guidance = root.split("## 阅读约定\n\n", 1)[1].strip().splitlines()
+    guidance = [line for line in guidance if line.strip()]
+    assert len(guidance) == 3
+    assert "unknown" in guidance[0] and "可选检查" in guidance[1]
+    assert "原有必需测试" in guidance[2]
+    for path in output.rglob("*.md"):
+        if path != output / "index.md":
+            assert not any(line in path.read_text(encoding="utf-8") for line in guidance)
+    for lesson in lessons:
+        path = output / "ui/text" / (lesson["id"] + ".lesson.md")
+        body = path.read_text(encoding="utf-8")
+        for value in [lesson["title"], lesson["when"], lesson["why"],
+                      *lesson["unless"], *lesson["how"], *lesson["check"]]:
+            assert value in body
+        assert ("## 可选检查" in body) == bool(lesson["check"])
+        for ref in lesson["evidence"]:
+            assert all(ref[key] in body for key in ("case", "claim", "revision"))
+        assert all(target.is_file() for target in _links(path))
+    assert lessons[0]["description"] in (output / "ui/text/lesson-text.lesson.md").read_text(encoding="utf-8")
+    assert memory.current() == original
+
+
 def test_local_card_links_resolve_to_exact_revision_and_no_cards_are_copied(prepared):
     memory = memory_with(prepared)
     output = prepared["root"] / "阅读 包" / "v1"

@@ -2,6 +2,16 @@
 
 The initial 2026-09-17 checks covered skill instructions and scripts only. Later dated checks below include the shared inquiry changes needed by self-contained card validation; they do not deploy the renderer/server or modify global hook configuration.
 
+## Decision-oriented maintenance and shared reading guidance (2026-09-29)
+
+- Maintenance compares applicable conditions, mechanisms and actions before stage labels. Examples show role-specific branches without mandatory spec/implementation duplication; equivalent new cases normally add evidence rather than more historical narrative. No new fields, model reports or semantic-review steps.
+- Recall delegates reminder timing to the host/hook, reuses current inputs, and requests only local clarification of genuinely missing prerequisites. It does not require adoption logs or a change to an already compliant plan. Existing hook implementation/configuration is unchanged.
+- Export moves only common optional-check/source guidance to the root index. Topic previews, exceptions, lesson ordering, actions, concrete checks, dependencies and source bindings are preserved. Store/card schemas and inquiry rules are unchanged.
+- **88 focused tests passed**, then **244 passed / 1 skipped** across `skills/tests` with Python 3.13 and `PYTHONPATH=src`. Both edited skills pass frontmatter validation; independent package execution and installed file hashes pass.
+- Re-exported the existing 182-lesson / 44-topic multi-app snapshot at revision `738957e22fbfb31e88dbbe0703f0be4d51ced46428c5f6e181e817028e7b0dd0` into a new sibling directory. All 182 lesson contents match after removing generated boilerplate and blank lines; every non-root index is byte-identical, evidence manifests match, and the old reading package hashes remain valid. No lesson was re-merged or semantically rewritten.
+- The new reading view removes 12,234 characters from lesson files and adds 138 at the root (net 12,096 characters). This measures text reduction, not a tested token/time or migration-quality improvement.
+- Local comparison package: `_migloop-multiapp-memory-20260927/runs/f6f89fad6b0f16f2/memory-readable-20260929/index.md`. The original `memory/` and store HEAD are unchanged; experiment project copies and Server deployment are not updated by these checks.
+
 ## Task-start recall and high-precision write reminder (0.8.3, 2026-09-25)
 
 - SubagentStart injects a short task-based recall instruction for every child; the main session receives it on its first UserPromptSubmit. A separate first explicit-write checkpoint remains even when the entry was already read. The second reminder reuses prior reading and requests only relevant additions or changes to the pending output, without a report or another compulsory read.
