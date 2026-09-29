@@ -10,9 +10,10 @@ database (``~/.local/share/deveco/deveco.db``, schema: session / message / part
   enrichment also comes from the same DB.  The DB is the source of truth — the
   reconstructed data is a superset of the official export, with the overlapping
   fields identical.
-* **export file path** → read a self-contained ``.json`` export (backward
-  compatible; useful for shared files that aren't in the local DB).  Both paths
-  converge on :func:`_parse`, so their traces are identical.
+* **export file path** → native ``{info,messages}`` JSON or frozen
+  ``deveco-events/1`` JSONL, plus explicitly parented child exports in the same
+  folder. Portable reports do not consult the host database unless requested.
+  All paths converge on :func:`_parse` and the same child-agent accounting.
 
 The export is produced by DevEco's "export session" action and looks like::
 
@@ -56,9 +57,8 @@ Key differences from Claude Code / Codex that this adapter absorbs:
 * **tools are inline ``part.type == "tool"``** with ``state.input`` /
   ``state.output`` / ``state.status`` / ``state.time`` — no separate
   ``toolUseResult`` pass needed.
-* **no subagents** — every message belongs to the same ``agent``
-  (``DynamicWorkflow``).  The ``agents[]`` list is therefore empty and all
-  lineage is reconstructed from the single main thread.
+* **subagents** — separate native child sessions linked by ``parentID``;
+  their tools, token counters and activity intervals contribute to the report.
 * **stage signal** — two sources: the ``workflow`` tool's ``name``/``runName``
   (``explore`` / ``implement`` / ``verify_fix`` / ``acceptance_audit`` ...) opens
   a ``wf:<name>`` stage; a pipeline ``skill`` tool call (``a2h-spec`` /
@@ -99,6 +99,7 @@ from datetime import datetime, timezone
 
 from . import claude as common
 from .base import SessionCandidate
+from . import deveco_source
 
 FORMAT = "deveco"
 SUPPORTS_LIVE = False  # export is a snapshot; incremental SQLite reader is future work
@@ -213,20 +214,11 @@ def _to_text(value):
 
 
 def _read_export(path):
-    """Read an export file, skip any leading banner, parse the JSON object."""
+    """Read native export or the shared frozen event representation."""
     try:
-        with open(path, encoding="utf-8", errors="replace") as stream:
-            text = stream.read()
-    except OSError:
+        return deveco_source.load(path)
+    except (OSError, ValueError, KeyError, TypeError):
         return None
-    i = text.find("{")
-    if i < 0:
-        return None
-    try:
-        data = json.loads(text[i:])
-    except json.JSONDecodeError:
-        return None
-    return data if isinstance(data, dict) else None
 
 
 def _file_path(inp):
@@ -1131,12 +1123,17 @@ def _workflow_result_index(workflow_calls):
 
 def _build_db_agents(db, session_id, stages, cwd, model, billing, wf_index):
     children = _load_child_sessions(db, session_id)
+    return _build_child_agents(children, lambda sid: _load_child_parts(db, sid),
+                               stages, cwd, model, billing, wf_index)
+
+
+def _build_child_agents(children, load_parts, stages, cwd, model, billing, wf_index):
     if not children:
         return [], []
     agents = []
     sub_act = []  # 子代理活动区间 [(stage_id, start_ms, end_ms)]
     for ch in children:
-        child_parts = _load_child_parts(db, ch["id"])
+        child_parts = load_parts(ch["id"])
         tools = []
         child_act = []  # 该子代理自己的活动区间 [(start_ms, end_ms)]
         for i, part in enumerate(child_parts):
@@ -1217,7 +1214,7 @@ def _build_db_agents(db, session_id, stages, cwd, model, billing, wf_index):
         }
         _aggregate_reads(entry, tools)
         # bill subagent tokens
-        key = model or "unknown"
+        key = ch.get("model") or model or "unknown"
         b = billing.setdefault(key, {"req": 0, "inp": 0, "cread": 0, "cw5": 0, "cw1h": 0, "out": 0})
         b["req"] += 1
         b["inp"] += tk["input"]
@@ -1250,7 +1247,7 @@ def session_summary(path):
             head = stream.read(8192)
     except OSError:
         return None
-    if '"info"' not in head or '"messages"' not in head:
+    if ('"info"' not in head or '"messages"' not in head) and 'deveco-events/1' not in head:
         return None
     data = _read_export(path)
     if not isinstance(data, dict):
@@ -1344,8 +1341,11 @@ def extract(path, storage_root=None):
     # export(向后兼容,例如他人分享的导出文件)。
     if isinstance(path, str) and not os.path.isfile(path) and _SESSION_ID_RE.match(path):
         return extract_from_db(path, storage_root=storage_root)
-    return _parse(_load_export(path), storage_root=storage_root,
-                  source_file=os.path.abspath(path))
+    data = _load_export(path)
+    children = deveco_source.descendants(path, data["info"]["id"])
+    # Explicit DB opt-in remains available for older root-only exports.
+    return _parse(data, storage_root=storage_root, source_file=os.path.abspath(path),
+                  child_documents=children if children or storage_root is None else None)
 
 
 def extract_from_db(session_id, storage_root=None):
@@ -1366,7 +1366,7 @@ def extract_from_db(session_id, storage_root=None):
                   source_file="deveco.db:" + session_id)
 
 
-def _parse(data, storage_root=None, source_file=None):
+def _parse(data, storage_root=None, source_file=None, child_documents=None):
     info = data["info"]
     messages = data["messages"]
     session_id = info.get("id")
@@ -1500,7 +1500,10 @@ def _parse(data, storage_root=None, source_file=None):
     wf_index = _workflow_result_index(workflow_calls)
     agents = []
     sub_act = []  # 子代理活动区间 [(stage_id, start_ms, end_ms)]
-    db_path = _find_db(storage_root)
+    if child_documents is not None:
+        rows, parts = deveco_source.child_rows(child_documents)
+        agents, sub_act = _build_child_agents(rows, parts.__getitem__, stages, cwd, model, billing, wf_index)
+    db_path = _find_db(storage_root) if child_documents is None else None
     if db_path:
         db = _open_db(db_path)
         if db is not None:
