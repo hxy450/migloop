@@ -15,7 +15,7 @@ description: 将新增、修订或撤回的迁移情景卡融入已有经验库�
 
 来源修改或撤回后，查看impact给出的受影响条目，更新相应经验再恢复使用。经验内容由模型判断，机械检查负责引用、版本和依赖。
 
-卡片兼容 `migloop-case/1` 与精简的 `/2`。旧库去除冗余封装时，用 `python scripts/memory.py compact --store STORE --out NEW_STORE`：保持正文、树、经验内容、版本和核验状态，重算卡片/快照哈希并同步历史来源绑定。原库不改；核对并重新export后，才替换开发仓库中的store与阅读目录。此操作不是重新归因或将未决经验转正。
+旧卡兼容 `migloop-case/1`、`/2`、`/3`。去除冗余封装时，用 `python scripts/memory.py compact --store STORE --out NEW_STORE`：保留模型正文、图的判断与调用证据、经验内容和语义版本，转成自包含的 `/4`，同步历史来源绑定。原库不改；核对并重新export后再替换开发库。转换不重新归因，也不将未决经验转正。
 
 交付新 revision、阅读包入口、主要归并理由、更新/退役范围及待复查项。命令在本 skill 目录执行。发布包包含所需脚本与 YAML 解析，Python 3.10+ 即可独立运行，不需要相邻 skill 或 inquiry 索引。云端发布和 hook 接入由宿主负责。
 
@@ -145,7 +145,7 @@ how:
 
 ## 入卡与自主阅读
 
-正式 `case/3` 的 summary、recommendations 和 graphs 直接在卡片顶层；`diagnosis` 引用 summary，`recommendation:N` 引用第 N 条 recommendations（从 1 开始），不另存重复的 claims 正文。旧 case/1、case/2 仍可读。共享会话元数据由脚本存于 `sessions/` 并在 ingest 时自动带入；移动卡片目录时一起保留它，不需要你填写或整理这些文件。模型提案格式不变。
+正式 `case/4` 保留完整模型稿：summary、recommendations、graphs 在顶层，node、edge、reason和force依据原样保存；只自动补充卡片身份、迁移材料版本及已记录的模型/平台/API等历史环境。检查回执、绑定操作、展示节点、独立引用表和共享元数据文件不进入卡片，UI从稿件与原始session索引重新生成展示。`diagnosis`对应summary，`recommendation:N`对应第N条建议，不另复制claims正文。模型模板不变；旧`/3`仅在读取或转换时需要它原有的sessions目录。
 
 ```text
 python scripts/memory.py init --store STORE

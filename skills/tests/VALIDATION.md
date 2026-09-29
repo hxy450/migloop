@@ -2,6 +2,13 @@
 
 The initial 2026-09-17 checks covered skill instructions and scripts only. Later dated checks below include the shared inquiry changes needed by self-contained card validation; they do not deploy the renderer/server or modify global hook configuration.
 
+## Authored analysis only (0.10.0, 2026-09-29)
+
+- New case/4 stores the complete author draft plus identity and small historical metadata. No checker receipts, bound operations, derived nodes, independent reference table, copied triage records or shared session files. Pack still runs the same inquiry checks before emitting a card; UI reconstructs its view from the draft and frozen session.
+- **268 passed / 1 skipped** in skills/tests. Portable single-file ingest/apply/export, force/supplemental-input draft preservation, exact authored roundtrip, legacy receipt gates, metadata enrichment, history/source rebinding, and standalone Claude/Codex packs covered. Both edited skill frontmatters validate.
+- Converted 183 multi-app cards in a new directory; all authored fields/graphs/force anchors match the originals exactly. 182 lessons retain prose, status and semantic versions. Representative card: 81,446 bytes / 1,514 lines → 32,635 bytes / 516 lines (original draft alone 30,543 bytes). No source store was modified.
+- Hashes detect content changes, not malicious forgery. Without raw materials, admission validates the card structure; it does not rerun historical relation or semantic analysis.
+
 ## Single-graph formal cards (0.9.0, 2026-09-29)
 
 - The authoring template and inquiry relation rules are unchanged. New pack/enrich outputs use case/3; legacy case/1 and case/2 keep their original read/validation rules. Common accessors derive authored graphs and claims; scope/environment/provenance use immutable shared objects.

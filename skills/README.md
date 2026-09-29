@@ -51,7 +51,7 @@ python -m pytest skills/tests -q -o pythonpath=src
 
 卡片与经验共用召回语义：`when`写**任务阶段＋具体动作**，`description`写**当前输入可见的适用情境**。阶段来自偏差定位及预防动作，不取修复者角色、固定Stage编号或历史时刻。summary/why解释历史机制，recommendations/how说明动作。0.7.2 起 lesson 的 `check` 可省略或为空，阅读包仅在有内容时显示“可选检查”；只在条件疑问、输入冲突或关键假设需要核实时按需执行，优先复用正常测试，不改变来源/版本的机械校验。阅读目录提供时机、情境和例外预览；只有相关经验才展开正文。
 
-旧case/1、case/2与memory/1仍可读取，缺字段不补造语义、不自动改hash或状态。0.9.0正式制卡写case/3：正文在顶层，一套graphs保留声明及全部实际操作，claims按正文解析，最小通过凭据绑定图和引用；共享会话元数据按内容指纹保存在sessions/。模型模板不变，ingest、enrich、归并、导出和云端传输共用case_format读取接口。转移正式卡时保留其同目录sessions/。已有库不会被升级自动重写；memory.py compact只在指定新目录迁移所有历史快照及来源绑定，经验正文、身份、语义版本和状态保持不变。失败稿不能通过格式转换升格为正式卡。
+0.10.0正式制卡只写自包含的case/4：完整模型draft内容＋少量卡片身份、迁移材料版本与历史环境。node/edge/reason/force依据原样保存；无绑定操作、派生展示结构、检查回执、引用表、整池会话名录或sessions侧文件。pack仍执行内核机械检查，入库检查正式格式、内容哈希和声明图结构。UI从同一稿件与原始session索引重新绑定关系、查询原文/diff，派生缓存可丢弃，不回写卡片。旧case/1、/2、/3与memory/1仍可读，旧/3侧文件仅用于兼容。模型模板不变，各消费方共用case_format。memory.py compact在新目录迁移历史来源绑定，保持经验正文、身份、语义版本和状态；原库不改，失败旧稿不能靠转换升格。
 
 0.5.0增加文件阅读发布：维护者运行`memory.py export --store STORE --out NEW_DIRECTORY`，宿主向迁移agent提供召回skill和生成的`index.md`。Claude Code 可另行安装项目级提醒，0.8.3为任务开始召回 + 首次明确写入前复核，写入识别precision优先，见`migloop-memory-recall/references/claude-hook.md`；只有安装并验证项目配置后才算接通。Codex/DevEco hook、云端 OBS/API 和跨租户权限尚未接入。旧`recall.py notice`仍是兼容诊断payload，不是已经安装的hook，也不是新版阅读入口。
 

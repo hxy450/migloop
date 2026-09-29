@@ -119,8 +119,9 @@ def test_enrichment_preserves_original_and_does_not_bypass_existing_review_gate(
     assert prepared["card_path"].read_bytes() == original
     assert content(new_card) == content(prepared["card"])
     assert claims(new_card) == claims(prepared["card"])
-    assert new_card["check"] == prepared["card"]["check"]
-    assert context(new_card, shared_objects(new_card, out / "sessions"))["environment"]["unknown"]
+    assert new_card["graphs"] == prepared["card"]["graphs"]
+    assert not (out / "sessions").exists()
+    assert "check" not in new_card
     # The fresh card already had identical empty environment metadata: re-enrichment is idempotent.
     assert new_card["revision"] == prepared["card"]["revision"]
     legacy = legacy_card(prepared, complete=True)

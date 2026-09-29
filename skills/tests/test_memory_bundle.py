@@ -199,13 +199,13 @@ def test_deveco_only_selected_descendants_and_model_not_message_id(tmp_path):
 def test_pack_autofills_identity_and_no_false_graph_certification(prepared):
     card = prepared["card"]
     metadata = context(card, shared_objects(card, prepared["root"] / "sessions"))
-    assert metadata["provenance"]["observed"]["session_ids"] == ["session-1"]
+    assert card["migration_key"] == "migration-1"
+    assert "session_ids" not in metadata["provenance"]["observed"]
     assert claims(card)["diagnosis"]["text"] == prepared["draft"]["summary"]
-    assert card["schema"] == "migloop-case/3"
-    assert "agent.jsonl" in metadata["provenance"]["sources"]
+    assert card["schema"] == "migloop-case/4"
+    assert card["graphs"] == prepared["draft"]["graphs"]
     assert "node_provenance" not in card
-    assert card["check"]["mechanical_status"] == "valid"
-    assert "semantic_verified" not in card["check"]
+    assert "check" not in card and "validation" not in card
     assert load(prepared["root"] / "case.views/target-1.json") == prepared["draft"]["graphs"][0]
 
 
@@ -581,7 +581,8 @@ def test_card_template_examples_validate_without_declaring_repairer(prepared):
     stored = load(root / "examples.json")
     for graph in stored["graphs"]:
         assert all(n["key"] != "repairer" for n in graph["nodes"])
-        assert {op["relation"] for e in graph["edges"] for op in e["operations"]} == {"read", "write"}
+        assert all("operations" not in edge for edge in graph["edges"])
+    assert stored["graphs"] == draft["graphs"]
 
 
 def test_card_preserves_stage_and_description_without_changing_graph(prepared):

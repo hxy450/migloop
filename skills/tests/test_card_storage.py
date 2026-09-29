@@ -18,7 +18,8 @@ from test_memory_bundle import prepared, memory_with
 
 def legacy_card(prepared, *, complete=False):
     formal = prepared["card"]
-    card = {k: copy.deepcopy(formal[k]) for k in ("id", "created_at", "job", "migration_key", "packager")}
+    card = {k: copy.deepcopy(formal[k]) for k in ("id", "created_at", "job", "migration_key")}
+    card["packager"] = {"name": "migloop-memory-skills", "version": "fixture"}
     card.update(schema="migloop-case/1", draft=content(formal), claims=claims(formal),
                 **context(formal, shared_objects(formal, prepared["root"] / "sessions")))
     card["validation"] = {"status": "valid", "graph_check": "performed", "kernel_sha256": "fixture-kernel"}
@@ -110,7 +111,7 @@ def test_store_migration_rebinds_all_history_without_reactivating(prepared):
         state = migrated.current(p.stem)
         for identity, info in state["cases"].items():
             card = migrated.case(identity, info["revision"], state)
-            assert card["schema"] == "migloop-case/3" and content(card) == old["draft"]
+            assert card["schema"] == "migloop-case/4" and content(card) == old["draft"]
         for lesson in state["lessons"].values():
             for ref in lesson["evidence"]:
                 assert ref["claim"] in claims(migrated.case(ref["case"], ref["revision"], state))

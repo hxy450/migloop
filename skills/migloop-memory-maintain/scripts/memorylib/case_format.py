@@ -1,8 +1,7 @@
 """The formal card format. Authoring YAML is independent of persistence.
 
-Only one graph is persisted: authored coordinates plus bound operations. Old
-cards are projected through the same accessors. Shared context is immutable and
-content addressed; different observation windows never share an invented scope.
+Only the authored graph is persisted. Bound operations are display-time data.
+Shared-context handling exists only for reading older case/3 cards.
 """
 from __future__ import annotations
 
@@ -13,15 +12,16 @@ from datetime import datetime
 from pathlib import Path, PurePosixPath
 
 from .common import fingerprint, load, write_new
+from .lean_card import SCHEMA, metadata_of
 
-SCHEMA = "migloop-case/3"
+SHARED_SCHEMA = "migloop-case/3"
 CONTENT = ("title", "when", "description", "summary", "recommendations", "unknown", "unresolved_targets")
 PRESENTATION_ORDER = (
     "schema", "id", "created_at", "migration_key",
     "title", "when", "description", "summary",
     "recommendations", "changes", "participants", "graphs",
     "unknown", "unresolved_targets",
-    "job", "identity_basis", "context", "references", "packager", "check", "revision",
+    "job", "metadata", "identity_basis", "context", "references", "packager", "check", "revision",
 )
 
 
@@ -36,7 +36,9 @@ Unrecognized extension fields remain intact instead of being silently omitted.
 
 
 def content(card):
-    if card.get("schema") != SCHEMA:
+    if card.get("schema") == SCHEMA:
+        return {k: copy.deepcopy(card[k]) for k in (*CONTENT, "graphs") if k in card}
+    if card.get("schema") != SHARED_SCHEMA:
         return copy.deepcopy(card["draft"])
     result = {k: copy.deepcopy(card[k]) for k in CONTENT if k in card}
     refs = card["references"]
@@ -73,7 +75,7 @@ def _digest(value):
 
 def shared_objects(card, directory):
     """Resolve only fixed content-addressed names, never a path supplied by a card."""
-    if card.get("schema") != SCHEMA:
+    if card.get("schema") != SHARED_SCHEMA:
         return {}
     objects = {}
     for key, digest in card["context"].items():
@@ -90,7 +92,15 @@ def shared_objects(card, directory):
 
 
 def context(card, objects):
-    if card.get("schema") != SCHEMA:
+    if card.get("schema") == SCHEMA:
+        meta = card["metadata"]
+        targets = [g["target"] for g in card["graphs"]]
+        return {"provenance": {"migration": meta.get("migration", {}), "analysis": meta.get("analysis", {}),
+                "materials": meta.get("transcript_root", ""),
+                "observed": meta.get("observed_in_materials", {}), "source_set_id": meta.get("source_set_id")},
+                "scope": {"generation_end": targets[0].get("since"), "observation_end": targets[0]["at"]},
+                "environment": {"facts": copy.deepcopy(meta.get("environment", []))}}
+    if card.get("schema") != SHARED_SCHEMA:
         return {k: copy.deepcopy(card.get(k, {})) for k in ("provenance", "scope", "environment")}
     values = {}
     for key, digest in card["context"].items():
@@ -104,6 +114,8 @@ def context(card, objects):
 
 
 def write_shared(directory, objects):
+    if not objects:
+        return
     Path(directory).mkdir(parents=True, exist_ok=True)
     for digest, obj in objects.items():
         if fingerprint(obj) != _digest(digest):
@@ -139,7 +151,7 @@ def _matches(declared, bound, aliases):
     if bound["kind"] != "agent":
         return False
     name = PurePosixPath(left).name
-    names = {f"agent-{right}.jsonl", f"main-{right}.jsonl"}
+    names = {f"agent-{right}.jsonl", f"main-{right}.jsonl", f"{right}.jsonl"}
     if ":" in right:
         session, agent = right.rsplit(":", 1)
         names.add(f"main-{session}.jsonl" if agent == "main" else f"agent-{agent}.jsonl")
@@ -202,52 +214,36 @@ def _merge_graph(graph, evidence, refs, aliases):
 
 def finalize(card, objects=None):
     """Convert a passed legacy card without another model call or checker run."""
-    from .card_storage import compact_card
     from .card_contract import require_valid_card
     from .registry import revision_of, validate_case
     validate_case(card)
     if card["schema"] == SCHEMA:
         return presentation(card)
     require_valid_card(card)
-    aliases = {}
-    metadata = card.get("provenance", {})
-    if isinstance(metadata.get("sources"), list):
-        for source in metadata["sources"]:
-            values = {x["value"] for k in ("agent_ids", "session_ids") for x in source.get(k, [])}
-            values.update(s["value"] + ":" + a["value"] for s in source.get("session_ids", []) for a in source.get("agent_ids", []))
-            for key in (source["source"], str(PurePosixPath(metadata["materials"].replace("\\", "/")) / source["source"])):
-                aliases[key] = values
-    old = compact_card(card)
-    objects = objects if objects is not None else {}
-    common = copy.deepcopy(old["provenance"])
-    sources = common.pop("sources")
-    common.pop("captured_at", None)
-    contexts = {"provenance": common, "sources": sources, "scope": old.get("scope", {}), "environment": old.get("environment", {})}
-    references = {}
-    for key, value in contexts.items():
-        obj = {"schema": "migloop-session-context/1", "kind": key, "value": copy.deepcopy(value)}
-        digest = fingerprint(obj)
-        objects[digest] = obj
-        references[key] = digest
-    result = {k: copy.deepcopy(old[k]) for k in ("id", "created_at", "job", "identity_basis", "migration_key", "changes", "participants", "packager") if k in old}
-    result.update(schema=SCHEMA, context=references, **{k: copy.deepcopy(old["draft"][k]) for k in CONTENT if k in old["draft"]})
-    refs = []
-    bindings = {e["graph"]: e for e in old.get("graph_evidence", [])}
-    result["graphs"] = [_merge_graph(g, bindings.get(i, {}), refs, aliases) for i, g in enumerate(old["draft"]["graphs"], 1)]
-    result["references"] = refs
-    result["check"] = {"kernel_sha256": old["validation"].get("kernel_sha256"),
-                       "graphs_sha256": fingerprint(result["graphs"]), "references_sha256": fingerprint(refs),
-                       "mechanical_status": "valid", "path_status": "complete"}
+    details, draft = context(card, objects or {}), content(card)
+    result = {k: copy.deepcopy(card[k]) for k in ("id", "created_at", "job", "migration_key") if k in card}
+    result.update(schema=SCHEMA, metadata=metadata_of(details, card.get("packager")), **draft)
+    # Keep an address base only when the author used absolute transcript paths.
+    root = details["provenance"].get("materials", "").replace("\\", "/").rstrip("/")
+    coordinates = [n["key"] for g in draft["graphs"] for n in g["nodes"]]
+    coordinates += [r["source"] for g in draft["graphs"] for e in g["edges"]
+                    for r in e.get("evidence", []) if isinstance(r, dict)]
+    if root and any(v.replace("\\", "/").startswith(root + "/") or v.replace("\\", "/") == root for v in coordinates):
+        result["metadata"]["transcript_root"] = root
     result["revision"] = revision_of(result)
     validate_case(result)
     require_valid_card(result)
-    if content(result) != old["draft"] or claims(result) != old["claims"]:
+    if content(result) != draft or claims(result) != claims(card):
         raise ValueError("Card conversion changed authored content")
     return presentation(result)
 
 
 def validate_formal(card):
     """Shape/integrity only. Historical relation checks remain in inquiry."""
+    if card.get("schema") == SCHEMA:
+        from .lean_card import validate
+        validate(card)
+        return
     from .card_contract import validate_draft
     if set(card) & {"draft", "claims", "graph_evidence", "validation", "validation_sha256", "provenance", "environment", "scope", "targets", "node_provenance"}:
         raise ValueError("Formal cards contain one graph and shared context references, not legacy copies")

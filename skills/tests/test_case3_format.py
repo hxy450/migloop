@@ -16,30 +16,29 @@ from memorylib.card_storage import compact_card, compact_store
 
 def test_formal_pack_keeps_exact_authoring_but_no_copies(prepared):
     card = prepared["card"]
-    assert card["schema"] == "migloop-case/3"
+    assert card["schema"] == "migloop-case/4"
     assert not set(card) & {"draft", "claims", "graph_evidence", "validation", "environment", "provenance", "targets"}
     assert content(card) == prepared["draft"]
     assert claims(card)["diagnosis"]["text"] == card["summary"]
     metadata = context(card, shared_objects(card, prepared["root"] / "sessions"))
-    assert metadata["scope"] == load(prepared["job"])["scope"]
-    assert metadata["provenance"]["sources"]["agent.jsonl"]
+    assert metadata["scope"]["generation_end"] == load(prepared["job"])["scope"]["generation_end"]
+    assert card["metadata"]["source_set_id"] == load(prepared["meta"])["source_set_id"]
+    assert not (prepared["root"] / "sessions").exists()
     require_valid_card(card)
     assert finalize(card) == card
 
 
-@pytest.mark.parametrize("part", ["prose", "check", "operation", "reference", "context"])
+@pytest.mark.parametrize("part", ["prose", "node", "edge", "metadata"])
 def test_formal_revision_binds_body_graph_receipt_and_dependencies(prepared, part):
     card = copy.deepcopy(prepared["card"])
     if part == "prose":
         card["summary"] += " altered"
-    elif part == "check":
-        card["check"]["path_status"] = "needs_path"
-    elif part == "operation":
-        card["graphs"][0]["edges"][0]["operations"][0]["at"] = "2026-01-01T00:00:01Z"
-    elif part == "reference":
-        card["references"][0] = "fake:999"
+    elif part == "node":
+        card["graphs"][0]["nodes"][0]["at"] = "2026-01-01T00:00:01Z"
+    elif part == "edge":
+        card["graphs"][0]["edges"][0]["to"] = 1
     else:
-        card["context"]["scope"] = "f" * 64
+        card["metadata"]["source_set_id"] = "f" * 64
     assert revision_of(card) != prepared["card"]["revision"]
     with pytest.raises(ValueError, match="revision hash"):
         validate_case(card)
@@ -47,9 +46,9 @@ def test_formal_revision_binds_body_graph_receipt_and_dependencies(prepared, par
 
 def test_rehashed_graph_without_matching_check_fails(prepared):
     card = copy.deepcopy(prepared["card"])
-    card["graphs"][0]["edges"][0]["operations"] = []
+    card["graphs"][0]["edges"] = []
     card["revision"] = revision_of(card)
-    with pytest.raises(ValueError, match="receipt"):
+    with pytest.raises(ValueError, match="declared deviation path"):
         require_valid_card(card)
 
 
@@ -57,8 +56,10 @@ def test_rehashed_graph_without_matching_check_fails(prepared):
 def test_context_cannot_be_missing_mutated_or_escape_directory(prepared, mutation):
     memory = Memory(prepared["root"] / "other-store")
     memory.init()
-    card = copy.deepcopy(prepared["card"])
+    card, objects = shared_fixture(prepared)
     directory = prepared["root"] / "sessions"
+    write_shared(directory, objects)
+    prepared["card_path"].write_text(__import__('json').dumps(card), encoding="utf-8")
     path = directory / (card["context"]["scope"] + ".json")
     if mutation == "missing":
         path.unlink()
@@ -98,12 +99,35 @@ def test_multiple_operations_extra_versions_and_same_line_sources_survive():
 
 
 def test_shared_publish_is_atomic_with_parallel_writers(prepared):
-    objects = shared_objects(prepared["card"], prepared["root"] / "sessions")
+    card, objects = shared_fixture(prepared)
     out = prepared["root"] / "parallel-context"
     with ThreadPoolExecutor(max_workers=6) as pool:
         list(pool.map(lambda _: write_shared(out, objects), range(24)))
-    assert shared_objects(prepared["card"], out) == objects
+    assert shared_objects(card, out) == objects
     assert len(list(out.iterdir())) == len(objects)
+
+
+def shared_fixture(prepared):
+    """An explicit legacy case/3 fixture; current pack never writes this shape."""
+    old = legacy_card(prepared, complete=True)
+    refs = []
+    receipt = old["validation"]["graph_checks"][0]["receipt"]
+    graph = _merge_graph(old["draft"]["graphs"][0], receipt, refs, {"agent.jsonl": {"agent"}})
+    values = {"provenance": old["provenance"], "sources": {s["source"]: s["sha256"] for s in old["provenance"]["sources"]},
+              "scope": old["scope"], "environment": old.get("environment", {})}
+    objects, ctx = {}, {}
+    for key, value in values.items():
+        obj = {"schema": "migloop-session-context/1", "kind": key, "value": value}
+        ctx[key] = fingerprint(obj)
+        objects[ctx[key]] = obj
+    card = {k: copy.deepcopy(old[k]) for k in ("id", "created_at", "job", "migration_key")}
+    card.update(copy.deepcopy(old["draft"]))
+    card.update(schema="migloop-case/3", graphs=[graph], references=refs, context=ctx,
+                check={"graphs_sha256": fingerprint([graph]), "references_sha256": fingerprint(refs),
+                       "mechanical_status": "valid", "path_status": "complete"})
+    card["revision"] = revision_of(card)
+    validate_case(card)
+    return card, objects
 
 
 def test_migration_preserves_claims_status_versions_and_history(prepared):

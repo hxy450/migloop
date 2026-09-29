@@ -13,8 +13,8 @@ def test_pack_puts_authored_content_before_technical_context(prepared):
     assert list(card) == [
         "schema", "id", "created_at", "migration_key",
         "title", "when", "description", "summary",
-        "recommendations", "changes", "participants", "graphs", "unknown",
-        "job", "identity_basis", "context", "references", "packager", "check", "revision",
+        "recommendations", "graphs", "unknown",
+        "job", "metadata", "revision",
     ]
     assert content(card) == prepared["draft"]
 
@@ -41,5 +41,5 @@ def test_optional_fields_and_extensions_are_not_lost_or_added(prepared):
     value = presentation(card)
     assert value == before and card == before
     assert "unknown" not in value
-    assert list(value).index("graphs") < list(value).index("unresolved_targets") < list(value).index("context")
+    assert list(value).index("graphs") < list(value).index("unresolved_targets") < list(value).index("metadata")
     assert json.dumps(value["extension"]) == json.dumps(before["extension"])

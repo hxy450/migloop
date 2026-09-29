@@ -35,7 +35,7 @@ def compact_card(card):
     """Preserve authored content exactly; replace session inventories/debug replies."""
     from .registry import revision_of, validate_case
     validate_case(card)
-    if card["schema"] in ("migloop-case/2", "migloop-case/3"):
+    if card["schema"] in ("migloop-case/2", "migloop-case/3", "migloop-case/4"):
         return copy.deepcopy(card)
     result = copy.deepcopy({k: v for k, v in card.items()
                             if k not in ("provenance", "node_provenance", "validation", "revision")})
@@ -123,7 +123,6 @@ def compact_store(memory, out):
             revision_map[key] = state["revision"]
             snapshots[state["revision"]] = state
     # No output exists until all inputs and hashes have been checked.
-    write_shared(out / "sessions", objects)
     for (identity, revision), card in cards.items():
         write_new(out / "cases" / identity / (revision + ".json"), card)
     for revision, state in snapshots.items():

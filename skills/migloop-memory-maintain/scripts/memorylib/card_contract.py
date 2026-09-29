@@ -113,11 +113,12 @@ def validation_digest(validation):
 def require_valid_card(card):
     """Admission contract shared by pack, ingest and lesson source binding.
 
-The inquiry kernel checks the actual relations. Here we require its successful
-result for each unchanged authored graph, not a separate semantic review.
+The inquiry kernel checks actual relations before pack emits a card. Admission
+checks the final shape and declared paths, not a retained receipt or a
+second semantic review. Legacy formats still validate their historical binding.
 """
-    from .case_format import SCHEMA, validate_formal
-    if card.get("schema") == SCHEMA:
+    from .case_format import SCHEMA, SHARED_SCHEMA, validate_formal
+    if card.get("schema") in (SCHEMA, SHARED_SCHEMA):
         validate_formal(card)
         return
     draft = card.get("draft", {})

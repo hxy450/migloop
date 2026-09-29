@@ -49,8 +49,8 @@ def test_pack_retains_report_local_existence_basis(tmp_path):
     card = load(tmp_path / "case-final.json")
     from memorylib.case_format import content
     assert content(card) == draft
-    declared, = [n["resolved"] for n in card["graphs"][0]["nodes"] if n["key"] == "/app/inputs/spec.md"]
-    assert declared["existence_basis"] == "model_review"
+    assert card["graphs"] == draft["graphs"]
+    assert all("resolved" not in node for node in card["graphs"][0]["nodes"])
     assert load(tmp_path / "case-final.views/target-1.json")["edges"] == draft["graphs"][0]["edges"]
     store = Store(db)
     try:

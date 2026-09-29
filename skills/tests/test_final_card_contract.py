@@ -92,8 +92,8 @@ def test_stored_receipt_mutation_cannot_support_new_lesson(prepared):
     memory = memory_with(prepared)
     state = memory.current()
     card = memory.case(prepared["card"]["id"])
-    # A stored outcome cannot be edited independently of the hashed summary.
-    card["check"]["path_status"] = "needs_path"
+    # Authored evidence cannot be edited independently of the card revision.
+    card["graphs"][0]["edges"][0]["evidence"] = ["invented"]
     path = memory.root / "cases" / card["id"] / (card["revision"] + ".json")
     path.write_text(json.dumps(card), encoding="utf-8")
     with pytest.raises(ValueError, match="revision hash"):
@@ -109,7 +109,7 @@ def test_valid_final_card_flows_directly_to_published_lesson(prepared):
     lesson.pop("status")
     memory = memory_with(prepared, [lesson])
     assert memory.current()["lessons"]["lesson-text"]["status"] == "active"
-    assert memory.case(prepared["card"]["id"])["check"]["mechanical_status"] == "valid"
+    assert memory.case(prepared["card"]["id"])["schema"] == "migloop-case/4"
 
 
 @pytest.mark.parametrize("field,value", [("graph", 2), ("draft_sha256", "f" * 64),

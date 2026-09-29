@@ -8,13 +8,13 @@ from pathlib import Path
 
 from .common import fields, fingerprint, load, nonempty, now, replace_json, slug, strings, write_new
 from .card_contract import require_valid_card, validation_digest
-from .case_format import SCHEMA, claims, content, shared_objects, write_shared, validate_formal
+from .case_format import SCHEMA, SHARED_SCHEMA, claims, content, shared_objects, write_shared, validate_formal
 
 STATUSES = {"candidate", "active", "disputed", "needs_review", "retired"}
 
 
 def revision_of(card):
-    if card.get("schema") == SCHEMA:
+    if card.get("schema") in (SCHEMA, SHARED_SCHEMA):
         return fingerprint({k: v for k, v in card.items() if k not in ("revision", "created_at")})
     payload = copy.deepcopy({k: v for k, v in card.items() if k not in ("revision", "created_at", "validation")})
     if isinstance(payload.get("provenance"), dict):
@@ -23,12 +23,12 @@ def revision_of(card):
 
 
 def validate_case(card):
-    if not isinstance(card, dict) or card.get("schema") not in {"migloop-case/1", "migloop-case/2", SCHEMA}:
-        raise ValueError("Expected a packaged migloop-case/1, /2 or /3, not a bare draft or UI graph")
+    if not isinstance(card, dict) or card.get("schema") not in {"migloop-case/1", "migloop-case/2", SHARED_SCHEMA, SCHEMA}:
+        raise ValueError("Expected a packaged migloop-case/1, /2, /3 or /4, not a bare draft or UI graph")
     slug(card.get("id"), "case.id")
     if card.get("revision") != revision_of(card):
         raise ValueError("Case content differs from its revision hash; repack the source draft")
-    if card["schema"] == SCHEMA:
+    if card["schema"] in (SCHEMA, SHARED_SCHEMA):
         validate_formal(card)
         return
     # Legacy records remain readable under their original revision algorithm.
