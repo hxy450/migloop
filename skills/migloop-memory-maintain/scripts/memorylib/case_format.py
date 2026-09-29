@@ -16,6 +16,23 @@ from .common import fingerprint, load, write_new
 
 SCHEMA = "migloop-case/3"
 CONTENT = ("title", "when", "description", "summary", "recommendations", "unknown", "unresolved_targets")
+PRESENTATION_ORDER = (
+    "schema", "id", "created_at", "migration_key",
+    "title", "when", "description", "summary",
+    "recommendations", "changes", "participants", "graphs",
+    "unknown", "unresolved_targets",
+    "job", "identity_basis", "context", "references", "packager", "check", "revision",
+)
+
+
+def presentation(card):
+    """Order top-level fields for reading; preserve every value and list order.
+
+Revisions use canonical sorted-key JSON, so presentation is not a new revision.
+Unrecognized extension fields remain intact instead of being silently omitted.
+"""
+    keys = (*PRESENTATION_ORDER, *(key for key in card if key not in PRESENTATION_ORDER))
+    return {key: copy.deepcopy(card[key]) for key in keys if key in card}
 
 
 def content(card):
@@ -190,7 +207,7 @@ def finalize(card, objects=None):
     from .registry import revision_of, validate_case
     validate_case(card)
     if card["schema"] == SCHEMA:
-        return copy.deepcopy(card)
+        return presentation(card)
     require_valid_card(card)
     aliases = {}
     metadata = card.get("provenance", {})
@@ -226,7 +243,7 @@ def finalize(card, objects=None):
     require_valid_card(result)
     if content(result) != old["draft"] or claims(result) != old["claims"]:
         raise ValueError("Card conversion changed authored content")
-    return result
+    return presentation(result)
 
 
 def validate_formal(card):

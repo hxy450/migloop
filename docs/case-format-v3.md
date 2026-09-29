@@ -6,6 +6,11 @@ contract passes. Legacy `/1` and `/2` remain readable under their original hashe
 
 ## Persisted shape
 
+The top-level reading order is identity → situation/summary → recommendations
+and repair changes → graph → unresolved items → technical context/references and
+receipt. Serialization order never changes a card revision, node/edge ordering,
+or lesson source binding; hashes continue to use canonical sorted-key JSON.
+
 - Identity, migration key, original creation time, title, when, description,
   summary, recommendations, changes, participants and unknown/unresolved targets.
 - **One `graphs` list.** Authored nodes keep their key/time/reason/problem.
