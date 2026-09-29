@@ -66,3 +66,19 @@ def test_mixed_projection_is_rejected(tmp_path):
     path.write_text("\n".join(json.dumps(e) for e in rows), encoding="utf-8")
     with pytest.raises(ValueError, match="mixed"):
         deveco_source.load(path)
+
+
+def test_lineage_classifier_is_scoped_even_on_error(tmp_path, monkeypatch):
+    path = tmp_path / "root.json"
+    save(path, document("ses_root"), False)
+    original = deveco.common._spec_kind
+
+    def fail(*args, **kwargs):
+        assert deveco.common._spec_kind is original
+        assert kwargs["spec_kind"](".deveco/workflows/explore/plan.md") == "analysis"
+        raise RuntimeError("test renderer failure")
+
+    monkeypatch.setattr(deveco.common, "build_lineage", fail)
+    with pytest.raises(RuntimeError, match="renderer"):
+        deveco.extract(str(path))
+    assert deveco.common._spec_kind is original

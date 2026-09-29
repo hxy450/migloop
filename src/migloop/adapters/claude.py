@@ -851,7 +851,8 @@ def collect_blame_events(path: str) -> list[tuple[Any, ...]]:
 
 
 def build_lineage(
-    agents: list[dict[str, Any]], main_tools: list[dict[str, Any]], cwd: str | None
+    agents: list[dict[str, Any]], main_tools: list[dict[str, Any]], cwd: str | None,
+    *, spec_kind=None,
 ) -> dict[str, Any]:
     """从子代理(+主线)的可见源码行与 Write 还原 agent ↔ spec/Android 源 ↔ 鸿蒙文件关系。
     **不做任何归属推断**：每个 spec 文件(含 addendum)、每个 Android 源文件、每个 agent、
@@ -859,6 +860,7 @@ def build_lineage(
     Android 可见行来自 Read 与搜索/命令的最终输出，排除只有路径、计数或重定向的访问。"""
     # 进 spec 列的类别：spec/ 目录下**全部**文件(canonical 的 page/feature/base 之外,
     # handoff/shared/plan/other 同样是 spec 阶段的产出与输入,都要进图)
+    classify_spec = spec_kind or _spec_kind
     SPEC_COL = ("page", "feature", "base", "analysis", "handoff", "shared", "plan", "other")
     la: list[dict[str, Any]] = []  # per-agent：读了哪些 spec/android、写了哪些文件
     # spec rel -> {kind, read_by:set}   谁实际 Read 了这个 spec 文件
@@ -1010,7 +1012,7 @@ def build_lineage(
         android_full: list[str] = []
         proj_reads: list[str] = []
         for r in sorted(set(reads_rel)):
-            k = _spec_kind(r)
+            k = classify_spec(r)
             if k:   # spec/ 目录下全算(不再只认 canonical 的 page/feature/base)
                 spec_reads.append(r)
                 lines_spec += rl_rel.get(r, 0)
@@ -1047,7 +1049,7 @@ def build_lineage(
         w_res: list[str] = []
         w_other: list[str] = []
         for w in sorted(set(writes_rel)):
-            sk = _spec_kind(w)
+            sk = classify_spec(w)
             hk = _is_hmos(w)
             if not sk and not hk:
                 # 既不是 spec 也不是鸿蒙产物:仍然是这个 agent 的产出(构建脚本、
@@ -1092,7 +1094,7 @@ def build_lineage(
             low = r.lower()
             if any(x in low for x in _EXTERNAL_EXCLUDE):
                 continue
-            if _spec_kind(r) or _is_hmos(r):
+            if classify_spec(r) or _is_hmos(r):
                 continue
             if low.endswith(_ANDROID_EXT):
                 probed_rel.append(r)
@@ -1115,7 +1117,7 @@ def build_lineage(
         # 只有【中断且零产出】的白跑分身被排除(它们随后会被重发,留着就是重复计数)。
         if w_ets or w_spec or not (a.get("aborted") and n_out_a == 0):
             for r in spec_reads:
-                spec_read_by.setdefault(r, {"kind": _spec_kind(r), "read_by": set()})["read_by"].add(a["agent_id"])
+                spec_read_by.setdefault(r, {"kind": classify_spec(r), "read_by": set()})["read_by"].add(a["agent_id"])
             for r in probed_rel:
                 android_probed_by.setdefault(r, set()).add(a["agent_id"])
             for r in android_full:

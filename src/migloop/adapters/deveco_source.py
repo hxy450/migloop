@@ -27,6 +27,8 @@ def normalize(document):
 
 def load(path):
     text = Path(path).read_text(encoding="utf-8-sig")
+    if not text.strip():
+        raise ValueError("empty DevEco session: " + str(path))
     if text.startswith("Exporting session:"):
         text = text.split("\n", 1)[1]
     try:

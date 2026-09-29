@@ -1600,9 +1600,7 @@ def _parse(data, storage_root=None, source_file=None, child_documents=None):
             return "shared"
         return None
 
-    common._spec_kind = _deveco_spec_kind
-    lineage = common.build_lineage(agents, tools, target_root or cwd)
-    common._spec_kind = _orig_spec_kind
+    lineage = common.build_lineage(agents, tools, target_root or cwd, spec_kind=_deveco_spec_kind)
     if lineage and target_root:
         lineage["cwd"] = cwd  # 分类用 target_root,血缘展示仍用迁移工作区 cwd
 
