@@ -202,6 +202,8 @@ pack检查模板与每张图的关系路径。返回`status: valid`时才写出�
 
 pack自动附带已记录的模型/平台/SDK等环境线索，未知保持未知；无需模型补查或增加字段。这些是历史环境，不是lesson适用版本范围。维护旧卡环境时才看[补录说明](references/environment.md)，正常制卡跳过。
 
+制卡宿主可通过MIGLOOP_ANALYSIS_CONTEXT提供同一材料池的实际分析模型、平台和会话记录；pack自动附在metadata.analysis，不改冻结的迁移材料。历史迁移模型仍在migration/observed_in_materials，不能用它们猜调查员模型。宿主未提供时沿用已记录信息或保持未知，调查员无需读取或填写运行记录。
+
 正式稿填写title、when、description、summary、非空recommendations及至少一张graph。后续稿沿用同一job，保留原稿；只有通过的稿件才产生case文件。
 
 ## 处理机械反馈

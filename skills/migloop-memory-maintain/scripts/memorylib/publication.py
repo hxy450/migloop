@@ -46,6 +46,10 @@ def _lesson_text(lesson, state, memory, output, paths, link_cards):
         for identity in lesson["requires"]:
             lines.append("- " + _link(state["lessons"][identity]["title"], output / paths[identity], current))
         lines.append("")
+    # Deployment readers need the lesson, not an expanding evidence ledger.
+    # Exact bindings remain in the manifest; development exports can link cards.
+    if not link_cards:
+        return "\n".join(lines) + "\n"
     lines += ["## 来源（按需复核）", ""]
     sources = {}
     for ref in lesson["evidence"]:
@@ -121,14 +125,20 @@ def _render(memory, state, output, link_cards):
             lines += ["本版暂无可发布的 active 经验。", ""]
         if not topic:
             lines += ["## 阅读约定", "",
-                      "经验是有适用范围的历史建议。核查来源时同时看结论与 unknown；来源卡未随阅读包复制。", "",
+                      ("经验是有适用范围的历史建议。核查来源时同时看结论与 unknown；来源卡未随阅读包复制。"
+                       if link_cards else "经验是有适用范围的历史建议；来源绑定由维护端保留，正常使用无需读取。"), "",
                       "可选检查仅在适用条件不确定、与当前输入冲突或需要验证关键假设时按需执行；优先复用已有证据和正常测试。",
                       "不因读取经验而额外启动验证流程；项目原有必需测试照常执行。", ""]
         files[str(relative)] = "\n".join(lines)
     for identity, lesson in sorted(lessons.items()):
         files[str(paths[identity])] = _lesson_text(lesson, state, memory, output, paths, link_cards)
+    crowded = [{"topic": topic or "/", "entries": len(row["children"]) + len(row["lessons"]),
+                "code": "crowded_index", "next_step": "Consider meaningful subtopics; keep lesson IDs and preview conditions. This is a navigation hint, not a publication failure."}
+               for topic, row in sorted(directories.items())
+               if len(row["children"]) + len(row["lessons"]) > 20]
     manifest = {"schema": "migloop-memory-files/1", "publisher_version": VERSION,
                 "memory_revision": state["revision"], "card_links": "local" if link_cards else "references_only",
+                "sources_in_body": bool(link_cards), "navigation_warnings": crowded,
                 "counts": {"lessons": len(lessons), "topics": len(directories) - 1},
                 "lessons": {key: {"path": str(paths[key]), "version": value["version"],
                                   "evidence": value["evidence"]} for key, value in sorted(lessons.items())},
@@ -163,4 +173,4 @@ def export_memory(memory, directory, *, link_cards=False):
             stage.rename(output)
     return {"revision": state["revision"], "entry": str(output / "index.md"),
             "manifest": str(output / "manifest.json"), **manifest["counts"],
-            "card_links": manifest["card_links"], "store_changed": False}
+            "card_links": manifest["card_links"], "warnings": manifest["navigation_warnings"], "store_changed": False}

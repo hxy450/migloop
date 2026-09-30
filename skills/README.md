@@ -64,7 +64,7 @@ python skills/migloop-memory-maintain/scripts/memory.py export --store STORE --o
 
 导出根`index.md`只列一级主题；每个子目录有自己的`index.md`，列直接子主题与本级经验预览；一条经验一个`*.lesson.md`。可以同时读多个分支，按当前任务选择，未遍历全库不等于召回未完成。目录不复制后代全文，经验正文不截断。
 
-只导出active记录，保留ID、版本、when/description/unless/why/how/check及来源绑定。默认阅读包不包含来源卡或本机路径，可单独分发；开发版`--link-cards`指向store中确切版本的卡片文件，链接只适用于保持相对位置的本地目录。manifest.json记录版本和文件校验和供维护审计，不是模型入口。两者是同一份store的派生视图，不维护第二份经验真理源。
+只导出active记录，保留ID、版本、when/description/unless/why/how/check。0.10.1起默认部署阅读包不渲染来源段，不包含来源卡或本机路径；完整来源绑定仍在store/manifest中。开发版`--link-cards`保留来源列表并指向store中确切版本的卡片文件，链接只适用于保持相对位置的本地目录。manifest.json记录版本和文件校验和供维护审计，不是模型入口。两者是同一份store的派生视图，不维护第二份经验真理源。export对超过20个直接子主题/lesson的索引给出非阻断提示，由归并者按语义整理。
 
 导出前检查所有可见主题的介绍及来源版本，完整暂存后再发布到**全新**目录。既有目录拒绝覆盖，修订后导出新版本并交付新入口；旧包不会随来源撤回而自行失效。经验和目录调整通过维护提案回到store，再重新export。CATALOG.md全量汇总仍可供人审阅，但不作为召回入口。
 

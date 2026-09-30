@@ -69,7 +69,8 @@ def test_shared_guidance_is_at_root_without_dropping_lesson_data(prepared, link_
     guidance = root.split("## 阅读约定\n\n", 1)[1].strip().splitlines()
     guidance = [line for line in guidance if line.strip()]
     assert len(guidance) == 3
-    assert "unknown" in guidance[0] and "可选检查" in guidance[1]
+    assert ("unknown" in guidance[0]) == link_cards
+    assert "可选检查" in guidance[1]
     assert "原有必需测试" in guidance[2]
     for path in output.rglob("*.md"):
         if path != output / "index.md":
@@ -82,7 +83,7 @@ def test_shared_guidance_is_at_root_without_dropping_lesson_data(prepared, link_
             assert value in body
         assert ("## 可选检查" in body) == bool(lesson["check"])
         for ref in lesson["evidence"]:
-            assert all(ref[key] in body for key in ("case", "claim", "revision"))
+            assert all(ref[key] in body for key in ("case", "claim", "revision")) == link_cards
         assert all(target.is_file() for target in _links(path))
     assert lessons[0]["description"] in (output / "ui/text/lesson-text.lesson.md").read_text(encoding="utf-8")
     assert memory.current() == original
@@ -110,8 +111,28 @@ def test_application_package_is_portable_without_store_or_card_content(prepared)
         assert all(target.is_file() and target.is_relative_to(copied) for target in _links(path))
         body = path.read_text(encoding="utf-8")
         assert "Test diagnosis" not in body and "recorded-generation-model" not in body
-    assert prepared["card"]["revision"] in (copied / "ui/text/lesson-text.lesson.md").read_text(encoding="utf-8")
+    body = (copied / "ui/text/lesson-text.lesson.md").read_text(encoding="utf-8")
+    assert prepared["card"]["revision"] not in body
+    assert "## 来源" not in body
+    assert load(copied / "manifest.json")["lessons"]["lesson-text"]["evidence"]
     assert load(copied / "manifest.json")["card_links"] == "references_only"
+
+
+@pytest.mark.parametrize("entries, warned", [(20, False), (21, True)])
+def test_crowded_navigation_is_a_nonblocking_direct_entry_hint(prepared, entries, warned):
+    lessons = [make_lesson(prepared["card"], f"lesson-{i}") for i in range(entries - 1)]
+    lessons.append(make_lesson(prepared["card"], "lesson-child", topic=["ui", "text", "child"]))
+    memory = memory_with(prepared, lessons)
+    state = memory.current()
+    memory.apply({"base_revision": state["revision"], "upsert": [],
+                  "topic_descriptions": {"ui/text/child": "A meaningful child topic"}})
+    before = memory.current()
+    result = export_memory(memory, prepared["root"] / "reading")
+    assert bool(result["warnings"]) == warned
+    if warned:
+        assert result["warnings"][0]["topic"] == "ui/text"
+        assert result["warnings"][0]["entries"] == entries
+    assert memory.current() == before
 
 
 def test_requires_links_cross_topics_and_stable_identity_after_move(prepared):

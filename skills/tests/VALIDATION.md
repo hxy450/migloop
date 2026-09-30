@@ -2,6 +2,15 @@
 
 The initial 2026-09-17 checks covered skill instructions and scripts only. Later dated checks below include the shared inquiry changes needed by self-contained card validation; they do not deploy the renderer/server or modify global hook configuration.
 
+## Lean deployment reading and observed analyst identity (0.10.1, 2026-09-30)
+
+- Default export omits source paragraphs from lesson Markdown; exact evidence bindings stay in store/manifest. Development `--link-cards` retains links. The action title, when, description, boundaries and how remain unchanged.
+- Export reports a nonblocking `crowded_index` hint above 20 direct children + lessons. No automatic semantic grouping or text truncation.
+- Hosts can provide material-scoped observed analysis labels through `MIGLOOP_ANALYSIS_CONTEXT`; pack adds them without mutating frozen job provenance or inquiry data. Metadata-only `record-analysis` checks identical authored content/claims, preserves lesson versions/statuses, and rebinds only source revisions.
+- **274 passed / 1 skipped** in skills/tests; all three edited processing/recall skill frontmatters validate. Controller identity/push/continuation suite: **66 tests, 1 skipped**. No Server deployment or new migration/model run.
+- Real-library dry run: 276 cards retain exact authored content, graphs, force anchors and migration environment; 225 missing analyst-model labels filled from actual analysis transcripts. All 276 then have Opus 5.5 analysis labels. Two why paragraphs shortened and 34 lesson topics moved; all other semantic fields and evidence claim identities preserved. The visual-repair lesson stays under layout, so whole-topic comparisons cover the same lessons.
+- Index-path estimates include intermediate indexes: reading only layout constraints is smaller; reading every navigation branch adds about 5%. These are file-selection estimates, not measured model recall or migration-quality improvements.
+
 ## Authored analysis only (0.10.0, 2026-09-29)
 
 - New case/4 stores the complete author draft plus identity and small historical metadata. No checker receipts, bound operations, derived nodes, independent reference table, copied triage records or shared session files. Pack still runs the same inquiry checks before emitting a card; UI reconstructs its view from the draft and frozen session.

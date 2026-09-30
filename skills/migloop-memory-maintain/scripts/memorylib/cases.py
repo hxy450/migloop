@@ -172,6 +172,11 @@ def pack(job_path, draft_path, out, db=None, debug_receipts=None):
     from .case_format import finalize, write_shared
     shared = {}
     card = finalize(card, shared)
+    from .analysis import from_host
+    host_analysis = from_host(metadata)
+    if host_analysis:
+        card["metadata"].setdefault("analysis", {}).update(host_analysis)
+        card["revision"] = revision_of(card)
     write_shared(out.parent / "sessions", shared)
     write_new(out, card)
     for index, graph in enumerate(graphs, 1):
