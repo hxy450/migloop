@@ -66,6 +66,8 @@ python skills/migloop-memory-maintain/scripts/memory.py export --store STORE --o
 
 只导出active记录，保留ID、版本、when/description/unless/why/how/check。本地维护与GitHub知识仓库使用`--link-cards`保留来源列表并链接store中确切版本的卡片；保持相对目录结构即可浏览。只有部署给迁移agent时，才另行省略该参数导出不带来源段、卡片或本机路径的精简包，不用它替换仓库里的memory。完整来源绑定始终留在store/manifest中。manifest.json记录版本和文件校验和供维护审计，不是模型入口。两者是同一份store的派生视图，不维护第二份经验真理源。export对超过20个直接子主题/lesson的索引给出非阻断提示，由归并者按语义整理。
 
+0.10.3起，两种阅读版均在正文末尾显示一行来源计数；部署版只有计数，没有来源清单。按case ID、已记录的迁移身份和project标识去重，多条claim不重复算卡；缺失的迁移/应用身份不猜测。计数仅表示历史样本覆盖，不是正确率、成功复用次数或置信度评分，不改卡片及lesson模板，也不扩展各级索引。
+
 导出前检查所有可见主题的介绍及来源版本，完整暂存后再发布到**全新**目录。既有目录拒绝覆盖，修订后导出新版本并交付新入口；旧包不会随来源撤回而自行失效。经验和目录调整通过维护提案回到store，再重新export。CATALOG.md全量汇总仍可供人审阅，但不作为召回入口。
 
 ## 数据与身份
