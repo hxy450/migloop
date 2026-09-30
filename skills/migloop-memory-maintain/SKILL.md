@@ -11,7 +11,7 @@ description: 将新增、修订或撤回的迁移情景卡融入已有经验库�
 2. **自主查阅并比较。** 从已有阅读目录的 `index.md` 逐层打开相关主题、lesson 和必要的来源卡，可以批量读取、普通文件搜索。比较当前可见的条件、偏差机制与决策动作：相同则补证，不同则分支，条件内冲突则保留争议；阶段帮助定位使用者，不作为强制拆分键。未发布条目的查看方法见下文。
 3. **提炼并写提案。** 围绕使用者下一次要作的具体决策，写清可见信号、成立条件和可直接采用的动作，再填写模板。由你明确选择支持该经验的 `case + claim + revision`，而非程序按关键词配证据。目录负责导航，每条经验保持一个稳定身份。
 4. **校验并发布。** 从有效卡片提炼可使用的lesson后直接标active，用apply检查格式、来源和版本并保存，不另派审核者或等待转正。真正未决的建议或冲突可保留candidate/disputed。版本冲突时重读变化再修订；语义归并由你判断。
-5. **生成阅读目录。** 用 export 把该版本的 active 经验生成到新文件夹，把根 `index.md` 路径交给使用者。迁移模型直接读这些文件，不需要运行查询脚本。
+5. **生成阅读目录。** 维护交付与知识仓库用 `export --link-cards` 保留可点击来源；部署给迁移 agent 时才另行导出不带来源的精简包。把根 `index.md` 路径交给使用者，模型直接读文件，不需要运行查询脚本。
 
 来源修改或撤回后，查看impact给出的受影响条目，更新相应经验再恢复使用。经验内容由模型判断，机械检查负责引用、版本和依赖。
 
@@ -237,11 +237,11 @@ apply串行发布。遇版本冲突，重读当前状态并比较变化，再形
 ## 发布分层阅读包
 
 ```text
-python scripts/memory.py export --store STORE --out NEW_READING_DIRECTORY
 python scripts/memory.py export --store STORE --out NEW_DEVELOPMENT_DIRECTORY --link-cards
+python scripts/memory.py export --store STORE --out NEW_DEPLOYMENT_DIRECTORY
 ```
 
-第一条生成部署阅读包，lesson正文不渲染来源段，也不复制卡片或转录；完整case/claim/revision绑定仍在store和manifest中，正常召回不用读取。第二条用于本地开发，在经验文件中保留完整来源与相对路径链接，指向store里的确切卡片JSON版本；移动阅读包后这些本地链接可能失效。两种导出复用同一份经验与绑定，不生成另一份卡片摘要。
+第一条是本地维护与GitHub知识仓库的交付形式：lesson保留来源段和相对路径链接，直接指向store中确切版本的卡片；memory与store保持相对位置即可在本地及GitHub浏览。第二条仅用于部署给迁移agent：正文不渲染来源段，不复制卡片或转录，完整case/claim/revision绑定仍在store和manifest中。不要拿部署包替换开发仓库的memory；目录移动改变与store的相对位置时，按最终位置重新导出。两种导出复用同一份经验与绑定，不生成另一份卡片摘要。
 
 每一级`index.md`只列直接子主题和本级经验预览；`*.lesson.md`保留完整经验、例外、依赖和具体可选检查。根目录不会列出全库经验，公共阅读约定集中在根入口。export返回超过20个直接入口的导航提示，由维护者判断怎样分组，不因提示中断交付。manifest.json记录版本、文件校验和及来源绑定，供维护检查，不要求迁移模型读取。
 
