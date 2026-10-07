@@ -28,6 +28,47 @@ def _lesson_path(lesson):
     return PurePosixPath(*lesson["topic"], lesson["id"] + ".lesson.md")
 
 
+def _support_counts(lesson, state):
+    """Count historical support without exposing the case ledger to deployment readers."""
+    refs = {(ref["case"], ref["revision"]) for ref in lesson["evidence"]}
+    migrations, projects = set(), set()
+    missing_migrations = missing_projects = 0
+    for identity, _revision in refs:
+        migration = state["cases"][identity].get("migration", {})
+        if not isinstance(migration, dict):
+            migration = {}
+        migration_id = migration.get("server_session_id") or migration.get("id")
+        project = migration.get("project")
+        if migration_id:
+            migrations.add(str(migration_id))
+        else:
+            missing_migrations += 1
+        if project:
+            projects.add(str(project).casefold())
+        else:
+            missing_projects += 1
+    return {
+        "cards": len(refs),
+        "migrations": len(migrations),
+        "applications": len(projects),
+        "missing_migration_cards": missing_migrations,
+        "missing_application_cards": missing_projects,
+    }
+
+
+def _support_line(counts):
+    parts = [f"{counts['cards']} 张卡"]
+    for key, missing_key, unit, label in (
+            ("migrations", "missing_migration_cards", "次迁移", "迁移数"),
+            ("applications", "missing_application_cards", "个应用", "应用数")):
+        count, missing = counts[key], counts[missing_key]
+        if missing:
+            parts.append(f"已知 {count} {unit}（部分未记录）" if count else label + "未记录")
+        else:
+            parts.append(f"{count} {unit}")
+    return "来源支持：" + " · ".join(parts)
+
+
 def _lesson_text(lesson, state, memory, output, paths, link_cards):
     current = output / paths[lesson["id"]]
     lines = [f"# {lesson['title']}", "", f"ID：`{lesson['id']}` · 版本：{lesson['version']}", "",
@@ -40,17 +81,18 @@ def _lesson_text(lesson, state, memory, output, paths, link_cards):
     lines += ["## 原因", "", lesson["why"], "", "## 做法", "",
               *[f"{i}. {x}" for i, x in enumerate(lesson["how"], 1)], ""]
     if lesson.get("check"):
-        lines += ["## 可选检查", "",
-                  "仅在适用条件不确定、与当前输入冲突或需要验证关键假设时按需执行；优先复用已有证据和正常测试。",
-                  "不因读取本条经验而额外启动验证流程；项目原有必需测试照常执行。", "",
-                  *[f"- {x}" for x in lesson["check"]], ""]
+        lines += ["## 可选检查", "", *[f"- {x}" for x in lesson["check"]], ""]
     if lesson["requires"]:
         lines += ["## 依赖经验", ""]
         for identity in lesson["requires"]:
             lines.append("- " + _link(state["lessons"][identity]["title"], output / paths[identity], current))
         lines.append("")
-    lines += ["## 来源（按需复核）", "",
-              "经验是有适用范围的历史建议。核查来源时同时看结论与 unknown；来源卡未随阅读包复制。", ""]
+    # Deployment readers need the usable lesson and a compact support signal;
+    # exact case/claim/revision bindings remain in manifest.json.
+    lines += [_support_line(_support_counts(lesson, state)), ""]
+    if not link_cards:
+        return "\n".join(lines) + "\n"
+    lines += ["## 来源（按需复核）", ""]
     sources = {}
     for ref in lesson["evidence"]:
         sources.setdefault((ref["case"], ref["revision"]), []).append(ref["claim"])
@@ -123,11 +165,19 @@ def _render(memory, state, output, link_cards):
             lines.append("")
         if not directory["children"] and not directory["lessons"]:
             lines += ["本版暂无可发布的 active 经验。", ""]
+        if not topic:
+            lines += ["## 阅读约定", "",
+                      ("经验是有适用范围的历史建议。核查来源时同时看结论与 unknown；来源卡未随阅读包复制。"
+                       if link_cards else "经验是有适用范围的历史建议；来源绑定由维护端保留，正常使用无需读取。")
+                      + " 来源计数按卡片、迁移身份与项目标识去重，表示历史样本覆盖，不是正确概率或成功复用次数。", "",
+                      "可选检查仅在适用条件不确定、与当前输入冲突或需要验证关键假设时按需执行；优先复用已有证据和正常测试。",
+                      "不因读取经验而额外启动验证流程；项目原有必需测试照常执行。", ""]
         files[str(relative)] = "\n".join(lines)
     for identity, lesson in sorted(lessons.items()):
         files[str(paths[identity])] = _lesson_text(lesson, state, memory, output, paths, link_cards)
     manifest = {"schema": "migloop-memory-files/1", "publisher_version": VERSION,
                 "memory_revision": state["revision"], "card_links": "local" if link_cards else "references_only",
+                "sources_in_body": bool(link_cards),
                 "counts": {"lessons": len(lessons), "topics": len(directories) - 1},
                 "lessons": {key: {"path": str(paths[key]), "version": value["version"],
                                   "evidence": value["evidence"]} for key, value in sorted(lessons.items())},

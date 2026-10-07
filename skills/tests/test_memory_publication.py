@@ -57,6 +57,51 @@ def test_direct_lessons_and_subtopics_can_coexist(prepared):
     assert output / "ui/text/lesson-text.lesson.md" not in links
 
 
+@pytest.mark.parametrize("link_cards", [False, True])
+def test_shared_guidance_is_at_root_without_dropping_lesson_data(prepared, link_cards):
+    lessons = [make_lesson(prepared["card"], description="Known input condition"),
+               make_lesson(prepared["card"], "lesson-second", check=[], requires=["lesson-text"])]
+    memory = memory_with(prepared, lessons)
+    original = memory.current()
+    output = prepared["root"] / "reading"
+    export_memory(memory, output, link_cards=link_cards)
+    root = (output / "index.md").read_text(encoding="utf-8")
+    guidance = root.split("## 阅读约定\n\n", 1)[1].strip().splitlines()
+    guidance = [line for line in guidance if line.strip()]
+    assert len(guidance) == 3
+    if link_cards:
+        assert "unknown" in guidance[0]
+    else:
+        assert "来源绑定" in guidance[0]
+    assert "可选检查" in guidance[1]
+    assert "原有必需测试" in guidance[2]
+    for path in output.rglob("*.md"):
+        if path != output / "index.md":
+            assert not any(line in path.read_text(encoding="utf-8") for line in guidance)
+    for lesson in lessons:
+        path = output / "ui/text" / (lesson["id"] + ".lesson.md")
+        body = path.read_text(encoding="utf-8")
+        for value in [lesson["title"], lesson["when"], lesson["why"],
+                      *lesson["unless"], *lesson["how"], *lesson["check"]]:
+            assert value in body
+        assert ("## 可选检查" in body) == bool(lesson["check"])
+        if link_cards:
+            for ref in lesson["evidence"]:
+                assert all(ref[key] in body for key in ("case", "claim", "revision"))
+        else:
+            assert all(ref["case"] not in body for ref in lesson["evidence"])
+        assert all(target.is_file() for target in _links(path))
+        if link_cards:
+            assert "## 来源（按需复核）" in body
+        else:
+            assert "## 来源（按需复核）" not in body
+            assert "来源支持：" in body
+    manifest = load(output / "manifest.json")
+    assert manifest["sources_in_body"] is link_cards
+    assert lessons[0]["description"] in (output / "ui/text/lesson-text.lesson.md").read_text(encoding="utf-8")
+    assert memory.current() == original
+
+
 def test_local_card_links_resolve_to_exact_revision_and_no_cards_are_copied(prepared):
     memory = memory_with(prepared)
     output = prepared["root"] / "阅读 包" / "v1"
@@ -79,8 +124,13 @@ def test_application_package_is_portable_without_store_or_card_content(prepared)
         assert all(target.is_file() and target.is_relative_to(copied) for target in _links(path))
         body = path.read_text(encoding="utf-8")
         assert "Test diagnosis" not in body and "recorded-generation-model" not in body
-    assert prepared["card"]["revision"] in (copied / "ui/text/lesson-text.lesson.md").read_text(encoding="utf-8")
-    assert load(copied / "manifest.json")["card_links"] == "references_only"
+        if path.name.endswith(".lesson.md"):
+            assert "## 来源（按需复核）" not in body
+            assert "来源支持：" in body
+    manifest = load(copied / "manifest.json")
+    assert manifest["card_links"] == "references_only"
+    assert manifest["sources_in_body"] is False
+    assert manifest["lessons"]["lesson-text"]["evidence"][0]["revision"] == prepared["card"]["revision"]
 
 
 def test_requires_links_cross_topics_and_stable_identity_after_move(prepared):
