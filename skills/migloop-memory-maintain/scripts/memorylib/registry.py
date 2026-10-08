@@ -11,6 +11,59 @@ from .card_contract import require_valid_card, validation_digest
 from .case_format import SCHEMA, SHARED_SCHEMA, claims, content, shared_objects, write_shared, validate_formal
 
 STATUSES = {"candidate", "active", "disputed", "needs_review", "retired"}
+MEMORY_SCHEMA = "migloop-memory/2"
+# Retrieval axes. Stage is a field, never a directory level.
+STAGES = ("spec", "plan", "execute", "verify", "repair", "converge")
+# Structure limits enforced by apply and export; growth happens by splitting topics.
+LEAF_MAX, DESCRIPTION_MAX, SUMMARY_MAX, SIGNALS_MAX, SIGNAL_MAX = 12, 60, 30, 12, 60
+
+
+# Lowercase tool/format/unit names that are legitimate grep targets despite being plain words.
+SIGNAL_ALLOW = {"aapt", "apktool", "hvigor", "hvigorw", "ohpm", "hilog", "lottie", "rawfile", "mipmap", "webp", "xxhdpi",
+                "xhdpi", "xldpi", "sips", "varint", "zlib", "strarray", "styleable", "heredoc", "rg", "placeable", "lerp",
+                "bigint", "instanceof", "typeof", "dp", "px", "vp", "sp", "fp", "lpx", "gradle", "grep", "inflate",
+                "rethrow", "reviver", "replacer", "clickable", "focusable", "selectable", "hypium", "hamock", "jest", "mocha", "junit", "espresso", "robolectric", "hdc", "hilogcat", "arkts", "ets", "hap", "har", "hsp", "ohos"}
+
+
+def generic_signal(symbol):
+    """A bare lowercase word (import, title, loading) matches any codebase; identifiers, dotted
+    paths, file names and decorators carry case, punctuation or are on the allow list."""
+    import re
+    return bool(re.fullmatch(r"[a-z]{1,10}", symbol)) and symbol not in SIGNAL_ALLOW
+
+
+def structure_errors(lessons, topics, *, require_fields=False, require_descriptions=False):
+    """Mechanical structure contract over active lessons; returns messages, raises nothing."""
+    errors, leaves = [], {}
+    for identity, lesson in sorted(lessons.items()):
+        route = "/".join(lesson["topic"])
+        if len(lesson["topic"]) < 2:
+            errors.append(f"{identity}: topic must be domain/topic[/subtopic], not {route!r}")
+        leaves.setdefault(route, []).append(identity)
+        if require_fields and not all(lesson.get(k) for k in ("stage", "summary", "signals")):
+            errors.append(f"{identity}: missing stage/summary/signals; re-apply the lesson with retrieval fields")
+    used = set()
+    for route, members in sorted(leaves.items()):
+        if any(other.startswith(route + "/") for other in leaves):
+            errors.append(f"{route}: holds lessons and subtopics; move its {len(members)} lesson(s) into leaf topics")
+        if len(members) > LEAF_MAX:
+            errors.append(f"{route}: {len(members)} lessons exceed {LEAF_MAX}; split by mechanism into subtopics")
+        parent = ""
+        for part in route.split("/"):
+            parent = parent + "/" + part if parent else part
+            used.add(parent)
+            if require_descriptions and not topics.get(parent):
+                errors.append(f"Missing topic description: {parent}; supply topic_descriptions via apply")
+    # Only topics readers can reach are judged; retired paths keep their history untouched.
+    for path in sorted(used):
+        errors.extend(description_errors({path: topics[path]}) if path in topics else [])
+    return sorted(set(errors))
+
+
+def description_errors(descriptions):
+    return [f"{path}: topic description exceeds {DESCRIPTION_MAX} characters; one defining sentence only"
+            for path, description in sorted(descriptions.items())
+            if isinstance(description, str) and len(description.strip()) > DESCRIPTION_MAX]
 
 
 def revision_of(card):
@@ -39,7 +92,10 @@ def validate_case(card):
     expected = {"diagnosis": {"text": draft.get("summary"), "kind": "diagnosis", "status": "model_claim"}}
     expected.update({f"recommendation:{i}": {"text": text, "kind": "recommendation", "status": "model_claim"}
                      for i, text in enumerate(draft.get("recommendations", []), 1)})
-    if card.get("claims") != expected:
+    # Legacy cards embed their claim table; positional names and stable IDs are both revision-bound.
+    from .case_format import claim_map
+    stable = {claim_map({"schema": "migloop-case/1", "draft": draft})[key]: value for key, value in expected.items()}
+    if card.get("claims") not in (expected, stable):
         raise ValueError("Claims must match the packaged draft, not a separately edited assertion list")
     for claim in expected.values():
         nonempty(claim["text"], "case claim")
@@ -105,7 +161,7 @@ class Memory:
                 return {"revision": self.current()["revision"], "initialized": False}
             if (self.root / "snapshots").exists():
                 raise ValueError("Snapshots without HEAD: recover deliberately instead of overwriting history")
-            return self._publish({"schema": "migloop-memory/1", "cases": {}, "lessons": {}, "topics": {}}, ["initialized"])
+            return self._publish({"schema": MEMORY_SCHEMA, "cases": {}, "lessons": {}, "topics": {}}, ["initialized"])
 
     def case(self, identity, revision=None, state=None):
         slug(identity, "case ID")
@@ -206,6 +262,42 @@ class Memory:
         return {"revision": state["revision"], "direct": direct, "all": sorted(affected),
                 "topics": sorted({"/".join(state["lessons"][x]["topic"]) for x in affected})}
 
+    def migrate(self, base_revision):
+        """Rebind positional claim names to stable IDs and mark the memory schema.
+
+        Cards are not rewritten: formal cards derive claim IDs at read time, so
+        only the snapshot's claim lists and lesson evidence change.
+        """
+        from .case_format import claim_map
+        with self.lock():
+            state = self._base(base_revision)
+            maps, cases, rebound = {}, 0, 0
+
+            def names(identity, revision):
+                key = (identity, revision)
+                if key not in maps:
+                    maps[key] = claim_map(self.case(identity, revision, state=state))
+                return maps[key]
+
+            for identity, head in sorted(state["cases"].items()):
+                mapping = names(identity, head["revision"])
+                if all(old == new for old, new in mapping.items()):
+                    continue
+                head["claims"] = sorted(mapping.get(c, c) for c in head["claims"])
+                head["withdrawn_claims"] = sorted(mapping.get(c, c) for c in head["withdrawn_claims"])
+                cases += 1
+            for lesson in state["lessons"].values():
+                for ref in lesson["evidence"]:
+                    if ref["case"] not in state["cases"]:
+                        continue
+                    new = names(ref["case"], ref["revision"]).get(ref["claim"], ref["claim"])
+                    if new != ref["claim"]:
+                        ref["claim"] = new
+                        rebound += 1
+            state["schema"] = MEMORY_SCHEMA
+            return self._publish(state, [{"migrated": MEMORY_SCHEMA, "cases_with_stable_claims": cases,
+                                          "claim_bindings_rebound": rebound}])
+
     def withdraw(self, identity, reason, base_revision, claim=None):
         nonempty(reason, "withdraw reason")
         with self.lock():
@@ -226,22 +318,38 @@ class Memory:
 
     @staticmethod
     def _lesson(item, state):
-        allowed = {"id", "title", "topic", "when", "description", "unless", "why", "how", "check", "evidence", "requires", "status"}
+        allowed = {"id", "title", "topic", "stage", "summary", "signals", "when", "description", "unless", "why",
+                   "how", "check", "evidence", "requires", "status"}
         fields(item, allowed, allowed - {"id", "requires", "unless", "status", "description", "check"}, "lesson")
         value = copy.deepcopy(item)
         value.setdefault("requires", [])
         value.setdefault("unless", [])
         value.setdefault("check", [])
         value.setdefault("status", "active")
-        for field in ("title", "when", "why"):
+        for field in ("title", "when", "why", "summary"):
             nonempty(value[field], "lesson." + field)
         if "description" in value:
             nonempty(value["description"], "lesson.description")
+        if len(value["summary"].strip()) > SUMMARY_MAX:
+            raise ValueError(f"lesson.summary: at most {SUMMARY_MAX} characters; it is the index line")
+        stage = value["stage"]
+        if (not isinstance(stage, list) or not stage or len(set(stage)) != len(stage)
+                or any(s not in STAGES for s in stage)):
+            raise ValueError("lesson.stage: expected a nonempty list drawn from " + "/".join(STAGES))
+        strings(value["signals"], "lesson.signals", empty=False)
+        signals = value["signals"]
+        if len(signals) > SIGNALS_MAX or len(set(signals)) != len(signals):
+            raise ValueError(f"lesson.signals: 1–{SIGNALS_MAX} distinct symbols")
+        if any(s != s.strip() or len(s) > SIGNAL_MAX or "\n" in s for s in signals):
+            raise ValueError("lesson.signals: each entry is one trimmed API/component/file symbol")
+        generic = [s for s in signals if generic_signal(s)]
+        if generic:
+            raise ValueError("lesson.signals: plain words are not grep targets, use identifiers/file names: " + ", ".join(generic))
         strings(value["how"], "lesson.how", empty=False)
         for field in ("unless", "requires", "check"):
             strings(value[field], "lesson." + field)
-        if not isinstance(value["topic"], list) or not 1 <= len(value["topic"]) <= 3:
-            raise ValueError("topic must contain 1–3 path segments")
+        if not isinstance(value["topic"], list) or not 2 <= len(value["topic"]) <= 3:
+            raise ValueError("topic must contain 2–3 path segments: domain/topic[/subtopic]")
         for part in value["topic"]:
             slug(part, "topic segment")
         if value["status"] not in {"candidate", "active", "disputed"}:
@@ -332,6 +440,10 @@ class Memory:
                 for part in path.split("/"):
                     slug(part, "topic path")
                 state["topics"][path] = nonempty(description, "topic description")
+            active = {k: v for k, v in state["lessons"].items() if v["status"] == "active"}
+            errors = description_errors(descriptions) + structure_errors(active, state["topics"])
+            if errors:
+                raise ValueError("Structure contract violated; nothing published: " + " | ".join(errors))
             return self._publish(state, [{"upserted": sorted(updated), "changed_dependencies": sorted(changed),
                                           "needs_review": sorted(k for k, x in state["lessons"].items() if x["status"] == "needs_review")}])
 
@@ -340,7 +452,7 @@ def main():
     import argparse
     parser = argparse.ArgumentParser(description="Maintain versioned memory; no automatic causal judgment or model calls.")
     commands = parser.add_subparsers(dest="command", required=True)
-    for name in ("init", "snapshot", "ingest", "apply", "impact", "withdraw", "export", "compact", "record-analysis"):
+    for name in ("init", "snapshot", "ingest", "apply", "impact", "withdraw", "export", "compact", "record-analysis", "migrate"):
         sub = commands.add_parser(name)
         sub.add_argument("--store", required=True)
         if name == "snapshot":
@@ -358,6 +470,8 @@ def main():
             sub.add_argument("--base-revision", required=True)
         elif name == "compact":
             sub.add_argument("--out", required=True, help="New compact store; the original store is preserved")
+        elif name == "migrate":
+            sub.add_argument("--base-revision", required=True, help="Rebind claims to stable IDs under migloop-memory/2")
         elif name in ("impact", "withdraw"):
             sub.add_argument("--case" if name == "withdraw" else "--id", required=True)
             sub.add_argument("--claim")
@@ -391,6 +505,8 @@ def main():
     elif args.command == "compact":
         from .card_storage import compact_store
         result = compact_store(memory, args.out)
+    elif args.command == "migrate":
+        result = memory.migrate(args.base_revision)
     else:
         result = memory.withdraw(args.case, args.reason, args.base_revision, args.claim)
     print(json.dumps(result, ensure_ascii=False, indent=2))

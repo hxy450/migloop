@@ -76,23 +76,29 @@ def compact_card(card):
 def compact_store(memory, out):
     """Migrate into a new directory, remapping every historical source binding."""
     from .registry import Memory
-    from .case_format import finalize, content, claims, shared_objects, write_shared
+    from .case_format import finalize, content, claim_map, claim_texts, shared_objects, write_shared
     out = Path(out).resolve()
     if out.exists() or out.is_relative_to(memory.root) or memory.root.is_relative_to(out):
         raise ValueError("Compact output must be a new directory outside the source store")
     head = memory.current()["revision"]
     states = {p.stem: memory.current(p.stem) for p in (memory.root / "snapshots").glob("*.json")}
-    cards, card_map, snapshots, revision_map, objects = {}, {}, {}, {}, {}
+    cards, card_map, claim_maps, snapshots, revision_map, objects = {}, {}, {}, {}, {}, {}
+
+    def convert(key, state):
+        original = memory.case(*key, state=state)
+        objects.update(shared_objects(original, memory.root / "sessions"))
+        packed = finalize(original, objects)
+        assert content(packed) == content(original) and claim_texts(packed) == claim_texts(original)
+        card_map[key] = packed["revision"]
+        # Legacy positional names map onto the stable IDs of the converted card.
+        claim_maps[key] = claim_map(packed)
+        cards[(key[0], packed["revision"])] = packed
+
     for state in states.values():
         for identity, item in state["cases"].items():
             key = (identity, item["revision"])
             if key not in card_map:
-                original = memory.case(identity, item["revision"], state=state)
-                objects.update(shared_objects(original, memory.root / "sessions"))
-                packed = finalize(original, objects)
-                assert content(packed) == content(original) and claims(packed) == claims(original)
-                card_map[key] = packed["revision"]
-                cards[(identity, packed["revision"])] = packed
+                convert(key, state)
     # Parent-first traversal, independent of file order. Reject cycles/broken history.
     pending = dict(states)
     while pending:
@@ -105,7 +111,11 @@ def compact_store(memory, out):
             if state.get("parent"):
                 state["parent"] = revision_map[state["parent"]]
             for identity, item in state["cases"].items():
-                item["revision"] = card_map[(identity, item["revision"])]
+                old_key = (identity, item["revision"])
+                names = claim_maps[old_key]
+                item["revision"] = card_map[old_key]
+                item["claims"] = sorted(names.get(c, c) for c in item["claims"])
+                item["withdrawn_claims"] = sorted(names.get(c, c) for c in item["withdrawn_claims"])
                 for metadata_key in ("observed", "migration", "analysis"):
                     item.pop(metadata_key, None)
             for lesson in state["lessons"].values():
@@ -113,12 +123,10 @@ def compact_store(memory, out):
                     old_key = (ref["case"], ref["revision"])
                     if old_key not in card_map:
                         # A historical source may no longer be a case HEAD.
-                        original = memory.case(*old_key, state=states[key])
-                        objects.update(shared_objects(original, memory.root / "sessions"))
-                        packed = finalize(original, objects)
-                        card_map[old_key] = packed["revision"]
-                        cards[(old_key[0], packed["revision"])] = packed
+                        convert(old_key, states[key])
                     ref["revision"] = card_map[old_key]
+                    ref["claim"] = claim_maps[old_key].get(ref["claim"], ref["claim"])
+            state["schema"] = "migloop-memory/2"
             state["revision"] = fingerprint(state)
             revision_map[key] = state["revision"]
             snapshots[state["revision"]] = state
@@ -131,5 +139,6 @@ def compact_store(memory, out):
     Memory(out).current()
     return {"store": str(out), "previous_revision": head, "revision": revision_map[head],
             "cards": len(cards), "snapshots": len(snapshots), "claims_changed": False,
+            "claim_ids": "stable (legacy positional names rebound to text-hash IDs)",
             "case_revisions": [{"case": k[0], "from": k[1], "to": v} for k, v in sorted(card_map.items())],
             "source_changed": False}

@@ -7,7 +7,7 @@ import math
 import re
 
 from .common import nonempty, page
-from .registry import Memory
+from .registry import STAGES, Memory
 
 
 def _visible(state, all_statuses=False):
@@ -16,14 +16,28 @@ def _visible(state, all_statuses=False):
 
 def preview(lesson):
     return {**{k: lesson[k] for k in ("id", "title", "when", "topic", "status")},
-            "description": lesson.get("description", "")}
+            "summary": lesson.get("summary", ""), "stage": lesson.get("stage", []),
+            "signals": lesson.get("signals", []), "description": lesson.get("description", "")}
 
 
-def browse(memory, topic="", offset=0, limit=8, all_statuses=False):
+def _filtered(lessons, stage=None, signal=None):
+    """Structured pre-filter on the retrieval axes; lessons without the fields never match a filter."""
+    if stage and stage not in STAGES:
+        raise ValueError("stage must be one of " + "/".join(STAGES))
+    wanted = signal.casefold() if signal else None
+    for lesson in lessons:
+        if stage and stage not in lesson.get("stage", []):
+            continue
+        if wanted and wanted not in {s.casefold() for s in lesson.get("signals", [])}:
+            continue
+        yield lesson
+
+
+def browse(memory, topic="", offset=0, limit=8, all_statuses=False, stage=None, signal=None):
     state = memory.current()
     prefix = topic.strip("/").split("/") if topic.strip("/") else []
     directories, entries = {}, []
-    for lesson in _visible(state, all_statuses).values():
+    for lesson in _filtered(_visible(state, all_statuses).values(), stage, signal):
         route = lesson["topic"]
         if route[:len(prefix)] != prefix:
             continue
@@ -50,15 +64,16 @@ def tokens(text):
     return result
 
 
-def search(memory, query, topic="", offset=0, limit=8, all_statuses=False):
+def search(memory, query, topic="", offset=0, limit=8, all_statuses=False, stage=None, signal=None):
     nonempty(query, "query")
     state, terms = memory.current(), tokens(query)
     documents = []
-    for value in _visible(state, all_statuses).values():
+    for value in _filtered(_visible(state, all_statuses).values(), stage, signal):
         route = "/".join(value["topic"])
         if topic and route != topic and not route.startswith(topic + "/"):
             continue
-        routing = " ".join([value["title"], value["when"], value.get("description", "")])
+        routing = " ".join([value["title"], value.get("summary", ""), value["when"], value.get("description", ""),
+                            *value.get("signals", [])])
         text = " ".join([routing, value["why"], route,
                          *value["unless"], *value["how"], *value["check"]])
         documents.append((value, tokens(text), tokens(routing)))
@@ -109,6 +124,8 @@ def main():
         sub.add_argument("--store", required=True)
         if name in ("browse", "search"):
             sub.add_argument("--topic", default="")
+            sub.add_argument("--stage", choices=STAGES, help="Only lessons declared for this stage")
+            sub.add_argument("--signal", help="Only lessons whose signals contain this symbol (case-insensitive)")
             sub.add_argument("--offset", type=int, default=0)
             sub.add_argument("--limit", type=int, default=8)
         if name in ("browse", "search", "read"):
@@ -122,9 +139,9 @@ def main():
     args = parser.parse_args()
     memory = Memory(args.store)
     if args.command == "browse":
-        result = browse(memory, args.topic, args.offset, args.limit, args.all_statuses)
+        result = browse(memory, args.topic, args.offset, args.limit, args.all_statuses, args.stage, args.signal)
     elif args.command == "search":
-        result = search(memory, args.query, args.topic, args.offset, args.limit, args.all_statuses)
+        result = search(memory, args.query, args.topic, args.offset, args.limit, args.all_statuses, args.stage, args.signal)
     elif args.command == "read":
         result = read(memory, args.ids, args.all_statuses)
     elif args.command == "case":

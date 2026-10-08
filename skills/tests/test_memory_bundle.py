@@ -62,6 +62,7 @@ def prepared(tmp_path):
 
 def make_lesson(card, identity="lesson-text", **changes):
     return {"id": identity, "title": "富文本 text segments", "topic": ["ui", "text"],
+            "stage": ["execute"], "summary": "富文本分段样式逐段保留", "signals": ["StyledString", "Span", "SpannableString"],
             "when": "迁移富文本或 Span 时", "unless": ["全串相同样式"], "why": "Avoid losing segment style",
             "how": ["保留数字和后缀的独立字号"], "check": ["Compare each segment"], "requires": [],
             "evidence": [{"case": card["id"], "claim": "diagnosis", "revision": card["revision"]}],
@@ -91,7 +92,7 @@ def test_optional_checks_roundtrip_without_empty_reading_section(prepared, omit)
     assert search(memory, "text")["total"] == 1
     directory = prepared["root"] / "reading"
     export_memory(memory, directory, link_cards=True)
-    body = (directory / "ui/text/lesson-text.lesson.md").read_text(encoding="utf-8")
+    body = (directory / "topics/ui/text/lesson-text.lesson.md").read_text(encoding="utf-8")
     assert "## 可选检查" not in body and "## 检查" not in body
     assert lesson["how"][0] in body and prepared["card"]["revision"] in body
     assert memory.current() == original
@@ -104,7 +105,7 @@ def test_legacy_checks_export_as_optional_without_mutating_history(prepared):
     original = memory.current()
     directory = prepared["root"] / "reading"
     export_memory(memory, directory)
-    body = (directory / "ui/text/lesson-text.lesson.md").read_text(encoding="utf-8")
+    body = (directory / "topics/ui/text/lesson-text.lesson.md").read_text(encoding="utf-8")
     assert "## 可选检查" in body and "## 检查\n" not in body
     assert "Compare each segment" in body
     assert memory.current() == original
@@ -231,10 +232,16 @@ def test_unresolved_only_investigation_stays_yaml_not_a_card(prepared):
 
 def test_browse_is_paginated_and_search_reaches_other_topics(prepared):
     card = prepared["card"]
-    memory = memory_with(prepared, [make_lesson(card), make_lesson(card, "lesson-layout", topic=["layout"], title="布局边距", when="尺寸与留白", why="Avoid width overflow")])
-    first = browse(memory, limit=1)
+    memory = memory_with(prepared, [make_lesson(card), make_lesson(card, "lesson-layout", topic=["ui", "layout"], title="布局边距", when="尺寸与留白", why="Avoid width overflow")])
+    assert [item["path"] for item in browse(memory)["items"]] == ["ui"]
+    first = browse(memory, "ui", limit=1)
     assert first["total"] == 2 and first["next"] == 1 and not first["complete"]
-    assert browse(memory, offset=first["next"], limit=1)["complete"]
+    assert browse(memory, "ui", offset=first["next"], limit=1)["complete"]
+    assert [item["id"] for item in browse(memory, "ui/text", stage="execute")["items"]] == ["lesson-text"]
+    assert browse(memory, "ui", stage="verify")["total"] == 0
+    assert search(memory, "字号", signal="styledstring")["total"] == 2
+    assert search(memory, "字号", signal="layoutWeight")["total"] == 0
+    assert search(memory, "StyledString")["items"][0]["signals"] == ["StyledString", "Span", "SpannableString"]
     assert search(memory, "字号")["total"] == 2  # searches full body, not only the index preview
     assert search(memory, "overflow")["items"][0]["id"] == "lesson-layout"
     assert search(memory, "不存在的词 xyzxyz")["total"] == 0
@@ -247,7 +254,8 @@ def test_withdraw_claim_invalidates_only_its_dependents_and_transitive(prepared)
     card = prepared["card"]
     a = make_lesson(card)
     b = make_lesson(card, "lesson-child", requires=[a["id"]])
-    independent = make_lesson(card, "lesson-independent", evidence=[{"case": card["id"], "claim": "recommendation:1", "revision": card["revision"]}])
+    from memorylib.case_format import claim_map
+    independent = make_lesson(card, "lesson-independent", evidence=[{"case": card["id"], "claim": claim_map(card)["recommendation:1"], "revision": card["revision"]}])
     memory = memory_with(prepared, [a, b, independent])
     old = memory.current()["revision"]
     result = memory.withdraw(card["id"], "Diagnosis disproved", old, "diagnosis")

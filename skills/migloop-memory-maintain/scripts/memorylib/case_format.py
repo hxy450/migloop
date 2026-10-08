@@ -60,11 +60,37 @@ def content(card):
     return result
 
 
-def claims(card):
+def claim_map(card):
+    """Positional claim name -> stable claim ID for this card version.
+
+    Stable IDs hash the recommendation text, so reordering, inserting or
+    removing other recommendations never changes an existing binding. Equal
+    texts within one card get a positional suffix instead of colliding.
+    """
     value = content(card)
-    return {"diagnosis": {"text": value["summary"], "kind": "diagnosis", "status": "model_claim"},
-            **{f"recommendation:{i}": {"text": text, "kind": "recommendation", "status": "model_claim"}
-               for i, text in enumerate(value["recommendations"], 1)}}
+    result, seen = {"diagnosis": "diagnosis"}, {}
+    for index, text in enumerate(value["recommendations"], 1):
+        key = "rec-" + fingerprint(text)[:10]
+        seen[key] = seen.get(key, 0) + 1
+        result[f"recommendation:{index}"] = key if seen[key] == 1 else f"{key}-{seen[key]}"
+    return result
+
+
+def claims(card):
+    """Claim ID -> claim. Formal cards use stable IDs; legacy cards keep the
+    positional names embedded in their revision-bound `claims` field."""
+    if card.get("schema") not in (SCHEMA, SHARED_SCHEMA):
+        return copy.deepcopy(card["claims"])  # revision-bound; validate_case checks it against the draft
+    value, names = content(card), claim_map(card)
+    result = {"diagnosis": {"text": value["summary"], "kind": "diagnosis", "status": "model_claim"}}
+    for index, text in enumerate(value["recommendations"], 1):
+        result[names[f"recommendation:{index}"]] = {"text": text, "kind": "recommendation", "status": "model_claim"}
+    return result
+
+
+def claim_texts(card):
+    """Authored claim texts in order, independent of the ID scheme."""
+    return [claim["text"] for claim in claims(card).values()]
 
 
 def _digest(value):
@@ -233,7 +259,7 @@ def finalize(card, objects=None):
     result["revision"] = revision_of(result)
     validate_case(result)
     require_valid_card(result)
-    if content(result) != draft or claims(result) != claims(card):
+    if content(result) != draft or claim_texts(result) != claim_texts(card):
         raise ValueError("Card conversion changed authored content")
     return presentation(result)
 
