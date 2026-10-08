@@ -62,7 +62,7 @@ python skills/migloop-memory-maintain/scripts/memory.py export --store STORE --o
 python skills/migloop-memory-maintain/scripts/memory.py export --store STORE --out NEW_DEVELOPMENT_DIRECTORY --link-cards
 ```
 
-导出根`index.md`只列一级主题；每个子目录有自己的`index.md`，列直接子主题与本级经验预览；一条经验一个`*.lesson.md`。可以同时读多个分支，按当前任务选择，未遍历全库不等于召回未完成。目录不复制后代全文，经验正文不截断。
+0.11.0 起阅读包按三个检索轴组织：`stage`（spec/plan/execute/verify 为主，repair/converge 可选；字段而非目录）、`topic`（领域/主题[/子主题]，按技术机制划分）、`signals`（输入里可 grep 的符号）。根`index.md`给出三步召回协议、领域与阶段入口；`catalog.jsonl`每行一条经验，`signals.json`是符号倒排表，`by-stage/`按阶段分组，`topics/`每级只列直接子项，正文`<id>.lesson.md`与主题索引同目录，自动附同源经验。结构契约（经验只在叶子、叶子最多 12 条、主题描述一句不超过 60 字）由 apply 和 export 共同执行。claim ID 改为建议文本哈希（`rec-…`），`memory.py migrate` 升级旧库快照，卡片不重写。可以同时读多个分支，按当前任务选择，未遍历全库不等于召回未完成。
 
 只导出active记录，保留ID、版本、when/description/unless/why/how/check。本地维护与GitHub知识仓库使用`--link-cards`保留来源列表并链接store中确切版本的卡片；保持相对目录结构即可浏览。只有部署给迁移agent时，才另行省略该参数导出不带来源段、卡片或本机路径的精简包，不用它替换仓库里的memory。完整来源绑定始终留在store/manifest中。manifest.json记录版本和文件校验和供维护审计，不是模型入口。两者是同一份store的派生视图，不维护第二份经验真理源。export对超过20个直接子主题/lesson的索引给出非阻断提示，由归并者按语义整理。
 

@@ -65,6 +65,9 @@ check可省略或填`[]`。确有疑问时才写“什么条件下，用什么�
 ```yaml
 title: 将图片内容缩放与组件尺寸约束分别落实
 topic: [ui, layout, image]
+stage: [execute]
+summary: 图片盒宽高与盒内缩放分别确定
+signals: [adjustViewBounds, wrap_content, objectFit, aspectRatio, ImageFit.Contain]
 when: 界面实现阶段，确定图片组件的宽高约束时
 description: 源布局依赖wrap_content、adjustViewBounds或资源固有比例，目标图片宽度由父容器或权重分配，高度仍需确定。
 unless:
@@ -84,6 +87,9 @@ how:
 ```yaml
 title: Snackbar使用单一展示宿主，并保留源端排队或取消策略
 topic: [ui, feedback]
+stage: [execute]
+summary: Snackbar 单一宿主并保留排队或取消语义
+signals: [SnackbarHostState, showSnackbar, SnackbarHost, promptAction.showToast]
 when: 界面实现与接线阶段，将多个操作结果接到提示宿主时
 description: 源端共用一个SnackbarHostState，目标准备按操作分别创建浮层，多个结果可能先后到达。
 unless:
@@ -103,6 +109,9 @@ how:
 ```yaml
 title: 应用版本显示从当前安装包读取，避免与构建配置维护两份值
 topic: [app, identity]
+stage: [execute]
+summary: 应用版本从安装包读取，不复制构建配置
+signals: [VERSION_NAME, VERSION_CODE, bundleManager.getBundleInfoForSelfSync, versionName, app.json5]
 when: 实现关于页或按应用版本判断更新提示时
 description: 源端使用构建生成的VERSION_NAME或VERSION_CODE，目标准备把配置中的值复制为页面常量。
 unless:
@@ -147,15 +156,16 @@ how:
 
 ## 入卡与自主阅读
 
-正式 `case/4` 保留完整模型稿：summary、recommendations、graphs 在顶层，node、edge、reason和force依据原样保存；只自动补充卡片身份、迁移材料版本及已记录的模型/平台/API等历史环境。检查回执、绑定操作、展示节点、独立引用表和共享元数据文件不进入卡片，UI从稿件与原始session索引重新生成展示。`diagnosis`对应summary，`recommendation:N`对应第N条建议，不另复制claims正文。模型模板不变；旧`/3`仅在读取或转换时需要它原有的sessions目录。
+正式 `case/4` 保留完整模型稿：summary、recommendations、graphs 在顶层，node、edge、reason和force依据原样保存；只自动补充卡片身份、迁移材料版本及已记录的模型/平台/API等历史环境。检查回执、绑定操作、展示节点、独立引用表和共享元数据文件不进入卡片，UI从稿件与原始session索引重新生成展示。claim ID由读取时派生：`diagnosis`对应summary，`rec-<建议文本哈希前10位>`对应每条建议（同卡重复文本加序号后缀），增删或重排其他建议不改变已有绑定；不另复制claims正文。模型模板不变；旧`/3`仅在读取或转换时需要它原有的sessions目录。
 
 ```text
 python scripts/memory.py init --store STORE
 python scripts/memory.py snapshot --store STORE
 python scripts/memory.py ingest --store STORE --cards CASE_A.json CASE_B.json --base-revision REV
 python scripts/memory.py withdraw --store STORE --case CASE_ID --reason "撤回原因" --base-revision REV
-python scripts/memory.py withdraw --store STORE --case CASE_ID --claim recommendation:1 --reason "该建议失效" --base-revision REV
+python scripts/memory.py withdraw --store STORE --case CASE_ID --claim rec-0123456789 --reason "该建议失效" --base-revision REV
 python scripts/memory.py impact --store STORE --id CASE_OR_LESSON_ID
+python scripts/memory.py migrate --store STORE --base-revision REV   # 旧库：claim ID 稳定化并标记 memory/2
 ```
 
 已有库从snapshot开始，新库才init。每次写入后取得新revision；仅空库首次入卡可省base revision。snapshot默认返回版本及计数，全库审计时用--full。修订卡沿用原身份，ingest保存版本并标出受影响经验。
@@ -184,7 +194,10 @@ python scripts/memory.py impact --store STORE --id CASE_OR_LESSON_ID
 base_revision: "当前snapshot返回值"
 upsert:
   - title: "条件明确、指出机制或行动的短标题"
-    topic: [ui, text]
+    topic: [ui, text] # 领域/主题[/子主题]，经验只放在叶子主题；一个叶子最多 12 条
+    stage: [execute] # spec / plan / execute / verify 为主，repair / converge 可选；可多值；阶段是字段，不是目录
+    summary: "条件＋动作，不超过 30 字" # 索引行和 catalog 只显示它
+    signals: [StyledString, Span, SpannableString] # 当前输入里能 grep 到的 API、组件、装饰器、文件名，1–12 个
     when: "下一次使用经验的任务阶段＋具体决策，可共用的阶段不必拆条"
     description: "当前输入中可识别的技术信号和关键适用条件，不依赖历史项目名称或变量"
     unless: [] # 有依据的例外再填写，不为完整而编造
@@ -199,20 +212,23 @@ upsert:
         claim: diagnosis
         revision: "所引用卡版本的hash"
       - case: "真实卡ID"
-        claim: recommendation:1 # 选真正支持本条动作的索引，不固定选第1条
+        claim: rec-0123456789 # 建议的稳定 ID（文本哈希），见 snapshot 中该卡的 claims；不固定选第 1 条
         revision: "所引用卡版本的hash"
     requires: []
     status: active # 正常交付；只有确有未决建议或冲突才用candidate/disputed
 retire: []
 topic_descriptions:
-  ui/text: "文本内容、分段样式、数字与单位"
+  ui: "界面迁移：布局、文本、状态、导航等渲染与交互机制"
+  ui/text: "文本内容、分段样式、数字与单位" # 一句定义，不超过 60 字，不枚举经验
 ```
 
-新lesson省略id；更新时填写原id。topic使用最多三层slug路径，优先复用已有主题。一个index的直接子主题与直接lesson合计超过20项时，优先按使用者读经验前已知的任务、输入特征和技术环境细分；这是整理提示，不是发布门禁。拿不准时先看when/description里的任务对象，不因how改了某个属性就按该属性选目录；触发场景与修法指向不同分支时，优先触发侧。条件、机制和行动是否相同仍用于判断补证、分支或另开经验，不由目录归属代替。
+新lesson省略id；更新时填写原id。topic是`领域/主题`或`领域/主题/子主题`的slug路径，优先复用已有主题。结构契约由apply和export共同执行，违反即拒绝发布：经验只放在叶子主题（有子主题的路径不放经验）；一个叶子最多12条active经验，超过就在同一提案里按子机制拆出子主题并补topic_descriptions；主题描述是不超过60字的一句定义，不随经验追加枚举。export另给出少于4条或多于9条的整理提示，不中断交付。主题按技术机制划分，不按阶段、应用或源框架；阶段写在stage字段里。拿不准时先看when/description里的任务对象，不因how改了某个属性就按该属性选目录；触发场景与修法指向不同分支时，优先触发侧。条件、机制和行动是否相同仍用于判断补证、分支或另开经验，不由目录归属代替。
+
+stage、summary、signals是检索字段，归并时由你填写：stage从spec（规格提取）/plan（计划、派工、范围与编排）/execute（实现、转换、接线）/verify（验证、判读、审计）中选，repair（修复）与converge（收敛、移交）可选，可多值；summary是不超过30字的「条件＋动作」，索引行和catalog只显示它；signals是当前输入里能grep到的API、组件、装饰器、文件名，1到12个，源端与目标端都写，不放Android、ArkUI这类泛称；纯小写英文单词（import、title、loading）会被apply拒绝，只有ohpm、hvigor、px这类工具、格式与单位名例外。正文没有具体符号时宁可少写，不填推断的泛词。归并前先用stage和signals在catalog里查候选，提案说明写明与哪些已有id比较过；同机制只补evidence，不新开经验。
 
 例如，“把LazyRow/horizontalScroll行转成目标滚动容器”时需要的交叉轴定高经验，放scrolling，不因最后写.height()就放sizing；“点击后从锚点冒出气泡/动效”的即时坐标经验，放interaction，不因动效画在覆盖层就放layers。任务本来就在确定尺寸或覆盖层几何时，这些仍是有效的事前已知入口；不机械禁止how中出现过的名词。
 
-小分支保持浅层，不按数字分桶。父索引只列直接子项，不重复铺开后代；每一级topic_descriptions用简短介绍帮助选择，包括中间目录。保留“动作标题＋时机＋情境”的预览形式和关键条件，不固定截字。移动沿用lesson ID；整理后用少数代表任务对照目录介绍，确认自然的阅读路径能到达相关经验，再看全部所需索引的阅读量，不只看父文件变短；这不是新增必交评测报告。诊断和建议索引来自脚本生成的claims；核对引用的具体主张支持why/how。建议依赖多项来源时分别列出。
+小分支保持浅层，不按数字分桶。父索引只列直接子项和各子项的经验数，不重复铺开后代；每一级topic_descriptions一句定义，包括中间目录。移动沿用lesson ID；正文放在主题目录里（`topics/<路径>/<id>.lesson.md`），移动主题即移动文件，git按重命名记录。整理后用少数代表任务对照catalog和目录介绍，确认三步召回能到达相关经验；这不是新增必交评测报告。claim ID来自脚本：`diagnosis`对应summary，`rec-<文本哈希前10位>`对应每条建议，见snapshot中该卡的claims；核对引用的具体主张支持why/how。建议依赖多项来源时分别列出。
 
 把会影响采用的来源unknown保留在经验的why/unless中；不要把某次修复数值或未验证假设扩成无条件规则。调整分类沿用lesson身份，合并或拆分时显式处理来源与依赖。
 
@@ -249,7 +265,9 @@ python scripts/memory.py export --store STORE --out NEW_DEPLOYMENT_DIRECTORY
 
 计数由导出器从绑定卡片自动去重：多个claim不重复算卡，迁移使用已记录的server_session_id或migration.id，应用按project标识去重；缺失项标未记录，不用agent数量、材料版本或分析会话补数。开发版也显示同一行。计数是历史样本覆盖，不是正确概率或成功复用次数；不打分、不按数量自动裁决冲突，不增加模型必填字段。
 
-每一级`index.md`只列直接子主题和本级经验预览；`*.lesson.md`保留完整经验、例外、依赖和具体可选检查。根目录不会列出全库经验，公共阅读约定集中在根入口。export返回超过20个直接入口的导航提示，由维护者判断怎样分组，不因提示中断交付。manifest.json记录版本、文件校验和及来源绑定，供维护检查，不要求迁移模型读取。
+阅读包布局：根`index.md`给出三步召回协议、领域入口（含经验数）和阶段入口；`catalog.jsonl`每行一条经验（id、summary、topic、stage、signals、title、cards、apps、path）；`signals.json`把符号映射到经验id；`by-stage/<阶段>.md`按阶段列出同领域主题下的经验；`topics/<路径>/index.md`只列直接子主题（带经验数）或本级经验的summary、阶段和前几个信号；`topics/<路径>/<id>.lesson.md`与本级索引同目录，保留完整经验、例外、依赖、可选检查，并自动附「同源经验」（由共享来源卡派生，最多5条，不是依赖）。公共阅读约定集中在根入口。export在结构契约不满足时拒绝导出，另返回稀疏/拥挤叶子的整理提示；manifest.json记录版本、全部文件校验和、每条经验的路径、主题、阶段、summary、signals及来源绑定，供维护检查和宿主校验，不要求迁移模型读取。
+
+旧库升级：`python scripts/memory.py migrate --store STORE --base-revision REV`把快照里的`recommendation:N`绑定改为稳定claim ID并标记`migloop-memory/2`，卡片不重写；然后用一份提案给全部active经验补stage、summary、signals并按契约重划主题，再export。
 
 制卡模型属于metadata.analysis，历史迁移模型属于migration/observed_in_materials；两者分开。宿主已核对实际分析记录、需补旧卡标签时，可用`memory.py record-analysis --store STORE --records HOST_RECORDS.json --base-revision REV`。记录映射为case ID到models/platforms/root_session_ids；命令只补分析标签并重绑未改变的claim，保留lesson正文、版本和状态，不重新调查。调查员不手填这些字段。
 
