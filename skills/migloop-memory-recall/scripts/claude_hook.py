@@ -163,8 +163,9 @@ def handle(config, payload):
             return {}
         return {"hookSpecificOutput": {"hookEventName": event_name, "additionalContext":
                 f"任务开始时的经验召回：请结合刚收到的任务，用 Read 阅读召回说明 {skill} 和根索引 {entry}，"
-                "快速选择明显相关的经验，让它指导后续查阅和方案；任务信息不足时先补读必要输入。"
-                "只读相关分支，不遍历全库、不展开历史卡片、不另写报告。首次明确写入前还会提醒复核，"
+                "按根索引的三步召回：写下当前阶段与输入中的符号，用同目录的 catalog.jsonl / signals.json "
+                "或领域、阶段入口定位候选，只读相关正文并让它指导后续方案；任务信息不足时先补读必要输入。"
+                "不遍历全库、不展开历史卡片、不另写报告。首次明确写入前还会提醒复核，"
                 "届时复用已读经验，只补查新发现的相关项。无需让主代理代读或向用户确认。"}}
     if event_name == "PostToolUse":
         if tool == "Read":
