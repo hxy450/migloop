@@ -4,6 +4,65 @@
 执行拓扑 / Git 式执行流(主干=主会话,分支=子代理)/ 主线上下文占用曲线 / 阶段对比 / 阶段明细 + 点击详情抽屉 /
 风险点审计 / 数据血缘 / **返修链路**(哪个文件被谁修了、被修的行是谁写的、当时读了什么)。
 
+## 先看这里：这个仓库负责什么
+
+MigLoop 把一次迁移从“会话记录”接到“可复用经验”，但它不是迁移编译器，也不是云端 Server。核心链路是：
+
+```text
+Claude / Codex / DevEco session
+        ↓ adapters
+统一轨迹、阶段和文件血缘
+        ↓ viewer / --serve
+HTML、风险审计、返修链路、Function Graph 展示
+        ↓ memory skills
+triage → 情景卡 → lesson 归并 → 分层 Markdown 阅读包
+        ↓ 下一次迁移
+recall skill + hook 在写入前按需读取经验
+```
+
+### 能力分层
+
+| 层 | 入口 | 作用 |
+|---|---|---|
+| 会话解析与 UI | `src/migloop/adapters/`、`render/`、`live/`、`serve.py` | 把 Claude、Codex、DevEco 记录统一成轨迹并生成 HTML / 本地服务页 |
+| 返修与归因工具 | `atoms*.py`、`filestory*.py`、`blame.py`、`crosschain.py` | 找出 execute 之后的修改、文件版本、写者和返修链路 |
+| 制卡与经验库 | `skills/migloop-repair-triage` → `migloop-build-cards` → `migloop-memory-maintain` | 从真实修复中拆任务、制卡、归并成可跨项目复用的 lesson |
+| 下一轮召回 | `skills/migloop-memory-recall` | 从分层 `index.md` 渐进选择相关经验；不加载无关来源卡 |
+| 一次性入口 | `skills/migloop-session-to-memory` | 串起 triage、制卡和归并；它是编排入口，不是第二套实现 |
+
+### 最常用的三条路径
+
+**只看一次迁移：**
+
+```bash
+py dist/migloop-lineage.pyz <session-id-or-jsonl> --open
+```
+
+**看返修链路和原始调用：**
+
+```bash
+py dist/migloop-lineage.pyz <session-id-or-jsonl> --serve --open
+```
+
+**把完整迁移沉淀成 memory：**
+
+```text
+1. migloop-repair-triage   盘点 execute 之后的真实修复
+2. migloop-build-cards     追“正确输入 → 偏差输出 → 被修文件”并通过机械检查
+3. migloop-memory-maintain 将通过的卡归并为 lesson 和分层阅读包
+4. migloop-memory-recall   下一次迁移按任务特征召回 lesson
+```
+
+制卡和归并脚本随对应 skill 自带，正常运行不依赖相邻 skill 的 Python 模块、MCP 或云端服务。Server 可以消费同一套会话和卡片，但 Server 部署、云端 FunctionGraph 和远端 Git 仓库不在本仓库的运行时范围内。
+
+### 当前适配范围
+
+- Claude Code、Codex：支持离线 HTML；Claude 支持 `--live`，Codex 当前支持离线和 `--compare`。
+- DevEco：已有 adapter，可解析兼容记录；完整 live / 返修展示能力以对应输入格式和当前实现为准。
+- memory skills：卡片和 lesson 是 Markdown/YAML/JSON 文件，目录入口是导出的 `memory/index.md`。
+
+如果只想使用 memory，不需要先读 viewer 的实现；直接从对应 skill 的 `SKILL.md` 开始。反过来，只想看迁移报告，也不需要安装 memory skills。
+
 ## 文档
 
 - [MigLoop 设计说明](./docs/design.md)：目标、证据口径、数据结构和实现方式
