@@ -801,7 +801,7 @@ def inquiry_database(path: str) -> str:
         stat = item.stat()
         registrations.append((item, name))
         signature.append((name, str(item), stat.st_size, stat.st_mtime_ns))
-    fingerprint = digest(encode(["inquiry/index/5", signature]).encode())
+    fingerprint = digest(encode(["inquiry/index/5-drivecase", signature]).encode())
     cache = Path(os.environ.get("MIGLOOP_CACHE_DIR") or
                  os.path.join(os.environ.get("LOCALAPPDATA") or os.path.expanduser("~"), "Migloop"))
     database = cache / "inquiry" / (fingerprint + ".sqlite")
