@@ -3,7 +3,7 @@
 import difflib
 import json
 
-from .store import encode, parts, path_key
+from .store import encode, parts, path_key, same_path
 
 
 def change_payloads(store, operation):
@@ -16,7 +16,7 @@ def change_payloads(store, operation):
             continue
         if role == "patch" and isinstance(data, dict):
             for path, detail in data.items():
-                if path_key(path, record["cwd"]) == operation["path"]:
+                if same_path(path_key(path, record["cwd"]), operation["path"]):
                     result.append({"block": slot, "tool": tool, "body": detail})
         elif role == "request" and isinstance(data, dict):
             if not isinstance(tool, str):
@@ -24,14 +24,14 @@ def change_payloads(store, operation):
             name = tool.split(".")[-1].casefold()
             if name == "apply_patch":
                 for path, detail in data.get("changes", {}).items():
-                    if path_key(path, record["cwd"]) == operation["path"]:
+                    if same_path(path_key(path, record["cwd"]), operation["path"]):
                         result.append({"block": slot, "tool": tool, "body": detail})
                 continue
             path = data.get("file_path") or data.get("path")
             if (
                 name not in {"write", "write_file", "edit", "multiedit", "delete_file"}
                 or not isinstance(path, str)
-                or path_key(path, record["cwd"]) != operation["path"]
+                or not same_path(path_key(path, record["cwd"]), operation["path"])
             ):
                 continue
             result.append(

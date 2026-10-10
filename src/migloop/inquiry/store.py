@@ -16,8 +16,10 @@ from .command_shape import call_read_basis, literal_path_mentions
 from .tool_contracts import file_effects, navigation_paths
 from .source_adapters import identity as source_identity, input_role, parts
 
-INDEX_SCHEMA = "inquiry/index/6"
+INDEX_SCHEMA = "inquiry/index/7"
 
+# Windows drive paths name files case-insensitively: C:/p/Entry/a and C:/p/entry/a are one file.
+_DRIVE_PATH = re.compile(r"^[A-Za-z]:/")
 _FILE_TOKEN = re.compile(r"(?<![\w.])[\w@+-][\w@+.-]*\.[A-Za-z][A-Za-z0-9]{0,15}(?!\w)")
 
 
@@ -66,6 +68,15 @@ def path_key(value, cwd=""):
     if not value.startswith("/") and not re.match(r"^[A-Za-z]:/", value):
         value = posixpath.join(cwd.replace("\\", "/"), value)
     return posixpath.normpath(value)
+
+
+def same_path(a, b):
+    """Normalized paths naming one file; only drive paths ignore case."""
+    return a == b or (
+        isinstance(a, str) and isinstance(b, str)
+        and bool(_DRIVE_PATH.match(a)) and bool(_DRIVE_PATH.match(b))
+        and a.casefold() == b.casefold()
+    )
 
 
 def flatten(value):
@@ -131,6 +142,7 @@ CREATE INDEX effect_path ON effects(path,at);
 CREATE INDEX effect_agent ON effects(agent,at);
 CREATE TABLE dispatches(id TEXT PRIMARY KEY,parent TEXT,child TEXT,at INT,request TEXT,result TEXT);
 CREATE TABLE files(path TEXT PRIMARY KEY);
+CREATE TABLE file_aliases(alias TEXT PRIMARY KEY,path TEXT);
 CREATE TABLE runs(id TEXT PRIMARY KEY,kind TEXT,request TEXT,data TEXT,body TEXT);
 CREATE TABLE frames(run TEXT,offset INT,text TEXT,sha TEXT,PRIMARY KEY(run,offset));
 CREATE TABLE visible(run TEXT,offset INT,complete INT,observed TEXT);
@@ -187,6 +199,7 @@ class Store:
             for source in sources:
                 cls._import(db, source)
             cls._effects(db)
+            cls._fold_drive_path_case(db)
             db.execute("INSERT INTO meta VALUES(?,?)", ("schema", INDEX_SCHEMA))
             db.commit()
         finally:
@@ -303,6 +316,31 @@ class Store:
         after = path.stat()
         if (before.st_size, before.st_mtime_ns) != (after.st_size, after.st_mtime_ns):
             raise ValueError("source changed during import: " + source.name)
+
+    @staticmethod
+    def _fold_drive_path_case(db):
+        """Merge spellings of one Windows file (e.g. a writer that typed Entry/ for entry/).
+
+        The most-used spelling stays the file key; the others become aliases that
+        resolve_file maps back, so reads, writes and targets meet on one identity.
+        POSIX paths remain case-sensitive.
+        """
+        counts = dict(db.execute(
+            "SELECT f.path, COUNT(e.id) FROM files f LEFT JOIN effects e ON e.path=f.path GROUP BY f.path"
+        ).fetchall())
+        groups = {}
+        for path in counts:
+            if _DRIVE_PATH.match(path):
+                groups.setdefault(path.casefold(), []).append(path)
+        for spellings in groups.values():
+            if len(spellings) < 2:
+                continue
+            canonical = min(spellings, key=lambda p: (-counts[p], p))
+            for alias in spellings:
+                if alias != canonical:
+                    db.execute("UPDATE effects SET path=? WHERE path=?", (canonical, alias))
+                    db.execute("DELETE FROM files WHERE path=?", (alias,))
+                    db.execute("INSERT INTO file_aliases VALUES(?,?)", (alias, canonical))
 
     @staticmethod
     def _effects(db):
@@ -631,11 +669,17 @@ class Store:
         if not isinstance(key, str) or not key:
             raise ValueError("file key required")
         normalized = path_key(key)
-        candidates = [
-            r["path"]
-            for r in self.rows("SELECT path FROM files")
-            if r["path"] == normalized or r["path"].endswith("/" + normalized)
-        ]
+        alias = self.db.execute("SELECT path FROM file_aliases WHERE alias=?", (normalized,)).fetchone()
+        if alias:
+            normalized = alias[0]
+        paths = [r["path"] for r in self.rows("SELECT path FROM files")]
+        candidates = [p for p in paths if p == normalized or p.endswith("/" + normalized)]
+        if not candidates:
+            folded = normalized.casefold()
+            candidates = [
+                p for p in paths
+                if _DRIVE_PATH.match(p) and (p.casefold() == folded or p.casefold().endswith("/" + folded))
+            ]
         if len(candidates) > 1:
             raise ValueError("ambiguous file; use full path: " + ", ".join(candidates))
         return candidates[0] if candidates else normalized
