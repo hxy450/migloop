@@ -241,6 +241,8 @@ def force_review(engine, edge, origin, destination):
 Each group still goes through reviewed_edge. Nothing is collapsed into an
 invented single timestamp, and a failed group must remain an explicit error.
 """
+    from .engine import content_text
+
     actor = destination if edge["relation"] == "read" else origin
     cutoff = min(timestamp(n["at"], required=True) for n in (origin, destination))
     records = []
@@ -276,9 +278,12 @@ invented single timestamp, and a failed group must remain an explicit error.
     reviews = []
     for rows in groups.values():
         anchor = max(rows, key=lambda r: (r["at"], r["ref"]))
-        opened = engine.query({"op": "open", "ref": anchor["ref"], "at": iso(cutoff)})
+        # All supplied records already passed the cutoff/source checks above.
+        # Only the decoded original is needed, not navigation handles or the
+        # actor's entire relation history inside a query writer transaction.
+        _, raw = engine.store.source_record(anchor["ref"])
         reviews.append({"review": {"at": iso(anchor["at"]),
-            "quotes": [{"ref": anchor["ref"], "text": opened["text"][:1000]}]},
+            "quotes": [{"ref": anchor["ref"], "text": content_text(raw)[:1000]}]},
             "evidence": sorted(context | {r["ref"] for r in rows})})
     return reviews
 

@@ -265,7 +265,7 @@ class Store:
         self.path = Path(path).resolve()
         if not self.path.is_file():
             raise ValueError("index does not exist; import first")
-        self.db = sqlite3.connect(self.path)
+        self.db = sqlite3.connect(self.path, timeout=30.0)
         self.db.row_factory = sqlite3.Row
         self.db.create_function(
             "literal_contains",
@@ -280,6 +280,22 @@ class Store:
             raise ValueError(
                 "incomplete or incompatible index; import into a new path or use its frozen code"
             )
+        # Investigators read the same immutable source index while saving small
+        # coordinate/report records. DELETE journals let a long reader prevent
+        # those commits; WAL separates readers from the single short writer.
+        try:
+            mode = self.db.execute("PRAGMA journal_mode").fetchone()[0]
+            if mode.casefold() != "wal":
+                mode = self.db.execute("PRAGMA journal_mode=WAL").fetchone()[0]
+            if mode.casefold() != "wal":
+                raise sqlite3.OperationalError("the index filesystem did not enable WAL")
+        except sqlite3.OperationalError as exc:
+            self.db.close()
+            raise sqlite3.OperationalError(
+                "Cannot enable concurrent access to the shared inquiry index. "
+                "Pause other index users, retry prepare, then resume the saved drafts; "
+                "this is an index-access failure, not a card error. " + str(exc)
+            ) from exc
 
     def close(self):
         self.db.close()

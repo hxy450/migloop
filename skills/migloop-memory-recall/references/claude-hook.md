@@ -19,7 +19,7 @@ python scripts/claude_hook.py install --project PROJECT --memory READING_DIRECTO
 - **写前复核**：`PreToolUse` 在首次明确写入前返回 deny，给模型一次按经验调整待写内容的机会。即使启动时已读入口，这次提示仍保留；只复核、补漏，不要求重复阅读。不是用户拒绝，无需询问用户。
 - 模型用 Read 完整读取项目内召回 skill 和根 index；已读可复用。写前提示已发出且两个入口已读时，重试回到原有权限流程，hook 从不返回 allow。只记录提醒和读取，不机械判断是否理解、采用或真的修改了方案。
 - 主代理和所有类型子代理按 session_id + agent_id 隔离。启动提示和写前提示分开记账；跨会话不复用，恢复同一个代理不重复提醒。
-- 日志位于 `.claude/migloop-runtime/`，记录提醒、索引/经验读取、恢复与首次成功修改的时间和工具调用 ID，不复制源码或工具正文。读取记录不是采用或理解的证明；采用理由留在代理原本的结果里。
+- 日志位于 `.claude/migloop-runtime/`，记录提醒、索引/经验读取、恢复与首次成功修改的时间和工具调用 ID，不复制源码或工具正文。读取记录不是采用或理解的证明；事后结合转录和实际产物分析，不要求代理另写采用记录。
 - 写入检测以 **precision 优先**：原生 Write/Edit/MultiEdit/NotebookEdit 必拦；Shell 只识别直接文件重定向、tee 到文件、cp/mv、sed 原地修改、apply_patch，以及 PowerShell 的 Set-Content/Add-Content/Out-File/Copy-Item/Move-Item 等明确动作。识别实际命令位置，不把引号、注释、heredoc 正文里的命令文字当执行。
 - `2>/dev/null`、`2>&1`、PowerShell `>$null`、目录准备和只读调用放行。单凭 python/node/bash、脚本名或 `--output` 不触发；不递归分析脚本体，不展开动态路径，复杂语法不确定就放行。因此不透明脚本可能先写，首次明确动作也可能只是临时产物；这是提醒的覆盖边界，不是安全沙箱或精确业务阶段判定。
 - 不重置已有会话记录，不向已进入写前流程的代理补发启动提示。完整双提醒从新会话/新代理验证，旧会话已读状态继续有效。

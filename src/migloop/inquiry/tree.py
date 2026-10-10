@@ -87,7 +87,7 @@ def neighbor_row(event, scope, direction="upstream"):
 
 def reviewed_edge(engine, edge, origin, destination, fid):
     """Validate locatable quotes, not the model's interpretation of those quotes."""
-    from .engine import bounds, in_scope
+    from .engine import bounds, content_text, in_scope
 
     if "link" in edge:
         raise ValueError("reviewed relation uses raw evidence, not an indexed link")
@@ -128,19 +128,14 @@ def reviewed_edge(engine, edge, origin, destination, fid):
         record, raw = engine.store.source_record(quote["ref"])
         if record["ref"] not in records:
             raise ValueError("review quote is not in this edge's evidence")
-        opened = engine.query(
-            {
-                "op": "open",
-                "ref": quote["ref"],
-                "at": iso(
-                    min(
-                        timestamp(origin["at"], required=True),
-                        timestamp(destination["at"], required=True),
-                    )
-                ),
-            }
+        cutoff = min(
+            timestamp(origin["at"], required=True),
+            timestamp(destination["at"], required=True),
         )
-        if quote["text"] not in opened["text"]:
+        if not in_scope(record["at"], cutoff, None):
+            raise ValueError("record outside requested time scope")
+        # Share the public open decoder, without its UI navigation side effects.
+        if quote["text"] not in content_text(raw):
             raise ValueError(
                 "review quote does not occur in the cited original content"
             )
