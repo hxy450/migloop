@@ -20,6 +20,10 @@ triage → 情景卡 → lesson 归并 → 分层 Markdown 阅读包
 recall skill + hook 在写入前按需读取经验
 ```
 
+### 想帮忙把迁移经验提炼进团队经验库？
+
+把 [docs/HELP-DISTILL-MEMORY.md](docs/HELP-DISTILL-MEMORY.md) 整页交给你的 agent。它会用 memory skills（triage → 制卡 → 归并）从一次已返修的迁移里提炼经验卡和经验，交回新的库版本，由我们审核后合并。不要推送到任何共享仓库；ColorLines 是测试集，不要用它。
+
 ### 能力分层
 
 | 层 | 入口 | 作用 |
