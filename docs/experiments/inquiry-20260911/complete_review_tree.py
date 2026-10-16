@@ -76,6 +76,9 @@ def prepare(out, review_root, identity):
     with closing(sqlite3.connect(parent_db.resolve().as_uri() + "?mode=ro", uri=True)) as source:
         with closing(sqlite3.connect(snapshot)) as saved:
             source.backup(saved)
+            # Store opens indexes in WAL mode and backup copies that mode. Keep the
+            # frozen snapshot in one file so its digest covers every committed change.
+            saved.execute("PRAGMA journal_mode=DELETE")
             with closing(sqlite3.connect(out / "index.sqlite")) as working:
                 inherited = inherit_queries(saved, working)
     if BASE.sha(parent_db) != source_digest:

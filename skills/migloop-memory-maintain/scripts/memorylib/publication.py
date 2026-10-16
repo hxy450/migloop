@@ -10,6 +10,7 @@ from pathlib import Path, PurePosixPath
 from urllib.parse import quote
 
 from . import VERSION
+from .case_format import context, shared_objects
 from .common import nonempty, slug
 
 
@@ -28,48 +29,39 @@ def _lesson_path(lesson):
     return PurePosixPath(*lesson["topic"], lesson["id"] + ".lesson.md")
 
 
-def _support_counts(lesson, state):
-    """Count historical support without exposing the case ledger to deployment readers."""
-    refs = {(ref["case"], ref["revision"]) for ref in lesson["evidence"]}
-    migrations, projects = set(), set()
+def _support_counts(lesson, migrations):
+    """Count recorded historical support, not claims, agents or successful reuses."""
+    refs = {ref["case"]: ref["revision"] for ref in lesson["evidence"]}
+    migration_ids, projects = set(), set()
     missing_migrations = missing_projects = 0
-    for identity, _revision in refs:
-        migration = state["cases"][identity].get("migration", {})
-        if not isinstance(migration, dict):
-            migration = {}
-        migration_id = migration.get("server_session_id") or migration.get("id")
-        project = migration.get("project")
+    for identity, revision in refs.items():
+        migration = migrations[(identity, revision)]
+        labels = {key: value.strip() for key, value in migration.items()
+                  if isinstance(value, str) and value.strip()}
+        migration_id = labels.get("server_session_id") or labels.get("id")
         if migration_id:
-            migrations.add(str(migration_id))
+            migration_ids.add(migration_id)
         else:
             missing_migrations += 1
-        if project:
-            projects.add(str(project).casefold())
+        if labels.get("project"):
+            projects.add(labels["project"].casefold())
         else:
             missing_projects += 1
-    return {
-        "cards": len(refs),
-        "migrations": len(migrations),
-        "applications": len(projects),
-        "missing_migration_cards": missing_migrations,
-        "missing_application_cards": missing_projects,
-    }
+    return {"cards": len(refs), "migrations": len(migration_ids), "applications": len(projects),
+            "missing_migration_cards": missing_migrations, "missing_application_cards": missing_projects}
 
 
 def _support_line(counts):
     parts = [f"{counts['cards']} 张卡"]
-    for key, missing_key, unit, label in (
-            ("migrations", "missing_migration_cards", "次迁移", "迁移数"),
-            ("applications", "missing_application_cards", "个应用", "应用数")):
+    for key, missing_key, unit, label in (("migrations", "missing_migration_cards", "次迁移", "迁移数"),
+                                          ("applications", "missing_application_cards", "个应用", "应用数")):
         count, missing = counts[key], counts[missing_key]
-        if missing:
-            parts.append(f"已知 {count} {unit}（部分未记录）" if count else label + "未记录")
-        else:
-            parts.append(f"{count} {unit}")
+        parts.append((f"已知 {count} {unit}（部分未记录）" if count else label + "未记录")
+                     if missing else f"{count} {unit}")
     return "来源支持：" + " · ".join(parts)
 
 
-def _lesson_text(lesson, state, memory, output, paths, link_cards):
+def _lesson_text(lesson, state, memory, output, paths, link_cards, support):
     current = output / paths[lesson["id"]]
     lines = [f"# {lesson['title']}", "", f"ID：`{lesson['id']}` · 版本：{lesson['version']}", "",
              _link("本主题", current.parent / "index.md", current), "",
@@ -87,9 +79,9 @@ def _lesson_text(lesson, state, memory, output, paths, link_cards):
         for identity in lesson["requires"]:
             lines.append("- " + _link(state["lessons"][identity]["title"], output / paths[identity], current))
         lines.append("")
-    # Deployment readers need the usable lesson and a compact support signal;
-    # exact case/claim/revision bindings remain in manifest.json.
-    lines += [_support_line(_support_counts(lesson, state)), ""]
+    # Deployment readers need the lesson, not an expanding evidence ledger.
+    # Exact bindings remain in the manifest; development exports can link cards.
+    lines += [_support_line(support), ""]
     if not link_cards:
         return "\n".join(lines) + "\n"
     lines += ["## 来源（按需复核）", ""]
@@ -106,7 +98,7 @@ def _lesson_text(lesson, state, memory, output, paths, link_cards):
 
 def _render(memory, state, output, link_cards):
     lessons = {key: value for key, value in state["lessons"].items() if value["status"] == "active"}
-    directories, checked = {"": {"children": set(), "lessons": []}}, set()
+    directories, migrations = {"": {"children": set(), "lessons": []}}, {}
     for identity, lesson in lessons.items():
         slug(identity, "lesson ID")
         if identity != lesson["id"]:
@@ -129,11 +121,12 @@ def _render(memory, state, output, link_cards):
                     or ref["claim"] not in head["claims"] or ref["claim"] in head["withdrawn_claims"]):
                 raise ValueError("Active lesson has stale or withdrawn evidence: " + identity)
             source = (ref["case"], ref["revision"])
-            if source not in checked:
+            if source not in migrations:
                 card = memory.case(ref["case"], ref["revision"], state=state)
                 if card["id"] != ref["case"] or card["revision"] != ref["revision"]:
                     raise ValueError("Source card identity/version mismatch")
-                checked.add(source)
+                details = context(card, shared_objects(card, memory.root / "sessions"))
+                migrations[source] = details.get("provenance", {}).get("migration", {})
     paths = {key: _lesson_path(value) for key, value in lessons.items()}
     files = {}
     for topic, directory in sorted(directories.items()):
@@ -169,15 +162,20 @@ def _render(memory, state, output, link_cards):
             lines += ["## 阅读约定", "",
                       ("经验是有适用范围的历史建议。核查来源时同时看结论与 unknown；来源卡未随阅读包复制。"
                        if link_cards else "经验是有适用范围的历史建议；来源绑定由维护端保留，正常使用无需读取。")
-                      + " 来源计数按卡片、迁移身份与项目标识去重，表示历史样本覆盖，不是正确概率或成功复用次数。", "",
+                      + " 来源计数按卡片、迁移身份与项目标识去重，表示历史样本覆盖，不是正确概率或成功复用次数；适用条件优先。", "",
                       "可选检查仅在适用条件不确定、与当前输入冲突或需要验证关键假设时按需执行；优先复用已有证据和正常测试。",
                       "不因读取经验而额外启动验证流程；项目原有必需测试照常执行。", ""]
         files[str(relative)] = "\n".join(lines)
     for identity, lesson in sorted(lessons.items()):
-        files[str(paths[identity])] = _lesson_text(lesson, state, memory, output, paths, link_cards)
+        files[str(paths[identity])] = _lesson_text(lesson, state, memory, output, paths, link_cards,
+                                                  _support_counts(lesson, migrations))
+    crowded = [{"topic": topic or "/", "entries": len(row["children"]) + len(row["lessons"]),
+                "code": "crowded_index", "next_step": "Consider meaningful subtopics; keep lesson IDs and preview conditions. This is a navigation hint, not a publication failure."}
+               for topic, row in sorted(directories.items())
+               if len(row["children"]) + len(row["lessons"]) > 20]
     manifest = {"schema": "migloop-memory-files/1", "publisher_version": VERSION,
                 "memory_revision": state["revision"], "card_links": "local" if link_cards else "references_only",
-                "sources_in_body": bool(link_cards),
+                "sources_in_body": bool(link_cards), "navigation_warnings": crowded,
                 "counts": {"lessons": len(lessons), "topics": len(directories) - 1},
                 "lessons": {key: {"path": str(paths[key]), "version": value["version"],
                                   "evidence": value["evidence"]} for key, value in sorted(lessons.items())},
@@ -212,4 +210,4 @@ def export_memory(memory, directory, *, link_cards=False):
             stage.rename(output)
     return {"revision": state["revision"], "entry": str(output / "index.md"),
             "manifest": str(output / "manifest.json"), **manifest["counts"],
-            "card_links": manifest["card_links"], "store_changed": False}
+            "card_links": manifest["card_links"], "warnings": manifest["navigation_warnings"], "store_changed": False}

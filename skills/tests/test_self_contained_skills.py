@@ -142,7 +142,9 @@ def test_pack_automatically_prepares_and_uses_exact_source_kernel(investigation)
         assert a[key] == b[key]
     generated = json.loads((x["root"] / "auto.json").read_text(encoding="utf-8"))
     canonical = json.loads((x["root"] / "source.json").read_text(encoding="utf-8"))
-    assert generated["graph_evidence"] == canonical["graph_evidence"]
+    assert generated["graphs"] == canonical["graphs"]
+    assert generated["metadata"] == canonical["metadata"]
+    assert "references" not in generated and "check" not in generated
 
 
 def test_bad_edge_is_not_certified_and_source_change_is_rejected(investigation):

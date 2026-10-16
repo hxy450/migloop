@@ -13,6 +13,10 @@ from functools import lru_cache
 from pathlib import Path
 
 from .command_shape import call_read_basis, literal_path_mentions
+from .tool_contracts import file_effects, navigation_paths
+from .source_adapters import identity as source_identity, input_role, parts
+
+INDEX_SCHEMA = "inquiry/index/7"
 
 # Windows drive paths name files case-insensitively: C:/p/Entry/a and C:/p/entry/a are one file.
 _DRIVE_PATH = re.compile(r"^[A-Za-z]:/")
@@ -111,11 +115,14 @@ class Source:
     agent: str | None = None
     cwd: str = ""
     protocol: str = "auto"
+    platform: str = "unknown"
+    parent: str | None = None
 
 
 _SCHEMA = """
 CREATE TABLE meta(key TEXT PRIMARY KEY,value TEXT);
 CREATE TABLE sources(id TEXT PRIMARY KEY,name TEXT UNIQUE,path TEXT,agent TEXT,cwd TEXT,size INT,mtime INT);
+CREATE TABLE source_metadata(source TEXT PRIMARY KEY,platform TEXT,parent TEXT);
 CREATE TABLE records(ref TEXT PRIMARY KEY,source TEXT,line INT,offset INT,length INT,sha TEXT,
  at INT,kind TEXT,body TEXT,summary TEXT,native TEXT);
 CREATE INDEX record_scope ON records(source,at,line);
@@ -146,131 +153,6 @@ CREATE TABLE tool_returns(record TEXT,slot INT,family TEXT,success INT,PRIMARY K
 """
 
 
-def input_role(record):
-    message = record.get("message")
-    if not isinstance(message, dict):
-        payload = record.get("payload")
-        if (
-            record.get("type") == "event_msg"
-            and isinstance(payload, dict)
-            and payload.get("type") == "user_message"
-        ):
-            return "user"
-        message = (
-            payload
-            if isinstance(payload, dict) and payload.get("type") == "message"
-            else {}
-        )
-    role = message.get("role", record.get("type"))
-    content = message.get("content")
-    if role in ("user", "system", "developer") and (
-        isinstance(content, str)
-        and bool(content)
-        or isinstance(content, list)
-        and any(
-            isinstance(b, dict)
-            and b.get("type") in ("text", "input_text", "image", "input_image")
-            for b in content
-        )
-    ):
-        return role
-    return None
-
-
-def parts(record):
-    """Only protocol-defined positions. Never parse code strings as executed calls."""
-    blocks = (
-        (record.get("message") or {}).get("content")
-        if isinstance(record.get("message"), dict)
-        else None
-    )
-    if isinstance(blocks, list):
-        for slot, block in enumerate(blocks):
-            if not isinstance(block, dict):
-                continue
-            if block.get("type") == "tool_use":
-                yield (
-                    slot,
-                    "cc",
-                    "request",
-                    block.get("id"),
-                    block.get("name", ""),
-                    block.get("input"),
-                    None,
-                )
-            elif block.get("type") == "tool_result":
-                error = block.get("is_error", False)
-                success = int(not error) if isinstance(error, bool) else None
-                metadata = record.get("toolUseResult")
-                child = metadata.get("agentId") if isinstance(metadata, dict) else None
-                yield (
-                    slot,
-                    "cc",
-                    "result",
-                    block.get("tool_use_id"),
-                    "",
-                    {"content": block.get("content"), "native_child_id": child},
-                    success,
-                )
-    payload = record.get("payload")
-    if not isinstance(payload, dict):
-        return
-    kind = payload.get("type")
-    if record.get("type") == "response_item":
-        if kind in ("function_call", "custom_tool_call"):
-            value = (
-                payload.get("arguments")
-                if kind == "function_call"
-                else payload.get("input")
-            )
-            if isinstance(value, str):
-                try:
-                    value = json.loads(value)
-                except ValueError:
-                    pass
-            yield (
-                0,
-                kind,
-                "request",
-                payload.get("call_id"),
-                payload.get("name", ""),
-                value,
-                None,
-            )
-        elif kind in ("function_call_output", "custom_tool_call_output"):
-            value = payload.get("output")
-            success = None
-            for container in (payload, value):
-                if isinstance(container, dict):
-                    if type(container.get("exit_code")) is int:
-                        success = int(container["exit_code"] == 0)
-                    if type(container.get("success")) is bool:
-                        success = int(container["success"])
-                    if type(container.get("is_error")) is bool:
-                        success = int(not container["is_error"])
-            yield (
-                0,
-                kind.removesuffix("_output"),
-                "result",
-                payload.get("call_id"),
-                "",
-                value,
-                success,
-            )
-    if record.get("type") == "event_msg" and kind == "patch_apply_end":
-        success = (
-            int(payload["success"]) if type(payload.get("success")) is bool else None
-        )
-        yield (
-            0,
-            "patch",
-            "patch",
-            payload.get("call_id"),
-            "apply_patch",
-            payload.get("changes"),
-            success,
-        )
-
 
 class Store:
     def __init__(self, path):
@@ -287,7 +169,7 @@ class Store:
         )
         self.db.create_function("literal_any", 2, literal_any, deterministic=True)
         schema = self.db.execute("SELECT value FROM meta WHERE key='schema'").fetchone()
-        if schema is None or schema[0] != "inquiry/index/5-drivecase":
+        if schema is None or schema[0] != INDEX_SCHEMA:
             self.db.close()
             raise ValueError(
                 "incomplete or incompatible index; import into a new path or use its frozen code"
@@ -334,7 +216,7 @@ class Store:
                 cls._import(db, source)
             cls._effects(db)
             cls._fold_drive_path_case(db)
-            db.execute("INSERT INTO meta VALUES(?,?)", ("schema", "inquiry/index/5-drivecase"))
+            db.execute("INSERT INTO meta VALUES(?,?)", ("schema", INDEX_SCHEMA))
             db.commit()
         finally:
             db.close()
@@ -357,6 +239,7 @@ class Store:
                 before.st_mtime_ns,
             ),
         )
+        db.execute("INSERT INTO source_metadata VALUES(?,?,?)", (sid, source.platform, source.parent))
         with path.open("rb") as stream:
             line = 0
             while True:
@@ -413,7 +296,7 @@ class Store:
                 role = input_role(record)
                 if role:
                     db.execute("INSERT INTO input_messages VALUES(?,?)", (ref, role))
-                for slot, family, role, cid, tool, payload, success in parts(record):
+                for slot, family, role, cid, tool, payload, success in parts(record, owner=source.agent):
                     if role in ("result", "patch"):
                         db.execute(
                             "INSERT INTO tool_returns VALUES(?,?,?,?)",
@@ -425,7 +308,8 @@ class Store:
                             (ref, slot, tool, call_read_basis(tool, payload)),
                         )
                     if role == "request":
-                        for mentioned_path in literal_path_mentions(tool, payload):
+                        hints = set(literal_path_mentions(tool, payload)) | set(navigation_paths(tool, payload, source.cwd))
+                        for mentioned_path in sorted(hints):
                             # A source-backed lexical identity, not a read/write.
                             # Rebuilt indexes gain hints; old indexes are not migrated.
                             db.execute("INSERT OR IGNORE INTO files VALUES(?)", (mentioned_path,))
@@ -576,15 +460,7 @@ class Store:
             if not isinstance(data, dict):
                 continue
             name = request["tool"].split(".")[-1].casefold()
-            op = {
-                "read": "read",
-                "read_file": "read",
-                "write": "write",
-                "write_file": "write",
-                "edit": "write",
-                "multiedit": "write",
-                "delete_file": "delete",
-            }.get(name)
+            operations = file_effects(request["tool"], data)
             owner = sources[request["source"]]
             if (
                 name in ("task", "agent", "spawn_agent")
@@ -624,7 +500,7 @@ class Store:
                             result["record"],
                         ),
                     )
-            if not op:
+            if not operations:
                 continue
             # A copied CC record cannot certify one actor as its unique writer.
             copied = (
@@ -636,19 +512,34 @@ class Store:
                 > 1
             )
             confirmed = ordered and result["success"] == 1 and not copied
-            effect(
-                data.get("file_path") or data.get("path"),
-                owner,
-                op,
-                "confirmed" if confirmed else "candidate",
-                result["at"] if ordered else request["at"],
-                request["record"],
-                result["record"] if ordered else None,
-                "copied_owner" if copied else status,
-                "native_tool",
-                request["slot"],
-                result["slot"] if ordered else None,
-            )
+            for path, op, basis in operations:
+                # Native patch_apply_end is the authoritative observation when
+                # present; do not double count the same request/result write.
+                if basis == "native_apply_patch" and db.execute(
+                    "SELECT 1 FROM parts WHERE role='patch' AND source=? AND call_id=?",
+                    (request["source"], cid),
+                ).fetchone():
+                    continue
+                effect(path, owner, op, "confirmed" if confirmed else "candidate",
+                       result["at"] if ordered else request["at"], request["record"],
+                       result["record"] if ordered else None, "copied_owner" if copied else status,
+                       basis, request["slot"], result["slot"] if ordered else None)
+        # Adapters may expose a read observed in a runtime execution receipt.
+        # Its command and returned output must still form one unambiguous pair.
+        for part in db.execute("SELECT * FROM parts WHERE role='read_observation'").fetchall():
+            data = json.loads(part["payload"])
+            if not isinstance(data, dict):
+                continue
+            pair = db.execute(
+                "SELECT * FROM call_pairs WHERE request=? AND request_slot=? AND result=? AND result_slot=?",
+                (part["record"], data.get("request_slot"), part["record"], data.get("result_slot")),
+            ).fetchone()
+            if pair is None:
+                continue
+            effect(data.get("path"), sources[part["source"]], "read",
+                   "confirmed" if part["success"] == 1 and part["at"] is not None else "candidate",
+                   part["at"], pair["request"], pair["result"], "native_observation",
+                   "native_command_read", pair["request_slot"], pair["result_slot"])
         for part in db.execute("SELECT * FROM parts WHERE role='patch'").fetchall():
             changes = json.loads(part["payload"])
             if isinstance(changes, dict):
@@ -669,7 +560,7 @@ class Store:
                         None,
                         part["record"],
                         "native_observation",
-                        "patch_apply_end",
+                        "codex_file_change" if part["family"] == "codex_file_change" else "patch_apply_end",
                         None,
                         part["slot"],
                     )
@@ -813,7 +704,7 @@ class Store:
 def describe_source(path, name):
     """Read native ownership once; directories never establish agent identity."""
     path = Path(path)
-    agent, cwd = None, ""
+    agent, cwd, platform, parent = None, "", "unknown", None
     if path.suffix == ".jsonl":
         with path.open("r", encoding="utf-8-sig", errors="replace") as stream:
             for _ in range(20):
@@ -826,20 +717,13 @@ def describe_source(path, name):
                     continue
                 if not isinstance(obj, dict):
                     continue
-                if obj.get("type") == "session_meta" and isinstance(
-                    obj.get("payload"), dict
-                ):
-                    agent = obj["payload"].get("id")
-                    cwd = obj["payload"].get("cwd") or ""
-                    break
-                if obj.get("sessionId"):
-                    agent = (
-                        str(obj["sessionId"]) + ":" + str(obj.get("agentId") or "main")
-                    )
-                    cwd = obj.get("cwd") or ""
+                found = source_identity(obj)
+                if found:
+                    agent, cwd = found.agent, found.cwd
+                    platform, parent = found.platform, found.parent
                     break
     return Source(
-        str(path), name, agent, cwd, "auto" if path.suffix == ".jsonl" else "text"
+        str(path), name, agent, cwd, "auto" if path.suffix == ".jsonl" else "text", platform, parent
     )
 
 

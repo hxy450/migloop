@@ -13,7 +13,7 @@ import pytest
 
 from test_memory_bundle import SCRIPTS, make_lesson, memory_with, prepared
 from memorylib.common import load
-from memorylib.publication import export_memory
+from memorylib.publication import export_memory, _support_counts, _support_line
 
 
 def _links(path):
@@ -69,9 +69,8 @@ def test_shared_guidance_is_at_root_without_dropping_lesson_data(prepared, link_
     guidance = root.split("## 阅读约定\n\n", 1)[1].strip().splitlines()
     guidance = [line for line in guidance if line.strip()]
     assert len(guidance) == 3
-    if link_cards:
-        assert "unknown" in guidance[0]
-    else:
+    assert ("unknown" in guidance[0]) == link_cards
+    if not link_cards:
         assert "来源绑定" in guidance[0]
     assert "可选检查" in guidance[1]
     assert "原有必需测试" in guidance[2]
@@ -85,17 +84,13 @@ def test_shared_guidance_is_at_root_without_dropping_lesson_data(prepared, link_
                       *lesson["unless"], *lesson["how"], *lesson["check"]]:
             assert value in body
         assert ("## 可选检查" in body) == bool(lesson["check"])
-        if link_cards:
-            for ref in lesson["evidence"]:
-                assert all(ref[key] in body for key in ("case", "claim", "revision"))
-        else:
+        for ref in lesson["evidence"]:
+            assert all(ref[key] in body for key in ("case", "claim", "revision")) == link_cards
+        if not link_cards:
             assert all(ref["case"] not in body for ref in lesson["evidence"])
         assert all(target.is_file() for target in _links(path))
-        if link_cards:
-            assert "## 来源（按需复核）" in body
-        else:
-            assert "## 来源（按需复核）" not in body
-            assert "来源支持：" in body
+        assert ("## 来源（按需复核）" in body) == link_cards
+        assert "来源支持：" in body
     manifest = load(output / "manifest.json")
     assert manifest["sources_in_body"] is link_cards
     assert lessons[0]["description"] in (output / "ui/text/lesson-text.lesson.md").read_text(encoding="utf-8")
@@ -127,10 +122,75 @@ def test_application_package_is_portable_without_store_or_card_content(prepared)
         if path.name.endswith(".lesson.md"):
             assert "## 来源（按需复核）" not in body
             assert "来源支持：" in body
+    body = (copied / "ui/text/lesson-text.lesson.md").read_text(encoding="utf-8")
+    assert prepared["card"]["revision"] not in body
+    assert "## 来源" not in body
     manifest = load(copied / "manifest.json")
     assert manifest["card_links"] == "references_only"
     assert manifest["sources_in_body"] is False
     assert manifest["lessons"]["lesson-text"]["evidence"][0]["revision"] == prepared["card"]["revision"]
+
+
+def test_support_deduplicates_claims_and_same_app_across_migrations():
+    lesson = {"evidence": [
+        {"case": "a", "revision": "r1", "claim": "diagnosis"},
+        {"case": "a", "revision": "r1", "claim": "recommendation:1"},
+        {"case": "b", "revision": "r2", "claim": "diagnosis"},
+        {"case": "c", "revision": "r3", "claim": "diagnosis"}]}
+    counts = _support_counts(lesson, {
+        ("a", "r1"): {"server_session_id": "run-1", "project": "DemoApp"},
+        ("b", "r2"): {"server_session_id": "run-1", "project": " demoapp "},
+        ("c", "r3"): {"server_session_id": "run-2", "project": "DemoApp"}})
+    assert counts == {"cards": 3, "migrations": 2, "applications": 1,
+                      "missing_migration_cards": 0, "missing_application_cards": 0}
+    assert _support_line(counts) == "来源支持：3 张卡 · 2 次迁移 · 1 个应用"
+
+
+def test_support_does_not_infer_migrations_from_agents_or_material_versions():
+    lesson = {"evidence": [{"case": "a", "revision": "r", "claim": "diagnosis"},
+                           {"case": "b", "revision": "r", "claim": "diagnosis"}]}
+    records = {("a", "r"): {"id": "migration-1", "project": "A"},
+               ("b", "r"): {"root_session_ids": ["root", "child"], "source_set_id": "pool"}}
+    counts = _support_counts(lesson, records)
+    assert counts == {"cards": 2, "migrations": 1, "applications": 1,
+                      "missing_migration_cards": 1, "missing_application_cards": 1}
+    assert "部分未记录" in _support_line(counts)
+    records[("a", "r")] = {}
+    assert _support_line(_support_counts(lesson, records)) == "来源支持：2 张卡 · 迁移数未记录 · 应用数未记录"
+
+
+@pytest.mark.parametrize("link_cards", [False, True])
+def test_support_line_is_derived_without_changing_knowledge_or_index(prepared, link_cards):
+    lesson = make_lesson(prepared["card"])
+    lesson["evidence"].append({**lesson["evidence"][0], "claim": "recommendation:1"})
+    memory = memory_with(prepared, [lesson])
+    before = memory.current()
+    output = prepared["root"] / "support-reading"
+    export_memory(memory, output, link_cards=link_cards)
+    body = (output / "ui/text/lesson-text.lesson.md").read_text(encoding="utf-8")
+    assert body.count("来源支持：") == 1
+    assert "来源支持：1 张卡 · 1 次迁移 · 应用数未记录" in body
+    assert ("## 来源（按需复核）" in body) == link_cards
+    assert "来源支持：" not in (output / "ui/text/index.md").read_text(encoding="utf-8")
+    assert "不是正确概率或成功复用次数" in (output / "index.md").read_text(encoding="utf-8")
+    assert memory.current() == before
+
+
+@pytest.mark.parametrize("entries, warned", [(20, False), (21, True)])
+def test_crowded_navigation_is_a_nonblocking_direct_entry_hint(prepared, entries, warned):
+    lessons = [make_lesson(prepared["card"], f"lesson-{i}") for i in range(entries - 1)]
+    lessons.append(make_lesson(prepared["card"], "lesson-child", topic=["ui", "text", "child"]))
+    memory = memory_with(prepared, lessons)
+    state = memory.current()
+    memory.apply({"base_revision": state["revision"], "upsert": [],
+                  "topic_descriptions": {"ui/text/child": "A meaningful child topic"}})
+    before = memory.current()
+    result = export_memory(memory, prepared["root"] / "reading")
+    assert bool(result["warnings"]) == warned
+    if warned:
+        assert result["warnings"][0]["topic"] == "ui/text"
+        assert result["warnings"][0]["entries"] == entries
+    assert memory.current() == before
 
 
 def test_requires_links_cross_topics_and_stable_identity_after_move(prepared):
@@ -219,7 +279,7 @@ def test_failed_generation_never_publishes_partial_directory(prepared, monkeypat
 def test_damaged_card_rejects_export_even_without_card_links(prepared):
     memory = memory_with(prepared)
     card = copy.deepcopy(prepared["card"])
-    card["draft"]["summary"] = "modified without revision"
+    card["summary"] = "modified without revision"
     path = memory.root / "cases" / card["id"] / (card["revision"] + ".json")
     path.write_text(json.dumps(card), encoding="utf-8")
     with pytest.raises(ValueError, match="revision hash"):

@@ -17,7 +17,7 @@ def literal_path_mentions(tool, payload):
     Loop variables are skipped; no shell evaluation, globbing or disk lookup.
     """
     if not isinstance(tool, str) or tool.split(".")[-1].casefold() not in {
-        "bash", "exec_command", "run_shell_command"
+        "bash", "exec_command", "run_shell_command", "shell_command"
     } or not isinstance(payload, dict):
         return []
     command = payload.get("command", payload.get("cmd"))
@@ -125,7 +125,7 @@ def call_read_basis(tool, payload):
     name = tool.split(".")[-1].casefold()
     if name in {"read", "read_file", "glob", "grep", "ls", "list_files"}:
         return "native read-only tool contract"
-    if name in {"bash", "exec_command", "run_shell_command"} and isinstance(
+    if name in {"bash", "exec_command", "run_shell_command", "shell_command"} and isinstance(
         payload, dict
     ):
         return read_only_shape(payload.get("command", payload.get("cmd")))

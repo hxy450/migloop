@@ -66,17 +66,27 @@ def build(source, out):
                     target_core = runtime / "migloop/inquiry"
                     target_core.mkdir(parents=True)
                     shutil.copy2(repo / "src/migloop/__init__.py", runtime / "migloop/__init__.py")
-                    for path in sorted(core.glob("*.py")):
-                        if path.name not in CORE_EXCLUDED:
-                            shutil.copy2(path, target_core / path.name)
+                    for path in sorted(core.rglob("*.py")):
+                        relative = path.relative_to(core)
+                        if not (path.parent == core and path.name in CORE_EXCLUDED):
+                            (target_core / relative).parent.mkdir(parents=True, exist_ok=True)
+                            shutil.copy2(path, target_core / relative)
                 for entry in ENTRIES[name]:
                     shutil.copy2(scripts / "package_entry.py", target_scripts / entry)
                 if name == "migloop-memory-maintain":
                     shutil.copy2(scripts / "install_bundle.py", target_scripts / "install_bundle.py")
+                    shutil.copy2(scripts / "lint.py", target_scripts / "lint.py")   # standard library only
                 if name == "migloop-memory-recall":
                     hook = src / "scripts/claude_hook.py"
                     if hook.is_file():
                         shutil.copy2(hook, target_scripts / hook.name)
+            # Portable release bytes must not depend on Git's core.autocrlf on
+            # the maintainer's machine. Normalize generated text BEFORE hashing.
+            for path in dst.rglob("*"):
+                if path.is_file() and path.suffix in (".py", ".md", ".yaml", ".yml", ".json", ".txt"):
+                    raw = path.read_bytes()
+                    if b"\r\n" in raw:
+                        path.write_bytes(raw.replace(b"\r\n", b"\n"))
             files = {p.relative_to(dst).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
                      for p in sorted(dst.rglob("*")) if p.is_file()}
             digest = hashlib.sha256(json.dumps(files, sort_keys=True, separators=(",", ":")).encode()).hexdigest()

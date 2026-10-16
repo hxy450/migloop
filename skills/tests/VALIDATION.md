@@ -2,6 +2,30 @@
 
 The initial 2026-09-17 checks covered skill instructions and scripts only. Later dated checks below include the shared inquiry changes needed by self-contained card validation; they do not deploy the renderer/server or modify global hook configuration.
 
+## Lean deployment reading and observed analyst identity (0.10.1, 2026-09-30)
+
+- Default export omits source paragraphs from lesson Markdown; exact evidence bindings stay in store/manifest. Development `--link-cards` retains links. The action title, when, description, boundaries and how remain unchanged.
+- Export reports a nonblocking `crowded_index` hint above 20 direct children + lessons. No automatic semantic grouping or text truncation.
+- Hosts can provide material-scoped observed analysis labels through `MIGLOOP_ANALYSIS_CONTEXT`; pack adds them without mutating frozen job provenance or inquiry data. Metadata-only `record-analysis` checks identical authored content/claims, preserves lesson versions/statuses, and rebinds only source revisions.
+- **274 passed / 1 skipped** in skills/tests; all three edited processing/recall skill frontmatters validate. Controller identity/push/continuation suite: **66 tests, 1 skipped**. No Server deployment or new migration/model run.
+- Real-library dry run: 276 cards retain exact authored content, graphs, force anchors and migration environment; 225 missing analyst-model labels filled from actual analysis transcripts. All 276 then have Opus 5.5 analysis labels. Two why paragraphs shortened and 34 lesson topics moved; all other semantic fields and evidence claim identities preserved. The visual-repair lesson stays under layout, so whole-topic comparisons cover the same lessons.
+- Index-path estimates include intermediate indexes: reading only layout constraints is smaller; reading every navigation branch adds about 5%. These are file-selection estimates, not measured model recall or migration-quality improvements.
+
+## Authored analysis only (0.10.0, 2026-09-29)
+
+- New case/4 stores the complete author draft plus identity and small historical metadata. No checker receipts, bound operations, derived nodes, independent reference table, copied triage records or shared session files. Pack still runs the same inquiry checks before emitting a card; UI reconstructs its view from the draft and frozen session.
+- **268 passed / 1 skipped** in skills/tests. Portable single-file ingest/apply/export, force/supplemental-input draft preservation, exact authored roundtrip, legacy receipt gates, metadata enrichment, history/source rebinding, and standalone Claude/Codex packs covered. Both edited skill frontmatters validate.
+- Converted 183 multi-app cards in a new directory; all authored fields/graphs/force anchors match the originals exactly. 182 lessons retain prose, status and semantic versions. Representative card: 81,446 bytes / 1,514 lines → 32,635 bytes / 516 lines (original draft alone 30,543 bytes). No source store was modified.
+- Hashes detect content changes, not malicious forgery. Without raw materials, admission validates the card structure; it does not rerun historical relation or semantic analysis.
+
+## Single-graph formal cards (0.9.0, 2026-09-29)
+
+- The authoring template and inquiry relation rules are unchanged. New pack/enrich outputs use case/3; legacy case/1 and case/2 keep their original read/validation rules. Common accessors derive authored graphs and claims; scope/environment/provenance use immutable shared objects.
+- **258 passed / 1 skipped** across skills/tests. Added coverage for receipt/content/context tampering, missing context, path traversal, parallel atomic context writes, same-line different-source anchors, multiple operations per edge, derived version nodes/edges, migration/history/source rebinding, and refusal to promote failed legacy cards. Both edited skill frontmatters pass validation.
+- Converted the real multi-app store into a separate directory: **183 cards, 331 graphs, 1,248 authored edges (762 force), 1,560 bound operations, 182 lessons, 26 historical snapshots**. Exact authored content, checked node/operation coordinates, all anchors, force flags/reasons, scope/environment/provenance and lesson semantic versions/statuses match. All historical source bindings resolve; original HEAD is unchanged.
+- Card bytes: 6,980,036 → 3,553,897, plus 270,572 bytes of shared context (45.2% net reduction for cards/context). Snapshots: 18,059,084 → 6,528,164 bytes. Total JSON store: 25,039,120 → 10,352,633 bytes (58.7% reduction). The 1,514-line sample becomes 894 lines / 43,283 bytes (original 81,446 bytes); this general format is larger than the earlier all-force one-card prototype, and also supports ordinary/extra-version relations.
+- Read-only acceptance report: `C:/Users/hongy/projects/_migloop-case3-migration-20260929/validation.json`; reading package at the sibling `memory/index.md`. No model calls, new semantic review, lesson rewrite, or in-place old-store migration.
+
 ## Decision-oriented maintenance and shared reading guidance (2026-09-29)
 
 - Maintenance compares applicable conditions, mechanisms and actions before stage labels. Examples show role-specific branches without mandatory spec/implementation duplication; equivalent new cases normally add evidence rather than more historical narrative. No new fields, model reports or semantic-review steps.

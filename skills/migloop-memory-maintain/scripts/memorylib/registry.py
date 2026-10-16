@@ -8,11 +8,14 @@ from pathlib import Path
 
 from .common import fields, fingerprint, load, nonempty, now, replace_json, slug, strings, write_new
 from .card_contract import require_valid_card, validation_digest
+from .case_format import SCHEMA, SHARED_SCHEMA, claims, content, shared_objects, write_shared, validate_formal
 
 STATUSES = {"candidate", "active", "disputed", "needs_review", "retired"}
 
 
 def revision_of(card):
+    if card.get("schema") in (SCHEMA, SHARED_SCHEMA):
+        return fingerprint({k: v for k, v in card.items() if k not in ("revision", "created_at")})
     payload = copy.deepcopy({k: v for k, v in card.items() if k not in ("revision", "created_at", "validation")})
     if isinstance(payload.get("provenance"), dict):
         payload["provenance"].pop("captured_at", None)
@@ -20,11 +23,14 @@ def revision_of(card):
 
 
 def validate_case(card):
-    if not isinstance(card, dict) or card.get("schema") not in {"migloop-case/1", "migloop-case/2"}:
-        raise ValueError("Expected a packaged migloop-case/1 or /2, not a bare draft or UI graph")
+    if not isinstance(card, dict) or card.get("schema") not in {"migloop-case/1", "migloop-case/2", SHARED_SCHEMA, SCHEMA}:
+        raise ValueError("Expected a packaged migloop-case/1, /2, /3 or /4, not a bare draft or UI graph")
     slug(card.get("id"), "case.id")
     if card.get("revision") != revision_of(card):
         raise ValueError("Case content differs from its revision hash; repack the source draft")
+    if card["schema"] in (SCHEMA, SHARED_SCHEMA):
+        validate_formal(card)
+        return
     # Legacy records remain readable under their original revision algorithm.
     # New admissions require this binding through require_valid_card.
     if "validation_sha256" in card and card["validation_sha256"] != validation_digest(card.get("validation", {})):
@@ -111,6 +117,7 @@ class Memory:
             raise ValueError("Invalid case revision")
         value = load(self.root / "cases" / identity / (revision + ".json"))
         validate_case(value)
+        shared_objects(value, self.root / "sessions")
         return value
 
     @staticmethod
@@ -145,6 +152,9 @@ class Memory:
         for card in cards:
             validate_case(card)
             require_valid_card(card)
+        objects = {}
+        for card, path in zip(cards, paths):
+            objects.update(shared_objects(card, Path(path).parent / "sessions"))
         if len({c["id"] for c in cards}) != len(cards):
             raise ValueError("One version per case per ingest; do not pick an arbitrary winner")
         with self.lock():
@@ -152,6 +162,7 @@ class Memory:
             if base_revision is None and not state["cases"] and not state["lessons"]:
                 base_revision = state["revision"]
             state = self._base(base_revision)
+            write_shared(self.root / "sessions", objects)
             changed = []
             for card in cards:
                 old = state["cases"].get(card["id"])
@@ -163,11 +174,8 @@ class Memory:
                 else:
                     write_new(path, card)
                 state["cases"][card["id"]] = {
-                    "revision": card["revision"], "title": card["draft"]["title"], "status": "available",
-                    "withdrawn_claims": [], "claims": sorted(card["claims"]),
-                    "observed": card["provenance"].get("observed", {}),
-                    "migration": card["provenance"].get("migration", {}),
-                    "analysis": card["provenance"].get("analysis", {})}
+                    "revision": card["revision"], "title": content(card)["title"], "status": "available",
+                    "withdrawn_claims": [], "claims": sorted(claims(card))}
                 changed.append(card["id"])
             if not changed:
                 return {"revision": state["revision"], "changes": [], "affected": []}
@@ -332,7 +340,7 @@ def main():
     import argparse
     parser = argparse.ArgumentParser(description="Maintain versioned memory; no automatic causal judgment or model calls.")
     commands = parser.add_subparsers(dest="command", required=True)
-    for name in ("init", "snapshot", "ingest", "apply", "impact", "withdraw", "export", "compact"):
+    for name in ("init", "snapshot", "ingest", "apply", "impact", "withdraw", "export", "compact", "record-analysis"):
         sub = commands.add_parser(name)
         sub.add_argument("--store", required=True)
         if name == "snapshot":
@@ -345,6 +353,9 @@ def main():
         elif name == "export":
             sub.add_argument("--out", required=True, help="New Markdown reading directory; existing output is never overwritten")
             sub.add_argument("--link-cards", action="store_true", help="Development view: link to exact local card versions without copying them")
+        elif name == "record-analysis":
+            sub.add_argument("--records", required=True, help="Host-observed case-ID to analysis-label mapping")
+            sub.add_argument("--base-revision", required=True)
         elif name == "compact":
             sub.add_argument("--out", required=True, help="New compact store; the original store is preserved")
         elif name in ("impact", "withdraw"):
@@ -374,6 +385,9 @@ def main():
     elif args.command == "export":
         from .publication import export_memory
         result = export_memory(memory, args.out, link_cards=args.link_cards)
+    elif args.command == "record-analysis":
+        from .analysis import record_analysis
+        result = record_analysis(memory, load(args.records), args.base_revision)
     elif args.command == "compact":
         from .card_storage import compact_store
         result = compact_store(memory, args.out)

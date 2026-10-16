@@ -1,8 +1,5 @@
 # 迁移经验闭环：统一入口 + 四个处理 skill
 
-> **注意（2026-10-16）**：本分支是 0.8.x 源码模板线，经验维护规则停在 0.8.4。团队实际使用和后续更新的是 `feat/memory-reading-ergonomics`（经验维护 0.10.9：归因分三层判断；改已有经验只限纠错、增量、呈现三种理由；召回或使用失败不写进经验；删除已有内容前先确认它没有在召回中起作用）。协作者帮忙提炼经验请用那个分支，任务说明见 `docs/HELP-DISTILL-MEMORY.md`。
-
-
 本目录维护一个薄编排入口与四个处理 skill 的源模板及共享业务代码。只给完整 session 时使用 `migloop-session-to-memory`，由主 agent 拆分、派独立子代理制卡，再归并出 memory；具体模板和脚本仍由原有三个阶段 skill 提供，入口本身没有运行代码，需与它们一起安装。
 
 四个处理 skill 的发布包各自自包含，只需 Python 3.10+。制卡包携带从 `src/migloop/inquiry` 构建的同一新内核，其他包不携带内核。YAML 的纯 Python 依赖随包提供；运行时无需 pip、MCP、migloop 源码仓或 PYTHONPATH。不包含第二套读写实现，也不打包旧 UI/服务端。
@@ -54,7 +51,11 @@ python -m pytest skills/tests -q -o pythonpath=src
 
 卡片与经验共用召回语义：`when`写**任务阶段＋具体动作**，`description`写**当前输入可见的适用情境**。阶段来自偏差定位及预防动作，不取修复者角色、固定Stage编号或历史时刻。summary/why解释历史机制，recommendations/how说明动作。0.7.2 起 lesson 的 `check` 可省略或为空，阅读包仅在有内容时显示“可选检查”；只在条件疑问、输入冲突或关键假设需要核实时按需执行，优先复用正常测试，不改变来源/版本的机械校验。阅读目录提供时机、情境和例外预览；只有相关经验才展开正文。
 
-旧case/1、case/2与memory/1仍可读取，缺字段不补造语义、不自动改hash或状态。0.8.0正式制卡按当前模板要求description等字段；重新入库或引用旧卡时，需满足同一有效卡契约，未通过则用原job与稿件重新pack。已有经验库不会被本次升级自动重写。
+0.10.0正式制卡只写自包含的case/4：完整模型draft内容＋少量卡片身份、迁移材料版本与历史环境。node/edge/reason/force依据原样保存；无绑定操作、派生展示结构、检查回执、引用表、整池会话名录或sessions侧文件。pack仍执行内核机械检查，入库检查正式格式、内容哈希和声明图结构。UI从同一稿件与原始session索引重新绑定关系、查询原文/diff，派生缓存可丢弃，不回写卡片。旧case/1、/2、/3与memory/1仍可读，旧/3侧文件仅用于兼容。模型模板不变，各消费方共用case_format。memory.py compact在新目录迁移历史来源绑定，保持经验正文、身份、语义版本和状态；原库不改，失败旧稿不能靠转换升格。
+
+0.10.9 修订经验维护规则（memory-maintain）：归因时把经验原文、召回 worker 的传递、agent 的执行分三层判断，提醒不能当作原文的适用范围；改已有经验只限纠错、增量、呈现三种理由，各需真实偏差的卡片证据，召回或使用失败写进 REPORT.md「召回或使用失败」而不写进经验；删除或缩短已有内容前先确认它没有在实际召回中起作用；互补的条件或动作不因同机制合并删除。发布包新增 `scripts/lint.py`，在 apply 之后、export 之前检查新增或修订的经验（叙述经过、无出处数值、待核退路、标题过长），命中只作提示。协作 agent 帮忙提炼经验的任务说明见 `docs/HELP-DISTILL-MEMORY.md`。
+
+0.10.10 是 0.10.9 合入原 `dev/memory-skills` 线的召回与内核改动，经验维护规则和卡片格式不变：召回先完整读当前目录的 `index.md`，尽量一起比较可能相关的同层分支再收窄到正文，看过索引后搜索只作补充；制卡共用的 inquiry 索引以 WAL 模式打开并设 30 秒等待，多个调查员可同时读索引并保存记录；核对引用时直接解码原文，不经 open 查询。此后 `dev/memory-skills` 是唯一开发分支。
 
 0.5.0增加文件阅读发布：维护者运行`memory.py export --store STORE --out NEW_DIRECTORY`，宿主向迁移agent提供召回skill和生成的`index.md`。Claude Code 可另行安装项目级提醒，0.8.3为任务开始召回 + 首次明确写入前复核，写入识别precision优先，见`migloop-memory-recall/references/claude-hook.md`；只有安装并验证项目配置后才算接通。Codex/DevEco hook、云端 OBS/API 和跨租户权限尚未接入。旧`recall.py notice`仍是兼容诊断payload，不是已经安装的hook，也不是新版阅读入口。
 
@@ -67,7 +68,9 @@ python skills/migloop-memory-maintain/scripts/memory.py export --store STORE --o
 
 导出根`index.md`只列一级主题；每个子目录有自己的`index.md`，列直接子主题与本级经验预览；一条经验一个`*.lesson.md`。可以同时读多个分支，按当前任务选择，未遍历全库不等于召回未完成。目录不复制后代全文，经验正文不截断。
 
-只导出active记录，保留ID、版本、when/description/unless/why/how/check及来源绑定。默认阅读包不包含来源卡或本机路径，可单独分发；开发版`--link-cards`指向store中确切版本的卡片文件，链接只适用于保持相对位置的本地目录。manifest.json记录版本和文件校验和供维护审计，不是模型入口。两者是同一份store的派生视图，不维护第二份经验真理源。
+只导出active记录，保留ID、版本、when/description/unless/why/how/check。本地维护与GitHub知识仓库使用`--link-cards`保留来源列表并链接store中确切版本的卡片；保持相对目录结构即可浏览。只有部署给迁移agent时，才另行省略该参数导出不带来源段、卡片或本机路径的精简包，不用它替换仓库里的memory。完整来源绑定始终留在store/manifest中。manifest.json记录版本和文件校验和供维护审计，不是模型入口。两者是同一份store的派生视图，不维护第二份经验真理源。export对超过20个直接子主题/lesson的索引给出非阻断提示，由归并者按语义整理。
+
+0.10.3起，两种阅读版均在正文末尾显示一行来源计数；部署版只有计数，没有来源清单。按case ID、已记录的迁移身份和project标识去重，多条claim不重复算卡；缺失的迁移/应用身份不猜测。计数仅表示历史样本覆盖，不是正确率、成功复用次数或置信度评分，不改卡片及lesson模板，也不扩展各级索引。
 
 导出前检查所有可见主题的介绍及来源版本，完整暂存后再发布到**全新**目录。既有目录拒绝覆盖，修订后导出新版本并交付新入口；旧包不会随来源撤回而自行失效。经验和目录调整通过维护提案回到store，再重新export。CATALOG.md全量汇总仍可供人审阅，但不作为召回入口。
 

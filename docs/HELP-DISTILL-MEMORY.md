@@ -10,12 +10,12 @@
 
 ## 1. 准备
 
-1. **安装 skill**：克隆 https://github.com/hxy450/migloop ，切到分支 `feat/memory-reading-ergonomics`（经验维护 skill 0.10.9 及以后）。按 `skills/README.md` 构建并安装发布包，需要 Python 3.10+ 和 PyYAML==6.0.3：
+1. **安装 skill**：克隆 https://github.com/hxy450/migloop ，切到分支 `dev/memory-skills`（经验维护 skill 0.10.10 及以后）。按 `skills/README.md` 构建并安装发布包，需要 Python 3.10+ 和 PyYAML==6.0.3：
    ```text
    python skills/migloop-memory-maintain/scripts/build_bundle.py --out <仓库外的新目录>
    python skills/migloop-memory-maintain/scripts/install_bundle.py --destination <你的 skills 根目录>
    ```
-   安装后有五个 skill：`migloop-session-to-memory`（入口）、`migloop-repair-triage`、`migloop-build-cards`、`migloop-memory-maintain`、`migloop-memory-recall`。`dev/memory-skills` 分支是旧版模板线，不要用。
+   安装后有五个 skill：`migloop-session-to-memory`（入口）、`migloop-repair-triage`、`migloop-build-cards`、`migloop-memory-maintain`、`migloop-memory-recall`。
 2. **迁移材料**（由我们提供或你自己的迁移）：
    - 迁移会话的完整转录，含所有子 agent 转录；
    - 返修会话的完整转录；

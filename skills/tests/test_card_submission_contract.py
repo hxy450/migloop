@@ -35,7 +35,8 @@ def test_optional_prose_inherits_without_rewriting_authored_card(prepared):
     path.write_text(json.dumps(draft), encoding="utf-8")
     out = prepared["root"] / "minimal-case.json"
     result = pack(prepared["job"], path, out)
-    assert load(out)["draft"] == draft
+    from memorylib.case_format import content
+    assert content(load(out)) == draft
     view = load(Path(result["views"]) / "target-1.json")
     assert view["summary"] == draft["summary"]
     assert view["recommendations"] == draft["recommendations"]

@@ -732,7 +732,17 @@ def report_trace(path: str, *, static: bool = False, with_chains: bool = True,
     chains: list[dict[str, Any]] | None = None
     pool_builds: list[dict[str, Any]] | None = None
     pool_agents: list[dict[str, Any]] | None = None
+    pool_traces = []
     cwd = str((data.get("meta") or {}).get("cwd") or "")
+    audit_gaps = False
+    # Only explicitly frozen roots belong to this audit scope. Same-directory
+    # historical migrations may be useful for lineage, not for clearing warnings.
+    for pp in scope["roots"]:
+        if pp != path:
+            try:
+                pool_traces.append(extract_trace(pp, storage_root))
+            except Exception:
+                audit_gaps = True
     if with_chains and fmt in _ATOM_FORMATS:
         try:
             chains = list(fixchain_payload(path).get("chains") or [])
@@ -748,7 +758,7 @@ def report_trace(path: str, *, static: bool = False, with_chains: bool = True,
         except Exception:
             chains = None                          # 链算不出不拖垮报告
     data["audit"] = audit.build_audit(data, fix_chains=chains, pool_builds=pool_builds,
-                                      pool_agents=pool_agents)
+                                      pool_agents=pool_agents, pool_traces=pool_traces, material_gaps=audit_gaps)
     fixed_scope = scope["mode"] == "frozen_anchor"
     later = [] if fixed_scope else later_roots(fmt, path, cwd)
     prior = [] if fixed_scope else prior_roots(fmt, path, cwd)[:1]
@@ -772,7 +782,7 @@ def inquiry_database(path: str) -> str:
     save handles). A changed source set gets another index, not a rewritten report.
     """
     from .cc_sources import all_source_paths
-    from .inquiry.store import Store, describe_source, digest, encode
+    from .inquiry.store import INDEX_SCHEMA, Store, describe_source, digest, encode
 
     scope = observation_scope(path)
     anchor = str(scope["anchor"])
@@ -801,7 +811,7 @@ def inquiry_database(path: str) -> str:
         stat = item.stat()
         registrations.append((item, name))
         signature.append((name, str(item), stat.st_size, stat.st_mtime_ns))
-    fingerprint = digest(encode(["inquiry/index/5-drivecase", signature]).encode())
+    fingerprint = digest(encode([INDEX_SCHEMA, signature]).encode())
     cache = Path(os.environ.get("MIGLOOP_CACHE_DIR") or
                  os.path.join(os.environ.get("LOCALAPPDATA") or os.path.expanduser("~"), "Migloop"))
     database = cache / "inquiry" / (fingerprint + ".sqlite")

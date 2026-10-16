@@ -181,6 +181,7 @@ def enrich_cards(paths, metadata_path, out):
     """Create additive card revisions; preserve all authored claims, graph evidence and validation."""
     from .provenance import verify_materials
     from .registry import revision_of, validate_case
+    from .case_format import SCHEMA, context, shared_objects, finalize
 
     metadata, output = load(metadata_path), Path(out).resolve()
     if metadata.get("schema") != "migloop-provenance/1":
@@ -189,19 +190,28 @@ def enrich_cards(paths, metadata_path, out):
         raise ValueError("Enrichment output must be a new directory; existing cards are preserved")
     verify_materials(metadata)
     source_hashes = {s["source"]: s["sha256"] for s in metadata["sources"]}
-    prepared = []
+    prepared, objects = [], {}
     for path in paths:
         card = load(path)
         validate_case(card)
-        provenance = card.get("provenance", {})
-        if Path(provenance.get("materials", "")).resolve() != Path(metadata["materials"]).resolve():
+        objects.update(shared_objects(card, Path(path).parent / "sessions"))
+        card_context = context(card, objects)
+        provenance = card_context["provenance"]
+        if card["schema"] == SCHEMA:
+            if provenance.get("source_set_id") != metadata.get("source_set_id"):
+                raise ValueError(f"{card['id']}: environment material version differs from the card")
+        elif Path(provenance.get("materials", "")).resolve() != Path(metadata["materials"]).resolve():
             raise ValueError(f"{card['id']}: environment pool differs from the card's migration materials")
         sources = provenance.get("sources", {})
         sources = sources if isinstance(sources, dict) else {s["source"]: s["sha256"] for s in sources}
-        if not sources or any(source_hashes.get(name) != digest for name, digest in sources.items()):
+        if card["schema"] != SCHEMA and (not sources or any(source_hashes.get(name) != digest for name, digest in sources.items())):
             raise ValueError(f"{card['id']}: original transcript hashes do not match; do not relabel another history")
-        enriched = copy.deepcopy(card)
-        enriched["environment"] = for_card(metadata, card.get("scope", {}))
+        enriched = finalize(card, objects)
+        facts = for_card(metadata, card_context["scope"])["facts"]
+        if facts:
+            enriched["metadata"]["environment"] = facts
+        else:
+            enriched["metadata"].pop("environment", None)
         enriched["revision"] = revision_of(enriched)
         validate_case(enriched)
         prepared.append((card, enriched))

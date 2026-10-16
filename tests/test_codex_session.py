@@ -38,12 +38,12 @@ class CodexSessionAdapterTest(unittest.TestCase):
             root_id, child_id = "root-1", "child-1"
             main_path = os.path.join(root, "rollout-root-1.jsonl")
             child_path = os.path.join(root, "rollout-child-1.jsonl")
-            command = "Get-Content -LiteralPath %s -Raw" % json.dumps(source)
+            command = "Get-Content -LiteralPath .agents/skills/a2h-spec/SKILL.md -Raw; Get-Content -LiteralPath %s -Raw" % json.dumps(source)
             js = "const r = await tools.shell_command({command:%s,workdir:%s}); text(r);" % (
                 json.dumps(command), json.dumps(project)
             )
-            # A real Codex stage boundary is a read of the converted skill.
-            js = js.replace("const r =", "// .agents/skills/a2h-spec/SKILL.md\nconst r =")
+            # A comment mentioning a skill is not a stage signal; the actual
+            # read request above is retained as a weak skill-load hint.
             root_records = [
                 rec("2026-01-01T00:00:00Z", "session_meta", {
                     "id": root_id, "session_id": root_id, "cwd": project,

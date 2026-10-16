@@ -60,6 +60,24 @@ def _observe(info, row, ref):
     at, kind = row.get("timestamp"), row.get("type")
     payload = row.get("payload") if isinstance(row.get("payload"), dict) else {}
     message = row.get("message") if isinstance(row.get("message"), dict) else {}
+    if row.get("format") == "deveco-events/1":
+        session = row.get("session") or {}
+        header = row.get("info") or {}
+        model = message.get("model") or header.get("model") or {}
+        if isinstance(model, str):
+            try:
+                model = json.loads(model)
+            except ValueError:
+                model = {"modelID": model}
+        if not isinstance(model, dict):
+            model = {}
+        for field, value in (("platforms", "deveco"), ("session_ids", session.get("id")),
+                             ("agent_ids", session.get("id")), ("projects", session.get("directory")),
+                             ("client_versions", header.get("version")),
+                             ("models", message.get("modelID") or model.get("modelID")),
+                             ("providers", message.get("providerID") or model.get("providerID"))):
+            _record(info, field, value, ref, at)
+        return
     if kind == "session_meta":
         for field, value in (("platforms", "codex"), ("session_ids", payload.get("id")),
                              ("client_versions", payload.get("cli_version")),

@@ -550,24 +550,27 @@ def build_audit(trace: dict[str, Any],
                 pipeline: tuple[str, ...] = DEFAULT_PIPELINE,
                 fix_chains: list[dict[str, Any]] | None = None,
                 pool_builds: list[dict[str, Any]] | None = None,
-                pool_agents: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+                pool_agents: list[dict[str, Any]] | None = None,
+                pool_traces: list[dict[str, Any]] | None = None,
+                material_gaps: bool = False) -> dict[str, Any]:
     """跑全部规则,findings 按严重度排序。纯函数,不 I/O。
     fix_chains = 两原子账本算好的返修链(filestory.build_fix_chains);不传(摘要端点、进行中的
     会话)就没有返修追溯卡 —— 这里不再从血缘层另算。"""
-    # 启用集 = 用户点名的六条经验检测。其余规则(管线跳步/盲写/输入缺失/
-    # spec 覆盖缺口/异常收尾/返工)代码与测试保留但暂不启用 —— 风险点面板
-    # 不放自由发挥的东西,逐条评审后再回来。pipeline 参数供未启用的
-    # _check_pipeline_gap 复用,签名不动。
-    findings = [
-        *_check_skill_failures(trace),
-        *_check_script_failures(trace),
-        *_check_execute_build(trace, pool_builds),
-        *_check_spec_analyzer(trace, pool_agents),
-        *_check_verify_emulator(trace),
-        *_check_aborted_agents(trace),
-        *_check_snapshot_agents(trace),
-        *check_fix_chains(fix_chains or []),
-    ]
+    # Legacy private rules remain import-compatible, but are not the report's
+    # policy. All active observations use the migration-wide engine below;
+    # naming-based spec policies and absence-as-error rules are intentionally off.
+    from .audit_review import run
+    traces = [trace, *(pool_traces or [])]
+    review = run(traces, material_gaps=material_gaps)
+    findings = review["findings"]
+    snapshots = set()
+    for tr in traces:
+        for f in _check_snapshot_agents(tr):
+            key = tuple(sorted(f.get("agents", [])))
+            if key not in snapshots:
+                findings.append(f)
+                snapshots.add(key)
+    findings.extend(check_fix_chains(fix_chains or []))
     findings.sort(key=lambda f: _LEVEL_ORDER.get(f["level"], 9))
     counts = {"error": 0, "warn": 0, "info": 0}
     for f in findings:
@@ -575,8 +578,7 @@ def build_audit(trace: dict[str, Any],
     return {
         "findings": findings,
         "counts": counts,
-        "checked": ["skill-fail", "script-fail", "execute-no-build",
-                    "spec-no-analyzer", "spec-main-write", "verify-no-emulator",
-                    "verify-no-install", "verify-no-screenshot", "aborted-agent",
-                    "agent-snapshot", "verify-fix-traceback"],
+        "checked": [c["rule"] for c in review["assessments"] if c["status"] not in ("unknown", "not_applicable")],
+        "assessments": review["assessments"],
+        "coverage": review["coverage"],
     }
