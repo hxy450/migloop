@@ -1,5 +1,8 @@
 # 迁移经验闭环：统一入口 + 四个处理 skill
 
+> **注意（2026-10-16）**：本分支是 0.8.x 源码模板线，经验维护规则停在 0.8.4。团队实际使用和后续更新的是 `feat/memory-reading-ergonomics`（经验维护 0.10.9：归因分三层判断；改已有经验只限纠错、增量、呈现三种理由；召回或使用失败不写进经验；删除已有内容前先确认它没有在召回中起作用）。协作者帮忙提炼经验请用那个分支，任务说明见 `docs/HELP-DISTILL-MEMORY.md`。
+
+
 本目录维护一个薄编排入口与四个处理 skill 的源模板及共享业务代码。只给完整 session 时使用 `migloop-session-to-memory`，由主 agent 拆分、派独立子代理制卡，再归并出 memory；具体模板和脚本仍由原有三个阶段 skill 提供，入口本身没有运行代码，需与它们一起安装。
 
 四个处理 skill 的发布包各自自包含，只需 Python 3.10+。制卡包携带从 `src/migloop/inquiry` 构建的同一新内核，其他包不携带内核。YAML 的纯 Python 依赖随包提供；运行时无需 pip、MCP、migloop 源码仓或 PYTHONPATH。不包含第二套读写实现，也不打包旧 UI/服务端。
