@@ -75,6 +75,7 @@ def build(source, out):
                     shutil.copy2(scripts / "package_entry.py", target_scripts / entry)
                 if name == "migloop-memory-maintain":
                     shutil.copy2(scripts / "install_bundle.py", target_scripts / "install_bundle.py")
+                    shutil.copy2(scripts / "lint.py", target_scripts / "lint.py")   # standard library only
                 if name == "migloop-memory-recall":
                     hook = src / "scripts/claude_hook.py"
                     if hook.is_file():
