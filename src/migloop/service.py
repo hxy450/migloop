@@ -120,14 +120,18 @@ def _root_signature(path: str) -> tuple[str, str | None]:
     fmt = str(adapters.detect(path).FORMAT)
     cwd: Any = None
     try:
-        with open(path, encoding="utf-8-sig") as stream:
-            record = json.loads(stream.readline(1024 * 1024))
+        if fmt == "dsh":                                  # header row, possibly inside a Zstandard frame
+            from .adapters import dsh_source
+            record = dsh_source.read_header(path)
+        else:
+            with open(path, encoding="utf-8-sig") as stream:
+                record = json.loads(stream.readline(1024 * 1024))
         if isinstance(record, dict):
             cwd = record.get("cwd")
             payload = record.get("payload")
             if not cwd and isinstance(payload, dict):
                 cwd = payload.get("cwd")
-    except (OSError, ValueError):
+    except (OSError, ValueError, RuntimeError):
         cwd = None
     normalized = str(cwd).replace("\\", "/").rstrip("/") if isinstance(cwd, str) and cwd.strip() else None
     result = (fmt, normalized)
@@ -259,7 +263,8 @@ def locate_session(target: str, roots: dict[str, str] | None = None) -> str:
         return os.path.abspath(target)
     rows = list(adapters.discover(roots or {}))
     want = str(target or "").strip()
-    hits = [r for r in rows if want and str(r.session_id or "").startswith(want)]
+    hits = [r for r in rows if want and (str(r.session_id or "").startswith(want) or (
+        getattr(r, "format", None) == "dsh" and str(r.session_id or "").startswith("session-" + want)))]
     if not hits:
         hits = [r for r in rows if want and want.lower() in str(r.project or "").lower()]
     if not hits:
@@ -373,6 +378,10 @@ def root_sid8(fmt: str, path: str) -> str:
     if fmt == "codex":
         cx: Any = adapters.get("codex")
         return str((cx.session_summary(path) or {}).get("id") or "")[:8]
+    if fmt == "dsh":                                      # session-<uuid>: the uuid part names the route
+        from .adapters import dsh_source
+        sid = str(dsh_source.read_header(path)["id"])
+        return (sid[len("session-"):] if sid.startswith("session-") else sid)[:8]
     return os.path.splitext(os.path.basename(path))[0][:8]
 
 
@@ -775,6 +784,43 @@ def report_html(path: str) -> str:
     return build_html(report_trace(path), load_template())
 
 
+def _dsh_inquiry_database(anchor: str) -> str:
+    """dsh root + sub-agent Sessions frozen as dsh-events/1 JSONL, then indexed like any source pool.
+
+    The freeze is keyed by every generation file's size and mtime, so a Session
+    that grows gets a new frozen copy and a new index instead of a rewrite.
+    """
+    import shutil
+    import tempfile
+    from .adapters import dsh_source
+    from .inquiry.store import INDEX_SCHEMA, Store, describe_source, digest, encode
+
+    root = dsh_source.root_of(anchor)
+    header = dsh_source.read_header(anchor)
+    gens = [anchor] + [g for _h, g in dsh_source.descendants(root, header["id"])]
+    signature = [(g, os.stat(g).st_size, os.stat(g).st_mtime_ns) for g in gens]
+    fingerprint = digest(encode([INDEX_SCHEMA, "dsh-events/1", signature]).encode())
+    cache = Path(os.environ.get("MIGLOOP_CACHE_DIR") or
+                 os.path.join(os.environ.get("LOCALAPPDATA") or os.path.expanduser("~"), "Migloop"))
+    frozen = cache / "dsh-frozen" / fingerprint[:16]        # short: frozen paths nest two session ids (MAX_PATH)
+    database = cache / "inquiry" / (fingerprint + ".sqlite")
+    with _LOCK:
+        if not frozen.is_dir():
+            frozen.parent.mkdir(parents=True, exist_ok=True)
+            staging = Path(tempfile.mkdtemp(prefix=".dsh-", dir=str(frozen.parent)))
+            try:
+                dsh_source.freeze_tree(anchor, str(staging), root)
+                os.replace(staging, frozen)
+            finally:
+                if staging.exists():
+                    shutil.rmtree(staging, ignore_errors=True)
+        if not database.exists():
+            sources = sorted(p for p in frozen.rglob("*.jsonl"))
+            store = Store.build(database, [describe_source(p, p.relative_to(frozen).as_posix()) for p in sources])
+            store.close()
+    return str(database)
+
+
 def inquiry_database(path: str) -> str:
     """Snapshot index for the selected source pool; no legacy ledger construction.
 
@@ -787,6 +833,8 @@ def inquiry_database(path: str) -> str:
     scope = observation_scope(path)
     anchor = str(scope["anchor"])
     fmt, cwd = _root_signature(anchor)
+    if fmt == "dsh":
+        return _dsh_inquiry_database(anchor)
     if fmt not in _ATOM_FORMATS:
         raise SessionLookupError(f"时间证据树暂不支持 {fmt} 会话")
     pool = _frozen_pool()
@@ -840,6 +888,11 @@ def fixchain_html(path: str) -> str:
     scope = observation_scope(path)
     anchor = str(scope["anchor"])
     fmt, cwd = _root_signature(anchor)
+    if fmt == "dsh":
+        # dsh has no two-atom ledger: the page runs on the inquiry index alone (no fixchain-data cards).
+        sid = root_sid8(fmt, anchor)
+        return render_page(f"/api/insight1/inquiry/{sid}",
+                           {"sid": sid, "project": (cwd or "").rsplit("/", 1)[-1], "observation_scope": scope})
     if fmt not in _ATOM_FORMATS:
         raise SessionLookupError(f"时间证据树暂不支持 {fmt} 会话")
     owner = describe_source(anchor, anchor).agent

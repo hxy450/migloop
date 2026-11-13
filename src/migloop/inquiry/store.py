@@ -463,7 +463,7 @@ class Store:
             operations = file_effects(request["tool"], data)
             owner = sources[request["source"]]
             if (
-                name in ("task", "agent", "spawn_agent")
+                name in ("task", "agent", "spawn_agent", "subagent", "subagent_fork")
                 and ordered
                 and result["success"] != 0
             ):

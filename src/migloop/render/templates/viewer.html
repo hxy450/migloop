@@ -685,14 +685,15 @@
   var proj = (D.meta.cwd || "").split("\\").pop() || "project";
   var isCodex = D.meta.session_format === "codex";
   var isDeveco = D.meta.session_format === "deveco";
+  var isDsh = D.meta.session_format === "dsh";
   var isDbDirect = isDeveco && D.meta.source_file && D.meta.source_file.indexOf("deveco.db:") === 0;
-  var fmtLabel = isDeveco ? "DevEco Code" : (isCodex ? "Codex" : "Claude Code");
-  var fmtVer = isDeveco ? "deveco " : (isCodex ? "codex " : "cc ");
-  var fmtSrc = isDeveco ? (isDbDirect ? "来源: deveco.db 直读" : "来源: 导出 JSON 导入") : "来源: JSONL 离线导入";
-  var fmtAdapter = isDeveco ? "adapters/deveco.py" : (isCodex ? "adapters/codex.py" : "adapters/claude.py");
-  var fmtMedium = isDeveco ? (isDbDirect ? "SQLite 数据库" : "导出 JSON") : "JSONL";
+  var fmtLabel = isDsh ? "DeepSeek Harness" : (isDeveco ? "DevEco Code" : (isCodex ? "Codex" : "Claude Code"));
+  var fmtVer = isDsh ? "dsh " : (isDeveco ? "deveco " : (isCodex ? "codex " : "cc "));
+  var fmtSrc = isDsh ? "来源: dsh 会话日志" : (isDeveco ? (isDbDirect ? "来源: deveco.db 直读" : "来源: 导出 JSON 导入") : "来源: JSONL 离线导入");
+  var fmtAdapter = isDsh ? "adapters/dsh.py" : (isDeveco ? "adapters/deveco.py" : (isCodex ? "adapters/codex.py" : "adapters/claude.py"));
+  var fmtMedium = isDsh ? "JSONL / Zstandard" : (isDeveco ? (isDbDirect ? "SQLite 数据库" : "导出 JSON") : "JSONL");
   [
-    "session " + (D.meta.session_id || "").slice(0, 8),
+    "session " + (D.meta.session_id || "").replace(/^session-/, "").slice(0, 8),
     proj,
     D.meta.model || "",
     fmtVer + (D.meta.cc_version || ""),

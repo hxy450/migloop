@@ -4,11 +4,11 @@ To add a new source (for example DevEco), implement the contract in
 ``base.py`` and register its module in ``ADAPTERS``.  The renderer and trace
 analysis layers do not need source-specific changes.
 """
-from . import claude, codex, deveco
+from . import claude, codex, deveco, dsh
 
 
 # More-specific detectors must precede permissive fallbacks.
-ADAPTERS = (deveco, codex, claude)
+ADAPTERS = (dsh, deveco, codex, claude)
 
 
 def get(name):

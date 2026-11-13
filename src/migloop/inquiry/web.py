@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import html
-from pathlib import Path
+from importlib import resources
 from urllib.parse import parse_qs, urlparse
 
 from .engine import Engine
@@ -11,12 +11,15 @@ from .report import check, load_report
 from .store import Store, encode, iso
 
 
+def _asset(name):
+    """Package asset text; importlib.resources also reads inside the migloop-lineage.pyz zipapp."""
+    return resources.files(__package__).joinpath(name).read_text(encoding="utf-8")
+
+
 def render_page(api_base="", context=None):
     config = encode({**(context or {}), "api_base": api_base}).replace("<", "\\u003c")
     return (
-        Path(__file__)
-        .with_name("page.html")
-        .read_text(encoding="utf-8")
+        _asset("page.html")
         .replace("__INQUIRY_CONFIG__", config)
         .replace("__INQUIRY_ASSET_BASE__", html.escape(api_base, quote=True))
     )
@@ -30,7 +33,7 @@ def dispatch_http(path, route, data=None):
     if parsed.path in ("/tree.js", "/viewer.js") and data is None:
         return (
             200,
-            Path(__file__).with_name(parsed.path[1:]).read_text(encoding="utf-8"),
+            _asset(parsed.path[1:]),
             "text/javascript; charset=utf-8",
         )
     store = None

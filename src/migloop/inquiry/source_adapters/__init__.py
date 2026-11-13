@@ -2,9 +2,10 @@
 from .claude import ClaudeAdapter
 from .codex import CodexAdapter
 from .deveco import DevEcoAdapter
+from .dsh import DshAdapter
 from ..tool_contracts import normalize_input
 
-ADAPTERS = (DevEcoAdapter(), CodexAdapter(), ClaudeAdapter())
+ADAPTERS = (DshAdapter(), DevEcoAdapter(), CodexAdapter(), ClaudeAdapter())
 
 
 def adapter_for(record):

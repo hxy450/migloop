@@ -67,7 +67,7 @@ def navigation_paths(tool, data, cwd=""):
     creates no effect, no confirmed relationship, no file contents or state.
     """
     name = tool.split(".")[-1].casefold() if isinstance(tool, str) else ""
-    if name not in {"bash", "shell_command", "exec_command", "run_shell_command", "exec", "js"}:
+    if name not in {"bash", "pwsh", "powershell", "shell_command", "exec_command", "run_shell_command", "exec", "js"}:
         return []
     command = data.get("command", data.get("cmd")) if isinstance(data, dict) else data
     if not isinstance(command, str):

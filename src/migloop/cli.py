@@ -14,6 +14,7 @@ MigLoop Trace Viewer — 单命令生成 Claude Code / Codex 会话轨迹页面
 依赖:Python >= 3.9,无第三方库
 """
 import argparse
+import glob
 import os
 import sys
 import webbrowser
@@ -68,12 +69,16 @@ def list_sessions(root, codex_root=None, deveco_root=None, limit=20):
     for mt, p, proj, size, kind, sid in rows[:limit]:
         t = datetime.datetime.fromtimestamp(mt).strftime("%m-%d %H:%M")
         print("  %-30s %-7s %-10s %7.1fM  %s" %
-              (short_proj(proj)[:30], kind, sid[:8], size / 1e6, t))
+              (short_proj(proj)[:30], kind, (sid[len("session-"):] if kind == "dsh" and sid.startswith("session-") else sid)[:8],
+               size / 1e6, t))
     print("\n用法: migloop <session-id 前缀 | 项目名片段 | jsonl 路径> [-o out.html] [--open]")
 
 
 def resolve_target(target, root, codex_root=None, deveco_root=None):
     """把用户输入解析成唯一的 jsonl 路径;歧义/未命中时报错退出。"""
+    dsh_log = adapters.get("dsh").dsh_log_of(target)
+    if dsh_log:
+        return dsh_log
     if os.path.isfile(target):
         return target
     directory_hint = None
@@ -88,7 +93,8 @@ def resolve_target(target, root, codex_root=None, deveco_root=None):
 
     rows = all_sessions(root, codex_root, deveco_root)
     lookup = directory_hint or target
-    by_sid = [p for _, p, _, _, _, sid in rows if sid.startswith(lookup)]
+    by_sid = [p for _, p, _, _, kind, sid in rows
+              if sid.startswith(lookup) or (kind == "dsh" and sid.startswith("session-" + lookup))]
     if len(by_sid) == 1:
         return by_sid[0]
     if len(by_sid) > 1:
@@ -127,6 +133,8 @@ def main():
     ap.add_argument("--projects-root", default=None, help="覆盖 ~/.claude/projects")
     ap.add_argument("--codex-sessions-root", default=None, help="覆盖 ~/.codex/sessions")
     ap.add_argument("--deveco-sessions-root", default=None, help="覆盖 DevEco 数据目录")
+    ap.add_argument("--dsh-sessions-root", default=None,
+                    help="覆盖 dsh 会话根目录(默认 $DSH_HOME/sessions 或 ~/.dsh/sessions)")
     ap.add_argument("--deveco-db", default=None,
                     help="deveco.db 路径(或 DevEco 数据目录)，覆盖默认位置；用于按 session id 直读 DB 及定位子代理库")
     ap.add_argument("--serve", action="store_true",
@@ -157,6 +165,8 @@ def main():
     ap.add_argument("--chat-timeout", type=float, default=180.0,
                     help="单次分析最长等待秒数（默认 180）")
     args = ap.parse_args()
+    if args.dsh_sessions_root:
+        os.environ["DSH_SESSIONS_ROOT"] = os.path.abspath(args.dsh_sessions_root)
 
     root = projects_root(args.projects_root)
     codex_root = codex_sessions_root(args.codex_sessions_root)
