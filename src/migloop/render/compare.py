@@ -86,5 +86,6 @@ def build_compare_html(traces, compare_template_text, font_face=""):
                          separators=(",", ":")).replace("</", "<\\/")
     payload = payload.replace("�", "?")
     html = compare_template_text.replace("/*__FONT_FACE__*/", font_face)
-    assert "__COMPARE_JSON__" in html
+    if "__COMPARE_JSON__" not in html:     # python -O 会剥掉 assert,模板占位检查不能跟着丢
+        raise AssertionError("Invariant failed: '__COMPARE_JSON__' in html")
     return html.replace("__COMPARE_JSON__", payload)
