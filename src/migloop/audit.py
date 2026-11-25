@@ -353,7 +353,7 @@ def _check_spec_analyzer(trace: dict[str, Any],
     续接的主线里结束(DiceRoller 0903),analyzer 起在前一个会话里就不算没起。"""
     stage_seq = [str(s.get("stage") or "") for s in trace.get("stages") or []]
     spec_idx = [i for i, name in enumerate(stage_seq)
-                if "spec" in name and name != "setup"]
+                if "spec" in name and "retrospect" not in name and name != "setup"]
     if not spec_idx or max(spec_idx) == len(stage_seq) - 1:
         return []
     spec_stages = {stage_seq[i] for i in spec_idx}
@@ -655,13 +655,65 @@ def _check_ecat_no_effect(trace: dict[str, Any]) -> list[dict[str, Any]]:
     )]
 
 
+#: 必须经 Skill 工具调起的 skill —— /a2h-run 对每个阶段的约定是「宣告 + 调用对应
+#: skill」。只管这几个:辅助 skill 的 SKILL.md 被当参考资料读是常态,管了就是误报。
+_MUST_INVOKE_SKILLS = (*DEFAULT_PIPELINE, "a2h-retrospect")
+
+
+def _pipeline_skill_reads(trace: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
+    """主线 Read 过的管线 skill 的 SKILL.md(``…/skills/<名>/SKILL.md``),按 skill 分组。"""
+    reads: dict[str, list[dict[str, Any]]] = {}
+    for t in trace.get("tools") or []:
+        if t.get("name") != "Read":
+            continue
+        parts = str(t.get("brief") or "").replace("\\", "/").split("/")
+        if len(parts) < 3 or parts[-1] != "SKILL.md" or parts[-3] != "skills":
+            continue
+        if parts[-2] in _MUST_INVOKE_SKILLS:
+            reads.setdefault(parts[-2], []).append(t)
+    return reads
+
+
+def _check_skill_not_invoked(trace: dict[str, Any]) -> list[dict[str, Any]]:
+    """主线直接 Read 了管线 skill 的 SKILL.md 照着执行,全程没有经 Skill 工具调用它
+    (移植自 hmigbot-plus 53c5524d)。
+
+    这是模型没遵从调用约定,不是阶段划分要去适配的情况:阶段里没有这个 skill 是对
+    实际执行的如实还原,这里只负责把它标出来。调过(哪怕失败,那归 skill-fail)、
+    或归属戳切出了该阶段(斜杠命令 / resume 续跑进入),都不算。证据是那几次 Read 本身。
+    """
+    tools = trace.get("tools") or []
+    invoked = {str(t.get("skill") or t.get("brief") or "").split(":")[-1]
+               for t in tools if t.get("name") == "Skill"}
+    invoked |= {str(s.get("stage") or "") for s in trace.get("stages") or []}
+    out = []
+    for skill, hits in _pipeline_skill_reads(trace).items():
+        if skill in invoked:
+            continue
+        first = hits[0]
+        when = str(first.get("ts") or "")[11:16]
+        out.append(_finding(
+            "skill-not-invoked", "warn",
+            f"未经 Skill 调用 · {skill}",
+            f"主线{f'在 {when} ' if when else ''}直接读取了 {skill} 的 SKILL.md 照着执行"
+            f"(共 {len(hits)} 次),全程没有通过 Skill 工具调用它 —— 未遵从管线的调用约定;"
+            f"该阶段不会单独出现在阶段划分里,其耗时与用量计入了「{first.get('stage') or '?'}」。",
+            paths=[skill],
+            anchor={"stage": first.get("stage"), "ts": first.get("ts")},
+        ))
+    return out
+
+
 def _session_rules(traces: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    """逐会话的事实规则(agent-type-missing 与两条 ECAT 生成端规则)→ (findings, assessments)。"""
+    """逐会话的事实规则(agent-type-missing、skill-not-invoked 与两条 ECAT 生成端规则)
+    → (findings, assessments)。"""
     findings: list[dict[str, Any]] = []
     for tr in traces:
-        findings += _check_agent_type_missing(tr) + _check_ecat_out_of_scope(tr) + _check_ecat_no_effect(tr)
+        findings += (_check_agent_type_missing(tr) + _check_skill_not_invoked(tr)
+                     + _check_ecat_out_of_scope(tr) + _check_ecat_no_effect(tr))
     fired = {f["rule"] for f in findings}
     dispatched = any(t.get("name") in ("Agent", "Task") for tr in traces for t in tr.get("tools") or [])
+    skill_reads = any(_pipeline_skill_reads(tr) for tr in traces)
     generator = any(_ecat_meta(tr).get("role") == "generator" for tr in traces)
     scoped = any(_ecat_meta(tr).get("role") == "generator" and "work_list_files" in _ecat_meta(tr)
                  for tr in traces)
@@ -672,6 +724,7 @@ def _session_rules(traces: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], 
         return {"rule": rule, "status": "failed" if rule in fired else ("observed" if applicable else "not_applicable")}
 
     assessments = [status("agent-type-missing", dispatched),
+                   status("skill-not-invoked", skill_reads),
                    status("ecat-out-of-scope", generator and scoped),
                    status("ecat-no-effect", generator and measured)]
     return findings, assessments

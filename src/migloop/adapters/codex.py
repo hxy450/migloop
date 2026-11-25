@@ -268,12 +268,14 @@ def _tool_failed(output: str | None) -> bool:
     low = (output or "").lower()
     if "script failed" in low or '"iserror":true' in low.replace(" ", ""):
         return True
-    match = re.search(r"exit code:\s*(-?\d+)", low)
+    # CLI 0.147+ 的 exec_command 输出头写作「Process exited with code N」(hmigbot-plus 53c5524d)
+    match = (re.search(r"exit code:\s*(-?\d+)", low)
+             or re.search(r"^process exited with code\s+(-?\d+)", low, re.MULTILINE))
     return bool(match and int(match.group(1)) != 0)
 
 
 def _duration_ms(start_ts: str | None, end_ts: str | None, output: str | None) -> int | None:
-    values = [float(x) for x in re.findall(r"Wall time\s+([0-9.]+)\s+seconds", output or "", re.I)]
+    values = [float(x) for x in re.findall(r"Wall time:?\s+([0-9.]+)\s+seconds", output or "", re.I)]
     if values:
         return int(max(values) * 1000)
     return common.ms_between(start_ts, end_ts)
@@ -532,6 +534,66 @@ def _tool_entry(
     }
 
 
+def _shell_row(
+    call: dict[str, Any], command: str, workdir: str | None,
+    output: str, output_ts: str | None,
+) -> dict[str, Any]:
+    """一条 shell 命令 → 工具行(摘要 + 源码视野 + 探测路径 + 引用的 skill)。
+
+    工具名沿用 "PowerShell":共用的视野推断与下游审计只认 Bash / PowerShell 这一族,
+    与宿主实际用的 shell 无关。
+    """
+    entry = _tool_entry(call["idx"], call["ts"], "PowerShell",
+                        {"command": command, "workdir": workdir},
+                        call.get("call_id"), output, output_ts,
+                        brief=" ".join(command.split())[:300])
+    visible = common._infer_visible_source_lines(
+        "PowerShell", {"command": command}, output, workdir
+    )
+    existing = {(event["path"], tuple(event["intervals"])) for event in visible}
+    for event in _generic_visible_events(command, output, workdir):
+        key = (event["path"], tuple(event["intervals"]))
+        if key not in existing:
+            visible.append(event)
+            existing.add(key)
+    if not visible:
+        covered = {event["path"] for event in visible}
+        for event in _offline_visible_events(command, output, workdir):
+            if event["path"] in covered or os.path.isfile(event["path"]):
+                continue  # 本机盘上存在的文件以磁盘比对为权威
+            visible.append(event)
+    if visible:
+        entry["_visible_source_lines"] = visible
+    probed = common._script_probed_paths(
+        "PowerShell", {"command": command}, workdir
+    )
+    if probed:
+        entry["_probed_paths"] = probed
+    skills = _skill_names(command)
+    if skills:
+        entry["skills"] = skills
+    return entry
+
+
+def _direct_shell_command(call: dict[str, Any]) -> tuple[str, str | None] | None:
+    """直接的 shell 函数调用 → (命令, workdir)。CLI 0.147+ 是 ``exec_command{cmd}``,
+    更早是 ``shell_command{command}`` / ``shell{command:[...]}``;此前只有 ``exec``
+    包装里的嵌套调用出 shell 行,直接调用的摘要是空串,审计什么都匹配不到
+    (hmigbot-plus 53c5524d)。"""
+    if call.get("name") not in ("exec_command", "shell_command", "shell"):
+        return None
+    args = _decode_arguments(call.get("raw"))
+    if not isinstance(args, dict):
+        return None
+    command = args.get("cmd") or args.get("command")
+    if isinstance(command, list):
+        command = " ".join(str(part) for part in command)
+    if not isinstance(command, str) or not command.strip():
+        return None
+    workdir = args.get("workdir") or args.get("cwd")
+    return command, workdir if isinstance(workdir, str) else None
+
+
 def _normalize_one(
     call: dict[str, Any], outputs: dict[Any, dict[str, Any]], cwd: str | None
 ) -> list[dict[str, Any]]:
@@ -546,38 +608,8 @@ def _normalize_one(
         extracted = False
         for shell in _extract_shell_calls(raw, cwd):
             extracted = True
-            command = shell["command"]
-            workdir = shell.get("workdir") or cwd
-            entry = _tool_entry(call["idx"], call["ts"], "PowerShell",
-                                {"command": command, "workdir": workdir},
-                                call.get("call_id"), output, output_ts,
-                                brief=" ".join(command.split())[:300])
-            visible = common._infer_visible_source_lines(
-                "PowerShell", {"command": command}, output, workdir
-            )
-            existing = {(event["path"], tuple(event["intervals"])) for event in visible}
-            for event in _generic_visible_events(command, output, workdir):
-                key = (event["path"], tuple(event["intervals"]))
-                if key not in existing:
-                    visible.append(event)
-                    existing.add(key)
-            if not visible:
-                covered = {event["path"] for event in visible}
-                for event in _offline_visible_events(command, output, workdir):
-                    if event["path"] in covered or os.path.isfile(event["path"]):
-                        continue  # 本机盘上存在的文件以磁盘比对为权威
-                    visible.append(event)
-            if visible:
-                entry["_visible_source_lines"] = visible
-            probed = common._script_probed_paths(
-                "PowerShell", {"command": command}, workdir
-            )
-            if probed:
-                entry["_probed_paths"] = probed
-            skills = _skill_names(command)
-            if skills:
-                entry["skills"] = skills
-            rows.append(entry)
+            rows.append(_shell_row(call, shell["command"], shell.get("workdir") or cwd,
+                                   output, output_ts))
         for patch in _extract_apply_patches(raw):
             extracted = True
             for patch_row in _patch_entries(patch, cwd):
@@ -590,6 +622,11 @@ def _normalize_one(
             rows.append(_tool_entry(call["idx"], call["ts"], "exec",
                                     {"input": raw}, call.get("call_id"), output, output_ts,
                                     brief=" ".join(raw.split())[:300]))
+        return rows
+
+    direct = _direct_shell_command(call)
+    if direct:
+        rows.append(_shell_row(call, direct[0], direct[1] or cwd, output, output_ts))
         return rows
 
     args = _decode_arguments(call.get("raw"))
