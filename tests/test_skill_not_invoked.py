@@ -75,7 +75,9 @@ def test_skill_md_read_ignores_non_pipeline_and_reference_files() -> None:
                 "brief": "/p/.claude/skills/a2h-plan/templates/ui-plan-template.md"},
                ])
     assert "skill-not-invoked" not in _rules_hit(t)
-    assert "skill-not-invoked" not in build_audit(t)["checked"], "没读过管线 SKILL.md 时不适用"
+    # 有管线阶段时「未见 X / 缺结束标记」检查适用,但这里什么都没触发
+    assert "skill-not-invoked" in build_audit(t)["checked"]
+    assert "skill-not-invoked" not in build_audit(_trace(stages=[{"stage": "session"}], tools=[]))["checked"]
     # Skill 调了但失败、转头去读 SKILL.md:由 skill-fail 负责报,这里不重复
     failed = _trace(
         stages=[{"stage": "a2h-spec"}],
@@ -95,3 +97,11 @@ def test_retrospect_is_not_mistaken_for_a_spec_stage() -> None:
     hit = _rules_hit(t)
     assert "spec-no-analyzer" not in hit
     assert "spec-main-write" not in hit
+
+
+def test_missing_stage_and_missing_end_mark_are_flagged() -> None:
+    t = _trace(stages=[{"stage": "a2h-init"}, {"stage": "a2h-spec"}, {"stage": "a2h-plan"},
+                       {"stage": "a2h-execute", "label": "Execute（缺结束标记）", "missing_end_mark": True,
+                        "start_ts": "2026-11-01T11:46:13Z"}], tools=[])
+    titles = [f["title"] for f in build_audit(t)["findings"] if f["rule"] == "skill-not-invoked"]
+    assert titles == ["未见 a2h-build", "未见 a2h-run", "缺结束标记 · Execute（缺结束标记）"]

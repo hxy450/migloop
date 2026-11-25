@@ -612,6 +612,25 @@ def _check_skill_not_invoked(trace: dict[str, Any]) -> list[dict[str, Any]]:
             paths=[skill],
             anchor={"stage": first.get("stage"), "ts": first.get("ts")},
         ))
+    # 缺的阶段不补推断:阶段划分里出现了前后阶段、中间那个没有任何信号,就如实标出来
+    from .stage_signals import missing_stages
+    stages = trace.get("stages") or []
+    reported = {f["paths"][0] for f in out if f.get("paths")}
+    for name in missing_stages(s.get("stage") for s in stages):
+        if name in reported:
+            continue
+        out.append(_finding(
+            "skill-not-invoked", "warn", f"未见 {name}",
+            f"阶段划分里出现了它前后的阶段,却没有 {name} 的信号(mark 或 skill 调用);这一段没有补推断,"
+            "它的耗时与用量归在相邻阶段里。",
+            paths=[name]))
+    for s in stages:
+        if s.get("missing_end_mark"):
+            out.append(_finding(
+                "skill-not-invoked", "warn", f"缺结束标记 · {s.get('label') or s.get('stage')}",
+                "最后一个 mark 之后这一段没有打收尾 mark:段名取自段内的 skill 信号(没有信号就是「未标记」),"
+                "一直算到会话末尾;阶段没收尾,段内的人工输入不算后续轮。",
+                anchor={"stage": s.get("stage"), "ts": s.get("start_ts")}))
     return out
 
 
@@ -624,7 +643,9 @@ def _session_rules(traces: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], 
                      + _check_ecat_out_of_scope(tr) + _check_ecat_no_effect(tr))
     fired = {f["rule"] for f in findings}
     dispatched = any(t.get("name") in ("Agent", "Task") for tr in traces for t in tr.get("tools") or [])
-    skill_reads = any(_pipeline_skill_reads(tr) for tr in traces)
+    skill_reads = any(_pipeline_skill_reads(tr) or any(str(st.get("stage") or "").startswith("a2h-")
+                                                        for st in tr.get("stages") or [])
+                      for tr in traces)
     generator = any(_ecat_meta(tr).get("role") == "generator" for tr in traces)
     scoped = any(_ecat_meta(tr).get("role") == "generator" and "work_list_files" in _ecat_meta(tr)
                  for tr in traces)
