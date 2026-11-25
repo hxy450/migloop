@@ -88,6 +88,7 @@ Run standalone (without touching the CLI registry):
 from __future__ import annotations
 
 import argparse
+import bisect
 import glob
 import json
 import os
@@ -178,6 +179,53 @@ def _iso_ms(iso):
     """ISO-8601 string -> Unix millis (float); None if unparseable."""
     d = common.parse_ts(iso)
     return d.timestamp() * 1000.0 if d is not None else None
+
+
+def _turn_stalls(infos):
+    """停摆 [(起, 止)] 毫秒:回合关闭(assistant 以 stop 等收尾,或出错 / 被中断)到下一条消息开始。
+    回合进行中的静默(工具在跑、等 API、编排在跑)不算 —— 与 Claude / Codex 同一条规则。"""
+    starts, closes = [], []
+    for mi in infos:
+        t = mi.get("time") or {}
+        created = _to_num(t.get("created"))
+        if created is not None:
+            starts.append(created)
+        if mi.get("role") == "assistant":
+            done = _to_num(t.get("completed"))
+            finish = mi.get("finish")
+            if done is not None and (mi.get("error") or (finish and finish not in ("tool-calls", "tool_calls"))):
+                closes.append(done)
+    starts.sort()
+    stalls = []
+    for close in sorted(closes):
+        k = bisect.bisect_right(starts, close)
+        if k >= len(starts):
+            continue
+        if stalls and stalls[-1][1] == starts[k]:   # 下一条之前收了两次:取早的那次
+            continue
+        stalls.append((close, starts[k]))
+    return stalls
+
+
+def _busy_windows(infos):
+    """一个(子)会话的忙碌窗口:[首条消息, 末条完成] 扣掉它自己的停摆。"""
+    times = []
+    for mi in infos:
+        t = mi.get("time") or {}
+        for key in ("created", "completed"):
+            v = _to_num(t.get(key))
+            if v is not None:
+                times.append(v)
+    if not times:
+        return []
+    out, cur, last = [], min(times), max(times)
+    for a, b in _turn_stalls(infos):
+        if a > cur:
+            out.append((cur, min(a, last)))
+        cur = max(cur, b)
+    if cur < last:
+        out.append((cur, last))
+    return out
 
 
 def _union_ms(intervals):
@@ -1027,14 +1075,16 @@ def _load_child_sessions(db, session_id):
                     continue
                 seen.add(sid)
                 found.append(sid)
-                requests = 0
+                requests, infos = 0, []
                 for (mdata,) in db.execute("SELECT data FROM message WHERE session_id=?", (sid,)):
                     try:
-                        requests += json.loads(mdata).get("role") == "assistant"
+                        mi = json.loads(mdata)
+                        requests += mi.get("role") == "assistant"
                     except (ValueError, AttributeError):
                         continue
+                    infos.append({k: mi.get(k) for k in ("role", "time", "finish", "error")})
                 rows.append({
-                    "requests": requests,
+                    "requests": requests, "turn_infos": infos,
                     "id": sid, "title": title or "", "agent": agent or "",
                     "model": _parse_model_column(model_str),
                     "tokens": {"input": ti or 0, "output": to or 0, "reasoning": tr or 0,
@@ -1231,6 +1281,11 @@ def _build_child_agents(children, load_parts, stages, cwd, model, billing, wf_in
         created = _ms_to_iso(ch["created"])
         updated = _ms_to_iso(ch["updated"])
         stage = _stage_of_time(stages, created)
+        if ch.get("turn_infos") is not None:
+            busy = _busy_windows(ch["turn_infos"])
+        else:
+            busy = [(float(ch["created"]), float(ch["updated"]))] \
+                if isinstance(ch.get("created"), (int, float)) and isinstance(ch.get("updated"), (int, float)) else []
         for s0, s1 in child_act:
             sub_act.append((stage["id"], s0, s1))
         reasoning = tk["reasoning"]
@@ -1286,6 +1341,7 @@ def _build_child_agents(children, load_parts, stages, cwd, model, billing, wf_in
             "_prompt": "", "_probed": [], "_reads": [], "_writes": [],
             "_read_lines": {}, "_read_iv": {}, "_read_total": {}, "_read_sources": {},
             "_write_lines": {}, "_write_events": [],
+            "_busy_ms": busy,
         }
         _aggregate_reads(entry, tools)
         # 子会话计费:请求数 = 它的 assistant 消息行数。一条消息都没有的子会话(workflow 探针
@@ -1646,11 +1702,7 @@ def _parse(data, storage_root=None, source_file=None, child_documents=None):
         stg = _stage_of_idx(stages, m_idx)
         main_act_resolved.append((stg["id"], s0, s1))
     all_act = main_act_resolved + sub_act
-    merged_global, global_active = _union_ms([(s0, s1) for _, s0, s1 in all_act])
-    for s in stages:
-        ivs = [(s0, s1) for sid, s0, s1 in all_act if sid == s["id"]]
-        merged, act = _union_ms(ivs)
-        s["active_ms"] = act
+    merged_global, _activity_ms = _union_ms([(s0, s1) for _, s0, s1 in all_act])   # 甘特的活动条
 
     # ---- 阶段墙钟/甘特轴并入真实起止 ----
     # DevEco 的子代理活在 SQLite 子会话、不在主线 messages;纯派发的 workflow 阶段
@@ -1678,6 +1730,31 @@ def _parse(data, storage_root=None, source_file=None, child_documents=None):
         if cur_hi is None or hi > cur_hi:
             s["end_ts"] = _ms_to_iso(hi)
         s["duration_ms"] = common.ms_between(s["start_ts"], s["end_ts"])
+
+    # ---- 活跃时长 = 时长 − 停摆:回合关闭(assistant 以 stop 收尾 / 出错)到下一条消息之间,
+    #      扣掉子会话的忙碌窗口(子会话按它自己的同一条规则切)。与 Claude / Codex 同一条规则
+    busy = []
+    for a in agents:
+        busy.extend(a.pop("_busy_ms", None) or [])
+    if not busy:   # 无 DB 兜底:workflow 结果里的起止
+        for a in agents:
+            st0 = _iso_ms(a.get("start_ts"))
+            if st0 is not None and a.get("dur_ms"):
+                busy.append((st0, st0 + a["dur_ms"]))
+    pieces = stage_signals.stall_pieces(
+        [(a, b, None, None) for a, b in _turn_stalls([m.get("info") or {} for m in messages])],
+        stage_signals.merge_busy(busy))
+
+    def _active(lo, hi):
+        if lo is None or hi is None or hi < lo:
+            return None
+        stalled = sum(max(0.0, min(b, hi) - max(a, lo)) for a, b, _k, _t in pieces)
+        return int(max(0.0, (hi - lo) - stalled))
+
+    for s in stages:
+        s["active_ms"] = _active(_iso_ms(s.get("start_ts")) if s.get("start_ts") else None,
+                                 _iso_ms(s.get("end_ts")) if s.get("end_ts") else None)
+    global_active = _active(first_num, last_num)
 
     # ---- lineage:反推鸿蒙目标根作为 cwd,让工作区内的 Android 源码重新成为
     #      cwd 之外的绝对路径(否则落入"工程内读取"而非"Android 参考")。

@@ -85,7 +85,8 @@ def test_portable_tree_report_without_local_database(tmp_path, monkeypatch, proj
     assert trace["totals"]["main_output_tokens"] == 15
     assert trace["totals"]["subagent_output_tokens"] == 57
     assert trace["totals"]["agent_calls"] == 2
-    assert trace["totals"]["active_ms"] == 1000
+    # 活跃按停摆规则:回合没收尾(没有 stop / 出错的 assistant),整段 4 秒都算活跃
+    assert trace["totals"]["active_ms"] == 4000
     assert trace["billing"]["ses_child-model"]["out"] == 24
     assert "ses_other-model" not in trace["billing"]
     assert all(a["tool_uses"] == 1 for a in trace["agents"])

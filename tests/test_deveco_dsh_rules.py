@@ -95,3 +95,36 @@ def test_dsh_commands_dedupe_and_cache_write(tmp_path: Path) -> None:
     assert (bill["req"], bill["cw5"], bill["cw1h"]) == (1, 3, 0)
     assert [s["stage"] for s in trace["stages"]] == ["session"]
     assert trace["totals"]["active_ms"] >= 60000          # 命令 run → done 在跑
+
+
+def test_deveco_active_uses_the_stall_rule() -> None:
+    """回合以 stop 收尾到下一条消息之间算停,扣掉子会话自己的忙碌窗口;回合中的静默算忙。"""
+    child = {"info": {"id": "ses_c", "title": "worker", "model": {"id": "glm-5.3-flash"},
+                      "time": {"created": T0 + 10 * 60000, "updated": T0 + 20 * 60000}},
+             "messages": [_msg("c1", "assistant", 10, [], tokens=_tokens(), finish="tool-calls"),
+                          {"info": {"id": "c2", "role": "assistant", "finish": "stop", "tokens": _tokens(),
+                                    "time": {"created": T0 + 19 * 60000, "completed": T0 + 20 * 60000}}, "parts": []}]}
+    data = {"info": {"id": "ses_x", "directory": "/w", "model": {"id": "glm-5.3-flash"}}, "messages": [
+        _msg("m0", "user", 0, [{"type": "text", "text": "go"}]),
+        {"info": {"id": "m1", "role": "assistant", "finish": "stop", "tokens": _tokens(),
+                  "time": {"created": T0 + 60000, "completed": T0 + 5 * 60000}}, "parts": []},   # 1–5 分在跑
+        _msg("m2", "user", 30, [{"type": "text", "text": "继续"}]),
+        {"info": {"id": "m3", "role": "assistant", "finish": "stop", "tokens": _tokens(),
+                  "time": {"created": T0 + 30 * 60000, "completed": T0 + 40 * 60000}}, "parts": []},
+    ]}
+    trace = deveco._parse(data, storage_root="/nonexistent", child_documents=[child])
+    # 0–40 分:5→30 分回合关着(25 分),其中 10→20 分子会话在跑 → 停 15 分,活跃 25 分
+    assert trace["totals"]["active_ms"] == 25 * 60000
+
+
+def test_dsh_active_uses_turn_end_to_next_turn(tmp_path: Path) -> None:
+    base = 1794566300000
+    events = [
+        {"type": "turn/start", "seq": 1, "time": base, "data": {"turn": 1}},
+        {"type": "turn/end", "seq": 2, "time": base + 5 * 60000, "data": {"reason": {"kind": "completed"}}},
+        {"type": "turn/start", "seq": 3, "time": base + 20 * 60000, "data": {"turn": 2}},
+        {"type": "turn/end", "seq": 4, "time": base + 25 * 60000, "data": {"reason": {"kind": "completed"}}},
+    ]
+    trace = dsh.extract(_dsh_log(tmp_path, events))
+    # 0–25 分里 5→20 分回合关着:活跃 10 分
+    assert (trace["totals"]["duration_ms"], trace["totals"]["active_ms"]) == (25 * 60000, 10 * 60000)

@@ -217,7 +217,10 @@ def _session_walk(header, events):
     out = {"tools": [], "prompts": [], "usage": [], "texts": [], "markers": [],
            "act": [], "dispatches": [], "turn_end": None, "model": None, "reasoning_chars": 0,
            "text_chars": 0, "tool_chars": 0, "first": header.get("createdAt"), "last": header.get("createdAt"),
-           "skills": [], "context": []}
+           "skills": [], "context": [],
+           # 停摆:turn/end 到下一个回合开始 / 下一条输入之间;斜杠命令 run → done 期间算忙
+           "stalls": [], "cmd_busy": []}
+    turn_closed = None
     model = None
     for ev in events:
         t, d, ms = ev.get("type"), ev.get("data") or {}, ev.get("time")
@@ -226,6 +229,13 @@ def _session_walk(header, events):
             out["last"] = ms if out["last"] is None else max(out["last"], ms)
         ts = src.iso(ms)
         seq = ev.get("seq")
+        if isinstance(ms, (int, float)):
+            if t == "turn/end":
+                turn_closed = turn_closed if turn_closed is not None else float(ms)
+            elif turn_closed is not None and t in ("turn/start", "user/message", "command/run"):
+                if ms > turn_closed:
+                    out["stalls"].append((turn_closed, float(ms)))
+                turn_closed = None
         if t == "request/header":
             model = ((d.get("header") or {}).get("config") or {}).get("model") or model
             out["model"] = out["model"] or model
@@ -252,6 +262,7 @@ def _session_walk(header, events):
             started = commands.pop(d.get("commandId"), None)
             if started and isinstance(ms, (int, float)) and ms > started[1]:
                 out["act"].append((started[0], started[1], float(ms)))
+                out["cmd_busy"].append((started[1], float(ms)))
         elif t == "assistant/message":
             msg = d.get("message") or {}
             mid = msg.get("id") or d.get("id")
@@ -310,6 +321,21 @@ def _session_walk(header, events):
             out["turn_end"] = (d.get("reason") or {}).get("kind")
     for i, row in enumerate(out["tools"]):
         row["seq"] = i
+    return out
+
+
+def _busy_windows(walk):
+    """一个子会话的忙碌窗口:[首, 末] 扣掉它自己的停摆(turn/end 到下一个回合开始)。"""
+    first, last = walk.get("first"), walk.get("last")
+    if not isinstance(first, (int, float)) or not isinstance(last, (int, float)) or last <= first:
+        return []
+    out, cur = [], float(first)
+    for a, b in sorted(walk.get("stalls") or []):
+        if a > cur:
+            out.append((cur, min(a, float(last))))
+        cur = max(cur, b)
+    if cur < last:
+        out.append((cur, float(last)))
     return out
 
 
@@ -483,16 +509,28 @@ def _parse(header, events, gen, children):
     for agent in agents:
         agent["abort_explicit"] = bool(agent.get("aborted"))
 
-    # ---- activity
+    # ---- activity:甘特的活动条仍是活动区间并集;活跃时长按停摆规则(与 Claude / Codex / DevEco 同)
     main_act = []
     for seq, s0, s1 in main["act"]:
         stg = dv._stage_of_idx(stages, seq if isinstance(seq, int) else 0)
         main_act.append((stg["id"], s0, s1))
     all_act = main_act + sub_act
-    merged_global, global_active = dv._union_ms([(s0, s1) for _, s0, s1 in all_act])
+    merged_global, _activity_ms = dv._union_ms([(s0, s1) for _, s0, s1 in all_act])
+    busy = list(main["cmd_busy"])
+    for ch, _cgen in children:
+        busy.extend(_busy_windows(walks[ch["id"]]))
+    pieces = stage_signals.stall_pieces([(a, b, None, None) for a, b in main["stalls"]],
+                                        stage_signals.merge_busy(busy))
+
+    def _active(lo, hi):
+        if lo is None or hi is None or hi < lo:
+            return None
+        stalled = sum(max(0.0, min(b, hi) - max(a, lo)) for a, b, _k, _t in pieces)
+        return int(max(0.0, (hi - lo) - stalled))
+
     for s in stages:
-        _m, act = dv._union_ms([(s0, s1) for sid, s0, s1 in all_act if sid == s["id"]])
-        s["active_ms"] = act
+        s["active_ms"] = _active(dv._iso_ms(s["start_ts"]) if s.get("start_ts") else None,
+                                 dv._iso_ms(s["end_ts"]) if s.get("end_ts") else None)
 
     # ---- lineage (classification root = HarmonyOS project root when it can be found)
     write_paths = [p for a in agents for p in a.get("_writes") or []]
@@ -520,6 +558,8 @@ def _parse(header, events, gen, children):
         "ended_at": ended_at,
         "record_count": len(events) + sum(len(by_id[h["id"]][1]) for h, _ in children),
     }
+    global_active = _active(dv._iso_ms(started_at) if started_at else None,
+                            dv._iso_ms(ended_at) if ended_at else None)
     totals = {
         "duration_ms": common.ms_between(started_at, ended_at),
         "active_ms": global_active,
