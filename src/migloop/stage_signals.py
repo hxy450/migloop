@@ -1,17 +1,23 @@
 """阶段切分的统一口径:所有 adapter 与 live 共用,各家只负责把原始记录翻译成信号。
 
-用户定的四条(2026-11-24):
+用户定的四条(2026-11-24,11-25 补充口径):
 
-1. **阶段信号**。有 mark-stage(``.migbot/metrics/*/facts/stage-marks.json``,或转录里的
-   ``a2h mark-stage <阶段>`` 调用)就只按它切:管线阶段的 mark 打在阶段**结束**时,
-   init / ecat-refine 打在**开始**时。没有 mark 才用 skill 调用(含归属戳、斜杠命令)或
-   读 SKILL.md,一段至少 ``MIN_SPAN_S`` 秒,短于它不切。缺的阶段不补推断(审计里标「未见」)。
-   既没有 mark、也没跑过管线 skill 的会话整段一个 Session。
+1. **阶段信号**。有 mark-stage 就只按它切。mark 先读 ``.migbot/metrics/*/facts/stage-marks.json``,
+   再收转录里真跑成了的 ``a2h mark-stage <阶段>`` / ``a2h-codex mark-stage <阶段>``(看工具回执,
+   只出现在文字里的不算),两处合并去重。除 ecat-refine(ECAT 开跑时由插件打,算开始)外,
+   mark 都是「完成水位」,打在阶段结束时,a2h-init 也一样;第一个阶段从它自己的 skill 信号起算,
+   之前归 setup。最后一个 mark 之后没有收尾 mark 的那段不再按 skill 切:段名取段内的管线 skill
+   信号、标「缺结束标记」;没有信号就叫「未标记(X 之后)」,段内的人工输入不触发后续轮。
+   没有 mark 才用 skill 调用(含归属戳、斜杠命令)或读 SKILL.md,一段至少 ``MIN_SPAN_S`` 秒,
+   短于它不切。缺的阶段不补推断(审计里标「未见」)。既没有 mark、也没跑过管线 skill 的会话
+   整段一个 Session。
 2. **后续轮**。最后一个管线阶段结束后,从第一条人工输入起单独成段(``TRAILING``),
-   不算进最后一个管线阶段。
+   不算进最后一个管线阶段。有 mark 时,收尾 mark 到第一条人工输入之间单列 ``AFTER``;
+   没有 mark 时,「继续 / continue / resume / 接着 / 跑完」这类只要求接着干的输入算同一阶段继续。
 3. **Workflow**。管线阶段里发起的 Workflow 是该阶段的子段,段尾取 workflow 实际结束时刻,
    之后回到外层阶段;不在任何管线阶段里的才算顶层段。
-4. **人工输入** = 人打的文字 + 斜杠命令;SDK / 驱动程序下发的指令记 ``PROGRAM``,不算人工。
+4. **人工输入** = 人打的文字 + 斜杠命令,按来源字段判,老版本没有来源字段才看内容;
+   SDK / 驱动程序下发的指令记 ``PROGRAM``,不算人工。
 
 时刻一律是 epoch 秒(float);各家转换好再交进来。``segment`` 只吃信号,不读文件。
 """
@@ -31,18 +37,27 @@ PIPELINE = {"a2h-run", "a2h-init", "a2h-build", "mig-arch", "a2h-arch-scaffold",
 
 #: 一段至少多少秒才切(只管 skill / SKILL.md 信号;mark 是权威,不过滤)
 MIN_SPAN_S = 90.0
-#: 管线阶段在**收尾**时调 ``a2h mark-stage``;其余(a2h-init、ecat-refine 等)在开始时打
-END_MARK_STAGES = frozenset({"a2h-spec", "a2h-plan", "a2h-execute", "a2h-verify", "a2h-retrospect", "a2h-build"})
-#: a2h 主流水线的规范先后 —— 审计「未见 a2h-plan」只在这条线上找缺口
-CANON_PIPELINE = ("a2h-spec", "a2h-plan", "a2h-execute", "a2h-verify", "a2h-retrospect")
+#: 只有 ecat-refine 的 mark 打在**开始**(插件随 ECAT 开跑上报);其余都是完成水位,打在收尾
+START_MARK_STAGES = frozenset({"ecat-refine"})
+#: 收尾 mark 落在这几个阶段上,管线就算走完了(之后是收尾段与后续轮);更早的阶段收尾后
+#: 再没有 mark,说明下一个阶段没打收尾
+DONE_STAGES = frozenset({"a2h-execute", "a2h-verify", "a2h-retrospect"})
+#: a2h 流水线的规范先后 —— 审计「未见 a2h-plan」只在这条线上、首末出现之间找缺口
+CANON_PIPELINE = ("a2h-init", "a2h-build", "a2h-run", "a2h-spec", "a2h-plan", "a2h-execute",
+                  "a2h-verify", "a2h-retrospect")
 
 SETUP = "setup"
 SESSION = "session"
-TRAILING = "after-pipeline"
+TRAILING = "follow-up"
+AFTER = "after-pipeline"
+UNMARKED = "unmarked"
 HUMAN = "human"
 PROGRAM = "program"
 
-_MARK_CALL = re.compile(r"\ba2h(?:\.exe)?\s+mark-stage\s+([a-z0-9_-]+)")
+_MARK_CALL = re.compile(r"\ba2h(?:-codex)?(?:\.exe)?\s+mark-stage\s+([a-z0-9_-]+)")
+_MARK_ECHO = re.compile(r"mark-stage(?::\s*[a-z0-9_-]+|\s+ok\b)")
+_RESUME = re.compile(r"^[\s\W]*(?:请|please\s+)?(?:继续|接着|跑完|恢复|continue|resume|go\s+on|keep\s+going|"
+                     r"carry\s+on|proceed)", re.IGNORECASE)
 _COMMAND = re.compile(r"<command-name>\s*/?([^<]+)</command-name>")
 
 
@@ -65,6 +80,30 @@ def mark_calls(text: Any) -> List[str]:
         if stage:
             out.append(stage)
     return out
+
+
+def mark_ran(ok: Any, result: Any) -> bool:
+    """转录里的 mark-stage 调用真跑成了:回执没报错;报错时(串在后面的别的命令失败)要输出里
+    有 mark-stage 的回显。被拒、被打断、没有回执的都不算。"""
+    if ok is True:
+        return True
+    return ok is False and bool(_MARK_ECHO.search(str(result or "")))
+
+
+def merge_marks(*sources: Iterable[Tuple[float, str]], window: float = 120.0) -> List[Tuple[float, str]]:
+    """stage-marks.json 与转录里的 mark 合并:同一阶段相隔 ``window`` 秒内的算一次,取早的。"""
+    rows = sorted({(float(t), st) for src in sources for t, st in src})
+    out: List[Tuple[float, str]] = []
+    for t, st in rows:
+        if any(s == st and abs(t - u) <= window for u, s in out):
+            continue
+        out.append((t, st))
+    return out
+
+
+def is_resume_request(text: Any) -> bool:
+    """人工输入只是要求接着干(继续 / continue / resume / 接着 / 跑完 开头)。"""
+    return bool(_RESUME.match(str(text or "")))
 
 
 def iso_seconds(ts: Any) -> Optional[float]:
@@ -190,43 +229,54 @@ class _Clock:
 
 
 def _from_marks(clock: _Clock, marks: Sequence[Tuple[float, str]], signals: Sequence[Tuple[int, str]]
-                ) -> Tuple[List[Tuple[int, str, str]], Optional[int]]:
-    """mark → [(起始下标, 阶段, 'mark')] 与最后一个管线阶段的收尾下标。
-    结束 mark 的阶段占 (上一 mark, 本 mark];起始 mark 的阶段从 mark 起。起始 mark 后面紧跟
-    别的阶段的结束 mark 时(a2h-init 只有几秒),那一段归结束 mark 的阶段。最后一个 mark 之后
-    的尾巴:之后有别的阶段的 skill 信号就按它命名(那个阶段还没打收尾 mark),否则归最后一段。"""
+                ) -> Tuple[List[Tuple[int, str, str, Dict[str, Any]]], Optional[int]]:
+    """mark → [(起始下标, 阶段, 信号, 附注)] 与管线收尾的下标(没走完为 None)。
+
+    收尾 mark 的阶段占 (上一 mark, 本 mark];第一个阶段从它自己(本 mark 之前)最早的 skill 信号
+    起算,之前归 setup。起始 mark(ecat-refine)从 mark 起;它后面紧跟别的阶段的收尾 mark 时,
+    那一段归收尾 mark 的阶段。最后一个 mark 之后的尾巴:有还没打过 mark 的阶段的 skill 信号,
+    按第一个这样的信号命名、标缺结束标记;没有信号时,最后收尾的是 execute 及之后的阶段就是
+    管线收尾段(``AFTER``),否则是「未标记(X 之后)」。只有收尾段那种情况管线算走完。"""
     rows = sorted(marks)
-    out: List[Tuple[int, str, str]] = []
+    out: List[Tuple[int, str, str, Dict[str, Any]]] = []
     cursor: Optional[int] = clock.idxs[0] if clock.idxs else None
-    last_end_t: Optional[float] = None
+    last_end: Optional[Tuple[float, str]] = None
     for k, (t, st) in enumerate(rows):
         nxt = rows[k + 1] if k + 1 < len(rows) else None
-        if st in END_MARK_STAGES:
-            if cursor is not None and (not out or out[-1][1] != st):
-                out.append((cursor, st, "mark"))
-            cursor = clock.first_after(t)
-            last_end_t = t
-        elif nxt is not None and nxt[1] in END_MARK_STAGES:
-            cursor = clock.first_at_or_after(t)
-        else:
+        if st in START_MARK_STAGES:
+            if nxt is not None and nxt[1] not in START_MARK_STAGES:
+                cursor = clock.first_at_or_after(t)
+                continue
             start = clock.first_at_or_after(t)
             if start is not None and (not out or out[-1][1] != st):
                 if out and out[-1][0] == start:
-                    out[-1] = (start, st, "mark")
+                    out[-1] = (start, st, "mark", {})
                 else:
-                    out.append((start, st, "mark"))
-            cursor = None
-            last_end_t = None
-    # 起始 mark 之前若还有记录,归 setup(由调用方补);首个结束 mark 的阶段从会话开头算起
-    if cursor is not None and out:
-        marked = {st for _, st in rows}
-        later = [(i, s) for i, s in signals if i >= cursor and s not in marked]
-        if later:
-            # 还没打收尾 mark 的阶段:它没「结束」,不切后续轮
-            out.append((cursor, later[0][1], "skill"))
-            return out, None
-    end_idx = clock.last_at_or_before(last_end_t) if last_end_t is not None else None
-    return out, end_idx
+                    out.append((start, st, "mark", {}))
+            cursor, last_end = None, None
+            continue
+        if cursor is not None and (not out or out[-1][1] != st):
+            start = cursor
+            if not out:
+                upto = clock.last_at_or_before(t)
+                own = [i for i, s in signals if s == st and i >= cursor and (upto is None or i <= upto)]
+                if own:
+                    start = min(own)
+            out.append((start, st, "mark", {}))
+        cursor = clock.first_after(t)
+        last_end = (t, st)
+    if cursor is None or last_end is None or not out:
+        return out, None
+    marked = {st for _, st in rows}
+    later = next(((i, s) for i, s in sorted(signals) if i >= cursor and s not in marked), None)
+    if later is not None:
+        out.append((cursor, later[1], "unterminated", {"after": last_end[1]}))
+        return out, None
+    if last_end[1] in DONE_STAGES:
+        out.append((cursor, AFTER, "after-marks", {"after": last_end[1]}))
+        return out, clock.last_at_or_before(last_end[0])
+    out.append((cursor, UNMARKED, "unterminated", {"after": last_end[1]}))
+    return out, None
 
 
 def _dedupe(bounds: List[Tuple[int, str]]) -> List[Tuple[int, str]]:
@@ -256,51 +306,70 @@ def _from_signals(clock: _Clock, signals: Sequence[Tuple[int, str]], min_span: f
         bounds = _dedupe(bounds[:k] + bounds[k + 1:])
     if bounds and spans()[0] < min_span:
         bounds = bounds[1:]
-    return [(idx, st, "skill") for idx, st in bounds]
+    return [(idx, st, "skill", {}) for idx, st in bounds]
 
 
 def segment(points: Sequence[Tuple[int, Optional[float]]], *,
             marks: Sequence[Tuple[float, str]] = (),
             signals: Sequence[Tuple[int, str]] = (),
             human: Sequence[int] = (),
+            resumes: Iterable[int] = (),
             workflows: Sequence[Dict[str, Any]] = (),
             last_pipeline_idx: Optional[int] = None,
             min_span: float = MIN_SPAN_S) -> List[Dict[str, Any]]:
     """按四条口径切段。``points`` 是全部记录的 (下标, 时刻),下标递增;``signals`` 是已归一的
-    (下标, 阶段);``human`` 是人工输入的下标;``workflows`` 是 {idx: 发起下标, end: 结束时刻,
-    key: 段名}。返回 [{start_idx, end_idx, stage, signal, parent}]:parent 为 None 的是顶层段,
-    彼此相接、覆盖全部记录;子段(管线阶段里的 Workflow)的 parent 是所在顶层段的序号,
-    另带 ``start_t`` / ``end_t``(发起与实际结束时刻)。"""
+    (下标, 阶段);``human`` 是人工输入的下标,``resumes`` 是其中只要求接着干的那些;
+    ``workflows`` 是 {idx: 发起下标, end: 结束时刻, key: 段名}。返回 [{start_idx, end_idx, stage,
+    signal, parent, after?}]:parent 为 None 的是顶层段,彼此相接、覆盖全部记录;``signal`` 取
+    mark / skill / unterminated(缺结束标记)/ after-marks(收尾段)/ rule(后续轮)/ none /
+    workflow;``after`` 是缺结束标记的段之前最后收尾的阶段。子段(管线阶段里的 Workflow)的
+    parent 是所在顶层段的序号,另带 ``start_t`` / ``end_t``(发起与实际结束时刻)。"""
     if not points:
         return []
     clock = _Clock(points)
     first_idx, last_idx = clock.idxs[0], clock.idxs[-1]
+    lo, hi = clock.mono[0] - 60, clock.end + 60
+    marks = [(t, st) for t, st in marks if lo <= t <= hi]
+    resume_set = set(resumes)
     if marks:
         bounds, pipe_end = _from_marks(clock, marks, signals)
+        if bounds and pipe_end is not None:
+            # 管线已收尾:收尾段起第一条人工输入(不论内容)开始是后续轮
+            tail = bounds[-1]
+            trailing = next((h for h in sorted(human) if h >= tail[0]), None)
+            if trailing is not None:
+                if trailing == tail[0]:
+                    bounds.pop()
+                bounds.append((trailing, TRAILING, "rule", {}))
     else:
         bounds = _from_signals(clock, signals, min_span)
         pipe_end = last_pipeline_idx if last_pipeline_idx is not None else (
             max((i for i, _ in signals), default=None) if bounds else None)
-    if bounds and pipe_end is not None:
-        trailing = next((h for h in sorted(human) if h > pipe_end and h > bounds[-1][0]), None)
-        if trailing is not None:
-            bounds.append((trailing, TRAILING, "rule"))
+        if bounds and pipe_end is not None:
+            trailing = next((h for h in sorted(human)
+                             if h > pipe_end and h > bounds[-1][0] and h not in resume_set), None)
+            if trailing is not None:
+                bounds.append((trailing, TRAILING, "rule", {}))
     if not bounds:
-        bounds = [(first_idx, SESSION, "none")]
+        bounds = [(first_idx, SESSION, "none", {})]
     elif bounds[0][0] > first_idx:
-        bounds.insert(0, (first_idx, SETUP, "none"))
+        if clock.time_at(bounds[0][0]) <= clock.time_at(first_idx):
+            # 开头几条没有时刻 / 同一时刻:不单列零长的 setup
+            bounds[0] = (first_idx,) + tuple(bounds[0][1:])
+        else:
+            bounds.insert(0, (first_idx, SETUP, "none", {}))
     top: List[Dict[str, Any]] = []
-    for k, (idx, st, sig) in enumerate(bounds):
+    for k, (idx, st, sig, extra) in enumerate(bounds):
         end = bounds[k + 1][0] - 1 if k + 1 < len(bounds) else last_idx
         if top and top[-1]["start_idx"] == idx:
             continue
-        top.append({"start_idx": idx, "end_idx": end, "stage": st, "signal": sig, "parent": None})
+        top.append({"start_idx": idx, "end_idx": end, "stage": st, "signal": sig, "parent": None, **extra})
     children: List[Dict[str, Any]] = []
     for wf in sorted(workflows, key=lambda w: w["idx"]):
         pos = next((k for k in range(len(top) - 1, -1, -1) if top[k]["start_idx"] <= wf["idx"]), 0)
         seg = top[pos]
         end_t = wf.get("end")
-        if is_pipeline_stage(seg["stage"]):
+        if is_pipeline_stage(seg["stage"]) or seg["stage"] == UNMARKED:
             children.append({"parent_seg": seg, "start_idx": wf["idx"], "stage": "wf:" + wf["key"],
                              "signal": "workflow", "start_t": clock.time_at(wf["idx"]), "end_t": end_t})
             continue
@@ -327,7 +396,7 @@ def segment(points: Sequence[Tuple[int, Optional[float]]], *,
 
 
 def missing_stages(stages: Iterable[Any]) -> List[str]:
-    """出现过的 a2h 主流水线阶段之间缺掉的那几个(只在首末出现之间找,不猜后面没跑的)。"""
+    """出现过的 a2h 流水线阶段之间缺掉的那几个(只在首末出现之间找,不猜后面没跑的)。"""
     seen = {str(s) for s in stages}
     pos = [k for k, name in enumerate(CANON_PIPELINE) if name in seen]
     if len(pos) < 2:
