@@ -32,6 +32,7 @@ from typing import Any
 
 from .base import SessionCandidate
 from ..audit_events import ClaudeCalls
+from ..cc_records import is_request_replay
 from ..stage_signals import claude_boundaries
 from ..blame import replay_file as _blame_replay
 
@@ -212,7 +213,8 @@ def load_main_session(path: str) -> list[dict[str, Any]]:
                 continue
             try:
                 record = json.loads(line)
-                if isinstance(record, dict):
+                # 请求体快照不是对话记录,读进来会把工具调用再算一遍(见 cc_records)
+                if isinstance(record, dict) and not is_request_replay(record):
                     record["_source_line"] = line_no
                     records.append(record)
             except json.JSONDecodeError:
@@ -1913,6 +1915,8 @@ def extract(path: str) -> dict[str, Any]:
                             try:
                                 rec = json.loads(line)
                             except json.JSONDecodeError:
+                                continue
+                            if is_request_replay(rec):
                                 continue
                             child_audit.observe(rec, line_no)
                             if rec.get("uuid"):

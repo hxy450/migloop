@@ -22,6 +22,7 @@ import json
 import os
 from typing import Any
 
+from migloop.cc_records import is_request_replay
 from migloop.filestory import Ev
 from migloop.shellparse import _split_segments, _strip_heredocs, parse_shell
 
@@ -68,6 +69,8 @@ def _collect_one(path: str, who: str, seq: list[int]) -> list[Ev]:
             r = json.loads(line)
         except Exception:
             continue
+        if is_request_replay(r):
+            continue  # 请求体快照,写入与真实对话行重复(见 cc_records)
         ts = str(r.get("timestamp") or "")
         cwd = r.get("cwd")
         m = r.get("message")

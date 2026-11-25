@@ -32,10 +32,12 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from ..adapters import claude as extract_session
+from ..cc_records import is_request_replay
 from ..chat import provider as chat_provider
 
 
-CACHE_SCHEMA = 3
+#: 4:不再把 api-request-blob 计入工具/用量,旧 checkpoint 的累计值作废重放
+CACHE_SCHEMA = 4
 _AGENT_FILE_RE = re.compile(r"agent-([^.\\/]+)\.jsonl$", re.IGNORECASE)
 _PIPELINE_SKILLS = set(extract_session.PIPELINE_SKILLS)
 _TERMINAL_WORKFLOW_STATES = {"done", "completed", "failed", "error", "cancelled", "canceled"}
@@ -690,6 +692,8 @@ class IncrementalSessionMonitor:
         self._read_tool_result(stream, tool, block, record)
 
     def _process_record(self, stream, record):
+        if is_request_replay(record):
+            return  # 请求体快照,不是对话记录(见 cc_records)
         stream["records"] += 1
         self.state["records"] += 1
         ts = record.get("timestamp")

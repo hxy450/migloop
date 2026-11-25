@@ -12,6 +12,7 @@ import os
 from typing import Any
 
 from . import atoms, body_sources, raw_events, temporal, transcript_store as store
+from .cc_records import is_request_replay
 
 SCHEMA = "migloop-time-atom/1"
 _SECTIONS = ("writes", "reads", "candidates", "messages", "dispatches")
@@ -198,8 +199,8 @@ def _participants(groups, window, include_undated):
 def _text_fields(record):
     """Original message fields only; tool-result user envelopes are not tasks."""
     value = record.value
-    if not isinstance(value, dict):
-        return
+    if not isinstance(value, dict) or is_request_replay(value):
+        return  # 请求体快照里的消息是已发生对话的副本,不是新的输入
     content, base, label = None, None, None
     message = value.get("message")
     if isinstance(message, dict) and message.get("role") in ("user", "system", "developer"):

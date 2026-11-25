@@ -25,6 +25,8 @@ import urllib.error
 import urllib.request
 from typing import Optional
 
+from ..cc_records import is_request_replay
+
 
 SYSTEM_PROMPT = """你是 MigLoop Session 技术分析助手。你的事实源是完整 session 记录，包括主线程 JSONL、子 Agent transcript、Workflow 元数据及其实际工具调用；血缘快照只是便于定位的确定性索引，不是回答边界。
 
@@ -107,6 +109,8 @@ class SessionCorpus:
 
     @staticmethod
     def _record_text(record):
+        if is_request_replay(record):
+            return ""  # 请求体快照是已有对话的副本,检索命中只会重复
         parts = []
 
         def walk(value, depth=0):
