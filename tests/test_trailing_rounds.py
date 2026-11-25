@@ -1,4 +1,4 @@
-"""管线走完后的续轮不算进最后一个阶段(移植自 hmigbot-plus 72c56b60)。
+"""管线走完后的续轮不算进最后一个阶段(移植自 hmigbot-plus 72c56b60、cd6d3d4e)。
 
 只在管线的终点阶段(a2h-retrospect)之后切:单 skill 的能力会话(视觉对比等)只在第一轮盖
 skill 归属戳,后续 loop 轮仍在做该 skill 的活(2026-09-23 DiceRoller 视觉对比实测:后续轮
@@ -84,3 +84,16 @@ def test_trailing_rounds_mid_pipeline_without_attribution_are_not_split_off(tmp_
     ])
 
     assert [s["label"] for s in trace["stages"] if s["stage"] != "setup"] == ["Execute", "Verify"]
+
+
+def test_later_rounds_of_a_single_skill_session_stay_in_that_skill(tmp_path: Path) -> None:
+    trace = _extract(tmp_path, [
+        _prompt(0, "调用 arkts-visual-verify skill"),
+        _said(1, 0, "visual verify", "arkts-visual-verify"), _said(17, 0, "第一轮完成", "arkts-visual-verify"),
+        _prompt(20, "reviewer:继续修复视觉差异"), _said(21, 0, "派 visual-fixer 修复", None),
+        _prompt(40, "reviewer:继续"), _said(59, 0, "修复完成", None),
+    ])
+
+    stages = [s for s in trace["stages"] if s["stage"] != "setup"]
+    assert [s["label"] for s in stages] == ["Visual Verify"]
+    assert stages[0]["end_ts"] == _ts(59)

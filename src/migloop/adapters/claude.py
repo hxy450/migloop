@@ -83,10 +83,12 @@ PIPELINE_SKILLS = ["a2h-run", "a2h-run-zh", "a2h-init-zh", "a2h-build-zh", "a2h-
                    "a2h-execute", "a2h-verify", "a2h-retrospect",
                    "arkts-visual-verify"]
 
-#: 管线最后一个阶段之后的续轮(loop 续跑的门禁回合等):harness 不给它们盖任何管线
-#: 归属戳,不能算进最后一个阶段的耗时与统计。
+#: a2h 管线走到终点阶段(复盘)之后 loop 又续的轮次(门禁回合等):不算进复盘的耗时与统计。
+#: 只认终点阶段 —— 单 skill 的能力会话(视觉对比等)只在第一轮盖归属戳,后续轮仍是该
+#: skill 的活,归原阶段(hmigbot-plus cd6d3d4e)。
 TRAILING_ROUNDS_STAGE = "after-pipeline"
-TRAILING_ROUNDS_LABEL = "收尾后续轮"
+TRAILING_ROUNDS_LABEL = "管线完成后"
+_TERMINAL_PIPELINE_STAGES = frozenset({"a2h-retrospect"})
 
 STAGE_LABELS = {
     "a2h-build": "Build",
@@ -1791,11 +1793,12 @@ def extract(path: str) -> dict[str, Any]:
             key = "wf:" + wf_runs[rid]["name"]
             wf_stage_of_run[rid] = key
             pipe_boundaries.append((idx, key))
-    # 末段收口:最后一个管线阶段之后,从某条新提示词起到会话结束都没有管线归属戳 ——
-    # 那是管线走完后的续轮(loop 门禁回合等),单独成段,不拖长最后一个阶段(hmigbot-plus 72c56b60)。
-    # 只看末尾:管线中途没盖戳的续跑轮仍归所在阶段。只扫内存里已读好的记录。
+    # 末段收口:管线已到终点阶段(复盘),其后从某条新提示词起到会话结束都没有管线归属戳 ——
+    # 那是管线完成后 loop 又续的轮次,单独成段,不拖长复盘(hmigbot-plus 72c56b60、cd6d3d4e)。
+    # 管线中途、或单 skill 会话的后续轮没盖戳时仍归所在阶段。只扫内存里已读好的记录。
     skill_bounds = {i for i, key in pipe_boundaries if key in PIPELINE_SKILLS}
-    if skill_bounds:
+    last_key = max(pipe_boundaries)[1] if pipe_boundaries else ""
+    if skill_bounds and norm_skill(last_key) in _TERMINAL_PIPELINE_STAGES:
         last_attr = max(i for i, rec in enumerate(records)
                         if i in skill_bounds or norm_skill(rec.get("attributionSkill")) in PIPELINE_SKILLS)
         trailing = next((pr["idx"] for pr in prompts if pr["idx"] > last_attr), None)
