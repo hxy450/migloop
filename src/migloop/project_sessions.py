@@ -1,8 +1,9 @@
 """同一工程的 root 会话:找前后会话用的文件系统事实(会话解析层自用)。
 
-从 crosschain.py 复制而来(collect_claude_project_roots / collect_project_roots / _first_record_ts),
-让后续节点(followups)与会话总览(chain)不反过来 import 返修链路模块;返修链路拆出去时
-crosschain 整块带走,这里不跟着动。与原函数的差别:首条时间戳跳过 api-request-blob 行。
+从 crosschain.py 复制而来(collect_claude_project_roots / collect_project_roots / _first_record_ts /
+find_prior_* / find_later_*),让后续节点(followups)、会话总览(chain)与报告页的跨会话提示
+(service.prior_roots / later_roots)不反过来 import 返修链路模块;返修链路拆出去时 crosschain
+整块带走,这里不跟着动。与原函数的差别:首条时间戳跳过 api-request-blob 行。
 """
 
 from __future__ import annotations
@@ -70,4 +71,58 @@ def codex_project_roots(cur_path: str, cur_cwd: str, limit: int = 8) -> list[str
         if same_project(str(summary.get("cwd") or ""), cur_cwd):
             out.append(cand_abs)
     out.sort(key=lambda x: str(os.path.basename(x)))
+    return out[:limit]
+
+
+def find_prior_claude_roots(cur_path: str, limit: int = 3) -> list[str]:
+    """同 transcript 目录里首条时刻早于当前会话的主会话,近→远。"""
+    cur_abs = os.path.abspath(cur_path)
+    cur_ts = first_record_ts(cur_path)
+    out = [f for f in claude_project_roots(cur_path, 64)
+           if f != cur_abs and first_record_ts(f) < cur_ts]
+    return out[-limit:][::-1]
+
+
+def find_later_claude_roots(cur_path: str, limit: int = 3) -> list[str]:
+    """镜像方向:首条时刻晚于当前会话的主会话,近→远。"""
+    cur_abs = os.path.abspath(cur_path)
+    cur_ts = first_record_ts(cur_path)
+    out = [f for f in claude_project_roots(cur_path, 64)
+           if f != cur_abs and first_record_ts(f) > cur_ts]
+    return out[:limit]
+
+
+def _codex_neighbours(cur_path: str, cur_cwd: str, later: bool) -> list[str]:
+    from . import adapters
+
+    codex: Any = adapters.get("codex")
+    cur_abs = os.path.abspath(cur_path)
+    cur_base = os.path.basename(cur_path)
+    out = []
+    for cand in codex.iter_sessions(codex.default_root()):
+        if os.path.abspath(cand.path) == cur_abs:
+            continue
+        base = os.path.basename(cand.path)
+        if (base <= cur_base) if later else (base >= cur_base):
+            continue
+        summary = codex.session_summary(cand.path) or {}
+        if same_project(str(summary.get("cwd") or ""), cur_cwd):
+            out.append(cand.path)
+    return out
+
+
+def find_prior_codex_roots(cur_path: str, cur_cwd: str, limit: int = 3) -> list[str]:
+    """同一工程树里、时间早于当前会话的 codex 主会话(rollout 文件名即时间序),近→远。
+
+    工程同树 = 两个 cwd 相等或一方是另一方的父目录(生成会话 cwd 在工程父目录、verify 会话
+    cwd 在工程根)。子代理 rollout 由 iter_sessions 排除。"""
+    out = _codex_neighbours(cur_path, cur_cwd, later=False)
+    out.sort(key=lambda x: str(x).rsplit("rollout-", 1)[-1], reverse=True)
+    return out[:limit]
+
+
+def find_later_codex_roots(cur_path: str, cur_cwd: str, limit: int = 3) -> list[str]:
+    """镜像方向:同工程树里时间晚于当前会话的 codex 主会话,近→远。"""
+    out = _codex_neighbours(cur_path, cur_cwd, later=True)
+    out.sort(key=lambda x: str(x).rsplit("rollout-", 1)[-1])
     return out[:limit]
