@@ -19,7 +19,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from . import adapters, atoms, atoms_collect, atoms_text, audit, crosschain, ecat, filestory
+from . import adapters, atoms, atoms_collect, atoms_text, audit, crosschain, ecat, filestory, followups
 from .render import build_html, load_template
 
 
@@ -786,6 +786,12 @@ def report_trace(path: str, *, static: bool = False, with_chains: bool = True,
             "prior": root_sid8(fmt, prior[0]) if prior else None}
     if hint["later"] or hint["prior"]:
         data["audit"]["cross_hint"] = hint
+    # 执行拓扑的后续节点(同工程其后的能力会话 + ECAT run);冻结池只看给定的根,不往外找。
+    # 挂不上不能拖垮报告
+    try:
+        data["followups"] = [] if fixed_scope else followups.collect(path, data, link=not static)
+    except Exception:  # noqa: BLE001
+        data["followups"] = []
     if static or fmt not in _ATOM_FORMATS:
         data["urls"] = {"fixchain": None}
     return data

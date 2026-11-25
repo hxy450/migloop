@@ -169,6 +169,8 @@
   .sat text { fill: var(--ink-2); font-size: 11px; font-weight: 500; }
   .sat .n { fill: var(--ink); font-weight: 700; }
   .tedge { stroke: var(--axis); stroke-width: 1.5; fill: none; marker-end: url(#arr); }
+  .fnode rect { stroke-dasharray: 5 4; }
+  .fedge { stroke-dasharray: 5 4; }
   .dedge { stroke: var(--axis); stroke-width: 1.4; fill: none; }
   .ledge { stroke: var(--g-skill); stroke-width: 1.5; fill: none; marker-end: url(#arrLoop); }
   .lloop-label { fill: var(--g-skill); font-size: 10.5px; font-weight: 600; }
@@ -883,9 +885,12 @@
   (function buildTopo() {
     var svg = document.getElementById("topo");
     var vis = stages.filter(function (s) { return s.stage !== "setup" || (toolsByStage[s.stage] || []).length > 0; });
+    // 后续节点:本会话之后同工程跑起来的能力会话 / ECAT run(独立 transcript,
+    // 本会话里没有它们的记录),接在主链末尾,虚线框,点击跳到各自的报告
+    var fups = D.followups || [];
     var colW = 250, x0 = 30, yStage = 46, stageW = 170, stageH = 62;
     // 宽度按最右一列的卫星胶囊右缘计算(x + 24 + stageW + 36),避免被 viewBox 裁切
-    var width = x0 * 2 + (vis.length - 1) * colW + stageW + 60;
+    var width = x0 * 2 + (vis.length + fups.length - 1) * colW + stageW + 60;
 
     // satellites: agent types per stage
     var sats = [];
@@ -1023,6 +1028,47 @@
         });
         svg.appendChild(sg);
       });
+    });
+
+    fups.forEach(function (f, j) {
+      var i = vis.length + j;
+      var x = x0 + i * colW;
+      var p = svgEl("path");
+      var xa = x0 + (i - 1) * colW + stageW;
+      p.setAttribute("d", "M" + xa + " " + (yStage + stageH / 2) + " L" + (x - 3) + " " + (yStage + stageH / 2));
+      p.setAttribute("class", "tedge fedge");
+      svg.appendChild(p);
+      var g = svgEl("g");
+      g.setAttribute("class", "tnode fnode");
+      g.setAttribute("tabindex", "0");
+      g.setAttribute("role", f.href ? "link" : "img");
+      g.setAttribute("aria-label", "后续:" + f.label);
+      var r = svgEl("rect");
+      r.setAttribute("x", x); r.setAttribute("y", yStage);
+      r.setAttribute("width", stageW); r.setAttribute("height", stageH);
+      r.setAttribute("rx", 6);
+      g.appendChild(r);
+      var e0 = svgEl("text");
+      e0.setAttribute("x", x + 13); e0.setAttribute("y", yStage + 17);
+      e0.setAttribute("class", "teyebrow");
+      e0.textContent = "后续 · " + (f.kind === "ecat" ? "ECAT" : "SESSION");
+      g.appendChild(e0);
+      var n1 = svgEl("text");
+      n1.setAttribute("x", x + 13); n1.setAttribute("y", yStage + 36);
+      n1.setAttribute("class", "tname");
+      n1.textContent = f.label;
+      g.appendChild(n1);
+      var s2 = svgEl("text");
+      s2.setAttribute("x", x + 13); s2.setAttribute("y", yStage + 52);
+      s2.setAttribute("class", "tsub");
+      s2.textContent = (f.duration_ms != null ? fmtDur(f.duration_ms) + " · " : "") + f.sub;
+      g.appendChild(s2);
+      if (f.href) {
+        var goF = function () { window.open(f.href, "_top"); };
+        g.addEventListener("click", goF);
+        g.addEventListener("keydown", function (ev) { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); goF(); } });
+      }
+      svg.appendChild(g);
     });
   })();
 

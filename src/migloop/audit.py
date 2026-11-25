@@ -463,7 +463,9 @@ _FIX_STAGE_WORDS = ("verify", "fix", "repair", "retrospect", "refine", "ecat", "
 def stage_order(stage: str | None) -> int | None:
     """阶段 → 规范序。认不出返回 None(保守当生成侧,不凭空造修复关系)。"""
     s = str(stage or "").strip().lower()
-    if not s:
+    if not s or s.startswith("task:"):
+        # 任务清单切出的段(claude._task_list_boundaries)名字是会话自己写的任务题目,
+        # 不是管线阶段;题目里碰巧有 fix / verify 也不能据此判修复侧
         return None
     if s in _CANON_STAGE_ORDER:
         return _CANON_STAGE_ORDER[s]

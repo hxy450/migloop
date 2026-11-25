@@ -20,6 +20,7 @@ import copy
 import glob
 import json
 import os
+import re
 import sys
 import argparse
 import difflib
@@ -99,6 +100,47 @@ STAGE_LABELS = {
     "a2h-retrospect": "Retrospect",
     "session": "Session",
 }
+
+#: TaskCreate 的回执形态:「Task #N created successfully: <题目>」
+_TASK_CREATED_RE = re.compile(r"Task #(\d+) created successfully:\s*(.+)")
+_TASK_LIST_TOOLS = ("TaskCreate", "TaskUpdate", "TaskList", "TaskGet")
+
+
+def _task_list_boundaries(tools: list[dict[str, Any]]) -> list[tuple[int, str]]:
+    """无管线 skill 边界的会话:按会话自己登记的任务清单切阶段(移植自 hmigbot-plus fe468482)。
+
+    TaskCreate 的回执给出题目,TaskUpdate status=in_progress 开段;紧挨着开工
+    (中间没有别的工具调用)的几个任务是并发派发,并成一段、标签用「 + 」连。
+    DT / 视觉等能力会话不调 a2h-* 管线 skill,之前整场只有一段无名 Session
+    (2026-09-10 DT verify 实测:7 个任务、5 个 Agent 全塞一段)。不按能力名识别,
+    只吃会话里已有的信息。
+    """
+    subjects: dict[str, str] = {}
+    boundaries: list[tuple[int, list[str]]] = []
+    opened: set[str] = set()
+    worked_since_open = True
+    for t in tools:
+        name = t.get("name")
+        inp = t.get("_inp") or {}
+        if name == "TaskCreate":
+            m = _TASK_CREATED_RE.search(str(t.get("result") or ""))
+            if m:
+                subjects[m.group(1)] = m.group(2).strip()
+            continue
+        if name == "TaskUpdate":
+            tid = str(inp.get("taskId") or "")
+            if inp.get("status") == "in_progress" and tid and tid not in opened:
+                opened.add(tid)
+                label = subjects.get(tid) or f"task #{tid}"
+                if boundaries and not worked_since_open:
+                    boundaries[-1][1].append(label)
+                else:
+                    boundaries.append((int(t["idx"]), [label]))
+                    worked_since_open = False
+            continue
+        if name not in _TASK_LIST_TOOLS:
+            worked_since_open = True
+    return [(idx, "task:" + " + ".join(labels)) for idx, labels in boundaries]
 
 
 def parse_ts(ts: str | None) -> datetime | None:
@@ -1730,6 +1772,8 @@ def extract(path: str) -> dict[str, Any]:
             key = "wf:" + wf_runs[rid]["name"]
             wf_stage_of_run[rid] = key
             pipe_boundaries.append((idx, key))
+    if not pipe_boundaries:
+        pipe_boundaries = _task_list_boundaries(tools)
     pipe_boundaries.sort()
 
     # 首个管线边界之前的记录归 setup(若首边界即 idx 0 则无 setup 段)
@@ -1753,9 +1797,10 @@ def extract(path: str) -> dict[str, Any]:
         ts_list: list[str] = [str(r["timestamp"]) for r in seg_records if r.get("timestamp")]
         stages.append({
             "id": f"s{b}",
-            "signal": "native-stage-event" if stage_key != "setup" else "unassigned",
+            "signal": ("unassigned" if stage_key == "setup"
+                       else "task-list" if stage_key.startswith("task:") else "native-stage-event"),
             "stage": stage_key,
-            "label": (stage_key[3:] if stage_key.startswith("wf:")
+            "label": (stage_key.split(":", 1)[1] if stage_key.startswith(("wf:", "task:"))
                       else STAGE_LABELS.get(stage_key, stage_key)),
             "start_idx": start_idx,
             "end_idx": end_idx,
@@ -1775,10 +1820,13 @@ def extract(path: str) -> dict[str, Any]:
             "active_ms": None,  # 活跃时长 = duration - wait(定稿于阶段归属之后)
         })
 
-    # 无任何管线 Skill 调用的通用会话:整段作为单一 Session 阶段展示
+    # 无任何管线 Skill 调用、也没有任务清单的通用会话:整段作为单一 session 阶段。
+    # harness 给记录盖了统一的 skill 归属戳时用那个戳当标签(会话自己的信息);
+    # 没有戳(ECAT 判别器/生成器)仍叫 Session,ecat.annotate 再按角色改标签。
     if not pipe_boundaries:
         stages[0]["stage"] = "session"
-        stages[0]["label"] = "Session"
+        attrs = {norm_skill(r.get("attributionSkill")) for r in records} - {""}
+        stages[0]["label"] = attrs.pop() if len(attrs) == 1 else "Session"
 
     # 同一阶段多次出现(如 verify→execute 回环)时,后续段落编号区分
     seen_stage_keys: dict[str, int] = {}
