@@ -1,4 +1,0 @@
-interface:
-  display_name: "迁移经验召回"
-  short_description: "按当前任务逐层阅读 Markdown 经验目录，选择相关经验并核实适用条件"
-  default_prompt: "使用 $migloop-memory-recall 从给定 index.md 按需读取当前任务适用的经验。"
