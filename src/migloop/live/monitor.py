@@ -739,6 +739,8 @@ class IncrementalSessionMonitor:
                 self.write_files.add(target)
                 self._event("write", "%s %s" % (name, os.path.basename(target)), ts)
         elif name in ("Agent", "Task"):
+            if stream["kind"] == "main":   # 各阶段的子代理数按派发计(会话总览用)
+                self.state["agent_dispatches"] = int(self.state.get("agent_dispatches") or 0) + 1
             self._event("agent", "派发 %s" % (inp.get("description") or
                                                inp.get("subagent_type") or "subagent"), ts)
 

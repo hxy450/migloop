@@ -470,7 +470,10 @@ def _thread(slot: Dict[str, Any], href: Optional[str]) -> Dict[str, Any]:
                        "duration_ms": ms_between(h.get("start_ts") or started, end) or 0,
                        "tool_calls": int(((nxt or {}).get("tools_at_start") if nxt else snap.get("tool_calls")) or 0)
                        - int(h.get("tools_at_start") or 0),
-                       "agents": 0})
+                       # 按派发计;老 checkpoint 没记派发数的段给 None(页面显示「—」)
+                       "agents": None if "agents_at_start" not in h else
+                       int(((nxt or {}).get("agents_at_start") if nxt else snap.get("agent_dispatches")) or 0)
+                       - int(h.get("agents_at_start") or 0)})
     base.update(
         model=snap.get("model"), started_at=started, ended_at=ended,
         duration_ms=ms_between(started, ended) or 0,
@@ -633,6 +636,19 @@ class MigrationHTTPServer(ThreadingHTTPServer):
         return self._chats[key]
 
 
+def _stop_signal(signum: int, frame: Any) -> None:
+    raise KeyboardInterrupt
+
+
+def install_stop_signals() -> None:
+    """Windows 的 Ctrl+Break 与关控制台窗口走 SIGBREAK,默认是直接结束进程、不写最终页;
+    改成和 Ctrl+C 一样从 serve_forever 退出、照常写最终页。"""
+    import signal
+    if hasattr(signal, "SIGBREAK"):
+        with suppress(ValueError, OSError):   # 只能在主线程装
+            signal.signal(signal.SIGBREAK, _stop_signal)
+
+
 def write_final(migration: MigrationMonitor, out_path: str, build_report: Callable[[str], bytes],
                 build_trace: Optional[Callable[[str], Dict[str, Any]]] = None) -> str:
     """最终自包含页面:总览(数据内嵌)+ 每个会话一份完整分析页(``<out>.sessions/``)。"""
@@ -641,13 +657,17 @@ def write_final(migration: MigrationMonitor, out_path: str, build_report: Callab
     sess_dir = os.path.join(os.path.dirname(out_path), stem + ".sessions")
     os.makedirs(sess_dir, exist_ok=True)
     findings: Dict[str, List[Dict[str, Any]]] = {}
-    for slot in list(migration.slots.values()):
-        if not slot["live"]:
-            continue
-        name = re.sub(r"[^A-Za-z0-9_.-]", "_", slot["key"]) + ".html"
+    live_slots = [s for s in list(migration.slots.values()) if s["live"]]
+    for slot in live_slots:
+        slot["_final"] = stem + ".sessions/" + re.sub(r"[^A-Za-z0-9_.-]", "_", slot["key"]) + ".html"
+    # 先写总览(很快):关窗口只给几秒,至少总览在;各会话的完整分析页随后逐个写
+    data = migration.overview(href=lambda slot: slot.get("_final"))
+    data["live"] = None
+    _atomic_write(out_path, overview_html(data=data))
+    for slot in live_slots:
+        name = os.path.basename(slot["_final"])
         try:
             _atomic_write(os.path.join(sess_dir, name), build_report(slot["path"]), binary=True)
-            slot["_final"] = stem + ".sessions/" + name
             if build_trace is not None:
                 from .. import audit
                 findings[slot["key"]] = audit.build_audit(build_trace(slot["path"]))["findings"]
@@ -685,7 +705,8 @@ def run(harmony: str, focus: Optional[str], out_path: str, build_report: Callabl
     focus_key = next((k for k, s in migration.slots.items() if focus and os.path.normcase(s["path"]) == os.path.normcase(os.path.abspath(focus))), None)
     if focus_key:
         print("当前会话      -> %ss/%s/" % (url, urllib.parse.quote(focus_key)))
-    print("每 %g 秒刷新;Ctrl+C 停止,停止时%s最终页面。" % (interval, "生成" if write_final_page else "不生成"))
+    print("每 %g 秒刷新;Ctrl+C / Ctrl+Break 停止,停止时%s最终页面。" % (interval, "生成" if write_final_page else "不生成"))
+    install_stop_signals()
     if open_browser:
         webbrowser.open(url)
     try:

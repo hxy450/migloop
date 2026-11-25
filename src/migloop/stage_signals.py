@@ -447,13 +447,23 @@ class LiveStages:
         hist = st.setdefault("stage_history", [])
         if hist and hist[-1].get("stage") == stage:
             return
-        hist.append({"stage": stage, "start_ts": ts, "tools_at_start": int(st.get("tool_calls") or 0)})
+        hist.append({"stage": stage, "start_ts": ts, "tools_at_start": int(st.get("tool_calls") or 0),
+                     "agents_at_start": int(st.get("agent_dispatches") or 0)})
         if len(hist) > self.HISTORY_MAX:
             del hist[1:len(hist) - self.HISTORY_MAX + 1]
 
     @property
     def marks_mode(self) -> bool:
         return bool(self.st.get("marked_stages"))
+
+    def _rename(self, stage: str) -> None:
+        """当前开着的段改名(不另起新段),之后的名字来自 skill 信号。"""
+        st = self.st
+        st["current_stage"] = stage
+        st["named_by_signal"] = True
+        hist = st.get("stage_history") or []
+        if hist:
+            hist[-1]["stage"] = stage
 
     def signal(self, stage: str, ts: Any) -> None:
         st = self.st
@@ -462,16 +472,17 @@ class LiveStages:
             if stage in st["marked_stages"]:
                 return
             current = st.get("current_stage")
-            if current in (UNMARKED, AFTER, TRAILING):
+            if current in (UNMARKED, AFTER):
+                # 收尾 mark 开出来的段:skill 信号来了就给这段改名(离线也是整段一个名字),不另起新段
+                self._rename(stage)
+                self.emit("stage", "进入 %s(缺结束标记)" % stage, ts)
+            elif current == TRAILING:
                 self._enter(stage, ts)
                 st["named_by_signal"] = True
                 self.emit("stage", "进入 %s(缺结束标记)" % stage, ts)
             elif st.get("named_by_signal") and _canon_rank(stage) > _canon_rank(current):
                 # 段名来自 skill 信号:后面又见规范顺序更靠后、还没打 mark 的阶段,就改用它(同一段)
-                st["current_stage"] = stage
-                hist = st.get("stage_history") or []
-                if hist:
-                    hist[-1]["stage"] = stage
+                self._rename(stage)
                 self.emit("stage", "改名 %s(缺结束标记)" % stage, ts)
             return
         if stage == st.get("current_stage"):

@@ -281,6 +281,9 @@ class CodexLiveMonitor:
                 m["tool_uses_outer"] = int(m.get("tool_uses_outer") or 0) + 1
                 if m.get("kind") == "root":
                     self.state["tool_calls"] += inner
+                    spawns = 1 if payload.get("name") == "spawn_agent" else (
+                        len(re.findall(r"\btools\.spawn_agent\s*\(", raw)) if payload.get("name") == "exec" else 0)
+                    self.state["agent_dispatches"] = int(self.state.get("agent_dispatches") or 0) + spawns
                 call_id = str(payload.get("call_id") or "")
                 if call_id:
                     self._pending_calls[call_id] = str(payload.get("name") or "")

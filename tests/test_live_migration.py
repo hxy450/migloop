@@ -87,3 +87,40 @@ def test_final_page_carries_the_overview(tmp_path: Path) -> None:
     assert thread["thread_id"] == "aaaa" and thread["href"] == "final.sessions/aaaa.html"
     assert (out.parent / "final.sessions" / "aaaa.html").read_bytes() == b"<html>report</html>"
     assert "会话总览" in page
+
+
+def test_overview_counts_agents_per_stage_from_dispatches(tmp_path: Path) -> None:
+    harmony, slug, mon = _setup(tmp_path)
+    h = str(harmony)
+    agent = {"type": "tool_use", "id": "t1", "name": "Agent", "input": {"description": "worker", "prompt": "p"}}
+    rows = [_rec("2026-11-25T10:00:00Z", "user", "<command-name>/a2h-spec</command-name>", h, "aaaa"),
+            _rec("2026-11-25T10:02:00Z", "assistant", [{"type": "text", "text": "spec"}], h, "aaaa"),
+            _rec("2026-11-25T10:03:00Z", "assistant", [agent], h, "aaaa")]
+    _write(slug / "aaaa.jsonl", rows)
+    mon.poll_once()
+    (thread,) = mon.overview()["sessions"][0]["threads"]
+    assert [(st["label"], st["agents"]) for st in thread["stages"]] == [("Spec", 1)]
+    from migloop.render import load_asset
+    assert "实时不统计" in load_asset("chain.html")      # 老 checkpoint 没记派发数的段显示「—」
+
+
+def test_final_page_writes_the_overview_before_the_slow_details(tmp_path: Path) -> None:
+    import signal
+    _harmony, _slug, mon = _setup(tmp_path)
+    mon.poll_once()
+    out = tmp_path / "out" / "final.html"
+    seen = []
+
+    def build_report(path: str) -> bytes:
+        seen.append(out.is_file())                      # 关窗口只给几秒:先有总览,再逐个写详情
+        return b"<html>report</html>"
+
+    migration.write_final(mon, str(out), build_report=build_report)
+    assert seen == [True]
+    if hasattr(signal, "SIGBREAK"):                     # Windows:Ctrl+Break / 关窗口也照常写最终页
+        old = signal.getsignal(signal.SIGBREAK)
+        try:
+            migration.install_stop_signals()
+            assert signal.getsignal(signal.SIGBREAK) is migration._stop_signal
+        finally:
+            signal.signal(signal.SIGBREAK, old)

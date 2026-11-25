@@ -141,3 +141,13 @@ def test_live_human_input_before_execute_does_not_open_follow_up() -> None:
     stages.confirm("2026-10-31T11:05:00Z")
     stages.human("统计一下用量", "2026-10-31T12:00:00Z")
     assert state["current_stage"] == "follow-up"
+
+
+def test_live_unmarked_segment_after_an_end_mark_is_renamed_not_split() -> None:
+    state, stages = _stages()
+    stages.mark("a2h-build", "2026-11-04T07:54:25Z")
+    n = len(state["stage_history"])
+    assert state["stage_history"][-1]["stage"] == "unmarked"
+    stages.signal("a2h-spec", "2026-11-04T07:54:38Z")
+    assert len(state["stage_history"]) == n and state["stage_history"][-1]["stage"] == "a2h-spec"
+    assert state["stage_history"][-1]["start_ts"] == "2026-11-04T07:54:25Z"   # 段从收尾 mark 起

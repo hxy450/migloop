@@ -122,7 +122,8 @@
           var mine = (s.timeline || []).filter(function (e) { return e.stage === st.label; });
           var nd = mine.filter(function (e) { return e.kind === "decision"; }).length, ne = mine.filter(function (e) { return e.kind === "evaluation"; }).length;
           return '<tr><td>' + esc(st.label) + '</td><td>' + hhmm(st.start_ts) + '–' + hhmm(st.end_ts) +
-          '</td><td class="n">' + dur(st.duration_ms) + '</td><td class="n">' + st.tool_calls + '</td><td class="n">' + st.agents +
+          '</td><td class="n">' + dur(st.duration_ms) + '</td><td class="n">' + st.tool_calls + '</td><td class="n">' +
+          (st.agents == null ? '<span class="sub" title="实时不统计">—</span>' : st.agents) +
           '</td><td class="n">' + (nd || ne ? nd + ' / ' + ne : '') + '</td></tr>'; }).join("");
         return (rows ? '<div class="scroll"><table><tr><th>阶段</th><th>时段</th><th class="n">耗时</th><th class="n">工具</th><th class="n">子代理</th><th class="n">评审 / 评估</th></tr>' + rows + '</table></div>' : '') +
           '<div class="sub">' + esc(t.model || "") + ' · 请求 ' + num(t.requests) + ' · 输出 ' + num(t.output_tokens) + ' · 工具 ' + (t.tool_calls || 0) +
