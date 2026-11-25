@@ -911,7 +911,8 @@ def _reopen(s: dict[str, Any], idx: int, ts: str | None, kind: str | None) -> No
         if ts > s["close"]:
             s["stalls"].append([s["close"], ts, kind, idx])
         s["close"] = None
-    elif kind and s["stalls"] and s["stalls"][-1][2] is None and s["stalls"][-1][1] == ts:
+    elif kind and s["stalls"] and s["stalls"][-1][2] is None:
+        # task_started 先到、输入随后才落盘:回合开头的第一条输入补上来源
         s["stalls"][-1][2], s["stalls"][-1][3] = kind, idx
 
 

@@ -89,8 +89,8 @@ def test_marks_inner_counts_and_stalls(tmp_path: Path) -> None:
                out="Script failed\nexit code: 1"),                          # 没跑成,不算
         _rec(12, "event_msg", {"type": "task_complete"}),
         _rec(40, "event_msg", {"type": "task_started"}),
-        _user(40, "还在吗"),
-        *_exec(41, "c4", 'await tools.exec_command({cmd:"ls"})'),
+        _user(41, "还在吗"),                                              # 输入比 task_started 晚落盘
+        *_exec(42, "c4", 'await tools.exec_command({cmd:"ls"})'),
     ]), sessions_root=str(tmp_path / "sessions"))
     stages = [(s["stage"], s.get("missing_end_mark", False)) for s in trace["stages"]]
     assert stages == [("setup", False), ("a2h-spec", False), ("unmarked", True)]
