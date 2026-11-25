@@ -188,6 +188,7 @@ def _new_stream(path, kind, agent_id=None):
         "tool_uses": 0,
         "tool_counts": {},
         "pending_tools": {},
+        "seen_tools": set(),   # 已计过的 tool_use id:同一 id 只收一次
         "active_usage": {},
         "output_tokens": 0,
         "input_tokens": 0,
@@ -208,6 +209,7 @@ def _restore_stream(data):
     stream = dict(data)
     stream["read_files"] = set(stream.get("read_files") or [])
     stream["write_files"] = set(stream.get("write_files") or [])
+    stream["seen_tools"] = set(stream.get("seen_tools") or [])
     stream.setdefault("pending_tools", {})
     stream.setdefault("active_usage", {})
     stream.setdefault("tool_counts", {})
@@ -647,8 +649,10 @@ class IncrementalSessionMonitor:
         tid = block.get("id")
         name = block.get("name") or "unknown"
         inp = block.get("input") if isinstance(block.get("input"), dict) else {}
-        if tid and tid in stream["pending_tools"]:
+        if tid and (tid in stream["pending_tools"] or tid in stream["seen_tools"]):
             return
+        if tid:
+            stream["seen_tools"].add(tid)
         stream["tool_uses"] += 1
         stream["tool_counts"][name] = stream["tool_counts"].get(name, 0) + 1
         self.state["tool_calls"] += 1
@@ -718,12 +722,13 @@ class IncrementalSessionMonitor:
             self._update_usage(stream, message)
             content = message.get("content")
             if isinstance(content, list):
+                # 调用只认 assistant 行、回执只认 user 行;别的行即使带着同 id 的块也是副本
                 for block in content:
                     if not isinstance(block, dict):
                         continue
-                    if block.get("type") == "tool_use":
+                    if block.get("type") == "tool_use" and rtype == "assistant":
                         self._handle_tool_use(stream, block, ts)
-                    elif block.get("type") == "tool_result":
+                    elif block.get("type") == "tool_result" and rtype == "user":
                         self._handle_tool_result(stream, block, record)
 
         if stream["kind"] == "main":

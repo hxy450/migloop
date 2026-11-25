@@ -113,17 +113,22 @@ class ClaudeCalls:
 
     def observe(self, record, idx):
         blocks = (record.get("message") or {}).get("content")
-        if not isinstance(blocks, list):
+        # 调用只认 assistant 行、回执只认 user 行,同一 id 只收一次(请求体快照等副本不算)。
+        # 没有 type 的手造记录(单测、旧导出)照旧按块读
+        rtype = record.get("type")
+        if not isinstance(blocks, list) or rtype not in ("assistant", "user", None):
             return
         for b in blocks:
             if not isinstance(b, dict):
                 continue
-            if b.get("type") == "tool_use":
+            if b.get("type") == "tool_use" and rtype in ("assistant", None):
                 cid = b.get("id")
+                if cid is not None and cid in self.calls:
+                    continue
                 self.inputs[cid] = b.get("input")
                 self.calls[cid] = observation(b.get("name"), b.get("input"), call=cid, idx=idx, ts=record.get("timestamp"))
                 self.calls[cid]["line"] = record.get("_source_line", idx + 1)
-            elif b.get("type") == "tool_result" and b.get("tool_use_id") in self.calls:
+            elif b.get("type") == "tool_result" and rtype in ("user", None) and b.get("tool_use_id") in self.calls:
                 cid = b["tool_use_id"]
                 old = self.calls[cid]
                 receipt = observation(old["name"], self.inputs.pop(cid, {}), b.get("content"),

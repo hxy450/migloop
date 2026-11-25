@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import shutil
 
@@ -72,6 +73,64 @@ def test_live_monitor_skips_blob_rows(tmp_path):
     snap = mon.snapshot()
     assert snap["tool_calls"] == 4          # 主线 2 + 子代理 2
     assert snap["tool_counts"] == {"Agent": 1, "Read": 1, "Write": 1, "Edit": 1}
+
+
+def _stage_session(tmp_path) -> str:
+    """管线 spec → plan → execute;请求体快照与一条非对话行带着早先 Skill 调用的副本,
+    主线还有一条同 id 的 assistant 重复行(resume 拼接实录形态)。"""
+    sid = "b10b0000-0000-4000-8000-0000000000aa"
+
+    def skill(n, kid, name, attr):
+        return {"type": "assistant", "uuid": f"a{n}", "timestamp": "2026-11-23T12:%02d:00.000Z" % n,
+                "sessionId": sid, "cwd": "C:/fixture/app", "attributionSkill": attr,
+                "message": {"id": f"m{n}", "model": "deepseek-flash", "role": "assistant",
+                            "usage": {"output_tokens": 1},
+                            "content": [{"type": "tool_use", "id": kid, "name": "Skill",
+                                         "input": {"skill": name}}]}}
+
+    def result(n, kid, attr):
+        return {"type": "user", "uuid": f"u{n}", "timestamp": "2026-11-23T12:%02d:30.000Z" % n,
+                "sessionId": sid, "attributionSkill": attr,
+                "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": kid,
+                                                         "content": "Launching skill"}]}}
+
+    spec_use = skill(1, "k1", "a2h-spec", "a2h-spec")["message"]["content"]
+    rows = [
+        {"type": "user", "uuid": "u0", "timestamp": "2026-11-23T12:00:00.000Z", "sessionId": sid,
+         "cwd": "C:/fixture/app", "promptSource": "typed", "message": {"role": "user", "content": "/a2h-run"}},
+        skill(1, "k1", "a2h-spec", "a2h-spec"), result(1, "k1", "a2h-spec"),
+        skill(5, "k2", "a2h-plan", "a2h-plan"), result(5, "k2", "a2h-plan"),
+        {"type": "api-request-blob", "sessionId": sid, "hash": "h1",
+         "message": {"role": "assistant", "content": spec_use}},
+        {"type": "progress", "sessionId": sid, "timestamp": "2026-11-23T12:06:00.000Z",
+         "message": {"role": "assistant", "content": spec_use}},
+        skill(5, "k2", "a2h-plan", "a2h-plan"),            # 同 id 重复行
+        skill(9, "k3", "a2h-execute", "a2h-execute"), result(9, "k3", "a2h-execute"),
+    ]
+    path = tmp_path / f"{sid}.jsonl"
+    path.write_text("".join(json.dumps(r) + "\n" for r in rows), encoding="utf-8")
+    return str(path)
+
+
+def test_copies_of_skill_calls_do_not_reopen_stages(tmp_path):
+    """副本里的 Skill 调用不能当显式阶段边界(FairEmail 曾被切成 42 段),
+    tool_by_id 也不能被副本改指。"""
+    trace = cc.extract(_stage_session(tmp_path))
+    assert [s["stage"] for s in trace["stages"] if s["stage"] != "setup"] == [
+        "a2h-spec", "a2h-plan", "a2h-execute"]
+    assert [t["tuid"] for t in trace["tools"]] == ["k1", "k2", "k3"]
+    assert all(t["ok"] is True for t in trace["tools"])
+    assert sorted(c["call"] for c in trace["audit_tools"]) == ["k1", "k2", "k3"]
+
+
+def test_live_monitor_counts_each_tool_use_once(tmp_path):
+    path = _stage_session(tmp_path)
+    mon = IncrementalSessionMonitor(path, cache_dir=str(tmp_path / "cache"), poll_interval=0.05,
+                                    checkpoint_interval=0.01, reset_cache=True)
+    mon.poll_once()
+    snap = mon.snapshot()
+    assert snap["tool_calls"] == 3
+    assert snap["current_stage"] == "a2h-execute"
 
 
 def test_raw_index_does_not_pair_blob_calls():

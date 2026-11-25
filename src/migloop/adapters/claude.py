@@ -1680,9 +1680,13 @@ def extract(path: str) -> dict[str, Any]:
                     slot["ch"][1] += tx
                     slot["ch"][2] += tu
             content = msg.get("content")
-            if isinstance(content, list):
+            # 调用只认 assistant 行,同一 tool_use id 只收一次:别的行带着同 id 的块是副本
+            # (api-request-blob 已在读入时跳过,这里再兜一层,免得 tool_by_id 被副本改指)
+            if isinstance(content, list) and rtype == "assistant":
                 for block in content:
                     if not (isinstance(block, dict) and block.get("type") == "tool_use"):
+                        continue
+                    if block.get("id") is not None and block.get("id") in tool_by_id:
                         continue
                     name = block.get("name")
                     inp = block.get("input", {})
@@ -1954,6 +1958,7 @@ def extract(path: str) -> dict[str, Any]:
                     # message.id -> {m:model, u:最新 usage, ch:[think,text,tool]字符}
                     sub_usage: dict[Any, dict[str, Any]] = {}
                     pending_skill: dict[Any, int] = {}  # tool_use_id -> skill_calls 下标(待回填结果)
+                    seen_tuids: set[Any] = set()        # 已收过的 tool_use id
                     pending_read: dict[Any, str] = {}   # tool_use_id -> file_path(待从结果取 numLines)
                     # tool_use_id -> (name, input)，从最终输出还原源码行
                     pending_visible: dict[Any, tuple[str, Any]] = {}
@@ -2002,11 +2007,16 @@ def extract(path: str) -> dict[str, Any]:
                                         if isinstance(c, list) else "")
                                     if pt and pt.strip():
                                         entry["_prompt"] = pt.strip()[:4000]
-                                if isinstance(c, list):
+                                # 调用 / 回执只认 assistant / user 行,同一 tool_use id 只收一次
+                                if isinstance(c, list) and rec.get("type") in ("assistant", "user"):
                                     for blk in c:
                                         if not isinstance(blk, dict):
                                             continue
                                         if blk.get("type") == "tool_use":
+                                            if blk.get("id") is not None:
+                                                if blk.get("id") in seen_tuids:
+                                                    continue
+                                                seen_tuids.add(blk.get("id"))
                                             entry["tool_uses"] += 1
                                             n = blk.get("name")
                                             entry["tool_counts"][n] = entry["tool_counts"].get(n, 0) + 1
