@@ -58,6 +58,7 @@ _MARK_CALL = re.compile(r"\ba2h(?:-codex)?(?:\.exe)?\s+mark-stage\s+([a-z0-9_-]+
 _MARK_ECHO = re.compile(r"mark-stage(?::\s*[a-z0-9_-]+|\s+ok\b)")
 _RESUME = re.compile(r"^[\s\W]*(?:请|please\s+)?(?:继续|接着|跑完|恢复|continue|resume|go\s+on|keep\s+going|"
                      r"carry\s+on|proceed)", re.IGNORECASE)
+_RESUME_WORD = re.compile(r"继续|接着|跑完|恢复|continue|resume|go\s+on|keep\s+going|carry\s+on|proceed", re.IGNORECASE)
 _COMMAND = re.compile(r"<command-name>\s*/?([^<]+)</command-name>")
 
 
@@ -101,9 +102,17 @@ def merge_marks(*sources: Iterable[Tuple[float, str]], window: float = 120.0) ->
     return out
 
 
+#: 短输入里出现续跑词也算(「一直跑完，自己推荐方案」「不是你继续啊」)
+_RESUME_SHORT = 20
+
+
 def is_resume_request(text: Any) -> bool:
-    """人工输入只是要求接着干(继续 / continue / resume / 接着 / 跑完 开头)。"""
-    return bool(_RESUME.match(str(text or "")))
+    """人工输入只是要求接着干:以「继续 / continue / resume / 接着 / 跑完」开头,或是不超过
+    ``_RESUME_SHORT`` 个字、里面带这类词。"""
+    text = str(text or "").strip()
+    if _RESUME.match(text):
+        return True
+    return len(text) <= _RESUME_SHORT and bool(_RESUME_WORD.search(text))
 
 
 def iso_seconds(ts: Any) -> Optional[float]:

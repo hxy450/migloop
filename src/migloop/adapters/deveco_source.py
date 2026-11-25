@@ -98,6 +98,7 @@ def child_rows(documents):
             model = model.get("id") or model.get("modelID")
         rows.append({"id": info["id"], "title": info.get("title") or "", "agent": info.get("agent") or "",
                      "model": model, "created": times.get("created"), "updated": times.get("updated"),
+                     "requests": sum(1 for m in messages if m["info"].get("role") == "assistant"),
                      "tokens": {**{key: tokens.get(key) or 0 for key in ("input", "output", "reasoning")},
                                 "cache_read": (tokens.get("cache") or {}).get("read") or 0,
                                 "cache_write": (tokens.get("cache") or {}).get("write") or 0}})

@@ -98,6 +98,7 @@ from collections import Counter
 from datetime import datetime, timezone
 
 from . import claude as common
+from .. import stage_signals
 from .base import SessionCandidate
 from . import deveco_source
 
@@ -416,8 +417,9 @@ def _parts_chars(parts):
 
 
 def _user_prompt(parts):
+    """人打的文字:synthetic 的文本段(任务完成通知 <task …>、附件展开)是注入的,不算。"""
     chunks = [p.get("text") for p in parts
-              if p.get("type") == "text" and isinstance(p.get("text"), str)]
+              if p.get("type") == "text" and isinstance(p.get("text"), str) and not p.get("synthetic")]
     return "\n".join(chunks)
 
 
@@ -457,6 +459,12 @@ def _message_model(mi):
     return mi.get("providerID")
 
 
+def _bucket(billing, model):
+    """计费桶。req = assistant 消息行数(DevEco 每次请求落一行,中断 / 出错的也算一次请求)。"""
+    return billing.setdefault(model or "unknown", {"req": 0, "inp": 0, "cread": 0, "cw5": 0, "cw1h": 0,
+                                                  "out": 0, "reasoning": 0})
+
+
 def _accumulate_usage(billing, context_timeline, mi, model):
     tk = mi.get("tokens")
     if not isinstance(tk, dict):
@@ -466,14 +474,13 @@ def _accumulate_usage(billing, context_timeline, mi, model):
     cread = cache.get("read") or 0
     cwrite = cache.get("write") or 0
     out = (tk.get("output") or 0) + (tk.get("reasoning") or 0)  # output 桶不含 reasoning,对齐 claude 的 output_tokens
-    key = model or "unknown"
-    bucket = billing.setdefault(key, {"req": 0, "inp": 0, "cread": 0,
-                                      "cw5": 0, "cw1h": 0, "out": 0})
+    bucket = _bucket(billing, model)
     bucket["req"] += 1
     bucket["inp"] += inp
     bucket["cread"] += cread
-    bucket["cw1h"] += cwrite  # opencode has no 5m/1h cache split; fold into 1h
-    bucket["out"] += out
+    bucket["cw5"] += cwrite  # 库里缓存写入只有一个总数(没有 5m/1h 之分),归 cw5
+    bucket["out"] += out     # 按输出计费:含 reasoning;reasoning 另列
+    bucket["reasoning"] += tk.get("reasoning") or 0
     context_timeline.append({
         "ts": _ms_to_iso((mi.get("time") or {}).get("created")),
         "ctx": inp + cread + cwrite,
@@ -506,61 +513,89 @@ def _workflow_key(t):
     return None
 
 
-def _stage_boundaries(tools):
-    # 两条阶段信号(DevEco 没有 attributionSkill,Skill 工具调用即唯一管线信号,
-    # 故用 codex 的 current 变更检测——正确处理 execute→verify→execute 回环):
-    #   1) 管线 skill(Skill 工具调用,归一后命中 common.PIPELINE_SKILLS)= 阶段边界,段名取 skill 名;
-    #   2) workflow 模式(Workflow 工具调用)= 一个阶段,段名取 wf:<workflow name>。
-    # 两条边界按 message idx 合并、去重,setup 兜底逻辑不变。
-    transitions = []
-    current = None
+def _stage_signals(tools):
+    """DevEco 没有归属戳:管线 Skill 工具调用即阶段信号 [(消息下标, 阶段)]。"""
+    out = []
     for t in tools:
         if t["name"] == "Skill" and t.get("skill"):
-            nskill = (t["skill"] or "").split(":")[-1]
-            if nskill in common.PIPELINE_SKILLS and nskill != current:
-                transitions.append((t["idx"], nskill))
-                current = nskill
-        elif t["name"] == "Workflow":
-            key = _workflow_key(t)
-            if key:
-                transitions.append((t["idx"], "wf:" + key))
-    if not transitions:
-        return [(0, "session")]
-    # 去重(保留先出现者),避免退化出空段(对齐 claude 的 dedup):
-    #   * 同一 idx —— Skill 与 Workflow 落在同一条消息时只留一个边界;
-    #   * 相邻 key 相同 —— DynamicWorkflow 分阶段派发(如 acceptance_audit_a 先发一条
-    #     explore 预扫描、再发真正的 audit),两次调用同属一个 runName,若都开阶段会拆出
-    #     一个空的 explore 段 + 一个真正的 audit 段。合并成一个阶段。
-    deduped = []
-    for bnd in transitions:
-        if deduped and (deduped[-1][0] == bnd[0] or deduped[-1][1] == bnd[1]):
+            stage = stage_signals.normalize(t["skill"])
+            if stage:
+                out.append((t["idx"], stage))
+    return out
+
+
+def _stage_workflows(tools):
+    """Workflow 工具调用 → segment 的 workflows:{idx, end(秒), key}。段尾取 workflow 工具的实际结束时刻。"""
+    out = []
+    for t in tools:
+        if t["name"] != "Workflow":
             continue
-        deduped.append(bnd)
-    rows = [(0, "setup")] if deduped[0][0] > 0 else []
-    rows.extend(deduped)
-    return rows
+        key = _workflow_key(t)
+        if key:
+            end = t.get("_end_ms")
+            out.append({"idx": t["idx"], "end": end / 1000.0 if isinstance(end, (int, float)) else None,
+                        "key": key})
+    return out
 
 
-def _build_stages(boundaries, points, max_idx):
+def _stage_marks(tools, cwd, first_ms, source_file):
+    """stage-marks.json + 主线 Bash 里真跑成了的 a2h mark-stage(时刻取所在消息),合并去重。"""
+    called = []
+    for t in tools:
+        if t["name"] not in ("Bash", "PowerShell"):
+            continue
+        stages = stage_signals.mark_calls((t.get("_inp") or {}).get("command"))
+        if stages and t.get("_done") and stage_signals.mark_ran(t.get("ok"), t.get("result")):
+            tt = stage_signals.iso_seconds(t.get("ts"))
+            if tt is not None:
+                called.extend((tt, st) for st in stages)
+    found = stage_signals.find_stage_marks(source_file or os.path.join(cwd or ".", "x"), cwd,
+                                           first_ms / 1000.0 if first_ms is not None else None)
+    return stage_signals.merge_marks(found, called)
+
+
+def _build_stages(segs, points, records_ms):
+    """segment() 的顶层段 → stage 字典;子段(管线阶段里的 Workflow)挂在 children。"""
     stages = []
     seen = Counter()
-    for pos, (start_idx, key) in enumerate(boundaries):
-        end_idx = boundaries[pos + 1][0] - 1 if pos + 1 < len(boundaries) else max_idx
-        nums = [ts for idx, ts in points if start_idx <= idx <= end_idx and ts is not None]
+    top = [sg for sg in segs if sg["parent"] is None]
+    for pos, sg in enumerate(top):
+        key = sg["stage"]
+        nums = [ts for idx, ts in points if sg["start_idx"] <= idx <= sg["end_idx"] and ts is not None]
+        if sg.get("end_t") is not None:      # 顶层 workflow 段:段尾取 workflow 实际结束
+            nums.append(sg["end_t"] * 1000.0)
         start = _ms_to_iso(min(nums)) if nums else None
         end = _ms_to_iso(max(nums)) if nums else None
-        label = key[3:] if key.startswith("wf:") else common.STAGE_LABELS.get(key, key)
+        label = common.segment_label(sg)
         seen[key] += 1
         if seen[key] > 1:
             label += " ·%d" % seen[key]
-        stages.append({
+        stage = {
             "id": "s%d" % pos, "stage": key, "label": label,
-            "start_idx": start_idx, "end_idx": end_idx,
+            "signal": {"mark": "stage-mark", "skill": "native-stage-event", "workflow": "workflow",
+                       "unterminated": "stage-mark-missing-end"}.get(sg["signal"], "unassigned"),
+            "start_idx": sg["start_idx"], "end_idx": sg["end_idx"],
             "start_ts": start, "end_ts": end,
             "duration_ms": common.ms_between(start, end),
             "tool_counts": {}, "output_tokens": 0, "cache_read_tokens": 0,
             "helper_skills": [], "artifacts": [], "agent_count": 0,
-            "prompt_idxs": [], "active_ms": None,
+            "prompt_idxs": [], "active_ms": None, "children": [],
+        }
+        if sg["signal"] == "unterminated":
+            stage["missing_end_mark"] = True
+        stages.append(stage)
+    for sg in segs:
+        if sg["parent"] is None:
+            continue
+        parent = stages[sg["parent"]]
+        start = _ms_to_iso(sg["start_t"] * 1000.0) if sg.get("start_t") is not None else None
+        end = _ms_to_iso(sg["end_t"] * 1000.0) if sg.get("end_t") is not None else parent["end_ts"]
+        parent["children"].append({
+            "id": "%s.w%d" % (parent["id"], len(parent["children"])), "parent": parent["id"],
+            "signal": "workflow", "stage": sg["stage"], "label": sg["stage"].split(":", 1)[1],
+            "start_idx": sg["start_idx"], "end_idx": sg["end_idx"],
+            "start_ts": start, "end_ts": end, "duration_ms": common.ms_between(start, end),
+            "tool_counts": {}, "agent_count": 0,
         })
     return stages
 
@@ -992,7 +1027,14 @@ def _load_child_sessions(db, session_id):
                     continue
                 seen.add(sid)
                 found.append(sid)
+                requests = 0
+                for (mdata,) in db.execute("SELECT data FROM message WHERE session_id=?", (sid,)):
+                    try:
+                        requests += json.loads(mdata).get("role") == "assistant"
+                    except (ValueError, AttributeError):
+                        continue
                 rows.append({
+                    "requests": requests,
                     "id": sid, "title": title or "", "agent": agent or "",
                     "model": _parse_model_column(model_str),
                     "tokens": {"input": ti or 0, "output": to or 0, "reasoning": tr or 0,
@@ -1246,14 +1288,20 @@ def _build_child_agents(children, load_parts, stages, cwd, model, billing, wf_in
             "_write_lines": {}, "_write_events": [],
         }
         _aggregate_reads(entry, tools)
-        # bill subagent tokens
-        key = ch.get("model") or model or "unknown"
-        b = billing.setdefault(key, {"req": 0, "inp": 0, "cread": 0, "cw5": 0, "cw1h": 0, "out": 0})
-        b["req"] += 1
-        b["inp"] += tk["input"]
-        b["cread"] += tk["cache_read"]
-        b["cw1h"] += tk["cache_write"]
-        b["out"] += tk["output"] + tk["reasoning"]
+        # 子会话计费:请求数 = 它的 assistant 消息行数。一条消息都没有的子会话(workflow 探针
+        # 失败,model 列是占位值)不建计费桶,作为失败子会话列出
+        requests = ch.get("requests")
+        if requests == 0 and not any(tk.values()):
+            entry["empty_session"] = True
+            entry["model"] = None
+        else:
+            b = _bucket(billing, ch.get("model") or model)
+            b["req"] += requests if requests is not None else 1
+            b["inp"] += tk["input"]
+            b["cread"] += tk["cache_read"]
+            b["cw5"] += tk["cache_write"]
+            b["out"] += tk["output"] + tk["reasoning"]
+            b["reasoning"] += tk["reasoning"]
         agents.append(entry)
     return agents, sub_act
 
@@ -1450,12 +1498,14 @@ def _parse(data, storage_root=None, source_file=None, child_documents=None):
             txt = _user_prompt(parts)
             if txt.strip():
                 # 与 claude / codex 同上限:报告抽屉给全文,悬浮提示由页面截短
-                prompts.append({"idx": m["_idx"], "ts": ts, "wait_ms": 0,
+                prompts.append({"idx": m["_idx"], "ts": ts, "wait_ms": 0, "kind": "human",
                                 "text": " ".join(txt.split())[:common.PROMPT_TEXT_MAX]})
             continue
 
-        # assistant
-        if not mi.get("error"):
+        # assistant:每行是一次请求(出错 / 中断的也发出去了),用量只记没出错的行
+        if mi.get("error"):
+            _bucket(billing, model)["req"] += 1
+        else:
             # 中断/错误消息不是真实 LLM 请求(对齐 claude 的 <synthetic> 跳过),
             # 不进 usage/字符统计/上下文曲线;其 tool 部分仍提取(可能含未完成的中断工具调用)。
             th, tx, tu = _parts_chars(parts)
@@ -1482,6 +1532,9 @@ def _parse(data, storage_root=None, source_file=None, child_documents=None):
             name, call_id, inp, output, state = tool
             entry = _build_tool_entry(
                 len(tools), m["_idx"], ts, name, inp, call_id, output, state, cwd)
+            entry["_done"] = (state or {}).get("status") in ("completed", "error", "failed")
+            if isinstance(((state or {}).get("time") or {}).get("end"), (int, float)):
+                entry["_end_ms"] = float(state["time"]["end"])
             if entry["name"] == "Workflow":
                 workflow_calls.append((entry, output))
             else:
@@ -1493,24 +1546,37 @@ def _parse(data, storage_root=None, source_file=None, child_documents=None):
             tools.append(entry)
 
     # ---- stages ----
-    max_idx = len(messages) - 1
-    boundaries = _stage_boundaries(tools)
     points = []
     for m in messages:
         n = _to_num(((m.get("info") or {}).get("time") or {}).get("created"))
-        if n is not None:
-            points.append((m["_idx"], n))
-    stages = _build_stages(boundaries, points, max_idx)
+        points.append((m["_idx"], n))
+    human = [p for p in prompts if p.get("kind") == "human"]
+    segs = stage_signals.segment(
+        [(i, n / 1000.0 if n is not None else None) for i, n in points] or [(0, None)],
+        marks=_stage_marks(tools, cwd, first_num, source_file),
+        signals=_stage_signals(tools), human=[p["idx"] for p in human],
+        resumes=[p["idx"] for p in human if stage_signals.is_resume_request(p.get("text"))],
+        workflows=_stage_workflows(tools))
+    stages = _build_stages(segs, points, None)
+    wf_slot = {}   # workflow 段名 → (顶层段, 子段 | None)
+    for st in stages:
+        if st["stage"].startswith("wf:"):
+            wf_slot.setdefault(st["stage"][3:], (st, None))
+        for ch in st["children"]:
+            wf_slot.setdefault(ch["stage"][3:], (st, ch))
 
     for t in tools:
         s = _stage_of_idx(stages, t["idx"])
         t["stage"] = s["stage"]
         t["seg"] = s["id"]
         s["tool_counts"][t["name"]] = s["tool_counts"].get(t["name"], 0) + 1
+        for ch in s["children"]:
+            if ch["start_idx"] <= t["idx"] <= ch["end_idx"]:
+                t["subseg"] = ch["id"]
+                ch["tool_counts"][t["name"]] = ch["tool_counts"].get(t["name"], 0) + 1
         if t["name"] in ("Write", "Edit") and t.get("brief") and t["brief"] not in s["artifacts"]:
             s["artifacts"].append(t["brief"])
-        if t["name"] == "Skill" and t.get("skill") \
-                and (t["skill"] or "").split(":")[-1] not in common.PIPELINE_SKILLS:
+        if t["name"] == "Skill" and t.get("skill") and stage_signals.normalize(t["skill"]) is None:
             s["helper_skills"].append({"idx": t["idx"], "ts": t["ts"], "skill": t["skill"]})
     for p in prompts:
         s = _stage_of_idx(stages, p["idx"])
@@ -1555,6 +1621,13 @@ def _parse(data, storage_root=None, source_file=None, child_documents=None):
             if st is not None and a.get("dur_ms"):
                 sub_act.append((a.get("seg"), st, st + a["dur_ms"]))
     for a in agents:
+        # workflow 子代理归所属 workflow:管线阶段里的记子段,管线外的就是那个顶层段
+        slot = wf_slot.get(a.get("wf_run") or "")
+        if slot:
+            a["stage"], a["seg"] = slot[0]["stage"], slot[0]["id"]
+            if slot[1] is not None:
+                a["subseg"] = slot[1]["id"]
+                slot[1]["agent_count"] += 1
         for s in stages:
             if s["id"] == a["seg"]:
                 s["agent_count"] += 1
@@ -1701,7 +1774,11 @@ def _parse(data, storage_root=None, source_file=None, child_documents=None):
         "interrupted_output_tokens": sum(a["output_tokens"] for a in agents if a.get("abort_explicit")),
         "waste_output_tokens": None,
         "output_split": {k: int(v) for k, v in split.items()},
-        "user_prompts": len(prompts),
+        "user_prompts": sum(1 for p in prompts if p.get("kind") == "human"),
+        "program_prompts": sum(1 for p in prompts if p.get("kind") == "program"),
+        # 一条消息都没有的子会话(workflow 探针失败等):不计费,单列
+        "empty_child_sessions": [{"id": a["agent_id"], "title": a.get("desc")} for a in agents
+                                 if a.get("empty_session")],
         "files_touched": len({t.get("brief") for t in tools
                               if t["name"] in ("Write", "Edit") and t.get("brief")}),
         "compactions": len(markers),
@@ -1712,6 +1789,8 @@ def _parse(data, storage_root=None, source_file=None, child_documents=None):
         t.pop("_inp", None)
         t.pop("_visible_source_lines", None)
         t.pop("_probed_paths", None)
+        t.pop("_done", None)
+        t.pop("_end_ms", None)
     for a in agents:
         for key in ("_prompt", "_reads", "_writes", "_read_lines", "_write_lines",
                     "_read_iv", "_read_total", "_read_sources", "_write_events", "_probed"):

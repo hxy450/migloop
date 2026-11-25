@@ -113,7 +113,9 @@ def test_resume_requests_keep_the_last_stage_without_marks() -> None:
     assert _top(segs) == [(0, 0, "setup"), (1, 14, "a2h-execute"), (15, 19, "follow-up")]
     assert ss.is_resume_request("继续执行 a2h-execute，直到结束。上一次是 API 429 中断的")
     assert ss.is_resume_request("继续，resume agent") and ss.is_resume_request("  Continue please")
+    assert ss.is_resume_request("一直跑完，自己推荐方案") and ss.is_resume_request("不是你继续啊")
     assert not ss.is_resume_request("不算中断时间 各个阶段和总耗时多久")
+    assert not ss.is_resume_request("把这几处修掉 然后给我打个压缩包到桌面 修完再继续看看别的问题")
 
 
 def test_program_prompts_do_not_open_trailing_rounds() -> None:
