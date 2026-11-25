@@ -8,7 +8,7 @@ MigLoop Trace Viewer — 单命令生成 Claude Code / Codex 会话轨迹页面
   migloop <session-id 前缀>         在 Claude / Codex session 目录中自动定位
   migloop <项目名片段>              匹配项目目录,取最新 session
   migloop <目标> -o out.html --open
-  migloop <目标> --serve --open      本机服务:报告页 + 返修链路页 + 两原子端点
+  migloop <目标> --serve --open      本机服务:报告页 + 会话总览
 
 跨平台:Windows `py migloop.pyz ...` / macOS·Linux `python3 migloop.pyz ...`
 依赖:Python >= 3.9,无第三方库
@@ -140,7 +140,7 @@ def main():
     ap.add_argument("--deveco-db", default=None,
                     help="deveco.db 路径(或 DevEco 数据目录)，覆盖默认位置；用于按 session id 直读 DB 及定位子代理库")
     ap.add_argument("--serve", action="store_true",
-                    help="起本机服务:报告页 + 返修链路页 + 两原子端点(供调查 agent / MCP);复用 --host/--port/--open")
+                    help="起本机服务:报告页 + 会话总览;复用 --host/--port/--open")
     ap.add_argument("--live", action="store_true",
                     help="增量监控仍在追加的 session，并启动本地自动刷新页面")
     ap.add_argument("--interval", type=float, default=10.0,
@@ -232,8 +232,8 @@ def main():
         template = load_template()
 
         def build_snapshot_bytes():
-            # live 快照:带审计,不建两原子账本(每次刷新都重算太贵);页面没有服务端,藏返修链路入口
-            trace = service.report_trace(jsonl, static=True, with_chains=False)
+            # live 快照:带审计;页面没有服务端,后续节点不带站内链接
+            trace = service.report_trace(jsonl, static=True)
             return build_html(trace, template).encode("utf-8")
 
         chat_service = None
@@ -282,7 +282,7 @@ def main():
         return
 
     print("解析 %s ..." % jsonl)
-    # 离线报告 = 提取 + 审计 + 返修追溯卡(claude / codex 建两原子账本);导出页没有服务端,藏返修链路入口
+    # 离线报告 = 提取 + 审计 + 跨会话提示 + 执行拓扑后续节点;导出页没有服务端
     trace = service.report_trace(jsonl, static=True, storage_root=args.deveco_db)
 
     m, t = trace["meta"], trace["totals"]

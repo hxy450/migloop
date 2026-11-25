@@ -438,95 +438,6 @@ def _check_verify_emulator(trace: dict[str, Any]) -> list[dict[str, Any]]:
     return out
 
 
-#: 规范阶段序 —— 跨会话通用的迁移阶段刻度。纯修复轮会话里没有 execute
-#: 阶段(整场只有 verify),所以分界线不能用时间戳,只能用这张序表比较。
-_CANON_STAGE_ORDER = {
-    "setup": 0,
-    "mig-arch": 1, "a2h-arch-scaffold": 1,
-    "a2h-spec": 2,
-    "a2h-plan": 3,
-    "a2h-execute": 4,
-    "a2h-verify": 5, "arkts-visual-verify": 5,
-    "a2h-retrospect": 6,
-    # 管线收尾之后的两轮改码(DiceRoller 0903 实录):a2h-build 编译修复循环、ecat-refine ECAT 对抗式
-    # visual verify(判别器出单、修复方改码)。都在 execute 之后改鸿蒙码 → 修复侧
-    "a2h-build": 7, "ecat-refine": 7,
-}
-#: 分界线:execute 之后(序 > 4)全部是修复
-_GEN_LAST_ORDER = _CANON_STAGE_ORDER["a2h-execute"]
-#: workflow 自定义阶段名的词根兜底(dynamic workflow 不走 skill 词表)
-#: 用户口径(2026-09-04):只有主流水线(run/spec/plan/execute)是生成,dt verify / visual verify /
-#: ECAT / build 循环这些全是修复 —— 词根兜底覆盖没进上表的新阶段名
-_FIX_STAGE_WORDS = ("verify", "fix", "repair", "retrospect", "refine", "ecat", "build")
-
-
-def stage_order(stage: str | None) -> int | None:
-    """阶段 → 规范序。认不出返回 None(保守当生成侧,不凭空造修复关系)。"""
-    s = str(stage or "").strip().lower()
-    if not s or s.startswith("task:"):
-        # 任务清单切出的段(claude._task_list_boundaries)名字是会话自己写的任务题目,
-        # 不是管线阶段;题目里碰巧有 fix / verify 也不能据此判修复侧
-        return None
-    if s in _CANON_STAGE_ORDER:
-        return _CANON_STAGE_ORDER[s]
-    if any(w in s for w in _FIX_STAGE_WORDS):
-        return _GEN_LAST_ORDER + 1
-    return None
-
-
-def agent_is_fixer(a: dict[str, Any]) -> bool:
-    """修复方判定 —— 口径只此一处:唯一用武之地是账本的 filestory.build_fix_chains(逐笔版本的
-    阶段)与它的血缘层兜底映射;「02 风险点」返修追溯卡、链页首屏、迁移全程轮间连接都吃它算的链。
-
-    正式口径:**a2h-execute 结束就是修复开始的标志,之后所有的都是修复**。
-    判据是规范阶段序 > execute,不是 per-agent 的类型/描述关键词:
-    - execute 内部的收尾(group closer 修 build error)算生成侧 —— 把一组
-      产出收尾到可编译属于"生成完成",返修是交付之后别人回来改。它作为
-      行级原作者的身份由 blame 保留,链上信息不丢。
-    - 阶段认不出时保守归生成侧:宁可少一条链,不可凭空造修复关系。
-    """
-    return (stage_order(a.get("stage")) or 0) > _GEN_LAST_ORDER
-
-
-def check_fix_chains(chains: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """返修追溯 —— 链由两原子账本算(filestory.build_fix_chains,逐笔版本按阶段判修复方),
-    这里只把它包成「02 风险点」的一张卡:点名文件与生成方、跨会话计数、跳转链页。
-    修复/生成的划分只在账本那一层;不再从血缘层另算一遍,免得两处口径漂移。
-    """
-    if not chains:
-        return []
-    created = [c for c in chains if c.get("kind") == "created"]
-    template = [c for c in chains if c.get("kind") == "template"]
-    tag = {"created": "(修复期新建)", "template": "(模板未改)"}
-    shown = " · ".join(
-        f"{str(c.get('file') or '').rsplit('/', 1)[-1]}"
-        + tag.get(str(c.get("kind")), f"(生成:{str((c.get('generator') or {}).get('desc') or '')[:24]})")
-        for c in chains[:5])
-    more = f" 等 {len(chains)} 个文件" if len(chains) > 5 else ""
-    if created:
-        more += f";其中 {len(created)} 个是生成期没有、修复期补建的"
-    if template:
-        more += f";{len(template)} 个是模板/外部原样留到修复期才改的"
-    cross = sum(1 for c in chains if c.get("gen_session") or c.get("fix_session"))
-    stage = next((str((c.get("generator") or {}).get("stage"))
-                  for c in chains if (c.get("generator") or {}).get("stage")), None)
-    finding = _finding(
-        "verify-fix-traceback", "info",
-        "返修追溯",
-        f"修复轮改写了 {len(chains)} 个生成产物:{shown}{more}"
-        + (f"(其中 {cross} 条跨会话)" if cross else "")
-        + " —— 点开链路看生成方依据(spec 页/派发指令)与修复方说明;逐行归属与 diff 在链页。",
-        paths=[str(c.get("file_abs") or c.get("file")) for c in chains],
-        anchor={"stage": stage} if stage else None,
-    )
-    finding["chain"] = [
-        {"file": c.get("file"), "file_abs": c.get("file_abs"),
-         "generator": c.get("generator"), "fixer": c.get("fixer"), "lines": c.get("lines"),
-         "gen_session": c.get("gen_session"), "fix_session": c.get("fix_session")}
-        for c in chains[:40]]
-    return [finding]
-
-
 def _check_rework(trace: dict[str, Any]) -> list[dict[str, Any]]:
     """返工热点:同一代码文件被多个代理先后重写。少量属并行组装的正常现象,
     集中出现说明派发切分有重叠 —— 给信息级提示,完整名单在血缘视图。"""
@@ -732,14 +643,13 @@ def _session_rules(traces: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], 
 
 def build_audit(trace: dict[str, Any],
                 pipeline: tuple[str, ...] = DEFAULT_PIPELINE,
-                fix_chains: list[dict[str, Any]] | None = None,
                 pool_builds: list[dict[str, Any]] | None = None,
                 pool_agents: list[dict[str, Any]] | None = None,
                 pool_traces: list[dict[str, Any]] | None = None,
                 material_gaps: bool = False) -> dict[str, Any]:
     """跑全部规则,findings 按严重度排序。纯函数,不 I/O。
-    fix_chains = 两原子账本算好的返修链(filestory.build_fix_chains);不传(摘要端点、进行中的
-    会话)就没有返修追溯卡 —— 这里不再从血缘层另算。"""
+    返修追溯卡(verify-fix-traceback)吃两原子账本算的链,随返修链路移到 fuxi-ailabs/a2h-memory 的
+    ``fixchain/``,由那边的服务补进本函数的结果;这里不从血缘层另算。"""
     # Legacy private rules remain import-compatible, but are not the report's
     # policy. All active observations use the migration-wide engine below;
     # naming-based spec policies and absence-as-error rules are intentionally off.
@@ -754,7 +664,6 @@ def build_audit(trace: dict[str, Any],
             if key not in snapshots:
                 findings.append(f)
                 snapshots.add(key)
-    findings.extend(check_fix_chains(fix_chains or []))
     session_findings, session_checks = _session_rules(traces)
     findings.extend(session_findings)
     assessments = [*review["assessments"], *session_checks]

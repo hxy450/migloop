@@ -701,19 +701,9 @@
     fmtVer + (D.meta.cc_version || ""),
     fmtSrc
   ].forEach(function (c) { if (c) { var e = el("span", "chip", c); if (c.indexOf("session") === 0) e.classList.add("mono"); chips.appendChild(e); } });
-  // 返修链路页入口(页面级 button;链路可视化只在独立页,migloop 本页不渲染)。
-  // 单会话无链但会话里有修复型 agent 时也给入口 —— 生成方在前序会话,
-  // 独立页会做跨会话接力(codex),这里不预算链数。
+  // 同工程相邻轮次与迁移全程入口。返修链路页入口随返修链路移到 a2h-memory 的 fixchain/,本页不再画。
   (function () {
-    var tb = ((D.audit || {}).findings || []).filter(function (f) {
-      return f.rule === "verify-fix-traceback" && f.chain && f.chain.length; })[0];
-    var hasFixer = (D.agents || []).some(function (a) {
-      var t = String(a.type || "").toLowerCase();
-      return t.indexOf("fixer") >= 0 || t.indexOf("visual") >= 0;
-    });
-    // cross_hint:同工程的相邻轮次。轮次链接让"生成轮/验证轮"互相可见;
-    // 生成轮自己没有修复方时,后继轮的存在也是返修入口的依据
-    // (链页会自动重定向到后继的链)
+    // cross_hint:同工程的相邻轮次。轮次链接让"生成轮/验证轮"互相可见
     var hint = (D.audit || {}).cross_hint || {};
     function roundChip(label, sid8) {
       if (!sid8) return;
@@ -727,7 +717,7 @@
     }
     roundChip("← 前一轮", hint.prior);
     roundChip("后一轮", hint.later);
-    // 返修链路是迁移结束后的复盘 —— 会话还在跑时按钮不出现
+    // 迁移全程是结束后的复盘 —— 会话还在跑时按钮不出现
     if ((D.audit || {}).live_running) return;
     if (hint.prior || hint.later) {
       var jn = document.createElement("a");
@@ -739,18 +729,6 @@
       jn.style.textDecoration = "none";
       chips.appendChild(jn);
     }
-    // 宿主自己有返修链路入口(server 看板弹窗的按钮)时注入 urls 且 fixchain 为空:这里不再画入口
-    if (D.urls && !D.urls.fixchain) return;
-    if (!tb && !hasFixer && !hint.later) return;
-    var a = document.createElement("a");
-    a.className = "chip";
-    a.textContent = tb ? ("返修链路 ↗ " + tb.chain.length + " 条") : "返修链路 ↗ 跨会话";
-    a.href = (((D.urls || {}).fixchain && !/^https?:/i.test(D.urls.fixchain)) ? (window.__API_BASE__ || "") : "")
-      + (((D.urls || {}).fixchain) || ("/api/insight1/fixchain/" + encodeURIComponent((D.meta || {}).session_id || "")));
-    a.target = "_blank";
-    a.rel = "noopener";
-    a.style.cssText = "text-decoration:none;color:var(--crit);border-color:color-mix(in srgb, var(--crit) 45%, transparent);font-weight:650;";
-    chips.appendChild(a);
   })();
   document.getElementById("src-file").textContent = (D.meta.source_file || "").split("\\").pop();
   document.getElementById("extractor-name").textContent = fmtAdapter;
@@ -2714,18 +2692,6 @@
             e.source ? e.source.split(/[\\/]/).pop() + (e.line ? ":" + e.line : "") : "", e.outcome].filter(Boolean).join(" · ")));
         });
         bd.appendChild(evidenceDetails);
-      }
-      // 链路可视化在独立页(纯文字版没人看得懂) —— 这里只留跳转按钮
-      if (f.chain && f.chain.length && !(D.urls && !D.urls.fixchain)) {
-        var goChain = el("p", "risk-d");
-        var lnk = el("a", null, "打开返修链路页 ↗ (" + f.chain.length + " 条)");
-        lnk.href = (((D.urls || {}).fixchain && !/^https?:/i.test(D.urls.fixchain)) ? (window.__API_BASE__ || "") : "")
-          + (((D.urls || {}).fixchain) || ("/api/insight1/fixchain/" + encodeURIComponent((D.meta || {}).session_id || "")));
-        lnk.target = "_blank";
-        lnk.rel = "noopener";
-        lnk.addEventListener("click", function (ev) { ev.stopPropagation(); });
-        goChain.appendChild(lnk);
-        bd.appendChild(goChain);
       }
       it.appendChild(bd);
       // 证据锚点:点击跳到 06 对应阶段卡并闪烁;带时刻的顺便放大时间轴

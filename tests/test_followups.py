@@ -58,7 +58,7 @@ def _write(path: Path, recs: list[dict]) -> None:
 
 
 def _report(path: Path, *, static: bool = False) -> dict:
-    return service.report_trace(str(path), static=static, with_chains=False)
+    return service.report_trace(str(path), static=static)
 
 
 @pytest.fixture
