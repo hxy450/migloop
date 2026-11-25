@@ -136,10 +136,12 @@ def test_claude_stage_transitions(rows,want):
     assert [s["stage"] for s in result["stages"]] == want
 
 
-def test_codex_short_stage_preserved_and_bulk_read_not_a_transition():
+def test_codex_skill_reads_are_signals_and_bulk_read_is_not():
+    def root(calls):
+        return {"calls": calls, "tools": [], "cwd": None}
     calls = [{"idx": 0,"raw":"cat /skills/a2h-execute/SKILL.md","ts":"2026-01-01T00:00:00Z"},
              {"idx": 1,"raw":"cat /skills/a2h-verify/SKILL.md","ts":"2026-01-01T00:00:30Z"}]
-    assert codex._stage_boundaries({"calls":calls}) == [(0,"a2h-execute"),(1,"a2h-verify")]
-    assert codex._stage_boundaries({"calls":[{"idx":0,"raw":"cat /skills/a2h-spec/SKILL.md /skills/a2h-plan/SKILL.md"}]}) == [(0,"session")]
-    assert codex._stage_boundaries({"calls":[{"idx":0,"raw":"echo /skills/a2h-verify/SKILL.md"}]}) == [(0,"session")]
-    assert codex._stage_boundaries({"calls":[{"idx":0,"raw":"// /skills/a2h-verify/SKILL.md\nconst x = 1;"}]}) == [(0,"session")]
+    assert codex._stage_signals(root(calls)) == [(0,"a2h-execute"),(1,"a2h-verify")]
+    assert codex._stage_signals(root([{"idx":0,"raw":"cat /skills/a2h-spec/SKILL.md /skills/a2h-plan/SKILL.md"}])) == []
+    assert codex._stage_signals(root([{"idx":0,"raw":"echo /skills/a2h-verify/SKILL.md"}])) == []
+    assert codex._stage_signals(root([{"idx":0,"raw":"// /skills/a2h-verify/SKILL.md\nconst x = 1;"}])) == []

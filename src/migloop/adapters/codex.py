@@ -21,6 +21,7 @@ from datetime import datetime
 from typing import Any
 
 from .. import shellparse
+from .. import stage_signals
 
 from . import claude as common
 from .base import SessionCandidate
@@ -37,16 +38,6 @@ def default_root() -> str:
 
 _JSON_STRING = r'"(?:\\.|[^"\\])*"'
 _PIPELINE_SKILLS = set(common.PIPELINE_SKILLS)
-# Codex conversion skills read the run/build wrappers while bootstrapping.
-# They are orchestration helpers, not migration work phases.  The concrete
-# phase skills below are the stable stage boundaries users expect to see.
-_CODEX_STAGE_SKILLS = {
-    "mig-arch", "a2h-arch-scaffold", "a2h-spec", "a2h-plan",
-    "a2h-execute", "a2h-verify", "a2h-retrospect",
-    # dynamic workflow 的 verify 轮:visual verify 会话整场读它开工 ——
-    # 不成阶段的话 fixer 拿不到 verify 语义,正式口径(verify 阶段=fix)落空
-    "arkts-visual-verify",
-}
 
 
 def _first_json(path: str) -> Any:
@@ -263,6 +254,141 @@ def _extract_apply_patches(source: str | None) -> list[str]:
 def _skill_names(text: str | None) -> list[str]:
     pattern = re.compile(r"(?i)(?:\\+|/)+skills(?:\\+|/)+([a-z0-9_-]+)(?:\\+|/)+SKILL\.md")
     return list(dict.fromkeys(match.group(1) for match in pattern.finditer(text or "")))
+
+
+_SKILL_PATH = re.compile(r"(?i)([^\s'\"`;|&<>()]*?(?:\\+|/)+skills(?:\\+|/)+([a-z0-9_-]+)(?:\\+|/)+SKILL\.md)")
+#: 会话注入的 skill 清单条目:「- 名字: 描述 (file: 路径/SKILL.md)」
+_SKILL_LIST_ENTRY = re.compile(r"^\s*-\s*([A-Za-z0-9_.:-]+):[^\n]*?\(file:\s*([^)\n]*?SKILL\.md)\)", re.M)
+_SKILL_INJECT = re.compile(r"^\s*<skill>\s*<name>\s*([^<\s]+)\s*</name>")
+_SKILL_MENTION = re.compile(r"^\s*\[\$([A-Za-z0-9_:-]+)\]\(")
+_SKILL_DIR = re.compile(r"(?i)(?:\\+|/)skills(?:\\+|/)+([a-z0-9_-]+)(?:\\+|/)")
+#: role=user 消息里的注入段(工程说明、环境、skill 正文、旁栏页面、打断回执):不是人的输入
+_INJECTED_HEADS = ("# AGENTS.md instructions", "<environment_context>", "<user_instructions>", "<skill>",
+                   "<external_codex_apps_open_page>", "<turn_aborted>")
+#: 定时任务(automation heartbeat)发来的检查指令:程序下发
+_PROGRAM_HEADS = ("<heartbeat>",)
+
+
+def _skill_paths(text: str | None) -> list[tuple[str, str]]:
+    """命令里点到的 SKILL.md:[(skill 目录名, 原样路径)]。"""
+    return list(dict.fromkeys((m.group(2), m.group(1)) for m in _SKILL_PATH.finditer(text or "")))
+
+
+def _user_message_parts(content: Any) -> list[tuple[str, str]]:
+    """role=user 消息逐段归类 [(kind, text)],kind ∈ human / program / injected。"""
+    out: list[tuple[str, str]] = []
+    for item in content if isinstance(content, list) else [content]:
+        text = item.get("text") if isinstance(item, dict) else item
+        if not isinstance(text, str) or not text.strip():
+            continue
+        head = text.lstrip()
+        kind = ("injected" if head.startswith(_INJECTED_HEADS)
+                else "program" if head.startswith(_PROGRAM_HEADS) else "human")
+        out.append((kind, head))
+    return out
+
+
+def _driver_session(meta: dict[str, Any]) -> bool:
+    """codex exec / MCP 起的会话:输入全是程序下发(session_meta 的来源字段)。"""
+    source = meta.get("source")
+    return (isinstance(source, str) and source.lower() in ("exec", "mcp")) or \
+        "exec" in str(meta.get("originator") or "").lower()
+
+
+_TOOL_CALL = re.compile(r"\btools\.[A-Za-z_][\w]*\s*\(")
+_FOR_OF = re.compile(r"\bfor\s*(?:await\s*)?\(")
+
+
+def _match_close(text: str, start: int, opener: str, closer: str) -> int:
+    """text[start] 是 opener:返回配对的 closer 下标(跳过字符串与模板串),找不到给末尾。"""
+    depth, quote, k, n = 0, None, start, len(text)
+    while k < n:
+        ch = text[k]
+        if quote:
+            if ch == "\\":
+                k += 2
+                continue
+            if ch == quote:
+                quote = None
+        elif ch in "'\"`":
+            quote = ch
+        elif ch == opener:
+            depth += 1
+        elif ch == closer:
+            depth -= 1
+            if depth == 0:
+                return k
+        k += 1
+    return n - 1
+
+
+def _array_len(text: str) -> int | None:
+    """``[a, b, c]`` 字面量的元素数(顶层逗号);不是字面量给 None。"""
+    text = text.strip()
+    if not text.startswith("["):
+        return None
+    end = _match_close(text, 0, "[", "]")
+    body = text[1:end]
+    if not body.strip():
+        return 0
+    depth, quote, count, k = 0, None, 1, 0
+    while k < len(body):
+        ch = body[k]
+        if quote:
+            if ch == "\\":
+                k += 2
+                continue
+            if ch == quote:
+                quote = None
+        elif ch in "'\"`":
+            quote = ch
+        elif ch in "([{":
+            depth += 1
+        elif ch in ")]}":
+            depth -= 1
+        elif ch == "," and depth == 0 and body[k + 1:].strip():
+            count += 1
+        k += 1
+    return count
+
+
+def _inner_tool_count(code: str) -> int:
+    """code 模式 exec 脚本里的工具调用次数:每个 ``tools.*()`` 算一次,``for…of`` 遍历数组
+    字面量时按数组长度展开(嵌套相乘);别的循环按一次算。"""
+    total, pos = 0, 0
+    while True:
+        m = _FOR_OF.search(code, pos)
+        stop = m.start() if m else len(code)
+        total += len(_TOOL_CALL.findall(code, pos, stop))
+        if not m:
+            return total
+        head_open = m.end() - 1
+        head_close = _match_close(code, head_open, "(", ")")
+        header = code[head_open + 1:head_close]
+        times = None
+        of = re.search(r"\bof\b", header)
+        if of:
+            times = _array_len(header[of.end():])
+        total += len(_TOOL_CALL.findall(header))
+        k = head_close + 1
+        while k < len(code) and code[k].isspace():
+            k += 1
+        if k < len(code) and code[k] == "{":
+            body_end = _match_close(code, k, "{", "}")
+            body = code[k + 1:body_end]
+        else:
+            body_end = code.find(";", k)
+            body_end = len(code) - 1 if body_end < 0 else body_end
+            body = code[k:body_end + 1]
+        total += (1 if times is None else times) * _inner_tool_count(body)
+        pos = body_end + 1
+
+
+def _call_tool_count(call: dict[str, Any]) -> int:
+    """一次外层调用里实际发生的工具调用数:code 模式 exec 按脚本里层算,其余算一次。"""
+    if call.get("name") == "exec" and call.get("ptype") == "custom_tool_call":
+        return _inner_tool_count(call.get("raw") or "")
+    return 1
 
 
 def _tool_failed(output: str | None) -> bool:
@@ -670,6 +796,7 @@ def _new_scan_state() -> dict[str, Any]:
     return {"line_idx": 0, "local_start": 0, "inherited": {}, "meta": {},
             "first": None, "last": None, "record_points": [], "calls": [],
             "outputs": {}, "prompts": [], "token_points": [], "markers": [],
+            "prompts_ri": [], "skill_marks": [], "listed_skills": {}, "stalls": [], "close": None,
             "model": None, "last_message": "", "first_message": "", "completed": False,
             "text_chars": 0, "tool_chars": 0, "record_count": 0,
             "norm": {}, "offset": 0, "sig": None, "head": None}
@@ -704,6 +831,26 @@ def _scan_record(s: dict[str, Any], idx: int, record: dict[str, Any]) -> None:
             s["tool_chars"] += len(raw or "")
         elif ptype in ("function_call_output", "custom_tool_call_output"):
             s["outputs"][payload.get("call_id")] = {"ts": ts, "text": _content_text(payload.get("output"))}
+        elif ptype == "message" and payload.get("role") in ("user", "developer"):
+            content = payload.get("content")
+            for item in content if isinstance(content, list) else [content]:
+                text = item.get("text") if isinstance(item, dict) else item
+                if isinstance(text, str) and "(file:" in text:
+                    for name, where in _SKILL_LIST_ENTRY.findall(text):
+                        s["listed_skills"].setdefault(name, where.strip())
+            if payload.get("role") == "user":
+                parts = _user_message_parts(content)
+                for kind, text in parts:
+                    hit = _SKILL_INJECT.match(text) or (_SKILL_MENTION.match(text) if kind == "human" else None)
+                    if hit:
+                        s["skill_marks"].append((idx, hit.group(1)))
+                kinds = {kind for kind, _ in parts}
+                if kinds - {"injected"}:
+                    kind = "human" if "human" in kinds else "program"
+                    text = " ".join(t for k, t in parts if k == kind)
+                    s["prompts_ri"].append({"idx": idx, "ts": ts, "wait_ms": 0, "kind": kind,
+                                            "text": " ".join(text.split())[:common.PROMPT_TEXT_MAX]})
+                    _reopen(s, idx, ts, kind)
         elif ptype == "message" and payload.get("role") == "assistant":
             text = _content_text(payload.get("content"))
             if text.strip():
@@ -720,19 +867,23 @@ def _scan_record(s: dict[str, Any], idx: int, record: dict[str, Any]) -> None:
         if ptype == "user_message":
             text = payload.get("message") or ""
             if text.strip():
-                s["prompts"].append({"idx": idx, "ts": ts, "wait_ms": 0,
+                s["prompts"].append({"idx": idx, "ts": ts, "wait_ms": 0, "kind": "human",
                                      "text": " ".join(text.split())[:common.PROMPT_TEXT_MAX]})
+                _reopen(s, idx, ts, "human")
         elif ptype == "agent_message" and payload.get("message"):
             s["last_message"] = str(payload.get("message"))[:300]
         elif ptype == "task_complete":
             s["completed"] = True
             s["abort_explicit"] = False
+            s["close"] = s["close"] or ts
         elif ptype == "task_started":
             s["completed"] = False
             s["abort_explicit"] = False
+            _reopen(s, idx, ts, None)
         elif ptype in ("turn_aborted", "task_aborted"):
             s["completed"] = False
             s["abort_explicit"] = True
+            s["close"] = s["close"] or ts
         elif ptype == "token_count" and isinstance(payload.get("info"), dict):
             info = payload["info"]
             total = dict(info.get("total_token_usage") or {})
@@ -745,6 +896,17 @@ def _scan_record(s: dict[str, Any], idx: int, record: dict[str, Any]) -> None:
                                       "model": s["model"] or "codex"})
         elif ptype in ("context_compacted", "compaction"):
             s["markers"].append({"idx": idx, "ts": ts, "kind": "compact"})
+
+
+def _reopen(s: dict[str, Any], idx: int, ts: str | None, kind: str | None) -> None:
+    """回合关闭(task_complete / 打断)之后的下一条输入:这段算停摆。kind 是那条输入的来源,
+    task_started 先到时记 None,紧随其后的输入再补上来源。"""
+    if s["close"] and ts:
+        if ts > s["close"]:
+            s["stalls"].append([s["close"], ts, kind, idx])
+        s["close"] = None
+    elif kind and s["stalls"] and s["stalls"][-1][2] is None and s["stalls"][-1][1] == ts:
+        s["stalls"][-1][2], s["stalls"][-1][3] = kind, idx
 
 
 def _split_complete_lines(data: bytes) -> tuple[list[bytes], int]:
@@ -829,7 +991,17 @@ def _emit(s: dict[str, Any], path: str, tree_item: dict[str, Any] | None = None)
         "start_ts": s["first"] or meta_payload.get("timestamp"), "end_ts": s["last"],
         "record_count": s["record_count"], "record_points": s["record_points"],
         "calls": s["calls"], "outputs": outputs,
-        "prompts": [dict(pp) for pp in s["prompts"]],
+        # 有 user_message 事件(人打的原文)就用它;没有的版本(Codex Desktop 0.164)取 role=user
+        # 消息、去掉注入段;exec / MCP 起的会话输入都是程序下发
+        "prompts": [dict(pp, kind="program") if _driver_session(meta_payload) else dict(pp)
+                    for pp in (s["prompts"] or s["prompts_ri"])],
+        "skill_marks": list(s["skill_marks"]), "listed_skills": dict(s["listed_skills"]),
+        "stalls": [list(x) for x in s["stalls"]],
+        "inner_tool_calls": sum(_call_tool_count(c) for c in s["calls"]),
+        "outer_tool_calls": len(s["calls"]),
+        "spawn_calls": sum(1 for c in s["calls"] if c.get("name") == "spawn_agent") + sum(
+            len(re.findall(r"\btools\.spawn_agent\s*\(", c.get("raw") or "")) for c in s["calls"]
+            if c.get("name") == "exec" and c.get("ptype") == "custom_tool_call"),
         "token_points": token_points,
         "markers": [dict(m) for m in s["markers"]],
         "completed": s["completed"], "result": s["last_message"],
@@ -936,10 +1108,6 @@ def _billing_add(
     bucket["out"] += delta.get("output_tokens") or 0
 
 
-#: 阶段最短驻留(秒):短于它的"阶段"是技能路径的浏览批次,不是真实切换
-_STAGE_MIN_SPAN_S = 90
-
-
 def _ts_seconds(ts: Any) -> float | None:
     try:
         return datetime.fromisoformat(str(ts).replace("Z", "+00:00")).timestamp()
@@ -947,120 +1115,177 @@ def _ts_seconds(ts: Any) -> float | None:
         return None
 
 
-#: 流水线先后;不在表里的阶段技能(arkts-visual-verify)不参与「提前读」判定
-_STAGE_RANK = {name: rank for rank, name in enumerate(
-    ("mig-arch", "a2h-arch-scaffold", "a2h-spec", "a2h-plan",
-     "a2h-execute", "a2h-verify", "a2h-retrospect"))}
-_MARK_STAGE = re.compile(r"\ba2h(?:\.exe)?\s+mark-stage\s+([a-z0-9_-]+)")
+def _modified_skill_dirs(root: dict[str, Any]) -> set[str]:
+    """会话自己改过文件的 skills/<名字>/ 目录(改 skill 源码的开发会话里,读 SKILL.md 不是调用)。"""
+    names: set[str] = set()
+    for tool in root["tools"]:
+        paths: list[str] = []
+        if tool["name"] in ("Write", "Edit") and tool.get("brief"):
+            paths.append(str(tool["brief"]))
+        elif tool["name"] in ("Bash", "PowerShell"):
+            paths.extend(shellparse.parse_shell(str((tool.get("_inp") or {}).get("command") or "")).writes)
+        for path in paths:
+            names.update(m.group(1).lower() for m in _SKILL_DIR.finditer(path))
+    return names
 
 
-def _is_read_ahead(skill: str, idx: int, open_until: dict[str, int],
-                   ranked_reads: list[tuple[int, int]]) -> bool:
-    """``skill`` 的 SKILL.md 这次是提前读、不是切换 —— 两个信号都对得上才算(hmigbot-plus 82395e6e):
+def _norm_path(path: str) -> str:
+    return os.path.normcase(os.path.normpath(os.path.expanduser(path.replace("\\", "/"))))
 
-    1. 某个更靠前的阶段已进入,它的 ``a2h mark-stage`` 还在后面(技能把 mark-stage 写成最后一步);
-    2. 那次 mark-stage 之后读的第一个阶段技能不比 ``skill`` 靠后 —— 流水线此后才走到它或它之前。
 
-    只凭 1 不够:mark-stage 由模型执行,可能迟打、攒到最后一起打;那时 2 不成立(之后没有读取,
-    或已经读到更后面去了),按原样切换,阶段不会从报告里消失。实录:主线派出 spec 子代理后趁
-    wait_agent 的空当读了 plan / execute / verify,spec 打完水位才重读 plan 开工;那两段假阶段
-    各撑了 17、28 分钟,最短驻留拦不住。往回走(verify → execute 返工)、不在流水线表里的技能不拦。
-    """
-    rank = _STAGE_RANK.get(skill)
-    if rank is None:
+def _skill_read_counts(name: str, path: str, listed: dict[str, str], modified: set[str], cwd: str | None) -> bool:
+    """读 SKILL.md 算调用 skill:读的是会话注入的 skill 清单里列出的路径,且会话没改过这个
+    skill 目录下的文件。清单写的是别名短路径(r9/a2h-spec/SKILL.md)时按目录名对;写的是
+    绝对路径时要同一个文件。会话里没有注入清单(老版本)时不拦。"""
+    if name.lower() in modified:
         return False
-    for stage, until in open_until.items():
-        if _STAGE_RANK[stage] >= rank or until <= idx:
-            continue
-        resumed = next((r for i, r in ranked_reads if i > until), None)
-        if resumed is not None and resumed <= rank:
-            return True
-    return False
+    if not listed:
+        return True
+    where = listed.get(name)
+    if where is None:
+        return False
+    if os.path.isabs(where) or where.startswith("~"):
+        full = path if os.path.isabs(path) or path.startswith("~") else os.path.join(cwd or "", path)
+        return _norm_path(full) == _norm_path(where)
+    return True
 
 
-def _stage_boundaries(root: dict[str, Any]) -> list[tuple[int, str]]:
-    from ..stage_signals import normalize
+def _stage_signals(root: dict[str, Any]) -> list[tuple[int, str]]:
+    """主线 rollout → 已归一的 skill 信号 [(下标, 阶段)]:用户点 skill(``[$a2h-x](…)`` 与随后注入的
+    ``<skill>``)、显式 Skill 调用、读 SKILL.md(按 _skill_read_counts 判)。一条命令同时读几个
+    阶段 skill 是准备,不算。"""
     from ..audit_events import segments
-    markers: list[tuple[int, str]] = []
-    explicit: set[int] = set()                   # Skill 工具调用:确定信号,不按提前读拦
-    marks: dict[str, list[int]] = {}             # 阶段 → a2h mark-stage 出现的调用下标
+    listed = root.get("listed_skills") or {}
+    modified = _modified_skill_dirs(root)
+    out: list[tuple[int, str]] = []
+    for idx, name in root.get("skill_marks") or []:
+        stage = stage_signals.normalize(name)
+        if stage:
+            out.append((idx, stage))
     for call in root["calls"]:
         raw = call.get("raw") or ""
-        for stage in _MARK_STAGE.findall(raw):
-            stage = normalize(stage)
-            if stage:
-                marks.setdefault(stage, []).append(call["idx"])
+        if "SKILL.md" not in raw and str(call.get("name", "")).lower() != "skill":
+            continue
         args = _decode_arguments(raw)
         if str(call.get("name", "")).lower() == "skill":
-            skill = normalize(args.get("skill") or args.get("name"))
-            if skill:
-                markers.append((call["idx"], skill))
-                explicit.add(call["idx"])
+            stage = stage_signals.normalize(args.get("skill") or args.get("name"))
+            if stage:
+                out.append((call["idx"], stage))
             continue
-        commands = [s["command"] for s in _extract_shell_calls(raw, root.get("cwd"))]
+        commands = [c["command"] for c in _extract_shell_calls(raw, root.get("cwd"))]
         if not commands:
             commands = [args.get("command") or args.get("cmd") or raw]
-        names = []
+        reads: list[tuple[str, str]] = []
         for command in commands:
-            for words in segments(command):
+            if isinstance(command, list):
+                command = " ".join(str(x) for x in command)
+            for words in segments(str(command)):
                 if words and words[0].lower() in ("cat", "get-content", "sed", "head", "type"):
-                    names.extend(normalize(s) for s in _skill_names(" ".join(words)))
-        names = list(dict.fromkeys(n for n in names if n))
-        # Reading several stage skills together is preparation, not a timeline
-        # of phase transitions. A single read remains a labelled weak signal.
-        if len(names) == 1:
-            markers.append((call["idx"], names[0]))
-    # Preserve textual/call order for multiple skill paths in one command.
-    # Tuple sorting would alphabetize equal-index skills (Build before Run),
-    # inventing a stage transition that never happened.
-    markers.sort(key=lambda item: item[0])
-    transitions: list[tuple[int, str]] = []
-    current: str | None = None
-    used_idx: set[int] = set()
-    open_until: dict[str, int] = {}
-    ranked_reads = [(idx, _STAGE_RANK[skill]) for idx, skill in markers if skill in _STAGE_RANK]
-    for idx, skill in markers:
-        if idx in used_idx or skill == current:
+                    reads.extend(_skill_paths(" ".join(words)))
+        stages = {stage_signals.normalize(n) for n, _ in reads} - {None}
+        if len(stages) != 1:
             continue
-        if idx not in explicit and _is_read_ahead(skill, idx, open_until, ranked_reads):
+        name, path = next((n, pth) for n, pth in reads if stage_signals.normalize(n))
+        if _skill_read_counts(name, path, listed, modified, root.get("cwd")):
+            out.append((call["idx"], stages.pop()))
+    out.sort(key=lambda item: item[0])
+    return out
+
+
+def _stage_marks(root: dict[str, Any]) -> list[tuple[float, str]]:
+    """stage-marks.json + 主线里真跑成了的 ``a2h mark-stage``(看 exec / shell 回执),合并去重。"""
+    called: list[tuple[float, str]] = []
+    for call in root["calls"]:
+        stages = stage_signals.mark_calls(call.get("raw"))
+        if not stages:
             continue
-        if skill in _STAGE_RANK:
-            open_until[skill] = min((m for m in marks.get(skill, ()) if m > idx), default=-1)
-        transitions.append((idx, skill))
-        used_idx.add(idx)
-        current = skill
-    if not transitions:
-        return [(0, "session")]
-    rows = [(0, "setup")] if transitions[0][0] > 0 else []
-    rows.extend(transitions)
-    return rows
+        result = root["outputs"].get(call.get("call_id"))
+        if not result:
+            continue
+        output = result.get("text") or ""
+        t = _ts_seconds(call.get("ts"))
+        if t is not None and stage_signals.mark_ran(not _tool_failed(output), output):
+            called.extend((t, st) for st in stages)
+    first_t = _ts_seconds(root.get("start_ts"))
+    return stage_signals.merge_marks(
+        stage_signals.find_stage_marks(root["path"], root.get("cwd"), first_t), called)
 
 
 def _build_stages(root: dict[str, Any]) -> list[dict[str, Any]]:
-    boundaries = _stage_boundaries(root)
-    max_idx = max([idx for idx, _ in root["record_points"]] or [0])
-    points = root["record_points"]
+    points = [(idx, _ts_seconds(ts)) for idx, ts in root["record_points"]]
+    if not points:
+        points = [(0, _ts_seconds(root.get("start_ts")))]
+    human = [p for p in root["prompts"] if p.get("kind", "human") == "human"]
+    segs = stage_signals.segment(
+        points, marks=_stage_marks(root), signals=_stage_signals(root),
+        human=[p["idx"] for p in human],
+        resumes=[p["idx"] for p in human if stage_signals.is_resume_request(p.get("text"))])
+    ts_of = dict(root["record_points"])
     stages: list[dict[str, Any]] = []
     seen: Counter[str] = Counter()
-    for pos, (start_idx, key) in enumerate(boundaries):
-        end_idx = boundaries[pos + 1][0] - 1 if pos + 1 < len(boundaries) else max_idx
-        times = [ts for idx, ts in points if start_idx <= idx <= end_idx and ts]
-        label = common.STAGE_LABELS.get(key, key)
+    for pos, sg in enumerate(sg for sg in segs if sg["parent"] is None):
+        key = sg["stage"]
+        times = [ts_of[i] for i, _ in points if sg["start_idx"] <= i <= sg["end_idx"] and ts_of.get(i)]
+        label = common.segment_label(sg)
         seen[key] += 1
         if seen[key] > 1:
             label += " ·%d" % seen[key]
-        stages.append({
+        stage = {
             "id": "s%d" % pos, "stage": key, "label": label,
-            "signal": "skill-load-hint" if key not in ("session", "setup") else "unassigned",
-            "start_idx": start_idx, "end_idx": end_idx,
+            "signal": {"mark": "stage-mark", "skill": "skill-load-hint",
+                       "unterminated": "stage-mark-missing-end"}.get(sg["signal"], "unassigned"),
+            "start_idx": sg["start_idx"], "end_idx": sg["end_idx"],
             "start_ts": min(times) if times else None,
             "end_ts": max(times) if times else None,
             "duration_ms": common.ms_between(min(times), max(times)) if times else None,
             "tool_counts": {}, "output_tokens": 0, "cache_read_tokens": 0,
             "helper_skills": [], "artifacts": [], "agent_count": 0,
             "prompt_idxs": [], "wait_ms": 0, "active_ms": None,
-        })
+        }
+        if sg["signal"] == "unterminated":
+            stage["missing_end_mark"] = True
+        stages.append(stage)
     return stages
+
+
+def _busy_windows(rollout: dict[str, Any]) -> list[list[str]]:
+    """[首, 末] 扣掉回合关闭到下一条输入之间的停摆。"""
+    return common._busy_windows(rollout.get("start_ts"), rollout.get("end_ts"),
+                                [(a, b) for a, b, _k, _i in rollout.get("stalls") or []])
+
+
+def _settle_active(stages: list[dict[str, Any]], root: dict[str, Any], agents: list[dict[str, Any]],
+                   prompts: list[dict[str, Any]]) -> tuple[int | None, int | None]:
+    """活跃 = 时长 − 停摆(回合关闭到下一条输入),停摆再扣掉子代理忙碌窗口(与 Claude 同一条规则)。
+    返回 (总活跃, 等人工输入的停摆)。"""
+    busy = stage_signals.merge_busy(
+        (a, b) for ag in agents for a, b in (ag.get("busy") or []) if a and b and b > a)
+    pieces = stage_signals.stall_pieces([tuple(x) for x in root.get("stalls") or []], busy)
+    by_idx = {p["idx"]: p for p in prompts}
+
+    def overlap(a: str, b: str, lo: str | None, hi: str | None) -> int:
+        if not lo or not hi:
+            return 0
+        x0, x1 = max(a, lo), min(b, hi)
+        return max(0, common.ms_between(x0, x1) or 0) if x1 > x0 else 0
+
+    for a, b, kind, idx in pieces:
+        if kind == "human" and idx in by_idx:
+            by_idx[idx]["wait_ms"] += common.ms_between(a, b) or 0
+    for stage in stages:
+        if stage["duration_ms"] is None:
+            continue
+        stall = sum(overlap(a, b, stage["start_ts"], stage["end_ts"]) for a, b, _k, _i in pieces)
+        wait = sum(overlap(a, b, stage["start_ts"], stage["end_ts"]) for a, b, k, _i in pieces if k == "human")
+        stall = min(stall, stage["duration_ms"])
+        stage["active_ms"] = stage["duration_ms"] - stall
+        stage["wait_ms"] = min(wait, stall)
+    duration = common.ms_between(root["start_ts"], root["end_ts"])
+    if duration is None:
+        return None, None
+    stall = min(sum(overlap(a, b, root["start_ts"], root["end_ts"]) for a, b, _k, _i in pieces), duration)
+    wait = sum(overlap(a, b, root["start_ts"], root["end_ts"]) for a, b, k, _i in pieces if k == "human")
+    return duration - stall, min(wait, stall)
 
 
 def _stage_of_idx(stages: list[dict[str, Any]], idx: int) -> dict[str, Any]:
@@ -1152,7 +1377,9 @@ def _agent_entry(
         "stage": stage["stage"], "seg": stage["id"],
         "start_ts": rollout["start_ts"], "end_ts": rollout["end_ts"],
         "dur_ms": common.ms_between(rollout["start_ts"], rollout["end_ts"]),
-        "output_tokens": output, "tool_uses": len(rollout["tools"]),
+        "output_tokens": output, "tool_uses": rollout["inner_tool_calls"],
+        "tool_uses_outer": rollout["outer_tool_calls"],
+        "busy": _busy_windows(rollout),
         "tool_counts": dict(Counter(tool["name"] for tool in rollout["tools"])),
         "status": "completed" if rollout["completed"] else "unknown",
         "aborted": "interrupted" if rollout.get("abort_explicit") else None,
@@ -1319,15 +1546,23 @@ def extract(path: str, sessions_root: str | None = None) -> dict[str, Any]:
     split["thinking"] += min(main_out, root_reasoning)
     split["text"] += max(0, main_out - root_reasoning)
     duration = common.ms_between(meta["started_at"], meta["ended_at"])
+    active, waited = _settle_active(stages, root, agents, root["prompts"])
     totals = {
-        "duration_ms": duration, "user_wait_ms": 0,
-        "active_ms": duration, "tool_calls": len(root["tools"]),
-        "agent_calls": len(agents), "subagent_transcripts": len(agents),
+        "duration_ms": duration, "user_wait_ms": waited,
+        "active_ms": active,
+        # 工具数按里层算(code 模式 exec 里的 tools.* 调用);外层调用次数另列
+        "tool_calls": root["inner_tool_calls"], "tool_calls_outer": root["outer_tool_calls"],
+        "subagent_tool_calls": sum(agent.get("tool_uses") or 0 for agent in agents),
+        "subagent_tool_calls_outer": sum(agent.get("tool_uses_outer") or 0 for agent in agents),
+        # 派发次数与实际有转录的子会话分开报(下载包常只带一部分子会话)
+        "agent_calls": root["spawn_calls"], "subagent_transcripts": len(agents),
         "main_output_tokens": main_out, "subagent_output_tokens": sub_out,
         "aborted_agents": sum(1 for agent in agents if agent.get("aborted")),
         "interrupted_output_tokens": sum(agent["output_tokens"] for agent in agents if agent.get("abort_explicit")),
         "waste_output_tokens": None,
-        "output_split": split, "user_prompts": len(root["prompts"]),
+        "output_split": split,
+        "user_prompts": sum(1 for p in root["prompts"] if p.get("kind", "human") == "human"),
+        "program_prompts": sum(1 for p in root["prompts"] if p.get("kind") == "program"),
         "files_touched": len({tool.get("brief") for tool in root["tools"]
                               if tool["name"] in ("Write", "Edit") and tool.get("brief")}),
         "compactions": len(root["markers"]),

@@ -1,4 +1,4 @@
-"""codex 阶段切分:spec 期间提前读下游 SKILL.md 不是进入下游阶段。
+"""codex 阶段切分:有 mark-stage 只按 mark 切,spec 期间提前读下游 SKILL.md 不是进入下游阶段。
 
 移植自 hmigbot-plus tests/web/test_insight1_codex_audit.py 后半(82395e6e)。
 
@@ -71,8 +71,8 @@ def test_reading_downstream_skills_before_the_stage_is_marked_is_not_a_transitio
     ]) == ["a2h-spec", "a2h-plan", "a2h-execute"]
 
 
-def test_verify_execute_loop_survives_the_mark_stage_rule(tmp_path: Path) -> None:
-    """返工回环是往回走,不受「未标记不得前进」约束;第二轮 execute 没再标记也照常前进。"""
+def test_rework_inside_a_marked_stage_is_not_cut(tmp_path: Path) -> None:
+    """有 mark 只按 mark 切:verify 不过回去返工的那段仍在 verify 的 mark 之内,不另切。"""
     assert _stages(tmp_path, [
         (1, _read("a2h-execute")),
         (20, ".migbot/bin/a2h mark-stage a2h-execute"),
@@ -80,12 +80,12 @@ def test_verify_execute_loop_survives_the_mark_stage_rule(tmp_path: Path) -> Non
         (30, _read("a2h-execute")),                                    # verify 不过,回去返工
         (45, _read("a2h-verify")),
         (50, ".migbot/bin/a2h mark-stage a2h-verify"),
-    ]) == ["a2h-execute", "a2h-verify", "a2h-execute", "a2h-verify"]
+    ]) == ["a2h-execute", "a2h-verify"]
 
 
 def test_sessions_without_mark_stage_keep_the_old_behaviour(tmp_path: Path) -> None:
     assert _stages(tmp_path, [
-        (1, _read("a2h-spec")), (20, _read("a2h-plan")), (40, _read("a2h-execute")),
+        (1, _read("a2h-spec")), (20, _read("a2h-plan")), (40, _read("a2h-execute")), (50, "echo done"),
     ]) == ["a2h-spec", "a2h-plan", "a2h-execute"]
 
 
@@ -115,19 +115,23 @@ def test_single_read_ahead_while_plan_is_open_is_ignored(tmp_path: Path) -> None
     ]) == ["a2h-plan", "a2h-execute"]
 
 
-def test_late_or_batched_mark_stage_never_erases_a_stage(tmp_path: Path) -> None:
-    """mark-stage 由模型执行,不保证打在阶段末尾:攒到最后一起打时,前面的切换照常成立。"""
+def test_batched_marks_only_close_the_first_stage(tmp_path: Path) -> None:
+    """mark 攒到最后一起打:mark 是权威,后两个阶段长度为零,不再按 skill 信号补回来。"""
     assert _stages(tmp_path, [
         (1, _read("a2h-spec")), (20, _read("a2h-plan")), (40, _read("a2h-execute")),
-        (60, ".migbot/bin/a2h mark-stage a2h-spec; .migbot/bin/a2h mark-stage a2h-plan; "
+        (59, ".migbot/bin/a2h mark-stage a2h-spec; .migbot/bin/a2h mark-stage a2h-plan; "
              ".migbot/bin/a2h mark-stage a2h-execute"),
-    ]) == ["a2h-spec", "a2h-plan", "a2h-execute"]
+    ]) == ["a2h-spec"]
 
 
-def test_stage_entered_before_a_late_mark_is_kept(tmp_path: Path) -> None:
-    """spec 的水位迟打(plan 已经开工),之后直接读到 execute —— plan 是真阶段,不能被吞掉。"""
-    assert _stages(tmp_path, [
+def test_tail_after_a_late_mark_is_named_by_the_next_unmarked_skill(tmp_path: Path) -> None:
+    """spec 的水位迟打(plan 已经开工):mark 之前的 plan 读取不切;mark 之后读到 execute,
+    尾段按它命名并标缺结束标记。"""
+    trace = codex.extract(_stage_rollout(tmp_path, [
         (1, _read("a2h-spec")), (20, _read("a2h-plan")),
         (25, ".migbot/bin/a2h mark-stage a2h-spec"),
         (40, _read("a2h-execute")),
-    ]) == ["a2h-spec", "a2h-plan", "a2h-execute"]
+    ]), sessions_root=str(tmp_path / "sessions"))
+    tail = trace["stages"][-1]
+    assert [s["stage"] for s in trace["stages"] if s["stage"] != "setup"] == ["a2h-spec", "a2h-execute"]
+    assert tail["missing_end_mark"] and tail["label"] == "Execute（缺结束标记）"

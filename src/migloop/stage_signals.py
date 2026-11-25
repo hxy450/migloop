@@ -92,9 +92,9 @@ def mark_ran(ok: Any, result: Any) -> bool:
 
 def merge_marks(*sources: Iterable[Tuple[float, str]], window: float = 120.0) -> List[Tuple[float, str]]:
     """stage-marks.json 与转录里的 mark 合并:同一阶段相隔 ``window`` 秒内的算一次,取早的。"""
-    rows = sorted({(float(t), st) for src in sources for t, st in src})
+    rows = sorted(((float(t), st) for src in sources for t, st in src), key=lambda m: m[0])
     out: List[Tuple[float, str]] = []
-    for t, st in rows:
+    for t, st in rows:   # 同一时刻的按原顺序(一条命令里先后打的几个 mark)
         if any(s == st and abs(t - u) <= window for u, s in out):
             continue
         out.append((t, st))
@@ -237,7 +237,7 @@ def _from_marks(clock: _Clock, marks: Sequence[Tuple[float, str]], signals: Sequ
     那一段归收尾 mark 的阶段。最后一个 mark 之后的尾巴:有还没打过 mark 的阶段的 skill 信号,
     按第一个这样的信号命名、标缺结束标记;没有信号时,最后收尾的是 execute 及之后的阶段就是
     管线收尾段(``AFTER``),否则是「未标记(X 之后)」。只有收尾段那种情况管线算走完。"""
-    rows = sorted(marks)
+    rows = sorted(marks, key=lambda m: m[0])
     out: List[Tuple[int, str, str, Dict[str, Any]]] = []
     cursor: Optional[int] = clock.idxs[0] if clock.idxs else None
     last_end: Optional[Tuple[float, str]] = None

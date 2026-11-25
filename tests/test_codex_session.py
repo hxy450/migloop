@@ -74,7 +74,7 @@ class CodexSessionAdapterTest(unittest.TestCase):
                     "type": "function_call_output", "call_id": "call-agent",
                     "output": json.dumps({"task_name": "/root/worker"}),
                 }),
-                rec("2026-01-01T00:00:07Z", "event_msg", {
+                rec("2026-01-01T00:05:07Z", "event_msg", {
                     "type": "token_count", "info": {
                         "total_token_usage": {"input_tokens": 100, "cached_input_tokens": 40,
                                               "output_tokens": 20, "reasoning_output_tokens": 5},
@@ -82,7 +82,7 @@ class CodexSessionAdapterTest(unittest.TestCase):
                                              "output_tokens": 20, "reasoning_output_tokens": 5},
                     },
                 }),
-                rec("2026-01-01T00:00:08Z", "event_msg", {
+                rec("2026-01-01T00:05:08Z", "event_msg", {
                     "type": "task_complete", "turn_id": "turn-1",
                 }),
             ]
