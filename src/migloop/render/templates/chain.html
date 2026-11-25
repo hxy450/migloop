@@ -53,7 +53,7 @@
 <script>
 (function () {
   var IDENT = __CHAIN_ID__;
-  var STAGE_HINT = { "开跑前": "第一个阶段开始之前", "管线完成后": "a2h 五阶段已走完(复盘之后),loop 又续的轮次" };
+  var STAGE_HINT = { "开跑前": "第一个阶段开始之前", "管线结束后": "最后一个收尾 mark 之后、人还没开口的那一段", "后续轮": "管线走完后从第一条人工输入起的轮次,不算进最后一个阶段" };
   var KIND = { session: "会话", worker: "主迁移", reviewer: "托管评审", ecat: "ECAT 精修", capability: "能力会话" };
   var COLOR = { session: "var(--c-worker)", worker: "var(--c-worker)", reviewer: "var(--c-reviewer)", ecat: "var(--c-ecat)", capability: "var(--c-other)" };
   function esc(x) { return String(x == null ? "" : x).replace(/[&<>"']/g, function (c) {

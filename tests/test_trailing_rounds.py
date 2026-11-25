@@ -1,13 +1,8 @@
-"""管线走完后的续轮不算进最后一个阶段(移植自 hmigbot-plus 72c56b60、cd6d3d4e)。
+"""后续轮(stage_signals 第 2 条)与人工 / 程序下发(第 4 条)在 Claude adapter 上的落地。
 
-只在管线的终点阶段(a2h-retrospect)之后切:单 skill 的能力会话(视觉对比等)只在第一轮盖
-skill 归属戳,后续 loop 轮仍在做该 skill 的活(2026-09-23 DiceRoller 视觉对比实测:后续轮
-64 次工具调用、visual-fixer / visual-fixer-reviewer 等 6 个子代理,1h18m),不能切成续轮。
-
-阶段按 attributionSkill 切,末段原先一直延到会话最后一条记录。2026-09-21 DiceRoller 实测:
-a2h-retrospect 实际 10:20–10:25,之后 loop 又续了 9 轮(每轮一条 DEFERRED 门禁提示、worker
-几秒回一句「按 DEFERRED 完成」,记录全无 attributionSkill),Retrospect 被算成 13m30s,
-这 9 轮的评审与评估也被标成「Retrospect」。管线中途的续跑轮仍归原阶段,不受影响。
+最后一个管线阶段结束后,从第一条**人工输入**起单独成「后续轮」,不算进最后一个阶段;
+SDK / 驱动程序下发的指令(promptSource=sdk,如 loop 的 DEFERRED 门禁回合)不是人工,
+不开后续轮。管线中途的人工输入不切。
 """
 
 from __future__ import annotations
@@ -27,9 +22,12 @@ def _ts(minute: int, second: int = 0) -> str:
     return f"2026-09-21T17:{minute:02d}:{second:02d}.000Z"
 
 
-def _prompt(minute: int, text: str) -> dict:
-    return {"type": "user", "timestamp": _ts(minute), "sessionId": SID, "cwd": "/w/h", "promptSource": "sdk",
-            "message": {"role": "user", "content": text}}
+def _prompt(minute: int, text: str, source: str | None = "typed") -> dict:
+    rec = {"type": "user", "timestamp": _ts(minute), "sessionId": SID, "cwd": "/w/h",
+           "message": {"role": "user", "content": text}}
+    if source:
+        rec["promptSource"] = source
+    return rec
 
 
 def _said(minute: int, second: int, text: str, skill: str | None) -> dict:
@@ -47,53 +45,52 @@ def _extract(tmp_path: Path, recs: list[dict]) -> dict:
     return adapter.extract(str(path))
 
 
-def test_rounds_after_the_last_stage_get_their_own_segment(tmp_path: Path) -> None:
+def test_human_input_after_the_last_stage_opens_trailing_rounds(tmp_path: Path) -> None:
     trace = _extract(tmp_path, [
         _prompt(0, "运行 /a2h-run"),
-        _said(9, 0, "verify", "a2h-verify"), _said(20, 0, "verify done", "a2h-verify"),
-        _said(21, 0, "retrospect", "a2h-retrospect"), _said(25, 47, "全流程完成", "a2h-retrospect"),
-        _prompt(26, "以下验证项因设备条件尚未实测,请确认验证环境就绪后继续"), _said(27, 54, "按 DEFERRED 完成", None),
-        _prompt(34, "以下验证项因设备条件尚未实测,请确认验证环境就绪后继续"), _said(34, 7, "按 DEFERRED 完成", None),
+        _said(1, 0, "execute", "a2h-execute"), _said(20, 0, "execute done", "a2h-execute"),
+        _prompt(26, "帮我看看各阶段耗时"), _said(27, 54, "好的", None),
+        _prompt(34, "再导出一份"), _said(34, 7, "导出了", None),
     ])
-
     stages = {s["label"]: s for s in trace["stages"]}
-    assert list(stages)[-2:] == ["Retrospect", adapter.TRAILING_ROUNDS_LABEL]
-    assert stages["Retrospect"]["end_ts"] == _ts(25, 47)
+    assert list(stages)[-2:] == ["Execute", adapter.TRAILING_ROUNDS_LABEL]
+    assert stages["Execute"]["end_ts"] == _ts(20)
     trailing = stages[adapter.TRAILING_ROUNDS_LABEL]
     assert (trailing["start_ts"], trailing["end_ts"]) == (_ts(26), _ts(34, 7))
+    assert trace["totals"]["user_prompts"] == 3 and trace["totals"]["program_prompts"] == 0
 
 
-def test_a_resume_round_that_keeps_working_in_a_stage_stays_in_that_stage(tmp_path: Path) -> None:
+def test_program_issued_rounds_after_the_pipeline_stay_in_the_last_stage(tmp_path: Path) -> None:
+    """loop 驱动下发的 DEFERRED 门禁回合是程序下发,不是人工,不开后续轮(2026-11-24 口径)。"""
+    trace = _extract(tmp_path, [
+        _prompt(0, "运行 /a2h-run", source="sdk"),
+        _said(9, 0, "verify", "a2h-verify"), _said(20, 0, "verify done", "a2h-verify"),
+        _prompt(26, "以下验证项因设备条件尚未实测,请确认验证环境就绪后继续", source="sdk"),
+        _said(27, 54, "按 DEFERRED 完成", None),
+    ])
+    assert [s["label"] for s in trace["stages"] if s["stage"] != "setup"] == ["Verify"]
+    assert trace["totals"]["user_prompts"] == 0 and trace["totals"]["program_prompts"] == 2
+    assert {p["kind"] for p in trace["prompts"]} == {"program"}
+
+
+def test_human_input_mid_pipeline_is_not_split_off(tmp_path: Path) -> None:
     trace = _extract(tmp_path, [
         _prompt(0, "运行 /a2h-run"),
         _said(9, 0, "execute", "a2h-execute"),
-        _prompt(10, "reviewer:继续补齐"), _said(11, 0, "继续 execute", "a2h-execute"),
-        _said(20, 0, "verify", "a2h-verify"),
+        _prompt(10, "继续"), _said(11, 0, "继续 execute", None),
+        _said(20, 0, "verify", "a2h-verify"), _said(25, 0, "verify done", "a2h-verify"),
     ])
-
     assert [s["label"] for s in trace["stages"] if s["stage"] != "setup"] == ["Execute", "Verify"]
 
 
-def test_trailing_rounds_mid_pipeline_without_attribution_are_not_split_off(tmp_path: Path) -> None:
-    """只切「最后一个管线阶段之后」的续轮;中途没盖归属戳的续轮照旧留在所在阶段。"""
+def test_old_transcripts_without_prompt_source_are_judged_by_content(tmp_path: Path) -> None:
+    """老版本没有 promptSource:人打的文字与斜杠命令算人工,本地命令回显 / 通知不算。"""
     trace = _extract(tmp_path, [
-        _prompt(0, "运行 /a2h-run"),
-        _said(9, 0, "execute", "a2h-execute"),
-        _prompt(10, "reviewer:继续"), _said(11, 0, "继续", None),
-        _said(20, 0, "verify", "a2h-verify"),
+        _prompt(0, "<command-message>a2h-run</command-message>\n<command-name>/a2h-run</command-name>", source=None),
+        _prompt(1, "<local-command-stdout>Bye!</local-command-stdout>", source=None),
+        _prompt(2, "<task-notification><task-id>x</task-id></task-notification>", source=None),
+        _prompt(3, "帮我启动下鸿蒙应用", source=None),
+        _said(4, 0, "ok", None),
     ])
-
-    assert [s["label"] for s in trace["stages"] if s["stage"] != "setup"] == ["Execute", "Verify"]
-
-
-def test_later_rounds_of_a_single_skill_session_stay_in_that_skill(tmp_path: Path) -> None:
-    trace = _extract(tmp_path, [
-        _prompt(0, "调用 arkts-visual-verify skill"),
-        _said(1, 0, "visual verify", "arkts-visual-verify"), _said(17, 0, "第一轮完成", "arkts-visual-verify"),
-        _prompt(20, "reviewer:继续修复视觉差异"), _said(21, 0, "派 visual-fixer 修复", None),
-        _prompt(40, "reviewer:继续"), _said(59, 0, "修复完成", None),
-    ])
-
-    stages = [s for s in trace["stages"] if s["stage"] != "setup"]
-    assert [s["label"] for s in stages] == ["Visual Verify"]
-    assert stages[0]["end_ts"] == _ts(59)
+    assert [(p["kind"], p["text"]) for p in trace["prompts"]] == [
+        ("human", "/a2h-run"), ("human", "帮我启动下鸿蒙应用")]

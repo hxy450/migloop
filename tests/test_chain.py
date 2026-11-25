@@ -148,7 +148,7 @@ def test_timeline_entries_are_placed_in_the_stage_they_happened_in() -> None:
 
 
 def test_entries_after_the_trailing_rounds_segment_keep_its_name() -> None:
-    """末段已经是「管线完成后」时,其后的条目不再叠一个「之后」。"""
+    """末段已经是「后续轮」时,其后的条目不再叠一个「之后」。"""
     stages = [{"label": "Visual Verify", "start_ts": "2026-09-21T19:00:00Z", "end_ts": "2026-09-21T19:10:00Z"},
               {"label": claude_adapter.TRAILING_ROUNDS_LABEL,
                "start_ts": "2026-09-21T19:20:00Z", "end_ts": "2026-09-21T19:30:00Z"}]

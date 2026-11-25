@@ -28,13 +28,15 @@ import difflib
 from ..shellparse import parse_shell
 from collections import Counter
 from collections.abc import Iterator
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from .base import SessionCandidate
 from ..audit_events import ClaudeCalls
 from ..cc_records import is_request_replay
-from ..stage_signals import claude_boundaries
+from .. import stage_signals
+from ..stage_signals import (claude_boundaries, find_stage_marks, is_resume_request, iso_seconds,
+                             mark_calls, mark_ran, merge_marks, normalize as norm_stage, segment)
 from ..line_blame import replay_file as _blame_replay
 
 
@@ -83,19 +85,48 @@ PIPELINE_SKILLS = ["a2h-run", "a2h-run-zh", "a2h-init-zh", "a2h-build-zh", "a2h-
                    "a2h-execute", "a2h-verify", "a2h-retrospect",
                    "arkts-visual-verify"]
 
-#: a2h 管线走到终点阶段(复盘)之后 loop 又续的轮次(门禁回合等):不算进复盘的耗时与统计。
-#: 只认终点阶段 —— 单 skill 的能力会话(视觉对比等)只在第一轮盖归属戳,后续轮仍是该
-#: skill 的活,归原阶段(hmigbot-plus cd6d3d4e)。
-TRAILING_ROUNDS_STAGE = "after-pipeline"
-TRAILING_ROUNDS_LABEL = "管线完成后"
-_TERMINAL_PIPELINE_STAGES = frozenset({"a2h-retrospect"})
+#: 最后一个管线阶段结束后、从第一条人工输入起的轮次(stage_signals 第 2 条):单列,
+#: 不算进最后一个管线阶段的耗时与用量
+TRAILING_ROUNDS_STAGE = stage_signals.TRAILING
+TRAILING_ROUNDS_LABEL = "后续轮"
+#: 有 mark 时,最后一个收尾 mark 到第一条人工输入之间(管线已走完、人还没开口)
+AFTER_PIPELINE_LABEL = "管线结束后"
+MISSING_END_MARK = "缺结束标记"
+
+#: stage_signals.segment 的段来源 → trace 里 stage.signal 的写法
+_SEGMENT_SIGNAL = {"mark": "stage-mark", "skill": "native-stage-event", "workflow": "workflow",
+                   "unterminated": "stage-mark-missing-end", "after-marks": "unassigned",
+                   "rule": "unassigned", "none": "unassigned"}
+
+
+def segment_label(sg: dict[str, Any]) -> str:
+    """顶层段的显示名:缺结束标记的段带上标注,没有信号的叫「未标记(X 之后)」。"""
+    key = sg["stage"]
+    if key.startswith("wf:"):
+        return key.split(":", 1)[1]
+    if key == stage_signals.UNMARKED:
+        return "未标记（%s 之后）" % sg.get("after", "")
+    label = STAGE_LABELS.get(key, key)
+    if sg.get("signal") == "unterminated":
+        label += "（%s）" % MISSING_END_MARK
+    return label
+
+
+def _iso_of(t: float | None) -> str | None:
+    """epoch 秒 → 与转录同格式的 ISO(毫秒、Z 结尾)。"""
+    if t is None:
+        return None
+    return datetime.fromtimestamp(t, tz=timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+
 
 STAGE_LABELS = {
     "a2h-build": "Build",
     "setup": "Setup",
     TRAILING_ROUNDS_STAGE: TRAILING_ROUNDS_LABEL,
+    stage_signals.AFTER: AFTER_PIPELINE_LABEL,
     "a2h-run": "Run",
     "a2h-run-zh": "Run",
+    "a2h-init": "Init",
     "a2h-init-zh": "Init",
     "a2h-build-zh": "Build",
     "mig-arch": "Arch (mig-arch)",
@@ -109,46 +140,6 @@ STAGE_LABELS = {
     "session": "Session",
 }
 
-#: TaskCreate 的回执形态:「Task #N created successfully: <题目>」
-_TASK_CREATED_RE = re.compile(r"Task #(\d+) created successfully:\s*(.+)")
-_TASK_LIST_TOOLS = ("TaskCreate", "TaskUpdate", "TaskList", "TaskGet")
-
-
-def _task_list_boundaries(tools: list[dict[str, Any]]) -> list[tuple[int, str]]:
-    """无管线 skill 边界的会话:按会话自己登记的任务清单切阶段(移植自 hmigbot-plus fe468482)。
-
-    TaskCreate 的回执给出题目,TaskUpdate status=in_progress 开段;紧挨着开工
-    (中间没有别的工具调用)的几个任务是并发派发,并成一段、标签用「 + 」连。
-    DT / 视觉等能力会话不调 a2h-* 管线 skill,之前整场只有一段无名 Session
-    (2026-09-10 DT verify 实测:7 个任务、5 个 Agent 全塞一段)。不按能力名识别,
-    只吃会话里已有的信息。
-    """
-    subjects: dict[str, str] = {}
-    boundaries: list[tuple[int, list[str]]] = []
-    opened: set[str] = set()
-    worked_since_open = True
-    for t in tools:
-        name = t.get("name")
-        inp = t.get("_inp") or {}
-        if name == "TaskCreate":
-            m = _TASK_CREATED_RE.search(str(t.get("result") or ""))
-            if m:
-                subjects[m.group(1)] = m.group(2).strip()
-            continue
-        if name == "TaskUpdate":
-            tid = str(inp.get("taskId") or "")
-            if inp.get("status") == "in_progress" and tid and tid not in opened:
-                opened.add(tid)
-                label = subjects.get(tid) or f"task #{tid}"
-                if boundaries and not worked_since_open:
-                    boundaries[-1][1].append(label)
-                else:
-                    boundaries.append((int(t["idx"]), [label]))
-                    worked_since_open = False
-            continue
-        if name not in _TASK_LIST_TOOLS:
-            worked_since_open = True
-    return [(idx, "task:" + " + ".join(labels)) for idx, labels in boundaries]
 
 
 def parse_ts(ts: str | None) -> datetime | None:
@@ -181,6 +172,41 @@ def _activity_segments(ts_list: "list[str]", gap_ms: int = 600000) -> "list[list
         else:
             segs.append([ts, ts])
     return segs
+
+
+#: 不是会话活动的落盘:排队框的增删、离开时自动写的回顾。段首段尾不按它们算
+_NON_ACTIVITY_TYPES = frozenset({"queue-operation"})
+_NON_ACTIVITY_SUBTYPES = frozenset({"away_summary"})
+
+
+def _is_activity(rec: dict[str, Any]) -> bool:
+    return rec.get("type") not in _NON_ACTIVITY_TYPES and rec.get("subtype") not in _NON_ACTIVITY_SUBTYPES
+
+
+def _closes_turn(rec: dict[str, Any]) -> bool:
+    """子代理回合关闭:子代理转录里没有 system 回合关闭记录,看 assistant 的 stop_reason ——
+    end_turn(交回)或 stop_sequence(API 错误停下,如 429)。回合进行中的长静默照旧算忙。"""
+    return rec.get("type") == "assistant" and \
+        (rec.get("message") or {}).get("stop_reason") in ("end_turn", "stop_sequence")
+
+
+def _busy_windows(first: str | None, last: str | None, stalls: "list[tuple[str, str]]") -> "list[list[str]]":
+    """[首, 末] 扣掉停摆区间后的忙碌窗口。"""
+    if not first or not last or last <= first:
+        return [[first, last]] if first and last else []
+    out: "list[list[str]]" = []
+    cur = first
+    for s0, s1 in sorted(stalls):
+        if s1 <= cur:
+            continue
+        if s0 > cur:
+            out.append([cur, min(s0, last)])
+        cur = max(cur, s1)
+        if cur >= last:
+            break
+    if cur < last:
+        out.append([cur, last])
+    return out
 
 
 def brief_tool_target(name: Any, inp: Any) -> str:
@@ -1504,6 +1530,9 @@ def load_workflow_runs(
             "phases": [p.get("title") for p in (d.get("phases") or []) if isinstance(p, dict)],
             "status": d.get("status"),
             "duration_ms": d.get("durationMs"),
+            # 编排实际结束时刻(epoch 秒):Workflow 子段的段尾取它(stage_signals 第 3 条)
+            "end_t": ((d["startTime"] + d["durationMs"]) / 1000.0
+                      if isinstance(d.get("startTime"), (int, float)) and isinstance(d.get("durationMs"), (int, float)) else None),
             "agent_count": d.get("agentCount"),
             "tokens": d.get("totalTokens"),
             "tool_calls": d.get("totalToolCalls"),
@@ -1537,6 +1566,48 @@ _PROMPT_SOURCES = frozenset({"typed", "sdk"})
 #: 提示词正文上限(codex 适配器同用):报告抽屉标题是「全文」,ECAT / reviewer
 #: 提示词动辄数千字;只防病态超长把 trace 撑爆,悬浮提示由页面另行截短。
 PROMPT_TEXT_MAX = 20000
+#: user 记录里不是提示词的几种注入(本地命令回显、子代理完成通知、系统提醒、中断标记)
+_NOT_PROMPT_PREFIXES = ("<task-notification>", "<local-command-caveat>", "<local-command-stdout>",
+                        "<local-command-stderr>", "<system-reminder>", "[Request interrupted")
+_CMD_NAME_RE = re.compile(r"<command-name>\s*(/?[^<]*?)\s*</command-name>")
+_CMD_ARGS_RE = re.compile(r"<command-args>([^<]*)</command-args>", re.S)
+
+
+def prompt_of(rec: dict[str, Any]) -> tuple[str, str] | None:
+    """一条 user 记录是不是提示词、是谁下发的(stage_signals 第 4 条):返回 (kind, 正文)。
+
+    人工 = 人打的文字 + 斜杠命令;``promptSource=sdk`` 或 SDK 入口(entrypoint=sdk-*)下发的记
+    ``program``。``promptSource=system``(通知注入)、isMeta、压缩摘要、本地命令回显、工具结果
+    都不是提示词。老版本没有 promptSource,按内容判断。"""
+    if rec.get("type") != "user" or rec.get("isMeta") or rec.get("isCompactSummary"):
+        return None
+    src = rec.get("promptSource")
+    if src == "system":
+        return None
+    content = (rec.get("message") or {}).get("content")
+    if isinstance(content, list):
+        if any(isinstance(b, dict) and b.get("type") == "tool_result" for b in content):
+            return None
+        content = "\n".join(str(b.get("text") or "") for b in content
+                            if isinstance(b, dict) and b.get("type") == "text")
+    if not isinstance(content, str) or not content.strip():
+        return None
+    text = content.lstrip()
+    if text.startswith(_NOT_PROMPT_PREFIXES):
+        return None
+    cmd = _CMD_NAME_RE.search(text)
+    if cmd:
+        args = _CMD_ARGS_RE.search(text)
+        name = cmd.group(1).strip()
+        text = ("/" + name.lstrip("/") + (" " + args.group(1).strip() if args and args.group(1).strip() else ""))
+    kind = "program" if src == "sdk" or (src is None and str(rec.get("entrypoint") or "").startswith("sdk")) else "human"
+    return kind, " ".join(text.split())[:PROMPT_TEXT_MAX]
+
+
+def _usage_key(msg: dict[str, Any], fallback: Any) -> Any:
+    """跨文件同一条模型回复的身份:message.id(fork 子代理把父会话的前缀原样抄进自己的转录)。"""
+    mid = msg.get("id")
+    return ("id", mid) if mid else ("rec",) + tuple(fallback)
 
 
 def extract(path: str) -> dict[str, Any]:
@@ -1599,19 +1670,27 @@ def extract(path: str) -> dict[str, Any]:
                         pass
         return th, tx, tu
 
-    def bill(model: str, u: dict[str, Any]) -> None:
-        b = billing.setdefault(model, {"req": 0, "inp": 0, "cread": 0,
-                                       "cw5": 0, "cw1h": 0, "out": 0})
-        b["req"] += 1
-        b["inp"] += u.get("input_tokens") or 0
-        b["cread"] += u.get("cache_read_input_tokens") or 0
-        cc = u.get("cache_creation")
-        if isinstance(cc, dict):
-            b["cw5"] += cc.get("ephemeral_5m_input_tokens") or 0
-            b["cw1h"] += cc.get("ephemeral_1h_input_tokens") or 0
-        else:
-            b["cw1h"] += u.get("cache_creation_input_tokens") or 0
-        b["out"] += u.get("output_tokens") or 0
+    # 计费账:同一条模型回复(message.id)跨文件只记一次、取最后一条 —— fork 子代理把父会话的
+    # 前缀原样抄进自己的转录,不去重就在主线和子代理里各算一遍(ECAT 9cdf16b6 多出 6 次请求)
+    ledger: dict[Any, tuple[str, dict[str, Any]]] = {}
+
+    def bill(model: str, u: dict[str, Any], key: Any) -> None:
+        ledger[key] = (model, u)
+
+    def settle_billing() -> None:
+        for model, u in ledger.values():
+            b = billing.setdefault(model, {"req": 0, "inp": 0, "cread": 0,
+                                           "cw5": 0, "cw1h": 0, "out": 0})
+            b["req"] += 1
+            b["inp"] += u.get("input_tokens") or 0
+            b["cread"] += u.get("cache_read_input_tokens") or 0
+            cc = u.get("cache_creation")
+            if isinstance(cc, dict):
+                b["cw5"] += cc.get("ephemeral_5m_input_tokens") or 0
+                b["cw1h"] += cc.get("ephemeral_1h_input_tokens") or 0
+            else:
+                b["cw1h"] += u.get("cache_creation_input_tokens") or 0
+            b["out"] += u.get("output_tokens") or 0
 
     prev_ts = None  # 上一条带时间戳记录
     for i, rec in enumerate(records):
@@ -1634,11 +1713,9 @@ def extract(path: str) -> dict[str, Any]:
             markers.append({"idx": i, "ts": ts, "kind": "compact"})
 
         if rtype == "user":
-            if rec.get("promptSource") in _PROMPT_SOURCES:
-                content = rec.get("message", {}).get("content")
-                if isinstance(content, str) and content.strip():
-                    prompts.append({"idx": i, "ts": ts, "wait_ms": 0,
-                                    "text": " ".join(content.split())[:PROMPT_TEXT_MAX]})
+            got = prompt_of(rec)
+            if got:
+                prompts.append({"idx": i, "ts": ts, "wait_ms": 0, "kind": got[0], "text": got[1]})
             # tool_result 回填耗时与状态
             msg = rec.get("message")
             if isinstance(msg, dict) and isinstance(msg.get("content"), list):
@@ -1652,6 +1729,8 @@ def extract(path: str) -> dict[str, Any]:
                             t["result"] = result_snippet(block, rec.get("toolUseResult"))
                             full_result = result_text(block, rec.get("toolUseResult"))
                             t["_result_rec"] = i
+                            if t["name"] in ("Bash", "PowerShell") and mark_calls((t.get("_inp") or {}).get("command")):
+                                t["_mark_ok"] = mark_ran(t["ok"], full_result)
                             tur = rec.get("toolUseResult")
                             if isinstance(tur, dict):
                                 t["_tur"] = tur
@@ -1741,10 +1820,34 @@ def extract(path: str) -> dict[str, Any]:
     # output 构成:按该消息 thinking/正文/工具参数的字符占比,把 output token 摊到三类。
     # 字符≠token,但同一消息内三类的相对占比是可靠的(同一 tokenizer)。
     main_split = {"thinking": 0.0, "text": 0.0, "tool": 0.0}
-    for slot in sorted(msg_usage.values(), key=lambda s: s["idx"]):
+    main_mids = {mid for mid in msg_usage if mid}
+
+    def settle_agent(entry: dict[str, Any]) -> None:
+        """子代理的用量入账并算 output 构成。fork 子代理抄进来的父会话前缀(message.id 已在
+        主线出现)归主线,不再算进子代理,也不再记一次账。"""
+        if "_usage" not in entry:
+            return
+        a_split = {"thinking": 0.0, "text": 0.0, "tool": 0.0}
+        entry["output_tokens"] = 0
+        for k, (mid, model, u, ch) in enumerate(entry["_usage"]):
+            if mid and mid in main_mids:
+                continue
+            bill(model, u, ("id", mid) if mid else ("agent", entry.get("agent_id"), k))
+            o = u.get("output_tokens") or 0
+            entry["output_tokens"] += o
+            th, tx, tu = ch
+            tot_ch = th + tx + tu
+            if tot_ch:
+                a_split["thinking"] += o * th / tot_ch
+                a_split["text"] += o * tx / tot_ch
+                a_split["tool"] += o * tu / tot_ch
+            else:
+                a_split["text"] += o
+        entry["out_split"] = {k: int(round(v)) for k, v in a_split.items()}
+    for mid, slot in sorted(msg_usage.items(), key=lambda kv: kv[1]["idx"]):
         u = slot["u"]
         usage_by_idx.append((slot["idx"], u))
-        bill(slot["model"], u)
+        bill(slot["model"], u, ("id", mid) if mid else ("main", None))
         o = u.get("output_tokens") or 0
         th, tx, tu = slot.get("ch") or (0, 0, 0)
         tot_ch = th + tx + tu
@@ -1761,79 +1864,60 @@ def extract(path: str) -> dict[str, Any]:
                                  "out": u.get("output_tokens") or 0,
                                  "inp": inp, "cread": cread, "cwrite": cwrite})
 
-    # ---- 阶段切分 ----
-    # 主信号:attributionSkill —— harness 给每条记录盖的确定性 skill 归属戳。
-    # 即使某管线阶段没有再触发一次 Skill 工具调用(resume 续跑 / 斜杠命令进入 /
-    # 在导出边界之前进入),归属戳仍在,据此切阶段。Skill 工具调用退为兜底。
+    # ---- 阶段切分(stage_signals 四条口径)----
+    # 有 run 级 mark(stage-marks.json,或主线自己调的 a2h mark-stage)只按 mark 切;否则用 skill
+    # 信号(显式 Skill 调用、attributionSkill 归属戳切换、斜杠命令),一段不足 90 秒不切。最后一个
+    # 管线阶段结束后,从第一条人工输入起单列「后续轮」;管线阶段里发起的 Workflow 是子段。
     # skill 打包为插件后名字带命名空间前缀(如 migbot:a2h-spec),匹配前先归一。
     def norm_skill(name: Any) -> str:
         return (name or "").split(":")[-1]
 
-    pipe_boundaries = claude_boundaries(records, skill_calls)
-    # Workflow 模式:主线每次 Workflow 调用开一个阶段(阶段名取脚本 meta.name)。
-    # 这样"整段一个 Session"会按编排单元自然拆开，与管线 skill 的阶段等价。
-    wf_stage_of_run: dict[str, str] = {}
+    signals = claude_boundaries(records, skill_calls)
+    points = [(i, iso_seconds(r.get("timestamp"))) for i, r in enumerate(records)]
+    first_t = next((t for _, t in points if t is not None), None)
+    # mark:stage-marks.json + 主线真跑成了的 mark-stage 调用(时刻取调用那一刻),合并去重
+    called: list[tuple[float, str]] = []
+    for t in tools:
+        if t.get("_mark_ok"):
+            tt = iso_seconds(t["ts"])
+            if tt is not None:
+                called.extend((tt, st) for st in mark_calls((t.get("_inp") or {}).get("command")))
+    marks = merge_marks(find_stage_marks(path, meta["cwd"], first_t), called)
+    # Workflow 模式:主线每次 Workflow 调用对应一次编排 run(阶段名取脚本 meta.name),
+    # 段尾取编排实际结束时刻(wf_*.json 的 startTime + durationMs)
+    launched: list[tuple[int, str | None]] = []
     if wf_runs:
         by_task = {r["task_id"]: rid for rid, r in wf_runs.items() if r.get("task_id")}
-        launched: list[tuple[int, str | None]] = []
         for t in tools:
             if t["name"] != "Workflow":
                 continue
             m = re.search(r"Task ID:\s*(\S+)", t.get("result") or "")
-            rid = by_task.get(m.group(1)) if m else None
-            launched.append((t["idx"], rid))
+            launched.append((t["idx"], by_task.get(m.group(1)) if m else None))
         # 没有 Task ID 回填(会话被截断)时按启动顺序对齐 startTime
         if launched and any(r is None for _, r in launched):
             spare = [rid for rid in sorted(wf_runs, key=lambda k: wf_runs[k].get("run_id") or "")
                      if rid not in {r for _, r in launched if r}]
             launched = [(i, r or (spare.pop(0) if spare else None)) for i, r in launched]
-        for idx, rid in launched:
-            if not rid:
-                continue
-            key = "wf:" + wf_runs[rid]["name"]
-            wf_stage_of_run[rid] = key
-            pipe_boundaries.append((idx, key))
-    # 末段收口:管线已到终点阶段(复盘),其后从某条新提示词起到会话结束都没有管线归属戳 ——
-    # 那是管线完成后 loop 又续的轮次,单独成段,不拖长复盘(hmigbot-plus 72c56b60、cd6d3d4e)。
-    # 管线中途、或单 skill 会话的后续轮没盖戳时仍归所在阶段。只扫内存里已读好的记录。
-    skill_bounds = {i for i, key in pipe_boundaries if key in PIPELINE_SKILLS}
-    last_key = max(pipe_boundaries)[1] if pipe_boundaries else ""
-    if skill_bounds and norm_skill(last_key) in _TERMINAL_PIPELINE_STAGES:
-        last_attr = max(i for i, rec in enumerate(records)
-                        if i in skill_bounds or norm_skill(rec.get("attributionSkill")) in PIPELINE_SKILLS)
-        trailing = next((pr["idx"] for pr in prompts if pr["idx"] > last_attr), None)
-        if trailing is not None:
-            pipe_boundaries.append((trailing, TRAILING_ROUNDS_STAGE))
-    if not pipe_boundaries:
-        pipe_boundaries = _task_list_boundaries(tools)
-    pipe_boundaries.sort()
-
-    # 首个管线边界之前的记录归 setup(若首边界即 idx 0 则无 setup 段)
-    boundaries: list[tuple[int, str]] = []
-    if not pipe_boundaries or pipe_boundaries[0][0] > 0:
-        boundaries.append((0, "setup"))
-    boundaries += pipe_boundaries
-    boundaries.sort()
-    # 同一 idx 去重(保留先出现者),避免退化出空段(end_idx=-1)
-    deduped: list[tuple[int, str]] = []
-    for bnd in boundaries:
-        if deduped and deduped[-1][0] == bnd[0]:
-            continue
-        deduped.append(bnd)
-    boundaries = deduped
+    workflows = [{"idx": idx, "end": wf_runs[rid].get("end_t"), "key": wf_runs[rid]["name"], "rid": rid}
+                 for idx, rid in launched if rid]
+    pipe_attr = [i for i, rec in enumerate(records) if norm_stage(rec.get("attributionSkill"))]
+    human_prompts = [p for p in prompts if p.get("kind") == "human"]
+    segs = segment(points, marks=marks, signals=signals,
+                   human=[p["idx"] for p in human_prompts],
+                   resumes=[p["idx"] for p in human_prompts if is_resume_request(p.get("text"))],
+                   workflows=workflows, last_pipeline_idx=max(pipe_attr) if pipe_attr else None)
+    top_segs = [sg for sg in segs if sg["parent"] is None]
 
     stages: list[dict[str, Any]] = []
-    for b, (start_idx, stage_key) in enumerate(boundaries):
-        end_idx = boundaries[b + 1][0] - 1 if b + 1 < len(boundaries) else len(records) - 1
+    for b, sg in enumerate(top_segs):
+        start_idx, end_idx, stage_key = sg["start_idx"], sg["end_idx"], sg["stage"]
         seg_records = records[start_idx:end_idx + 1]
-        ts_list: list[str] = [str(r["timestamp"]) for r in seg_records if r.get("timestamp")]
+        ts_list: list[str] = [str(r["timestamp"]) for r in seg_records if r.get("timestamp") and _is_activity(r)]
         stages.append({
             "id": f"s{b}",
-            "signal": ("unassigned" if stage_key in ("setup", TRAILING_ROUNDS_STAGE)
-                       else "task-list" if stage_key.startswith("task:") else "native-stage-event"),
+            "signal": _SEGMENT_SIGNAL.get(sg["signal"], "unassigned"),
             "stage": stage_key,
-            "label": (stage_key.split(":", 1)[1] if stage_key.startswith(("wf:", "task:"))
-                      else STAGE_LABELS.get(stage_key, stage_key)),
+            "label": segment_label(sg),
             "start_idx": start_idx,
             "end_idx": end_idx,
             # 取最早/最晚而不是首条/末条:主线 jsonl 的时间戳并非严格按下标递增
@@ -1850,15 +1934,42 @@ def extract(path: str) -> dict[str, Any]:
             "prompt_idxs": [],
             "wait_ms": 0,       # 等待用户输入的空转时长
             "active_ms": None,  # 活跃时长 = duration - wait(定稿于阶段归属之后)
+            "children": [],     # 管线阶段里发起的 Workflow(子段)
         })
+        if sg["signal"] == "unterminated":   # 最后一个 mark 之后、没打收尾 mark 的阶段
+            stages[-1]["missing_end_mark"] = True
+    wf_stage_of_run: dict[str, tuple[str, str, str | None]] = {}   # rid -> (阶段键, 段 id, 子段 id)
+    wf_by_launch = {wf["idx"]: wf for wf in workflows}
+    for sg in segs:
+        wf = wf_by_launch.get(sg["start_idx"]) if sg["signal"] == "workflow" else None
+        if sg["parent"] is None:
+            if wf:
+                st = next(s for s in stages if s["start_idx"] == sg["start_idx"])
+                wf_stage_of_run[wf["rid"]] = (st["stage"], st["id"], None)
+            continue
+        parent = stages[sg["parent"]]
+        seg_records = records[sg["start_idx"]:sg["end_idx"] + 1]
+        ts_list = [str(r["timestamp"]) for r in seg_records if r.get("timestamp") and _is_activity(r)]
+        start_ts = _iso_of(sg.get("start_t")) or (min(ts_list) if ts_list else None)
+        end_ts = _iso_of(sg.get("end_t")) or (max(ts_list) if ts_list else None)
+        child = {"id": "%s.w%d" % (parent["id"], len(parent["children"])), "parent": parent["id"],
+                 "signal": "workflow", "stage": sg["stage"], "label": sg["stage"].split(":", 1)[1],
+                 "start_idx": sg["start_idx"], "end_idx": sg["end_idx"],
+                 "start_ts": start_ts, "end_ts": end_ts, "duration_ms": ms_between(start_ts, end_ts),
+                 "tool_counts": {}, "agent_count": 0}
+        parent["children"].append(child)
+        if wf:
+            wf_stage_of_run[wf["rid"]] = (parent["stage"], parent["id"], child["id"])
 
-    # 无任何管线 Skill 调用、也没有任务清单的通用会话:整段作为单一 session 阶段。
-    # harness 给记录盖了统一的 skill 归属戳时用那个戳当标签(会话自己的信息);
-    # 没有戳(ECAT 判别器/生成器)仍叫 Session,ecat.annotate 再按角色改标签。
-    if not pipe_boundaries:
-        stages[0]["stage"] = "session"
+    # 既没有 mark、也没跑过管线 skill 的会话整段一个 session。harness 给记录盖了统一的
+    # skill 归属戳时用那个戳当标签(会话自己的信息);没有戳(ECAT 判别器/生成器)仍叫
+    # Session,ecat.annotate 再按角色改标签。
+    if all(s["stage"] == "session" or s["stage"].startswith("wf:") for s in stages):
         attrs = {norm_skill(r.get("attributionSkill")) for r in records} - {""}
-        stages[0]["label"] = attrs.pop() if len(attrs) == 1 else "Session"
+        session_label = next(iter(attrs)) if len(attrs) == 1 else "Session"
+        for s in stages:
+            if s["stage"] == "session":
+                s["label"] = session_label
 
     # 同一阶段多次出现(如 verify→execute 回环)时,后续段落编号区分
     seen_stage_keys: dict[str, int] = {}
@@ -1878,11 +1989,16 @@ def extract(path: str) -> dict[str, Any]:
         t["stage"] = s["stage"]
         t["seg"] = s["id"]
         s["tool_counts"][t["name"]] = s["tool_counts"].get(t["name"], 0) + 1
+        for ch in s["children"]:
+            if ch["start_idx"] <= t["idx"] <= ch["end_idx"]:
+                t["subseg"] = ch["id"]
+                ch["tool_counts"][t["name"]] = ch["tool_counts"].get(t["name"], 0) + 1
         if t["name"] in ("Write", "Edit"):
             fp = t["brief"]
             if fp and fp not in s["artifacts"]:
                 s["artifacts"].append(fp)
-        if t["name"] == "Skill" and t.get("skill") and norm_skill(t["skill"]) not in PIPELINE_SKILLS:
+        # 管线 skill(含 -zh 与插件命名空间)不是 helper,走同一个归一
+        if t["name"] == "Skill" and t.get("skill") and norm_stage(t["skill"]) is None:
             s["helper_skills"].append({"idx": t["idx"], "ts": t["ts"], "skill": t["skill"]})
 
     for p in prompts:
@@ -1913,6 +2029,22 @@ def extract(path: str) -> dict[str, Any]:
                 for fn in sorted(os.listdir(rdir)):
                     if fn.endswith(".meta.json"):
                         meta_files.append((rdir, fn))
+    # 第三种:服务端下载包布局 —— sessions/main-<sid>.jsonl 同目录平铺 agent-<id>.jsonl,没有 meta。
+    # 派发回执(Agent 工具的 toolUseResult.agentId)把它们连回主线:类型、描述取派发参数。
+    synth_meta: dict[str, dict[str, Any]] = {}
+    if not meta_files:
+        by_agent_id = {str(t["_tur"]["agentId"]): t for t in tools
+                       if t["name"] in ("Agent", "Task") and isinstance(t.get("_tur"), dict)
+                       and t["_tur"].get("agentId")}
+        here = os.path.dirname(os.path.abspath(path))
+        for jl_name in sorted(glob.glob(os.path.join(here, "agent-*.jsonl"))) if by_agent_id else []:
+            aid = os.path.basename(jl_name)[len("agent-"):-len(".jsonl")]
+            if aid in by_agent_id and not os.path.isfile(jl_name[:-len(".jsonl")] + ".meta.json"):
+                parent_tool = by_agent_id[aid]
+                synth_meta[aid] = {"agentType": parent_tool.get("agent_type"),
+                                   "description": parent_tool.get("agent_desc") or "",
+                                   "toolUseId": parent_tool.get("tuid")}
+                meta_files.append((here, f"agent-{aid}.meta.json"))
 
     agents: list[dict[str, Any]] = []
     if meta_files:
@@ -1920,13 +2052,17 @@ def extract(path: str) -> dict[str, Any]:
             if not fn.endswith(".meta.json"):
                 continue
             agent_id = fn[len("agent-"):-len(".meta.json")]
-            try:
-                m = json.load(open(os.path.join(adir, fn), encoding="utf-8"))
-            except (json.JSONDecodeError, OSError):
-                continue
+            if agent_id in synth_meta:
+                m = synth_meta[agent_id]
+            else:
+                try:
+                    m = json.load(open(os.path.join(adir, fn), encoding="utf-8"))
+                except (json.JSONDecodeError, OSError):
+                    continue
             wfi = wf_byagent.get(agent_id) or {}
             _jl_path = os.path.join(adir, f"agent-{agent_id}.jsonl")
-            _sig = _sub_sig(_jl_path, os.path.join(adir, fn), meta["cwd"])
+            _sig = _sub_sig(_jl_path, _jl_path if agent_id in synth_meta else os.path.join(adir, fn),
+                            meta["cwd"])
             _hit = _SUB_CACHE.get(_jl_path) if _sig else None
             if _hit is not None and _hit[0] == _sig:
                 entry = copy.deepcopy(_hit[1])
@@ -1983,6 +2119,10 @@ def extract(path: str) -> dict[str, Any]:
                     # 先收集后排序再分段 —— resume 拼接的转录时间戳有乱序,
                     # 边走边并会把段尾往回拨出负时长(MyAIPPT830 实测)
                     act_ts: list[str] = []
+                    # 忙碌窗口:与主线同一条停摆规则——回合已关闭(子代理交回 end_turn、或撞 API
+                    # 错误停下)到下一条 assistant/user 记录之间算停,其余算忙
+                    sub_stalls: list[tuple[str, str]] = []
+                    sub_close: str | None = None
                     # message.id -> {m:model, u:最新 usage, ch:[think,text,tool]字符}
                     sub_usage: dict[Any, dict[str, Any]] = {}
                     pending_skill: dict[Any, int] = {}  # tool_use_id -> skill_calls 下标(待回填结果)
@@ -2008,6 +2148,13 @@ def extract(path: str) -> dict[str, Any]:
                                     first_ts = ts
                                 last_ts = ts
                                 act_ts.append(ts)
+                                if rec.get("type") in ("assistant", "user"):
+                                    if sub_close is not None:
+                                        if ts > sub_close:
+                                            sub_stalls.append((sub_close, ts))
+                                        sub_close = None
+                                    if _closes_turn(rec):
+                                        sub_close = ts
                             # 收尾判定用:正常结束的子代理末条一定是 stop_reason=end_turn 的
                             # assistant 文本;被中断/断连的则停在 [Request interrupted] 或错误上
                             last_rec = rec
@@ -2170,24 +2317,13 @@ def extract(path: str) -> dict[str, Any]:
                                         elif (blk.get("type") == "text" and blk.get("text", "").strip()
                                               and msg.get("role") == "assistant"):
                                             entry["result"] = blk["text"].strip()[:300]
-                    a_split = {"thinking": 0.0, "text": 0.0, "tool": 0.0}
-                    for sslot in sub_usage.values():
-                        u = sslot["u"]
-                        entry["output_tokens"] += u.get("output_tokens") or 0
-                        bill(sslot["m"], u)
-                        o = u.get("output_tokens") or 0
-                        th, tx, tu = sslot["ch"]
-                        tot_ch = th + tx + tu
-                        if tot_ch:
-                            a_split["thinking"] += o * th / tot_ch
-                            a_split["text"] += o * tx / tot_ch
-                            a_split["tool"] += o * tu / tot_ch
-                        else:
-                            a_split["text"] += o
-                    entry["out_split"] = {k: int(round(v)) for k, v in a_split.items()}
+                    # 逐条回复的用量留在条目里(缓存命中也要记账),归属在 settle_agent 里定
+                    entry["_usage"] = [(mid, sslot["m"], sslot["u"], list(sslot["ch"]))
+                                       for mid, sslot in sub_usage.items()]
                     entry["start_ts"] = first_ts
                     entry["end_ts"] = last_ts
                     entry["dur_ms"] = ms_between(first_ts, last_ts)
+                    entry["busy"] = _busy_windows(first_ts, last_ts, sub_stalls)
                     act_segs = _activity_segments(act_ts)
                     if len(act_segs) > 1:
                         entry["active"] = act_segs
@@ -2202,15 +2338,15 @@ def extract(path: str) -> dict[str, Any]:
                     if len(_SUB_CACHE) >= _SUB_CACHE_MAX:
                         _SUB_CACHE.pop(next(iter(_SUB_CACHE)))
                     _SUB_CACHE[_jl_path] = (_sig, copy.deepcopy(entry))
+            settle_agent(entry)
             # Workflow 子代理没有派发 tool_use,按所属 workflow 归段——
             # 工作流在后台跑，时间窗常越过主线阶段边界，按时间兜底会归错。
-            wf_key = wf_stage_of_run.get(entry.get("wf_run") or "")
-            if wf_key:
-                entry["stage"] = wf_key
-                for s in stages:
-                    if s["stage"] == wf_key:
-                        entry["seg"] = s["id"]
-                        break
+            wf_slot = wf_stage_of_run.get(entry.get("wf_run") or "")
+            if wf_slot:
+                # 管线阶段里的编排:归外层阶段、记子段;管线外的编排本身是顶层段
+                entry["stage"], entry["seg"] = wf_slot[0], wf_slot[1]
+                if wf_slot[2]:
+                    entry["subseg"] = wf_slot[2]
                 # workflow 子代理的 transcript 末条是 StructuredOutput 的 tool_result(user 记录),
                 # 不是 assistant/end_turn——收尾启发式会把【全部】判成 interrupted,
                 # 于是"白跑分身"过滤把整批真实工作剔出视野统计。编排状态才是权威。
@@ -2225,6 +2361,8 @@ def extract(path: str) -> dict[str, Any]:
                 parent = tools[tool_by_id[entry["tuid"]]]
                 entry["stage"] = parent.get("stage")
                 entry["seg"] = parent.get("seg")
+                if parent.get("subseg"):
+                    entry["subseg"] = parent["subseg"]
                 tur = parent.get("_tur")
                 if isinstance(tur, dict) and tur.get("status"):
                     entry["status"] = tur["status"]
@@ -2246,6 +2384,9 @@ def extract(path: str) -> dict[str, Any]:
             for s in stages:
                 if s["id"] == a["seg"]:
                     s["agent_count"] += 1
+                    for ch in s["children"]:
+                        if ch["id"] == a.get("subseg"):
+                            ch["agent_count"] += 1
                     break
 
     # ---- 等待/活跃定稿 ----
@@ -2260,9 +2401,11 @@ def extract(path: str) -> dict[str, Any]:
             if a0:
                 busy.append([a0, a0 + timedelta(milliseconds=t["dur_ms"])])
     for ag in agents:
-        a0, b0 = parse_ts(ag.get("start_ts")), parse_ts(ag.get("end_ts"))
-        if a0 and b0 and b0 > a0:
-            busy.append([a0, b0])
+        # 子代理按它自己转录里的停摆规则切开(续跑跨夜不算忙),老缓存条目没有就退回首末
+        for w0, w1 in ag.get("busy") or [[ag.get("start_ts"), ag.get("end_ts")]]:
+            a0, b0 = parse_ts(w0), parse_ts(w1)
+            if a0 and b0 and b0 > a0:
+                busy.append([a0, b0])
     busy.sort(key=lambda x: x[0])
     merged_busy: list[list[datetime]] = []
     for a0, b0 in busy:
@@ -2349,6 +2492,7 @@ def extract(path: str) -> dict[str, Any]:
     for t in tools:
         t.pop("_tur", None)
         t.pop("_result_rec", None)
+        t.pop("_mark_ok", None)
 
     total_out = sum(s["output_tokens"] for s in stages)
     dur_total = ms_between(meta["started_at"], meta["ended_at"])
@@ -2386,10 +2530,13 @@ def extract(path: str) -> dict[str, Any]:
         "interrupted_output_tokens": sum(a["output_tokens"] for a in agents if a.get("abort_explicit")),
         "waste_output_tokens": None,  # Unknown: interrupted output may be reused.
         "output_split": {k: int(round(v)) for k, v in g_split.items()},
-        "user_prompts": len(prompts),
+        # 人工输入(人打的文字 + 斜杠命令)与程序下发(SDK / 驱动)分开数,见 stage_signals 第 4 条
+        "user_prompts": sum(1 for p in prompts if p.get("kind") == "human"),
+        "program_prompts": sum(1 for p in prompts if p.get("kind") == "program"),
         "files_touched": len({t["brief"] for t in tools if t["name"] in ("Write", "Edit")}),
         "compactions": len(markers),
     }
+    settle_billing()
 
     # ---- 数据血缘: spec ↔ agent ↔ 鸿蒙文件(在剥离临时字段之前构建)----
     lineage = build_lineage(agents, tools, meta["cwd"])
@@ -2406,6 +2553,7 @@ def extract(path: str) -> dict[str, Any]:
         a.pop("_read_sources", None)
         a.pop("_write_events", None)
         a.pop("_blame_events", None)
+        a.pop("_usage", None)
     for tool in tools:
         tool.pop("_inp", None)
         tool.pop("_visible_source_lines", None)

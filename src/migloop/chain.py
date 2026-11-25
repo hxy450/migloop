@@ -66,7 +66,7 @@ def stage_of(ts: str, stages: list[dict[str, Any]]) -> str | None:
             return label
         if moment > end:
             previous = label
-    # 末段本身就是「管线完成后」时不再叠「之后」
+    # 末段本身就是「后续轮」时不再叠「之后」
     return previous if previous == TRAILING_ROUNDS_LABEL else f"{previous} 之后"
 
 

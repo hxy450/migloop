@@ -90,6 +90,7 @@ def _stage_session(tmp_path) -> str:
          "message": {"role": "assistant", "content": spec_use}},
         skill(5, "k2", "a2h-plan", "a2h-plan"),            # 同 id 重复行
         skill(9, "k3", "a2h-execute", "a2h-execute"), result(9, "k3", "a2h-execute"),
+        result(14, "k3", "a2h-execute"),                   # execute 跑满 90 秒以上
     ]
     path = tmp_path / f"{sid}.jsonl"
     path.write_text("".join(json.dumps(r) + "\n" for r in rows), encoding="utf-8")

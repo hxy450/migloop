@@ -1,9 +1,7 @@
-"""无管线 skill 会话的阶段切分:按会话自己登记的任务清单切(移植自 hmigbot-plus fe468482)。
+"""没有 mark、也没跑过管线 skill 的会话整段一个 Session(stage_signals 第 1 条,2026-11-24 口径)。
 
-DT / 视觉等能力会话不调 a2h-* 管线 skill,adapter 只给一段无名 Session
-(2026-09-10 DT verify 实测:7 个 TaskCreate、13 个 TaskUpdate、5 个 Agent 全塞在
-一段里)。这些会话自己用 TaskCreate 登记了步骤、用 TaskUpdate 开工/收工,
-阶段就从这份清单里来,不做任何按名字的能力识别。
+此前按会话自己的任务清单(TaskCreate / TaskUpdate)切段(hmigbot-plus fe468482);用户定的统一
+口径改为整段一个 Session,任务清单不再切段。管线会话照常按管线 skill 切。
 """
 
 from __future__ import annotations
@@ -39,16 +37,6 @@ def _result(ts: str, mid: str, text: str) -> dict:
         {"type": "tool_result", "tool_use_id": f"tu-{mid}", "content": text}]}}
 
 
-def _create(ts: str, mid: str, n: int, subject: str) -> list[dict]:
-    return [_tool(ts, mid, "TaskCreate", {"subject": subject, "description": "…"}),
-            _result(ts, mid, f"Task #{n} created successfully: {subject}")]
-
-
-def _update(ts: str, mid: str, n: int, status: str) -> list[dict]:
-    return [_tool(ts, mid, "TaskUpdate", {"taskId": str(n), "status": status}),
-            _result(ts, mid, f"Updated task #{n} status")]
-
-
 def _write(path: Path, recs: list[dict]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(json.dumps(r) for r in recs) + "\n", encoding="utf-8")
@@ -60,72 +48,31 @@ def _dt_like(tmp_path: Path, *, pipeline: bool = False) -> str:
     recs = [_user(_ts(45), "调用 arkts-dt-verifier skill,对本工程执行 TDD 验证", cwd),
             _tool(_ts(45, 25), "sk", "Skill", {"skill": "arkts-dt-verifier"}, attr),
             _result(_ts(45, 26), "sk", "Launching skill")]
-    recs += _create(_ts(47, 9), "c1", 1, "Step 1: 派发单元测试 Agent")
-    recs += _create(_ts(47, 10), "c2", 2, "Step 2a+2b 并发:测试数据 + ID 注入")
-    recs += _create(_ts(47, 11), "c3", 3, "Step 3: 派发 UI 测试 Agent")
-    # 1 与 2 紧挨着开工(并发派发),中间没有别的工具调用 → 并成一段
-    recs += _update(_ts(48, 12), "u1", 1, "in_progress")
-    recs += _update(_ts(48, 13), "u2", 2, "in_progress")
-    recs.append(_tool(_ts(49, 33), "a1", "Agent",
-                      {"subagent_type": "general-purpose", "description": "Step 1 单元测试生成",
-                       "prompt": "…"}, attr))
-    recs.append(_result(_ts(58), "a1", "done"))
-    recs += _update(_ts(59, 9), "u3", 1, "completed")
-    recs += _update(_ts(59, 9), "u4", 2, "completed")
-    recs += _update(_ts(59, 10), "u5", 3, "in_progress")
-    recs.append(_tool(_ts(59, 30), "b1", "Bash", {"command": "hvigorw assembleHap"}, attr))
-    recs.append(_result(_ts(59, 50), "b1", "BUILD SUCCESSFUL"))
-    recs += _update(_ts(59, 55), "u6", 3, "completed")
-    # 收工后再开一个不在清单里的任务(没有 TaskCreate 回执)
-    recs += _update(_ts(59, 58), "u7", 9, "in_progress")
+    recs += [_tool(_ts(47, 9), "c1", "TaskCreate", {"subject": "Step 1"}, attr),
+             _result(_ts(47, 9), "c1", "Task #1 created successfully: Step 1"),
+             _tool(_ts(48, 12), "u1", "TaskUpdate", {"taskId": "1", "status": "in_progress"}, attr),
+             _tool(_ts(49, 33), "a1", "Agent", {"subagent_type": "general-purpose", "description": "Step 1",
+                                                "prompt": "…"}, attr),
+             _result(_ts(58), "a1", "done"),
+             _tool(_ts(59, 30), "b1", "Bash", {"command": "hvigorw assembleHap"}, attr),
+             _result(_ts(59, 50), "b1", "BUILD SUCCESSFUL")]
     path = tmp_path / "projects" / "slug" / f"{SID}.jsonl"
     _write(path, recs)
     return str(path)
 
 
-def test_task_list_splits_generic_session_into_stages(tmp_path: Path) -> None:
-    trace = adapter.extract(_dt_like(tmp_path))
-    stages = trace["stages"]
-    assert [s["label"] for s in stages] == [
-        "Setup",
-        "Step 1: 派发单元测试 Agent + Step 2a+2b 并发:测试数据 + ID 注入",
-        "Step 3: 派发 UI 测试 Agent",
-        "task #9",
-    ]
-    assert all(s["stage"].startswith("task:") for s in stages[1:])
-    # 工具归属跟着阶段走:Agent 派发落在 Step 1+2 段,编译落在 Step 3 段
-    by_name = {t["name"]: t["stage"] for t in trace["tools"] if t["name"] in ("Agent", "Bash")}
-    assert by_name["Agent"] == stages[1]["stage"]
-    assert by_name["Bash"] == stages[2]["stage"]
-    assert stages[1]["agent_count"] == 0 or stages[1]["tool_counts"].get("Agent") == 1
+def test_task_list_no_longer_splits_a_session_without_pipeline(tmp_path: Path) -> None:
+    stages = adapter.extract(_dt_like(tmp_path))["stages"]
+    assert [s["stage"] for s in stages] == ["session"]
 
 
 def test_pipeline_session_with_task_list_keeps_pipeline_stages(tmp_path: Path) -> None:
-    """管线会话本来就用任务清单管子任务(主会话 TaskUpdate #21 实测),阶段仍按
-    管线 skill 切,任务清单不插手。"""
-    trace = adapter.extract(_dt_like(tmp_path, pipeline=True))
-    keys = [s["stage"] for s in trace["stages"]]
-    assert "a2h-execute" in keys
-    assert not any(k.startswith("task:") for k in keys)
-
-
-def test_session_without_task_list_stays_single_stage(tmp_path: Path) -> None:
-    """ECAT 判别器/生成器会话:没有任务清单、没有归属戳 → 仍是一段 session,
-    ecat.annotate 的 ECAT 标签覆盖照常生效。"""
-    cwd = str(tmp_path / "harmony")
-    recs = [_user(_ts(1), "You are the Discriminator", cwd),
-            _tool(_ts(2), "a1", "Agent", {"subagent_type": "entropy-judge", "description": "j",
-                                          "prompt": "…"}),
-            _result(_ts(3), "a1", "ok")]
-    path = tmp_path / "projects" / "slug" / f"{SID}.jsonl"
-    _write(path, recs)
-    stages = adapter.extract(str(path))["stages"]
-    assert [(s["stage"], s["label"]) for s in stages] == [("session", "Session")]
+    keys = [s["stage"] for s in adapter.extract(_dt_like(tmp_path, pipeline=True))["stages"]]
+    assert "a2h-execute" in keys and not any(k.startswith("task:") for k in keys)
 
 
 def test_single_stage_labelled_by_harness_attribution(tmp_path: Path) -> None:
-    """没有任务清单但 harness 给记录盖了统一的 skill 归属戳:整段仍是 session,
-    标签用那个戳(会话自己的信息),不再是无名 Session。"""
+    """没有管线信号但 harness 给记录盖了统一的 skill 归属戳:整段仍是 session,标签用那个戳。"""
     cwd = str(tmp_path / "harmony")
     recs = [_user(_ts(1), "跑 hitest", cwd),
             _tool(_ts(2), "b1", "Bash", {"command": "hdc list targets"}, "arkts-scenario-runner"),

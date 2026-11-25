@@ -117,7 +117,8 @@ def test_claude_result_projection_retains_action_and_source():
 
 
 def cc_row(i, skill=None, attr=None):
-    row = {"type": "assistant", "sessionId": "s", "timestamp": f"2026-01-01T00:00:{i:02d}Z",
+    # 相邻记录隔 2 分钟:阶段不足 90 秒不切(stage_signals 第 1 条),这里测的是切换本身
+    row = {"type": "assistant", "sessionId": "s", "timestamp": f"2026-01-01T00:{2 * i:02d}:00Z",
            "message": {"role": "assistant", "content": [{"type": "tool_use", "id": str(i), "name": "Skill", "input": {"skill": skill}}] if skill else []}}
     if attr:
         row["attributionSkill"] = attr
@@ -125,7 +126,7 @@ def cc_row(i, skill=None, attr=None):
 
 
 @pytest.mark.parametrize("rows,want", [
-    ([cc_row(0,"a2h-execute"),cc_row(1,"a2h-verify"),cc_row(2,"a2h-execute")], ["a2h-execute","a2h-verify","a2h-execute"]),
+    ([cc_row(0,"a2h-execute"),cc_row(1,"a2h-verify"),cc_row(2,"a2h-execute"),cc_row(3)], ["a2h-execute","a2h-verify","a2h-execute"]),
     ([cc_row(0,"a2h-verify"),cc_row(1)], ["a2h-verify"]),
     ([cc_row(0,"a2h-spec"),cc_row(1,attr="a2h-spec")], ["a2h-spec"]),
 ])
