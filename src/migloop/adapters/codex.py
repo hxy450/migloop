@@ -946,17 +946,55 @@ def _ts_seconds(ts: Any) -> float | None:
         return None
 
 
+#: 流水线先后;不在表里的阶段技能(arkts-visual-verify)不参与「提前读」判定
+_STAGE_RANK = {name: rank for rank, name in enumerate(
+    ("mig-arch", "a2h-arch-scaffold", "a2h-spec", "a2h-plan",
+     "a2h-execute", "a2h-verify", "a2h-retrospect"))}
+_MARK_STAGE = re.compile(r"\ba2h(?:\.exe)?\s+mark-stage\s+([a-z0-9_-]+)")
+
+
+def _is_read_ahead(skill: str, idx: int, open_until: dict[str, int],
+                   ranked_reads: list[tuple[int, int]]) -> bool:
+    """``skill`` 的 SKILL.md 这次是提前读、不是切换 —— 两个信号都对得上才算(hmigbot-plus 82395e6e):
+
+    1. 某个更靠前的阶段已进入,它的 ``a2h mark-stage`` 还在后面(技能把 mark-stage 写成最后一步);
+    2. 那次 mark-stage 之后读的第一个阶段技能不比 ``skill`` 靠后 —— 流水线此后才走到它或它之前。
+
+    只凭 1 不够:mark-stage 由模型执行,可能迟打、攒到最后一起打;那时 2 不成立(之后没有读取,
+    或已经读到更后面去了),按原样切换,阶段不会从报告里消失。实录:主线派出 spec 子代理后趁
+    wait_agent 的空当读了 plan / execute / verify,spec 打完水位才重读 plan 开工;那两段假阶段
+    各撑了 17、28 分钟,最短驻留拦不住。往回走(verify → execute 返工)、不在流水线表里的技能不拦。
+    """
+    rank = _STAGE_RANK.get(skill)
+    if rank is None:
+        return False
+    for stage, until in open_until.items():
+        if _STAGE_RANK[stage] >= rank or until <= idx:
+            continue
+        resumed = next((r for i, r in ranked_reads if i > until), None)
+        if resumed is not None and resumed <= rank:
+            return True
+    return False
+
+
 def _stage_boundaries(root: dict[str, Any]) -> list[tuple[int, str]]:
     from ..stage_signals import normalize
     from ..audit_events import segments
     markers: list[tuple[int, str]] = []
+    explicit: set[int] = set()                   # Skill 工具调用:确定信号,不按提前读拦
+    marks: dict[str, list[int]] = {}             # 阶段 → a2h mark-stage 出现的调用下标
     for call in root["calls"]:
         raw = call.get("raw") or ""
+        for stage in _MARK_STAGE.findall(raw):
+            stage = normalize(stage)
+            if stage:
+                marks.setdefault(stage, []).append(call["idx"])
         args = _decode_arguments(raw)
         if str(call.get("name", "")).lower() == "skill":
             skill = normalize(args.get("skill") or args.get("name"))
             if skill:
                 markers.append((call["idx"], skill))
+                explicit.add(call["idx"])
             continue
         commands = [s["command"] for s in _extract_shell_calls(raw, root.get("cwd"))]
         if not commands:
@@ -978,9 +1016,15 @@ def _stage_boundaries(root: dict[str, Any]) -> list[tuple[int, str]]:
     transitions: list[tuple[int, str]] = []
     current: str | None = None
     used_idx: set[int] = set()
+    open_until: dict[str, int] = {}
+    ranked_reads = [(idx, _STAGE_RANK[skill]) for idx, skill in markers if skill in _STAGE_RANK]
     for idx, skill in markers:
         if idx in used_idx or skill == current:
             continue
+        if idx not in explicit and _is_read_ahead(skill, idx, open_until, ranked_reads):
+            continue
+        if skill in _STAGE_RANK:
+            open_until[skill] = min((m for m in marks.get(skill, ()) if m > idx), default=-1)
         transitions.append((idx, skill))
         used_idx.add(idx)
         current = skill
