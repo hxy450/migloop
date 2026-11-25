@@ -122,7 +122,12 @@ class MigrationMonitor:
         self.reset_cache = reset_cache
         slug = claude_slug(self.harmony)
         self.claude_dirs = [os.path.join(r, slug) for r in claude_project_roots(claude_root)]
-        if self.focus and self.focus.endswith(".jsonl") and not ecat.role_of(self.focus):
+        # 格式按首行认:main-*.jsonl / agent-*.jsonl 这类 Codex 文件名不像 rollout,也不能当成 Claude
+        self._formats: Dict[str, str] = {}
+        self.codex_dirs: List[str] = []
+        if self.focus and self.focus.endswith(".jsonl") and self._format(self.focus) == "codex":
+            self.codex_dirs.append(os.path.dirname(self.focus))
+        elif self.focus and self.focus.endswith(".jsonl") and not ecat.role_of(self.focus):
             here = os.path.dirname(self.focus)
             if os.path.normcase(here) not in {os.path.normcase(d) for d in self.claude_dirs}:
                 self.claude_dirs.append(here)
@@ -156,6 +161,16 @@ class MigrationMonitor:
         self.slots[key] = slot
         return True
 
+    def _format(self, path: str) -> str:
+        """一个 .jsonl 是 Codex 还是 Claude(首行是 session_meta 就是 Codex);每个文件只读一次首行。"""
+        fmt = self._formats.get(path)
+        if fmt is None:
+            fmt = "codex" if _codex.is_codex_session(path) else "claude"
+            with suppress(OSError):
+                if os.path.getsize(path):
+                    self._formats[path] = fmt    # 空文件(首行还没写)下轮再认
+        return fmt
+
     def _scan_claude(self) -> bool:
         changed = False
         paths: List[str] = []
@@ -163,9 +178,9 @@ class MigrationMonitor:
             with suppress(OSError):
                 paths.extend(os.path.join(d, n) for n in os.listdir(d) if n.endswith(".jsonl"))
         paths.extend(ecat._iter_transcripts(self.harmony))
-        if self.focus and self.focus.endswith(".jsonl") and os.path.isfile(self.focus) \
-                and not _ROLLOUT.match(os.path.basename(self.focus)):
+        if self.focus and self.focus.endswith(".jsonl") and os.path.isfile(self.focus):
             paths.append(self.focus)
+        paths = [p for p in paths if self._format(p) == "claude"]
         for p in paths:
             key = os.path.splitext(os.path.basename(p))[0]
             role = ecat.role_of(p) or ""
@@ -174,13 +189,15 @@ class MigrationMonitor:
 
     def _scan_codex(self) -> bool:
         changed = False
-        if not self.codex_root or not os.path.isdir(self.codex_root):
-            return False
-        for dirpath, _dirs, names in os.walk(self.codex_root):
+        walks = list(os.walk(self.codex_root)) if self.codex_root and os.path.isdir(self.codex_root) else []
+        for d in self.codex_dirs:     # 盯的是下载包里的 main-*.jsonl:同目录的 Codex 文件按首行认
+            with suppress(OSError):
+                walks.append((d, [], [n for n in os.listdir(d) if n.endswith(".jsonl")]))
+        for dirpath, _dirs, names in walks:
             for name in names:
-                if not _ROLLOUT.match(name):
-                    continue
                 path = os.path.abspath(os.path.join(dirpath, name))
+                if not _ROLLOUT.match(name) and not (name.endswith(".jsonl") and self._format(path) == "codex"):
+                    continue
                 ours = self._codex_seen.get(path)
                 if ours is None:
                     summary = _codex.session_summary(path)
@@ -189,7 +206,8 @@ class MigrationMonitor:
                     source = summary.get("source")
                     child = summary.get("thread_source") == "subagent" or (
                         isinstance(source, dict) and "subagent" in source)
-                    ours = (not child) and _under(self.harmony, summary.get("cwd"))
+                    ours = (not child) and (_under(self.harmony, summary.get("cwd")) or (
+                        self.focus is not None and os.path.normcase(path) == os.path.normcase(self.focus)))
                     self._codex_seen[path] = ours
                 if ours:
                     tid = ecat._rollout_tid(path) or os.path.splitext(name)[0]
@@ -466,9 +484,16 @@ def _thread(slot: Dict[str, Any], href: Optional[str]) -> Dict[str, Any]:
     for k, h in enumerate(hist):
         nxt = hist[k + 1] if k + 1 < len(hist) else None
         end = (nxt or {}).get("start_ts") or ended
-        stages.append({"label": _label(h.get("stage")), "start_ts": h.get("start_ts") or started, "end_ts": end,
+        label = _label(h.get("stage"))
+        if nxt is None and snap.get("marked_stages"):    # 与离线段名同写法
+            if h.get("stage") == "unmarked" and snap.get("unmarked_after"):
+                label = "未标记（%s 之后）" % _label(snap.get("unmarked_after"))
+            elif snap.get("named_by_signal") and h.get("stage") == snap.get("current_stage"):
+                label += "（缺结束标记）"
+        stages.append({"label": label, "start_ts": h.get("start_ts") or started, "end_ts": end,
                        "duration_ms": ms_between(h.get("start_ts") or started, end) or 0,
-                       "tool_calls": int(((nxt or {}).get("tools_at_start") if nxt else snap.get("tool_calls")) or 0)
+                       "tool_calls": int(((nxt or {}).get("tools_at_start") if nxt else
+                                          snap.get("main_tool_calls", snap.get("tool_calls"))) or 0)
                        - int(h.get("tools_at_start") or 0),
                        # 按派发计;老 checkpoint 没记派发数的段给 None(页面显示「—」)
                        "agents": None if "agents_at_start" not in h else

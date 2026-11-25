@@ -151,3 +151,26 @@ def test_live_unmarked_segment_after_an_end_mark_is_renamed_not_split() -> None:
     stages.signal("a2h-spec", "2026-11-04T07:54:38Z")
     assert len(state["stage_history"]) == n and state["stage_history"][-1]["stage"] == "a2h-spec"
     assert state["stage_history"][-1]["start_ts"] == "2026-11-04T07:54:25Z"   # 段从收尾 mark 起
+
+
+def test_live_mark_names_the_closed_segment_and_fills_in_a_pending_signal() -> None:
+    state, stages = _stages()
+    state["tool_calls"] = 2
+    stages.signal("a2h-init", "2026-11-04T07:00:00Z")          # 还在 90 秒等待期
+    state["tool_calls"] = 5
+    stages.mark("a2h-init", "2026-11-04T07:00:40Z")
+    hist = state["stage_history"]
+    assert [(h["stage"], h["start_ts"], h["tools_at_start"]) for h in hist] == [
+        ("a2h-init", "2026-11-04T07:00:00Z", 2), ("unmarked", "2026-11-04T07:00:40Z", 5)]
+    stages.signal("a2h-spec", "2026-11-04T07:00:50Z")          # 段内先见下一阶段的信号
+    stages.mark("a2h-build", "2026-11-04T07:01:00Z")
+    assert [h["stage"] for h in hist] == ["a2h-init", "a2h-build", "unmarked"]   # 被关的段用 mark 的名字
+
+
+def test_live_segment_counts_are_taken_when_the_signal_is_pending() -> None:
+    state, stages = _stages()
+    state.update(tool_calls=3, agent_dispatches=1)
+    stages.signal("a2h-spec", "2026-11-04T07:00:00Z")
+    state.update(tool_calls=9, agent_dispatches=4)                # 90 秒等待期里又跑了工具、派了子代理
+    stages.confirm("2026-11-04T07:02:00Z")
+    assert (state["stage_history"][-1]["tools_at_start"], state["stage_history"][-1]["agents_at_start"]) == (3, 1)

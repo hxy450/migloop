@@ -41,7 +41,7 @@ from ..chat import provider as chat_provider
 _VISIBLE_POOL_MIN_CHARS = 4 * 1024 * 1024
 #: 6:增加 requests / prompt_log / stage_history(会话总览)。
 #: 4:不再把 api-request-blob 计入工具/用量;5:阶段与人工输入改走 stage_signals 口径。旧 checkpoint 作废重放
-CACHE_SCHEMA = 6
+CACHE_SCHEMA = 7
 
 
 #: 会话总览里每个会话最多留多少条输入原文、每条多长
@@ -713,6 +713,8 @@ class IncrementalSessionMonitor:
         stream["tool_uses"] += 1
         stream["tool_counts"][name] = stream["tool_counts"].get(name, 0) + 1
         self.state["tool_calls"] += 1
+        if stream["kind"] == "main":   # 各阶段的工具数只算主线(子代理流后读,不能混进最后一段)
+            self.state["main_tool_calls"] = int(self.state.get("main_tool_calls") or 0) + 1
         global_tools = self.state.setdefault("tool_counts", {})
         global_tools[name] = global_tools.get(name, 0) + 1
         if tid:

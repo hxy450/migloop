@@ -439,16 +439,22 @@ class LiveStages:
     #: 阶段历史最多记多少段(总览只要个轮廓)
     HISTORY_MAX = 200
 
-    def _enter(self, stage: str, ts: Any) -> None:
-        """切到 ``stage``,并在 ``stage_history`` 里记一段 {stage, start_ts, tools_at_start}。"""
+    def _counts(self) -> List[int]:
+        """[主线工具数, 主线派发数]:各段的工具 / 子代理只算主线(与离线的阶段表同口径)。"""
+        st = self.st
+        return [int(st.get("main_tool_calls", st.get("tool_calls")) or 0), int(st.get("agent_dispatches") or 0)]
+
+    def _enter(self, stage: str, ts: Any, counts: Optional[Sequence[int]] = None) -> None:
+        """切到 ``stage``,并在 ``stage_history`` 里记一段 {stage, start_ts, tools_at_start, agents_at_start}。
+        ``counts`` 是段起点那一刻的 [工具数, 派发数](挂起的信号补段时用挂起时记下的)。"""
         st = self.st
         st["current_stage"] = stage
         st["named_by_signal"] = False
         hist = st.setdefault("stage_history", [])
         if hist and hist[-1].get("stage") == stage:
             return
-        hist.append({"stage": stage, "start_ts": ts, "tools_at_start": int(st.get("tool_calls") or 0),
-                     "agents_at_start": int(st.get("agent_dispatches") or 0)})
+        tools, agents = (list(counts) + self._counts()[len(counts):]) if counts else self._counts()
+        hist.append({"stage": stage, "start_ts": ts, "tools_at_start": tools, "agents_at_start": agents})
         if len(hist) > self.HISTORY_MAX:
             del hist[1:len(hist) - self.HISTORY_MAX + 1]
 
@@ -491,7 +497,7 @@ class LiveStages:
         pending = st.get("stage_pending")
         if pending and pending[0] == stage:
             return  # 同一阶段的后续信号(归属戳)不重置起点
-        st["stage_pending"] = [stage, ts]
+        st["stage_pending"] = [stage, ts] + self._counts()
 
     def attribution(self, stage: str, ts: Any) -> None:
         """Claude 的归属戳:后续轮里又见管线归属 = 中途插话,退回管线;换戳才算信号。"""
@@ -514,7 +520,7 @@ class LiveStages:
             if st.get("current_stage") != pending[0] and not (
                     is_pipeline_stage(pending[0]) and not is_pipeline_stage(st.get("current_stage"))):
                 st["current_workflow"] = None
-            self._enter(pending[0], pending[1])
+            self._enter(pending[0], pending[1], pending[2:4])
             st["stage_pending"] = None
             self.emit("stage", "进入 %s" % pending[0], pending[1])
 
@@ -523,7 +529,11 @@ class LiveStages:
         execute 及之后收尾进收尾段,更早的收尾进「未标记」。"""
         st = self.st
         st["pipeline_seen"] = True
+        pending = st.get("stage_pending")
         st["stage_pending"] = None
+        if pending and pending[0] == stage and stage != st.get("current_stage"):
+            # 同一阶段的信号还在 90 秒等待期:这一段从信号挂起时开始(离线也是这样切的)
+            self._enter(stage, pending[1], pending[2:4])
         if stage not in st["marked_stages"]:
             st["marked_stages"].append(stage)
         if stage in START_MARK_STAGES:
@@ -535,8 +545,10 @@ class LiveStages:
         st["unmarked_after"] = stage
         st["current_workflow"] = None
         hist = st.get("stage_history") or []
-        if hist and hist[-1].get("stage") != stage and hist[-1].get("stage") in (SESSION, SETUP, UNMARKED):
-            hist[-1]["stage"] = stage     # mark 是完成水位:前面那段就是这个阶段
+        if hist and hist[-1].get("stage") != stage and hist[-1].get("stage") != TRAILING and \
+                not str(hist[-1].get("stage") or "").startswith("wf:"):
+            # mark 是完成水位:被关的这段就是 mark 的阶段,不用段内 skill 信号起的名字
+            hist[-1]["stage"] = stage
         elif not hist:
             hist.append({"stage": stage, "start_ts": None, "tools_at_start": 0})
         self._enter(AFTER if stage in DONE_STAGES else UNMARKED, ts)
