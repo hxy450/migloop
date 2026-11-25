@@ -27,7 +27,8 @@ from .base import SessionCandidate
 
 
 FORMAT = "codex"
-SUPPORTS_LIVE = False
+#: --live 走 live.codexlive.CodexLiveMonitor(子代理 rollout 按 mtime 水位线增量发现)
+SUPPORTS_LIVE = True
 
 
 def default_root() -> str:

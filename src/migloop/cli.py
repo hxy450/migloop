@@ -261,6 +261,10 @@ def main():
             except chat_provider.ChatConfigurationError as exc:
                 print("提示: 分析助手未启用: %s" % exc)
 
+        monitor_factory = None
+        if fmt == "codex":
+            from .live.codexlive import CodexLiveMonitor
+            monitor_factory = CodexLiveMonitor
         live_session.run_live(
             jsonl=jsonl,
             build_snapshot=build_snapshot_bytes,
@@ -273,6 +277,7 @@ def main():
             open_browser=args.open,
             write_final=not args.no_final,
             chat_service=chat_service,
+            monitor_factory=monitor_factory,
         )
         return
 

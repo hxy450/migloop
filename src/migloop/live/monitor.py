@@ -1243,8 +1243,10 @@ class LiveHTTPServer(ThreadingHTTPServer):
 
 def run_live(jsonl, build_snapshot, out_path, host="127.0.0.1", port=0,
              interval=10.0, cache_dir=None, reset_cache=False, open_browser=False,
-             write_final=True, chat_service=None):
-    monitor = IncrementalSessionMonitor(
+             write_final=True, chat_service=None, monitor_factory=None):
+    """``monitor_factory`` 换增量监控实现(codex 用 live.codexlive.CodexLiveMonitor);
+    它要有同样的 start / stop / snapshot / poll_interval / cache_path。"""
+    monitor = (monitor_factory or IncrementalSessionMonitor)(
         jsonl, cache_dir=cache_dir, poll_interval=interval, reset_cache=reset_cache
     )
     print("建立/恢复增量状态 …")
