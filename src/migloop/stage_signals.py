@@ -415,6 +415,14 @@ def missing_stages(stages: Iterable[Any]) -> List[str]:
 
 # ── live:逐条喂信号、随时给出当前阶段(Claude monitor 与 codexlive 共用) ───────────────
 
+def _canon_rank(stage: Any) -> int:
+    """规范流水线里的先后(不在表里的阶段算 -1)。"""
+    try:
+        return CANON_PIPELINE.index(str(stage))
+    except ValueError:
+        return -1
+
+
 class LiveStages:
     """与 ``segment`` 同一套口径的增量版。状态全在调用方给的 dict 里(随 checkpoint 落盘),
     ``emit(kind, text, ts)`` 用来报事件。没有 mark 时 skill 信号先挂起,满 ``MIN_SPAN_S`` 才进入;
@@ -435,6 +443,7 @@ class LiveStages:
         """切到 ``stage``,并在 ``stage_history`` 里记一段 {stage, start_ts, tools_at_start}。"""
         st = self.st
         st["current_stage"] = stage
+        st["named_by_signal"] = False
         hist = st.setdefault("stage_history", [])
         if hist and hist[-1].get("stage") == stage:
             return
@@ -450,9 +459,20 @@ class LiveStages:
         st = self.st
         st["pipeline_seen"] = True
         if self.marks_mode:
-            if stage not in st["marked_stages"] and st.get("current_stage") in (UNMARKED, AFTER, TRAILING):
+            if stage in st["marked_stages"]:
+                return
+            current = st.get("current_stage")
+            if current in (UNMARKED, AFTER, TRAILING):
                 self._enter(stage, ts)
+                st["named_by_signal"] = True
                 self.emit("stage", "进入 %s(缺结束标记)" % stage, ts)
+            elif st.get("named_by_signal") and _canon_rank(stage) > _canon_rank(current):
+                # 段名来自 skill 信号:后面又见规范顺序更靠后、还没打 mark 的阶段,就改用它(同一段)
+                st["current_stage"] = stage
+                hist = st.get("stage_history") or []
+                if hist:
+                    hist[-1]["stage"] = stage
+                self.emit("stage", "改名 %s(缺结束标记)" % stage, ts)
             return
         if stage == st.get("current_stage"):
             st["stage_pending"] = None
@@ -520,7 +540,8 @@ class LiveStages:
                 self._enter(TRAILING, ts)
                 self.emit("stage", "进入后续轮", ts)
         elif not command and st.get("pipeline_seen") and is_pipeline_stage(current) and \
-                not is_resume_request(text):
+                _canon_rank(current) >= _canon_rank("a2h-execute") and not is_resume_request(text):
+            # 管线还在进行(没到 execute 或更靠后)时人工输入一律不开后续轮
             self._enter(TRAILING, ts)
             st["stage_pending"] = None
             self.emit("stage", "进入后续轮", ts)

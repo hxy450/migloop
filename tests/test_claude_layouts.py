@@ -156,3 +156,24 @@ def test_marks_from_executed_calls_and_resumed_agent_is_not_busy_overnight(tmp_p
     assert trace["stages"][1]["label"] == "Execute（缺结束标记）"
     (agent,) = trace["agents"]
     assert agent["busy"] == [[_ts(3), _ts(5)], [_ts(45), _ts(50)]]
+
+
+def test_local_slash_command_closes_the_turn(tmp_path: Path, monkeypatch) -> None:
+    """/exit、/clear 这类本地命令不跑模型回合:命令输出落盘到下一条输入之间算停。"""
+    monkeypatch.setattr(cc, "_SUB_CACHE", {})
+
+    def sysrec(m, subtype):
+        return {"type": "system", "subtype": subtype, "timestamp": _ts(m), "sessionId": SID}
+
+    _w(tmp_path / f"{SID}.jsonl", [
+        _user(0, "go", promptSource="typed"),
+        _asst(1, "m1", [{"type": "text", "text": "done"}]),
+        sysrec(1, "turn_duration"),
+        _user(2, "<command-name>/exit</command-name>", promptSource="typed"),
+        _user(2, "<local-command-stdout>Bye!</local-command-stdout>"),
+        _user(30, "再看看", promptSource="typed"),                     # 28 分钟后才回来
+        _asst(31, "m2", [{"type": "text", "text": "ok"}]),
+    ])
+    trace = cc.extract(str(tmp_path / f"{SID}.jsonl"))
+    t = trace["totals"]
+    assert t["duration_ms"] - t["active_ms"] == 29 * 60_000      # 1→2 分 + 2→30 分

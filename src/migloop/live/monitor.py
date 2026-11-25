@@ -816,8 +816,10 @@ class IncrementalSessionMonitor:
                     if kind == "human":
                         stages.human(text, ts, command=bool(cmd))
             stages.confirm(ts)
-            if rtype == "system" and record.get("subtype") in ("stop_hook_summary", "turn_duration"):
+            if rtype == "system" and record.get("subtype") in ("stop_hook_summary", "turn_duration", "local_command"):
                 stream["status"] = "waiting"
+            elif rtype == "user" and extract_session.is_local_command_output(record):
+                stream["status"] = "waiting"   # 本地命令不跑模型回合,输出即回合关闭
             elif rtype == "assistant" and isinstance(message, dict):
                 stream["status"] = "waiting" if message.get("stop_reason") == "end_turn" else "running"
         else:

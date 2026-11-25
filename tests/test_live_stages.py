@@ -112,3 +112,32 @@ def test_workflow_name_forms() -> None:
     assert _workflow_name({"scriptPath": "a/b/antennapod53-case-selection-wf_121fca26-4ad.js"}) == "antennapod53-case-selection"
     assert _workflow_name({"name": "impl"}) == "impl"
     assert _workflow_name({}) is None
+
+
+def _stages() -> tuple[dict, "object"]:
+    from migloop.stage_signals import LiveStages
+    state: dict = {}
+    return state, LiveStages(state, lambda *a: None)
+
+
+def test_live_name_from_signal_moves_to_a_later_unmarked_stage() -> None:
+    state, stages = _stages()
+    stages.mark("a2h-build", "2026-11-04T07:54:25Z")
+    stages.signal("a2h-run", "2026-11-04T07:54:35Z")
+    assert state["current_stage"] == "a2h-run"
+    stages.signal("a2h-spec", "2026-11-04T07:54:38Z")           # 规范顺序更靠后、还没打 mark
+    assert state["current_stage"] == "a2h-spec" and state["stage_history"][-1]["stage"] == "a2h-spec"
+    stages.signal("a2h-init", "2026-11-04T08:00:00Z")           # 更靠前的不改
+    assert state["current_stage"] == "a2h-spec"
+
+
+def test_live_human_input_before_execute_does_not_open_follow_up() -> None:
+    state, stages = _stages()
+    stages.signal("a2h-init", "2026-10-31T10:00:34Z")
+    stages.confirm("2026-10-31T10:03:00Z")
+    stages.human("yes", "2026-10-31T10:03:19Z")
+    assert state["current_stage"] == "a2h-init"
+    stages.signal("a2h-execute", "2026-10-31T11:00:00Z")
+    stages.confirm("2026-10-31T11:05:00Z")
+    stages.human("统计一下用量", "2026-10-31T12:00:00Z")
+    assert state["current_stage"] == "follow-up"

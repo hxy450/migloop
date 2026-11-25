@@ -41,7 +41,7 @@ from ..adapters import codex as _codex
 from .livestream import TranscriptStream
 
 #: 2:阶段与人工 / 程序下发计数改走 stage_signals.LiveStages,旧 checkpoint 作废重放
-CACHE_SCHEMA = "codex-live/3"
+CACHE_SCHEMA = "codex-live/4"
 
 #: 计一次工具调用的 response_item 类型(apply_patch 走 custom_tool_call)
 _CALL_TYPES = ("function_call", "custom_tool_call")
@@ -262,11 +262,25 @@ class CodexLiveMonitor:
             return
         if m.get("kind") == "root":
             self._root_stage(stream, rtype, payload, ts)
+        elif not m.get("activated") and (
+                _codex._own_settings(rec, str(m.get("thread_id") or ""))
+                or (rtype == "response_item" and ptype == "message" and payload.get("role") == "developer"
+                    and _codex._FORK_MARKER in _codex._content_text(payload.get("content")))):
+            # fork 子会话:到这里为止是抄来的父会话前缀 —— 之前记的工具与用量作废
+            m["activated"] = True
+            m["tool_uses"] = m["tool_uses_outer"] = 0
+            m["_inherited"] = list(m.get("_totals") or [0, 0, 0])
 
         if rtype == "response_item":
             if ptype in _CALL_TYPES:
-                m["tool_uses"] = int(m.get("tool_uses") or 0) + 1
-                self.state["tool_calls"] += 1
+                # 与离线同口径:code 模式 exec 按里层算,外层另记;主会话与子会话分开
+                raw = payload.get("arguments") if ptype == "function_call" else payload.get("input")
+                raw = raw if isinstance(raw, str) else json.dumps(raw, ensure_ascii=False)
+                inner = _codex._call_tool_count({"name": payload.get("name"), "ptype": ptype, "raw": raw})
+                m["tool_uses"] = int(m.get("tool_uses") or 0) + inner
+                m["tool_uses_outer"] = int(m.get("tool_uses_outer") or 0) + 1
+                if m.get("kind") == "root":
+                    self.state["tool_calls"] += inner
                 call_id = str(payload.get("call_id") or "")
                 if call_id:
                     self._pending_calls[call_id] = str(payload.get("name") or "")
@@ -294,7 +308,8 @@ class CodexLiveMonitor:
                 if totals != m.get("_totals"):
                     m["requests"] = int(m.get("requests") or 0) + 1
                     m["_totals"] = totals
-                m["input_tokens"], m["cached_tokens"], m["output_tokens"] = totals
+                base = m.get("_inherited") or [0, 0, 0]
+                m["input_tokens"], m["cached_tokens"], m["output_tokens"] = [max(0, a - b) for a, b in zip(totals, base)]
 
     def _root_stage(self, stream: TranscriptStream, rtype: Any, payload: dict[str, Any], ts: Any) -> None:
         """主线记录 → 阶段信号与人工 / 程序下发计数(与离线 codex 同一套翻译)。"""
@@ -455,6 +470,10 @@ class CodexLiveMonitor:
             agents.sort(key=lambda x: (x.get("status") != "running", str(x.get("desc") or "")))
             out = dict(self.state)
             out["output_tokens"] = total_out
+            out["subagent_tool_calls"] = sum(int(s.meta.get("tool_uses") or 0) for s in self.streams.values()
+                                             if s.meta.get("kind") == "agent")
+            out["tool_calls_outer"] = sum(int(s.meta.get("tool_uses_outer") or 0) for s in self.streams.values()
+                                          if s.meta.get("kind") == "root")
             out["input_tokens"] = total_in
             out["cache_read_tokens"] = total_cached
             out["requests"] = total_req

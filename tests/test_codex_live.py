@@ -364,3 +364,28 @@ def test_live_stages_follow_the_offline_rules(tmp_path: Path) -> None:
     snap = mon.snapshot()
     assert snap["current_stage"] == "follow-up"
     assert (snap["user_prompts"], snap["program_prompts"]) == (2, 1)
+
+
+def test_tool_counts_follow_offline_and_skip_the_fork_prefix(tmp_path: Path) -> None:
+    """工具数按里层算、主会话与子会话分开;fork 子会话以自己线程 id 的 thread_settings_applied
+    为界,之前抄来的父会话前缀不算(离线与 live 同口径)。"""
+    from migloop.adapters import codex
+
+    def code_call(cid: str, code: str) -> str:
+        return _rec("response_item", {"type": "custom_tool_call", "call_id": cid, "name": "exec", "input": code})
+
+    root = _root(tmp_path)
+    with open(root, "a", encoding="utf-8") as fh:
+        fh.write(code_call("r1", 'for (const x of ["a","b"]) await tools.exec_command({cmd:"ls"});') + _out("r1"))
+    child = root.parent / "rollout-2026-08-18T10-01-00-t-child.jsonl"
+    child.write_text(
+        _meta("t-child", "s-1", parent="t-root") + _meta("t-root", "s-1")
+        + code_call("p1", 'await tools.exec_command({cmd:"prefix"})') + _out("p1")          # 抄来的父会话前缀
+        + _rec("event_msg", {"type": "thread_settings_applied", "thread_id": "t-child"})
+        + _call("c1") + _out("c1") + _call("c2") + _out("c2"), encoding="utf-8")
+    mon = CodexLiveMonitor(str(root), cache_dir=str(tmp_path / "cache"), poll_interval=999)
+    mon.poll_once()
+    snap = mon.snapshot()
+    assert (snap["tool_calls"], snap["subagent_tool_calls"], snap["tool_calls_outer"]) == (2, 2, 1)
+    trace = codex.extract(str(root), sessions_root=str(tmp_path / "sessions"))
+    assert (trace["totals"]["tool_calls"], trace["totals"]["subagent_tool_calls"]) == (2, 2)

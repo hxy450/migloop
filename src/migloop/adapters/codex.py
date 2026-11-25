@@ -916,6 +916,13 @@ def _reopen(s: dict[str, Any], idx: int, ts: str | None, kind: str | None) -> No
         s["stalls"][-1][2], s["stalls"][-1][3] = kind, idx
 
 
+def _own_settings(record: dict[str, Any], thread_id: str) -> bool:
+    """子会话自己的 thread_settings_applied(fork 抄来的父会话前缀到此为止)。"""
+    payload = record.get("payload") or {}
+    return (record.get("type") == "event_msg" and payload.get("type") == "thread_settings_applied"
+            and str(payload.get("thread_id") or "") == thread_id)
+
+
 def _split_complete_lines(data: bytes) -> tuple[list[bytes], int]:
     boundary = data.rfind(b"\n") + 1
     if boundary <= 0:
@@ -938,7 +945,10 @@ def _full_scan(path: str, tree_item: dict[str, Any] | None = None) -> dict[str, 
             continue
     # fork 子代理:先定 local_start(激活边界)与父的累计用量,再喂状态机
     if tree_item and tree_item.get("parent"):
-        for idx, record in records:
+        # 激活边界:子会话自己线程 id 的 thread_settings_applied;找不到再按 fork 提示的措辞认
+        own = str((tree_item.get("meta") or {}).get("id") or "")
+        s["local_start"] = next((idx for idx, record in records if own and _own_settings(record, own)), 0)
+        for idx, record in records if not s["local_start"] else ():
             payload = record.get("payload") or {}
             if (record.get("type") == "response_item" and
                     payload.get("type") == "message" and

@@ -185,6 +185,14 @@ def _is_activity(rec: dict[str, Any]) -> bool:
     return rec.get("type") not in _NON_ACTIVITY_TYPES and rec.get("subtype") not in _NON_ACTIVITY_SUBTYPES
 
 
+def is_local_command_output(rec: dict[str, Any]) -> bool:
+    """本地斜杠命令(/exit、/clear 等)的输出记录:``<local-command-stdout>`` / ``<local-command-stderr>``。"""
+    content = (rec.get("message") or {}).get("content")
+    if isinstance(content, list):
+        content = " ".join(b.get("text", "") for b in content if isinstance(b, dict) and b.get("type") == "text")
+    return isinstance(content, str) and content.lstrip().startswith(("<local-command-stdout>", "<local-command-stderr>"))
+
+
 def _closes_turn(rec: dict[str, Any]) -> bool:
     """子代理回合关闭:子代理转录里没有 system 回合关闭记录,看 assistant 的 stop_reason ——
     end_turn(交回)或 stop_sequence(API 错误停下,如 429)。回合进行中的长静默照旧算忙。"""
@@ -2627,7 +2635,7 @@ def extract(path: str) -> dict[str, Any]:
         if not ts:
             continue
         rt = rec.get("type")
-        if rt == "system" and rec.get("subtype") in ("stop_hook_summary", "turn_duration"):
+        if rt == "system" and rec.get("subtype") in ("stop_hook_summary", "turn_duration", "local_command"):
             if close_t is None:
                 close_t = ts
         elif rt in ("assistant", "user"):
@@ -2637,6 +2645,8 @@ def extract(path: str) -> dict[str, Any]:
                                and not content.lstrip().startswith("<task-notification>"))
                 stalls.append((close_t, ts, "user" if is_user_act else "auto", i))
                 close_t = None
+            if rt == "user" and is_local_command_output(rec):
+                close_t = ts   # /exit、/clear 这类本地命令不跑模型回合:输出落盘即回合关闭
     if close_t is not None and meta["ended_at"]:
         stalls.append((close_t, meta["ended_at"], "tail", None))
     for t in tools:  # AskUserQuestion = 明确停下等用户点选
