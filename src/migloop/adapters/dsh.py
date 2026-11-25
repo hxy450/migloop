@@ -22,9 +22,12 @@ Mapping (dsh Session format v4, dsh 0.2.2-rc.1):
 * ``assistant/message {usage}`` -> ``billing`` / ``context_timeline``:
   ``inputTokens`` (uncached), ``cacheReadTokens``, ``cacheWriteTokens``,
   ``outputTokens``; the model comes from the latest ``request/header``.
-* ``user/message`` with ``source.kind == "user"`` -> ``prompts``; injected
-  context (runtime-context, skill-catalog, agent-message, subagent-settled ...)
-  is not a human prompt.
+* ``user/message`` with ``source.kind == "user"`` and ``command/run`` (slash
+  commands) -> human ``prompts``; injected context (runtime-context,
+  skill-catalog, agent-message, subagent-settled ...) is not a human prompt.
+  ``agent/inbox/spliced`` re-delivers queued messages, so prompts and usage are
+  de-duplicated by message id; ``assistant/attempt`` (failed request, no usage)
+  is not a request.
 * ``subagent`` tool calls are dispatches; the child id is read from the tool's
   fixed result template ``started subagent <id>`` and must be confirmed by a
   ``subagent/catalog`` event of the parent or the child's ``parentSession``.
@@ -43,6 +46,7 @@ import os
 import sys
 from collections import Counter
 
+from .. import stage_signals
 from . import claude as common
 from . import codex as codex_common
 from . import deveco as dv
@@ -208,6 +212,8 @@ def _session_walk(header, events):
             cid = msg.get("toolCallId")
             if cid:
                 results[cid] = ev
+    seen_msgs = set()      # user / assistant 消息 id:inbox 拼接会重放同一条消息
+    commands = {}          # commandId → (seq, 开始毫秒)
     out = {"tools": [], "prompts": [], "usage": [], "texts": [], "markers": [],
            "act": [], "dispatches": [], "turn_end": None, "model": None, "reasoning_chars": 0,
            "text_chars": 0, "tool_chars": 0, "first": header.get("createdAt"), "last": header.get("createdAt"),
@@ -227,12 +233,31 @@ def _session_walk(header, events):
             out["model"] = out["model"] or d.get("agentModel")
         elif t == "user/message":
             source = d.get("source") or {}
+            if d.get("id") and ("u", d["id"]) in seen_msgs:
+                continue
+            seen_msgs.add(("u", d.get("id")))
             if source.get("kind") in HUMAN_SOURCES:
                 text = src.text_of(d.get("content"))
                 if text.strip():
-                    out["prompts"].append({"idx": seq, "ts": ts, "wait_ms": 0, "text": " ".join(text.split())[:400]})
+                    out["prompts"].append({"idx": seq, "ts": ts, "wait_ms": 0, "kind": "human",
+                                           "text": " ".join(text.split())[:400]})
+        elif t == "command/run":
+            # 斜杠命令:人敲的(source.kind=user)算人工输入;run → done 期间命令在跑,算活动
+            if (d.get("source") or {}).get("kind", "user") in HUMAN_SOURCES:
+                text = ("/%s%s" % (d.get("name") or "", d.get("args") or "")).strip()
+                out["prompts"].append({"idx": seq, "ts": ts, "wait_ms": 0, "kind": "human", "text": text[:400]})
+            if d.get("commandId") and isinstance(ms, (int, float)):
+                commands[d["commandId"]] = (seq, float(ms))
+        elif t == "command/done":
+            started = commands.pop(d.get("commandId"), None)
+            if started and isinstance(ms, (int, float)) and ms > started[1]:
+                out["act"].append((started[0], started[1], float(ms)))
         elif t == "assistant/message":
             msg = d.get("message") or {}
+            mid = msg.get("id") or d.get("id")
+            if mid and ("a", mid) in seen_msgs:
+                continue
+            seen_msgs.add(("a", mid))
             for block in msg.get("content") or []:
                 if not isinstance(block, dict):
                     continue
@@ -267,6 +292,10 @@ def _session_walk(header, events):
                     out["act"].append((seq, float(ms), float(res["time"])))
             rows = _tool_rows(len(out["tools"]), seq, ts, name, inp, d.get("callId"), output, ok, dur,
                               rdata.get("meta"), cwd)
+            for row in rows:
+                row["_done"] = res is not None
+                if res is not None and isinstance(res.get("time"), (int, float)):
+                    row["_end_ms"] = float(res["time"])
             out["tools"].extend(rows)
             if name in DISPATCH_TOOLS:
                 out["dispatches"].append({"call_id": d.get("callId"), "child": src.started_child(output),
@@ -293,7 +322,7 @@ def _bill(billing, timeline, usage_rows, default_model):
         b["req"] += 1
         b["inp"] += inp
         b["cread"] += cread
-        b["cw1h"] += cw          # dsh reports one cache-write bucket
+        b["cw5"] += cw           # dsh 只报一个缓存写入总数(没有 5m/1h 之分),与 DevEco 同归 cw5
         b["out"] += out
         if timeline is not None:
             timeline.append({"ts": ts, "ctx": inp + cread + cw, "out": out, "inp": inp,
@@ -336,19 +365,28 @@ def _parse(header, events, gen, children):
     _bill(billing, timeline, main["usage"], model)
     main_out = sum(_num(u.get("outputTokens")) for _, _, u in main["usage"])
 
-    # ---- stages (same signals as DevEco: pipeline skills / workflow calls)
-    boundaries = dv._stage_boundaries(tools)
-    seqs = [ev.get("seq") for ev in events if isinstance(ev.get("seq"), int)]
-    points = [(ev.get("seq"), ev.get("time")) for ev in events if isinstance(ev.get("seq"), int)]
-    max_idx = max(seqs) if seqs else 0
-    stages = dv._build_stages(boundaries, points, max_idx)
+    # ---- stages:与 DevEco 同一套信号(管线 skill、Workflow、mark-stage),统一走 stage_signals
+    points = [(ev.get("seq"), ev.get("time") if isinstance(ev.get("time"), (int, float)) else None)
+              for ev in events if isinstance(ev.get("seq"), int)]
+    human = [p for p in prompts if p.get("kind") == "human"]
+    segs = stage_signals.segment(
+        [(i, ms / 1000.0 if ms is not None else None) for i, ms in points] or [(0, None)],
+        marks=dv._stage_marks(tools, cwd, main["first"], gen),
+        signals=dv._stage_signals(tools), human=[p["idx"] for p in human],
+        resumes=[p["idx"] for p in human if stage_signals.is_resume_request(p.get("text"))],
+        workflows=dv._stage_workflows(tools))
+    stages = dv._build_stages(segs, points, None)
     for t in tools:
         s = dv._stage_of_idx(stages, t["idx"] if isinstance(t["idx"], int) else 0)
         t["stage"], t["seg"] = s["stage"], s["id"]
         s["tool_counts"][t["name"]] = s["tool_counts"].get(t["name"], 0) + 1
+        for ch in s["children"]:
+            if ch["start_idx"] <= t["idx"] <= ch["end_idx"]:
+                t["subseg"] = ch["id"]
+                ch["tool_counts"][t["name"]] = ch["tool_counts"].get(t["name"], 0) + 1
         if t["name"] in ("Write", "Edit") and t.get("brief") and t["brief"] not in s["artifacts"]:
             s["artifacts"].append(t["brief"])
-        if t["name"] == "Skill" and t.get("skill") and (t["skill"] or "").split(":")[-1] not in common.PIPELINE_SKILLS:
+        if t["name"] == "Skill" and t.get("skill") and stage_signals.normalize(t["skill"]) is None:
             s["helper_skills"].append({"idx": t["idx"], "ts": t["ts"], "skill": t["skill"]})
     for p in prompts:
         s = dv._stage_of_idx(stages, p["idx"] if isinstance(p["idx"], int) else 0)
@@ -494,12 +532,13 @@ def _parse(header, events, gen, children):
         "interrupted_output_tokens": sum(a["output_tokens"] for a in agents if a.get("abort_explicit")),
         "waste_output_tokens": None,
         "output_split": {k: int(v) for k, v in split.items()},
-        "user_prompts": len(prompts),
+        "user_prompts": sum(1 for p in prompts if p.get("kind") == "human"),
+        "program_prompts": sum(1 for p in prompts if p.get("kind") == "program"),
         "files_touched": len({t.get("brief") for t in tools if t["name"] in ("Write", "Edit") and t.get("brief")}),
         "compactions": len(main["markers"]),
     }
     for t in tools:
-        for key in ("_inp", "_visible_source_lines", "_probed_paths"):
+        for key in ("_inp", "_visible_source_lines", "_probed_paths", "_done", "_end_ms"):
             t.pop(key, None)
     for a in agents:
         for key in ("_prompt", "_reads", "_writes", "_read_lines", "_write_lines", "_read_iv", "_read_total",
