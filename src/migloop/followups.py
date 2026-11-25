@@ -96,7 +96,7 @@ def _iso(dt: datetime | None) -> str | None:
 
 
 def report_href(path: str) -> str:
-    """``--serve`` 的报告页地址。按 transcript 路径寻址:ECAT 角色会话落在
+    """本机服务的报告页地址(a2h-memory 的 fixchain 服务用)。按 transcript 路径寻址:ECAT 角色会话落在
     ``<harmony>/.ecat/agents/…`` 下,不在会话发现的根里,按会话号找不到。"""
     return "/insight1/report/" + urllib.parse.quote(os.path.abspath(path), safe="")
 

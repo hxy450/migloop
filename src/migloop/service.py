@@ -1,6 +1,6 @@
 """本地服务层:会话定位、trace 缓存、报告页 trace(审计 + 跨会话提示 + 执行拓扑后续节点)。
 
-``migloop <目标> --serve``(stdlib HTTP,见 serve.py)与离线报告共用这一层。池子 = 同工程磁盘上的
+离线报告、--live 的会话详情页(以及 a2h-memory 的 fixchain 服务)共用这一层。池子 = 同工程磁盘上的
 兄弟会话(project_sessions 的 root 发现),trace 按 (转录 mtime, size) 缓存。
 
 返修链路(两原子账本、返修链页、两原子端点、MCP 后端、调查页)已移到 fuxi-ailabs/a2h-memory 的

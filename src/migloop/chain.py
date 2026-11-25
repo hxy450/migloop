@@ -10,7 +10,7 @@
     codex 线按 stream 的 thread id 挂上的 rollout,按轮次标注。
 
 每个会话归约成一格:用量、阶段、审计发现、提示词全文。会话类别只认得出 ECAT 角色,
-其余一律记「会话」,不按名字猜主迁移 / 评审。每份 transcript 只解析一次:--serve 传入
+其余一律记「会话」,不按名字猜主迁移 / 评审。每份 transcript 只解析一次:调用方可传入
 service.extract_trace(带缓存);单独调用时用本模块的 adapter + ecat 补注,不 import 返修链路模块。
 """
 
@@ -172,7 +172,7 @@ def extract_trace(path: str) -> dict[str, Any]:
 def build_chain(path: str, extract: Callable[[str], dict[str, Any]] | None = None) -> dict[str, Any]:
     """锚点会话 → 它所在迁移的会话总览。**逐个归约 transcript,大工程要几十秒。**
 
-    ``extract`` 默认是本模块的 extract_trace;--serve 传 service.extract_trace 共用报告页的缓存。"""
+    ``extract`` 默认是本模块的 extract_trace;传 service.extract_trace 可共用报告页的缓存。"""
     with ecat.shared_scan():
         return _build_chain(os.path.abspath(path), extract or extract_trace)
 

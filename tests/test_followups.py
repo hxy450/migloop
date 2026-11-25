@@ -118,7 +118,7 @@ def test_main_session_gets_followups_in_time_order(project: tuple[Path, Path]) -
     ecat, dt = fups
     assert ecat["run_id"] == "run_20260910_130500"
     assert ecat["sub"].startswith("H 0.500 → 0.300")
-    # --serve 按 transcript 路径寻址:ECAT 会话不在会话发现的根里,按会话号找不到
+    # 本机服务按 transcript 路径寻址:ECAT 会话不在会话发现的根里,按会话号找不到
     assert ecat["start_ts"].startswith("2026-09-10T13:05") and ecat["href"] == followups.report_href(str(disc))
     assert dt["sid"] == DT and dt["href"] == followups.report_href(str(main.parent / f"{DT}.jsonl"))
     assert urllib.parse.unquote(dt["href"].rsplit("/", 1)[1]) == str(main.parent / f"{DT}.jsonl")

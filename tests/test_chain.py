@@ -2,22 +2,18 @@
 
 elite 的链骨架是事件库的会话时间线(切链、breather 接力、能力会话按名字前缀认),那部分是产品侧,
 不搬,对应用例不搬。migloop 只吃磁盘上的 transcript:同工程 root 会话 + ECAT 各 run 的角色会话。
-这里钉住解析部分:角色 / 轮次 / 判官维度、提示词、汇总、阶段定位、run 目录只扫一遍、--serve 路由。
+这里钉住解析部分:角色 / 轮次 / 判官维度、提示词、汇总、阶段定位、run 目录只扫一遍。
 """
 
 from __future__ import annotations
 
 import json
-import threading
-import urllib.error
-import urllib.parse
-import urllib.request
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
-from migloop import chain, ecat, followups, serve
+from migloop import chain, ecat, followups
 from migloop.adapters import claude as claude_adapter
 from migloop.adapters import codex as codex_adapter
 
@@ -185,33 +181,3 @@ def test_build_chain_scans_the_ecat_runs_once(project: SimpleNamespace, monkeypa
     assert calls == {"history": 1, "streams": 1}
     ecat.list_runs(str(project.harmony))
     assert calls["history"] == 2, "共享只在一次 build 之内,外面照常现读"
-
-
-def _get(base: str, path: str) -> tuple[int, str]:
-    try:
-        with urllib.request.urlopen(base + path, timeout=30) as r:
-            return r.status, r.read().decode("utf-8")
-    except urllib.error.HTTPError as e:
-        return e.code, e.read().decode("utf-8")
-
-
-def test_serve_routes_chain_page_and_data(project: SimpleNamespace) -> None:
-    srv = serve.make_server("x", port=0)
-    threading.Thread(target=srv.serve_forever, daemon=True).start()
-    try:
-        base = f"http://127.0.0.1:{srv.server_address[1]}"
-        ident = urllib.parse.quote(str(project.worker), safe="")
-        status, page = _get(base, f"/api/insight1/chain/{ident}")
-        assert status == 200 and "会话总览" in page and json.dumps(str(project.worker)) in page
-        assert "/api/insight1/chain-data/" in page
-        status, body = _get(base, f"/api/insight1/chain-data/{ident}")
-        assert status == 200
-        data = json.loads(body)
-        assert data["anchor"] == W and data["totals"]["threads"] == 7
-        # 总览里的报告链接能直接打开(ECAT rollout 不在会话发现的根里也行)
-        gen = _threads(data)[GEN]
-        status, report = _get(base, gen["href"])
-        assert status == 200 and "trace-data" in report
-    finally:
-        srv.shutdown()
-        srv.server_close()

@@ -33,9 +33,8 @@ src/migloop/
 ├── followups.py       # 执行拓扑的后续节点(同工程其后的能力会话 + ECAT run)
 ├── chain.py           # 会话总览:同工程全部会话 + ECAT 各轮
 ├── service.py         # 会话定位(含冻结池观察范围)、trace 缓存、报告 trace
-├── serve.py           # --serve:stdlib HTTP,报告页与会话总览,hmigbot 同名路由
 ├── render/            # 来源无关：静态报告、compare、viewer.html / chain.html
-├── live/              # 增量 cursor、checkpoint、本地 HTTP server(Claude、Codex)
+├── live/              # 增量 cursor、checkpoint、盯整次迁移(migration.py)与本地 HTTP server(Claude、Codex)
 ├── chat/              # 页面分析助手 provider
 ├── cli.py             # 命令行编排，只通过 adapter registry 接触来源
 └── __main__.py        # python -m migloop
@@ -96,22 +95,23 @@ python scripts/build_pyz.py
 
 产出是**自包含单文件 HTML**:数据与字体全部内嵌,无外部资源与网络请求,双击即看,断网可用,可直接转发。
 
-### `--serve`:报告页 + 会话总览
+### Live：盯一次迁移的全部会话
 
 ```bash
-py migloop-lineage.pyz <session-id或项目名> --serve --open
+py migloop-lineage.pyz <鸿蒙迁移工程目录> --live --interval 60 --open
+py migloop-lineage.pyz <session-id或jsonl路径> --live        # 取这个会话的 cwd 当迁移目录
 ```
 
-`serve.py` 是 stdlib `ThreadingHTTPServer`,路由与 hmigbot 同名(`/api/insight1/report|chain|chain-data/<sid>`),
-所以 `viewer.html` / `chain.html` 里的相对地址不用改。trace 按 `(转录 mtime, size)` 缓存在 `service.py`。
-路由收在 `_Handler.route_get` 里,`make_server(..., handler=子类)` 可以挂别的路由:a2h-memory 的返修服务
-就是这样在同一个 handler 上加返修链页与两原子端点。
+`live/migration.py` 的 `MigrationMonitor` 管一次迁移:每轮先列目录找新会话 —— 所有 `~/.claude*/projects`
+根下迁移目录对应的子目录、cwd 落在目录里的 Codex rollout(新文件只读首行认身份,读过就记住)、
+`<目录>/.ecat/agents/*/projects` 下的 ECAT 角色会话;再让每个会话自己的增量监控(Claude:
+`IncrementalSessionMonitor`,Codex:`CodexLiveMonitor`)只读新追加的内容。ECAT 会话按
+`.migbot/ecat_runs/run_*` 的熵记录与各轮角色流首行的 thread id 挂到 run 和轮次上。DevEco 与 dsh 没有增量
+监控,目录里的会话在总览里列出、标「不支持实时」。
 
-### Live：增量查看正在运行的会话
-
-```bash
-py migloop-lineage.pyz <session-id或项目名> --live --open
-```
+首页是会话总览(`chain.html`,数据由 `/api/overview` 轮询,来自各会话的增量状态:阶段历史、用量、输入原文),
+每个会话的完整分析页挂在 `/s/<会话>/`,点进去才建;停止时写最终页:总览数据内嵌 + `<out>.sessions/` 下每个
+会话一份完整分析页。首次打开要把已有会话从头读一遍,之后每次刷新只读新增内容。
 
 Live 页面默认启用本机 Codex CLI 作为只读“Agent 分析”助手。完整 session 是事实源，血缘图只是
 导航索引；需要具体证据时会追查主线程与子 Agent transcript。模型调用与页面解耦，可通过
@@ -123,7 +123,7 @@ Live 模式不是定时从头重跑 extractor。它为主会话和每个子 agen
 体积很小且采用覆盖写，只有 mtime 变化时才整份重读。Android 源码分母首次扫描后也进入 checkpoint，
 不会随每次刷新重复遍历仓库。
 
-浏览器连接本机 `127.0.0.1` 服务，默认首页复用完整离线 viewer。右下角 live 控件每 10 秒请求
+会话详情页复用完整离线 viewer。右下角 live 控件按刷新间隔请求
 小型聚合状态，ETag 未变化时返回 `304`；有新增时提示快照过期，只有用户点击“刷新完整分析”才
 重建全部图。控件显示快照版本、记录数和生成时间，并提供自包含 HTML 下载；`/status.html` 是
 可选的轻量状态页。按 `Ctrl+C` 停止时也会做一次最终全量校验并生成可分享的静态页面。
@@ -133,7 +133,7 @@ Live 模式不是定时从头重跑 extractor。它为主会话和每个子 agen
 常用的 `.migration/analysis/*.md` 与 canonical `spec/` 使用同一条确定性读写边口径。
 
 ```bash
---interval 5            # 文件变化和页面刷新间隔，默认 10 秒
+--interval 60           # 刷新间隔(找新会话 + 读新增内容)，默认 10 秒
 --port 8765             # 默认 0，自动选择空闲端口
 --cache-dir <dir>       # 默认 ~/.migloop/cache
 --reset-live-cache      # 忽略 checkpoint，从头重放
