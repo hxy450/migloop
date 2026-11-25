@@ -123,6 +123,11 @@ TOOL_MAP = {
     "plan_write": "PlanWrite",
     "start_app": "StartApp",
     "hdc_log": "HdcLog",
+    # hmigbot-plus 3fd7850d 的 DevEco 适配同样这么映射:task 是子代理派发,跟 CC 的 Agent 同名,
+    # 下游按 Agent / Task 认派发(审计 agent-type-missing、ECAT 判官计数)
+    "task": "Agent",
+    "todowrite": "TodoWrite",
+    "webfetch": "WebFetch",
 }
 
 # 阶段展示标签统一复用 claude 的 common.STAGE_LABELS(setup/session/管线 skill 全覆盖),
@@ -966,24 +971,36 @@ def _load_session_from_db(db, session_id):
 
 
 def _load_child_sessions(db, session_id):
+    """会话树里根以下的全部子会话:子代理还能再派子代理(hmigbot-plus 3fd7850d 的 _tree),
+    只取直接孩子会漏掉孙代理的 token 与读写。父在前、同层按开工时间;与导出路径的
+    deveco_source.descendants 同口径。"""
     cur = db.cursor()
-    try:
-        cur.execute(
-            "SELECT id, title, agent, model, tokens_input, tokens_output, tokens_reasoning, "
-            "tokens_cache_read, tokens_cache_write, cost, time_created, time_updated "
-            "FROM session WHERE parent_id=? ORDER BY time_created", (session_id,))
-    except sqlite3.Error:
-        return []
     rows = []
-    for (sid, title, agent, model_str, ti, to, tr, cr, cw, cost, tc, tu) in cur.fetchall():
-        rows.append({
-            "id": sid, "title": title or "", "agent": agent or "",
-            "model": _parse_model_column(model_str),
-            "tokens": {"input": ti or 0, "output": to or 0, "reasoning": tr or 0,
-                       "cache_read": cr or 0, "cache_write": cw or 0},
-            "cost": cost or 0.0,
-            "created": tc, "updated": tu,
-        })
+    frontier, seen = [session_id], {session_id}
+    while frontier:
+        found = []
+        for parent in frontier:
+            try:
+                cur.execute(
+                    "SELECT id, title, agent, model, tokens_input, tokens_output, tokens_reasoning, "
+                    "tokens_cache_read, tokens_cache_write, cost, time_created, time_updated "
+                    "FROM session WHERE parent_id=? ORDER BY time_created", (parent,))
+            except sqlite3.Error:
+                return rows
+            for (sid, title, agent, model_str, ti, to, tr, cr, cw, cost, tc, tu) in cur.fetchall():
+                if sid in seen:
+                    continue
+                seen.add(sid)
+                found.append(sid)
+                rows.append({
+                    "id": sid, "title": title or "", "agent": agent or "",
+                    "model": _parse_model_column(model_str),
+                    "tokens": {"input": ti or 0, "output": to or 0, "reasoning": tr or 0,
+                               "cache_read": cr or 0, "cache_write": cw or 0},
+                    "cost": cost or 0.0,
+                    "created": tc, "updated": tu,
+                })
+        frontier = found
     return rows
 
 
@@ -1058,10 +1075,21 @@ def _stage_of_time(stages, ts):
 
 
 _TITLE_RE = re.compile(r"^\[([^\]]+)\]\s*(.+)$")
+#: 工作流给放弃 / 失败的子会话标题尾部追加的结局:``[Verify] verify:page-main [failed]``
+#: (hmigbot-plus 3fd7850d 的 DevEco 适配认它;stalled = 卡死被工作流放弃)
+_TITLE_OUTCOME_RE = re.compile(r"\s*\[(stalled|failed)\]\s*$")
+
+
+def _title_outcome(title):
+    """子会话标题尾部的结局:'stalled' / 'failed' / None。"""
+    m = _TITLE_OUTCOME_RE.search(title or "")
+    return m.group(1) if m else None
 
 
 def _parse_title(title):
-    """拆子会话 title(如 '[Implement (2 units)] B01实体模型')为 (工作流类型, 单元 label)。"""
+    """拆子会话 title(如 '[Implement (2 units)] B01实体模型')为 (工作流类型, 单元 label)。
+    尾部的结局标记([stalled] / [failed])不算 label 的一部分,否则对不上 workflow 结果索引。"""
+    title = _TITLE_OUTCOME_RE.sub("", title or "")
     m = _TITLE_RE.match((title or "").strip())
     if not m:
         return "workflow", (title or "").strip()
@@ -1182,6 +1210,7 @@ def _build_child_agents(children, load_parts, stages, cwd, model, billing, wf_in
                 skill_calls.append({"skill": sk, "ts": t.get("ts"),
                                     "ok": t.get("ok"), "dur_ms": t.get("dur_ms")})
         wtype, label = _parse_title(ch["title"])
+        outcome = _title_outcome(ch["title"])
         info = wf_index.get(label) if wf_index else None
         # 最终产出:优先取子代理 transcript 的末条 text(排除 workflow 注入的 prompt,
         # 以 "Workflow phase:" 开头),退回 workflow 结果 JSON 的 summary(导出里常被截断)。
@@ -1205,8 +1234,9 @@ def _build_child_agents(children, load_parts, stages, cwd, model, billing, wf_in
             "output_tokens": tk["output"] + reasoning,
             "tool_uses": len(tools),
             "tool_counts": dict(Counter(t["name"] for t in tools)),
-            "status": "completed",
-            "aborted": None,
+            # 卡死的子会话是被工作流放弃的(记中断);失败是它自己的结论,不算中断
+            "status": outcome or "completed",
+            "aborted": "stalled" if outcome == "stalled" else None,
             "model": ch.get("model") or model,
             "result": result[:300],
             "skills": skills, "skill_calls": skill_calls,
@@ -1419,8 +1449,9 @@ def _parse(data, storage_root=None, source_file=None, child_documents=None):
                 continue
             txt = _user_prompt(parts)
             if txt.strip():
+                # 与 claude / codex 同上限:报告抽屉给全文,悬浮提示由页面截短
                 prompts.append({"idx": m["_idx"], "ts": ts, "wait_ms": 0,
-                                "text": " ".join(txt.split())[:400]})
+                                "text": " ".join(txt.split())[:common.PROMPT_TEXT_MAX]})
             continue
 
         # assistant
