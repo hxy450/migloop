@@ -64,14 +64,21 @@ def capabilities(name, inp):
             exe = words[1].replace("\\", "/").rsplit("/", 1)[-1]
         if any(w in ("--help", "-h", "--version") for w in words):
             continue
-        if exe in ("hvigor", "hvigorw", "hvigorw.bat", "hvigorw.js") and any(w in ("assemblehap", "assembleapp") for w in words):
-            found.add("build")
+        if exe in ("hvigor", "hvigorw", "hvigorw.bat", "hvigorw.js"):
+            if any(w in ("assemblehap", "assembleapp") for w in words):
+                found.add("build")
+            if any(w in ("install-hap", "installhap") for w in words):
+                found.add("install")
+        # 设备工具常放进 shell 变量调:`HDC=…/hdc; "$HDC" install …`、`"$BM" install -p …`
+        # (hmigbot-plus 9bf4d4be、c70d9154)。引号在分词时已剥掉,$X / ${X} 两种写法同款。
         if exe in ("hdc", "hdc.exe", "$hdc", "${hdc}", "adb", "adb.exe"):
             found.add("device")
             if "install" in words or "install-multiple" in words:
                 found.add("install")
             if any(w in ("screencap", "snapshot_display", "screenshot") for w in words):
                 found.add("screenshot")
+        if exe in ("bm", "bm.exe", "$bm", "${bm}") and "install" in words:
+            found.add("install")
     return sorted(found)
 
 
