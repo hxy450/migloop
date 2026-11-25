@@ -640,13 +640,55 @@ def _stop_signal(signum: int, frame: Any) -> None:
     raise KeyboardInterrupt
 
 
-def install_stop_signals() -> None:
-    """Windows 的 Ctrl+Break 与关控制台窗口走 SIGBREAK,默认是直接结束进程、不写最终页;
-    改成和 Ctrl+C 一样从 serve_forever 退出、照常写最终页。"""
+_CTRL_CLOSE_EVENT = 2
+_console_handler: Any = None      # ctypes 回调要一直留着引用
+
+
+class Stopper:
+    """停止流程的两个状态:``stopping`` 已开始停止(不再打断主线程),``done`` 最终页已写完。"""
+
+    def __init__(self) -> None:
+        self.stopping = threading.Event()
+        self.done = threading.Event()
+
+    def on_console_close(self, interrupt: Callable[[], None], wait: float = 60.0) -> bool:
+        """关控制台窗口:系统等处理函数返回后就结束进程(最多等几秒)。所以让主线程按 Ctrl+C 的路径停下,
+        这里一直等到最终页写完再返回。"""
+        if not self.stopping.is_set():
+            interrupt()
+        self.done.wait(wait)
+        return True
+
+
+def install_stop_signals(stopper: Optional[Stopper] = None) -> None:
+    """Windows 上 Ctrl+Break 走 SIGBREAK、关控制台窗口走 CTRL_CLOSE_EVENT,默认都是直接结束进程、
+    不写最终页。Ctrl+Break 改成和 Ctrl+C 一样从 serve_forever 退出;关窗口见 ``Stopper.on_console_close``。"""
+    global _console_handler
     import signal
-    if hasattr(signal, "SIGBREAK"):
-        with suppress(ValueError, OSError):   # 只能在主线程装
-            signal.signal(signal.SIGBREAK, _stop_signal)
+    if not hasattr(signal, "SIGBREAK"):
+        return
+    with suppress(ValueError, OSError):   # 只能在主线程装
+        signal.signal(signal.SIGBREAK, _stop_signal)
+    if stopper is None:
+        return
+    with suppress(Exception):
+        import _thread
+        import ctypes
+        from ctypes import wintypes
+
+        def on_ctrl(kind: int) -> bool:
+            if kind != _CTRL_CLOSE_EVENT:
+                return False                  # Ctrl+C / Ctrl+Break 交给上面的 signal 处理
+            return stopper.on_console_close(_thread.interrupt_main)
+
+        # 后注册的先被调用:排在 C 运行库的处理函数前面
+        _console_handler = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.DWORD)(on_ctrl)
+        ctypes.WinDLL("kernel32").SetConsoleCtrlHandler(_console_handler, True)
+
+
+def _say(text: str) -> None:
+    with suppress(OSError, ValueError):       # 控制台窗口已关时 print 会失败,不能挡住写最终页
+        print(text, flush=True)
 
 
 def write_final(migration: MigrationMonitor, out_path: str, build_report: Callable[[str], bytes],
@@ -660,14 +702,20 @@ def write_final(migration: MigrationMonitor, out_path: str, build_report: Callab
     live_slots = [s for s in list(migration.slots.values()) if s["live"]]
     for slot in live_slots:
         slot["_final"] = stem + ".sessions/" + re.sub(r"[^A-Za-z0-9_.-]", "_", slot["key"]) + ".html"
-    # 先写总览(很快):关窗口只给几秒,至少总览在;各会话的完整分析页随后逐个写
-    data = migration.overview(href=lambda slot: slot.get("_final"))
-    data["live"] = None
-    _atomic_write(out_path, overview_html(data=data))
+    def write_overview() -> None:
+        # 只链到已经写好的分析页:中途被结束也不会有断链
+        data = migration.overview(href=lambda slot: slot.get("_final") if slot.get("_final_written") else None)
+        data["live"] = None
+        _atomic_write(out_path, overview_html(data=data))
+
+    # 先写总览(很快):关窗口只给几秒,至少总览在;各会话的完整分析页随后逐个写,写好一个就补上它的链接
+    write_overview()
     for slot in live_slots:
         name = os.path.basename(slot["_final"])
         try:
             _atomic_write(os.path.join(sess_dir, name), build_report(slot["path"]), binary=True)
+            slot["_final_written"] = True
+            write_overview()
             if build_trace is not None:
                 from .. import audit
                 findings[slot["key"]] = audit.build_audit(build_trace(slot["path"]))["findings"]
@@ -705,20 +753,26 @@ def run(harmony: str, focus: Optional[str], out_path: str, build_report: Callabl
     focus_key = next((k for k, s in migration.slots.items() if focus and os.path.normcase(s["path"]) == os.path.normcase(os.path.abspath(focus))), None)
     if focus_key:
         print("当前会话      -> %ss/%s/" % (url, urllib.parse.quote(focus_key)))
-    print("每 %g 秒刷新;Ctrl+C / Ctrl+Break 停止,停止时%s最终页面。" % (interval, "生成" if write_final_page else "不生成"))
-    install_stop_signals()
+    print("每 %g 秒刷新;Ctrl+C / Ctrl+Break / 关窗口停止,停止时%s最终页面。" % (
+        interval, "生成" if write_final_page else "不生成"))
+    stopper = Stopper()
+    install_stop_signals(stopper)
     if open_browser:
         webbrowser.open(url)
     try:
-        server.serve_forever(poll_interval=0.25)
-    except KeyboardInterrupt:
-        print("\n正在停止 …")
+        try:
+            server.serve_forever(poll_interval=0.25)
+        except KeyboardInterrupt:
+            _say("\n正在停止 …")
+        finally:
+            stopper.stopping.set()
+            server.shutdown()
+            server.server_close()
+            migration.stop()
+        if write_final_page:
+            _say("生成最终页面(总览 + 各会话完整分析)…")
+            path = write_final(migration, out_path, build_report, build_trace)
+            _say("最终页面 -> %s" % path)
     finally:
-        server.shutdown()
-        server.server_close()
-        migration.stop()
-    if write_final_page:
-        print("生成最终页面(总览 + 各会话完整分析)…")
-        path = write_final(migration, out_path, build_report, build_trace)
-        print("最终页面 -> %s" % path)
+        stopper.done.set()
     return migration.overview()

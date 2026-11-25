@@ -112,15 +112,23 @@ def test_final_page_writes_the_overview_before_the_slow_details(tmp_path: Path) 
     seen = []
 
     def build_report(path: str) -> bytes:
-        seen.append(out.is_file())                      # 关窗口只给几秒:先有总览,再逐个写详情
-        return b"<html>report</html>"
+        seen.append(out.is_file() and ".sessions/" not in out.read_text(encoding="utf-8"))
+        return b"<html>report</html>"            # 关窗口只给几秒:先有总览(还没链到没写好的详情),再逐个写详情
 
     migration.write_final(mon, str(out), build_report=build_report)
-    assert seen == [True]
-    if hasattr(signal, "SIGBREAK"):                     # Windows:Ctrl+Break / 关窗口也照常写最终页
+    assert seen == [True] and "final.sessions/" in out.read_text(encoding="utf-8")
+    if hasattr(signal, "SIGBREAK"):                     # Windows:Ctrl+Break 也照常写最终页
         old = signal.getsignal(signal.SIGBREAK)
         try:
             migration.install_stop_signals()
             assert signal.getsignal(signal.SIGBREAK) is migration._stop_signal
         finally:
             signal.signal(signal.SIGBREAK, old)
+    # 关窗口:打断主线程一次,然后等最终页写完才返回(系统在处理函数返回后就结束进程)
+    import threading
+    stopper, calls = migration.Stopper(), []
+    threading.Timer(0.2, stopper.done.set).start()
+    assert stopper.on_console_close(lambda: calls.append(1), wait=5) is True
+    assert calls == [1] and stopper.done.is_set()
+    stopper.stopping.set()                              # 已在停止(正在写最终页)时不再打断
+    assert stopper.on_console_close(lambda: calls.append(2), wait=0) is True and calls == [1]
