@@ -53,6 +53,8 @@
 <script>
 (function () {
   var IDENT = __CHAIN_ID__;
+  // live / 最终页:window.__MIGLOOP_CHAIN__ = {inline: 数据} 或 {live: {url, poll_ms}};否则按 IDENT 向服务要数据
+  var BOOT = window.__MIGLOOP_CHAIN__ || null;
   var STAGE_HINT = { "开跑前": "第一个阶段开始之前", "管线结束后": "最后一个收尾 mark 之后、人还没开口的那一段", "后续轮": "管线走完后从第一条人工输入起的轮次,不算进最后一个阶段" };
   var KIND = { session: "会话", worker: "主迁移", reviewer: "托管评审", ecat: "ECAT 精修", capability: "能力会话" };
   var COLOR = { session: "var(--c-worker)", worker: "var(--c-worker)", reviewer: "var(--c-reviewer)", ecat: "var(--c-ecat)", capability: "var(--c-other)" };
@@ -64,7 +66,10 @@
   function num(x) { x = x || 0; return x >= 1e6 ? (x / 1e6).toFixed(1) + "M" : x >= 1e3 ? (x / 1e3).toFixed(1) + "K" : String(x); }
   function hhmmss(ts) { return ts ? new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "—"; }
   function hhmm(ts) { return ts ? new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—"; }
-  function report(t) { return t.transcript && t.href ? '<a href="' + esc(t.href) + '" target="_blank" rel="noopener">报告</a>' : '<span class="sub">无 transcript</span>'; }
+  function report(t) {
+    if (t.unsupported) return '<span class="chip warn">不支持实时</span>';
+    var live = t.status ? ' <span class="chip">' + esc(t.status) + (t.current_stage ? ' · ' + esc(t.current_stage) : '') + '</span>' : '';
+    return (t.transcript && t.href ? '<a href="' + esc(t.href) + '"' + (BOOT && (BOOT.live || BOOT.inline) ? '' : ' target="_blank" rel="noopener"') + '>' + (BOOT ? '详情' : '报告') + '</a>' : '<span class="sub">无 transcript</span>') + live; }
 
   function kindLabel(s) { return s.kind === "capability" && s.plugin_label ? s.plugin_label : (KIND[s.kind] || s.name || s.role); }
   function prompts(t) {
@@ -83,7 +88,8 @@
       return '<i title="' + esc(x.s.session_id + " · " + (x.t.dimension || (x.s.kind === "capability" ? kindLabel(x.s) : x.t.role))) + '" style="left:' + ((a - t0) / span * 100).toFixed(2) +
         '%;width:' + Math.max((b - a) / span * 100, .25).toFixed(2) + '%;background:' + (COLOR[x.s.kind] || "var(--c-other)") + '"></i>';
     }).join("");
-    var shown = {}; c.sessions.forEach(function (s) { shown[s.kind] = 1; }); return '<span><i style="background:' + COLOR[k] + '"></i>' + KIND[k] + '</span>'; }).join("");
+    var shown = {}; c.sessions.forEach(function (s) { shown[s.kind] = 1; });
+    var legend = Object.keys(shown).map(function (k) { return '<span><i style="background:' + COLOR[k] + '"></i>' + KIND[k] + '</span>'; }).join("");
     return '<div class="card"><div class="lane">' + bars + '</div><div class="legend">' + legend + '</div></div>';
   }
 
@@ -155,15 +161,41 @@
       [t.tool_failed + " / " + t.tool_calls, "工具失败 / 总数"]];
     document.title = (c.project || "迁移") + " · 会话总览";
     document.getElementById("root").innerHTML =
-      '<h1>' + esc(c.project || "迁移") + ' · 会话总览</h1><div class="sub">锚点会话 <code>' + esc(c.anchor) + '</code>' +
+      '<h1>' + esc(c.project || "迁移") + ' · 会话总览</h1><div class="sub">' + (BOOT ? '迁移目录' : '锚点会话') + ' <code>' + esc(c.anchor) + '</code>' +
       (c.run_id ? ' · run_id <code>' + esc(c.run_id) + '</code>' : '') + (c.hmigbot_session_id ? ' · hmigbot_session_id <code>' + esc(c.hmigbot_session_id) + '</code>' : '') +
       '<br>' + esc(c.android || "") + ' → ' + esc(c.harmony) + (t.threads_missing ? ' · <span class="warn">' + t.threads_missing + ' 个运行时会话的 transcript 已不在本机</span>' : '') + '</div>' +
       '<div class="kpis">' + kpis.map(function (k) { return '<div class="kpi"><b>' + esc(k[0]) + '</b><span>' + k[1] + '</span></div>'; }).join("") + '</div>' +
       '<h2>时间线</h2>' + lane(c) + '<h2>逐个会话</h2>' + c.sessions.map(session).join("") + entropy(c) + findings(c);
   }
 
-  fetch("/api/insight1/chain-data/" + encodeURIComponent(IDENT)).then(function (r) {
-    return r.json().then(function (body) { if (!r.ok) throw new Error(body.error || ("HTTP " + r.status)); return body; });
-  }).then(render).catch(function (e) { document.getElementById("state").textContent = "读不出这次迁移的会话总览:" + e.message; });
+  function fail(e) { document.getElementById("state").textContent = "读不出这次迁移的会话总览:" + e.message; }
+  if (BOOT && BOOT.inline) {
+    render(BOOT.inline);
+  } else if (BOOT && BOOT.live) {
+    var etag = "";
+    var tick = function () {
+      fetch(BOOT.live.url, { cache: "no-store", headers: etag ? { "If-None-Match": etag } : {} }).then(function (r) {
+        if (r.status === 304) return null;
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        etag = r.headers.get("ETag") || "";
+        return r.json();
+      }).then(function (c) {
+        if (!c) return;
+        var y = window.scrollY, open = {};
+        document.querySelectorAll("details[open]").forEach(function (d, i) { open[i] = 1; });
+        render(c);
+        document.querySelectorAll("details").forEach(function (d, i) { if (open[i]) d.open = true; });
+        var lv = c.live || {};
+        document.getElementById("root").insertAdjacentHTML("afterbegin", '<div class="sub">实时 · 每 ' + Math.round((lv.interval_s || 0)) +
+          ' 秒刷新 · 更新 ' + hhmmss(lv.last_update) + ' · v' + (lv.version || 0) + (lv.last_error ? ' · <span class="err">' + esc(lv.last_error) + '</span>' : '') + '</div>');
+        window.scrollTo(0, y);
+      }).catch(function (e) { if (!etag) fail(e); });
+    };
+    tick(); setInterval(tick, Math.max(1000, BOOT.live.poll_ms || 10000));
+  } else {
+    fetch("/api/insight1/chain-data/" + encodeURIComponent(IDENT)).then(function (r) {
+      return r.json().then(function (body) { if (!r.ok) throw new Error(body.error || ("HTTP " + r.status)); return body; });
+    }).then(render).catch(fail);
+  }
 })();
 </script>

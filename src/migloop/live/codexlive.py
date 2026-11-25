@@ -41,7 +41,7 @@ from ..adapters import codex as _codex
 from .livestream import TranscriptStream
 
 #: 2:阶段与人工 / 程序下发计数改走 stage_signals.LiveStages,旧 checkpoint 作废重放
-CACHE_SCHEMA = "codex-live/2"
+CACHE_SCHEMA = "codex-live/3"
 
 #: 计一次工具调用的 response_item 类型(apply_patch 走 custom_tool_call)
 _CALL_TYPES = ("function_call", "custom_tool_call")
@@ -124,6 +124,11 @@ class CodexLiveMonitor:
             "last_error": None,
             "user_prompts": 0,
             "program_prompts": 0,
+            "prompt_log": [],
+            "started_at": None,
+            "ended_at": None,
+            "model": None,
+            "cwd": None,
             "driver": False,          # exec / MCP 起的会话:输入都是程序下发
             "listed_skills": {},      # 会话注入的 skill 清单(名字 → 路径)
             "modified_skills": [],    # 会话改过文件的 skills/<名字>/ 目录
@@ -231,6 +236,11 @@ class CodexLiveMonitor:
         ts = rec.get("timestamp")
         if ts:
             m["last_ts"] = ts
+            m["first_ts"] = m.get("first_ts") or ts
+            if self.state.get("started_at") is None or ts < self.state["started_at"]:
+                self.state["started_at"] = ts
+            if self.state.get("ended_at") is None or ts > self.state["ended_at"]:
+                self.state["ended_at"] = ts
         rtype = rec.get("type")
         payload = rec.get("payload") or {}
         ptype = str(payload.get("type") or "")
@@ -246,6 +256,7 @@ class CodexLiveMonitor:
                 if m.get("kind") == "root":
                     self.state["driver"] = _codex._driver_session(payload)
                     m["cwd"] = payload.get("cwd")
+                    self.state["cwd"] = payload.get("cwd")
             if m["thread_id"]:
                 self.threads_known.add(m["thread_id"])
             return
@@ -278,14 +289,20 @@ class CodexLiveMonitor:
                     self._event("agent", f"子代理完成 {m.get('nickname') or m.get('thread_id')}")
             elif ptype == "token_count":
                 usage = (payload.get("info") or {}).get("total_token_usage") or {}
-                # 累计值,取最新 —— 不做加法
-                m["output_tokens"] = int(usage.get("output_tokens") or 0)
+                # 累计值,取最新 —— 不做加法;累计值变了算一次请求
+                totals = [int(usage.get(k) or 0) for k in ("input_tokens", "cached_input_tokens", "output_tokens")]
+                if totals != m.get("_totals"):
+                    m["requests"] = int(m.get("requests") or 0) + 1
+                    m["_totals"] = totals
+                m["input_tokens"], m["cached_tokens"], m["output_tokens"] = totals
 
     def _root_stage(self, stream: TranscriptStream, rtype: Any, payload: dict[str, Any], ts: Any) -> None:
         """主线记录 → 阶段信号与人工 / 程序下发计数(与离线 codex 同一套翻译)。"""
         stages = self._stages()
         ptype = payload.get("type")
         cwd = stream.meta.get("cwd")
+        if rtype == "turn_context" and payload.get("model"):
+            self.state["model"] = payload.get("model")
         if rtype == "response_item" and ptype == "message" and payload.get("role") in ("user", "developer"):
             content = payload.get("content")
             for item in content if isinstance(content, list) else [content]:
@@ -340,6 +357,8 @@ class CodexLiveMonitor:
             kind = "program"
         key = "user_prompts" if kind == "human" else "program_prompts"
         self.state[key] = int(self.state.get(key) or 0) + 1
+        from .monitor import _log_prompt
+        _log_prompt(self.state, ts, kind, text)
         self._event("prompt", "%s: %s" % ("用户输入" if kind == "human" else "程序下发", " ".join(text.split())[:100]), ts)
         if kind == "human":
             self._stages().human(text, ts, command=command)
@@ -416,10 +435,13 @@ class CodexLiveMonitor:
     def snapshot(self) -> dict[str, Any]:
         with self.lock:
             agents = []
-            total_out = 0
+            total_out = total_in = total_cached = total_req = 0
             for stream in self.streams.values():
                 m = stream.meta
                 total_out += int(m.get("output_tokens") or 0)
+                total_in += max(0, int(m.get("input_tokens") or 0) - int(m.get("cached_tokens") or 0))
+                total_cached += int(m.get("cached_tokens") or 0)
+                total_req += int(m.get("requests") or 0)
                 if m.get("kind") != "agent":
                     continue
                 agents.append({
@@ -433,6 +455,9 @@ class CodexLiveMonitor:
             agents.sort(key=lambda x: (x.get("status") != "running", str(x.get("desc") or "")))
             out = dict(self.state)
             out["output_tokens"] = total_out
+            out["input_tokens"] = total_in
+            out["cache_read_tokens"] = total_cached
+            out["requests"] = total_req
             # live 面板(live.monitor.LIVE_HTML)与 CC 共用;codex 没有的字段给中性值
             out.setdefault("current_stage", stage_signals.SESSION)
             out.setdefault("write_files", 0)

@@ -425,8 +425,22 @@ class LiveStages:
         self.emit = emit
         for key, value in (("current_stage", SESSION), ("stage_pending", None), ("marked_stages", []),
                            ("unmarked_after", None), ("current_workflow", None), ("pipeline_seen", False),
-                           ("last_attr", None)):
+                           ("last_attr", None), ("stage_history", [])):
             state.setdefault(key, value)
+
+    #: 阶段历史最多记多少段(总览只要个轮廓)
+    HISTORY_MAX = 200
+
+    def _enter(self, stage: str, ts: Any) -> None:
+        """切到 ``stage``,并在 ``stage_history`` 里记一段 {stage, start_ts, tools_at_start}。"""
+        st = self.st
+        st["current_stage"] = stage
+        hist = st.setdefault("stage_history", [])
+        if hist and hist[-1].get("stage") == stage:
+            return
+        hist.append({"stage": stage, "start_ts": ts, "tools_at_start": int(st.get("tool_calls") or 0)})
+        if len(hist) > self.HISTORY_MAX:
+            del hist[1:len(hist) - self.HISTORY_MAX + 1]
 
     @property
     def marks_mode(self) -> bool:
@@ -437,7 +451,7 @@ class LiveStages:
         st["pipeline_seen"] = True
         if self.marks_mode:
             if stage not in st["marked_stages"] and st.get("current_stage") in (UNMARKED, AFTER, TRAILING):
-                st["current_stage"] = stage
+                self._enter(stage, ts)
                 self.emit("stage", "进入 %s(缺结束标记)" % stage, ts)
             return
         if stage == st.get("current_stage"):
@@ -453,7 +467,7 @@ class LiveStages:
         st = self.st
         st["pipeline_seen"] = True
         if not self.marks_mode and st.get("current_stage") == TRAILING:
-            st["current_stage"] = stage
+            self._enter(stage, ts)
             self.emit("stage", "回到 %s" % stage, ts)
         if stage != st.get("last_attr"):
             st["last_attr"] = stage
@@ -469,7 +483,7 @@ class LiveStages:
             if st.get("current_stage") != pending[0] and not (
                     is_pipeline_stage(pending[0]) and not is_pipeline_stage(st.get("current_stage"))):
                 st["current_workflow"] = None
-            st["current_stage"] = pending[0]
+            self._enter(pending[0], pending[1])
             st["stage_pending"] = None
             self.emit("stage", "进入 %s" % pending[0], pending[1])
 
@@ -483,13 +497,18 @@ class LiveStages:
             st["marked_stages"].append(stage)
         if stage in START_MARK_STAGES:
             if stage != st.get("current_stage"):
-                st["current_stage"] = stage
+                self._enter(stage, ts)
                 self.emit("stage", "进入 %s" % stage, ts)
             return
         self.emit("stage", "%s 收尾" % stage, ts)
         st["unmarked_after"] = stage
         st["current_workflow"] = None
-        st["current_stage"] = AFTER if stage in DONE_STAGES else UNMARKED
+        hist = st.get("stage_history") or []
+        if hist and hist[-1].get("stage") != stage and hist[-1].get("stage") in (SESSION, SETUP, UNMARKED):
+            hist[-1]["stage"] = stage     # mark 是完成水位:前面那段就是这个阶段
+        elif not hist:
+            hist.append({"stage": stage, "start_ts": None, "tools_at_start": 0})
+        self._enter(AFTER if stage in DONE_STAGES else UNMARKED, ts)
 
     def human(self, text: Any, ts: Any, command: bool = False) -> None:
         """人工输入。有 mark:管线收尾后的第一条(不论内容)开后续轮;没有 mark:管线阶段里、
@@ -498,11 +517,11 @@ class LiveStages:
         current = st.get("current_stage")
         if self.marks_mode:
             if current == AFTER:
-                st["current_stage"] = TRAILING
+                self._enter(TRAILING, ts)
                 self.emit("stage", "进入后续轮", ts)
         elif not command and st.get("pipeline_seen") and is_pipeline_stage(current) and \
                 not is_resume_request(text):
-            st["current_stage"] = TRAILING
+            self._enter(TRAILING, ts)
             st["stage_pending"] = None
             self.emit("stage", "进入后续轮", ts)
 
@@ -514,7 +533,7 @@ class LiveStages:
         if is_pipeline_stage(current) or current == UNMARKED or is_pipeline_stage(pending[0]):
             st["current_workflow"] = name
         else:
-            st["current_stage"] = "wf:" + name
+            self._enter("wf:" + name, ts)
         self.emit("stage", "启动 %s" % name, ts)
 
 

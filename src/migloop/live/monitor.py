@@ -39,8 +39,21 @@ from ..chat import provider as chat_provider
 
 #: 源码视野推断积压的结果总字符数超过这个才分给子进程(首轮回放大会话时)
 _VISIBLE_POOL_MIN_CHARS = 4 * 1024 * 1024
+#: 6:增加 requests / prompt_log / stage_history(会话总览)。
 #: 4:不再把 api-request-blob 计入工具/用量;5:阶段与人工输入改走 stage_signals 口径。旧 checkpoint 作废重放
-CACHE_SCHEMA = 5
+CACHE_SCHEMA = 6
+
+
+#: 会话总览里每个会话最多留多少条输入原文、每条多长
+PROMPT_LOG_MAX = 200
+PROMPT_TEXT_MAX = 2000
+
+
+def _log_prompt(state, ts, kind, text):
+    log = state.setdefault("prompt_log", [])
+    log.append({"ts": ts, "kind": kind, "text": str(text or "")[:PROMPT_TEXT_MAX]})
+    if len(log) > PROMPT_LOG_MAX:
+        del log[:len(log) - PROMPT_LOG_MAX]
 
 
 def _workflow_name(inp):
@@ -296,9 +309,11 @@ class IncrementalSessionMonitor:
             "marked_stages": [],     # 已打过 mark 的阶段;非空 = 只按 mark 切
             "unmarked_after": None,  # 最后一个收尾 mark 的阶段(「未标记(X 之后)」)
             "tool_calls": 0,
+            "requests": 0,           # 模型回复条数(message.id 去重)
             "output_tokens": 0,
             "input_tokens": 0,
             "cache_read_tokens": 0,
+            "prompt_log": [],        # 最近的输入原文 [{ts, kind, text}](会话总览用)
             "bytes_read_total": 0,
             "bytes_read_last": 0,
             "json_errors": 0,
@@ -581,6 +596,8 @@ class IncrementalSessionMonitor:
             "inp": int(usage.get("input_tokens") or 0),
             "cache": int(usage.get("cache_read_input_tokens") or 0),
         }
+        if mid not in stream["active_usage"]:
+            self.state["requests"] = int(self.state.get("requests") or 0) + 1
         previous = stream["active_usage"].get(mid) or {"out": 0, "inp": 0, "cache": 0}
         for key, state_key in (("out", "output_tokens"), ("inp", "input_tokens"),
                                ("cache", "cache_read_tokens")):
@@ -795,6 +812,7 @@ class IncrementalSessionMonitor:
                         self.state.get("user_prompts" if kind == "human" else "program_prompts") or 0) + 1
                     stream["status"] = "running"
                     self._event("prompt", "%s: %s" % ("用户输入" if kind == "human" else "程序下发", text[:100]), ts)
+                    _log_prompt(self.state, ts, kind, text)
                     if kind == "human":
                         stages.human(text, ts, command=bool(cmd))
             stages.confirm(ts)
@@ -990,7 +1008,7 @@ LIVE_HTML = r'''<!doctype html>
 @media(prefers-color-scheme:dark){:root{--bg:#11151b;--card:#181e27;--ink:#eef2f7;--muted:#9ba7b6;--line:#303846}}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}.wrap{max-width:1240px;margin:auto;padding:24px}.top{display:flex;gap:14px;align-items:center;flex-wrap:wrap}.dot{width:10px;height:10px;border-radius:50%;background:var(--green);box-shadow:0 0 0 5px color-mix(in srgb,var(--green) 16%,transparent)}h1{font-size:24px;margin:0}.sub{color:var(--muted)}.actions{margin-left:auto;display:flex;gap:8px}.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:8px 12px;border-radius:8px;text-decoration:none;cursor:pointer}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin:20px 0}.card,.panel{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:15px}.k{color:var(--muted);font-size:12px}.v{font-size:24px;font-weight:650;margin-top:3px}.bar{height:7px;background:var(--line);border-radius:9px;overflow:hidden;margin-top:8px}.fill{height:100%;background:var(--blue)}.cols{display:grid;grid-template-columns:1.4fr .8fr;gap:12px}@media(max-width:850px){.cols{grid-template-columns:1fr}}h2{font-size:16px;margin:0 0 12px}table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:8px 6px;border-top:1px solid var(--line);vertical-align:top}th{color:var(--muted);font-size:11px}.status{display:inline-flex;border-radius:99px;padding:2px 7px;font-size:11px;background:var(--line)}.running{color:var(--green)}.failed,.interrupted{color:var(--red)}.waiting{color:var(--amber)}.events{display:flex;flex-direction:column;gap:8px}.event{border-left:2px solid var(--line);padding-left:9px}.event small{color:var(--muted)}.warn{background:color-mix(in srgb,var(--red) 10%,var(--card));border-color:color-mix(in srgb,var(--red) 40%,var(--line))}.mono{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}.empty{color:var(--muted);padding:16px 0}
 </style></head><body><main class="wrap">
-<div class="top"><span class="dot" id="dot"></span><div><h1>MigLoop Live</h1><div class="sub" id="headline">正在连接增量状态…</div></div><div class="actions"><a class="btn" href="/snapshot.html" target="_blank">生成详细快照</a></div></div>
+<div class="top"><span class="dot" id="dot"></span><div><h1>MigLoop Live</h1><div class="sub" id="headline">正在连接增量状态…</div></div><div class="actions"><a class="btn" href="snapshot.html" target="_blank">生成详细快照</a></div></div>
 <div id="error"></div><section class="grid" id="cards"></section><div class="cols"><section class="panel"><h2>Agent 进度</h2><div id="agents"></div></section><section class="panel"><h2>最近事件</h2><div class="events" id="events"></div></section></div>
 </main><script>
 let etag="";const $=id=>document.getElementById(id);const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));const fmt=n=>{n=Number(n||0);return n>=1e6?(n/1e6).toFixed(2)+"M":n>=1e3?(n/1e3).toFixed(1)+"K":String(n)};const pct=(a,b)=>b?Math.min(100,a*100/b):0;const tm=s=>s?new Date(s).toLocaleTimeString():"—";
@@ -1000,7 +1018,7 @@ function render(d){document.title=`MigLoop Live · ${String(d.session_id||"").sl
  $("error").innerHTML=d.last_error?`<div class="panel warn" style="margin-top:14px">保留上一版状态；刷新错误：${esc(d.last_error)}</div>`:"";
  const agents=d.agents||[];$("agents").innerHTML=agents.length?`<table><thead><tr><th>状态</th><th>Agent</th><th>阶段</th><th>工具</th><th>源码</th><th>Token</th></tr></thead><tbody>${agents.map(a=>`<tr><td><span class="status ${esc(a.status)}">${esc(a.status)}</span></td><td>${esc(a.desc||a.agent_id)}<div class="sub mono">${esc(String(a.agent_id||"").slice(0,8))}</div></td><td>${esc(a.stage||"—")}</td><td>${a.tool_uses||0}</td><td>${a.read_files||0} files</td><td>${fmt(a.output_tokens)}</td></tr>`).join("")}</tbody></table>`:`<div class="empty">尚未发现子 agent</div>`;
  const ev=(d.events||[]).slice(-18).reverse();$("events").innerHTML=ev.length?ev.map(e=>`<div class="event"><div>${esc(e.text)}</div><small>${tm(e.ts)} · ${esc(e.kind)}</small></div>`).join(""):`<div class="empty">等待新事件</div>`;}
-async function tick(){try{const r=await fetch("/api/state",{cache:"no-store",headers:etag?{"If-None-Match":etag}:{}});if(r.status===304)return;if(!r.ok)throw Error(r.status);etag=r.headers.get("ETag")||"";render(await r.json())}catch(e){$("headline").textContent="连接中断，正在重试…"}}
+async function tick(){try{const r=await fetch("api/state",{cache:"no-store",headers:etag?{"If-None-Match":etag}:{}});if(r.status===304)return;if(!r.ok)throw Error(r.status);etag=r.headers.get("ETag")||"";render(await r.json())}catch(e){$("headline").textContent="连接中断，正在重试…"}}
 tick();setInterval(tick,__MIGLOOP_POLL_MS__);
 </script></body></html>'''
 
@@ -1054,7 +1072,7 @@ def _chat_ui(chat_info):
     history.push({role:"user",content:content}); bubble("user",content,false); input.value=""; setBusy(true);
     var pending=bubble("assistant","正在分析…",false);
     try{
-      var r=await fetch("/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({messages:history})});
+      var r=await fetch("api/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({messages:history})});
       var data=await r.json().catch(function(){return {error:"服务返回了不可解析的响应"}});
       pending.remove();
       if(!r.ok)throw Error(data.error||("HTTP "+r.status));
@@ -1092,10 +1110,10 @@ def _attach_live_controls(body, baseline_version, baseline_records, poll_ms, cha
 <div id="migloop-live-controls" style="position:fixed;right:18px;bottom:18px;z-index:99990;display:flex;align-items:center;gap:10px;max-width:min(680px,calc(100vw - 36px));padding:10px 12px;border:1px solid rgba(90,105,125,.28);border-radius:12px;background:color-mix(in srgb,var(--paper,#fff) 94%,transparent);color:var(--ink,#18212f);box-shadow:0 8px 30px rgba(20,28,40,.18);font:13px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif;backdrop-filter:blur(12px)">
   <span id="migloop-live-dot" style="width:8px;height:8px;border-radius:50%;background:#23946b;flex:none"></span>
   <span id="migloop-live-text" style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">完整分析快照已生成，正在连接增量状态…</span>
-  <a id="migloop-live-refresh" href="/refresh" style="display:none;flex:none;padding:5px 9px;border-radius:8px;background:#3976d4;color:#fff;text-decoration:none">刷新完整分析</a>
+  <a id="migloop-live-refresh" href="refresh" style="display:none;flex:none;padding:5px 9px;border-radius:8px;background:#3976d4;color:#fff;text-decoration:none">刷新完整分析</a>
   __CHAT_BUTTON__
-  <a href="/export.html" style="flex:none;color:inherit;text-decoration:none">导出 HTML</a>
-  <a href="/status.html" style="flex:none;color:inherit;opacity:.72;text-decoration:none">状态</a>
+  <a href="export.html" style="flex:none;color:inherit;text-decoration:none">导出 HTML</a>
+  <a href="status.html" style="flex:none;color:inherit;opacity:.72;text-decoration:none">状态</a>
 </div>
 __CHAT_PANEL__
 <script>
@@ -1106,7 +1124,7 @@ __CHAT_PANEL__
   function clock(ts){if(!ts)return "—";return new Date(ts).toLocaleTimeString()}
   async function tick(){
     try{
-      var r=await fetch("/api/state",{cache:"no-store",headers:etag?{"If-None-Match":etag}:{}});
+      var r=await fetch("api/state",{cache:"no-store",headers:etag?{"If-None-Match":etag}:{}});
       if(r.status===304)return;
       if(!r.ok)throw Error(String(r.status));
       etag=r.headers.get("ETag")||"";

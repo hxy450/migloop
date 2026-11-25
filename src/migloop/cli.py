@@ -8,7 +8,7 @@ MigLoop Trace Viewer — 单命令生成 Claude Code / Codex 会话轨迹页面
   migloop <session-id 前缀>         在 Claude / Codex session 目录中自动定位
   migloop <项目名片段>              匹配项目目录,取最新 session
   migloop <目标> -o out.html --open
-  migloop <目标> --serve --open      本机服务:报告页 + 会话总览
+  migloop <迁移工程目录> --live [--interval 60]   盯整次迁移的全部会话(会话总览 + 各会话实时)
 
 跨平台:Windows `py migloop.pyz ...` / macOS·Linux `python3 migloop.pyz ...`
 依赖:Python >= 3.9,无第三方库
@@ -126,6 +126,63 @@ def extract_trace(path, storage_root=None):
     return service.annotate_trace(path, data)
 
 
+def live_target(target, root, codex_root, deveco_root):
+    """--live 的目标 → (迁移目录, 当前会话或 None)。目录就是迁移目录(Claude 的 projects 子目录则取
+    其中最新会话的 cwd);会话 id / jsonl 路径取它所在的迁移目录。"""
+    from .live import migration
+    if os.path.isdir(target) and not adapters.get("dsh").dsh_log_of(target):
+        cands = sorted(glob.glob(os.path.join(target, "*.jsonl")), key=os.path.getmtime, reverse=True)
+        if not cands:
+            return os.path.abspath(target), None
+        target = cands[0]
+    jsonl = resolve_target(target, root, codex_root, deveco_root)
+    adapter = adapters.detect(jsonl)
+    if not adapter.SUPPORTS_LIVE:
+        sys.exit("%s 会话已支持离线/对比报告；--live 增量监控尚未接入该格式" % adapter.FORMAT)
+    harmony = migration.harmony_of_session(jsonl, adapter.FORMAT)
+    if not harmony or not os.path.isdir(harmony):
+        sys.exit("找不到会话 %s 所在的迁移目录(cwd %r 不在本机)" % (jsonl, harmony))
+    return harmony, jsonl
+
+
+def run_live(args, root, codex_root, deveco_root):
+    from .chat import provider as chat_provider
+    from .live import migration
+    harmony, focus = live_target(args.targets[0], root, codex_root, deveco_root)
+    out = args.out or "migloop-%s-live.html" % (os.path.basename(harmony.rstrip("\\/")) or "migration")
+    template = load_template()
+
+    def build_report(path):
+        # 完整分析页:带审计;页面没有服务端,后续节点不带站内链接
+        return build_html(service.report_trace(path, static=True), template).encode("utf-8")
+
+    chat_factory = None
+    if args.chat_provider != "off":
+        try:
+            chat_config = chat_provider.ChatConfig(
+                provider=args.chat_provider, model=args.chat_model, api_key_env=args.chat_api_key_env,
+                base_url=args.chat_base_url, timeout=max(10.0, args.chat_timeout))
+
+            def chat_factory(path):
+                adapter = adapters.detect(path)
+                return chat_provider.ChatService(
+                    chat_config,
+                    lambda: chat_provider.build_lineage_context(adapter.extract(path), chat_config.max_context_chars),
+                    session=chat_provider.SessionCorpus(path))
+            info = chat_factory(focus or "").info() if focus else None
+            if info:
+                print("分析助手      -> %s / %s" % (info["provider"], info["model"]))
+        except chat_provider.ChatConfigurationError as exc:
+            print("提示: 分析助手未启用: %s" % exc)
+            chat_factory = None
+
+    migration.run(harmony, focus, out, build_report, build_trace=service.extract_trace,
+                  host=args.host, port=args.port, interval=args.interval, cache_dir=args.cache_dir,
+                  reset_cache=args.reset_live_cache, open_browser=args.open, write_final_page=not args.no_final,
+                  chat_factory=chat_factory, claude_root=args.projects_root, codex_root=codex_root,
+                  deveco_root=args.deveco_db or args.deveco_sessions_root, dsh_root=args.dsh_sessions_root)
+
+
 def main():
     ap = argparse.ArgumentParser(prog="migloop", description="Claude Code / Codex 会话轨迹可视化页面生成器")
     ap.add_argument("targets", nargs="*", help="jsonl 路径 | session-id 前缀 | 项目名片段(--compare 时可多个)")
@@ -139,12 +196,10 @@ def main():
                     help="覆盖 dsh 会话根目录(默认 $DSH_HOME/sessions 或 ~/.dsh/sessions)")
     ap.add_argument("--deveco-db", default=None,
                     help="deveco.db 路径(或 DevEco 数据目录)，覆盖默认位置；用于按 session id 直读 DB 及定位子代理库")
-    ap.add_argument("--serve", action="store_true",
-                    help="起本机服务:报告页 + 会话总览;复用 --host/--port/--open")
     ap.add_argument("--live", action="store_true",
-                    help="增量监控仍在追加的 session，并启动本地自动刷新页面")
+                    help="盯一次迁移的全部会话(目标可以是鸿蒙工程目录,也可以是其中一个会话),启动本地自动刷新页面")
     ap.add_argument("--interval", type=float, default=10.0,
-                    help="--live 文件变化与页面刷新间隔秒数（默认 10）")
+                    help="--live 刷新间隔秒数（默认 10;每次先找新会话,再读各会话新增的内容）")
     ap.add_argument("--host", default="127.0.0.1",
                     help="--live 本地服务监听地址（默认 127.0.0.1）")
     ap.add_argument("--port", type=int, default=0,
@@ -181,8 +236,6 @@ def main():
 
     if args.live and args.compare:
         sys.exit("--live 不能与 --compare 同时使用")
-    if args.serve and (args.live or args.compare):
-        sys.exit("--serve 不能与 --live / --compare 同时使用")
 
     if args.compare:
         if len(args.targets) < 2:
@@ -205,13 +258,8 @@ def main():
             webbrowser.open(pathlib.Path(out).resolve().as_uri())
         return
 
-    if args.serve:
-        # The service is the authority for frozen-pool and anchored scope.
-        # Resolving an alias via global discovery first can select a live copy
-        # outside the explicitly configured frozen pool.
-        from . import serve as serve_mod
-        serve_mod.serve(args.targets[0], host=args.host, port=args.port, open_browser=args.open,
-                        roots={"claude": root, "codex": codex_root, "deveco": deveco_root})
+    if args.live:
+        run_live(args, root, codex_root, deveco_root)
         return
 
     jsonl = resolve_target(args.targets[0], root, codex_root, deveco_root)
@@ -220,66 +268,6 @@ def main():
     sub = os.path.join(os.path.splitext(jsonl)[0], "subagents")
     if fmt == "claude" and not os.path.isdir(sub):
         print("提示: 未找到 %s,子代理泳道将为空(分享 session 时请连同同名目录一起拷贝)" % sub)
-
-    if args.live:
-        if not adapter.SUPPORTS_LIVE:
-            sys.exit("%s session 已支持离线/对比报告；--live 增量监控尚未接入该 adapter" % fmt)
-        from .chat import provider as chat_provider
-        from .live import monitor as live_session
-        cwd_base = os.path.basename(os.path.dirname(jsonl)).replace("C--Users-hongy-projects-", "") or "session"
-        out = args.out or "migloop-%s-%s.html" % (
-            cwd_base, os.path.splitext(os.path.basename(jsonl))[0][:8])
-        template = load_template()
-
-        def build_snapshot_bytes():
-            # live 快照:带审计;页面没有服务端,后续节点不带站内链接
-            trace = service.report_trace(jsonl, static=True)
-            return build_html(trace, template).encode("utf-8")
-
-        chat_service = None
-        if args.chat_provider != "off":
-            try:
-                chat_config = chat_provider.ChatConfig(
-                    provider=args.chat_provider,
-                    model=args.chat_model,
-                    api_key_env=args.chat_api_key_env,
-                    base_url=args.chat_base_url,
-                    timeout=max(10.0, args.chat_timeout),
-                )
-
-                def build_chat_context():
-                    return chat_provider.build_lineage_context(
-                        adapter.extract(jsonl), chat_config.max_context_chars
-                    )
-
-                chat_service = chat_provider.ChatService(
-                    chat_config, build_chat_context,
-                    session=chat_provider.SessionCorpus(jsonl),
-                )
-                info = chat_service.info()
-                print("分析助手    -> %s / %s" % (info["provider"], info["model"]))
-            except chat_provider.ChatConfigurationError as exc:
-                print("提示: 分析助手未启用: %s" % exc)
-
-        monitor_factory = None
-        if fmt == "codex":
-            from .live.codexlive import CodexLiveMonitor
-            monitor_factory = CodexLiveMonitor
-        live_session.run_live(
-            jsonl=jsonl,
-            build_snapshot=build_snapshot_bytes,
-            out_path=out,
-            host=args.host,
-            port=args.port,
-            interval=args.interval,
-            cache_dir=args.cache_dir,
-            reset_cache=args.reset_live_cache,
-            open_browser=args.open,
-            write_final=not args.no_final,
-            chat_service=chat_service,
-            monitor_factory=monitor_factory,
-        )
-        return
 
     print("解析 %s ..." % jsonl)
     # 离线报告 = 提取 + 审计 + 跨会话提示 + 执行拓扑后续节点;导出页没有服务端

@@ -57,7 +57,7 @@ class IncrementalLiveSessionTest(unittest.TestCase):
         self.assertIn("BASELINE_VERSION=7", page)
         self.assertIn("BASELINE_RECORDS=120", page)
         self.assertIn("setInterval(tick,10000)", page)
-        self.assertIn('href="/refresh"', page)
+        self.assertIn('href="refresh"', page)  # 相对地址:会话详情页挂在 /s/<key>/ 下也能用
 
     def test_reads_only_appended_bytes_and_restores_checkpoint(self):
         first = {

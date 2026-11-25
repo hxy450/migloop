@@ -1,0 +1,89 @@
+"""--live 盯整次迁移:新会话能被发现、ECAT 轮次挂得上、刷新只读增量、停止后的最终页带总览。"""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+from migloop.live import migration
+
+
+def _rec(ts: str, rtype: str, content, cwd: str, sid: str) -> dict:
+    msg = {"role": rtype, "content": content}
+    if rtype == "assistant":
+        msg.update(id="m-" + ts, model="glm-5.3", usage={"input_tokens": 3, "output_tokens": 5})
+    return {"type": rtype, "timestamp": ts, "sessionId": sid, "cwd": cwd, "message": msg,
+            **({"promptSource": "typed"} if rtype == "user" else {})}
+
+
+def _write(path: Path, rows: list[dict]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("".join(json.dumps(r) + "\n" for r in rows), encoding="utf-8")
+
+
+def _setup(tmp_path: Path):
+    harmony = tmp_path / "proj"
+    harmony.mkdir()
+    croot = tmp_path / "claude" / "projects"
+    slug = croot / migration.claude_slug(str(harmony))
+    _write(slug / "aaaa.jsonl", [_rec("2026-11-25T10:00:00Z", "user", "迁移", str(harmony), "aaaa"),
+                                 _rec("2026-11-25T10:00:05Z", "assistant", [{"type": "text", "text": "ok"}], str(harmony), "aaaa")])
+    mon = migration.MigrationMonitor(str(harmony), cache_dir=str(tmp_path / "cache"), claude_root=str(croot),
+                                     codex_root=str(tmp_path / "codex"), deveco_root=str(tmp_path / "nodb"),
+                                     dsh_root=str(tmp_path / "dsh"))
+    return harmony, slug, mon
+
+
+def test_new_session_in_the_directory_is_discovered(tmp_path: Path) -> None:
+    harmony, slug, mon = _setup(tmp_path)
+    mon.poll_once()
+    assert set(mon.slots) == {"aaaa"}
+    _write(slug / "bbbb.jsonl", [_rec("2026-11-25T11:00:00Z", "user", "中途新开的会话", str(harmony), "bbbb")])
+    mon.poll_once()
+    assert set(mon.slots) == {"aaaa", "bbbb"}
+    ids = [s["session_id"] for s in mon.overview()["sessions"]]
+    assert ids == ["aaaa", "bbbb"]
+
+
+def test_ecat_rounds_are_attached_to_their_run(tmp_path: Path) -> None:
+    harmony, _slug, mon = _setup(tmp_path)
+    run = harmony / ".migbot" / "ecat_runs" / "run_1"
+    run.mkdir(parents=True)
+    (run / "entropy_history.jsonl").write_text(
+        "".join(json.dumps({"iteration": i, "total_H": 1.0 / i, "breakdown": {"ui": 0.5 / i},
+                            "timestamp": "2026-11-25T12:0%d:00Z" % i}) + "\n" for i in (1, 2)), encoding="utf-8")
+    gen = harmony / ".ecat" / "agents" / "generator" / "projects" / migration.claude_slug(str(harmony)) / "gggg.jsonl"
+    _write(gen, [_rec("2026-11-25T12:05:00Z", "user", "ECAT adversarial loop (iteration 2) …", str(harmony), "gggg")])
+    mon.poll_once()
+    data = mon.overview()
+    row = next(s for s in data["sessions"] if s["session_id"] == "run_1")
+    (thread,) = row["threads"]
+    assert (thread["thread_id"], thread["role"], thread["ecat_iterations"]) == ("gggg", "generator", [2])
+    assert [it["iteration"] for it in data["ecat_runs"][0]["iterations"]] == [1, 2]
+
+
+def test_refresh_reads_only_the_appended_bytes(tmp_path: Path) -> None:
+    harmony, slug, mon = _setup(tmp_path)
+    mon.poll_once()
+    path = slug / "aaaa.jsonl"
+    extra = json.dumps(_rec("2026-11-25T10:01:00Z", "user", "继续", str(harmony), "aaaa")) + "\n"
+    with open(path, "a", encoding="utf-8", newline="") as fh:
+        fh.write(extra)
+    assert mon.poll_once()
+    snap = mon.slots["aaaa"]["monitor"].snapshot()
+    assert snap["bytes_read_last"] == len(extra.encode("utf-8"))
+    assert snap["bytes_read_total"] == path.stat().st_size
+    assert not mon.poll_once(), "没有新内容时不算变化"
+
+
+def test_final_page_carries_the_overview(tmp_path: Path) -> None:
+    _harmony, _slug, mon = _setup(tmp_path)
+    mon.poll_once()
+    out = tmp_path / "out" / "final.html"
+    migration.write_final(mon, str(out), build_report=lambda path: b"<html>report</html>")
+    page = out.read_text(encoding="utf-8")
+    boot = json.loads(page.split("window.__MIGLOOP_CHAIN__=", 1)[1].split(";</script>", 1)[0])
+    (thread,) = boot["inline"]["sessions"][0]["threads"]
+    assert thread["thread_id"] == "aaaa" and thread["href"] == "final.sessions/aaaa.html"
+    assert (out.parent / "final.sessions" / "aaaa.html").read_bytes() == b"<html>report</html>"
+    assert "会话总览" in page
