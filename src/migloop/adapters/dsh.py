@@ -218,9 +218,10 @@ def _session_walk(header, events):
            "act": [], "dispatches": [], "turn_end": None, "model": None, "reasoning_chars": 0,
            "text_chars": 0, "tool_chars": 0, "first": header.get("createdAt"), "last": header.get("createdAt"),
            "skills": [], "context": [],
-           # 停摆:turn/end 到下一个回合开始 / 下一条输入之间;斜杠命令 run → done 期间算忙
+           # 停摆:turn/end(或回合外的 command/done)到下一个回合开始 / 下一条输入;命令 run → done 算忙
            "stalls": [], "cmd_busy": []}
     turn_closed = None
+    turn_open = False
     model = None
     for ev in events:
         t, d, ms = ev.get("type"), ev.get("data") or {}, ev.get("time")
@@ -230,7 +231,11 @@ def _session_walk(header, events):
         ts = src.iso(ms)
         seq = ev.get("seq")
         if isinstance(ms, (int, float)):
-            if t == "turn/end":
+            if t == "turn/start":
+                turn_open = True
+            if t == "turn/end" or (t == "command/done" and not turn_open):
+                # 回合关闭:模型回合结束;只敲斜杠命令(没有模型回合)时,命令跑完也算
+                turn_open = False
                 turn_closed = turn_closed if turn_closed is not None else float(ms)
             elif turn_closed is not None and t in ("turn/start", "user/message", "command/run"):
                 if ms > turn_closed:

@@ -128,3 +128,16 @@ def test_dsh_active_uses_turn_end_to_next_turn(tmp_path: Path) -> None:
     trace = dsh.extract(_dsh_log(tmp_path, events))
     # 0–25 分里 5→20 分回合关着:活跃 10 分
     assert (trace["totals"]["duration_ms"], trace["totals"]["active_ms"]) == (25 * 60000, 10 * 60000)
+
+
+def test_dsh_command_done_outside_a_turn_closes_it(tmp_path: Path) -> None:
+    """只敲了斜杠命令、没有模型回合的会话:command/done 到下一条 command/run 之间算停。"""
+    base = 1794566300000
+    events = [
+        {"type": "command/run", "seq": 1, "time": base, "data": {"commandId": "a", "name": "fixchain", "args": " cards"}},
+        {"type": "command/done", "seq": 2, "time": base + 123, "data": {"commandId": "a"}},
+        {"type": "command/run", "seq": 3, "time": base + 10 * 60000, "data": {"commandId": "b", "name": "fixchain", "args": " status"}},
+        {"type": "command/done", "seq": 4, "time": base + 10 * 60000 + 1, "data": {"commandId": "b"}},
+    ]
+    trace = dsh.extract(_dsh_log(tmp_path, events))
+    assert trace["totals"]["active_ms"] == 124
