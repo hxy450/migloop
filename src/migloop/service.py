@@ -19,7 +19,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from . import adapters, atoms, atoms_collect, atoms_text, audit, crosschain, filestory
+from . import adapters, atoms, atoms_collect, atoms_text, audit, crosschain, ecat, filestory
 from .render import build_html, load_template
 
 
@@ -323,8 +323,19 @@ def extract_trace(path: str, storage_root: str | None = None) -> dict[str, Any]:
             data = dict(adapter.extract(path, storage_root=storage_root))
         else:
             data = dict(adapter.extract(path))
+        annotate_trace(path, data)
         _put(_TRACE_CACHE, path, (key, data))
         return data
+
+
+def annotate_trace(path: str, data: dict[str, Any]) -> dict[str, Any]:
+    """来源无关的补注:ECAT 角色会话补 ``meta.ecat`` 与阶段标签。复用已解析的 trace,
+    非 ECAT 会话只看路径 / rollout 首行;补不上不拖垮报告。"""
+    try:
+        ecat.annotate(path, data)
+    except Exception:  # noqa: BLE001 - 补注是锦上添花
+        pass
+    return data
 
 
 def _fmt_of(trace: dict[str, Any]) -> str:

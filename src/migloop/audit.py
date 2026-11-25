@@ -22,6 +22,7 @@ trace["stages"],trace["agents"](aborted/type),trace["lineage"]
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 #: a2h 管线的阶段顺序约定 —— pipeline-gap 规则的基准。
@@ -546,6 +547,134 @@ def _check_rework(trace: dict[str, Any]) -> list[dict[str, Any]]:
 _LEVEL_ORDER = {"error": 0, "warn": 1, "info": 2}
 
 
+# ── 子代理类型未注册(任何会话都适用;ECAT 判官是最常见的受害者,#161) ──────
+# 以下三条移植自 hmigbot-plus 90b6726d。都只吃已发生的事实:派发回执里的报错原文、
+# 判官工作单与实际写入、熵记录的 ΔH;不从「没看到」推断失败。
+
+_AGENT_NOT_FOUND = re.compile(r"Agent type '([^']+)' not found")
+
+#: 生成端「源码」的口径:这些后缀之外的写(日志/记忆/脚本)不算越界。
+_ECAT_SOURCE_SUFFIXES = (".ets", ".ts", ".json5", ".json", ".xml")
+_ECAT_NON_SOURCE_PREFIXES = (".ecat/", ".migbot/", "build/", "oh_modules/", "/tmp/", "/private/tmp/")
+
+
+def _check_agent_type_missing(trace: dict[str, Any]) -> list[dict[str, Any]]:
+    """派发的子代理类型在这个 CLAUDE_CONFIG_DIR 里不存在:模型通常会换个类型
+    重派(实测退化成 general-purpose),拿不到原类型定义里的工具限制与输出契约,
+    结果口径不可比,还白耗一段派发/重派的时间。按缺失的类型各出一条。"""
+    misses: dict[str, list[dict[str, Any]]] = {}
+    for t in trace.get("tools") or []:
+        if t.get("name") not in ("Agent", "Task") or t.get("ok") is not False:
+            continue
+        m = _AGENT_NOT_FOUND.search(str(t.get("result") or ""))
+        if m:
+            misses.setdefault(m.group(1), []).append(t)
+    out = []
+    for kind, rows in misses.items():
+        briefs = {str(r.get("brief") or "") for r in rows}
+        fallback = sorted({
+            str(a.get("type") or "") for a in trace.get("agents") or []
+            if str(a.get("desc") or "") in briefs and a.get("type") and a.get("type") != kind
+        })
+        fb = f",随后以 {'/'.join(fallback)} 身份重派" if fallback else ""
+        out.append(_finding(
+            "agent-type-missing", "error",
+            f"子代理类型未注册 · {kind}",
+            f"{len(rows)} 次派发因为 agent 类型「{kind}」未注册而失败{fb} —— "
+            "拿不到该类型定义里的工具限制与输出契约,结果口径与正常 run 不可比;"
+            "先核 CLAUDE_CONFIG_DIR/agents/ 下有没有它的定义。",
+            anchor={"stage": rows[0].get("stage"), "ts": rows[0].get("ts")},
+        ))
+    return out
+
+
+def _ecat_meta(trace: dict[str, Any]) -> dict[str, Any]:
+    meta = trace.get("meta") or {}
+    e = meta.get("ecat") if isinstance(meta, dict) else None
+    return e if isinstance(e, dict) else {}
+
+
+def _is_ecat_source(path: str) -> bool:
+    p = path.replace("\\", "/")
+    return p.endswith(_ECAT_SOURCE_SUFFIXES) and not p.startswith(_ECAT_NON_SOURCE_PREFIXES)
+
+
+def _check_ecat_out_of_scope(trace: dict[str, Any]) -> list[dict[str, Any]]:
+    """生成端越界写:改了判官工作单之外的源码文件。工作单是本轮的全部范围
+    (提示原话 "The work list is the whole scope"),范围外的改动多半是被措辞
+    带偏的盲修,最容易把熵改回去(#162 的 iter-1 反弹就是这么来的)。"""
+    e = _ecat_meta(trace)
+    if e.get("role") != "generator" or "work_list_files" not in e:
+        return []
+    scope = [str(x).replace("\\", "/") for x in (e.get("work_list_files") or [])]
+    files = (trace.get("lineage") or {}).get("files") or []
+    outside: list[str] = []
+    for f in files:
+        if not isinstance(f, dict) or not (f.get("writes") or 0):
+            continue
+        path = str(f.get("path") or "")
+        if not _is_ecat_source(path):
+            continue
+        norm = path.replace("\\", "/")
+        if any(norm == w or norm.endswith("/" + w) or w.endswith("/" + norm) for w in scope):
+            continue
+        outside.append(path)
+    if not outside:
+        return []
+    it = e.get("iteration")
+    return [_finding(
+        "ecat-out-of-scope", "warn",
+        f"生成端越界改动 · iter {it}" if it is not None else "生成端越界改动",
+        f"改了 {len(outside)} 个工作单之外的源码文件(工作单 {len(set(scope))} 个):"
+        f"{'、'.join(outside[:5])}{' 等' if len(outside) > 5 else ''} —— 范围外的改动没有判官"
+        "证据支撑,容易把别的维度改坏;核对 gradient.json 的 work_list 与措辞。",
+        paths=outside,
+        anchor={"stage": "session"},
+    )]
+
+
+def _check_ecat_no_effect(trace: dict[str, Any]) -> list[dict[str, Any]]:
+    """生成轮没把熵降下来:ΔH ≥ 0。等于这一轮 generator + 下一轮 discriminator
+    的时间都白花;ΔH = 0 通常是改动未被采纳(未 commit)。"""
+    e = _ecat_meta(trace)
+    dh = e.get("delta_H")
+    if e.get("role") != "generator" or not isinstance(dh, (int, float)):
+        return []
+    if dh < 0:
+        return []
+    it = e.get("iteration")
+    why = "改动未被采纳(ΔH = 0,未 commit)" if dh == 0 else f"熵反而上升(ΔH = +{dh:.4f})"
+    return [_finding(
+        "ecat-no-effect", "warn",
+        f"生成轮未降熵 · iter {it}" if it is not None else "生成轮未降熵",
+        f"{why} —— 这一轮的生成与下一轮评估都没换来收敛;看工作单是否在一个"
+        "不可能收敛的维度上打转(维度不收敛见 run 级审计)。",
+        anchor={"stage": "session"},
+    )]
+
+
+def _session_rules(traces: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """逐会话的事实规则(agent-type-missing 与两条 ECAT 生成端规则)→ (findings, assessments)。"""
+    findings: list[dict[str, Any]] = []
+    for tr in traces:
+        findings += _check_agent_type_missing(tr) + _check_ecat_out_of_scope(tr) + _check_ecat_no_effect(tr)
+    fired = {f["rule"] for f in findings}
+    dispatched = any(t.get("name") in ("Agent", "Task") for tr in traces for t in tr.get("tools") or [])
+    generator = any(_ecat_meta(tr).get("role") == "generator" for tr in traces)
+    scoped = any(_ecat_meta(tr).get("role") == "generator" and "work_list_files" in _ecat_meta(tr)
+                 for tr in traces)
+    measured = any(_ecat_meta(tr).get("role") == "generator"
+                   and isinstance(_ecat_meta(tr).get("delta_H"), (int, float)) for tr in traces)
+
+    def status(rule: str, applicable: bool) -> dict[str, Any]:
+        return {"rule": rule, "status": "failed" if rule in fired else ("observed" if applicable else "not_applicable")}
+
+    assessments = [status("agent-type-missing", dispatched),
+                   status("ecat-out-of-scope", generator and scoped),
+                   status("ecat-no-effect", generator and measured)]
+    return findings, assessments
+
+
 def build_audit(trace: dict[str, Any],
                 pipeline: tuple[str, ...] = DEFAULT_PIPELINE,
                 fix_chains: list[dict[str, Any]] | None = None,
@@ -571,6 +700,9 @@ def build_audit(trace: dict[str, Any],
                 findings.append(f)
                 snapshots.add(key)
     findings.extend(check_fix_chains(fix_chains or []))
+    session_findings, session_checks = _session_rules(traces)
+    findings.extend(session_findings)
+    assessments = [*review["assessments"], *session_checks]
     findings.sort(key=lambda f: _LEVEL_ORDER.get(f["level"], 9))
     counts = {"error": 0, "warn": 0, "info": 0}
     for f in findings:
@@ -578,7 +710,7 @@ def build_audit(trace: dict[str, Any],
     return {
         "findings": findings,
         "counts": counts,
-        "checked": [c["rule"] for c in review["assessments"] if c["status"] not in ("unknown", "not_applicable")],
-        "assessments": review["assessments"],
+        "checked": [c["rule"] for c in assessments if c["status"] not in ("unknown", "not_applicable")],
+        "assessments": assessments,
         "coverage": review["coverage"],
     }

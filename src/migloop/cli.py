@@ -120,8 +120,10 @@ def session_format(path):
 def extract_trace(path, storage_root=None):
     adapter = adapters.detect(path)
     if getattr(adapter, "FORMAT", "") == "deveco":
-        return adapter.extract(path, storage_root=storage_root)
-    return adapter.extract(path)
+        data = adapter.extract(path, storage_root=storage_root)
+    else:
+        data = adapter.extract(path)
+    return service.annotate_trace(path, data)
 
 
 def main():
