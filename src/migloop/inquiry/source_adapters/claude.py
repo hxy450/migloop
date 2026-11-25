@@ -1,5 +1,4 @@
 """Claude Code native JSONL. Request/result block slots remain unchanged."""
-from ...cc_records import is_request_replay
 from .base import Identity, message_role
 
 
@@ -7,10 +6,6 @@ class ClaudeAdapter:
     name = "claude"
 
     def matches(self, record):
-        # 请求体快照(api-request-blob)不是对话:它的 tool_use/tool_result 与真实行同 id,
-        # 认作 Claude 记录会给每次调用多配一对请求/结果。整行仍按原文入索引。
-        if is_request_replay(record):
-            return False
         return isinstance(record.get("message"), dict) or bool(record.get("sessionId"))
 
     def identity(self, record):

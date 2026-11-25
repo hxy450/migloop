@@ -11,10 +11,8 @@ import json
 import os
 import shutil
 
-from migloop import atoms_collect, filestory_collect
 from migloop.adapters import claude as cc
 from migloop.cc_records import is_request_replay
-from migloop.inquiry.source_adapters import adapter_for, parts
 from migloop.live.monitor import IncrementalSessionMonitor
 
 FIXTURE = os.path.join(os.path.dirname(__file__), "fixtures", "cc-request-blob")
@@ -49,20 +47,6 @@ def test_extract_counts_only_conversation_rows(tmp_path, monkeypatch):
     assert trace["billing"]["deepseek-flash"]["req"] == 6
     ets = [f for f in trace["lineage"]["files"] if str(f.get("path", "")).endswith("Index.ets")]
     assert ets and ets[0]["writes"] == 2
-
-
-def test_collectors_skip_blob_rows(tmp_path):
-    main = _copy(tmp_path)
-    agents = atoms_collect.collect_cc(main, [0])
-    sub = next(a for k, a in agents.items() if not k.startswith("__main__"))
-    tuids = [act.tuid for act in sub.actions if act.tuid]
-    assert sorted(tuids) == ["tuE", "tuW"]
-    main_rec = next(a for k, a in agents.items() if k.startswith("__main__"))
-    assert sorted(act.tuid for act in main_rec.actions if act.tuid) == ["tuA", "tuR"]
-
-    jl = os.path.join(os.path.dirname(main), SID, "subagents", "agent-s1.jsonl")
-    writes = [e for e in filestory_collect._collect_one(jl, "agent-s1", [0]) if e.kind != "read"]
-    assert len(writes) == 2
 
 
 def test_live_monitor_skips_blob_rows(tmp_path):
@@ -133,10 +117,10 @@ def test_live_monitor_counts_each_tool_use_once(tmp_path):
     assert snap["current_stage"] == "a2h-execute"
 
 
-def test_raw_index_does_not_pair_blob_calls():
+def test_request_replay_predicate():
     blob = {"type": "api-request-blob", "sessionId": SID, "hash": "h",
             "message": {"role": "assistant", "content": [{"type": "tool_use", "id": "tuR", "name": "Read",
                                                           "input": {"file_path": "x"}}]}}
     assert is_request_replay(blob)
-    assert adapter_for(blob) is None
-    assert list(parts(blob)) == []
+    assert not is_request_replay({"type": "assistant", "message": blob["message"]})
+    assert not is_request_replay("api-request-blob")

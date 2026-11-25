@@ -24,7 +24,7 @@ import urllib.parse
 from datetime import datetime
 from typing import Any
 
-from . import crosschain, ecat
+from . import ecat, project_sessions
 from .cc_records import is_request_replay
 
 #: 后续会话最多接几条 —— 同目录里可能堆着几百条别的会话,全扫一遍读不完
@@ -104,10 +104,10 @@ def report_href(path: str) -> str:
 def _later_sessions(path: str, ended: datetime, link: bool) -> list[dict[str, Any]]:
     cur = os.path.abspath(path)
     out: list[dict[str, Any]] = []
-    for sibling in crosschain.collect_claude_project_roots(path, 64):
+    for sibling in project_sessions.claude_project_roots(path, 64):
         if os.path.abspath(sibling) == cur:
             continue
-        first = ecat._parse_ts(crosschain._first_record_ts(sibling))
+        first = ecat._parse_ts(project_sessions.first_record_ts(sibling))
         if first is None or first <= ended:
             continue
         info = _scan(sibling)

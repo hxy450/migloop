@@ -3,9 +3,13 @@
 Claude Code ≥2.1.322 每发一次模型请求,会把请求体里的消息再落一行
 ``{"type": "api-request-blob", "hash": ..., "message": {"role": ..., "content": [...]}}``
 (由同文件的 ``api-request`` 行按 hash 引用)。它是请求快照:没有 uuid、timestamp,
-content 里的 tool_use / tool_result 与真实对话行同 id 重复。按对话读的解析器、收集器
-和原始调用索引都必须跳过它,否则工具调用、写入、文本会再算一遍(Cashiro 主线 745 次
-调用被算成 863 次,子代理 11,787 次被算成 15,185 次)。
+content 里的 tool_use / tool_result 与真实对话行同 id 重复。按对话读的解析器必须跳过它,
+否则工具调用、写入、文本会再算一遍(Cashiro 主线 745 次调用被算成 863 次,子代理 11,787 次
+被算成 15,185 次),副本里的 Skill 调用还会重开阶段。
+
+用到它的是会话解析层(adapters、live、chat、ecat、followups)。返修链路那批模块
+(atoms_collect / filestory_collect / raw_events / inquiry 等)按 c72c0db 原样保留、待拆仓,
+这里不改它们。
 """
 
 from __future__ import annotations

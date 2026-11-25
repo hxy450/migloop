@@ -168,8 +168,6 @@ def test_build_chain_aggregates_totals_entropy_and_findings(project: SimpleNames
 def test_build_chain_scans_the_ecat_runs_once(project: SimpleNamespace, monkeypatch) -> None:
     """每个 ECAT 会话的 extract 都要 run 上下文;不共享扫描,一条链就是
     会话数 × run 数遍的 run 目录扫描。"""
-    from migloop import service
-    monkeypatch.setattr(service, "_TRACE_CACHE", {})
     calls = {"history": 0, "streams": 0}
     load, streams = ecat._load_history, ecat._stream_sessions
 

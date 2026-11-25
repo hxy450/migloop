@@ -10,8 +10,8 @@
     codex 线按 stream 的 thread id 挂上的 rollout,按轮次标注。
 
 每个会话归约成一格:用量、阶段、审计发现、提示词全文。会话类别只认得出 ECAT 角色,
-其余一律记「会话」,不按名字猜主迁移 / 评审。每份 transcript 只解析一次(走
-service.extract_trace 的缓存),不另扫。
+其余一律记「会话」,不按名字猜主迁移 / 评审。每份 transcript 只解析一次:--serve 传入
+service.extract_trace(带缓存);单独调用时用本模块的 adapter + ecat 补注,不 import 返修链路模块。
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable
 
-from . import audit, crosschain, ecat, followups
+from . import adapters, audit, ecat, followups, project_sessions
 from .adapters.claude import TRAILING_ROUNDS_LABEL
 
 _SUMMED = ("requests", "input_tokens", "cache_read_tokens", "output_tokens",
@@ -100,9 +100,9 @@ def _project_roots(path: str, trace: dict[str, Any]) -> list[str]:
     meta = trace.get("meta") or {}
     fmt = str(meta.get("session_format") or "claude")
     if fmt == "codex":
-        return crosschain.collect_project_roots(path, str(meta.get("cwd") or ""), limit=64)
+        return project_sessions.codex_project_roots(path, str(meta.get("cwd") or ""), limit=64)
     if fmt == "claude":
-        return crosschain.collect_claude_project_roots(path, limit=64)
+        return project_sessions.claude_project_roots(path, limit=64)
     return [os.path.abspath(path)]
 
 
@@ -159,13 +159,22 @@ def _ecat_sessions(harmony: str, extract: Callable[[str], dict[str, Any]],
     return rows, runs
 
 
+def extract_trace(path: str) -> dict[str, Any]:
+    """adapter 解析 + ECAT 补注(与 service.extract_trace 同结果,不带缓存与冻结池)。"""
+    data = dict(adapters.detect(path).extract(path))
+    try:
+        ecat.annotate(path, data)
+    except Exception:  # noqa: BLE001 - 补注是锦上添花
+        pass
+    return data
+
+
 def build_chain(path: str, extract: Callable[[str], dict[str, Any]] | None = None) -> dict[str, Any]:
-    """锚点会话 → 它所在迁移的会话总览。**逐个归约 transcript,大工程要几十秒。**"""
-    if extract is None:
-        from . import service
-        extract = service.extract_trace
+    """锚点会话 → 它所在迁移的会话总览。**逐个归约 transcript,大工程要几十秒。**
+
+    ``extract`` 默认是本模块的 extract_trace;--serve 传 service.extract_trace 共用报告页的缓存。"""
     with ecat.shared_scan():
-        return _build_chain(os.path.abspath(path), extract)
+        return _build_chain(os.path.abspath(path), extract or extract_trace)
 
 
 def _build_chain(path: str, extract: Callable[[str], dict[str, Any]]) -> dict[str, Any]:

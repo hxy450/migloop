@@ -173,7 +173,7 @@ class _Handler(BaseHTTPRequestHandler):
             m = _RE_CHAIN_DATA.match(route)
             if m:
                 from . import chain
-                self._json(200, chain.build_chain(self._path_of(m.group(1))))
+                self._json(200, chain.build_chain(self._path_of(m.group(1)), service.extract_trace))
                 return
             m = _RE_FILEDIFF.match(route)
             if m:

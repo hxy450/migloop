@@ -27,7 +27,6 @@ from typing import Any
 from migloop.atoms import Action, AgentRec, FileRef
 from migloop import cc_sources
 from migloop.audit import stage_order
-from migloop.cc_records import is_request_replay
 from migloop.evidence import CONFIRMED_BASES, FileProof, proof_payload
 from migloop.filestory import Ev, ts_norm
 from migloop.filestory_collect import _clean_single_cat
@@ -1687,8 +1686,6 @@ def _walk(path: str, agent_id: str, session: str, seq: list[int],
                 continue
             if not isinstance(r, dict):
                 continue  # Raw time corpus retains non-object JSON records.
-            if is_request_replay(r):
-                continue  # 请求体快照,工具调用与真实对话行同 id 重复(见 cc_records)
             ts = str(r.get("timestamp") or "")
             cwd = r.get("cwd")
             attr = str(r.get("attributionSkill") or "").split(":")[-1]
@@ -1954,8 +1951,6 @@ def _prescan_scripts(paths: list[str]) -> ScriptTable:
                 try:
                     r = json.loads(line)
                 except Exception:
-                    continue
-                if is_request_replay(r):
                     continue
                 m = r.get("message")
                 blocks = m.get("content") if isinstance(m, dict) else None

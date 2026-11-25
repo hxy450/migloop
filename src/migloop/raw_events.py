@@ -28,7 +28,6 @@ from threading import RLock, get_ident
 from typing import Any
 
 from . import atoms, transcript_store as store
-from .cc_records import is_request_replay
 
 SCHEMA = "migloop-raw-events/1"
 _CACHE_BUDGET = 32 * 1024 * 1024
@@ -133,9 +132,7 @@ class _Event:
 def _native(record: store.Record) -> tuple[list[tuple[str, str | None, _Part]], list[str]]:
     """Recognize native envelopes, not JSON/text nested inside their payloads."""
     row = record.value
-    if not isinstance(row, dict) or is_request_replay(row):
-        # 请求体快照里的 tool_use/tool_result 与真实对话行同 id,当调用会把每次调用都判成重复;
-        # 整条按未识别记录留作原始材料
+    if not isinstance(row, dict):
         return [], [""]
     found, other = [], []
     message = row.get("message")
