@@ -35,7 +35,7 @@ from .base import SessionCandidate
 from ..audit_events import ClaudeCalls
 from ..cc_records import is_request_replay
 from ..stage_signals import claude_boundaries
-from ..blame import replay_file as _blame_replay
+from ..line_blame import replay_file as _blame_replay
 
 
 FORMAT = "claude"

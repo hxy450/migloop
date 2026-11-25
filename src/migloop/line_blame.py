@@ -12,6 +12,9 @@
 - 编辑区间落到的行,重放后该区间产出的行全部归编辑者;
 - 纯整行删除不给删除者记行(幸存行保持原作者),但接手台账(takeovers)记上;
 - takeovers = 谁顶掉了谁的多少行,自己改自己的行不算接手。
+
+会话解析层自用(adapters/claude.py 给 .ets 文件条目落 blame 字段)。原名 blame.py,返修链路拆到
+fuxi-ailabs/a2h-memory 的 ``fixchain/`` 时改名留在这里,内容未改。
 """
 
 from __future__ import annotations
