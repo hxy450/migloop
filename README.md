@@ -114,6 +114,7 @@ Anthropic/OpenAI-compatible 可用 `--chat-api-key-env <环境变量名>` 改 ke
 --interval 60           # 刷新间隔(找新会话 + 读新增内容);默认 10 秒
 --port 8765             # 固定本地端口;默认自动选空闲端口
 --reset-live-cache      # 丢弃 checkpoint,从头重放一次
+--cache-dir <目录>       # 增量 checkpoint 放哪;默认 ~/.migloop/cache
 --no-final              # 停止时不生成最终静态页面
 ```
 

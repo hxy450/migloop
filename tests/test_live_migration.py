@@ -162,3 +162,20 @@ def test_failed_dispatch_is_not_counted_live(tmp_path: Path) -> None:
     mon.poll_once()
     (thread,) = mon.overview()["sessions"][0]["threads"]
     assert (thread["agents"], thread["agents_with_transcript"]) == (0, 0)   # 报错的派发没生成子代理
+
+
+def test_usage_doc_uses_the_real_pyz_name_and_codex_files_are_told_by_first_line(tmp_path: Path) -> None:
+    root = Path(__file__).resolve().parents[1]
+    doc = (root / "dist" / "使用说明.txt").read_text(encoding="utf-8")
+    assert "migloop.pyz" not in doc and "migloop-lineage.pyz" in doc and "2.1.170" not in doc
+    assert "--cache-dir" in (root / "README.md").read_text(encoding="utf-8")
+    harmony, slug, mon = _setup(tmp_path)
+    dl = tmp_path / "download"
+    meta = {"timestamp": "2026-11-25T10:00:00Z", "type": "session_meta",
+            "payload": {"id": "01a1", "session_id": "01a1", "cwd": "/Users/x/proj", "source": "vscode"}}
+    _write(dl / "main-01a1.jsonl", [meta])
+    mon2 = migration.MigrationMonitor(str(harmony), focus=str(dl / "main-01a1.jsonl"),
+                                      cache_dir=str(tmp_path / "c2"), claude_root=str(tmp_path / "claude" / "projects"),
+                                      codex_root=str(tmp_path / "nocodex"))
+    mon2.scan()
+    assert {s["format"] for s in mon2.slots.values() if "01a1" in s["key"]} == {"codex"}

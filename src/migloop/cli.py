@@ -20,8 +20,8 @@ import sys
 import webbrowser
 
 try:
-    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace", line_buffering=True)
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace", line_buffering=True)
 except Exception:
     pass
 
