@@ -404,6 +404,111 @@ def missing_stages(stages: Iterable[Any]) -> List[str]:
     return [CANON_PIPELINE[k] for k in range(pos[0], pos[-1] + 1) if CANON_PIPELINE[k] not in seen]
 
 
+# ── live:逐条喂信号、随时给出当前阶段(Claude monitor 与 codexlive 共用) ───────────────
+
+class LiveStages:
+    """与 ``segment`` 同一套口径的增量版。状态全在调用方给的 dict 里(随 checkpoint 落盘),
+    ``emit(kind, text, ts)`` 用来报事件。没有 mark 时 skill 信号先挂起,满 ``MIN_SPAN_S`` 才进入;
+    打过 mark 后只认 mark,skill 信号只给缺结束标记的段起名。"""
+
+    def __init__(self, state: Dict[str, Any], emit: Any):
+        self.st = state
+        self.emit = emit
+        for key, value in (("current_stage", SESSION), ("stage_pending", None), ("marked_stages", []),
+                           ("unmarked_after", None), ("current_workflow", None), ("pipeline_seen", False),
+                           ("last_attr", None)):
+            state.setdefault(key, value)
+
+    @property
+    def marks_mode(self) -> bool:
+        return bool(self.st.get("marked_stages"))
+
+    def signal(self, stage: str, ts: Any) -> None:
+        st = self.st
+        st["pipeline_seen"] = True
+        if self.marks_mode:
+            if stage not in st["marked_stages"] and st.get("current_stage") in (UNMARKED, AFTER, TRAILING):
+                st["current_stage"] = stage
+                self.emit("stage", "进入 %s(缺结束标记)" % stage, ts)
+            return
+        if stage == st.get("current_stage"):
+            st["stage_pending"] = None
+            return
+        pending = st.get("stage_pending")
+        if pending and pending[0] == stage:
+            return  # 同一阶段的后续信号(归属戳)不重置起点
+        st["stage_pending"] = [stage, ts]
+
+    def attribution(self, stage: str, ts: Any) -> None:
+        """Claude 的归属戳:后续轮里又见管线归属 = 中途插话,退回管线;换戳才算信号。"""
+        st = self.st
+        st["pipeline_seen"] = True
+        if not self.marks_mode and st.get("current_stage") == TRAILING:
+            st["current_stage"] = stage
+            self.emit("stage", "回到 %s" % stage, ts)
+        if stage != st.get("last_attr"):
+            st["last_attr"] = stage
+            self.signal(stage, ts)
+
+    def confirm(self, ts: Any) -> None:
+        st = self.st
+        pending = st.get("stage_pending")
+        if not pending or not ts:
+            return
+        t0, t1 = iso_seconds(pending[1]), iso_seconds(ts)
+        if t0 is not None and t1 is not None and t1 - t0 >= MIN_SPAN_S:
+            if st.get("current_stage") != pending[0] and not (
+                    is_pipeline_stage(pending[0]) and not is_pipeline_stage(st.get("current_stage"))):
+                st["current_workflow"] = None
+            st["current_stage"] = pending[0]
+            st["stage_pending"] = None
+            self.emit("stage", "进入 %s" % pending[0], pending[1])
+
+    def mark(self, stage: str, ts: Any) -> None:
+        """真跑成了的 mark-stage(权威,不等 90 秒)。ecat-refine 是开始;其余是完成水位:
+        execute 及之后收尾进收尾段,更早的收尾进「未标记」。"""
+        st = self.st
+        st["pipeline_seen"] = True
+        st["stage_pending"] = None
+        if stage not in st["marked_stages"]:
+            st["marked_stages"].append(stage)
+        if stage in START_MARK_STAGES:
+            if stage != st.get("current_stage"):
+                st["current_stage"] = stage
+                self.emit("stage", "进入 %s" % stage, ts)
+            return
+        self.emit("stage", "%s 收尾" % stage, ts)
+        st["unmarked_after"] = stage
+        st["current_workflow"] = None
+        st["current_stage"] = AFTER if stage in DONE_STAGES else UNMARKED
+
+    def human(self, text: Any, ts: Any, command: bool = False) -> None:
+        """人工输入。有 mark:管线收尾后的第一条(不论内容)开后续轮;没有 mark:管线阶段里、
+        不是斜杠命令、也不是「继续」类的输入开后续轮(之后再见管线归属戳就退回)。"""
+        st = self.st
+        current = st.get("current_stage")
+        if self.marks_mode:
+            if current == AFTER:
+                st["current_stage"] = TRAILING
+                self.emit("stage", "进入后续轮", ts)
+        elif not command and st.get("pipeline_seen") and is_pipeline_stage(current) and \
+                not is_resume_request(text):
+            st["current_stage"] = TRAILING
+            st["stage_pending"] = None
+            self.emit("stage", "进入后续轮", ts)
+
+    def workflow(self, name: str, ts: Any) -> None:
+        """管线阶段里(含还在 90 秒挂起期的)发起的编排是子段,外层阶段不变;否则是顶层段。"""
+        st = self.st
+        pending = st.get("stage_pending") or [None]
+        current = st.get("current_stage")
+        if is_pipeline_stage(current) or current == UNMARKED or is_pipeline_stage(pending[0]):
+            st["current_workflow"] = name
+        else:
+            st["current_stage"] = "wf:" + name
+        self.emit("stage", "启动 %s" % name, ts)
+
+
 # ── 空闲 = 回合已结束、到下一次活动之间什么都没在跑(Claude / Codex 共用) ──────────────
 
 def merge_busy(busy: Iterable[Tuple[Any, Any]]) -> List[List[Any]]:

@@ -325,3 +325,42 @@ def test_live_http_server_serves_codex_state(tmp_path: Path) -> None:
     finally:
         srv.shutdown()
         srv.server_close()
+
+
+def test_live_stages_follow_the_offline_rules(tmp_path: Path) -> None:
+    """codexlive 与离线同一套阶段口径:点 skill 是信号(不足 90 秒不进入)、mark 回执确认后收尾、
+    管线收尾后的首条人工输入开后续轮;heartbeat 记程序下发。"""
+    def user(text: str, ts: str) -> str:
+        return _rec("response_item", {"type": "message", "role": "user",
+                                      "content": [{"type": "input_text", "text": text}]}, ts)
+
+    def call(cid: str, cmd: str, ts: str) -> str:
+        return _rec("response_item", {"type": "function_call", "call_id": cid, "name": "exec_command",
+                                      "arguments": json.dumps({"cmd": cmd})}, ts)
+
+    def out(cid: str, ts: str, code: int = 0) -> str:
+        return _rec("response_item", {"type": "function_call_output", "call_id": cid,
+                                      "output": f"Process exited with code {code}\nOutput:\n"}, ts)
+
+    f = _root(tmp_path)
+    with open(f, "a", encoding="utf-8") as fh:
+        fh.write(user("[$a2h-spec](/w/.agents/skills/a2h-spec/SKILL.md)", "2026-08-18T10:00:10Z")
+                 + _tokens(1).replace("10:00:00", "10:03:00"))
+    mon = CodexLiveMonitor(str(f), cache_dir=str(tmp_path / "cache"), poll_interval=999)
+    mon.poll_once()
+    assert mon.snapshot()["current_stage"] == "a2h-spec"
+    with open(f, "a", encoding="utf-8") as fh:
+        fh.write(call("m1", ".migbot/bin/a2h mark-stage a2h-plan", "2026-08-18T10:20:00Z")
+                 + out("m1", "2026-08-18T10:20:01Z", code=1)                      # 没跑成
+                 + call("m2", ".migbot/bin/a2h mark-stage a2h-execute", "2026-08-18T10:30:00Z")
+                 + out("m2", "2026-08-18T10:30:01Z")
+                 + user("<heartbeat><automation_id>x</automation_id>", "2026-08-18T10:40:00Z"))
+    mon.poll_once()
+    snap = mon.snapshot()
+    assert (snap["current_stage"], snap["marked_stages"]) == ("after-pipeline", ["a2h-execute"])
+    with open(f, "a", encoding="utf-8") as fh:
+        fh.write(user("统计一下用量", "2026-08-18T10:50:00Z"))
+    mon.poll_once()
+    snap = mon.snapshot()
+    assert snap["current_stage"] == "follow-up"
+    assert (snap["user_prompts"], snap["program_prompts"]) == (2, 1)

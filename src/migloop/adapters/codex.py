@@ -1150,11 +1150,38 @@ def _skill_read_counts(name: str, path: str, listed: dict[str, str], modified: s
     return True
 
 
+def _call_skill_stage(call: dict[str, Any], listed: dict[str, str], modified: set[str],
+                      cwd: str | None) -> str | None:
+    """一次调用是不是调用了某个管线 skill:显式 Skill 调用,或读 SKILL.md(按 _skill_read_counts 判)。
+    一条命令同时读几个阶段 skill 是准备,不算。离线与 codexlive 共用。"""
+    from ..audit_events import segments
+    raw = call.get("raw") or ""
+    name = str(call.get("name", "")).lower()
+    if "SKILL.md" not in raw and name != "skill":
+        return None
+    args = _decode_arguments(raw)
+    if name == "skill":
+        return stage_signals.normalize(args.get("skill") or args.get("name"))
+    commands = [c["command"] for c in _extract_shell_calls(raw, cwd)]
+    if not commands:
+        commands = [args.get("command") or args.get("cmd") or raw]
+    reads: list[tuple[str, str]] = []
+    for command in commands:
+        if isinstance(command, list):
+            command = " ".join(str(x) for x in command)
+        for words in segments(str(command)):
+            if words and words[0].lower() in ("cat", "get-content", "sed", "head", "type"):
+                reads.extend(_skill_paths(" ".join(words)))
+    stages = {stage_signals.normalize(n) for n, _ in reads} - {None}
+    if len(stages) != 1:
+        return None
+    skill, path = next((n, pth) for n, pth in reads if stage_signals.normalize(n))
+    return stages.pop() if _skill_read_counts(skill, path, listed, modified, cwd) else None
+
+
 def _stage_signals(root: dict[str, Any]) -> list[tuple[int, str]]:
     """主线 rollout → 已归一的 skill 信号 [(下标, 阶段)]:用户点 skill(``[$a2h-x](…)`` 与随后注入的
-    ``<skill>``)、显式 Skill 调用、读 SKILL.md(按 _skill_read_counts 判)。一条命令同时读几个
-    阶段 skill 是准备,不算。"""
-    from ..audit_events import segments
+    ``<skill>``)、显式 Skill 调用、读 SKILL.md。"""
     listed = root.get("listed_skills") or {}
     modified = _modified_skill_dirs(root)
     out: list[tuple[int, str]] = []
@@ -1163,31 +1190,9 @@ def _stage_signals(root: dict[str, Any]) -> list[tuple[int, str]]:
         if stage:
             out.append((idx, stage))
     for call in root["calls"]:
-        raw = call.get("raw") or ""
-        if "SKILL.md" not in raw and str(call.get("name", "")).lower() != "skill":
-            continue
-        args = _decode_arguments(raw)
-        if str(call.get("name", "")).lower() == "skill":
-            stage = stage_signals.normalize(args.get("skill") or args.get("name"))
-            if stage:
-                out.append((call["idx"], stage))
-            continue
-        commands = [c["command"] for c in _extract_shell_calls(raw, root.get("cwd"))]
-        if not commands:
-            commands = [args.get("command") or args.get("cmd") or raw]
-        reads: list[tuple[str, str]] = []
-        for command in commands:
-            if isinstance(command, list):
-                command = " ".join(str(x) for x in command)
-            for words in segments(str(command)):
-                if words and words[0].lower() in ("cat", "get-content", "sed", "head", "type"):
-                    reads.extend(_skill_paths(" ".join(words)))
-        stages = {stage_signals.normalize(n) for n, _ in reads} - {None}
-        if len(stages) != 1:
-            continue
-        name, path = next((n, pth) for n, pth in reads if stage_signals.normalize(n))
-        if _skill_read_counts(name, path, listed, modified, root.get("cwd")):
-            out.append((call["idx"], stages.pop()))
+        stage = _call_skill_stage(call, listed, modified, root.get("cwd"))
+        if stage:
+            out.append((call["idx"], stage))
     out.sort(key=lambda item: item[0])
     return out
 

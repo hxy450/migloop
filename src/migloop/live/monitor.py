@@ -688,22 +688,13 @@ class IncrementalSessionMonitor:
             if raw_skill:
                 stream["stage"] = skill or raw_skill
                 if stream["kind"] == "main" and skill:
-                    self._stage_signal(skill, ts)
+                    self._stages().signal(skill, ts)
         elif name == "Workflow":
             wf_name = _workflow_name(inp)
             if wf_name:
                 stream["stage"] = "wf:" + wf_name
                 if stream["kind"] == "main":
-                    # 管线阶段里发起的编排是该阶段的子段,外层阶段不变(stage_signals 第 3 条);
-                    # 刚进入、还在 90 秒挂起期的管线阶段也算
-                    pending = self.state.get("stage_pending") or [None]
-                    current = self.state.get("current_stage")
-                    if stage_signals.is_pipeline_stage(current) or current == stage_signals.UNMARKED or \
-                            stage_signals.is_pipeline_stage(pending[0]):
-                        self.state["current_workflow"] = wf_name
-                    else:
-                        self.state["current_stage"] = "wf:" + wf_name
-                    self._event("stage", "启动 %s" % wf_name, ts)
+                    self._stages().workflow(wf_name, ts)
         if name in ("Write", "Edit", "MultiEdit"):
             target = inp.get("file_path") or inp.get("path")
             if isinstance(target, str):
@@ -716,58 +707,9 @@ class IncrementalSessionMonitor:
             self._event("agent", "派发 %s" % (inp.get("description") or
                                                inp.get("subagent_type") or "subagent"), ts)
 
-    # ---------- 阶段(与离线同一套口径,见 stage_signals) ----------
-    def _stage_signal(self, stage, ts):
-        """skill 信号。打过 mark 后只给缺结束标记的段起名;否则一段不足 90 秒不切 ——
-        先挂起,90 秒内没被别的信号顶掉才算进入。"""
-        marked = self.state.get("marked_stages") or []
-        if marked:
-            current = self.state.get("current_stage")
-            if stage not in marked and current in (stage_signals.UNMARKED, stage_signals.AFTER,
-                                                   stage_signals.TRAILING):
-                self.state["current_stage"] = stage
-                self._event("stage", "进入 %s(缺结束标记)" % stage, ts)
-            return
-        if stage == self.state.get("current_stage"):
-            self.state["stage_pending"] = None
-            return
-        pending = self.state.get("stage_pending")
-        if pending and pending[0] == stage:
-            return  # 同一阶段的后续信号(归属戳)不重置起点
-        self.state["stage_pending"] = [stage, ts]
-
-    def _confirm_stage(self, ts):
-        pending = self.state.get("stage_pending")
-        if not pending or not ts:
-            return
-        t0, t1 = stage_signals.iso_seconds(pending[1]), stage_signals.iso_seconds(ts)
-        if t0 is not None and t1 is not None and t1 - t0 >= stage_signals.MIN_SPAN_S:
-            if self.state.get("current_stage") != pending[0]:
-                self.state["current_workflow"] = None if not stage_signals.is_pipeline_stage(pending[0]) \
-                    or stage_signals.is_pipeline_stage(self.state.get("current_stage")) else \
-                    self.state.get("current_workflow")
-            self.state["current_stage"] = pending[0]
-            self.state["stage_pending"] = None
-            self._event("stage", "进入 %s" % pending[0], pending[1])
-
-    def _stage_mark(self, stage, ts):
-        """真跑成了的 a2h mark-stage(权威,不等 90 秒)。ecat-refine 的 mark 是开始;其余是完成水位:
-        阶段到此收尾,execute 及之后收尾 = 管线走完(收尾段),更早的收尾后进入「未标记」。"""
-        self.state["pipeline_seen"] = True
-        self.state["stage_pending"] = None
-        marked = self.state.setdefault("marked_stages", [])
-        if stage not in marked:
-            marked.append(stage)
-        if stage in stage_signals.START_MARK_STAGES:
-            if stage != self.state.get("current_stage"):
-                self.state["current_stage"] = stage
-                self._event("stage", "进入 %s" % stage, ts)
-            return
-        self._event("stage", "%s 收尾" % stage, ts)
-        self.state["unmarked_after"] = stage
-        self.state["current_workflow"] = None
-        self.state["current_stage"] = (stage_signals.AFTER if stage in stage_signals.DONE_STAGES
-                                       else stage_signals.UNMARKED)
+    # ---------- 阶段(与离线同一套口径,见 stage_signals.LiveStages) ----------
+    def _stages(self):
+        return stage_signals.LiveStages(self.state, self._event)
 
     def _handle_tool_result(self, stream, block, record):
         tid = block.get("tool_use_id")
@@ -779,7 +721,7 @@ class IncrementalSessionMonitor:
             if stages and stage_signals.mark_ran(not block.get("is_error", False),
                                                  _tool_result_text(block, record)):
                 for marked in stages:
-                    self._stage_mark(marked, tool.get("ts"))
+                    self._stages().mark(marked, tool.get("ts"))
         self._read_tool_result(stream, tool, block, record)
 
     def _process_record(self, stream, record):
@@ -820,21 +762,14 @@ class IncrementalSessionMonitor:
 
         if stream["kind"] == "main":
             # 与离线同一套信号:归属戳切换、斜杠命令进入(显式 Skill 调用在 _handle_tool_use)
+            stages = self._stages()
             attr = stage_signals.normalize(record.get("attributionSkill"))
-            marks_mode = bool(self.state.get("marked_stages"))
             if attr:
-                self.state["pipeline_seen"] = True
-                if not marks_mode and self.state.get("current_stage") == stage_signals.TRAILING:
-                    # 人工输入之后又回到管线(中途插话):不是后续轮
-                    self.state["current_stage"] = attr
-                    self._event("stage", "回到 %s" % attr, ts)
-                if attr != self.state.get("last_attr"):
-                    self.state["last_attr"] = attr
-                    self._stage_signal(attr, ts)
+                stages.attribution(attr, ts)
             if rtype == "user":
                 cmd = stage_signals.command_stage((message or {}).get("content"))
                 if cmd:
-                    self._stage_signal(cmd, ts)
+                    stages.signal(cmd, ts)
                 got = extract_session.prompt_of(record)
                 if got:
                     kind, text = got
@@ -842,22 +777,9 @@ class IncrementalSessionMonitor:
                         self.state.get("user_prompts" if kind == "human" else "program_prompts") or 0) + 1
                     stream["status"] = "running"
                     self._event("prompt", "%s: %s" % ("用户输入" if kind == "human" else "程序下发", text[:100]), ts)
-                    current = self.state.get("current_stage")
-                    if kind != "human":
-                        pass
-                    elif marks_mode:
-                        # 有 mark:管线收尾后的第一条人工输入(不论内容)开后续轮
-                        if current == stage_signals.AFTER:
-                            self.state["current_stage"] = stage_signals.TRAILING
-                            self._event("stage", "进入后续轮", ts)
-                    elif not cmd and self.state.get("pipeline_seen") and \
-                            stage_signals.is_pipeline_stage(current) and \
-                            not stage_signals.is_resume_request(text):
-                        # 管线阶段之后的人工输入 = 后续轮(「继续」类不算);之后若再见管线归属戳就退回(见上)
-                        self.state["current_stage"] = stage_signals.TRAILING
-                        self.state["stage_pending"] = None
-                        self._event("stage", "进入后续轮", ts)
-            self._confirm_stage(ts)
+                    if kind == "human":
+                        stages.human(text, ts, command=bool(cmd))
+            stages.confirm(ts)
             if rtype == "system" and record.get("subtype") in ("stop_hook_summary", "turn_duration"):
                 stream["status"] = "waiting"
             elif rtype == "assistant" and isinstance(message, dict):

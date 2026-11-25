@@ -36,10 +36,12 @@ from contextlib import suppress
 from datetime import datetime, timezone
 from typing import Any, Deque, Dict, Optional, Set
 
+from .. import stage_signals
 from ..adapters import codex as _codex
 from .livestream import TranscriptStream
 
-CACHE_SCHEMA = "codex-live/1"
+#: 2:阶段与人工 / 程序下发计数改走 stage_signals.LiveStages,旧 checkpoint 作废重放
+CACHE_SCHEMA = "codex-live/2"
 
 #: 计一次工具调用的 response_item 类型(apply_patch 走 custom_tool_call)
 _CALL_TYPES = ("function_call", "custom_tool_call")
@@ -120,10 +122,19 @@ class CodexLiveMonitor:
             "status": "waiting",
             "last_update": None,
             "last_error": None,
+            "user_prompts": 0,
+            "program_prompts": 0,
+            "driver": False,          # exec / MCP 起的会话:输入都是程序下发
+            "listed_skills": {},      # 会话注入的 skill 清单(名字 → 路径)
+            "modified_skills": [],    # 会话改过文件的 skills/<名字>/ 目录
+            "mark_calls": {},         # call_id → 这次调用里的 mark-stage 阶段(等回执确认)
         }
 
-    def _event(self, kind: str, text: str) -> None:
-        self.events.append({"kind": kind, "text": text, "ts": _now_iso()})
+    def _event(self, kind: str, text: str, ts: Any = None) -> None:
+        self.events.append({"kind": kind, "text": text, "ts": ts or _now_iso()})
+
+    def _stages(self) -> "stage_signals.LiveStages":
+        return stage_signals.LiveStages(self.state, self._event)
 
     # ---------- 树发现 ----------
 
@@ -232,9 +243,14 @@ class CodexLiveMonitor:
                 m["thread_id"] = str(payload.get("id") or "")
             if not m.get("session_id"):
                 m["session_id"] = payload.get("session_id") or payload.get("id")
+                if m.get("kind") == "root":
+                    self.state["driver"] = _codex._driver_session(payload)
+                    m["cwd"] = payload.get("cwd")
             if m["thread_id"]:
                 self.threads_known.add(m["thread_id"])
             return
+        if m.get("kind") == "root":
+            self._root_stage(stream, rtype, payload, ts)
 
         if rtype == "response_item":
             if ptype in _CALL_TYPES:
@@ -264,6 +280,69 @@ class CodexLiveMonitor:
                 usage = (payload.get("info") or {}).get("total_token_usage") or {}
                 # 累计值,取最新 —— 不做加法
                 m["output_tokens"] = int(usage.get("output_tokens") or 0)
+
+    def _root_stage(self, stream: TranscriptStream, rtype: Any, payload: dict[str, Any], ts: Any) -> None:
+        """主线记录 → 阶段信号与人工 / 程序下发计数(与离线 codex 同一套翻译)。"""
+        stages = self._stages()
+        ptype = payload.get("type")
+        cwd = stream.meta.get("cwd")
+        if rtype == "response_item" and ptype == "message" and payload.get("role") in ("user", "developer"):
+            content = payload.get("content")
+            for item in content if isinstance(content, list) else [content]:
+                text = item.get("text") if isinstance(item, dict) else item
+                if isinstance(text, str) and "(file:" in text:
+                    for name, where in _codex._SKILL_LIST_ENTRY.findall(text):
+                        self.state["listed_skills"].setdefault(name, where.strip())
+            if payload.get("role") == "user":
+                parts = _codex._user_message_parts(content)
+                mention = False
+                for kind, text in parts:
+                    hit = _codex._SKILL_INJECT.match(text) or (
+                        _codex._SKILL_MENTION.match(text) if kind == "human" else None)
+                    stage = stage_signals.normalize(hit.group(1)) if hit else None
+                    if stage:
+                        mention = True
+                        stages.signal(stage, ts)
+                kinds = {kind for kind, _ in parts} - {"injected"}
+                if kinds:
+                    kind = "human" if "human" in kinds else "program"
+                    self._prompt(kind, " ".join(t for k, t in parts if k == kind), ts, command=mention)
+        elif rtype == "event_msg" and ptype == "user_message" and str(payload.get("message") or "").strip():
+            self._prompt("human", str(payload.get("message")), ts, command=False)
+        elif rtype == "response_item" and ptype in _CALL_TYPES:
+            raw = payload.get("arguments") if ptype == "function_call" else payload.get("input")
+            raw = raw if isinstance(raw, str) else json.dumps(raw, ensure_ascii=False)
+            call = {"name": payload.get("name"), "raw": raw}
+            for patch in _codex._extract_apply_patches(raw):
+                for row in _codex._patch_entries(patch, cwd):
+                    for hit in _codex._SKILL_DIR.finditer(str(row.get("brief") or "")):
+                        if hit.group(1).lower() not in self.state["modified_skills"]:
+                            self.state["modified_skills"].append(hit.group(1).lower())
+            stage = _codex._call_skill_stage(call, self.state["listed_skills"],
+                                             set(self.state["modified_skills"]), cwd)
+            if stage:
+                stages.signal(stage, ts)
+            marked = stage_signals.mark_calls(raw)
+            if marked and payload.get("call_id"):
+                self.state["mark_calls"][str(payload["call_id"])] = [marked, ts]
+        elif rtype == "response_item" and ptype in _OUTPUT_TYPES:
+            pending = self.state["mark_calls"].pop(str(payload.get("call_id") or ""), None)
+            if pending:
+                output = _codex._content_text(payload.get("output"))
+                if stage_signals.mark_ran(not _codex._tool_failed(output), output):
+                    for marked in pending[0]:
+                        stages.mark(marked, pending[1])
+        if ts:
+            stages.confirm(ts)
+
+    def _prompt(self, kind: str, text: str, ts: Any, command: bool) -> None:
+        if self.state.get("driver"):
+            kind = "program"
+        key = "user_prompts" if kind == "human" else "program_prompts"
+        self.state[key] = int(self.state.get(key) or 0) + 1
+        self._event("prompt", "%s: %s" % ("用户输入" if kind == "human" else "程序下发", " ".join(text.split())[:100]), ts)
+        if kind == "human":
+            self._stages().human(text, ts, command=command)
 
     def _overall_status(self) -> str:
         root = self.streams.get(self.jsonl_path)
@@ -355,7 +434,7 @@ class CodexLiveMonitor:
             out = dict(self.state)
             out["output_tokens"] = total_out
             # live 面板(live.monitor.LIVE_HTML)与 CC 共用;codex 没有的字段给中性值
-            out.setdefault("current_stage", None)
+            out.setdefault("current_stage", stage_signals.SESSION)
             out.setdefault("write_files", 0)
             out["agents"] = agents
             out["agent_counts"] = {
