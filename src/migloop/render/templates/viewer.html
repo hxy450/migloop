@@ -1150,6 +1150,8 @@
 
   /* ---------- tooltip ---------- */
   var tip = document.getElementById("tip");
+  // 提示词存的是全文;悬浮提示只放开头,全文在点开的抽屉里
+  function tipText(t) { t = String(t || ""); return (t.length > 400 ? t.slice(0, 400) + "…" : t).replace(/&/g, "&amp;").replace(/</g, "&lt;"); }
   function showTip(ev, html) { tip.innerHTML = html; tip.style.display = "block"; moveTip(ev); }
   function moveTip(ev) {
     var x = ev.clientX + 14, y = ev.clientY + 12;
@@ -1487,7 +1489,7 @@
         f.style.left = x + "%";
         f.addEventListener("mouseenter", function (ev) {
           showTip(ev, '<div class="tt-h">⚑ 用户输入 · ' + hhmm(p.ts) + '</div><div class="tt-m">'
-            + p.text.replace(/&/g, "&amp;").replace(/</g, "&lt;") + "</div>");
+            + tipText(p.text) + "</div>");
         });
         f.addEventListener("mousemove", moveTip);
         f.addEventListener("mouseleave", hideTip);
@@ -1747,7 +1749,7 @@
           var f = el("div", "pflag");
           f.style.left = (100 * (pt - v0) / span) + "%";
           f.addEventListener("mouseenter", function (ev) {
-            showTip(ev, '<div class="tt-h">⚑ 用户输入 · ' + hhmm(p.ts) + '</div><div class="tt-m">' + p.text.replace(/&/g, "&amp;").replace(/</g, "&lt;") + "</div>");
+            showTip(ev, '<div class="tt-h">⚑ 用户输入 · ' + hhmm(p.ts) + '</div><div class="tt-m">' + tipText(p.text) + "</div>");
           });
           f.addEventListener("mousemove", moveTip);
           f.addEventListener("mouseleave", hideTip);

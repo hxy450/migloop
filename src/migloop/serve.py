@@ -10,6 +10,9 @@ hmigbot 同名路径上(fixchain.html / viewer.html 的默认相对地址就是�
     /api/insight1/atom/<sid>/text/<tool>     guide | sessions | index | file | agent | blame | diff | action(文本)
     /api/insight1/filediff/<sid>?file=&v=
     /api/insight1/probe/<sid>?run=<目录>      调查覆盖:调查员的调用序列与报告环 → 树节点(JSON)
+    /api/insight1/chain/<sid>                会话总览页:同工程全部会话 + ECAT 各轮(chain.py)
+    /api/insight1/chain-data/<sid>           会话总览数据(JSON)
+<sid> 也可以是 URL 编码后的 transcript 路径(ECAT 角色会话不在会话发现的根里)。
 """
 
 from __future__ import annotations
@@ -33,6 +36,8 @@ _RE_ATOM_TEXT = re.compile(r"^/api/insight1/atom/([^/]+)/text/([a-z]+)/?$")
 _RE_ATOM = re.compile(r"^/api/insight1/atom/([^/]+)/([a-z]+)/?$")
 _RE_FILEDIFF = re.compile(r"^/api/insight1/filediff/([^/]+)/?$")
 _RE_PROBE = re.compile(r"^/api/insight1/probe/([^/]+)/?$")
+_RE_CHAIN = re.compile(r"^/(?:api/)?insight1/chain/([^/]+)/?$")
+_RE_CHAIN_DATA = re.compile(r"^/api/insight1/chain-data/([^/]+)/?$")
 
 
 class _Handler(BaseHTTPRequestHandler):
@@ -159,6 +164,17 @@ class _Handler(BaseHTTPRequestHandler):
                     return
                 self._json(200, service.probe_payload(self._path_of(m.group(1)), str(args["run"])))
                 return
+            m = _RE_CHAIN.match(route)
+            if m:
+                from .render import load_asset
+                ident = json.dumps(urllib.parse.unquote(m.group(1)), ensure_ascii=False).replace("</", "<\\/")
+                self._html(load_asset("chain.html").replace("__CHAIN_ID__", ident))
+                return
+            m = _RE_CHAIN_DATA.match(route)
+            if m:
+                from . import chain
+                self._json(200, chain.build_chain(self._path_of(m.group(1))))
+                return
             m = _RE_FILEDIFF.match(route)
             if m:
                 if not args.get("file") or args.get("v") is None:
@@ -196,6 +212,7 @@ def serve(target: str, host: str = "127.0.0.1", port: int = 0, open_browser: boo
     print(f"migloop serve · {path}")
     print(f"  报告页     {base}/api/insight1/report/{sid}")
     print(f"  返修链路   {base}/api/insight1/fixchain/{sid}")
+    print(f"  会话总览   {base}/api/insight1/chain/{sid}")
     print(f"  两原子文本 {base}/api/insight1/atom/{sid}/text/guide")
     print("Ctrl+C 停止")
     if open_browser:

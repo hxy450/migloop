@@ -1,0 +1,169 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>会话总览</title>
+<style>
+  :root {
+    --page: #f4f5f8; --surface: #ffffff; --ink: #191c23; --ink-2: #4b5160;
+    --ink-3: #8a90a0; --ring: #e3e5ec; --wash: #f0f1f5;
+    --c-worker: #1a9e6c; --c-reviewer: #b7791f; --c-ecat: #5b5fc7; --c-other: #2a78d6;
+    --c-warn: #b7791f; --c-err: #cf222e;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--page); color: var(--ink); padding: 26px 30px 60px;
+         font: 13.5px/1.6 "Segoe UI", "Microsoft YaHei", system-ui, sans-serif; }
+  .crumb { font-size: 11px; letter-spacing: .14em; color: var(--ink-3); text-transform: uppercase; }
+  h1 { font-size: 21px; margin: 4px 0 6px; }
+  h2 { font-size: 15px; margin: 30px 0 10px; }
+  .sub { font-size: 12px; color: var(--ink-3); }
+  code { font: 12px ui-monospace, Menlo, Consolas, monospace; }
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin: 18px 0 6px; }
+  .kpi { background: var(--surface); border: 1px solid var(--ring); border-radius: 12px; padding: 11px 14px; }
+  .kpi b { display: block; font-size: 19px; font-variant-numeric: tabular-nums; }
+  .kpi span { font-size: 11.5px; color: var(--ink-3); }
+  .card { background: var(--surface); border: 1px solid var(--ring); border-radius: 14px;
+          padding: 14px 18px; margin: 10px 0; box-shadow: 0 1px 4px rgba(20,24,40,.05); }
+  .card h3 { font-size: 14px; display: inline; }
+  .chip { display: inline-block; font-size: 11.5px; background: var(--wash); border-radius: 999px;
+          padding: 1px 10px; margin: 0 4px 3px 0; color: var(--ink-2); }
+  .scroll { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; margin-top: 8px; }
+  th, td { padding: 5px 10px; border-bottom: 1px solid var(--ring); text-align: left; white-space: nowrap; vertical-align: top; }
+  th { font-size: 11.5px; font-weight: 500; color: var(--ink-3); }
+  td.n, th.n { text-align: right; }
+  td.w { white-space: normal; min-width: 280px; }
+  tr.dead td { color: var(--c-err); }
+  .warn { color: var(--c-warn); } .err { color: var(--c-err); } .ok { color: var(--c-worker); }
+  a { color: var(--c-other); }
+  .lane { position: relative; height: 30px; background: var(--wash); border-radius: 7px; overflow: hidden; margin: 6px 0 4px; }
+  .lane i { position: absolute; top: 0; bottom: 0; opacity: .85; }
+  .legend span { margin-right: 14px; font-size: 11.5px; color: var(--ink-3); }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+  #state { margin-top: 40px; color: var(--ink-3); }
+  .sub .t { display: inline-block; min-width: 7.5em; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+  details.prompts { margin-top: 6px; }
+  details.prompts summary { cursor: pointer; font-size: 12px; color: var(--c-other); }
+  details.prompts .p { margin: 6px 0 0; }
+  details.prompts .p .sub { display: block; }
+  details.prompts pre { white-space: pre-wrap; word-break: break-word; max-height: 320px; overflow: auto;
+                        background: var(--wash); border-radius: 8px; padding: 8px 10px; margin-top: 2px;
+                        font: 12px/1.5 ui-monospace, Menlo, Consolas, monospace; }
+</style>
+<div class="crumb">MigLoop · 会话总览</div>
+<div id="root"><p id="state">正在归约这次迁移的全部会话(会话多时要几十秒)…</p></div>
+<script>
+(function () {
+  var IDENT = __CHAIN_ID__;
+  var STAGE_HINT = { "开跑前": "第一个阶段开始之前", "管线完成后": "a2h 五阶段已走完(复盘之后),loop 又续的轮次" };
+  var KIND = { session: "会话", worker: "主迁移", reviewer: "托管评审", ecat: "ECAT 精修", capability: "能力会话" };
+  var COLOR = { session: "var(--c-worker)", worker: "var(--c-worker)", reviewer: "var(--c-reviewer)", ecat: "var(--c-ecat)", capability: "var(--c-other)" };
+  function esc(x) { return String(x == null ? "" : x).replace(/[&<>"']/g, function (c) {
+    return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
+  function dur(ms) { var s = Math.round((ms || 0) / 1000);
+    return s >= 3600 ? Math.floor(s / 3600) + "h" + String(Math.floor(s % 3600 / 60)).padStart(2, "0") + "m"
+      : s >= 60 ? Math.floor(s / 60) + "m" + String(s % 60).padStart(2, "0") + "s" : s + "s"; }
+  function num(x) { x = x || 0; return x >= 1e6 ? (x / 1e6).toFixed(1) + "M" : x >= 1e3 ? (x / 1e3).toFixed(1) + "K" : String(x); }
+  function hhmmss(ts) { return ts ? new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "—"; }
+  function hhmm(ts) { return ts ? new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—"; }
+  function report(t) { return t.transcript && t.href ? '<a href="' + esc(t.href) + '" target="_blank" rel="noopener">报告</a>' : '<span class="sub">无 transcript</span>'; }
+
+  function kindLabel(s) { return s.kind === "capability" && s.plugin_label ? s.plugin_label : (KIND[s.kind] || s.name || s.role); }
+  function prompts(t) {
+    var ps = t.prompts || [];
+    if (!ps.length) return '<span class="sub">无提示词</span>';
+    return '<details class="prompts"><summary>提示词(' + ps.length + ')</summary>' + ps.map(function (p, i) {
+      return '<div class="p"><span class="sub">#' + (i + 1) + ' · ' + hhmm(p.ts) + '</span><pre>' + esc(p.text) + '</pre></div>'; }).join("") + '</details>';
+  }
+
+  function threadsOf(c) { return c.sessions.reduce(function (a, s) { return a.concat(s.threads.map(function (t) { return { s: s, t: t }; })); }, []); }
+
+  function lane(c) {
+    var t0 = Date.parse(c.started_at), t1 = Date.parse(c.ended_at), span = Math.max(t1 - t0, 1);
+    var bars = threadsOf(c).filter(function (x) { return x.t.started_at; }).map(function (x) {
+      var a = Date.parse(x.t.started_at), b = Date.parse(x.t.ended_at || x.t.started_at);
+      return '<i title="' + esc(x.s.session_id + " · " + (x.t.dimension || (x.s.kind === "capability" ? kindLabel(x.s) : x.t.role))) + '" style="left:' + ((a - t0) / span * 100).toFixed(2) +
+        '%;width:' + Math.max((b - a) / span * 100, .25).toFixed(2) + '%;background:' + (COLOR[x.s.kind] || "var(--c-other)") + '"></i>';
+    }).join("");
+    var shown = {}; c.sessions.forEach(function (s) { shown[s.kind] = 1; }); return '<span><i style="background:' + COLOR[k] + '"></i>' + KIND[k] + '</span>'; }).join("");
+    return '<div class="card"><div class="lane">' + bars + '</div><div class="legend">' + legend + '</div></div>';
+  }
+
+  function session(s) {
+    var head = '<h3>' + esc(kindLabel(s)) + '</h3>' + (s.plugin ? ' <span class="chip">' + esc(s.plugin) + '</span>' : '') +
+      ' <code>' + esc(s.session_id) + '</code> <span class="sub">· ' +
+      s.threads.length + ' 个运行时会话' + (s.state ? ' · ' + esc(s.state) : '') + '</span>';
+    if (s.loop) head += ' <span class="chip">loop ' + esc(s.loop.status) + ' · ' + s.loop.iterations + ' 轮</span>';
+    // 评估 / 评审决策 / 错误按发生先后排成一条(timeline 由事件库给,已按时刻排好)
+    var notes = (s.timeline || []).map(function (e) {
+      var t = '<span class="t">' + hhmmss(e.ts) + '</span>' + (e.stage ? '<span class="chip"' + (STAGE_HINT[e.stage] ? ' title="' + esc(STAGE_HINT[e.stage]) + '"' : '') + '>' + esc(e.stage) + '</span>' : '');
+      if (e.kind === "evaluation") return '<div class="sub ' + (e.is_complete ? "ok" : "warn") + '">' + t + '评估 第 ' + e.iteration +
+        ' 轮 · progress ' + e.progress + ' · ' + esc(e.summary) + '</div>';
+      if (e.kind === "decision") return '<div class="sub">' + t + '评审决策 · ' + esc(e.decision) + ' · ' + esc(e.rationale) + '</div>';
+      return '<div class="sub err">' + t + 'error · ' + esc(String(e.error).slice(0, 200)) + '</div>';
+    }).join("");
+    var body = "";
+    if (s.role === "ecat") {
+      body = '<div class="scroll"><table><tr><th>轮次</th><th>角色</th><th>维度</th><th>开始</th><th class="n">耗时</th><th class="n">请求</th>' +
+        '<th class="n">输出</th><th class="n">工具</th><th class="n">失败</th><th></th><th>提示词</th></tr>' +
+        s.threads.slice().sort(function (a, b) { return String(a.started_at).localeCompare(String(b.started_at)); }).map(function (t) {
+          return '<tr' + (t.transcript && !t.requests ? ' class="dead" title="零请求:会话起了但一次模型调用都没成"' : '') + '><td>' +
+            esc(t.ecat_iterations.length ? t.ecat_iterations.join("/") : "—") + '</td><td>' + esc(t.role) + '</td><td>' + esc(t.dimension || "") +
+            '</td><td>' + hhmm(t.started_at) + '</td><td class="n">' + dur(t.duration_ms) + '</td><td class="n">' + num(t.requests) +
+            '</td><td class="n">' + num(t.output_tokens) + '</td><td class="n">' + (t.tool_calls || 0) + '</td><td class="n">' + (t.tool_failed || 0) +
+            '</td><td>' + (t.role === "judge" ? "" : report(t)) + '</td><td class="w">' + prompts(t) + '</td></tr>'; }).join("") + '</table></div>';
+    } else {
+      body = s.threads.map(function (t) {
+        var rows = (t.stages || []).map(function (st) {
+          var mine = (s.timeline || []).filter(function (e) { return e.stage === st.label; });
+          var nd = mine.filter(function (e) { return e.kind === "decision"; }).length, ne = mine.filter(function (e) { return e.kind === "evaluation"; }).length;
+          return '<tr><td>' + esc(st.label) + '</td><td>' + hhmm(st.start_ts) + '–' + hhmm(st.end_ts) +
+          '</td><td class="n">' + dur(st.duration_ms) + '</td><td class="n">' + st.tool_calls + '</td><td class="n">' + st.agents +
+          '</td><td class="n">' + (nd || ne ? nd + ' / ' + ne : '') + '</td></tr>'; }).join("");
+        return (rows ? '<div class="scroll"><table><tr><th>阶段</th><th>时段</th><th class="n">耗时</th><th class="n">工具</th><th class="n">子代理</th><th class="n">评审 / 评估</th></tr>' + rows + '</table></div>' : '') +
+          '<div class="sub">' + esc(t.model || "") + ' · 请求 ' + num(t.requests) + ' · 输出 ' + num(t.output_tokens) + ' · 工具 ' + (t.tool_calls || 0) +
+          '(失败 ' + (t.tool_failed || 0) + ') · 子代理 ' + (t.agents || 0) + '(异常 ' + (t.aborted_agents || 0) + ') · ' + report(t) + '</div>' +
+          prompts(t); }).join("");
+    }
+    return '<div class="card">' + head + notes + body + '</div>';
+  }
+
+  function entropy(c) {
+    if (!c.ecat_runs.length) return "";
+    var rows = c.ecat_runs.map(function (r) {
+      if (!r.iterations.length) return '<tr class="dead"><td>' + esc(r.run_id) + '</td><td colspan="3">没有迭代记录(未产出熵值)</td></tr>';
+      return r.iterations.map(function (it) {
+        var dims = Object.keys(it.breakdown || {}).filter(function (k) { return it.breakdown[k]; })
+          .sort(function (a, b) { return it.breakdown[b] - it.breakdown[a]; })
+          .map(function (k) { return '<span class="chip">' + esc(k) + ' ' + it.breakdown[k].toFixed(3) + '</span>'; }).join("");
+        return '<tr><td>' + esc(r.run_id) + '</td><td>' + it.iteration + '</td><td class="n">' + (it.total_H == null ? "—" : it.total_H.toFixed(4)) +
+          '</td><td class="w">' + dims + '</td></tr>'; }).join(""); }).join("");
+    return '<h2>ECAT 熵曲线</h2><div class="card"><div class="scroll"><table><tr><th>run</th><th>轮次</th><th class="n">total_H</th><th>非零维度</th></tr>' + rows + '</table></div></div>';
+  }
+
+  function findings(c) {
+    var order = { error: 0, warn: 1, info: 2 };
+    var rows = c.findings.slice().sort(function (a, b) { return (order[a.level] || 9) - (order[b.level] || 9); }).map(function (f) {
+      return '<tr><td class="' + (f.level === "error" ? "err" : f.level === "warn" ? "warn" : "sub") + '">' + esc(f.level) + '</td><td><code>' +
+        esc(String(f.session_id).slice(0, 17)) + '</code></td><td>' + esc(f.role) + '</td><td>' + esc(f.rule) + '</td><td class="w">' + esc(f.detail) + '</td></tr>'; }).join("");
+    return '<h2>审计发现(' + c.findings.length + ')</h2><div class="card"><div class="scroll"><table><tr><th>级别</th><th>会话</th><th>角色</th><th>规则</th><th>内容</th></tr>' +
+      (rows || '<tr><td colspan="5" class="sub">无</td></tr>') + '</table></div></div>';
+  }
+
+  function render(c) {
+    var t = c.totals, span = c.started_at && c.ended_at ? Date.parse(c.ended_at) - Date.parse(c.started_at) : 0;
+    var kpis = [[dur(span), "全程墙钟"], [t.sessions, "会话"], [t.threads + " + " + t.agents, "运行时会话 + 子代理"],
+      [num(t.requests), "模型请求"], [num(t.output_tokens), "输出 token"], [num(t.cache_read_tokens), "缓存读 token"],
+      [t.tool_failed + " / " + t.tool_calls, "工具失败 / 总数"]];
+    document.title = (c.project || "迁移") + " · 会话总览";
+    document.getElementById("root").innerHTML =
+      '<h1>' + esc(c.project || "迁移") + ' · 会话总览</h1><div class="sub">锚点会话 <code>' + esc(c.anchor) + '</code>' +
+      (c.run_id ? ' · run_id <code>' + esc(c.run_id) + '</code>' : '') + (c.hmigbot_session_id ? ' · hmigbot_session_id <code>' + esc(c.hmigbot_session_id) + '</code>' : '') +
+      '<br>' + esc(c.android || "") + ' → ' + esc(c.harmony) + (t.threads_missing ? ' · <span class="warn">' + t.threads_missing + ' 个运行时会话的 transcript 已不在本机</span>' : '') + '</div>' +
+      '<div class="kpis">' + kpis.map(function (k) { return '<div class="kpi"><b>' + esc(k[0]) + '</b><span>' + k[1] + '</span></div>'; }).join("") + '</div>' +
+      '<h2>时间线</h2>' + lane(c) + '<h2>逐个会话</h2>' + c.sessions.map(session).join("") + entropy(c) + findings(c);
+  }
+
+  fetch("/api/insight1/chain-data/" + encodeURIComponent(IDENT)).then(function (r) {
+    return r.json().then(function (body) { if (!r.ok) throw new Error(body.error || ("HTTP " + r.status)); return body; });
+  }).then(render).catch(function (e) { document.getElementById("state").textContent = "读不出这次迁移的会话总览:" + e.message; });
+})();
+</script>

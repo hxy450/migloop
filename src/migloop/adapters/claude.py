@@ -83,9 +83,15 @@ PIPELINE_SKILLS = ["a2h-run", "a2h-run-zh", "a2h-init-zh", "a2h-build-zh", "a2h-
                    "a2h-execute", "a2h-verify", "a2h-retrospect",
                    "arkts-visual-verify"]
 
+#: 管线最后一个阶段之后的续轮(loop 续跑的门禁回合等):harness 不给它们盖任何管线
+#: 归属戳,不能算进最后一个阶段的耗时与统计。
+TRAILING_ROUNDS_STAGE = "after-pipeline"
+TRAILING_ROUNDS_LABEL = "收尾后续轮"
+
 STAGE_LABELS = {
     "a2h-build": "Build",
     "setup": "Setup",
+    TRAILING_ROUNDS_STAGE: TRAILING_ROUNDS_LABEL,
     "a2h-run": "Run",
     "a2h-run-zh": "Run",
     "a2h-init-zh": "Init",
@@ -1522,6 +1528,15 @@ def load_workflow_runs(
     return runs, byagent
 
 
+#: 算提示词的 user 记录来源:终端里敲的(typed)与经 SDK 发的(sdk)。HMBot 的会话
+#: ——主迁移、托管 reviewer、ECAT、能力插件——全经 SDK 起,只认 typed 时它们的提示词
+#: 一条都不进报告(hmigbot-plus 72c56b60)。工具结果 / 系统注入等其它 user 记录不带这两种来源。
+_PROMPT_SOURCES = frozenset({"typed", "sdk"})
+#: 提示词正文上限(codex 适配器同用):报告抽屉标题是「全文」,ECAT / reviewer
+#: 提示词动辄数千字;只防病态超长把 trace 撑爆,悬浮提示由页面另行截短。
+PROMPT_TEXT_MAX = 20000
+
+
 def extract(path: str) -> dict[str, Any]:
     records = load_main_session(path)
     audit_capture = ClaudeCalls(path)
@@ -1617,11 +1632,11 @@ def extract(path: str) -> dict[str, Any]:
             markers.append({"idx": i, "ts": ts, "kind": "compact"})
 
         if rtype == "user":
-            if rec.get("promptSource") == "typed":
+            if rec.get("promptSource") in _PROMPT_SOURCES:
                 content = rec.get("message", {}).get("content")
                 if isinstance(content, str) and content.strip():
                     prompts.append({"idx": i, "ts": ts, "wait_ms": 0,
-                                    "text": " ".join(content.split())[:400]})
+                                    "text": " ".join(content.split())[:PROMPT_TEXT_MAX]})
             # tool_result 回填耗时与状态
             msg = rec.get("message")
             if isinstance(msg, dict) and isinstance(msg.get("content"), list):
@@ -1776,6 +1791,16 @@ def extract(path: str) -> dict[str, Any]:
             key = "wf:" + wf_runs[rid]["name"]
             wf_stage_of_run[rid] = key
             pipe_boundaries.append((idx, key))
+    # 末段收口:最后一个管线阶段之后,从某条新提示词起到会话结束都没有管线归属戳 ——
+    # 那是管线走完后的续轮(loop 门禁回合等),单独成段,不拖长最后一个阶段(hmigbot-plus 72c56b60)。
+    # 只看末尾:管线中途没盖戳的续跑轮仍归所在阶段。只扫内存里已读好的记录。
+    skill_bounds = {i for i, key in pipe_boundaries if key in PIPELINE_SKILLS}
+    if skill_bounds:
+        last_attr = max(i for i, rec in enumerate(records)
+                        if i in skill_bounds or norm_skill(rec.get("attributionSkill")) in PIPELINE_SKILLS)
+        trailing = next((pr["idx"] for pr in prompts if pr["idx"] > last_attr), None)
+        if trailing is not None:
+            pipe_boundaries.append((trailing, TRAILING_ROUNDS_STAGE))
     if not pipe_boundaries:
         pipe_boundaries = _task_list_boundaries(tools)
     pipe_boundaries.sort()
@@ -1801,7 +1826,7 @@ def extract(path: str) -> dict[str, Any]:
         ts_list: list[str] = [str(r["timestamp"]) for r in seg_records if r.get("timestamp")]
         stages.append({
             "id": f"s{b}",
-            "signal": ("unassigned" if stage_key == "setup"
+            "signal": ("unassigned" if stage_key in ("setup", TRAILING_ROUNDS_STAGE)
                        else "task-list" if stage_key.startswith("task:") else "native-stage-event"),
             "stage": stage_key,
             "label": (stage_key.split(":", 1)[1] if stage_key.startswith(("wf:", "task:"))

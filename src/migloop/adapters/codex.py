@@ -720,7 +720,7 @@ def _scan_record(s: dict[str, Any], idx: int, record: dict[str, Any]) -> None:
             text = payload.get("message") or ""
             if text.strip():
                 s["prompts"].append({"idx": idx, "ts": ts, "wait_ms": 0,
-                                     "text": " ".join(text.split())[:400]})
+                                     "text": " ".join(text.split())[:common.PROMPT_TEXT_MAX]})
         elif ptype == "agent_message" and payload.get("message"):
             s["last_message"] = str(payload.get("message"))[:300]
         elif ptype == "task_complete":
