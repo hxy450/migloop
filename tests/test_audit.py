@@ -294,29 +294,6 @@ def test_findings_carry_evidence_anchor() -> None:
     assert by["skill-fail"]["evidence"][0]["outcome"] == "failed"
 
 
-def test_fix_chains_card_wraps_ledger_chains() -> None:
-    """返修追溯卡只包账本算好的链:文件、生成方点名、跨会话计数、锚到生成阶段;
-    不传链(摘要端点 / 进行中的会话)不出卡,也不再从血缘层另算。"""
-    chains = [{
-        "file": "A.ets", "file_abs": "/p/e/A.ets",
-        "generator": {"id": "g1", "desc": "conv A", "stage": "a2h-execute"},
-        "fixer": {"id": "f1", "desc": "vf", "stage": "arkts-visual-verify"},
-        "fixers_all": [{"id": "f1", "desc": "vf"}], "lines": {"touched": 3},
-        "gen_session": "aaaaaaaa",
-    }]
-    fs = [f for f in build_audit(_trace(), fix_chains=chains)["findings"]
-          if f["rule"] == "verify-fix-traceback"]
-    assert len(fs) == 1
-    f = fs[0]
-    assert f["level"] == "info" and f["paths"] == ["/p/e/A.ets"]
-    assert "conv A" in f["detail"] and "1 条跨会话" in f["detail"]
-    assert f["anchor"] == {"stage": "a2h-execute"}
-    assert f["chain"][0]["fixer"]["id"] == "f1" and f["chain"][0]["gen_session"] == "aaaaaaaa"
-    assert not [x for x in build_audit(_trace())["findings"] if x["rule"] == "verify-fix-traceback"]
-    assert not [x for x in build_audit(_trace(), fix_chains=[])["findings"]
-                if x["rule"] == "verify-fix-traceback"]
-
-
 # ---------- 主会话快照 ----------
 
 
@@ -361,27 +338,3 @@ def test_spec_no_analyzer_defers_to_analyzers_elsewhere_in_pool() -> None:
     for pool in ([], [{"agent_id": "a", "type": "analyzer", "stage": "a2h-spec"}]):
         assert "spec-no-analyzer" not in {f["rule"] for f in build_audit(t, pool_agents=pool)["findings"]}
 
-
-def test_fixer_policy_counts_post_pipeline_stages() -> None:
-    """DiceRoller 0903 导出:管线之后还有 a2h-build(编译修复循环)与 ecat-refine(ECAT 对抗式 visual verify),
-    都在 execute 之后改鸿蒙码 —— 按「execute 之后全是修复」的正式口径必须算修复方,否则 ECAT 修的全成生成侧。"""
-    from migloop.audit import agent_is_fixer
-    assert agent_is_fixer({"stage": "a2h-build"})
-    assert agent_is_fixer({"stage": "ecat-refine"})
-    assert agent_is_fixer({"stage": "arkts-visual-verify"})
-    assert not agent_is_fixer({"stage": "a2h-execute"})
-    assert not agent_is_fixer({"stage": "a2h-plan"})
-    assert not agent_is_fixer({"stage": None}) and not agent_is_fixer({"stage": "session"})
-
-
-def test_fix_chain_card_tags_created_and_template_roots() -> None:
-    """返修追溯卡:三种链根三种标签 —— 生成方名 / (修复期新建) / (模板未改),并分别计数。"""
-    from migloop.audit import check_fix_chains
-
-    def chain(file: str, kind: str) -> dict[str, Any]:
-        return {"file": file, "file_abs": "/p/" + file, "kind": kind, "fixer": {"id": "f"},
-                "generator": {"id": None if kind != "rework" else "g", "desc": "conv" if kind == "rework" else "x",
-                              "stage": "a2h-execute" if kind == "rework" else None}}
-    f = check_fix_chains([chain("A.ets", "rework"), chain("New.ets", "created"), chain("module.json5", "template")])[0]
-    assert "A.ets(生成:conv)" in f["detail"] and "New.ets(修复期新建)" in f["detail"] and "module.json5(模板未改)" in f["detail"]
-    assert "1 个是生成期没有、修复期补建的" in f["detail"] and "1 个是模板/外部原样留到修复期才改的" in f["detail"]

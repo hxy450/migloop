@@ -1,4 +1,6 @@
-"""冻结实验只消费临时池;所有路径和转录均由测试构造,不扫描真实用户数据。"""
+"""冻结实验只消费临时池;所有路径和转录均由测试构造,不扫描真实用户数据。
+
+会话定位与提取层的部分;冻结池里建账、收集器、stage-marks 的用例随返修链路移到 a2h-memory 的 fixchain/。"""
 from __future__ import annotations
 
 import json
@@ -9,14 +11,13 @@ from typing import Any
 
 import pytest
 
-from migloop import atoms_collect, service
+from migloop import service
 
 
 @pytest.fixture(autouse=True)
 def isolated(monkeypatch: Any) -> None:
     monkeypatch.delenv("MIGLOOP_FROZEN_POOL", raising=False)
-    for name in ("_TRACE_CACHE", "_LEDGER_CACHE", "_FIXCHAIN_CACHE"):
-        monkeypatch.setattr(service, name, {})
+    monkeypatch.setattr(service, "_TRACE_CACHE", {})
 
 
 def root(pool: Path, name: str = "abcdef12-main", ts: str = "2026-01-01T00:10:00Z", cwd: str = "/frozen/project") -> Path:
@@ -62,21 +63,6 @@ def test_frozen_resolves_only_root_paths_and_unique_prefixes(tmp_path: Path, mon
         service.locate_session("abcdef12")
 
 
-def test_frozen_rejects_outside_paths_sibling_prefixes_and_subagent_roots(tmp_path: Path, monkeypatch: Any) -> None:
-    pool = tmp_path / "pool"
-    first = root(pool)
-    outside = root(tmp_path / "pool-other")
-    child = root(pool / first.stem / "subagents", "agent-child")
-    monkeypatch.setenv("MIGLOOP_FROZEN_POOL", str(pool))
-    monkeypatch.setattr(service.adapters, "discover", fail_discovery)
-    for value in (str(outside), "../pool-other/" + outside.name, str(child),
-                  first.stem + "/subagents/" + child.name, str(pool)):
-        with pytest.raises(service.SessionLookupError):
-            service.locate_session(value)
-    with pytest.raises(service.SessionLookupError, match="越出"):
-        service.session_ledger(str(outside))
-
-
 def test_frozen_root_rejects_symlink_resolution_outside_pool(tmp_path: Path, monkeypatch: Any) -> None:
     pool = tmp_path / "pool"
     link = root(pool, "link")
@@ -85,21 +71,6 @@ def test_frozen_root_rejects_symlink_resolution_outside_pool(tmp_path: Path, mon
     redirect_realpath(monkeypatch, link, outside)
     with pytest.raises(service.SessionLookupError, match="越出"):
         service.locate_session("link.jsonl")
-
-
-def test_frozen_rejects_escaped_subagent_before_collect_or_extract(tmp_path: Path, monkeypatch: Any) -> None:
-    pool = tmp_path / "pool"
-    main = root(pool)
-    child = root(pool / main.stem / "subagents", "agent-child")
-    outside = root(tmp_path / "outside", "target")
-    monkeypatch.setenv("MIGLOOP_FROZEN_POOL", str(pool))
-    redirect_realpath(monkeypatch, child, outside)
-    monkeypatch.setattr(service.atoms_collect, "collect_cc_pool", fail_discovery)
-    monkeypatch.setattr(service.adapters, "detect", fail_discovery)
-    for operation in (lambda: service._collect("claude", [str(main)]),
-                      lambda: service.extract_trace(str(main)), lambda: service.pool_key([str(main)])):
-        with pytest.raises(service.SessionLookupError, match="越出"):
-            operation()
 
 
 def test_frozen_prior_and_later_roots_never_search_live_cwd(tmp_path: Path, monkeypatch: Any) -> None:
@@ -111,62 +82,10 @@ def test_frozen_prior_and_later_roots_never_search_live_cwd(tmp_path: Path, monk
     root(tmp_path / "live", "external", "2026-01-01T00:09:00Z")
     monkeypatch.setenv("MIGLOOP_FROZEN_POOL", str(pool))
     for name in ("find_prior_claude_roots", "find_later_claude_roots", "find_prior_codex_roots", "find_later_codex_roots"):
-        monkeypatch.setattr(service.crosschain, name, fail_discovery)
+        monkeypatch.setattr(service.project_sessions, name, fail_discovery)
     for fmt in ("claude", "codex"):
         assert service.prior_roots(fmt, str(current), str(tmp_path / "live")) == [str(second), str(first)]
         assert service.later_roots(fmt, str(current), str(tmp_path / "live")) == [str(later)]
-
-
-def test_frozen_stage_marks_only_come_from_the_pool(tmp_path: Path, monkeypatch: Any) -> None:
-    pool = tmp_path / "pool"
-    live = tmp_path / "live"
-    main = root(pool, cwd=str(live))
-    marks = {"marks": [{"stage": "a2h-init", "ts": "2026-01-01T00:00:00Z"},
-                       {"stage": "a2h-execute", "ts": "2026-01-01T01:00:00Z"},
-                       {"stage": "a2h-verify", "ts": "2026-01-01T02:00:00Z"}]}
-    live_marks = live / ".migbot/metrics/run/facts/stage-marks.json"
-    live_marks.parent.mkdir(parents=True)
-    live_marks.write_text(json.dumps(marks), encoding="utf-8")
-    monkeypatch.setenv("MIGLOOP_FROZEN_POOL", str(pool))
-    assert service.run_stage_intervals(str(main), str(live)) == []
-    (pool / "stage-marks.json").write_text(json.dumps(marks), encoding="utf-8")
-    intervals = service.run_stage_intervals(str(main), str(live))
-    assert atoms_collect.fix_boundary(intervals).startswith("2026-01-01T01:00:00")
-    redirect_realpath(monkeypatch, pool / "stage-marks.json", live_marks)
-    with pytest.raises(service.SessionLookupError, match="越出"):
-        service.run_stage_intervals(str(main), str(live))
-
-
-def test_frozen_cc_collection_keeps_all_sources_in_pool(tmp_path: Path, monkeypatch: Any) -> None:
-    pool = tmp_path / "pool"
-    main = root(pool)
-    child = root(pool / main.stem / "subagents", "agent-child")
-    old = root(pool, "older123", "2026-01-01T00:01:00Z")
-    monkeypatch.setenv("MIGLOOP_FROZEN_POOL", str(pool))
-    ledger = service._collect("claude", [str(old), str(main)])
-    assert "agent-child" in ledger.agents and "__main__:older123" in ledger.agents
-    assert {os.path.normpath(p) for p in ledger.tag_paths.values()} == {str(old), str(main), str(child)}
-
-
-def test_frozen_codex_passes_explicit_scan_root_to_extract_and_collect(tmp_path: Path, monkeypatch: Any) -> None:
-    pool = tmp_path / "pool"
-    main = root(pool)
-    seen: list[tuple[str, str | None]] = []
-
-    def extract(path: str, sessions_root: str | None = None) -> dict[str, Any]:
-        seen.append(("extract", sessions_root))
-        return {"meta": {"session_format": "codex"}}
-
-    def collect(path: str, seq: list[int], sessions_root: str | None = None) -> dict[str, Any]:
-        seen.append(("collect", sessions_root))
-        return {}
-
-    monkeypatch.setenv("MIGLOOP_FROZEN_POOL", str(pool))
-    monkeypatch.setattr(service.adapters, "detect", lambda path: SimpleNamespace(FORMAT="codex", extract=extract))
-    monkeypatch.setattr(service.atoms_collect, "collect_codex", collect)
-    service.extract_trace(str(main))
-    service._collect("codex", [str(main)])
-    assert seen == [("extract", str(pool)), ("collect", str(pool))]
 
 
 def test_frozen_trace_cache_does_not_reuse_nonfrozen_product(tmp_path: Path, monkeypatch: Any) -> None:
@@ -192,7 +111,7 @@ def test_nonfrozen_lookup_and_prior_discovery_remain_unchanged(tmp_path: Path, m
     monkeypatch.setattr(service.adapters, "discover", lambda roots: iter([row]))
     assert service.locate_session("test-project") == str(local)
     assert service.locate_session("id-") == str(local)
-    monkeypatch.setattr(service.crosschain, "find_prior_claude_roots", lambda path, limit: ["unchanged"])
+    monkeypatch.setattr(service.project_sessions, "find_prior_claude_roots", lambda path, limit: ["unchanged"])
     assert service.prior_roots("claude", str(local), "/live") == ["unchanged"]
     monkeypatch.setenv("MIGLOOP_FROZEN_POOL", str(tmp_path / "missing"))
     with pytest.raises(service.SessionLookupError, match="目录不存在"):
@@ -220,7 +139,7 @@ def test_frozen_adapter_skips_all_live_source_probes(tmp_path: Path, monkeypatch
 def test_frozen_extract_retains_recorded_reads_without_opening_live_sources(tmp_path: Path, monkeypatch: Any) -> None:
     import builtins
     from migloop.adapters import claude
-    from tests.test_atoms import _call, _read_call, _rec, _write_jsonl
+    from tests.cc_transcript import _call, _read_call, _rec, _write_jsonl
     pool = tmp_path / "pool"
     live = tmp_path / "live"
     source = live / "app/src/main/java/Source.java"
@@ -253,7 +172,7 @@ def test_frozen_extract_retains_recorded_reads_without_opening_live_sources(tmp_
 def test_frozen_subagent_cache_cannot_reuse_live_enriched_entry(tmp_path: Path, monkeypatch: Any) -> None:
     import builtins
     from migloop.adapters import claude
-    from tests.test_atoms import _call, _rec, _write_jsonl
+    from tests.cc_transcript import _call, _rec, _write_jsonl
     pool = tmp_path / "pool"
     live = tmp_path / "live"
     source = live / "app/src/main/java/Source.java"

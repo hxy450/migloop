@@ -7,9 +7,9 @@ content 里的 tool_use / tool_result 与真实对话行同 id 重复。按对�
 否则工具调用、写入、文本会再算一遍(Cashiro 主线 745 次调用被算成 863 次,子代理 11,787 次
 被算成 15,185 次),副本里的 Skill 调用还会重开阶段。
 
-用到它的是会话解析层(adapters、live、chat、ecat、followups)。返修链路那批模块
-(atoms_collect / filestory_collect / raw_events / inquiry 等)按 c72c0db 原样保留、待拆仓,
-这里不改它们。
+用到它的是会话解析层(adapters、live、chat、ecat、followups、project_sessions)。返修链路那批模块
+(atoms_collect / filestory_collect / raw_events / inquiry 等)已按 c72c0db 原样移到 fuxi-ailabs/a2h-memory
+的 fixchain/,它们有自己的转录读取,还没接这个过滤。
 """
 
 from __future__ import annotations

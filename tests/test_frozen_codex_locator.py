@@ -1,16 +1,34 @@
-"""The UUID serialized into a Codex page must resolve within its frozen root pool."""
-from __future__ import annotations
+"""The UUID serialized into a Codex page must resolve within its frozen root pool.
 
-import json
-import threading
+Locator half only; the page / API round-trip case moved with the repair chain to
+fuxi-ailabs/a2h-memory fixchain/.
+"""
+from __future__ import annotations
 
 import pytest
 
-from migloop import service, serve
-from tests.test_atoms import _write_jsonl
+from migloop import service
+from tests.cc_transcript import _write_jsonl
 from tests.test_frozen_pool import fail_discovery
-from tests.test_service_serve import _get
-from tests.test_transcript_tags import IDS, NAMES, roots
+
+# Same rollout names as tests/test_transcript_tags.py (moved to a2h-memory with the ledger tests).
+NAMES = ["rollout-2026-08-16T17-54-23-01a009fe-68e3-7f42-b76b-5e863c555976.jsonl",
+         "rollout-2026-08-21T09-18-20-01a021e5-c150-7b12-a610-d40c07816b98.jsonl"]
+
+IDS = ["01a009fe-68e3-7f42-b76b-5e863c555976", "01a021e5-c150-7b12-a610-d40c07816b98"]
+
+
+def roots(tmp_path, count=2):
+    """Write the root rollouts only; no ledger is built here."""
+    for name, sid in zip(NAMES[:count], IDS):
+        records = [{"timestamp": "2026-08-16T17:54:23Z", "type": "session_meta", "payload": {"id": sid, "cwd": "/proj"}},
+                   {"timestamp": "2026-08-16T17:54:24Z", "type": "response_item", "payload": {
+                       "type": "message", "id": "msg-" + sid, "role": "user", "content": [{"type": "input_text", "text": "instruction"}]}},
+                   {"timestamp": "2026-08-16T17:54:25Z", "type": "response_item", "payload": {
+                       "type": "function_call", "call_id": "call-" + sid, "name": "exec_command", "arguments": '{"cmd":"echo observed"}'}},
+                   {"timestamp": "2026-08-16T17:54:26Z", "type": "response_item", "payload": {
+                       "type": "function_call_output", "call_id": "call-" + sid, "output": "observed"}}]
+        _write_jsonl(str(tmp_path / name), records)
 
 
 @pytest.fixture
@@ -19,8 +37,7 @@ def pool(tmp_path, monkeypatch):
     roots(frozen)
     monkeypatch.setenv("MIGLOOP_FROZEN_POOL", str(frozen))
     monkeypatch.setattr(service.adapters, "discover", fail_discovery)
-    for name in ("_TRACE_CACHE", "_LEDGER_CACHE", "_FIXCHAIN_CACHE"):
-        monkeypatch.setattr(service, name, {})
+    monkeypatch.setattr(service, "_TRACE_CACHE", {})
     return frozen
 
 
@@ -48,26 +65,3 @@ def test_meta_fallback_never_searches_external_or_subagent_files(pool, tmp_path)
     _write_jsonl(str(pool / "rollout-another-name.jsonl"), [record])
     with pytest.raises(service.SessionLookupError, match="歧义"):
         service.locate_session(sid)
-
-
-def test_page_canonical_sid_roundtrips_all_frozen_api_routes(pool, monkeypatch):
-    path = str(pool / NAMES[1])
-    page = service.fixchain_html(path)
-    sid = IDS[1]
-    assert f'"sid":"{sid}"' in page
-    assert sid == IDS[1] and service.locate_session(sid) == path
-    monkeypatch.setattr(service, "probe_payload", lambda resolved, run: {"resolved": resolved, "run": run})
-    server = serve.make_server(sid, "127.0.0.1", 0, {})
-    threading.Thread(target=server.serve_forever, daemon=True).start()
-    base = f"http://127.0.0.1:{server.server_address[1]}"
-    try:
-        status, body, _ = _get(base, "/api/insight1/fixchain/" + sid)
-        assert status == 200 and f'"sid":"{sid}"' in body.decode("utf-8")
-        for prefix in ("/api/insight1/fixchain-data/", "/api/insight1/atom/"):
-            status, body, _ = _get(base, prefix + sid + ("/index" if "atom" in prefix else ""))
-            assert status == 200 and isinstance(json.loads(body), dict)
-        status, body, _ = _get(base, "/api/insight1/probe/" + sid + "?run=fixture")
-        assert status == 200 and json.loads(body) == {"resolved": path, "run": "fixture"}
-    finally:
-        server.shutdown()
-        server.server_close()

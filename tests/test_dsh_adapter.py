@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""DeepSeek Harness (dsh) source: log decoding, report adapter, inquiry index, CLI lookup.
+"""DeepSeek Harness (dsh) source: log decoding, report adapter, CLI lookup.
 
 Fixtures are real dsh 0.2.2-rc.1 recordings (deepseek-flash), scrubbed by the
 recording harness: a migration Session that dispatched one sub-agent and wrote
@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-from migloop import adapters, service
+from migloop import adapters
 from migloop.adapters import dsh, dsh_source
 from migloop.render import build_html, load_template
 
@@ -187,42 +187,3 @@ def test_cli_resolves_bare_uuid_prefix(monkeypatch):
     empty = str(FIX / "no-such-root")
     assert cli.resolve_target("638f5638", empty, empty, empty) == gen(MIGRATION)
     assert cli.resolve_target(str(PROJECT / REPAIR), empty, empty, empty) == gen(REPAIR)
-
-
-# --------------------------------------------------------------------------- inquiry (time evidence tree)
-
-def test_inquiry_index_has_dispatch_and_writes(monkeypatch, tmp_path):
-    from migloop.inquiry.store import Store
-    monkeypatch.setenv("MIGLOOP_CACHE_DIR", str(tmp_path / "cache"))
-    monkeypatch.delenv("MIGLOOP_FROZEN_POOL", raising=False)
-    db = service.inquiry_database(gen(MIGRATION))
-    store = Store(db)
-    try:
-        (d,) = store.rows("SELECT parent, child FROM dispatches")
-        assert (d["parent"], d["child"]) == (MIGRATION, CHILD)
-        writes = {(r["agent"], r["path"].rsplit("/", 1)[-1], r["strength"])
-                  for r in store.rows("SELECT agent, path, strength FROM effects WHERE op='write'")}
-        assert (CHILD, "ui-spec.md", "confirmed") in writes
-        assert (MIGRATION, "Index.ets", "confirmed") in writes
-    finally:
-        store.close()
-    assert service.inquiry_database(gen(MIGRATION)) == db       # unchanged logs reuse the index
-    page = service.fixchain_html(gen(MIGRATION))
-    assert "/api/insight1/inquiry/638f5638" in page and "fixchain-data" not in page
-
-
-def test_inquiry_source_adapter_parts():
-    from migloop.inquiry.source_adapters import adapter_for, identity, parts
-    row = {"format": "dsh-events/1", "session": {"id": "p", "cwd": "C:\\w", "parent": None},
-           "event": {"type": "tool/result", "seq": 5, "time": 1,
-                     "data": {"message": {"toolCallId": "c1", "isError": False,
-                                          "content": [{"type": "text", "text": "started subagent kid-1"}]}}}}
-    assert adapter_for(row).name == "dsh"
-    assert identity(row).agent == "p"
-    ((_, family, role, cid, _, payload, ok),) = list(parts(row))
-    assert (family, role, cid, ok, payload["native_child_id"]) == ("dsh", "result", "c1", 1, "kid-1")
-    call = dict(row, event={"type": "tool/call", "seq": 4, "time": 1,
-                            "data": {"callId": "c1", "name": "write",
-                                     "arguments": json.dumps({"file_path": "a.ets", "content": "x"})}})
-    ((_, _, role, _, tool, payload, _),) = list(parts(call))
-    assert (role, tool, payload["file_path"]) == ("request", "write", "a.ets")
