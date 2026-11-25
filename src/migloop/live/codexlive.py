@@ -100,6 +100,7 @@ class CodexLiveMonitor:
         self.watermark: float = 0.0
         self.events: Deque[Dict[str, Any]] = deque(maxlen=80)
         self._pending_calls: Dict[str, str] = {}
+        self._spawn_calls: set = set()     # 主线 spawn_agent 的 call_id:结果报错就从派发数里减掉
         self.state: Dict[str, Any] = self._fresh_state()
 
         if reset_cache or not self._load_checkpoint():
@@ -281,6 +282,8 @@ class CodexLiveMonitor:
                 m["tool_uses_outer"] = int(m.get("tool_uses_outer") or 0) + 1
                 if m.get("kind") == "root":
                     self.state["tool_calls"] += inner
+                    if payload.get("name") == "spawn_agent":
+                        self._spawn_calls.add(str(payload.get("call_id") or ""))
                     spawns = 1 if payload.get("name") == "spawn_agent" else (
                         len(re.findall(r"\btools\.spawn_agent\s*\(", raw)) if payload.get("name") == "exec" else 0)
                     self.state["agent_dispatches"] = int(self.state.get("agent_dispatches") or 0) + spawns
@@ -296,6 +299,10 @@ class CodexLiveMonitor:
                     failed = False
                 if failed:
                     self.state["tool_failures"] += 1
+                spawn = str(payload.get("call_id") or "") in self._spawn_calls
+                self._spawn_calls.discard(str(payload.get("call_id") or ""))
+                if failed and spawn:   # 派发报错 = 没生成子代理,不算派发
+                    self.state["agent_dispatches"] = max(0, int(self.state.get("agent_dispatches") or 0) - 1)
             return
 
         if rtype == "event_msg":

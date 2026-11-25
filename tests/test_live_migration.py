@@ -150,3 +150,15 @@ def test_agent_count_shows_dispatches_with_transcripts_when_fewer(tmp_path: Path
     assert (thread["agents"], thread["agents_with_transcript"]) == (1, 0)
     assert '"(有转录 "' in load_asset("chain.html")      # 总览:52(有转录 5);相等时只一个数
     assert '"(有转录 "' in load_asset("viewer.html")     # 离线页页头统计
+
+
+def test_failed_dispatch_is_not_counted_live(tmp_path: Path) -> None:
+    harmony, slug, mon = _setup(tmp_path)
+    h = str(harmony)
+    agent = {"type": "tool_use", "id": "t1", "name": "Agent", "input": {"description": "worker", "prompt": "p"}}
+    error = {"type": "tool_result", "tool_use_id": "t1", "is_error": True, "content": "Agent type 'x' not found"}
+    _write(slug / "aaaa.jsonl", [_rec("2026-11-25T10:00:00Z", "assistant", [agent], h, "aaaa"),
+                                 _rec("2026-11-25T10:00:01Z", "user", [error], h, "aaaa")])
+    mon.poll_once()
+    (thread,) = mon.overview()["sessions"][0]["threads"]
+    assert (thread["agents"], thread["agents_with_transcript"]) == (0, 0)   # 报错的派发没生成子代理

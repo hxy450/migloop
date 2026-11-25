@@ -99,3 +99,29 @@ def test_marks_inner_counts_and_stalls(tmp_path: Path) -> None:
     assert (t["tool_calls"], t["tool_calls_outer"]) == (5, 4)
     # 12 分到 40 分回合关闭等人:28 分钟不算活跃
     assert t["active_ms"] == t["duration_ms"] - 28 * 60_000 and t["user_wait_ms"] == 28 * 60_000
+
+
+def test_spawn_matches_transcript_by_returned_agent_path_and_failed_spawn_is_not_counted(tmp_path: Path) -> None:
+    def call(minute: int, cid: str, task: str) -> str:
+        return _rec(minute, "response_item", {"type": "function_call", "name": "spawn_agent", "call_id": cid,
+                                              "arguments": json.dumps({"task_name": task, "agent_type": "worker",
+                                                                       "message": "do " + task})})
+
+    def out(minute: int, cid: str, text: str) -> str:
+        return _rec(minute, "response_item", {"type": "function_call_output", "call_id": cid, "output": text})
+
+    main = _write(tmp_path, [_user(1, "go"), call(2, "c1", "a"), out(2, "c1", '{"task_name":"/root/a"}'),
+                             call(3, "c2", "b"), out(3, "c2", '{"isError": true, "message": "no slot"}')])
+    child = tmp_path / "sessions" / "rollout-child.jsonl"
+    meta = {"id": "child-1", "session_id": TID, "cwd": str(tmp_path / "w"), "timestamp": "2026-10-31T10:02:00.000Z",
+            "source": {"subagent": {"thread_spawn": {"parent_thread_id": TID, "depth": 1, "agent_path": "/root/a",
+                                                     "agent_role": "worker"}}}, "thread_source": "subagent"}
+    child.write_text("\n".join([_rec(2, "session_meta", meta), _rec(2, "turn_context", {"model": "gpt-6.1-sol"}),
+                                _rec(4, "response_item", {"type": "message", "role": "assistant",
+                                                          "content": [{"type": "output_text", "text": "done"}]})]) + "\n",
+                     encoding="utf-8")
+    trace = codex.extract(main, sessions_root=str(tmp_path / "sessions"))
+    assert (trace["totals"]["agent_calls"], trace["totals"]["subagent_transcripts"]) == (1, 1)   # 报错的派发不算
+    (agent,) = trace["agents"]
+    assert (agent["tuid"], agent["dispatch_ts"]) == ("c1", "2026-10-31T10:02:00.000Z")
+    assert agent["prompt_excerpt"] == "do a"                                                       # 派发原话

@@ -767,6 +767,10 @@ def _normalize_one(
                         call.get("call_id"), output, output_ts)
     if name == "spawn_agent":
         entry["agent_type"] = args.get("task_name") or "codex-subagent"
+        entry["agent_task"] = args.get("task_name") or ""
+        spawned = _decode_arguments(output) if output else {}
+        # 返回值里的 task_name 就是子代理的 agent_path(/root/<task>),对转录用它
+        entry["agent_path"] = spawned.get("task_name") if isinstance(spawned.get("task_name"), str) else None
         message = args.get("message") or ""
         entry["agent_desc"] = message[:240] if not message.startswith("gAAAA") else args.get("task_name", "")
         # 派发原话全文段:子代理条目的 prompt_excerpt 用(codex 子代理 rollout
@@ -1136,7 +1140,9 @@ def _child_compute(tree_item: dict[str, Any]) -> dict[str, Any]:
                     for row in _usage_deltas(rollout["token_points"])],
         # 孙代理要靠父的 Agent 工具行找自己的派发点,只留这一小撮
         "agent_tools": [{"name": tool["name"], "brief": tool.get("brief"),
-                         "tuid": tool.get("tuid"), "agent_prompt": tool.get("agent_prompt")}
+                         "tuid": tool.get("tuid"), "agent_prompt": tool.get("agent_prompt"),
+                         "ts": tool.get("ts"), "ok": tool.get("ok"), "agent_task": tool.get("agent_task"),
+                         "agent_path": tool.get("agent_path")}
                         for tool in rollout["tools"] if tool["name"] == "Agent"],
         "prompt_fallback": entry.get("_prompt") or "",
     }
@@ -1581,17 +1587,28 @@ def extract(path: str, sessions_root: str | None = None) -> dict[str, Any]:
     stage_by_agent: dict[Any, dict[str, Any]] = {}
     agents: list[dict[str, Any]] = []
     pending = sorted(children, key=lambda item: (item.get("depth") or 0, item["start_ts"] or ""))
+    used: set[int] = set()
     for child in pending:
         parent_stage = stage_by_agent.get(child.get("parent"))
         stage = parent_stage or _stage_of_time(stages, child.get("start_ts"))
         parent_tools = tools_by_rollout.get(child.get("parent"), [])
         task_name = (child.get("agent_path") or "").rstrip("/").split("/")[-1]
-        spawn = next((tool for tool in parent_tools
-                      if tool["name"] == "Agent" and task_name and task_name in (tool.get("brief") or "")), None)
+        # 派发点:spawn 返回的 agent_path 与子代理的相同;老格式没有返回值时按 task_name,再退到摘要里找。
+        # 同名重派时取子代理开始前最近的那次,每次派发只对一个子代理
+        hits = [tool for tool in parent_tools if tool["name"] == "Agent" and id(tool) not in used and task_name and (
+            (tool.get("agent_path") or "").rstrip("/") == (child.get("agent_path") or "").rstrip("/")
+            or (not tool.get("agent_path") and tool.get("agent_task") == task_name))] or [
+            tool for tool in parent_tools if tool["name"] == "Agent" and id(tool) not in used
+            and task_name and task_name in (tool.get("brief") or "")]
+        before = [tool for tool in hits if (tool.get("ts") or "") <= (child.get("start_ts") or "")]
+        spawn = before[-1] if before else (hits[0] if hits else None)
+        if spawn is not None:
+            used.add(id(spawn))
         # 归约产物不带阶段/派发点(那是主线决定的),命中后在这里回填 —— 同 CC
         agent = child["entry"]
         agent["stage"], agent["seg"] = stage["stage"], stage["id"]
         agent["tuid"] = spawn.get("tuid") if spawn else None
+        agent["dispatch_ts"] = spawn.get("ts") if spawn else None
         agent["_prompt"] = ((spawn or {}).get("agent_prompt") or child["prompt_fallback"])
         agents.append(agent)
         stage_by_agent[child["id"]] = stage
@@ -1644,7 +1661,8 @@ def extract(path: str, sessions_root: str | None = None) -> dict[str, Any]:
         "subagent_tool_calls": sum(agent.get("tool_uses") or 0 for agent in agents),
         "subagent_tool_calls_outer": sum(agent.get("tool_uses_outer") or 0 for agent in agents),
         # 派发次数与实际有转录的子会话分开报(下载包常只带一部分子会话)
-        "agent_calls": root["spawn_calls"], "subagent_transcripts": len(agents),
+        "agent_calls": root["spawn_calls"] - sum(1 for t in root["tools"] if t["name"] == "Agent" and t.get("ok") is False),
+        "subagent_transcripts": len(agents),
         "main_output_tokens": main_out, "subagent_output_tokens": sub_out,
         "aborted_agents": sum(1 for agent in agents if agent.get("aborted")),
         "interrupted_output_tokens": sum(agent["output_tokens"] for agent in agents if agent.get("abort_explicit")),

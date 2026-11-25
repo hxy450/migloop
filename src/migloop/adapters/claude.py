@@ -2721,7 +2721,8 @@ def extract(path: str) -> dict[str, Any]:
         "user_wait_ms": wait_total,
         "active_ms": active_total,
         "tool_calls": len(tools),
-        "agent_calls": sum(1 for t in tools if t["name"] in ("Agent", "Task")),
+        # 派发数只数成功的调用(工具结果报错的没生成子代理,失败次数在工具明细里)
+        "agent_calls": sum(1 for t in tools if t["name"] in ("Agent", "Task") and t.get("ok") is not False),
         "subagent_transcripts": len(agents),
         "main_output_tokens": total_out,
         "subagent_output_tokens": sum(a["output_tokens"] for a in agents),

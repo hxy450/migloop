@@ -753,6 +753,9 @@ class IncrementalSessionMonitor:
         tool = stream["pending_tools"].pop(tid, None)
         if not tool:
             return
+        if stream["kind"] == "main" and tool.get("name") in ("Agent", "Task") and block.get("is_error"):
+            # 派发报错 = 没生成子代理,不算派发(与离线同口径)
+            self.state["agent_dispatches"] = max(0, int(self.state.get("agent_dispatches") or 0) - 1)
         if stream["kind"] == "main" and tool.get("name") in ("Bash", "PowerShell"):
             stages = stage_signals.mark_calls((tool.get("input") or {}).get("command"))
             if stages and stage_signals.mark_ran(not block.get("is_error", False),

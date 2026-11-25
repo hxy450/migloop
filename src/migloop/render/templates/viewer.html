@@ -1242,6 +1242,7 @@
     var facts = [["\u72b6\u6001", a.status === "completed" ? "\u5b8c\u6210(\u540c\u6b65)" : "\u5f02\u6b65"],
               ["\u65f6\u957f", fmtDur(a.dur_ms)],
               ["Output tokens", fmtTok(a.output_tokens)], ["\u5185\u90e8\u8c03\u7528", a.tool_uses],
+              ["\u6d3e\u53d1\u65f6\u523b", a.dispatch_ts ? hhmm(a.dispatch_ts) : "\u2014"],
               ["\u6a21\u578b", (a.model || "").replace("claude-", "")], ["Agent ID", (a.agent_id || "").slice(0, 12)]];
     if (la.agent_id) {
       facts.push(["\u8bfb spec", (la.n_spec_read || 0) + " \u4e2a \u00b7 " + fmtTok(la.lines_spec || 0) + " \u884c"]);
