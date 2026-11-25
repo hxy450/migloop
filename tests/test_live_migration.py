@@ -132,3 +132,21 @@ def test_final_page_writes_the_overview_before_the_slow_details(tmp_path: Path) 
     assert calls == [1] and stopper.done.is_set()
     stopper.stopping.set()                              # 已在停止(正在写最终页)时不再打断
     assert stopper.on_console_close(lambda: calls.append(2), wait=0) is True and calls == [1]
+
+
+def test_agent_count_shows_dispatches_with_transcripts_when_fewer(tmp_path: Path) -> None:
+    from migloop import chain
+    from migloop.render import load_asset
+    trace = {"meta": {}, "totals": {"agent_calls": 52, "subagent_transcripts": 5}, "stages": [], "tools": [],
+             "agents": [], "prompts": []}
+    row = chain.summarize(trace)
+    assert (row["agents"], row["agents_with_transcript"]) == (52, 5)
+    harmony, slug, mon = _setup(tmp_path)              # live:派发 1 次,还没有子代理转录
+    h = str(harmony)
+    agent = {"type": "tool_use", "id": "t1", "name": "Agent", "input": {"description": "worker", "prompt": "p"}}
+    _write(slug / "aaaa.jsonl", [_rec("2026-11-25T10:00:00Z", "assistant", [agent], h, "aaaa")])
+    mon.poll_once()
+    (thread,) = mon.overview()["sessions"][0]["threads"]
+    assert (thread["agents"], thread["agents_with_transcript"]) == (1, 0)
+    assert '"(有转录 "' in load_asset("chain.html")      # 总览:52(有转录 5);相等时只一个数
+    assert '"(有转录 "' in load_asset("viewer.html")     # 离线页页头统计

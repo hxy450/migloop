@@ -127,7 +127,7 @@
           '</td><td class="n">' + (nd || ne ? nd + ' / ' + ne : '') + '</td></tr>'; }).join("");
         return (rows ? '<div class="scroll"><table><tr><th>阶段</th><th>时段</th><th class="n">耗时</th><th class="n">工具</th><th class="n">子代理</th><th class="n">评审 / 评估</th></tr>' + rows + '</table></div>' : '') +
           '<div class="sub">' + esc(t.model || "") + ' · 请求 ' + num(t.requests) + ' · 输出 ' + num(t.output_tokens) + ' · 工具 ' + (t.tool_calls || 0) +
-          '(失败 ' + (t.tool_failed || 0) + ') · 子代理 ' + (t.agents || 0) + '(异常 ' + (t.aborted_agents || 0) + ') · ' + report(t) + '</div>' +
+          '(失败 ' + (t.tool_failed || 0) + ') · 子代理 ' + agentText(t) + '(异常 ' + (t.aborted_agents || 0) + ') · ' + report(t) + '</div>' +
           prompts(t); }).join("");
     }
     return '<div class="card">' + head + notes + body + '</div>';
@@ -155,9 +155,15 @@
       (rows || '<tr><td colspan="5" class="sub">无</td></tr>') + '</table></div></div>';
   }
 
+  // 子代理按派发计;有转录的少于派发数时写成「52(有转录 5)」
+  function agentText(t) {
+    var n = t.agents || 0, w = t.agents_with_transcript;
+    return w != null && w < n ? n + "(有转录 " + w + ")" : String(n);
+  }
+
   function render(c) {
     var t = c.totals, span = c.started_at && c.ended_at ? Date.parse(c.ended_at) - Date.parse(c.started_at) : 0;
-    var kpis = [[dur(span), "全程墙钟"], [t.sessions, "会话"], [t.threads + " + " + t.agents, "运行时会话 + 子代理"],
+    var kpis = [[dur(span), "全程墙钟"], [t.sessions, "会话"], [t.threads + " + " + agentText(t), "运行时会话 + 子代理"],
       [num(t.requests), "模型请求"], [num(t.output_tokens), "输出 token"], [num(t.cache_read_tokens), "缓存读 token"],
       [t.tool_failed + " / " + t.tool_calls, "工具失败 / 总数"]];
     document.title = (c.project || "迁移") + " · 会话总览";

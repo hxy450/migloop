@@ -392,7 +392,7 @@ class MigrationMonitor:
         flat = [t for s in sessions for t in s["threads"]]
         found = [t for t in flat if t.get("transcript")]
         summed = ("requests", "input_tokens", "cache_read_tokens", "output_tokens", "tool_calls",
-                  "tool_failed", "agents", "aborted_agents")
+                  "tool_failed", "agents", "agents_with_transcript", "aborted_agents")
         totals: Dict[str, Any] = {k: sum(t.get(k) or 0 for t in found) for k in summed}
         totals.update(sessions=len(sessions), threads=len(flat), threads_missing=0,
                       unsupported=sum(1 for t in flat if t.get("unsupported")))
@@ -480,7 +480,9 @@ def _thread(slot: Dict[str, Any], href: Optional[str]) -> Dict[str, Any]:
         requests=snap.get("requests") or 0, input_tokens=snap.get("input_tokens") or 0,
         cache_read_tokens=snap.get("cache_read_tokens") or 0, output_tokens=snap.get("output_tokens") or 0,
         tool_calls=snap.get("tool_calls") or 0, tool_failed=snap.get("tool_failures") or 0,
-        agents=len(agents), aborted_agents=sum(1 for a in agents if a.get("status") in ("interrupted", "failed")),
+        # 子代理按派发计(与离线页同口径),有转录的另报
+        agents=max(int(snap.get("agent_dispatches") or 0), len(agents)), agents_with_transcript=len(agents),
+        aborted_agents=sum(1 for a in agents if a.get("status") in ("interrupted", "failed")),
         stages=stages, prompts=[{"ts": p.get("ts"), "text": p.get("text") or ""} for p in snap.get("prompt_log") or []],
         status=snap.get("status"), current_stage=_label(snap.get("current_stage")),
         records=snap.get("records") or 0, version=snap.get("version") or 0)

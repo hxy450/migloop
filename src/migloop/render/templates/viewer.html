@@ -751,7 +751,10 @@
     { k: "总时长", v: (T.duration_ms / 3600000).toFixed(1), u: "h", d: T.active_ms != null ? ("活跃 " + fmtDur(T.active_ms) + " · 等待用户 " + fmtDur(T.user_wait_ms) + (T.duration_ms - T.active_ms - T.user_wait_ms > 60000 ? " · 挂起 " + fmtDur(T.duration_ms - T.active_ms - T.user_wait_ms) : "")) : "含用户离开的挂起等待" },
     { k: "阶段", v: String(stages.filter(function (s) { return s.stage !== "setup"; }).length), d: stages.filter(function (s) { return s.stage !== "setup"; }).map(function (s) { return s.label; }).join(" → ") },
     { k: "工具调用", v: String(T.tool_calls), u: "次", d: failCount ? ('<span class="bad">' + failCount + " 次失败</span>") : "全部成功", html: true },
-    { k: "子代理", v: String(T.subagent_transcripts), u: "个", d: "独立 transcript 已回链" },
+    // 子代理按派发计,有转录的另写(下载包常只带一部分子会话);没有派发记录的老格式按转录数
+    { k: "子代理", v: String(Math.max(T.agent_calls || 0, T.subagent_transcripts || 0)),
+      u: (T.agent_calls || 0) > (T.subagent_transcripts || 0) ? "(有转录 " + T.subagent_transcripts + ")" : "个",
+      d: (T.agent_calls || 0) > (T.subagent_transcripts || 0) ? "按派发计,其余子会话的转录不在这份记录里" : "独立 transcript 已回链" },
     { k: "Output Tokens", v: fmtTok(T.main_output_tokens + T.subagent_output_tokens), d: "主线 " + fmtTok(T.main_output_tokens) + " + 子代理 " + fmtTok(T.subagent_output_tokens),
       split: [{ v: T.main_output_tokens, c: "var(--lane-1)" }, { v: T.subagent_output_tokens, c: "var(--lane-2)" }] },
     // 「白烧 Output」指标卡已撤 —— 异常收尾信息移入「02 风险点」的

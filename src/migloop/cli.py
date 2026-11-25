@@ -282,8 +282,10 @@ def main():
 
     print("  session  %s  (%s %s, %s)" %
           (m["session_id"], m.get("session_format", "claude"), m["cc_version"], m["model"]))
-    print("  时长 %.1fh · 工具调用 %d · 子代理 %d · 阶段 %s" % (
-        (t["duration_ms"] or 0) / 3600000, t["tool_calls"], t["subagent_transcripts"],
+    calls, have = int(t.get("agent_calls") or 0), int(t.get("subagent_transcripts") or 0)
+    print("  时长 %.1fh · 工具调用 %d · 子代理 %s · 阶段 %s" % (
+        (t["duration_ms"] or 0) / 3600000, t["tool_calls"],
+        ("%d(有转录 %d)" % (calls, have)) if calls > have else str(have),
         " → ".join(s["label"] for s in trace["stages"] if s["stage"] != "setup")))
     print("已生成 -> %s (%.0f KB)" % (os.path.abspath(out), os.path.getsize(out) / 1024))
 

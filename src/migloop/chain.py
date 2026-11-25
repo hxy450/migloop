@@ -27,7 +27,7 @@ from . import adapters, audit, ecat, followups, project_sessions
 from .adapters.claude import TRAILING_ROUNDS_LABEL
 
 _SUMMED = ("requests", "input_tokens", "cache_read_tokens", "output_tokens",
-           "tool_calls", "tool_failed", "agents", "aborted_agents")
+           "tool_calls", "tool_failed", "agents", "agents_with_transcript", "aborted_agents")
 
 
 def identity(harmony: str) -> dict[str, str]:
@@ -85,7 +85,9 @@ def summarize(trace: dict[str, Any]) -> dict[str, Any]:
         "cache_read_tokens": bill["cread"], "output_tokens": bill["out"],
         "tool_calls": totals.get("tool_calls") or 0,
         "tool_failed": sum(1 for t in tools if t.get("ok") is False),
-        "agents": totals.get("agent_calls") or 0, "aborted_agents": totals.get("aborted_agents") or 0,
+        "agents": max(totals.get("agent_calls") or 0, totals.get("subagent_transcripts") or 0),
+        "agents_with_transcript": totals.get("subagent_transcripts") or 0,
+        "aborted_agents": totals.get("aborted_agents") or 0,
         "stages": [{"label": s.get("label"), "start_ts": s.get("start_ts"), "end_ts": s.get("end_ts"),
                     "duration_ms": s.get("duration_ms") or 0,
                     "tool_calls": sum((s.get("tool_counts") or {}).values()),
