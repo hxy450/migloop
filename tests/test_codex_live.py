@@ -22,7 +22,8 @@ def _rec(rtype: str, payload: dict[str, Any], ts: str = "2026-08-18T10:00:00Z") 
 
 def _meta(tid: str, session: str, parent: str | None = None, nick: str | None = None) -> str:
     p: dict[str, Any] = {"id": tid, "session_id": session}
-    if parent:
+    if parent:   # 合成的子会话都按 fork 出来的写(真 fork 的 session_meta 带 forked_from_id)
+        p["forked_from_id"] = parent
         p["source"] = {"subagent": {"thread_spawn": {
             "parent_thread_id": parent, "agent_nickname": nick or tid}}}
     return _rec("session_meta", p)

@@ -90,7 +90,7 @@ class CodexSessionAdapterTest(unittest.TestCase):
             patch_js = "const patch = %s; text(await tools.apply_patch(patch));" % json.dumps(patch)
             child_records = [
                 rec("2026-01-01T00:00:05Z", "session_meta", {
-                    "id": child_id, "session_id": root_id, "cwd": project,
+                    "id": child_id, "session_id": root_id, "cwd": project, "forked_from_id": root_id,
                     "cli_version": "0.test", "thread_source": "subagent",
                     "source": {"subagent": {"thread_spawn": {
                         "parent_thread_id": root_id, "depth": 1,

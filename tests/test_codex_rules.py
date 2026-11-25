@@ -125,3 +125,20 @@ def test_spawn_matches_transcript_by_returned_agent_path_and_failed_spawn_is_not
     (agent,) = trace["agents"]
     assert (agent["tuid"], agent["dispatch_ts"]) == ("c1", "2026-10-31T10:02:00.000Z")
     assert agent["prompt_excerpt"] == "do a"                                                       # 派发原话
+
+
+def test_non_forked_child_keeps_its_model_from_turn_context_before_its_settings(tmp_path: Path) -> None:
+    main = _write(tmp_path, [_user(1, "go")])
+    child = tmp_path / "sessions" / "rollout-child2.jsonl"
+    meta = {"id": "child-2", "session_id": TID, "cwd": str(tmp_path / "w"), "timestamp": "2026-10-31T10:02:00.000Z",
+            "source": {"subagent": {"thread_spawn": {"parent_thread_id": TID, "depth": 1, "agent_path": "/root/x"}}},
+            "thread_source": "subagent"}                     # 没有 forked_from_id:不是 fork 出来的
+    usage = {"input_tokens": 10, "cached_input_tokens": 0, "output_tokens": 3, "reasoning_output_tokens": 0}
+    child.write_text("\n".join([
+        _rec(2, "session_meta", meta), _rec(2, "turn_context", {"model": "gpt-child"}),
+        _rec(2, "event_msg", {"type": "thread_settings_applied", "thread_id": "child-2",
+                              "thread_settings": {"model": "gpt-child"}}),
+        _rec(3, "event_msg", {"type": "token_count", "info": {"total_token_usage": usage, "last_token_usage": usage}}),
+    ]) + "\n", encoding="utf-8")
+    trace = codex.extract(main, sessions_root=str(tmp_path / "sessions"))
+    assert "codex" not in trace["billing"] and trace["billing"]["gpt-child"]["out"] == 3

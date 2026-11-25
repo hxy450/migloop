@@ -41,7 +41,7 @@ from ..adapters import codex as _codex
 from .livestream import TranscriptStream
 
 #: 2:阶段与人工 / 程序下发计数改走 stage_signals.LiveStages,旧 checkpoint 作废重放
-CACHE_SCHEMA = "codex-live/4"
+CACHE_SCHEMA = "codex-live/5"
 
 #: 计一次工具调用的 response_item 类型(apply_patch 走 custom_tool_call)
 _CALL_TYPES = ("function_call", "custom_tool_call")
@@ -252,6 +252,7 @@ class CodexLiveMonitor:
             # 覆盖会让 12 个 agent 的 thread_id 塌成 3 个。
             if not m.get("thread_id"):
                 m["thread_id"] = str(payload.get("id") or "")
+                m["forked"] = bool(payload.get("forked_from_id"))
             if not m.get("session_id"):
                 m["session_id"] = payload.get("session_id") or payload.get("id")
                 if m.get("kind") == "root":
@@ -263,7 +264,7 @@ class CodexLiveMonitor:
             return
         if m.get("kind") == "root":
             self._root_stage(stream, rtype, payload, ts)
-        elif not m.get("activated") and (
+        elif m.get("forked", True) and not m.get("activated") and (
                 _codex._own_settings(rec, str(m.get("thread_id") or ""))
                 or (rtype == "response_item" and ptype == "message" and payload.get("role") == "developer"
                     and _codex._FORK_MARKER in _codex._content_text(payload.get("content")))):

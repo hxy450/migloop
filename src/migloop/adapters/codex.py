@@ -95,6 +95,7 @@ def session_summary(path: str) -> dict[str, Any] | None:
         "cwd": payload.get("cwd"),
         "thread_source": payload.get("thread_source"),
         "source": payload.get("source"),
+        "forked_from_id": payload.get("forked_from_id"),
         "cli_version": payload.get("cli_version"),
     }
 
@@ -830,6 +831,10 @@ def _scan_record(s: dict[str, Any], idx: int, record: dict[str, Any]) -> None:
         s["first"] = s["first"] or payload.get("timestamp")
     elif outer == "turn_context":
         s["model"] = payload.get("model") or s["model"]
+    elif outer == "event_msg" and payload.get("type") == "thread_settings_applied" and not s["model"]:
+        # fork 子会话的 turn_context 可能全在抄来的前缀里:模型名从自己的线程设置取
+        settings = payload.get("thread_settings")
+        s["model"] = (settings.get("model") if isinstance(settings, dict) else None) or s["model"]
     elif outer == "response_item":
         ptype = payload.get("type")
         if ptype in ("function_call", "custom_tool_call"):
@@ -947,8 +952,9 @@ def _full_scan(path: str, tree_item: dict[str, Any] | None = None) -> dict[str, 
             records.append((idx, json.loads(raw)))
         except (json.JSONDecodeError, UnicodeDecodeError):
             continue
-    # fork 子代理:先定 local_start(激活边界)与父的累计用量,再喂状态机
-    if tree_item and tree_item.get("parent"):
+    # fork 子代理:先定 local_start(激活边界)与父的累计用量,再喂状态机。不是 fork 出来的子会话
+    # 没有抄来的前缀(它的 turn_context 写在自己的 thread_settings_applied 之前,跳了会丢模型名)
+    if tree_item and tree_item.get("parent") and (tree_item.get("meta") or {}).get("forked_from_id"):
         # 激活边界:子会话自己线程 id 的 thread_settings_applied;找不到再按 fork 提示的措辞认
         own = str((tree_item.get("meta") or {}).get("id") or "")
         s["local_start"] = next((idx for idx, record in records if own and _own_settings(record, own)), 0)
