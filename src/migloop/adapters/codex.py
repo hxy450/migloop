@@ -261,6 +261,8 @@ _SKILL_PATH = re.compile(r"(?i)([^\s'\"`;|&<>()]*?(?:\\+|/)+skills(?:\\+|/)+([a-
 _SKILL_LIST_ENTRY = re.compile(r"^\s*-\s*([A-Za-z0-9_.:-]+):[^\n]*?\(file:\s*([^)\n]*?SKILL\.md)\)", re.M)
 _SKILL_INJECT = re.compile(r"^\s*<skill>\s*<name>\s*([^<\s]+)\s*</name>")
 _SKILL_MENTION = re.compile(r"^\s*\[\$([A-Za-z0-9_:-]+)\]\(")
+#: _SKILL_PATH 的宽松版(不要求 skills 前有分隔符、不抓整条路径),只用来预筛名字
+_SKILL_NAME = re.compile(r"(?i)skills(?:\\+|/)+([a-z0-9_-]+)(?:\\+|/)+SKILL\.md")
 _SKILL_DIR = re.compile(r"(?i)(?:\\+|/)skills(?:\\+|/)+([a-z0-9_-]+)(?:\\+|/)")
 #: role=user 消息里的注入段(工程说明、环境、skill 正文、旁栏页面、打断回执):不是人的输入
 _INJECTED_HEADS = ("# AGENTS.md instructions", "<environment_context>", "<user_instructions>", "<skill>",
@@ -699,6 +701,8 @@ def _shell_row(
     skills = _skill_names(command)
     if skills:
         entry["skills"] = skills
+    # 血缘层随后要按命令原文解析读写;在这里(可能是子进程)解析好随行带回,调用方放进本进程的记忆
+    entry["_sio"] = shellparse.parse_shell(command)
     return entry
 
 
@@ -777,6 +781,8 @@ def _normalize_tools(rollout: dict[str, Any]) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for call in rollout["calls"]:
         rows.extend(_normalize_one(call, rollout["outputs"], rollout.get("cwd")))
+    for row in rows:
+        row.pop("_sio", None)
     for seq, row in enumerate(sorted(rows, key=lambda x: (x["idx"], x.get("ts") or "", x["name"]))):
         row["seq"] = seq
     return rows
@@ -963,17 +969,28 @@ def _emit(s: dict[str, Any], path: str, tree_item: dict[str, Any] | None = None)
     下游会回填 stage/seg,共享对象会污染缓存。"""
     outputs = s["outputs"]
     cwd = (s["meta"] or {}).get("cwd")
-    all_rows: list[dict[str, Any]] = []
+    todo = []          # 要(重新)规整的调用:新调用,或上次规整时还没有回执
     for call in s["calls"]:
         key = call.get("call_id") or "i%d" % call["idx"]
         out = outputs.get(call.get("call_id"))
         slot = s["norm"].get(key)
-        if slot is not None and (slot["had"] or not out):
-            rows = slot["rows"]
-        else:
-            rows = _normalize_one(call, outputs, cwd)
+        if slot is None or (not slot["had"] and out):
+            todo.append((key, call, out))
+    if todo:
+        # 规整是纯函数(只看这次调用、它的回执与 cwd):调用多、回执大时分给子进程并行
+        from ..parallel import Jobs
+        tasks = [(call, {call.get("call_id"): out} if out else {}, cwd) for _key, call, out in todo]
+        weights = [len(call.get("raw") or "") + len((out or {}).get("text") or "") for _key, call, out in todo]
+        rows_list = Jobs("migloop.adapters.codex:_normalize_one", tasks, weights, _POOL_MIN_CHARS).start().results()
+        for (key, _call, out), rows in zip(todo, rows_list):
+            for row in rows:
+                sio = row.pop("_sio", None)
+                if sio is not None:
+                    shellparse.prime(str((row.get("_inp") or {}).get("command") or ""), sio)
             s["norm"][key] = {"rows": rows, "had": bool(out)}
-        all_rows.extend(rows)
+    all_rows: list[dict[str, Any]] = []
+    for call in s["calls"]:
+        all_rows.extend(s["norm"][call.get("call_id") or "i%d" % call["idx"]]["rows"])
     tools = [dict(r) for r in sorted(all_rows, key=lambda x: (x["idx"], x.get("ts") or "", x["name"]))]
     for seq, row in enumerate(tools):
         row["seq"] = seq
@@ -1024,6 +1041,11 @@ def _parse_rollout(path: str, tree_item: dict[str, Any] | None = None) -> dict[s
     return _emit(_full_scan(path, tree_item), path, tree_item)
 
 
+#: 规整的输入(调用参数 + 回执)总字符数超过这个才分给子进程
+_POOL_MIN_CHARS = 8 * 1024 * 1024
+#: 子代理 rollout 总字节数超过这个才分给子进程
+_POOL_MIN_BYTES = 8 * 1024 * 1024
+
 #: 归约时还不知道自己属于哪个阶段(阶段由主线决定),命中后再回填。
 _NO_STAGE: dict[str, Any] = {"stage": None, "id": None}
 
@@ -1035,17 +1057,58 @@ def _child_product(tree_item: dict[str, Any]) -> dict[str, Any]:
     缓存的不是解析中间态而是成品 —— 原始 calls/outputs 没有任何下游消费者。
     阶段/派发点来自主线,可能每轮不同,和 CC 一样在命中后回填。
     """
-    path = tree_item["path"]
+    hit = _child_cached(tree_item)
+    if hit is not None:
+        return hit
+    return _child_store(tree_item, _child_compute(tree_item))
+
+
+def _child_sig(path: str) -> tuple[int, int] | None:
     try:
         st = os.stat(path)
-        sig: tuple[int, int] | None = (st.st_mtime_ns, st.st_size)
+        return (st.st_mtime_ns, st.st_size)
     except OSError:
-        sig = None
-    if sig is not None:
-        hit = _CHILD_CACHE.get(path)
-        if hit is not None and hit[0] == sig:
-            return copy.deepcopy(hit[1])
+        return None
 
+
+def _child_cached(tree_item: dict[str, Any]) -> dict[str, Any] | None:
+    sig = _child_sig(tree_item["path"])
+    hit = _CHILD_CACHE.get(tree_item["path"]) if sig is not None else None
+    return copy.deepcopy(hit[1]) if hit is not None and hit[0] == sig else None
+
+
+def _child_store(tree_item: dict[str, Any], product: dict[str, Any]) -> dict[str, Any]:
+    path = tree_item["path"]
+    sig = _child_sig(path)
+    if sig is not None:
+        if path not in _CHILD_CACHE and len(_CHILD_CACHE) >= _CHILD_CACHE_MAX:
+            _CHILD_CACHE.pop(next(iter(_CHILD_CACHE)))
+        _CHILD_CACHE[path] = (sig, copy.deepcopy(product))
+    return product
+
+
+def _child_products(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """一批子代理的归约产物(与 items 同序):缓存命中的直接取,其余按 rollout 大小分给子进程。"""
+    from ..parallel import Jobs
+    out: list[Any] = [_child_cached(item) for item in items]
+    miss = [k for k, got in enumerate(out) if got is None]
+    if miss:
+        sizes = []
+        for k in miss:
+            try:
+                sizes.append(os.path.getsize(items[k]["path"]))
+            except OSError:
+                sizes.append(0)
+        computed = Jobs("migloop.adapters.codex:_child_compute", [(items[k],) for k in miss], sizes,
+                        _POOL_MIN_BYTES).start().results()
+        for k, product in zip(miss, computed):
+            out[k] = _child_store(items[k], product)
+    return out
+
+
+def _child_compute(tree_item: dict[str, Any]) -> dict[str, Any]:
+    """一份子代理 rollout 的归约产物(不读写缓存;子进程里跑)。"""
+    path = tree_item["path"]
     rollout = _parse_rollout(path, tree_item)
     entry = _agent_entry(rollout, _NO_STAGE, None)
     for event in entry.get("audit_tools", []):
@@ -1066,10 +1129,6 @@ def _child_product(tree_item: dict[str, Any]) -> dict[str, Any]:
                         for tool in rollout["tools"] if tool["name"] == "Agent"],
         "prompt_fallback": entry.get("_prompt") or "",
     }
-    if sig is not None:
-        if path not in _CHILD_CACHE and len(_CHILD_CACHE) >= _CHILD_CACHE_MAX:
-            _CHILD_CACHE.pop(next(iter(_CHILD_CACHE)))
-        _CHILD_CACHE[path] = (sig, copy.deepcopy(product))
     return product
 
 
@@ -1123,7 +1182,9 @@ def _modified_skill_dirs(root: dict[str, Any]) -> set[str]:
         if tool["name"] in ("Write", "Edit") and tool.get("brief"):
             paths.append(str(tool["brief"]))
         elif tool["name"] in ("Bash", "PowerShell"):
-            paths.extend(shellparse.parse_shell(str((tool.get("_inp") or {}).get("command") or "")).writes)
+            command = str((tool.get("_inp") or {}).get("command") or "")
+            if "skills" in command.lower():     # 写到 skills/<名字>/ 下,命令里必然有这个词
+                paths.extend(shellparse.parse_shell(command).writes)
         for path in paths:
             names.update(m.group(1).lower() for m in _SKILL_DIR.finditer(path))
     return names
@@ -1150,10 +1211,11 @@ def _skill_read_counts(name: str, path: str, listed: dict[str, str], modified: s
     return True
 
 
-def _call_skill_stage(call: dict[str, Any], listed: dict[str, str], modified: set[str],
+def _call_skill_stage(call: dict[str, Any], listed: dict[str, str], modified: Any,
                       cwd: str | None) -> str | None:
     """一次调用是不是调用了某个管线 skill:显式 Skill 调用,或读 SKILL.md(按 _skill_read_counts 判)。
-    一条命令同时读几个阶段 skill 是准备,不算。离线与 codexlive 共用。"""
+    一条命令同时读几个阶段 skill 是准备,不算。离线与 codexlive 共用。``modified`` 可以是
+    集合,也可以是按需求值的无参函数(只有真要判读取时才去算)。"""
     from ..audit_events import segments
     raw = call.get("raw") or ""
     name = str(call.get("name", "")).lower()
@@ -1162,6 +1224,12 @@ def _call_skill_stage(call: dict[str, Any], listed: dict[str, str], modified: se
     args = _decode_arguments(raw)
     if name == "skill":
         return stage_signals.normalize(args.get("skill") or args.get("name"))
+    # 原文里点到的管线 skill 路径;注入清单里一个都没有就不可能算调用,不必分词
+    named = {m.group(1) for m in _SKILL_NAME.finditer(raw) if stage_signals.normalize(m.group(1))}
+    if not named or (listed and not named & set(listed)):
+        return None
+    if callable(modified):
+        modified = modified()
     commands = [c["command"] for c in _extract_shell_calls(raw, cwd)]
     if not commands:
         commands = [args.get("command") or args.get("cmd") or raw]
@@ -1183,7 +1251,12 @@ def _stage_signals(root: dict[str, Any]) -> list[tuple[int, str]]:
     """主线 rollout → 已归一的 skill 信号 [(下标, 阶段)]:用户点 skill(``[$a2h-x](…)`` 与随后注入的
     ``<skill>``)、显式 Skill 调用、读 SKILL.md。"""
     listed = root.get("listed_skills") or {}
-    modified = _modified_skill_dirs(root)
+    memo: list[set[str]] = []
+
+    def modified() -> set[str]:        # 只有真要判 SKILL.md 读取时才扫一遍写盘
+        if not memo:
+            memo.append(_modified_skill_dirs(root))
+        return memo[0]
     out: list[tuple[int, str]] = []
     for idx, name in root.get("skill_marks") or []:
         stage = stage_signals.normalize(name)
@@ -1456,7 +1529,7 @@ def extract(path: str, sessions_root: str | None = None) -> dict[str, Any]:
     root_item = next((item for item in tree if item["meta"].get("id") == root_id), tree[0])
     # 主线每次全解(它的工具明细要进 trace);子代理走归约产物缓存
     root = _parse_rollout(root_item["path"], root_item)
-    children = [_child_product(item) for item in tree if item is not root_item]
+    children = _child_products([item for item in tree if item is not root_item])
     stages = _build_stages(root)
 
     # Root tools and prompts receive deterministic stage ownership by record index.

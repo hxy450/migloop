@@ -306,9 +306,24 @@ def _classify(seg: str, io: ShellIO) -> None:
     # 未知命令(python xxx.py / $VAR 等):实参语义不可知,只有上面的通用重定向作数
 
 
-@cache
+#: parse_shell 的记忆:命令原文 -> ShellIO(调用方只读)
+_PARSED: dict = {}
+
+
 def parse_shell(command: str) -> ShellIO:
     """记忆化:同一段命令在 _shell_analyze / 单文件 cat / stdout 反证里各解析一遍;ShellIO 调用方只读。"""
+    hit = _PARSED.get(command)
+    if hit is None:
+        hit = _PARSED[command] = _parse_shell(command)
+    return hit
+
+
+def prime(command: str, io: ShellIO) -> None:
+    """子进程里解析好的结果放回本进程的记忆(同一段命令结果相同,不必再解析一遍)。"""
+    _PARSED.setdefault(command, io)
+
+
+def _parse_shell(command: str) -> ShellIO:
     io = ShellIO()
     text = (command or "").replace("\\\n", " ")      # 续行拼回一行再分段
     text, bodies = _strip_heredocs(text)

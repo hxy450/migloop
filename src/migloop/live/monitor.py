@@ -37,6 +37,8 @@ from ..cc_records import is_request_replay
 from ..chat import provider as chat_provider
 
 
+#: 源码视野推断积压的结果总字符数超过这个才分给子进程(首轮回放大会话时)
+_VISIBLE_POOL_MIN_CHARS = 4 * 1024 * 1024
 #: 4:不再把 api-request-blob 计入工具/用量;5:阶段与人工输入改走 stage_signals 口径。旧 checkpoint 作废重放
 CACHE_SCHEMA = 5
 
@@ -261,6 +263,9 @@ class IncrementalSessionMonitor:
         self.agent_workflow = {}
         self.intervals = IntervalIndex()
         self.streams = {}
+        # 搜索 / 命令结果的源码视野推断攒到本轮记录读完再算(首轮积压大时分给子进程);
+        # 视野按并集记账,先后无关
+        self._visible_backlog = []
         self.events = collections.deque(maxlen=80)
         self.source_paths = set()
         self.write_files = set()
@@ -545,6 +550,7 @@ class IncrementalSessionMonitor:
         return records, len(fresh), False
 
     def _reset_for_replay(self):
+        self._visible_backlog = []
         self.intervals = IntervalIndex()
         self.streams = {}
         self.events = collections.deque(maxlen=80)
@@ -663,8 +669,20 @@ class IncrementalSessionMonitor:
                 spans = [(1, body.count("\n") + 1)]
             self._add_visible(stream, path, spans)
         elif name in ("Grep", "Bash", "PowerShell"):
-            for event in extract_session._infer_visible_source_lines(
-                    name, inp, body, self.state.get("cwd")):
+            self._visible_backlog.append((stream, (name, inp, body, self.state.get("cwd"))))
+
+    def _flush_visible(self):
+        """本轮攒下的搜索 / 命令结果统一推断源码视野;积压够大时分给子进程并行。"""
+        backlog, self._visible_backlog = self._visible_backlog, []
+        if not backlog:
+            return
+        from ..parallel import Jobs
+        tasks = [args for _stream, args in backlog]
+        weights = [len(args[2] or "") for args in tasks]
+        results = Jobs("migloop.adapters.claude:_infer_visible_source_lines", tasks, weights,
+                       _VISIBLE_POOL_MIN_CHARS).start().results()
+        for (stream, _args), events in zip(backlog, results):
+            for event in events:
                 self._add_visible(stream, event["path"], event["intervals"])
 
     def _handle_tool_use(self, stream, block, ts):
@@ -930,6 +948,7 @@ class IncrementalSessionMonitor:
                     self.state["bytes_read_total"] += nbytes
                 for record in records:
                     self._process_record(stream, record)
+            self._flush_visible()
             self._apply_workflow_statuses()
             if changed:
                 self._ensure_inventory()

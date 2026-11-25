@@ -54,6 +54,10 @@ def capabilities(name, inp):
     command = inp.get("command", inp.get("cmd", ""))
     if not isinstance(command, str):
         return []
+    low = command.lower()
+    # 下面认的可执行名(hvigor* / hdc / adb / bm)一个都不出现,分词也认不出能力 —— 省掉 shlex
+    if not any(word in low for word in ("hvigor", "hdc", "adb", "bm")):
+        return []
     found = set()
     for tokens in segments(command):
         if not tokens:
@@ -90,20 +94,25 @@ def text(value):
     return ""
 
 
-def observation(name, inp, output=None, ok=None, *, call=None, idx=None, ts=None):
-    inp = inp if isinstance(inp, dict) else {}
+def receipt(output=None, ok=None):
+    """回执只决定 outcome 与 build_success(输入哈希、能力在调用时就定了,不必重算)。"""
     body = text(output)
     # Shell transport success is weaker than subcommand success, but an explicit
     # failing exit receipt must never erase a failed-attempt observation.
     if re.search(r"(?:exit code[: =]+|process exited with code\s+)[1-9]\d*\b|BUILD FAILED", body, re.I):
         ok = False
+    return {"outcome": "failed" if ok is False else ("returned" if ok is True else "unknown"),
+            "build_success": bool(re.search(r"\bBUILD SUCCESSFUL\b", body)) and ok is not False}
+
+
+def observation(name, inp, output=None, ok=None, *, call=None, idx=None, ts=None):
+    inp = inp if isinstance(inp, dict) else {}
     return {"call": call, "idx": idx, "ts": ts, "name": name,
             "kind": "skill" if str(name).lower() == "skill" else ("shell" if str(name).lower() in SHELLS else "tool"),
             "target": str(inp.get("skill") or inp.get("name") or "") if str(name).lower() == "skill" else "",
             "input_hash": hashlib.sha256(json.dumps(inp, sort_keys=True, ensure_ascii=False).encode()).hexdigest(),
             "capabilities": capabilities(name, inp),
-            "outcome": "failed" if ok is False else ("returned" if ok is True else "unknown"),
-            "build_success": bool(re.search(r"\bBUILD SUCCESSFUL\b", body)) and ok is not False}
+            **receipt(output, ok)}
 
 
 class ClaudeCalls:
@@ -130,10 +139,8 @@ class ClaudeCalls:
                 self.calls[cid]["line"] = record.get("_source_line", idx + 1)
             elif b.get("type") == "tool_result" and rtype in ("user", None) and b.get("tool_use_id") in self.calls:
                 cid = b["tool_use_id"]
-                old = self.calls[cid]
-                receipt = observation(old["name"], self.inputs.pop(cid, {}), b.get("content"),
-                    not b.get("is_error", False), call=cid, idx=old["idx"], ts=old["ts"])
-                self.calls[cid] = {**old, "outcome": receipt["outcome"], "build_success": receipt["build_success"]}
+                self.inputs.pop(cid, None)
+                self.calls[cid] = {**self.calls[cid], **receipt(b.get("content"), not b.get("is_error", False))}
 
     def finish(self):
         return [{**v, "source": self.source} for v in self.calls.values()]
